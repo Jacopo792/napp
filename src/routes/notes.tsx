@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -27,6 +27,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { FolderRail, ALL, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
 import { AxisBar } from "@/components/AxisBar";
+import { useIsCompact } from "@/lib/media";
 
 const NoteEditor = lazy(() =>
   import("@/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
@@ -43,6 +44,7 @@ type Draft = { title: string; body: string };
 
 function NotesPage() {
   const navigate = useNavigate();
+  const compact = useIsCompact();
 
   const [session, setSession] = useState<AppSession | null>(null);
   const [viewAs, setViewAs] = useState<"u1" | "u2">("u1");
@@ -71,6 +73,7 @@ function NotesPage() {
       return true;
     }
   });
+  const [mobilePane, setMobilePane] = useState<"folders" | "notes">("folders");
 
   const searchRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -117,6 +120,7 @@ function NotesPage() {
         return;
       }
       setSession(s);
+      setViewAs(s.role);
     });
   }, [navigate]);
 
@@ -528,6 +532,7 @@ function NotesPage() {
     setSelectedFolderId(ALL);
     setFilterTagIds([]);
     setQuery("");
+    setMobilePane("folders");
   }
 
   function handleSelectFolder(id: string) {
@@ -535,6 +540,23 @@ function NotesPage() {
     setSelectedId(null);
     setDraft(null);
     lastLoadedRef.current = null;
+    setMobilePane("notes");
+  }
+
+  function handleSelectNote(id: string) {
+    setSelectedId(id);
+  }
+
+  function handleMobileBack() {
+    if (selectedId) {
+      saveNow();
+      setSelectedId(null);
+      setDraft(null);
+      lastLoadedRef.current = null;
+      setMobilePane("notes");
+    } else {
+      setMobilePane("folders");
+    }
   }
 
   function handleLock() {
@@ -571,6 +593,150 @@ function NotesPage() {
       {lastSavedAt && <span className="readout text-ink-4">{formatStamp(lastSavedAt)}</span>}
     </span>
   );
+
+  if (compact) {
+    const showFolders = !selectedId && mobilePane === "folders";
+    const showNotes = !selectedId && mobilePane === "notes";
+
+    return (
+      <div className="flex flex-col overflow-hidden bg-surface" style={{ height: "100dvh" }}>
+        <header
+          className="flex min-h-14 shrink-0 items-center gap-2 border-b border-rule bg-surface px-3"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
+          {!showFolders ? (
+            <button
+              type="button"
+              onClick={handleMobileBack}
+              aria-label={selectedId ? "Back to notes" : "Back to folders"}
+              className="icon-button flex h-11 w-11 shrink-0 items-center justify-center text-ink-2"
+            >
+              <ChevronLeft size={21} strokeWidth={2.2} />
+            </button>
+          ) : (
+            <span className="font-display min-w-0 flex-1 truncate px-1 text-[16px] font-semibold text-ink">
+              Notes
+            </span>
+          )}
+
+          {!showFolders && (
+            <span className="font-display min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">
+              {selectedId ? selected?.note.title || "Untitled" : folderLabel}
+            </span>
+          )}
+
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={handleLock}
+            aria-label="Lock and sign out"
+            className="icon-button flex h-11 w-11 shrink-0 items-center justify-center text-ink-3"
+          >
+            <Lock size={16} strokeWidth={2} />
+          </button>
+        </header>
+
+        <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
+          <main className="min-h-0 flex-1 overflow-hidden bg-paper">
+            {showFolders && (
+              <div className="flex h-full min-h-0 flex-col">
+                {session.role === "u1" && (
+                  <div
+                    role="group"
+                    aria-label="Archive"
+                    className="mx-3 mt-3 flex shrink-0 rounded-xl border border-rule bg-page p-1"
+                  >
+                    {(
+                      [
+                        ["u1", "My notes"],
+                        ["u2", `${partnerName}'s notes`],
+                      ] as const
+                    ).map(([owner, label]) => (
+                      <button
+                        key={owner}
+                        type="button"
+                        onClick={() => handleViewChange(owner)}
+                        aria-pressed={viewAs === owner}
+                        className={`label min-h-10 min-w-0 flex-1 truncate rounded-lg px-3 transition-colors ${
+                          viewAs === owner ? "bg-accent text-on-accent" : "text-ink-3"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="min-h-0 flex-1">
+                  <FolderRail
+                    mobile
+                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
+                    meta={activeMeta}
+                    selectedFolderId={selectedFolderId}
+                    filterTagIds={filterTagIds}
+                    onSelectFolder={handleSelectFolder}
+                    onFilterTagsChange={setFilterTagIds}
+                    onMetaChange={handleMetaChange}
+                  />
+                </div>
+              </div>
+            )}
+
+            {showNotes && (
+              <NoteList
+                mobile
+                entries={visible}
+                meta={activeMeta}
+                selectedId={selectedId}
+                query={query}
+                loading={loading}
+                busy={saving}
+                folderLabel={folderLabel}
+                searchRef={searchRef}
+                onQueryChange={setQuery}
+                onSelect={handleSelectNote}
+                onNew={handleNew}
+                onDelete={handleDelete}
+                onTogglePin={handleTogglePin}
+              />
+            )}
+
+            {selectedId && (
+              <Suspense fallback={<div className="h-full bg-page" />}>
+                <NoteEditor
+                  mobile
+                  entry={selected}
+                  meta={activeMeta}
+                  draft={draft}
+                  canEdit={canEdit}
+                  viewingAsPartner={session.role === "u1" && viewAs === "u2"}
+                  partnerName={partnerName}
+                  titleRef={titleRef}
+                  onChange={handleDraftChange}
+                  onTagsChange={handleTagsChange}
+                  pinned={
+                    activeMeta.notes.find((note) => note.id === selected?.note.id)?.pinned === true
+                  }
+                  onTogglePin={() => selected && handleTogglePin(selected.note.id)}
+                  onNew={handleNew}
+                />
+              </Suspense>
+            )}
+          </main>
+        </DndContext>
+
+        {selectedId ? (
+          <AxisBar compact>{saveReadout}</AxisBar>
+        ) : (
+          <footer
+            className="flex min-h-10 shrink-0 items-center justify-end border-t border-rule bg-paper px-4"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
+            {saveReadout}
+          </footer>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col bg-surface">
@@ -640,6 +806,7 @@ function NotesPage() {
       </header>
 
       <DndContext
+        key="desktop-dnd"
         sensors={sensors}
         onDragStart={(e: DragStartEvent) => setDragId(e.active.id as string)}
         onDragCancel={() => setDragId(null)}
@@ -691,7 +858,7 @@ function NotesPage() {
               meta={activeMeta}
               draft={draft}
               canEdit={canEdit}
-              viewingAsPartner={viewAs === "u2"}
+              viewingAsPartner={session.role === "u1" && viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}
               onChange={handleDraftChange}

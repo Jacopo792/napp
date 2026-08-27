@@ -7,6 +7,7 @@ import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
 import type { NoteEntry } from "@/lib/entries";
 
 interface Props {
+  mobile?: boolean;
   entries: NoteEntry[];
   meta: Meta;
   selectedId: string | null;
@@ -28,6 +29,7 @@ interface Props {
    naming scheme its owner built. Three lines, then it stops. */
 
 function Row({
+  mobile,
   entry,
   index,
   meta,
@@ -36,6 +38,7 @@ function Row({
   onDelete,
   onTogglePin,
 }: {
+  mobile: boolean;
   entry: NoteEntry;
   index: number;
   meta: Meta;
@@ -45,7 +48,10 @@ function Row({
   onTogglePin: () => void;
 }) {
   const isDark = useIsDark();
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: entry.note.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: entry.note.id,
+    disabled: mobile,
+  });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -74,13 +80,15 @@ function Row({
         setNodeRef(el);
         rowRef.current = el;
       }}
-      {...listeners}
-      {...attributes}
+      {...(!mobile ? listeners : {})}
+      {...(!mobile ? attributes : {})}
       role="option"
       aria-selected={selected}
       onClick={onSelect}
       style={{ opacity: isDragging ? 0.4 : 1 }}
-      className={`group relative mx-2 mb-1 flex cursor-pointer touch-none gap-3 rounded-xl border px-3 py-3 transition-colors ${
+      className={`group relative mx-2 mb-1 flex cursor-pointer gap-3 rounded-xl border px-3 py-3 transition-colors ${
+        mobile ? "touch-pan-y" : "touch-none"
+      } ${
         selected
           ? "border-rule bg-page shadow-sm"
           : "border-transparent hover:border-rule-soft hover:bg-page"
@@ -159,7 +167,7 @@ function Row({
         className={`icon-button h-7 w-7 shrink-0 transition-all ${
           pinned
             ? "text-accent opacity-100"
-            : "text-ink-4 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+            : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
         }`}
       >
         <Pin size={13} strokeWidth={pinned ? 2.4 : 1.75} fill={pinned ? "currentColor" : "none"} />
@@ -185,7 +193,7 @@ function Row({
         className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
           confirmDelete
             ? "bg-danger text-white opacity-100"
-            : "text-ink-4 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+            : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
         }`}
       >
         {confirmDelete ? (
@@ -215,6 +223,7 @@ function Skeletons() {
 }
 
 export function NoteList({
+  mobile = false,
   entries,
   meta,
   selectedId,
@@ -232,7 +241,11 @@ export function NoteList({
   const hasQuery = query.trim().length > 0;
 
   return (
-    <section className="soft-pane flex w-[360px] shrink-0 flex-col bg-paper">
+    <section
+      className={`flex shrink-0 flex-col bg-paper ${
+        mobile ? "mobile-note-list h-full w-full border-0" : "soft-pane w-[360px]"
+      }`}
+    >
       <div className="soft-control mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3 shadow-sm">
         <Search size={13} strokeWidth={2} className="shrink-0 text-ink-4" />
         <input
@@ -297,6 +310,7 @@ export function NoteList({
         ) : (
           entries.map((e, i) => (
             <Row
+              mobile={mobile}
               key={e.note.id}
               entry={e}
               index={i}

@@ -44,6 +44,7 @@ const FORMAT_ITEMS: {
 ];
 
 interface Props {
+  mobile?: boolean;
   entry: NoteEntry | null;
   meta: Meta;
   draft: { title: string; body: string } | null;
@@ -64,6 +65,7 @@ interface Props {
    not a full-bleed input bar. */
 
 export function NoteEditor({
+  mobile = false,
   entry,
   meta,
   draft,
@@ -196,7 +198,9 @@ export function NoteEditor({
 
   if (!entry || !draft) {
     return (
-      <section className="soft-pane flex min-w-0 flex-1 flex-col bg-page">
+      <section
+        className={`flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor border-0" : "soft-pane"}`}
+      >
         <div className="flex flex-1 items-center justify-center px-8">
           <div
             className="w-full rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center"
@@ -225,9 +229,12 @@ export function NoteEditor({
   const chars = countChars(draft.body);
 
   return (
-    <section key={entry.note.id} className="soft-pane page-in flex min-w-0 flex-1 flex-col bg-page">
+    <section
+      key={entry.note.id}
+      className={`page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor border-0" : "soft-pane"}`}
+    >
       {/* Frontispiece — set over the measure the body will use. */}
-      <header className="shrink-0 px-10 pt-10 pb-5">
+      <header className={`shrink-0 ${mobile ? "px-5 pt-5 pb-3" : "px-10 pt-10 pb-5"}`}>
         <div className="w-full" style={{ maxWidth: "var(--read-measure)" }}>
           {viewingAsPartner && (
             <p className="label mb-3 text-ink-3">
@@ -497,7 +504,7 @@ export function NoteEditor({
       </header>
 
       {/* The text itself. */}
-      <div className="min-h-0 flex-1 px-10">
+      <div className={`min-h-0 flex-1 ${mobile ? "px-5" : "px-10"}`}>
         <MarkdownEditor
           ref={editorRef}
           value={draft.body}

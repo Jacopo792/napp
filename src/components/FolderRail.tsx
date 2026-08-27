@@ -9,6 +9,7 @@ export const ALL = "__all";
 export const UNFILED = "__unfiled";
 
 interface Props {
+  mobile?: boolean;
   entries: NoteEntry[];
   meta: Meta;
   selectedFolderId: string;
@@ -110,7 +111,7 @@ function FolderRow({
             e.stopPropagation();
             onDelete();
           }}
-          className="icon-button shrink-0 p-1 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+          className="icon-button shrink-0 p-1 text-ink-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
         >
           <Trash2 size={12} strokeWidth={1.75} />
         </button>
@@ -126,6 +127,7 @@ function FolderRow({
 }
 
 export function FolderRail({
+  mobile = false,
   entries,
   meta,
   selectedFolderId,
@@ -203,7 +205,11 @@ export function FolderRail({
   }
 
   return (
-    <aside className="soft-pane flex w-[224px] shrink-0 flex-col bg-paper">
+    <aside
+      className={`flex shrink-0 flex-col bg-paper ${
+        mobile ? "mobile-folder-rail h-full w-full border-0" : "soft-pane w-[224px]"
+      }`}
+    >
       <div className="flex-1 overflow-y-auto">
         <p className="label px-5 pt-5 pb-2 text-ink-4">Folders</p>
 
@@ -305,7 +311,7 @@ export function FolderRail({
                   e.stopPropagation();
                   deleteTag(tag.id);
                 }}
-                className="icon-button shrink-0 p-1 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+                className="icon-button shrink-0 p-1 text-ink-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
               >
                 <X size={11} strokeWidth={2.5} />
               </button>

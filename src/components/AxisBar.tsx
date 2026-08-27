@@ -47,18 +47,21 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
 }
 
 interface Props {
+  compact?: boolean;
   /** The save readout — the one state this bar always shows, open or shut. */
   children: ReactNode;
 }
 
-export function AxisBar({ children }: Props) {
+export function AxisBar({ children, compact = false }: Props) {
   const axes = useAxes();
   const [open, setOpen] = useState(false);
   const preset = matchingPreset(axes);
 
   return (
-    <div className="soft-pane mx-3 mb-3 shrink-0 bg-paper">
-      {open && (
+    <div
+      className={`shrink-0 bg-paper ${compact ? "border-t border-rule" : "soft-pane mx-3 mb-3"}`}
+    >
+      {!compact && open && (
         <div className="flex items-start gap-8 border-b border-rule-soft px-5 pt-4 pb-4">
           <div className="flex min-w-0 flex-[3] items-start gap-6">
             {AXIS_SPECS.map((spec) => (
@@ -97,21 +100,23 @@ export function AxisBar({ children }: Props) {
       )}
 
       <div className="flex h-10 items-center gap-3 px-4">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="label icon-button flex items-center gap-1.5 px-2 py-1 text-ink-3"
-        >
-          Axes
-          <ChevronUp
-            size={11}
-            strokeWidth={2}
-            className={`transition-transform duration-200 ${open ? "" : "rotate-180"}`}
-          />
-        </button>
+        {!compact && (
+          <button
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="label icon-button flex items-center gap-1.5 px-2 py-1 text-ink-3"
+          >
+            Axes
+            <ChevronUp
+              size={11}
+              strokeWidth={2}
+              className={`transition-transform duration-200 ${open ? "" : "rotate-180"}`}
+            />
+          </button>
+        )}
 
         <span className="readout text-ink-3">
-          {preset ? preset.name : "Custom"}
+          {compact ? "Reading" : preset ? preset.name : "Custom"}
           <span className="text-ink-4"> · </span>
           {axes.size}
           <span className="text-ink-4">/</span>

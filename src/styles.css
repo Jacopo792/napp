@@ -118,6 +118,7 @@
     font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
   }
 
   button,
@@ -181,6 +182,44 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--ink-3);
     background-clip: content-box;
+  }
+}
+
+@media (max-width: 767px), (max-height: 520px) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .mobile-folder-rail [role="button"],
+  .mobile-folder-rail > div > button {
+    min-height: 44px;
+  }
+
+  .mobile-note-list [role="option"] {
+    min-height: 72px;
+  }
+
+  .mobile-editor .popover {
+    width: min(18rem, calc(100vw - 2rem));
+    max-height: min(26rem, calc(100dvh - 7rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-editor .cm-scroller {
+    scrollbar-gutter: auto;
+    padding-bottom: max(35vh, calc(env(safe-area-inset-bottom) + 5rem));
+  }
+
+  .soft-pane {
+    box-shadow: none;
   }
 }
 
