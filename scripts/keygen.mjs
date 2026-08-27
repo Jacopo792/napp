@@ -44,7 +44,10 @@ function loadEnv() {
         .map((l) => {
           const eq = l.indexOf("=");
           const k = l.slice(0, eq).trim();
-          const v = l.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
+          const v = l
+            .slice(eq + 1)
+            .trim()
+            .replace(/^["']|["']$/g, "");
           return [k, v];
         }),
     );
@@ -60,16 +63,20 @@ const env = loadEnv();
 const { MASTER_SEED, GITHUB_PAT, GITHUB_REPO } = env;
 
 if (!MASTER_SEED || !GITHUB_PAT || !GITHUB_REPO) {
-  console.error("❌  .env is missing one or more required values: MASTER_SEED, GITHUB_PAT, GITHUB_REPO");
+  console.error(
+    "❌  .env is missing one or more required values: MASTER_SEED, GITHUB_PAT, GITHUB_REPO",
+  );
   process.exit(1);
 }
 
 if (!/^[0-9a-fA-F]{64}$/.test(MASTER_SEED)) {
-  console.error([
-    "❌  MASTER_SEED must be exactly 64 hex characters (32 bytes).",
-    "    Generate one with:",
-    '      node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
-  ].join("\n"));
+  console.error(
+    [
+      "❌  MASTER_SEED must be exactly 64 hex characters (32 bytes).",
+      "    Generate one with:",
+      "      node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    ].join("\n"),
+  );
   process.exit(1);
 }
 

@@ -43,7 +43,11 @@ export async function fetchNoteFiles(repo: string, pat: string): Promise<RemoteF
 }
 
 /** Reads a single file from the data branch via Contents API. Returns null if not found. */
-export async function readFile(repo: string, pat: string, path: string): Promise<RemoteFile | null> {
+export async function readFile(
+  repo: string,
+  pat: string,
+  path: string,
+): Promise<RemoteFile | null> {
   const res = await gh(pat, `/repos/${repo}/contents/${path}?ref=data`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Read failed ${res.status}`);
@@ -89,7 +93,12 @@ export async function writeNoteFile(
   return data.content.sha as string;
 }
 
-export async function deleteNoteFile(repo: string, pat: string, path: string, sha: string): Promise<void> {
+export async function deleteNoteFile(
+  repo: string,
+  pat: string,
+  path: string,
+  sha: string,
+): Promise<void> {
   const res = await gh(pat, `/repos/${repo}/contents/${path}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },

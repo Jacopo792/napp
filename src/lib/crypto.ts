@@ -17,8 +17,7 @@ export type Bundle = U1Bundle | U2Bundle;
 
 function hexToBytes(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++)
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
 }
 
@@ -32,9 +31,16 @@ function toBin(buf: ArrayBuffer): string {
 // ── Key derivation ─────────────────────────────────────────────────────────
 
 async function hkdfAesKey(seedHex: string, userId: "u1" | "u2"): Promise<CryptoKey> {
-  const km = await crypto.subtle.importKey("raw", hexToBytes(seedHex), "HKDF", false, ["deriveKey"]);
+  const km = await crypto.subtle.importKey("raw", hexToBytes(seedHex), "HKDF", false, [
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt: new TextEncoder().encode("napp-v1"), info: new TextEncoder().encode(userId) },
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode("napp-v1"),
+      info: new TextEncoder().encode(userId),
+    },
     km,
     { name: "AES-GCM", length: 256 },
     false,
@@ -43,14 +49,19 @@ async function hkdfAesKey(seedHex: string, userId: "u1" | "u2"): Promise<CryptoK
 }
 
 async function importRawAesKey(keyHex: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", hexToBytes(keyHex), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", hexToBytes(keyHex), { name: "AES-GCM" }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 // ── Bundle parsing ─────────────────────────────────────────────────────────
 
 export function parseBundle(token: string): Bundle {
   let obj: unknown;
-  try { obj = JSON.parse(atob(token.trim())); } catch {
+  try {
+    obj = JSON.parse(atob(token.trim()));
+  } catch {
     throw new Error("Invalid key — paste the full token from keygen");
   }
   if (!obj || typeof obj !== "object" || !("type" in obj) || !("pat" in obj) || !("repo" in obj))
@@ -64,7 +75,10 @@ export function parseBundle(token: string): Bundle {
 
 export async function deriveSessionKeys(bundle: Bundle): Promise<SessionKeys> {
   if (bundle.type === "u1") {
-    const [u1, u2] = await Promise.all([hkdfAesKey(bundle.seed, "u1"), hkdfAesKey(bundle.seed, "u2")]);
+    const [u1, u2] = await Promise.all([
+      hkdfAesKey(bundle.seed, "u1"),
+      hkdfAesKey(bundle.seed, "u2"),
+    ]);
     return { u1, u2 };
   }
   return { u2: await importRawAesKey(bundle.key) };
@@ -87,7 +101,11 @@ async function aesDecrypt<T>(content: string, key: CryptoKey): Promise<T | null>
   if (nl === -1) return null;
   try {
     const bytes = Uint8Array.from(atob(content.slice(nl + 1).trim()), (c) => c.charCodeAt(0));
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(0, 12) }, key, bytes.slice(12));
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: bytes.slice(0, 12) },
+      key,
+      bytes.slice(12),
+    );
     return JSON.parse(new TextDecoder().decode(plain)) as T;
   } catch {
     return null;
@@ -116,7 +134,11 @@ export async function decryptFile(content: string, keys: SessionKeys): Promise<N
 //  Line 1: NAPP:1:meta-<owner>
 //  Line 2: base64(IV[12] || AES-GCM ciphertext)
 
-export async function encryptMeta(meta: Meta, keys: SessionKeys, owner: "u1" | "u2"): Promise<string> {
+export async function encryptMeta(
+  meta: Meta,
+  keys: SessionKeys,
+  owner: "u1" | "u2",
+): Promise<string> {
   const key = owner === "u1" ? keys.u1! : keys.u2;
   return aesEncrypt(key, `NAPP:1:meta-${owner}`, meta);
 }

@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronDown, FolderPlus, Hash, Inbox, Notebook, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
-import type { AppSession } from "@/lib/session";
 import { TAG_COLORS, type Meta, type Folder as FolderType, type Tag as TagType } from "@/lib/types";
 import { useIsDark } from "@/lib/theme";
 import type { NoteEntry } from "@/lib/entries";
@@ -12,23 +11,21 @@ export const UNFILED = "__unfiled";
 interface Props {
   entries: NoteEntry[];
   meta: Meta;
-  session: AppSession;
-  viewAs: "u1" | "u2";
   selectedFolderId: string;
   filterTagIds: string[];
   onSelectFolder: (id: string) => void;
   onFilterTagsChange: (ids: string[]) => void;
   onMetaChange: (meta: Meta) => void;
-  onViewChange: (v: "u1" | "u2") => void;
 }
 
-/** One selectable row that notes can also be dropped onto. */
+/* Quiet navigation for folders and tags. Rounded selection surfaces make the
+   hierarchy scannable without competing with the editor. */
+
 function FolderRow({
   id,
   droppableId,
   label,
   count,
-  icon,
   selected,
   onSelect,
   onRename,
@@ -38,7 +35,6 @@ function FolderRow({
   droppableId: string | null;
   label: string;
   count: number;
-  icon: React.ReactNode;
   selected: boolean;
   onSelect: () => void;
   onRename?: (name: string) => void;
@@ -60,73 +56,71 @@ function FolderRow({
   }
 
   return (
-    <div ref={setNodeRef} className="px-2">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
-        onDoubleClick={() => {
-          if (!onRename) return;
-          setEditing(true);
-          setTimeout(() => inputRef.current?.select(), 0);
-        }}
-        className={`group flex items-center gap-2 h-7 px-2 rounded-md cursor-pointer select-none
-          ${selected ? "bg-accent text-on-accent" : "text-foreground hover:bg-selected"}
-          ${isOver && !selected ? "ring-1 ring-inset ring-accent bg-accent/10" : ""}
-          ${isOver && selected ? "ring-1 ring-inset ring-on-accent/50" : ""}`}
-      >
-        <span className={`shrink-0 ${selected ? "text-on-accent" : "text-accent"}`}>{icon}</span>
+    <div
+      ref={setNodeRef}
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      onDoubleClick={() => {
+        if (!onRename) return;
+        setEditing(true);
+        setTimeout(() => inputRef.current?.select(), 0);
+      }}
+      className={`group mx-2 flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3 transition-colors select-none ${
+        selected ? "bg-accent-wash" : "hover:bg-paper"
+      } ${isOver ? "ring-1 ring-accent ring-inset" : ""}`}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setValue(label);
+              setEditing(false);
+            }
+          }}
+          className="min-w-0 flex-1 rounded-md border border-accent bg-page px-2 py-1 text-[13px] outline-none"
+        />
+      ) : (
+        <span
+          className={`min-w-0 flex-1 truncate text-[13px] ${selected ? "text-accent" : "text-ink-2"}`}
+          style={{ fontVariationSettings: selected ? '"wght" 550' : '"wght" 450' }}
+        >
+          {label}
+        </span>
+      )}
 
-        {editing ? (
-          <input
-            ref={inputRef}
-            value={value}
-            autoFocus
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={commit}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") commit();
-              if (e.key === "Escape") {
-                setValue(label);
-                setEditing(false);
-              }
-            }}
-            className="flex-1 min-w-0 text-[13px] bg-transparent outline-none border-b border-current"
-          />
-        ) : (
-          <span className="flex-1 min-w-0 truncate text-[13px]">{label}</span>
-        )}
+      {onDelete && !editing && (
+        <button
+          title={`Delete “${label}”`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="icon-button shrink-0 p-1 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+        >
+          <Trash2 size={12} strokeWidth={1.75} />
+        </button>
+      )}
 
-        {onDelete && !editing && (
-          <button
-            title={`Delete "${label}"`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className={`shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer
-              ${selected ? "text-on-accent hover:opacity-70" : "text-muted hover:text-danger"}`}
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
-
-        {!editing && (
-          <span
-            className={`tnum shrink-0 text-[11px] ${selected ? "text-on-accent/75" : "text-faint"}`}
-          >
-            {count || ""}
-          </span>
-        )}
-      </div>
+      {!editing && (
+        <span className={`readout shrink-0 ${selected ? "text-accent" : "text-ink-4"}`}>
+          {count || "—"}
+        </span>
+      )}
     </div>
   );
 }
@@ -134,23 +128,17 @@ function FolderRow({
 export function FolderRail({
   entries,
   meta,
-  session,
-  viewAs,
   selectedFolderId,
   filterTagIds,
   onSelectFolder,
   onFilterTagsChange,
   onMetaChange,
-  onViewChange,
 }: Props) {
   const isDark = useIsDark();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-  const [tagsOpen, setTagsOpen] = useState(true);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState<TagType["color"]>("blue");
-
-  const partnerName = meta.partnerName ?? "Lisa";
 
   const counts = useMemo(() => {
     const byFolder = new Map<string, number>();
@@ -215,38 +203,15 @@ export function FolderRail({
   }
 
   return (
-    <aside className="w-[212px] shrink-0 flex flex-col bg-rail border-r border-border">
-      {/* Whose notes */}
-      <div className="h-11 shrink-0 flex items-center px-3 border-b border-border">
-        {session.role === "u1" ? (
-          <div className="relative flex-1 min-w-0">
-            <select
-              value={viewAs}
-              onChange={(e) => onViewChange(e.target.value as "u1" | "u2")}
-              aria-label="Whose notes to show"
-              className="w-full appearance-none bg-transparent outline-none cursor-pointer
-                         text-[13px] font-semibold text-foreground pr-5 truncate"
-            >
-              <option value="u1">My Notes</option>
-              <option value="u2">{partnerName}&apos;s Notes</option>
-            </select>
-            <ChevronDown
-              size={12}
-              className="absolute right-0 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
-            />
-          </div>
-        ) : (
-          <span className="text-[13px] font-semibold text-foreground">My Notes</span>
-        )}
-      </div>
+    <aside className="soft-pane flex w-[224px] shrink-0 flex-col bg-paper">
+      <div className="flex-1 overflow-y-auto">
+        <p className="label px-5 pt-5 pb-2 text-ink-4">Folders</p>
 
-      <div className="flex-1 overflow-y-auto py-2">
         <FolderRow
           id={ALL}
           droppableId={null}
-          label="All Notes"
+          label="All notes"
           count={counts.all}
-          icon={<Notebook size={14} />}
           selected={selectedFolderId === ALL}
           onSelect={() => onSelectFolder(ALL)}
         />
@@ -255,16 +220,9 @@ export function FolderRail({
           droppableId={UNFILED}
           label="Unfiled"
           count={counts.unfiled}
-          icon={<Inbox size={14} />}
           selected={selectedFolderId === UNFILED}
           onSelect={() => onSelectFolder(UNFILED)}
         />
-
-        {meta.folders.length > 0 && (
-          <p className="px-4 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
-            Folders
-          </p>
-        )}
         {meta.folders.map((f) => (
           <FolderRow
             key={f.id}
@@ -272,7 +230,6 @@ export function FolderRail({
             droppableId={f.id}
             label={f.name}
             count={counts.byFolder.get(f.id) ?? 0}
-            icon={<Notebook size={14} />}
             selected={selectedFolderId === f.id}
             onSelect={() => onSelectFolder(f.id)}
             onRename={(name) => renameFolder(f.id, name)}
@@ -280,111 +237,13 @@ export function FolderRail({
           />
         ))}
 
-        {/* Tags */}
-        <div className="mt-4">
-          <button
-            onClick={() => setTagsOpen((v) => !v)}
-            className="flex items-center gap-1 w-full px-4 py-1 text-[10px] font-semibold uppercase
-                       tracking-wider text-faint hover:text-muted transition-colors cursor-pointer"
-          >
-            Tags
-            <ChevronDown
-              size={11}
-              className={`transition-transform duration-150 ${tagsOpen ? "" : "-rotate-90"}`}
-            />
-          </button>
-
-          {tagsOpen && (
-            <div className="px-2 pt-1">
-              {meta.tags.map((tag) => {
-                const palette = TAG_COLORS.find((c) => c.id === tag.color) ?? TAG_COLORS[0];
-                const dot = isDark ? palette.darkFg : palette.fg;
-                const on = filterTagIds.includes(tag.id);
-                return (
-                  <div
-                    key={tag.id}
-                    className={`group flex items-center gap-2 h-7 px-2 rounded-md cursor-pointer
-                      ${on ? "bg-selected" : "hover:bg-selected/60"}`}
-                    onClick={() => toggleTag(tag.id)}
-                  >
-                    <Hash size={12} style={{ color: dot }} className="shrink-0" />
-                    <span
-                      className={`flex-1 min-w-0 truncate text-[13px] ${on ? "text-foreground font-medium" : "text-muted"}`}
-                    >
-                      {tag.name}
-                    </span>
-                    <button
-                      title={`Delete tag "${tag.name}"`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteTag(tag.id);
-                      }}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100
-                                 text-muted hover:text-danger transition-opacity cursor-pointer"
-                    >
-                      <X size={11} />
-                    </button>
-                  </div>
-                );
-              })}
-
-              <div className="flex items-center gap-1.5 h-7 px-2">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{
-                    background: isDark
-                      ? (TAG_COLORS.find((c) => c.id === newTagColor) ?? TAG_COLORS[0]).darkFg
-                      : (TAG_COLORS.find((c) => c.id === newTagColor) ?? TAG_COLORS[0]).fg,
-                  }}
-                />
-                <input
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter") addTag();
-                    if (e.key === "Escape") setNewTagName("");
-                  }}
-                  placeholder="New tag"
-                  className="flex-1 min-w-0 text-[13px] bg-transparent outline-none
-                             text-foreground placeholder:text-faint"
-                />
-              </div>
-
-              {newTagName.trim() && (
-                <div className="flex items-center gap-1 px-2 pb-1 animate-slide-up">
-                  {TAG_COLORS.map((c) => (
-                    <button
-                      key={c.id}
-                      title={c.id}
-                      onClick={() => setNewTagColor(c.id)}
-                      className="w-3.5 h-3.5 rounded-full cursor-pointer border-2 transition-transform hover:scale-110"
-                      style={{
-                        background: isDark ? c.darkFg : c.fg,
-                        borderColor: newTagColor === c.id ? "var(--foreground)" : "transparent",
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* New folder */}
-      <div className="shrink-0 border-t border-border p-2">
         {adding ? (
-          <div className="flex items-center gap-2 h-7 px-2">
-            <Notebook size={14} className="text-accent shrink-0" />
+          <div className="mx-2 flex h-9 items-center gap-2 px-3">
             <input
               value={newName}
               autoFocus
               onChange={(e) => setNewName(e.target.value)}
-              onBlur={() => {
-                if (newName.trim()) addFolder();
-                else setAdding(false);
-              }}
+              onBlur={() => (newName.trim() ? addFolder() : setAdding(false))}
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === "Enter") addFolder();
@@ -394,20 +253,110 @@ export function FolderRail({
                 }
               }}
               placeholder="Folder name"
-              className="flex-1 min-w-0 text-[13px] bg-transparent outline-none
-                         text-foreground placeholder:text-faint"
+              className="min-w-0 flex-1 rounded-lg border border-accent bg-page px-2 py-1 text-[13px] outline-none placeholder:text-ink-4"
             />
           </div>
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="flex items-center gap-2 w-full h-7 px-2 rounded-md text-[13px]
-                       text-muted hover:text-foreground hover:bg-selected transition-colors cursor-pointer"
+            className="label mx-2 flex h-9 w-[calc(100%_-_1rem)] items-center gap-1.5 rounded-lg px-3 text-ink-4 transition-colors hover:bg-page hover:text-accent"
           >
-            <FolderPlus size={14} />
-            New Folder
+            <Plus size={11} strokeWidth={2.5} />
+            New folder
           </button>
         )}
+
+        <p className="label px-5 pt-6 pb-2 text-ink-4">Tags</p>
+
+        {meta.tags.map((tag) => {
+          const palette = TAG_COLORS.find((c) => c.id === tag.color) ?? TAG_COLORS[0];
+          const swatch = isDark ? palette.darkFg : palette.fg;
+          const on = filterTagIds.includes(tag.id);
+          return (
+            <div
+              key={tag.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={on}
+              onClick={() => toggleTag(tag.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleTag(tag.id);
+                }
+              }}
+              className={`group mx-2 flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3 transition-colors ${
+                on ? "bg-accent-wash" : "hover:bg-page"
+              }`}
+            >
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: swatch }}
+              />
+              <span
+                className={`min-w-0 flex-1 truncate text-[13px] ${on ? "text-accent" : "text-ink-2"}`}
+              >
+                {tag.name}
+              </span>
+              <button
+                title={`Delete tag “${tag.name}”`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteTag(tag.id);
+                }}
+                className="icon-button shrink-0 p-1 text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+              >
+                <X size={11} strokeWidth={2.5} />
+              </button>
+            </div>
+          );
+        })}
+
+        <div className="mx-2 flex h-9 items-center gap-2 rounded-lg px-3 hover:bg-page">
+          <span
+            aria-hidden
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{
+              background: isDark
+                ? (TAG_COLORS.find((c) => c.id === newTagColor) ?? TAG_COLORS[0]).darkFg
+                : (TAG_COLORS.find((c) => c.id === newTagColor) ?? TAG_COLORS[0]).fg,
+            }}
+          />
+          <input
+            value={newTagName}
+            onChange={(e) => setNewTagName(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") addTag();
+              if (e.key === "Escape") setNewTagName("");
+            }}
+            placeholder="New tag"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-ink-4"
+          />
+        </div>
+
+        {newTagName.trim() && (
+          <div className="flex items-center gap-2 px-5 pt-2 pb-3">
+            {TAG_COLORS.map((c) => (
+              <button
+                key={c.id}
+                title={c.id}
+                aria-label={`Colour ${c.id}`}
+                aria-pressed={newTagColor === c.id}
+                onClick={() => setNewTagColor(c.id)}
+                className="h-4 w-4 rounded-full transition-transform hover:scale-110"
+                style={{
+                  background: isDark ? c.darkFg : c.fg,
+                  outline: newTagColor === c.id ? "1px solid var(--ink)" : "none",
+                  outlineOffset: "2px",
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="h-6" />
       </div>
     </aside>
   );

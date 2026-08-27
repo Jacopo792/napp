@@ -5,35 +5,25 @@ import { useIsDark } from "@/lib/theme";
 interface Props {
   tag: Tag;
   onRemove?: () => void;
-  onClick?: () => void;
-  active?: boolean;
-  size?: "sm" | "xs";
 }
 
-export function TagBadge({ tag, onRemove, onClick, active, size = "sm" }: Props) {
+/** Compact, readable tag treatment for metadata around the writing surface. */
+export function TagBadge({ tag, onRemove }: Props) {
   const isDark = useIsDark();
-  const palette = TAG_COLORS.find((c) => c.id === tag.color) ?? TAG_COLORS[0];
-  const bg = isDark ? palette.darkBg : palette.bg;
-  const fg = isDark ? palette.darkFg : palette.fg;
-
-  const baseClass = size === "xs" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-xs";
+  const p = TAG_COLORS.find((c) => c.id === tag.color) ?? TAG_COLORS[0];
+  const swatch = isDark ? p.darkFg : p.fg;
 
   return (
-    <span
-      onClick={onClick}
-      style={{ backgroundColor: bg, color: fg, opacity: active === false ? 0.45 : 1 }}
-      className={`inline-flex items-center gap-1 rounded-full font-medium select-none ${baseClass} ${
-        onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
-      }`}
-    >
-      {tag.name}
+    <span className="group inline-flex items-center gap-1.5 rounded-full border border-rule-soft bg-paper px-2 py-1">
+      <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: swatch }} />
+      <span className="text-[11px] font-medium text-ink-2">{tag.name}</span>
       {onRemove && (
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="rounded-full hover:opacity-60 cursor-pointer transition-opacity leading-none"
-          style={{ color: fg }}
+          onClick={onRemove}
+          title={`Remove ${tag.name}`}
+          className="icon-button text-ink-4 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
         >
-          <X size={9} strokeWidth={2.5} />
+          <X size={10} strokeWidth={2.5} />
         </button>
       )}
     </span>

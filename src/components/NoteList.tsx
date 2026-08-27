@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
 import { useIsDark } from "@/lib/theme";
+import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
 import type { NoteEntry } from "@/lib/entries";
 
 interface Props {
@@ -20,47 +21,21 @@ interface Props {
   onDelete: (entry: NoteEntry) => void;
 }
 
-/** Markdown syntax stripped down to something readable in a 1-line preview. */
-function previewOf(body: string): string {
-  return body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
-    .replace(/^\s{0,3}>\s?/gm, "")
-    .replace(/^\s*[-*+]\s+/gm, "")
-    .replace(/[*_`~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Apple-Notes-style relative date: time today, weekday this week, else date. */
-function formatStamp(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.floor((startOfToday.getTime() - d.getTime()) / 86_400_000);
-
-  if (d >= startOfToday) {
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-  if (diffDays < 1) return "Yesterday";
-  if (diffDays < 6) return d.toLocaleDateString(undefined, { weekday: "long" });
-  if (d.getFullYear() === now.getFullYear()) {
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  }
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
+/* The catalogue. Titles here are never truncated to one line: the real corpus
+   names notes things like "MAPPA 5: SK GROUP (il chaebol che ha catturato i
+   pezzi giusti)", and a list that cuts that at 30 characters throws away the
+   naming scheme its owner built. Three lines, then it stops. */
 
 function Row({
   entry,
+  index,
   meta,
   selected,
   onSelect,
   onDelete,
 }: {
   entry: NoteEntry;
+  index: number;
   meta: Meta;
   selected: boolean;
   onSelect: () => void;
@@ -69,18 +44,25 @@ function Row({
   const isDark = useIsDark();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: entry.note.id });
   const rowRef = useRef<HTMLDivElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const tags = useMemo(() => {
     const ids = meta.notes.find((n) => n.id === entry.note.id)?.tagIds ?? [];
     return ids.map((id) => meta.tags.find((t) => t.id === id)).filter(Boolean) as TagType[];
   }, [meta, entry.note.id]);
 
-  // Keyboard selection can land on a row that is scrolled out of view.
   useEffect(() => {
     if (selected) rowRef.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
 
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const timer = window.setTimeout(() => setConfirmDelete(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [confirmDelete]);
+
   const preview = previewOf(entry.note.body);
+  const words = countWords(entry.note.body);
 
   return (
     <div
@@ -94,48 +76,61 @@ function Row({
       aria-selected={selected}
       onClick={onSelect}
       style={{ opacity: isDragging ? 0.4 : 1 }}
-      className={`group relative flex flex-col gap-0.5 px-3 py-2 cursor-pointer touch-none
-        border-l-2 transition-colors duration-150
-        ${selected ? "bg-selected border-l-accent" : "border-l-transparent hover:bg-selected/50"}`}
+      className={`group relative mx-2 mb-1 flex cursor-pointer touch-none gap-3 rounded-xl border px-3 py-3 transition-colors ${
+        selected
+          ? "border-rule bg-page shadow-sm"
+          : "border-transparent hover:border-rule-soft hover:bg-page"
+      }`}
     >
-      <div className="flex items-center gap-2">
-        <p
-          className={`flex-1 min-w-0 truncate text-[13px] leading-5 ${
-            entry.note.title ? "font-medium text-foreground" : "font-medium text-faint italic"
-          }`}
-        >
-          {entry.note.title || "New Note"}
-        </p>
-        <button
-          title="Delete note"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100
-                     text-muted hover:text-danger transition-opacity cursor-pointer"
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
+      {/* The running number is the keyboard target and the position in the
+          current sort — information, not ornament. */}
+      <span
+        aria-hidden
+        className={`readout flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+          selected ? "bg-accent text-on-accent" : "bg-surface text-ink-4"
+        }`}
+      >
+        {index + 1}
+      </span>
 
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className="tnum shrink-0 text-[11px] leading-4 text-muted">
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-[13.5px] leading-[1.35] ${
+            entry.note.title ? "text-ink" : "text-ink-4 italic"
+          }`}
+          style={{
+            fontVariationSettings: '"wght" 500, "opsz" 16',
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {entry.note.title || "Untitled"}
+        </p>
+
+        <p className="readout mt-1.5 truncate text-ink-3">
           {formatStamp(entry.note.updatedAt)}
-        </span>
-        <span className="flex-1 min-w-0 truncate text-[11px] leading-4 text-faint">
-          {preview || "No additional text"}
-        </span>
+          <span className="text-ink-4"> · </span>
+          {formatCount(words)}w
+          {preview && (
+            <>
+              <span className="text-ink-4"> · </span>
+              <span className="text-ink-4">{preview}</span>
+            </>
+          )}
+        </p>
+
         {tags.length > 0 && (
-          <span className="flex shrink-0 items-center gap-1">
-            {tags.slice(0, 3).map((t) => {
+          <span className="mt-1.5 flex items-center gap-1">
+            {tags.slice(0, 5).map((t) => {
               const p = TAG_COLORS.find((c) => c.id === t.color) ?? TAG_COLORS[0];
               return (
                 <span
                   key={t.id}
                   title={t.name}
-                  className="w-1.5 h-1.5 rounded-full"
+                  aria-label={t.name}
+                  className="h-1.5 w-4 rounded-full"
                   style={{ background: isDark ? p.darkFg : p.fg }}
                 />
               );
@@ -143,17 +138,50 @@ function Row({
           </span>
         )}
       </div>
+
+      <button
+        aria-label={
+          confirmDelete
+            ? `Confirm deletion of ${entry.note.title || "Untitled"}`
+            : `Delete ${entry.note.title || "Untitled"}`
+        }
+        title={
+          confirmDelete
+            ? "Click again to permanently delete"
+            : `Delete "${entry.note.title || "Untitled"}"`
+        }
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirmDelete) onDelete();
+          else setConfirmDelete(true);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
+          confirmDelete
+            ? "bg-danger text-white opacity-100"
+            : "text-ink-4 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+        }`}
+      >
+        {confirmDelete ? (
+          <span className="label text-[10px]">Delete?</span>
+        ) : (
+          <Trash2 size={13} strokeWidth={1.75} />
+        )}
+      </button>
     </div>
   );
 }
 
 function Skeletons() {
   return (
-    <div aria-hidden className="pt-1">
+    <div aria-hidden>
       {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex flex-col gap-1.5 px-3 py-2.5 border-l-2 border-l-transparent">
-          <div className="skeleton h-3" style={{ width: `${72 - (i % 3) * 14}%` }} />
-          <div className="skeleton h-2.5" style={{ width: `${90 - (i % 4) * 12}%` }} />
+        <div key={i} className="mx-2 mb-1 flex gap-3 rounded-xl border border-rule-soft px-3 py-3">
+          <div className="skeleton mt-0.5 h-2.5 w-4 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="skeleton h-3" style={{ width: `${78 - (i % 3) * 16}%` }} />
+            <div className="skeleton h-2" style={{ width: `${58 - (i % 4) * 9}%` }} />
+          </div>
         </div>
       ))}
     </div>
@@ -177,84 +205,73 @@ export function NoteList({
   const hasQuery = query.trim().length > 0;
 
   return (
-    <section className="w-[288px] shrink-0 flex flex-col bg-surface border-r border-border">
-      {/* Search + new */}
-      <div className="h-11 shrink-0 flex items-center gap-2 px-3 border-b border-border">
-        <div className="relative flex-1 min-w-0">
-          <Search
-            size={12}
-            className="absolute left-2 top-1/2 -translate-y-1/2 text-faint pointer-events-none"
-          />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                onQueryChange("");
-                e.currentTarget.blur();
-              }
-            }}
-            placeholder="Search"
-            aria-label="Search notes"
-            className="w-full h-7 pl-7 pr-6 rounded-md bg-background border border-border
-                       text-[12px] text-foreground placeholder:text-faint
-                       outline-none focus:border-accent transition-colors"
-          />
-          {hasQuery && (
-            <button
-              title="Clear search"
-              onClick={() => onQueryChange("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground cursor-pointer"
-            >
-              <X size={11} />
-            </button>
-          )}
-        </div>
+    <section className="soft-pane flex w-[360px] shrink-0 flex-col bg-paper">
+      <div className="soft-control mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3 shadow-sm">
+        <Search size={13} strokeWidth={2} className="shrink-0 text-ink-4" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              onQueryChange("");
+              e.currentTarget.blur();
+            }
+          }}
+          placeholder="Search"
+          aria-label="Search notes"
+          className="readout min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
+        />
+        {hasQuery && (
+          <button
+            title="Clear search"
+            onClick={() => onQueryChange("")}
+            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+          >
+            <X size={12} strokeWidth={2.5} />
+          </button>
+        )}
         <button
           onClick={onNew}
           disabled={busy || loading}
-          title="New note (N)"
-          className="shrink-0 text-accent hover:opacity-70 disabled:opacity-30
-                     transition-opacity cursor-pointer disabled:cursor-default"
+          title="New note · N"
+          className="icon-button -mr-1 shrink-0 bg-accent p-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
         >
-          <SquarePen size={15} />
+          <SquarePen size={15} strokeWidth={1.75} />
         </button>
       </div>
 
-      <div role="listbox" aria-label={`Notes in ${folderLabel}`} className="flex-1 overflow-y-auto">
+      <div className="field-row shrink-0 px-4 pt-3 pb-2">
+        <span className="label truncate text-ink-3">{hasQuery ? "Results" : folderLabel}</span>
+        <span className="readout shrink-0 text-ink-4">{loading ? "—" : entries.length}</span>
+      </div>
+
+      <div
+        role="listbox"
+        aria-label={`Notes in ${folderLabel}`}
+        className="flex-1 overflow-y-auto pb-2"
+      >
         {loading ? (
           <Skeletons />
         ) : entries.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            {hasQuery ? (
-              <>
-                <p className="text-[13px] text-muted">No matches for “{query.trim()}”</p>
-                <button
-                  onClick={() => onQueryChange("")}
-                  className="mt-2 text-[12px] text-accent hover:opacity-70 cursor-pointer"
-                >
-                  Clear search
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-[13px] text-muted">{folderLabel} is empty</p>
-                <button
-                  onClick={onNew}
-                  className="mt-2 text-[12px] text-accent hover:opacity-70 cursor-pointer"
-                >
-                  Write the first note
-                </button>
-              </>
-            )}
+          <div className="mx-3 mt-2 rounded-xl border border-dashed border-rule px-6 py-12 text-center">
+            <p className="readout text-ink-2">
+              {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
+            </p>
+            <button
+              onClick={() => (hasQuery ? onQueryChange("") : onNew())}
+              className="label mt-3 text-accent transition-opacity hover:opacity-70"
+            >
+              {hasQuery ? "Clear search" : "Write the first note"}
+            </button>
           </div>
         ) : (
-          entries.map((e) => (
+          entries.map((e, i) => (
             <Row
               key={e.note.id}
               entry={e}
+              index={i}
               meta={meta}
               selected={selectedId === e.note.id}
               onSelect={() => onSelect(e.note.id)}
@@ -262,12 +279,6 @@ export function NoteList({
             />
           ))
         )}
-      </div>
-
-      <div className="h-7 shrink-0 flex items-center justify-center border-t border-border">
-        <span className="tnum text-[11px] text-faint">
-          {loading ? "" : `${entries.length} ${entries.length === 1 ? "note" : "notes"}`}
-        </span>
       </div>
     </section>
   );

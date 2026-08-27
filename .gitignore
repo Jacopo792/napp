@@ -49,3 +49,12 @@ frontend/
 .github/skills/
 .github/agents/
 .github/hooks/
+.impeccable/
+.pnpm-store/
+
+# Screenshot harness — mocks for local inspection, never shipped
+preview/
+vite.preview.config.ts
+
+# Local scratch
+tmp/

@@ -21,7 +21,12 @@ export async function createSession(token: string): Promise<AppSession> {
   const keys = await deriveSessionKeys(bundle);
   sessionStorage.setItem(
     KEY,
-    JSON.stringify({ role: bundle.type, token, pat: bundle.pat, repo: bundle.repo } satisfies Stored),
+    JSON.stringify({
+      role: bundle.type,
+      token,
+      pat: bundle.pat,
+      repo: bundle.repo,
+    } satisfies Stored),
   );
   return { role: bundle.type, keys, pat: bundle.pat, repo: bundle.repo };
 }

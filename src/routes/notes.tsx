@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, CloudUpload, Lock } from "lucide-react";
+import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -22,9 +22,11 @@ import {
 import { loadMeta, saveMeta } from "@/lib/meta";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
+import { formatStamp } from "@/lib/format";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FolderRail, ALL, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
+import { AxisBar } from "@/components/AxisBar";
 
 const NoteEditor = lazy(() =>
   import("@/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
@@ -58,12 +60,20 @@ function NotesPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
+  const [navigationOpen, setNavigationOpen] = useState(() => {
+    try {
+      return localStorage.getItem("napp:navigation") !== "closed";
+    } catch {
+      return true;
+    }
+  });
 
   const searchRef = useRef<HTMLInputElement>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Refs mirroring state, so the save pipeline can read the truth
   //    synchronously without waiting for a React commit. ───────────────────
@@ -81,6 +91,15 @@ function NotesPage() {
   const timerRef = useRef<number | undefined>(undefined);
 
   const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
+  const partnerName = myMeta.partnerName?.trim() || "Partner";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("napp:navigation", navigationOpen ? "open" : "closed");
+    } catch {
+      /* The preference is optional; writing still works without local storage. */
+    }
+  }, [navigationOpen]);
 
   const setActiveMeta = useCallback(
     (m: Meta) => {
@@ -187,7 +206,7 @@ function NotesPage() {
 
   const folderLabel =
     selectedFolderId === ALL
-      ? "All Notes"
+      ? "All notes"
       : selectedFolderId === UNFILED
         ? "Unfiled"
         : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
@@ -269,6 +288,7 @@ function NotesPage() {
         }
       }
       setError("");
+      setLastSavedAt(new Date().toISOString());
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 1800);
     } catch (e) {
@@ -513,50 +533,96 @@ function NotesPage() {
 
   const dragEntry = dragId ? entries.find((e) => e.note.id === dragId) : null;
 
+  const saveReadout = error ? (
+    <button
+      onClick={saveNow}
+      title="Retry the write now"
+      className="flex items-center gap-2 text-left"
+    >
+      <span className="label text-danger">Write failed</span>
+      <span className="readout max-w-[20rem] truncate text-ink-3 underline-offset-2 hover:underline">
+        {error}
+      </span>
+    </button>
+  ) : saving ? (
+    <span className="flex items-center gap-2">
+      <span className="animate-spin inline-block h-2.5 w-2.5 rounded-full border border-accent border-t-transparent" />
+      <span className="label text-accent">Writing</span>
+    </span>
+  ) : dirty ? (
+    <span className="label text-ink-2">Unsaved</span>
+  ) : (
+    <span className="flex items-center gap-2">
+      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Committed</span>
+      {lastSavedAt && <span className="readout text-ink-4">{formatStamp(lastSavedAt)}</span>}
+    </span>
+  );
+
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <header className="h-11 shrink-0 flex items-center gap-3 px-3 border-b border-border bg-rail">
-        <span className="text-[13px] font-semibold text-foreground mr-auto">Notes</span>
-
-        {error && (
-          <button
-            onClick={saveNow}
-            title={`${error} — click to retry`}
-            className="max-w-[22rem] truncate text-[11px] text-danger hover:underline cursor-pointer"
-          >
-            {error}
-          </button>
-        )}
-
-        <span className="flex items-center gap-1.5 text-[11px] text-muted min-w-[4.5rem] justify-end">
-          {saving ? (
-            <>
-              <span className="w-3 h-3 border-2 border-border border-t-accent rounded-full animate-spin inline-block" />
-              Saving
-            </>
-          ) : dirty ? (
-            <>
-              <CloudUpload size={12} />
-              Unsaved
-            </>
-          ) : savedFlash ? (
-            <span className="flex items-center gap-1 text-success animate-fade-in">
-              <Check size={12} /> Saved
-            </span>
-          ) : null}
+    <div className="flex h-screen flex-col bg-surface">
+      <header className="flex h-14 shrink-0 items-center gap-4 px-5">
+        <span
+          className="font-display text-[15px] text-ink"
+          style={{ fontVariationSettings: '"wght" 640, "opsz" 16', letterSpacing: "-0.02em" }}
+        >
+          Notes
         </span>
 
-        <ThemeToggle />
-
         <button
-          onClick={handleLock}
-          title="Lock and sign out"
-          className="flex items-center gap-1.5 text-[11px] text-muted hover:text-foreground
-                     transition-colors cursor-pointer"
+          onClick={() => setNavigationOpen((open) => !open)}
+          aria-label={navigationOpen ? "Hide navigation" : "Show navigation"}
+          aria-pressed={!navigationOpen}
+          title={navigationOpen ? "Hide navigation" : "Show navigation"}
+          className="icon-button p-2 text-ink-3"
         >
-          <Lock size={13} />
-          <span className="hidden sm:inline">Lock</span>
+          {navigationOpen ? (
+            <PanelLeftClose size={16} strokeWidth={1.9} />
+          ) : (
+            <PanelLeftOpen size={16} strokeWidth={1.9} />
+          )}
         </button>
+
+        {session.role === "u1" ? (
+          <div
+            role="group"
+            aria-label="Archive"
+            className="flex min-w-52 rounded-xl border border-rule bg-paper p-1"
+          >
+            {(
+              [
+                ["u1", "My notes"],
+                ["u2", `${partnerName}'s notes`],
+              ] as const
+            ).map(([owner, label]) => (
+              <button
+                key={owner}
+                onClick={() => handleViewChange(owner)}
+                aria-pressed={viewAs === owner}
+                className={`label min-w-0 flex-1 truncate rounded-lg px-3 py-1.5 transition-colors ${
+                  viewAs === owner
+                    ? "bg-accent text-on-accent"
+                    : "text-ink-3 hover:bg-page hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="label rounded-full bg-paper px-3 py-1.5 text-ink-3">My notes</span>
+        )}
+
+        <span className="ml-auto flex items-center gap-3">
+          <ThemeToggle />
+          <button
+            onClick={handleLock}
+            title="Lock and sign out"
+            className="label icon-button flex items-center gap-1.5 px-2.5 py-1.5 text-ink-3"
+          >
+            <Lock size={12} strokeWidth={2} />
+            Lock
+          </button>
+        </span>
       </header>
 
       <DndContext
@@ -565,40 +631,43 @@ function NotesPage() {
         onDragCancel={() => setDragId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 flex min-h-0">
-          <FolderRail
-            entries={entries.filter((e) => e.note.owner === viewAs)}
-            meta={activeMeta}
-            session={session}
-            viewAs={viewAs}
-            selectedFolderId={selectedFolderId}
-            filterTagIds={filterTagIds}
-            onSelectFolder={handleSelectFolder}
-            onFilterTagsChange={setFilterTagIds}
-            onMetaChange={handleMetaChange}
-            onViewChange={handleViewChange}
-          />
+        <div className="flex min-h-0 flex-1 gap-3 px-3 pb-3">
+          {navigationOpen && (
+            <>
+              <FolderRail
+                entries={entries.filter((e) => e.note.owner === viewAs)}
+                meta={activeMeta}
+                selectedFolderId={selectedFolderId}
+                filterTagIds={filterTagIds}
+                onSelectFolder={handleSelectFolder}
+                onFilterTagsChange={setFilterTagIds}
+                onMetaChange={handleMetaChange}
+              />
 
-          <NoteList
-            entries={visible}
-            meta={activeMeta}
-            selectedId={selectedId}
-            query={query}
-            loading={loading}
-            busy={saving}
-            folderLabel={folderLabel}
-            searchRef={searchRef}
-            onQueryChange={setQuery}
-            onSelect={setSelectedId}
-            onNew={handleNew}
-            onDelete={handleDelete}
-          />
+              <NoteList
+                entries={visible}
+                meta={activeMeta}
+                selectedId={selectedId}
+                query={query}
+                loading={loading}
+                busy={saving}
+                folderLabel={folderLabel}
+                searchRef={searchRef}
+                onQueryChange={setQuery}
+                onSelect={setSelectedId}
+                onNew={handleNew}
+                onDelete={handleDelete}
+              />
+            </>
+          )}
 
           <Suspense
             fallback={
-              <div className="flex-1 min-w-0 flex flex-col gap-3 px-6 pt-5 bg-background">
-                <div className="skeleton h-6 w-1/3" />
-                <div className="skeleton h-3 w-24" />
+              <div className="soft-pane flex min-w-0 flex-1 flex-col gap-4 bg-page px-10 pt-10">
+                <div className="w-full" style={{ maxWidth: "var(--read-measure)" }}>
+                  <div className="skeleton h-9 w-2/3" />
+                  <div className="skeleton mt-5 h-2.5 w-40" />
+                </div>
               </div>
             }
           >
@@ -608,6 +677,7 @@ function NotesPage() {
               draft={draft}
               canEdit={canEdit}
               viewingAsPartner={viewAs === "u2"}
+              partnerName={partnerName}
               titleRef={titleRef}
               onChange={handleDraftChange}
               onTagsChange={handleTagsChange}
@@ -618,14 +688,14 @@ function NotesPage() {
 
         <DragOverlay dropAnimation={null}>
           {dragEntry ? (
-            <div className="bg-raised border border-border rounded-lg shadow-lg px-3 py-1.5 w-52">
-              <p className="truncate text-[12px] font-medium text-foreground">
-                {dragEntry.note.title || "New Note"}
-              </p>
+            <div className="w-56 rounded-xl border border-accent bg-page px-3 py-2 shadow-lg">
+              <p className="readout truncate text-ink">{dragEntry.note.title || "Untitled"}</p>
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <AxisBar>{saveReadout}</AxisBar>
     </div>
   );
 }

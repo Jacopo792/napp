@@ -22,6 +22,7 @@ pnpm lint
 ```
 
 ### One-time key setup
+
 ```bash
 cp .env.example .env
 # Fill in MASTER_SEED (generate with command in .env.example), GITHUB_PAT, GITHUB_REPO
@@ -46,6 +47,7 @@ MASTER_SEED (.env, local only — never committed)
 - The PAT is not visible in the UI, but lives in `sessionStorage`. Security relies on u2 not extracting it from DevTools + the PAT being scoped to contents-write on this repo only.
 
 **Login bundles** are opaque base64-encoded JSON:
+
 ```
 u1: { type:"u1", seed:"<hex>", pat:"ghp_...", repo:"owner/repo" }
 u2: { type:"u2", key:"<hex>", pat:"ghp_...", repo:"owner/repo" }
@@ -80,16 +82,16 @@ NAPP:1:<owner>
 
 ## Key files
 
-| File | Role |
-|---|---|
-| `src/lib/crypto.ts` | HKDF key derivation, bundle parsing, AES-GCM encrypt/decrypt |
-| `src/lib/github.ts` | GitHub Contents API — list, CDN-read, write, delete, branch bootstrap |
-| `src/lib/session.ts` | `sessionStorage` lifecycle — create, restore (re-derives keys on refresh), clear |
-| `src/routes/index.tsx` | Login page — paste bundle token |
-| `src/routes/notes.tsx` | Main UI — sidebar, editor, create / save-on-blur / delete |
-| `scripts/keygen.mjs` | Key generation (Node, uses `webcrypto` — same HKDF as browser) |
-| `.github/workflows/deploy.yml` | Push to `main` → build → GitHub Pages deploy |
-| `.env.example` | Template for secrets needed by keygen |
+| File                           | Role                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `src/lib/crypto.ts`            | HKDF key derivation, bundle parsing, AES-GCM encrypt/decrypt                     |
+| `src/lib/github.ts`            | GitHub Contents API — list, CDN-read, write, delete, branch bootstrap            |
+| `src/lib/session.ts`           | `sessionStorage` lifecycle — create, restore (re-derives keys on refresh), clear |
+| `src/routes/index.tsx`         | Login page — paste bundle token                                                  |
+| `src/routes/notes.tsx`         | Main UI — sidebar, editor, create / save-on-blur / delete                        |
+| `scripts/keygen.mjs`           | Key generation (Node, uses `webcrypto` — same HKDF as browser)                   |
+| `.github/workflows/deploy.yml` | Push to `main` → build → GitHub Pages deploy                                     |
+| `.env.example`                 | Template for secrets needed by keygen                                            |
 
 ---
 

@@ -31,7 +31,14 @@ export async function saveMeta(
     // 409 = stale or missing SHA — re-read current SHA from GitHub and retry once
     if (e instanceof Error && e.message.includes("409")) {
       const current = await readFile(repo, pat, `notes/meta-${owner}.napp`);
-      return writeNoteFile(repo, pat, `notes/meta-${owner}.napp`, content, current?.sha, "update meta");
+      return writeNoteFile(
+        repo,
+        pat,
+        `notes/meta-${owner}.napp`,
+        content,
+        current?.sha,
+        "update meta",
+      );
     }
     throw e;
   }

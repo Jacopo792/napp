@@ -1,6 +1,7 @@
 import { createRootRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { initTheme } from "@/lib/theme";
+import { initAxes } from "@/lib/axes";
 
 export const Route = createRootRoute({
   component: Root,
@@ -9,33 +10,81 @@ export const Route = createRootRoute({
 });
 
 function Root() {
-  useEffect(() => { initTheme(); }, []);
+  useEffect(() => {
+    initTheme();
+    initAxes();
+  }, []);
   return <Outlet />;
+}
+
+/** Error states share the same calm, elevated surface as the unlock screen. */
+function Notice({
+  figure,
+  title,
+  detail,
+  action,
+}: {
+  figure: string;
+  title: string;
+  detail: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-surface px-6">
+      <div className="soft-pane w-full max-w-[26rem] bg-page p-8">
+        <p
+          aria-hidden
+          className="font-display text-ink"
+          style={{
+            fontSize: "clamp(3.5rem, 10vw, 5.5rem)",
+            lineHeight: 0.9,
+            letterSpacing: "-0.045em",
+            fontVariationSettings: '"wght" 700, "opsz" 72',
+          }}
+        >
+          {figure}
+        </p>
+        <p className="font-display mt-5 text-lg font-semibold text-ink">{title}</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-2">{detail}</p>
+        <div className="mt-5">{action}</div>
+      </div>
+    </div>
+  );
 }
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <p className="mt-2 text-sm text-muted">Page not found</p>
-        <Link to="/" className="mt-6 inline-block text-accent text-sm">Go home</Link>
-      </div>
-    </div>
+    <Notice
+      figure="404"
+      title="No such page"
+      detail="That address does not belong to this app."
+      action={
+        <Link to="/" className="label inline-flex rounded-lg bg-accent px-3 py-2 text-on-accent">
+          Back to unlock →
+        </Link>
+      }
+    />
   );
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <p className="font-semibold text-foreground">Something went wrong</p>
-        <p className="mt-2 text-sm text-muted">{error.message}</p>
-        <button onClick={() => { router.invalidate(); reset(); }} className="mt-4 text-sm text-accent">
-          Try again
+    <Notice
+      figure="Err"
+      title="Something broke"
+      detail={error.message}
+      action={
+        <button
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+          className="label rounded-lg bg-accent px-3 py-2 text-on-accent transition-opacity hover:opacity-90"
+        >
+          Try again →
         </button>
-      </div>
-    </div>
+      }
+    />
   );
 }

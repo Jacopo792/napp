@@ -1,63 +1,101 @@
+@import "./fonts.css";
 @import "tailwindcss" source(none);
 @source "../src";
 
-/* ── Color tokens ───────────────────────────────────────────────────────────
-   Three chrome layers, matching the three columns:
-     --rail        folder rail        (furthest from the writing)
-     --surface     note list          (middle)
-     --background  editor "paper"     (where the words go)
-   Light runs rail→paper dark→light; dark inverts it, so the editor is always
-   the calmest surface on screen. */
+/* ── The specimen palette ────────────────────────────────────────────────────
+   Three grounds, ordered by how close they sit to the writing:
+
+     --surface   index rail and axis bar   (furthest from the words)
+     --paper     catalogue column          (middle)
+     --page      the note itself           (where the words go)
+
+   Light runs surface→page dark→light. Dark inverts it, so in both themes the
+   page the words live on is the calmest surface on screen. Hues come from the
+   Pixel Services system (warm neutrals, oklch); the accent is azure, never the
+   system's sienna. ────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --surface: #f7f7f8;
-  --rail: #f2f2f4;
-  --raised: #ffffff;
-  --foreground: #1c1c1e;
-  --muted: #55555a;
-  --faint: #6e6e73;
-  --border: #e3e3e8;
-  --selected: #e4e4ea;
-  --accent: #007aff;
-  --on-accent: #ffffff;
-  --danger: #ff3b30;
-  --success: #34c759;
-  --skeleton: #e9e9ee;
+  --page: oklch(1 0 0);
+  --paper: oklch(0.982 0.002 255);
+  --surface: oklch(0.958 0.004 255);
+
+  --ink: oklch(0.195 0.014 255);
+  --ink-2: oklch(0.38 0.014 255);
+  --ink-3: oklch(0.52 0.012 255);
+  --ink-4: oklch(0.62 0.01 255);
+
+  --rule: oklch(0.89 0.008 255);
+  --rule-soft: oklch(0.94 0.005 255);
+
+  --accent: oklch(0.56 0.16 242);
+  --accent-strong: oklch(0.48 0.16 242);
+  --accent-wash: oklch(0.96 0.03 242);
+  --on-accent: oklch(0.99 0.002 242);
+
+  --danger: oklch(0.55 0.2 27);
+  --ok: oklch(0.5 0.12 155);
+
+  --shadow-soft: 0 1px 2px oklch(0.2 0.015 255 / 0.05), 0 8px 24px oklch(0.2 0.015 255 / 0.06);
+  --shadow-popover: 0 18px 50px oklch(0.2 0.015 255 / 0.12);
+  --radius-sm: 0.6rem;
+  --radius-md: 0.85rem;
+  --radius-lg: 1.15rem;
+
+  /* Reading axes — written by lib/axes.ts, read by the title and the editor.
+     These are real variable-font axes, not a size class. */
+  --read-size: 16px;
+  --read-measure: 68ch;
+  --read-weight: 400;
+  --read-leading: 1.65;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .dark {
-  --background: #111112;
-  --surface: #1a1a1c;
-  --rail: #1e1e20;
-  --raised: #2c2c2e;
-  --foreground: #f2f2f7;
-  --muted: #a1a1a8;
-  --faint: #8a8a92;
-  --border: #333336;
-  --selected: #313134;
-  --accent: #0a84ff;
-  --on-accent: #ffffff;
-  --danger: #ff453a;
-  --success: #30d158;
-  --skeleton: #242427;
+  --page: oklch(0.26 0.011 255);
+  --paper: oklch(0.22 0.01 255);
+  --surface: oklch(0.16 0.011 255);
+
+  --ink: oklch(0.97 0.005 255);
+  --ink-2: oklch(0.82 0.01 255);
+  --ink-3: oklch(0.72 0.011 255);
+  --ink-4: oklch(0.64 0.01 255);
+
+  --rule: oklch(0.36 0.013 255);
+  --rule-soft: oklch(0.3 0.011 255);
+
+  --accent: oklch(0.72 0.14 242);
+  --accent-strong: oklch(0.8 0.12 242);
+  --accent-wash: oklch(0.33 0.07 242);
+  --on-accent: oklch(0.17 0.02 242);
+
+  --danger: oklch(0.68 0.17 25);
+  --ok: oklch(0.72 0.13 158);
+
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35), 0 14px 34px oklch(0 0 0 / 0.28);
+  --shadow-popover: 0 22px 60px oklch(0 0 0 / 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --color-page: var(--page);
+  --color-paper: var(--paper);
   --color-surface: var(--surface);
-  --color-rail: var(--rail);
-  --color-raised: var(--raised);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
-  --color-border: var(--border);
-  --color-selected: var(--selected);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-wash: var(--accent-wash);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
-  --color-success: var(--success);
-  --color-skeleton: var(--skeleton);
-  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --color-ok: var(--ok);
+
+  --font-display: "Bricolage Grotesque", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-reading: "Source Serif 4 Variable", Georgia, ui-serif, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
@@ -73,12 +111,13 @@
   }
 
   body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    margin: 0;
   }
 
   button,
@@ -86,11 +125,12 @@
   input,
   select {
     font-family: inherit;
+    color: inherit;
   }
 
   /* Theme cross-fade is opt-in: theme.ts adds .theming to <html> for the
-     duration of a switch. A permanent transition on every node makes each
-     list re-render pay for animation it never uses. */
+     duration of a switch, so long lists never pay for a transition they
+     do not use. */
   html.theming *,
   html.theming *::before,
   html.theming *::after {
@@ -100,16 +140,15 @@
       color 0.18s ease;
   }
 
-  /* Browser surfaces we did not draw, themed rather than left to defaults. */
+  /* Surfaces the browser draws for us still belong to the design. */
   ::selection {
-    background: color-mix(in srgb, var(--accent) 24%, transparent);
-    color: var(--foreground);
+    background: var(--accent-wash);
+    color: var(--ink);
   }
 
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
-    border-radius: 4px;
   }
 
   input,
@@ -117,71 +156,130 @@
     caret-color: var(--accent);
   }
 
+  /* Ensure the compositor never dims the caret in dark mode */
+  .dark input,
+  .dark textarea {
+    caret-color: var(--accent);
+  }
+
   ::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
     background: transparent;
-    border-radius: 99px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: content-box;
   }
-  :hover > ::-webkit-scrollbar-thumb,
   *:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--muted) 38%, transparent);
+    background: var(--ink-4);
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--muted) 65%, transparent);
+    background: var(--ink-3);
     background-clip: content-box;
   }
-
-  /* Tabular numerals wherever we print dates or counts. */
-  .tnum {
-    font-variant-numeric: tabular-nums;
-  }
 }
 
-/* ── Animations ─────────────────────────────────────────────────────────── */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* ── The specimen's UI voice ─────────────────────────────────────────────────
+   Every label, unit and readout in this app is JetBrains Mono, uppercase and
+   tracked. It is measurement type, not a costume: these strings are all counts,
+   states, dates and axis values. ──────────────────────────────────────────── */
+@utility label {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
 }
 
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+@utility readout {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-@keyframes slide-up {
+.soft-pane {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  /* Slight inner highlight keeps white panes from sinking into the surround */
+  background-clip: padding-box;
+}
+
+.soft-control {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--page);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color 0.16s var(--ease),
+    color 0.16s var(--ease),
+    transform 0.16s var(--ease);
+}
+
+.icon-button:hover {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.popover {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--page);
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+}
+
+/* A label on the left, its value hard against the right edge — the specimen's
+   one repeating row, used for every measured pair in the interface. */
+@utility field-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────────
+   One authored moment: the page arriving under the cursor when a note is
+   opened. Everything else is a state change with no entrance of its own. */
+@keyframes page-in {
   from {
     opacity: 0;
     transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
+}
+
+.page-in {
+  animation: page-in 0.42s var(--ease) both;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
+}
+.animate-spin {
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes skeleton-pulse {
@@ -193,164 +291,258 @@
     opacity: 0.45;
   }
 }
-
-.animate-fade-in {
-  animation: fade-in 0.15s ease-out both;
-}
-.animate-scale-in {
-  animation: scale-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.animate-slide-up {
-  animation: slide-up 0.15s ease-out both;
-}
-.animate-spin {
-  animation: spin 0.7s linear infinite;
-}
-
 .skeleton {
-  background: var(--skeleton);
-  border-radius: 4px;
+  background: var(--rule-soft);
+  border-radius: 999px;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .animate-scale-in,
-  .animate-slide-up {
-    animation: none;
-  }
+  .page-in,
   .skeleton {
     animation: none;
   }
 }
 
-/* ── Markdown editor overrides ───────────────────────────────────────────── */
-
-/* Remove the editor's own border and background so it inherits ours */
-.w-md-editor {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+/* ── The reading page ────────────────────────────────────────────────────────
+   The editor is not a widget with a theme applied — it is a page of set text.
+   Sizes, measure and weight all come from the reading axes, so the axis bar
+   drives real font-variation-settings rather than a t-shirt size. ────────── */
+.cm-editor {
+  height: 100%;
+  background: transparent;
+  color: var(--ink);
 }
 
-/* Toolbar */
-.w-md-editor-toolbar {
-  background: var(--surface) !important;
-  border-bottom: 1px solid var(--border) !important;
-  border-radius: 8px 8px 0 0 !important;
-  padding: 4px 8px !important;
+.cm-editor.cm-focused {
+  outline: none;
 }
 
-.w-md-editor-toolbar li > button {
-  color: var(--muted) !important;
-  border-radius: 5px !important;
-  transition:
-    background 0.12s,
-    color 0.12s !important;
+.cm-scroller {
+  /* CodeMirror ships display:flex and a monospace stack on its own nodes; both
+     are overridden here so the note is set in the reading face and the measure
+     can be centred by plain auto margins. */
+  display: block;
+  font-size: var(--read-size);
+  line-height: var(--read-leading);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0 0 45vh;
 }
 
-.w-md-editor-toolbar li > button:hover {
-  color: var(--foreground) !important;
-  background: var(--selected) !important;
+.cm-editor .cm-content {
+  font-family: var(--font-reading);
+  font-variation-settings:
+    "wght" var(--read-weight),
+    "opsz" 20;
+  width: 100%;
+  max-width: var(--read-measure);
+  margin-inline: 0;
+  padding: 0;
+  caret-color: var(--accent);
 }
 
-.w-md-editor-toolbar-divider {
-  background: var(--border) !important;
+.cm-line {
+  padding: 0;
 }
 
-/* Editor area
-   .w-md-editor-text-input (textarea) and .w-md-editor-text-pre are
-   absolutely-positioned siblings — they MUST share identical font metrics
-   or the cursor drifts. The global "textarea { font-family: inherit }"
-   rule in @layer base would assign the page's sans-serif to the textarea
-   while the pre keeps monospace → characters have different widths →
-   cursor shifts right as the line grows. Force the same monospace stack
-   on ALL three nodes. Do NOT touch padding, font-size, or line-height. */
-.w-md-editor-content {
-  background: var(--background) !important;
+.cm-cursor,
+.cm-dropCursor {
+  border-left: 2.5px solid var(--accent) !important;
+  opacity: 1 !important;
 }
 
-.w-md-editor-text-input,
-.w-md-editor-text-pre,
-.w-md-editor-text-pre > code {
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace !important;
-}
-
-.w-md-editor-text-pre > code {
-  color: var(--foreground) !important;
-}
-
-.w-md-editor-text-input {
-  color: var(--foreground) !important;
-  caret-color: var(--accent) !important;
-}
-
-/* Preview */
-.wmde-markdown {
-  background: var(--background) !important;
-  color: var(--foreground) !important;
-  font-size: 14px !important;
-  line-height: 1.7 !important;
-}
-
-.wmde-markdown h1,
-.wmde-markdown h2,
-.wmde-markdown h3 {
-  border-bottom: 1px solid var(--border);
-  color: var(--foreground);
-}
-
-.wmde-markdown code {
-  background: var(--surface) !important;
-  color: var(--foreground) !important;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.wmde-markdown pre {
-  background: var(--surface) !important;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.wmde-markdown blockquote {
+.dark .cm-cursor,
+.dark .cm-dropCursor {
   border-left-color: var(--accent) !important;
-  color: var(--muted) !important;
+  box-shadow: 0 0 0 1px oklch(0.26 0.011 255 / 0.9);
 }
 
-.wmde-markdown a {
-  color: var(--accent) !important;
+/* CodeMirror animation can dim the cursor to 0 — keep it legible in both themes */
+@keyframes cm-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+.cm-cursor {
+  animation: cm-blink 1.1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-cursor {
+    animation: none;
+  }
 }
 
-.wmde-markdown hr {
-  border-color: var(--border) !important;
+.cm-selectionBackground,
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--accent-wash) !important;
 }
 
-.wmde-markdown table thead tr {
-  background: var(--surface) !important;
+.cm-placeholder {
+  color: var(--ink-4);
+  font-style: normal;
 }
 
-.wmde-markdown table tr {
-  background: var(--background) !important;
-  border-color: var(--border) !important;
+/* Rendered markdown. Headings take Bricolage at its own optical size; the
+   markers themselves are dimmed rather than deleted, so the source is always
+   recoverable by eye and the cursor never lands on hidden characters. */
+.cm-md-mark {
+  color: var(--ink-4);
+  font-weight: 400;
 }
 
-.wmde-markdown table tr:nth-child(2n) {
-  background: var(--surface) !important;
+.cm-md-h1,
+.cm-md-h2,
+.cm-md-h3,
+.cm-md-h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+}
+.cm-md-h1 {
+  font-size: 1.72em;
+  font-variation-settings:
+    "wght" 650,
+    "opsz" 40;
+}
+.cm-md-h2 {
+  font-size: 1.36em;
+  font-variation-settings:
+    "wght" 620,
+    "opsz" 28;
+}
+.cm-md-h3 {
+  font-size: 1.14em;
+  font-variation-settings:
+    "wght" 600,
+    "opsz" 20;
+}
+.cm-md-h4 {
+  font-size: 1em;
+  font-variation-settings:
+    "wght" 600,
+    "opsz" 16;
 }
 
-/* Tab buttons (Edit / Live / Preview) */
-.w-md-editor-toolbar-mode button {
-  color: var(--muted) !important;
+.cm-md-strong {
+  font-variation-settings:
+    "wght" 700,
+    "opsz" 20;
 }
-.w-md-editor-toolbar-mode button.active,
-.w-md-editor-toolbar-mode button[data-active="true"] {
-  color: var(--accent) !important;
+.cm-md-em {
+  font-style: italic;
+}
+.cm-md-strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--ink-3);
 }
 
-/* Drag bar */
-.w-md-editor-resize {
-  background: var(--border) !important;
+.cm-md-code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface);
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.3em;
+  padding: 0.05em 0.3em;
+}
+
+.cm-md-fence {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--ink-2);
+}
+
+.cm-md-quote {
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.cm-md-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.cm-md-list {
+  color: var(--accent);
+}
+
+/* A horizontal rule in the source draws a real rule across the measure. */
+.cm-md-hr {
+  color: transparent;
+  display: inline-block;
+  width: 100%;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+/* ── Axis sliders ───────────────────────────────────────────────────────────
+   The specimen's single control, rebuilt on a native range input so it keeps
+   keyboard stepping and screen-reader semantics for free. --fill is written
+   inline from the value, which is what colours the travelled part of the
+   track. ─────────────────────────────────────────────────────────────────── */
+.axis-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.axis-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 50%),
+    var(--rule) var(--fill, 50%) 100%
+  );
+}
+
+.axis-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -4.5px;
+}
+
+.axis-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill, 50%),
+    var(--rule) var(--fill, 50%) 100%
+  );
+}
+
+.axis-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.axis-range:focus-visible {
+  outline: none;
+}
+.axis-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.axis-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
