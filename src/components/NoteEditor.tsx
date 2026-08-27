@@ -199,7 +199,7 @@ export function NoteEditor({
   if (!entry || !draft) {
     return (
       <section
-        className={`flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor border-0" : "soft-pane"}`}
+        className={`flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
       >
         <div className="flex flex-1 items-center justify-center px-8">
           <div
@@ -231,10 +231,10 @@ export function NoteEditor({
   return (
     <section
       key={entry.note.id}
-      className={`page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor border-0" : "soft-pane"}`}
+      className={`page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
-      <header className={`shrink-0 ${mobile ? "px-5 pt-5 pb-3" : "px-10 pt-10 pb-5"}`}>
+      <header className={`shrink-0 ${mobile ? "px-5 pt-4 pb-3" : "px-10 pt-10 pb-5"}`}>
         <div className="w-full" style={{ maxWidth: "var(--read-measure)" }}>
           {viewingAsPartner && (
             <p className="label mb-3 text-ink-3">
@@ -262,7 +262,7 @@ export function NoteEditor({
             aria-label="Note title"
             className="font-display block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-4"
             style={{
-              fontSize: "clamp(1.75rem, 2.6vw, 2.5rem)",
+              fontSize: mobile ? "2rem" : "clamp(1.75rem, 2.6vw, 2.5rem)",
               lineHeight: 1.14,
               letterSpacing: "-0.028em",
               fontVariationSettings: '"wght" 620, "opsz" 42',
@@ -270,7 +270,9 @@ export function NoteEditor({
           />
 
           {/* Measurements. Every value right of its own label, tabular. */}
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-3">
+          <div
+            className={`flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-3 ${mobile ? "mobile-editor-meta mt-4" : "mt-5"}`}
+          >
             <span className="readout text-ink-3">
               Created <span className="text-ink-2">{formatStamp(entry.note.createdAt)}</span>
             </span>

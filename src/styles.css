@@ -186,6 +186,20 @@
 }
 
 @media (max-width: 767px), (max-height: 520px) {
+  :root {
+    --read-size: 17px;
+    --read-measure: 100%;
+    --read-leading: 1.62;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
   input,
   textarea,
   select {
@@ -206,6 +220,40 @@
     min-height: 72px;
   }
 
+  .mobile-topbar {
+    border-bottom: 0;
+  }
+
+  .mobile-card {
+    border: 1px solid var(--rule-soft);
+    border-radius: 1.1rem;
+    box-shadow: 0 1px 2px oklch(0.15 0.01 255 / 0.04);
+  }
+
+  .mobile-folder-row + .mobile-folder-row,
+  .mobile-note-row + .mobile-note-row {
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .mobile-folder-row:active,
+  .mobile-note-row:active {
+    background: var(--accent-wash);
+  }
+
+  .mobile-compose {
+    bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+    box-shadow: 0 10px 30px oklch(0.25 0.12 242 / 0.3);
+  }
+
+  .mobile-statusbar {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
+
+  .mobile-editor-meta > .readout:nth-of-type(1),
+  .mobile-editor-meta > .readout:nth-of-type(4) {
+    display: none;
+  }
+
   .mobile-editor .popover {
     width: min(18rem, calc(100vw - 2rem));
     max-height: min(26rem, calc(100dvh - 7rem));
@@ -215,7 +263,7 @@
 
   .mobile-editor .cm-scroller {
     scrollbar-gutter: auto;
-    padding-bottom: max(35vh, calc(env(safe-area-inset-bottom) + 5rem));
+    padding-bottom: max(40vh, calc(env(safe-area-inset-bottom) + 6rem));
   }
 
   .soft-pane {

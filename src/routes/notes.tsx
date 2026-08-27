@@ -601,7 +601,7 @@ function NotesPage() {
     return (
       <div className="flex flex-col overflow-hidden bg-surface" style={{ height: "100dvh" }}>
         <header
-          className="flex min-h-14 shrink-0 items-center gap-2 border-b border-rule bg-surface px-3"
+          className="mobile-topbar flex min-h-14 shrink-0 items-center gap-2 bg-surface px-3"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           {!showFolders ? (
@@ -609,21 +609,20 @@ function NotesPage() {
               type="button"
               onClick={handleMobileBack}
               aria-label={selectedId ? "Back to notes" : "Back to folders"}
-              className="icon-button flex h-11 w-11 shrink-0 items-center justify-center text-ink-2"
+              className="icon-button flex h-11 min-w-11 shrink-0 items-center gap-0.5 px-1 text-accent"
             >
               <ChevronLeft size={21} strokeWidth={2.2} />
+              <span className="max-w-28 truncate text-[14px] font-medium">
+                {selectedId ? folderLabel : "Folders"}
+              </span>
             </button>
           ) : (
-            <span className="font-display min-w-0 flex-1 truncate px-1 text-[16px] font-semibold text-ink">
+            <span className="font-display min-w-0 flex-1 truncate px-1 text-[15px] font-semibold text-ink-3">
               Notes
             </span>
           )}
 
-          {!showFolders && (
-            <span className="font-display min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">
-              {selectedId ? selected?.note.title || "Untitled" : folderLabel}
-            </span>
-          )}
+          {!showFolders && <span className="min-w-0 flex-1" />}
 
           <ThemeToggle />
           <button
@@ -637,14 +636,14 @@ function NotesPage() {
         </header>
 
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
-          <main className="min-h-0 flex-1 overflow-hidden bg-paper">
+          <main className="flex min-h-0 flex-1 overflow-hidden bg-surface">
             {showFolders && (
               <div className="flex h-full min-h-0 flex-col">
                 {session.role === "u1" && (
                   <div
                     role="group"
                     aria-label="Archive"
-                    className="mx-3 mt-3 flex shrink-0 rounded-xl border border-rule bg-page p-1"
+                    className="mx-4 mt-2 flex shrink-0 rounded-xl border border-rule bg-paper p-1"
                   >
                     {(
                       [
@@ -728,7 +727,7 @@ function NotesPage() {
           <AxisBar compact>{saveReadout}</AxisBar>
         ) : (
           <footer
-            className="flex min-h-10 shrink-0 items-center justify-end border-t border-rule bg-paper px-4"
+            className="mobile-statusbar flex min-h-9 shrink-0 items-center justify-start bg-surface px-5"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {saveReadout}

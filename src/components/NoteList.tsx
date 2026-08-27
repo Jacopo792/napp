@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Pin, Search, SquarePen, Trash2, X } from "lucide-react";
+import { ChevronRight, Pin, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
 import { useIsDark } from "@/lib/theme";
 import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
@@ -86,28 +86,36 @@ function Row({
       aria-selected={selected}
       onClick={onSelect}
       style={{ opacity: isDragging ? 0.4 : 1 }}
-      className={`group relative mx-2 mb-1 flex cursor-pointer gap-3 rounded-xl border px-3 py-3 transition-colors ${
-        mobile ? "touch-pan-y" : "touch-none"
+      className={`group relative flex cursor-pointer gap-3 transition-colors ${
+        mobile
+          ? "mobile-note-row min-h-[5.25rem] touch-pan-y px-4 py-3"
+          : "mx-2 mb-1 touch-none rounded-xl border px-3 py-3"
       } ${
         selected
-          ? "border-rule bg-page shadow-sm"
-          : "border-transparent hover:border-rule-soft hover:bg-page"
+          ? mobile
+            ? "bg-accent-wash"
+            : "border-rule bg-page shadow-sm"
+          : mobile
+            ? "hover:bg-page"
+            : "border-transparent hover:border-rule-soft hover:bg-page"
       }`}
     >
       {/* The running number is the keyboard target and the position in the
           current sort — information, not ornament. */}
-      <span
-        aria-hidden
-        className={`readout flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-          selected ? "bg-accent text-on-accent" : "bg-surface text-ink-4"
-        }`}
-      >
-        {index + 1}
-      </span>
+      {!mobile && (
+        <span
+          aria-hidden
+          className={`readout flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
+            selected ? "bg-accent text-on-accent" : "bg-surface text-ink-4"
+          }`}
+        >
+          {index + 1}
+        </span>
+      )}
 
       <div className="min-w-0 flex-1">
         <p
-          className={`text-[13.5px] leading-[1.35] ${
+          className={`${mobile ? "text-[16px]" : "text-[13.5px]"} leading-[1.35] ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           style={{
@@ -172,6 +180,7 @@ function Row({
       >
         <Pin size={13} strokeWidth={pinned ? 2.4 : 1.75} fill={pinned ? "currentColor" : "none"} />
       </button>
+      {mobile && <ChevronRight size={16} strokeWidth={2} className="mt-1 shrink-0 text-ink-4" />}
 
       <button
         aria-label={
@@ -239,6 +248,99 @@ export function NoteList({
   onTogglePin,
 }: Props) {
   const hasQuery = query.trim().length > 0;
+
+  if (mobile) {
+    return (
+      <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden bg-surface">
+        <div className="shrink-0 px-5 pt-4 pb-3">
+          <div className="flex items-end justify-between gap-4">
+            <h1 className="font-display min-w-0 truncate text-[2.15rem] leading-none tracking-[-0.04em] text-ink">
+              {hasQuery ? "Search" : folderLabel}
+            </h1>
+            <span className="readout mb-1 shrink-0 text-ink-4">
+              {loading ? "—" : entries.length}
+            </span>
+          </div>
+
+          <div className="mt-5 flex h-11 items-center gap-2 rounded-xl bg-paper px-3.5 shadow-sm ring-1 ring-rule-soft">
+            <Search size={16} strokeWidth={2} className="shrink-0 text-ink-4" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  onQueryChange("");
+                  event.currentTarget.blur();
+                }
+              }}
+              placeholder="Search notes"
+              aria-label="Search notes"
+              className="min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-4"
+            />
+            {hasQuery && (
+              <button
+                title="Clear search"
+                onClick={() => onQueryChange("")}
+                className="icon-button h-8 w-8 shrink-0 text-ink-4"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div
+          role="listbox"
+          aria-label={`Notes in ${folderLabel}`}
+          className="min-h-0 flex-1 overflow-y-auto px-4 pb-24"
+        >
+          <div className="mobile-card overflow-hidden bg-paper">
+            {loading ? (
+              <Skeletons />
+            ) : entries.length === 0 ? (
+              <div className="px-6 py-14 text-center">
+                <p className="text-[14px] text-ink-3">
+                  {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
+                </p>
+                <button
+                  onClick={() => (hasQuery ? onQueryChange("") : onNew())}
+                  className="mt-3 text-[14px] font-medium text-accent"
+                >
+                  {hasQuery ? "Clear search" : "Write the first note"}
+                </button>
+              </div>
+            ) : (
+              entries.map((entry, index) => (
+                <Row
+                  mobile
+                  key={entry.note.id}
+                  entry={entry}
+                  index={index}
+                  meta={meta}
+                  selected={selectedId === entry.note.id}
+                  onSelect={() => onSelect(entry.note.id)}
+                  onDelete={() => onDelete(entry)}
+                  onTogglePin={() => onTogglePin(entry.note.id)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onNew}
+          disabled={busy || loading}
+          aria-label="New note"
+          className="mobile-compose absolute right-5 bottom-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-lg disabled:opacity-40"
+        >
+          <SquarePen size={23} strokeWidth={1.9} />
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section
