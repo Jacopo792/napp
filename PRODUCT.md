@@ -57,8 +57,9 @@ self-hosted by anyone with a GitHub account in ten minutes.
 ## Capabilities and Constraints
 
 Confirmed functionality: create / edit / delete notes, autosave (1.5s debounce),
-folders, colored tags, full-text search, drag a note onto a folder, light/dark theme,
-and u1's `viewAs` archive switch.
+pinning, folders, colored tags, full-text search, drag a note onto a folder,
+light/dark theme, and u1's `viewAs` archive switch. Opening a note is read-only
+state selection: it must never update `updatedAt` or trigger a GitHub write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
 Bear model — markdown syntax renders as formatting while you type in one pane, with no

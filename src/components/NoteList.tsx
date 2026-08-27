@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Search, SquarePen, Trash2, X } from "lucide-react";
+import { Pin, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
 import { useIsDark } from "@/lib/theme";
 import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
@@ -19,6 +19,7 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (entry: NoteEntry) => void;
+  onTogglePin: (noteId: string) => void;
 }
 
 /* The catalogue. Titles here are never truncated to one line: the real corpus
@@ -33,6 +34,7 @@ function Row({
   selected,
   onSelect,
   onDelete,
+  onTogglePin,
 }: {
   entry: NoteEntry;
   index: number;
@@ -40,6 +42,7 @@ function Row({
   selected: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onTogglePin: () => void;
 }) {
   const isDark = useIsDark();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: entry.note.id });
@@ -63,6 +66,7 @@ function Row({
 
   const preview = previewOf(entry.note.body);
   const words = countWords(entry.note.body);
+  const pinned = meta.notes.find((note) => note.id === entry.note.id)?.pinned === true;
 
   return (
     <div
@@ -141,6 +145,28 @@ function Row({
 
       <button
         aria-label={
+          pinned
+            ? `Unpin ${entry.note.title || "Untitled"}`
+            : `Pin ${entry.note.title || "Untitled"}`
+        }
+        title={pinned ? "Unpin note" : "Pin note to top"}
+        aria-pressed={pinned}
+        onClick={(event) => {
+          event.stopPropagation();
+          onTogglePin();
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        className={`icon-button h-7 w-7 shrink-0 transition-all ${
+          pinned
+            ? "text-accent opacity-100"
+            : "text-ink-4 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+        }`}
+      >
+        <Pin size={13} strokeWidth={pinned ? 2.4 : 1.75} fill={pinned ? "currentColor" : "none"} />
+      </button>
+
+      <button
+        aria-label={
           confirmDelete
             ? `Confirm deletion of ${entry.note.title || "Untitled"}`
             : `Delete ${entry.note.title || "Untitled"}`
@@ -201,6 +227,7 @@ export function NoteList({
   onSelect,
   onNew,
   onDelete,
+  onTogglePin,
 }: Props) {
   const hasQuery = query.trim().length > 0;
 
@@ -236,9 +263,10 @@ export function NoteList({
           onClick={onNew}
           disabled={busy || loading}
           title="New note · N"
-          className="icon-button -mr-1 shrink-0 bg-accent p-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
+          className="label icon-button -mr-1 flex shrink-0 items-center gap-1.5 bg-accent px-2.5 py-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
         >
-          <SquarePen size={15} strokeWidth={1.75} />
+          <SquarePen size={14} strokeWidth={1.75} />
+          New note
         </button>
       </div>
 
@@ -276,6 +304,7 @@ export function NoteList({
               selected={selectedId === e.note.id}
               onSelect={() => onSelect(e.note.id)}
               onDelete={() => onDelete(e)}
+              onTogglePin={() => onTogglePin(e.note.id)}
             />
           ))
         )}

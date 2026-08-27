@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { EditorState, Compartment } from "@codemirror/state";
+import { Annotation, EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -64,6 +64,9 @@ const HEADING_CLASS: Record<string, string> = {
 
 const hideMark = Decoration.replace({});
 const dimMark = Decoration.mark({ class: "cm-md-mark" });
+
+/** Document replacements caused by opening/syncing a note are not user edits. */
+const externalDocumentChange = Annotation.define<boolean>();
 
 function buildDecorations(view: EditorView): DecorationSet {
   const ranges: { from: number; to: number; deco: Decoration }[] = [];
@@ -298,7 +301,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
             EditorView.editable.of(!readOnly),
           ]),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onChangeRef.current(u.state.doc.toString());
+            const external = u.transactions.some((transaction) =>
+              transaction.annotation(externalDocumentChange),
+            );
+            if (u.docChanged && !external) onChangeRef.current(u.state.doc.toString());
           }),
         ],
       }),
@@ -323,6 +329,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       changes: { from: 0, to: v.state.doc.length, insert: value },
       selection: { anchor: 0 },
       scrollIntoView: true,
+      annotations: externalDocumentChange.of(true),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docKey]);
@@ -333,7 +340,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
     const v = view.current;
     if (!v || v.hasFocus) return;
     if (v.state.doc.toString() === value) return;
-    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } });
+    v.dispatch({
+      changes: { from: 0, to: v.state.doc.length, insert: value },
+      annotations: externalDocumentChange.of(true),
+    });
   }, [value]);
 
   useEffect(() => {

@@ -35,6 +35,8 @@ export interface NoteMeta {
   id: string;
   folderId: string | null;
   tagIds: string[];
+  /** Optional for backward compatibility with metadata written before pinning existed. */
+  pinned?: boolean;
 }
 
 export interface Meta {

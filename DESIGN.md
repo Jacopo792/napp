@@ -63,7 +63,7 @@ Markdown is edited in one continuous reading surface. Syntax is formatted in pla
 
 - The rail makes archive separation explicit. For the master user, the two archives are a visible segmented switch with a saturated active state; they are never presented as blended or collaborative.
 - Folder selection uses an azure wash, azure text, and stable count alignment. Notes can be dragged onto valid folder rows, which show an inset azure ring while targeted.
-- Catalogue rows stay dense. Each row exposes its current sort position, a multiline title, timestamp, word count, clipped preview, and compact tag marks. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.
+- Catalogue rows stay dense. Pinned notes appear first, then every group is ordered by the latest real edit; opening a note never changes its position. Each row exposes its current sort position, a multiline title, timestamp, word count, clipped preview, compact tag marks, and a pin action. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.
 - Icon actions are quiet until hover or keyboard focus. Hover shifts them toward the accent wash; destructive actions shift to `--danger`.
 - Note deletion is deliberately two-step in place: the first click changes the row action to a visible **Delete?** confirmation, and the second click performs the permanent deletion. The confirmation expires after three seconds. Do not replace this with a one-click destructive icon.
 

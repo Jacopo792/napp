@@ -9,6 +9,7 @@ import {
   List,
   ListOrdered,
   Minus,
+  Pin,
   Plus,
   Quote,
   Strikethrough,
@@ -50,6 +51,8 @@ interface Props {
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (title: string, body: string) => void;
   onTagsChange: (noteId: string, tagIds: string[]) => void;
+  pinned: boolean;
+  onTogglePin: () => void;
   onNew: () => void;
 }
 
@@ -68,6 +71,8 @@ export function NoteEditor({
   titleRef,
   onChange,
   onTagsChange,
+  pinned,
+  onTogglePin,
   onNew,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -202,6 +207,9 @@ export function NoteEditor({
           {/* Measurements. Every value right of its own label, tabular. */}
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-3">
             <span className="readout text-ink-3">
+              Created <span className="text-ink-2">{formatStamp(entry.note.createdAt)}</span>
+            </span>
+            <span className="readout text-ink-3">
               Edited <span className="text-ink-2">{formatStamp(entry.note.updatedAt)}</span>
             </span>
             <span className="readout text-ink-3">
@@ -261,7 +269,27 @@ export function NoteEditor({
             )}
 
             {canEdit && (
-              <div className="relative ml-auto" ref={formatRef}>
+              <button
+                onClick={onTogglePin}
+                aria-pressed={pinned}
+                title={pinned ? "Unpin note" : "Pin note to top"}
+                className={`label soft-control ml-auto flex items-center gap-1.5 px-2.5 py-1.5 transition-colors ${
+                  pinned
+                    ? "border-accent text-accent"
+                    : "text-ink-2 hover:border-accent hover:text-accent"
+                }`}
+              >
+                <Pin
+                  size={13}
+                  strokeWidth={pinned ? 2.4 : 1.8}
+                  fill={pinned ? "currentColor" : "none"}
+                />
+                {pinned ? "Pinned" : "Pin"}
+              </button>
+            )}
+
+            {canEdit && (
+              <div className="relative" ref={formatRef}>
                 <button
                   onClick={() => setFormatOpen((value) => !value)}
                   aria-expanded={formatOpen}

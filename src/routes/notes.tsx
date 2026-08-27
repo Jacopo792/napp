@@ -171,6 +171,7 @@ function NotesPage() {
   // ── The visible slice: owner → folder → tags → search, newest first ─────
   const visible = useMemo(() => {
     const meta = activeMeta;
+    const pinnedIds = new Set(meta.notes.filter((note) => note.pinned).map((note) => note.id));
     const folderOf = (id: string) => {
       const fid = meta.notes.find((n) => n.id === id)?.folderId ?? null;
       return fid && meta.folders.some((f) => f.id === fid) ? fid : null;
@@ -198,7 +199,10 @@ function NotesPage() {
       );
     }
 
-    return [...list].sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
+    return [...list].sort((a, b) => {
+      const pinOrder = Number(pinnedIds.has(b.note.id)) - Number(pinnedIds.has(a.note.id));
+      return pinOrder || b.note.updatedAt.localeCompare(a.note.updatedAt);
+    });
   }, [entries, activeMeta, viewAs, selectedFolderId, filterTagIds, query]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
@@ -346,6 +350,16 @@ function NotesPage() {
     const notes: NoteMeta[] = existing
       ? activeMeta.notes.map((n) => (n.id === noteId ? { ...n, tagIds } : n))
       : [...activeMeta.notes, { id: noteId, folderId: null, tagIds }];
+    handleMetaChange({ ...activeMeta, notes });
+  }
+
+  function handleTogglePin(noteId: string) {
+    const existing = activeMeta.notes.find((note) => note.id === noteId);
+    const notes: NoteMeta[] = existing
+      ? activeMeta.notes.map((note) =>
+          note.id === noteId ? { ...note, pinned: !note.pinned } : note,
+        )
+      : [...activeMeta.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
     handleMetaChange({ ...activeMeta, notes });
   }
 
@@ -657,6 +671,7 @@ function NotesPage() {
                 onSelect={setSelectedId}
                 onNew={handleNew}
                 onDelete={handleDelete}
+                onTogglePin={handleTogglePin}
               />
             </>
           )}
@@ -681,6 +696,10 @@ function NotesPage() {
               titleRef={titleRef}
               onChange={handleDraftChange}
               onTagsChange={handleTagsChange}
+              pinned={
+                activeMeta.notes.find((note) => note.id === selected?.note.id)?.pinned === true
+              }
+              onTogglePin={() => selected && handleTogglePin(selected.note.id)}
               onNew={handleNew}
             />
           </Suspense>
