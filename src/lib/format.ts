@@ -32,8 +32,13 @@ export function formatStamp(iso: string): string {
 }
 
 export function countWords(s: string): number {
-  const t = s.trim();
+  const t = s.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").trim();
   return t ? t.split(/\s+/).length : 0;
+}
+
+/** Embedded image payloads are storage, not readable note characters. */
+export function countChars(s: string): number {
+  return s.replace(/!\[[^\]]*\]\([^)]*\)/g, "").length;
 }
 
 /** Counts are printed with a thin space grouping so four figures stay scannable. */

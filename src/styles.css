@@ -472,6 +472,66 @@
   text-decoration-thickness: 1px;
 }
 
+.cm-md-link-widget {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+
+.cm-md-link-widget:hover {
+  color: var(--accent-strong);
+}
+
+.cm-md-image-widget {
+  position: relative;
+  display: inline-block;
+  width: min(100%, 46rem);
+  margin-block: 0.75rem 1.1rem;
+  overflow: hidden;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.75rem;
+  background: var(--paper);
+}
+
+.cm-md-image-widget img {
+  display: block;
+  width: 100%;
+  max-height: 38rem;
+  object-fit: contain;
+  background: var(--surface);
+}
+
+.cm-md-image-edit {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.45rem;
+  background: var(--page);
+  color: var(--ink-2);
+  padding: 0.35rem 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.cm-md-image-widget:hover .cm-md-image-edit,
+.cm-md-image-edit:focus-visible {
+  opacity: 1;
+}
+
+.cm-md-image-error {
+  display: block;
+  padding: 1rem;
+  color: var(--danger);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+
 .cm-md-list {
   color: var(--accent);
 }

@@ -7,6 +7,7 @@ import {
   placeholder as cmPlaceholder,
   ViewPlugin,
   Decoration,
+  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -68,6 +69,131 @@ const dimMark = Decoration.mark({ class: "cm-md-mark" });
 /** Document replacements caused by opening/syncing a note are not user edits. */
 const externalDocumentChange = Annotation.define<boolean>();
 
+function safeLinkUrl(raw: string): string | null {
+  try {
+    const url = new URL(raw, window.location.href);
+    return ["http:", "https:", "mailto:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeImageUrl(raw: string): string | null {
+  if (/^data:image\/(?:jpeg|png|webp);base64,/i.test(raw)) return raw;
+  try {
+    const url = new URL(raw, window.location.href);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+class LinkWidget extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly url: string,
+  ) {
+    super();
+  }
+
+  eq(other: LinkWidget): boolean {
+    return other.label === this.label && other.url === this.url;
+  }
+
+  toDOM(): HTMLElement {
+    const anchor = document.createElement("a");
+    anchor.className = "cm-md-link-widget";
+    anchor.href = this.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.textContent = this.label;
+    anchor.title = this.url;
+    anchor.addEventListener("mousedown", (event) => event.stopPropagation());
+    anchor.addEventListener("click", (event) => event.stopPropagation());
+    return anchor;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+class ImageWidget extends WidgetType {
+  constructor(
+    readonly alt: string,
+    readonly url: string,
+    readonly sourceFrom: number,
+  ) {
+    super();
+  }
+
+  eq(other: ImageWidget): boolean {
+    return other.alt === this.alt && other.url === this.url && other.sourceFrom === this.sourceFrom;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const frame = document.createElement("span");
+    frame.className = "cm-md-image-widget";
+
+    const image = document.createElement("img");
+    image.src = this.url;
+    image.alt = this.alt;
+    image.loading = "lazy";
+    image.decoding = "async";
+    frame.append(image);
+
+    const error = document.createElement("span");
+    error.className = "cm-md-image-error";
+    error.textContent = "Image could not be loaded";
+    error.hidden = true;
+    frame.append(error);
+
+    image.addEventListener("error", () => {
+      image.hidden = true;
+      error.hidden = false;
+      frame.classList.add("is-error");
+    });
+
+    if (!view.state.readOnly) {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "cm-md-image-edit";
+      edit.textContent = "Edit source";
+      edit.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      edit.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        view.dispatch({ selection: { anchor: this.sourceFrom }, scrollIntoView: true });
+        view.focus();
+      });
+      frame.append(edit);
+    }
+
+    return frame;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+function markdownLink(source: string): { label: string; url: string } | null {
+  const match = source.match(/^\[([\s\S]*?)\]\(([\s\S]+)\)$/);
+  if (!match) return null;
+  const url = safeLinkUrl(match[2].trim());
+  return url ? { label: match[1] || url, url } : null;
+}
+
+function markdownImage(source: string): { alt: string; url: string } | null {
+  const match = source.match(/^!\[([\s\S]*?)\]\(([\s\S]+)\)$/);
+  if (!match) return null;
+  const url = safeImageUrl(match[2].trim());
+  return url ? { alt: match[1] || "Image", url } : null;
+}
+
 function buildDecorations(view: EditorView): DecorationSet {
   const ranges: { from: number; to: number; deco: Decoration }[] = [];
   const doc = view.state.doc;
@@ -75,10 +201,12 @@ function buildDecorations(view: EditorView): DecorationSet {
   // Lines the caret or a selection currently touches. Markers on these lines
   // stay visible, so editing the syntax never fights with rendering it.
   const activeLines = new Set<number>();
-  for (const r of view.state.selection.ranges) {
-    const first = doc.lineAt(r.from).number;
-    const last = doc.lineAt(r.to).number;
-    for (let n = first; n <= last; n++) activeLines.add(n);
+  if (view.hasFocus) {
+    for (const r of view.state.selection.ranges) {
+      const first = doc.lineAt(r.from).number;
+      const last = doc.lineAt(r.to).number;
+      for (let n = first; n <= last; n++) activeLines.add(n);
+    }
   }
 
   for (const { from, to } of view.visibleRanges) {
@@ -86,6 +214,48 @@ function buildDecorations(view: EditorView): DecorationSet {
       from,
       to,
       enter: (node) => {
+        const source = doc.sliceString(node.from, node.to);
+        const sourceLine = doc.lineAt(node.from).number;
+        const onActiveLine = activeLines.has(sourceLine);
+
+        if (node.name === "Image" && !onActiveLine) {
+          const image = markdownImage(source);
+          if (image) {
+            ranges.push({
+              from: node.from,
+              to: node.to,
+              deco: Decoration.replace({
+                widget: new ImageWidget(image.alt, image.url, node.from),
+              }),
+            });
+            return false;
+          }
+        }
+
+        if (node.name === "Link" && !onActiveLine) {
+          const link = markdownLink(source);
+          if (link) {
+            ranges.push({
+              from: node.from,
+              to: node.to,
+              deco: Decoration.replace({ widget: new LinkWidget(link.label, link.url) }),
+            });
+            return false;
+          }
+        }
+
+        if (node.name === "URL" && node.node.parent?.name !== "Link" && !onActiveLine) {
+          const url = safeLinkUrl(source);
+          if (url) {
+            ranges.push({
+              from: node.from,
+              to: node.to,
+              deco: Decoration.replace({ widget: new LinkWidget(source, url) }),
+            });
+            return false;
+          }
+        }
+
         const heading = HEADING_CLASS[node.name];
         if (heading) {
           // A line decoration so the whole line takes the heading's metrics,
@@ -101,7 +271,6 @@ function buildDecorations(view: EditorView): DecorationSet {
 
         if (HIDDEN_MARKS.has(node.name)) {
           if (node.to === node.from) return;
-          const onActiveLine = activeLines.has(doc.lineAt(node.from).number);
           ranges.push({
             from: node.from,
             to: node.to,
@@ -137,7 +306,7 @@ const richMarkdown = ViewPlugin.fromClass(
     update(u: ViewUpdate) {
       // Selection is in the dependency list on purpose: moving the caret onto
       // a line is what brings that line's markers back.
-      if (u.docChanged || u.viewportChanged || u.selectionSet) {
+      if (u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) {
         this.decorations = buildDecorations(u.view);
       }
     }
@@ -159,7 +328,10 @@ export type FormatAction =
 
 export interface MarkdownEditorHandle {
   format: (action: FormatAction) => void;
+  getSelectedText: () => string;
+  insertLink: (label: string, url: string) => void;
   insertText: (text: string) => void;
+  insertImage: (src: string, alt: string) => void;
   focus: () => void;
 }
 
@@ -256,6 +428,19 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       if (readOnly || !view.current) return;
       formatSelection(view.current, action);
     },
+    getSelectedText() {
+      const editor = view.current;
+      if (!editor) return "";
+      const { from, to } = editor.state.selection.main;
+      return editor.state.doc.sliceString(from, to);
+    },
+    insertLink(label, url) {
+      if (readOnly || !view.current) return;
+      const editor = view.current;
+      const cleanLabel = label.replaceAll("[", "").replaceAll("]", "").trim() || url;
+      const insert = `[${cleanLabel}](${url})`;
+      replaceSelection(editor, insert, insert.length, insert.length);
+    },
     insertText(text) {
       if (readOnly || !view.current) return;
       const editor = view.current;
@@ -263,6 +448,20 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       const prefix =
         from > 0 && !editor.state.doc.sliceString(0, from).endsWith("\n\n") ? "\n\n" : "";
       const insert = `${prefix}${text}\n\n`;
+      editor.dispatch({
+        changes: { from, to, insert },
+        selection: { anchor: from + insert.length },
+        scrollIntoView: true,
+      });
+      editor.focus();
+    },
+    insertImage(src, alt) {
+      if (readOnly || !view.current) return;
+      const editor = view.current;
+      const { from, to } = editor.state.selection.main;
+      const before = editor.state.doc.sliceString(0, from);
+      const prefix = from > 0 && !before.endsWith("\n\n") ? "\n\n" : "";
+      const insert = `${prefix}![${alt}](${src})\n\n`;
       editor.dispatch({
         changes: { from, to, insert },
         selection: { anchor: from + insert.length },

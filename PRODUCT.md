@@ -70,6 +70,12 @@ PDFs with selectable text may be imported locally into the current note. The bro
 extracts the text without uploading the document; OCR and AI document analysis are not
 part of this capability.
 
+JPG, PNG, and WebP images may be inserted locally. They are resized in the browser and
+embedded inside the encrypted note rather than uploaded as a separate plaintext file.
+Markdown image URLs render in place, and Markdown links plus bare HTTP(S) URLs become
+clickable when their source line is not being edited. Link insertion uses explicit text
+and URL fields instead of leaving an editable Markdown placeholder in the note.
+
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4, deployed to GitHub Pages under a

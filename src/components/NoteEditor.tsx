@@ -4,6 +4,7 @@ import {
   Code2,
   FileUp,
   Heading2,
+  ImagePlus,
   Italic,
   Link,
   List,
@@ -18,8 +19,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Meta, Tag } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { countWords, formatCount, formatStamp } from "@/lib/format";
+import { countChars, countWords, formatCount, formatStamp } from "@/lib/format";
 import { extractPdfText } from "@/lib/pdf";
+import { imageAltFromFilename, prepareImageForNote } from "@/lib/image";
 import { TagBadge } from "./TagBadge";
 import { MarkdownEditor, type FormatAction, type MarkdownEditorHandle } from "./MarkdownEditor";
 
@@ -77,22 +79,31 @@ export function NoteEditor({
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkError, setLinkError] = useState("");
   const [pdfStatus, setPdfStatus] = useState("");
   const [pdfError, setPdfError] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
   const formatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
+  const linkUrlRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<MarkdownEditorHandle>(null);
 
   useEffect(() => {
-    if (!pickerOpen && !formatOpen) return;
+    if (!pickerOpen && !formatOpen && !linkOpen) return;
     function onDown(e: MouseEvent) {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
-      if (formatRef.current && !formatRef.current.contains(e.target as Node)) setFormatOpen(false);
+      if (formatRef.current && !formatRef.current.contains(e.target as Node)) {
+        setFormatOpen(false);
+        setLinkOpen(false);
+      }
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [pickerOpen, formatOpen]);
+  }, [pickerOpen, formatOpen, linkOpen]);
 
   useEffect(() => {
     const el = titleRef.current;
@@ -136,6 +147,53 @@ export function NoteEditor({
     }
   }
 
+  async function handleImage(file: File | undefined) {
+    if (!file || !draft || !canEdit) return;
+    setPdfError("");
+    setPdfStatus("Preparing image…");
+    setFormatOpen(false);
+    try {
+      const dataUrl = await prepareImageForNote(file);
+      editorRef.current?.insertImage(dataUrl, imageAltFromFilename(file.name));
+      setPdfStatus("Image inserted and encrypted with this note");
+      window.setTimeout(() => setPdfStatus(""), 2600);
+    } catch (error) {
+      setPdfStatus("");
+      setPdfError(error instanceof Error ? error.message : "Could not insert image");
+    } finally {
+      if (imageRef.current) imageRef.current.value = "";
+    }
+  }
+
+  function openLinkForm() {
+    setLinkLabel(editorRef.current?.getSelectedText() ?? "");
+    setLinkUrl("");
+    setLinkError("");
+    setFormatOpen(false);
+    setLinkOpen(true);
+    window.setTimeout(() => linkUrlRef.current?.focus(), 0);
+  }
+
+  function handleInsertLink() {
+    let url = linkUrl.trim();
+    if (!url) {
+      setLinkError("Enter a URL");
+      return;
+    }
+    if (!/^[a-z][a-z\d+.-]*:/i.test(url)) url = `https://${url}`;
+    try {
+      const parsed = new URL(url);
+      if (!["http:", "https:", "mailto:"].includes(parsed.protocol)) throw new Error();
+      url = parsed.href;
+    } catch {
+      setLinkError("Enter a valid web address");
+      return;
+    }
+
+    editorRef.current?.insertLink(linkLabel, url);
+    setLinkOpen(false);
+  }
+
   if (!entry || !draft) {
     return (
       <section className="soft-pane flex min-w-0 flex-1 flex-col bg-page">
@@ -164,7 +222,7 @@ export function NoteEditor({
   }
 
   const words = countWords(draft.body);
-  const chars = draft.body.length;
+  const chars = countChars(draft.body);
 
   return (
     <section key={entry.note.id} className="soft-pane page-in flex min-w-0 flex-1 flex-col bg-page">
@@ -316,8 +374,11 @@ export function NoteEditor({
                         role="menuitem"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => {
-                          editorRef.current?.format(action);
-                          setFormatOpen(false);
+                          if (action === "link") openLinkForm();
+                          else {
+                            editorRef.current?.format(action);
+                            setFormatOpen(false);
+                          }
                         }}
                         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
                       >
@@ -330,6 +391,14 @@ export function NoteEditor({
                     <div className="my-1 border-t border-rule-soft" />
                     <button
                       role="menuitem"
+                      onClick={() => imageRef.current?.click()}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+                    >
+                      <ImagePlus size={14} strokeWidth={1.8} className="text-accent" />
+                      <span>Insert image</span>
+                    </button>
+                    <button
+                      role="menuitem"
                       onClick={() => fileRef.current?.click()}
                       className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
                     >
@@ -337,8 +406,64 @@ export function NoteEditor({
                       <span>Import PDF as text</span>
                     </button>
                     <p className="px-2.5 pt-1 pb-1.5 text-[10px] leading-relaxed text-ink-4">
-                      Processed locally. Text PDFs only.
+                      Files are processed locally. JPG, PNG, WebP and text PDFs.
                     </p>
+                  </div>
+                )}
+
+                {linkOpen && (
+                  <div className="popover absolute top-full right-0 z-30 mt-2 w-72 p-3">
+                    <p className="label mb-2 text-ink-2">Insert link</p>
+                    <label className="mb-2 block">
+                      <span className="label mb-1 block text-ink-4">Text</span>
+                      <input
+                        value={linkLabel}
+                        onChange={(event) => setLinkLabel(event.target.value)}
+                        placeholder="Link text (optional)"
+                        className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="label mb-1 block text-ink-4">URL</span>
+                      <input
+                        ref={linkUrlRef}
+                        value={linkUrl}
+                        onChange={(event) => {
+                          setLinkUrl(event.target.value);
+                          setLinkError("");
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleInsertLink();
+                          } else if (event.key === "Escape") {
+                            setLinkOpen(false);
+                          }
+                        }}
+                        placeholder="https://example.com"
+                        aria-invalid={linkError ? true : undefined}
+                        className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                      />
+                    </label>
+                    {linkError && (
+                      <p role="alert" className="mt-1.5 text-[11px] text-danger">
+                        {linkError}
+                      </p>
+                    )}
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        onClick={() => setLinkOpen(false)}
+                        className="label rounded-lg px-3 py-2 text-ink-3 hover:bg-surface"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleInsertLink}
+                        className="label rounded-lg bg-accent px-3 py-2 text-on-accent hover:bg-accent-strong"
+                      >
+                        Insert
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -348,6 +473,13 @@ export function NoteEditor({
                   accept="application/pdf,.pdf"
                   className="hidden"
                   onChange={(event) => void handlePdf(event.target.files?.[0])}
+                />
+                <input
+                  ref={imageRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={(event) => void handleImage(event.target.files?.[0])}
                 />
               </div>
             )}

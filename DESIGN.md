@@ -57,7 +57,7 @@ Title, metadata, and body share one left-aligned reading column capped at the ac
 
 The collapsed bar always shows the current preset or custom state plus the size/measure/weight readout and the save state. Expanding it reveals native range inputs and presets. Keep native keyboard stepping and screen-reader semantics; the travelled track and thumb use azure.
 
-Markdown is edited in one continuous reading surface. Syntax is formatted in place: markers remain visible but muted, headings gain display hierarchy, links and list markers use azure, code gains a restrained inset surface, and horizontal-rule source draws a real rule. A compact Format menu offers bold/italic/strike/heading/list/quote/link/code/divider plus a local “Import PDF as text” action that inserts extracted text without uploading. There is no always-visible toolbar or split preview.
+Markdown is edited in one continuous reading surface. Syntax is formatted in place: markers remain visible but muted, headings gain display hierarchy, links and list markers use azure, code gains a restrained inset surface, and horizontal-rule source draws a real rule. Links and images render as interactive reading objects whenever their source line is inactive; returning the caret to that line exposes the editable Markdown. A compact Format menu offers bold/italic/strike/heading/list/quote/link/code/divider, local image insertion, and “Import PDF as text.” There is no always-visible toolbar or split preview.
 
 ## Navigation and interaction states
 
