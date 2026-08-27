@@ -48,6 +48,8 @@ interface Props {
   entry: NoteEntry | null;
   meta: Meta;
   draft: { title: string; body: string } | null;
+  /** Raised when `draft` carries text pulled from the other device. */
+  syncRevision: number;
   canEdit: boolean;
   viewingAsPartner: boolean;
   partnerName: string;
@@ -69,6 +71,7 @@ export function NoteEditor({
   entry,
   meta,
   draft,
+  syncRevision,
   canEdit,
   viewingAsPartner,
   partnerName,
@@ -528,6 +531,7 @@ export function NoteEditor({
           ref={editorRef}
           value={draft.body}
           docKey={entry.note.id}
+          revision={syncRevision}
           readOnly={!canEdit}
           placeholder="Start writing. Markdown formats itself as you type."
           onChange={(body) => canEdit && onChange(draft.title, body)}

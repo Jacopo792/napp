@@ -11,15 +11,10 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
-import { decryptFile, encryptNote } from "@/lib/crypto";
-import {
-  fetchNoteFiles,
-  writeNoteFile,
-  deleteNoteFile,
-  ensureDataBranch,
-  readFile,
-} from "@/lib/github";
-import { loadMeta, saveMeta } from "@/lib/meta";
+import { encryptNote } from "@/lib/crypto";
+import { writeNoteFile, deleteNoteFile, ensureDataBranch, listNotesTree } from "@/lib/github";
+import { saveMeta } from "@/lib/meta";
+import { pullRemote, EMPTY_CURSOR, type PullUpdate } from "@/lib/sync";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
@@ -39,6 +34,21 @@ export const Route = createFileRoute("/notes")({
 
 /** How long the typing has to stop before a note is pushed to GitHub. */
 const AUTOSAVE_MS = 1500;
+
+/* ── Reading the other device ─────────────────────────────────────────────
+   The branch is polled, because a static site has nothing to be pushed to.
+   Each poll is one conditional request that GitHub answers 304 while the
+   archive is untouched, and 304s cost no rate limit — so the cadence can be
+   brisk while two people are actually writing to each other and slack off
+   when nobody is. ─────────────────────────────────────────────────────── */
+const SYNC_FAST_MS = 4000;
+const SYNC_IDLE_MS = 16_000;
+/** How long the fast cadence holds after the last edit, local or remote. */
+const SYNC_ACTIVE_MS = 90_000;
+/** Quiet period after a failed poll, so a flaky network is not hammered. */
+const SYNC_BACKOFF_MS = 30_000;
+/** A note written from this tab cannot be pulled away by a lagging read. */
+const WRITE_GRACE_MS = 30_000;
 
 type Draft = { title: string; body: string };
 
@@ -62,6 +72,10 @@ function NotesPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [syncFlash, setSyncFlash] = useState(false);
+  /** Raised only when a pull replaces the open draft, so the editor knows the
+   *  new text is not its own and may be applied under the caret. */
+  const [syncRevision, setSyncRevision] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,6 +106,23 @@ function NotesPage() {
   const pendingMetaRef = useRef<{ owner: "u1" | "u2"; meta: Meta } | null>(null);
   const inFlightRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
+
+  // ── Pull side ───────────────────────────────────────────────────────────
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
+  const cursorEtagRef = useRef<string | undefined>(undefined);
+  const foreignRef = useRef<Record<string, string>>({});
+  const readyRef = useRef(false);
+  const syncingRef = useRef(false);
+  const lastSyncRef = useRef(0);
+  const activeUntilRef = useRef(0);
+  const backoffUntilRef = useRef(0);
+  /** Counter bumped around every local write. A pull that straddles one is
+   *  describing a branch that has already moved, so its result is discarded. */
+  const writeSeqRef = useRef(0);
+  /** Paths this tab wrote recently, so an eventually-consistent read cannot
+   *  mistake a brand-new note for one the other device deleted. */
+  const justWrittenRef = useRef<Map<string, number>>(new Map());
 
   const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
   const partnerName = myMeta.partnerName?.trim() || "Partner";
@@ -124,6 +155,93 @@ function NotesPage() {
     });
   }, [navigate]);
 
+  /**
+   * Folds a pull into the page. The rule throughout is that unpushed local work
+   * wins: a remote body only reaches the editor when nothing is queued for that
+   * note, and remote metadata is skipped while a metadata write is waiting.
+   */
+  const applyPull = useCallback((result: PullUpdate) => {
+    cursorEtagRef.current = result.etag;
+    foreignRef.current = result.foreign;
+
+    const now = Date.now();
+    for (const [path, at] of justWrittenRef.current) {
+      if (now - at > WRITE_GRACE_MS) justWrittenRef.current.delete(path);
+    }
+    // A note this tab wrote seconds ago is not one the other device deleted —
+    // GitHub may still be answering from before our own commit. Keep it, and
+    // drop the ETag so the listing is taken again rather than trusted as final.
+    const rescued = entriesRef.current.filter(
+      (e) => result.removedIds.includes(e.note.id) && justWrittenRef.current.has(e.path),
+    );
+    if (rescued.length > 0) cursorEtagRef.current = undefined;
+
+    const next = [...result.entries, ...rescued].sort((a, b) =>
+      b.note.updatedAt.localeCompare(a.note.updatedAt),
+    );
+    entriesRef.current = next;
+    setEntries(next);
+
+    for (const { owner, meta, sha } of result.metas) {
+      if (pendingMetaRef.current?.owner === owner) continue;
+      metaShaRef.current[owner] = sha;
+      if (owner === "u1") setMyMeta(meta);
+      else setPartnerMeta(meta);
+    }
+
+    // The open note, if the other device moved it and nothing local is queued.
+    const open = selectedIdRef.current;
+    if (!open || pendingNotesRef.current.has(open)) return;
+    if (!result.updatedIds.includes(open)) return;
+    const fresh = next.find((e) => e.note.id === open);
+    if (!fresh) return;
+
+    // Retyping the title under a caret sitting in it would send that caret to
+    // the end, so an in-use title field keeps what it shows.
+    const titleBusy = document.activeElement === titleRef.current;
+    setDraft((d) =>
+      d ? { title: titleBusy ? d.title : fresh.note.title, body: fresh.note.body } : d,
+    );
+    setSyncRevision((n) => n + 1);
+  }, []);
+
+  const syncRemote = useCallback(async () => {
+    const s = sessionRef.current;
+    // A push in flight owns the branch; reading across it only invites conflict.
+    if (!s || !readyRef.current || syncingRef.current || inFlightRef.current) return;
+    if (Date.now() < backoffUntilRef.current) return;
+
+    syncingRef.current = true;
+    lastSyncRef.current = Date.now();
+    const seq = writeSeqRef.current;
+    try {
+      const result = await pullRemote(s, {
+        etag: cursorEtagRef.current,
+        entries: entriesRef.current,
+        metaShas: metaShaRef.current,
+        foreign: foreignRef.current,
+      });
+      if (!result.changed) return;
+      if (seq !== writeSeqRef.current) {
+        cursorEtagRef.current = undefined;
+        return;
+      }
+
+      applyPull(result);
+      if (result.updatedIds.length + result.removedIds.length + result.metas.length > 0) {
+        activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
+        setSyncFlash(true);
+        window.setTimeout(() => setSyncFlash(false), 2000);
+      }
+    } catch {
+      // Offline, throttled, or a transient 5xx. The status line reports writes
+      // the user asked for, not background reads: back off quietly and retry.
+      backoffUntilRef.current = Date.now() + SYNC_BACKOFF_MS;
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [applyPull]);
+
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
@@ -133,33 +251,14 @@ function NotesPage() {
       setError("");
       try {
         await ensureDataBranch(session.repo, session.pat);
-
-        const [files, mine, theirs] = await Promise.all([
-          fetchNoteFiles(session.repo, session.pat),
-          loadMeta(session.repo, session.pat, session.keys, session.role),
-          session.role === "u1"
-            ? loadMeta(session.repo, session.pat, session.keys, "u2")
-            : Promise.resolve({ meta: { ...EMPTY_META }, sha: undefined }),
-        ]);
+        // A first pull with no cursor is a full load: every note and both
+        // metadata files, read by blob SHA so nothing can be served stale.
+        const result = await pullRemote(session, EMPTY_CURSOR);
         if (cancelled) return;
-
-        const decrypted: NoteEntry[] = [];
-        await Promise.all(
-          files.map(async (f) => {
-            const note = await decryptFile(f.content, session.keys);
-            if (note) decrypted.push({ note, sha: f.sha, path: f.path });
-          }),
-        );
-        if (cancelled) return;
-
-        decrypted.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
-        setEntries(decrypted);
-        setMyMeta(mine.meta);
-        metaShaRef.current[session.role] = mine.sha;
-        if (session.role === "u1") {
-          setPartnerMeta(theirs.meta);
-          metaShaRef.current.u2 = theirs.sha;
-        }
+        if (result.changed) applyPull(result);
+        readyRef.current = true;
+        lastSyncRef.current = Date.now();
+        activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       } finally {
@@ -169,8 +268,39 @@ function NotesPage() {
 
     return () => {
       cancelled = true;
+      readyRef.current = false;
     };
-  }, [session]);
+  }, [session, applyPull]);
+
+  // ── Polling the branch ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!session) return;
+
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      const cadence = Date.now() < activeUntilRef.current ? SYNC_FAST_MS : SYNC_IDLE_MS;
+      if (Date.now() - lastSyncRef.current >= cadence) void syncRemote();
+    };
+    const timer = window.setInterval(tick, SYNC_FAST_MS);
+
+    // Returning to the tab, or to the network, is exactly when the page is most
+    // likely to be out of date — catch up at once rather than on the next tick.
+    const wake = () => {
+      if (document.visibilityState !== "visible") return;
+      activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
+      backoffUntilRef.current = 0;
+      void syncRemote();
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
+    };
+  }, [session, syncRemote]);
 
   // ── The visible slice: owner → folder → tags → search, newest first ─────
   const visible = useMemo(() => {
@@ -249,6 +379,7 @@ function NotesPage() {
     if (pendingNotesRef.current.size === 0 && !pendingMetaRef.current) return;
 
     inFlightRef.current = true;
+    writeSeqRef.current++;
     setSaving(true);
     let failed = false;
 
@@ -271,9 +402,14 @@ function NotesPage() {
           try {
             newSha = await writeNoteFile(s.repo, s.pat, entry.path, content, entry.sha);
           } catch (err) {
-            // Stale blob SHA (someone else wrote, or our copy drifted).
+            // Stale blob SHA: the other device wrote this note while we held it
+            // open. Their text loses — this is what the user just typed — but
+            // the write has to be re-aimed at the SHA that is actually there.
             if (err instanceof Error && err.message.includes("409")) {
-              const current = await readFile(s.repo, s.pat, entry.path);
+              const listing = await listNotesTree(s.repo, s.pat);
+              const current = listing.unchanged
+                ? undefined
+                : listing.files.find((f) => f.path === entry.path);
               newSha = await writeNoteFile(s.repo, s.pat, entry.path, content, current?.sha);
             } else {
               pendingNotesRef.current.set(id, d);
@@ -281,6 +417,7 @@ function NotesPage() {
             }
           }
 
+          justWrittenRef.current.set(entry.path, Date.now());
           const saved: NoteEntry = { ...entry, note: updated, sha: newSha };
           entriesRef.current = entriesRef.current.map((e) => (e.note.id === id ? saved : e));
           setEntries(entriesRef.current);
@@ -314,6 +451,7 @@ function NotesPage() {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
       inFlightRef.current = false;
+      writeSeqRef.current++;
       setSaving(false);
       setDirty(pendingNotesRef.current.size > 0 || pendingMetaRef.current !== null);
       if (failed) window.setTimeout(() => void drain(), 4000);
@@ -322,6 +460,8 @@ function NotesPage() {
 
   const schedule = useCallback(() => {
     setDirty(true);
+    // Someone is writing, so the other device is worth checking on often.
+    activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
     window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => void drain(), AUTOSAVE_MS);
   }, [drain]);
@@ -397,11 +537,13 @@ function NotesPage() {
 
     setSaving(true);
     setError("");
+    writeSeqRef.current++;
     try {
       const content = await encryptNote(note, s.keys);
       const path = `notes/${note.id}.napp`;
       const sha = await writeNoteFile(s.repo, s.pat, path, content);
 
+      justWrittenRef.current.set(path, Date.now());
       entriesRef.current = [{ note, sha, path }, ...entriesRef.current];
       setEntries(entriesRef.current);
 
@@ -419,6 +561,7 @@ function NotesPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create note");
     } finally {
+      writeSeqRef.current++;
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -476,10 +619,12 @@ function NotesPage() {
       if (!s) return;
       setSaving(true);
       setError("");
+      writeSeqRef.current++;
       try {
         pendingNotesRef.current.delete(entry.note.id);
         await deleteNoteFile(s.repo, s.pat, entry.path, entry.sha);
 
+        justWrittenRef.current.delete(entry.path);
         entriesRef.current = entriesRef.current.filter((e) => e.note.id !== entry.note.id);
         setEntries(entriesRef.current);
 
@@ -496,6 +641,7 @@ function NotesPage() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete permanently");
       } finally {
+        writeSeqRef.current++;
         setSaving(false);
       }
     },
@@ -647,6 +793,8 @@ function NotesPage() {
     </span>
   ) : dirty ? (
     <span className="label text-ink-2">Unsaved</span>
+  ) : syncFlash ? (
+    <span className="label text-accent">Synced from elsewhere</span>
   ) : (
     <span className="flex items-center gap-2">
       <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Committed</span>
@@ -770,6 +918,7 @@ function NotesPage() {
                   entry={selected}
                   meta={activeMeta}
                   draft={draft}
+                  syncRevision={syncRevision}
                   canEdit={canEdit}
                   viewingAsPartner={session.role === "u1" && viewAs === "u2"}
                   partnerName={partnerName}
@@ -924,6 +1073,7 @@ function NotesPage() {
               entry={selected}
               meta={activeMeta}
               draft={draft}
+              syncRevision={syncRevision}
               canEdit={canEdit}
               viewingAsPartner={session.role === "u1" && viewAs === "u2"}
               partnerName={partnerName}

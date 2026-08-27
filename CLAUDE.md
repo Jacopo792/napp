@@ -85,7 +85,8 @@ NAPP:1:<owner>
 | File                           | Role                                                                             |
 | ------------------------------ | -------------------------------------------------------------------------------- |
 | `src/lib/crypto.ts`            | HKDF key derivation, bundle parsing, AES-GCM encrypt/decrypt                     |
-| `src/lib/github.ts`            | GitHub Contents API — list, CDN-read, write, delete, branch bootstrap            |
+| `src/lib/github.ts`            | GitHub API — tree listing, blob read, write, delete, branch bootstrap            |
+| `src/lib/sync.ts`              | Pulls other devices' writes: conditional tree poll, then only changed blobs      |
 | `src/lib/session.ts`           | `sessionStorage` lifecycle — create, restore (re-derives keys on refresh), clear |
 | `src/routes/index.tsx`         | Login page — paste bundle token                                                  |
 | `src/routes/notes.tsx`         | Main UI — sidebar, editor, create / save-on-blur / delete                        |
@@ -103,6 +104,32 @@ data   → notes/{uuid}.napp  (auto-created on first login)
 ```
 
 `ensureDataBranch()` in `github.ts` creates the `data` branch on first login if it doesn't exist.
+
+---
+
+## Cross-device sync
+
+There is no backend to push from, so `notes.tsx` polls the branch while the tab
+is visible: every 4s for 90s after any edit (local or remote), every 16s once
+things go quiet, paused entirely when the tab is hidden and resumed the moment
+it comes back.
+
+Each poll is one conditional `GET /git/trees/data:notes` carrying the previous
+ETag. GitHub answers 304 while the directory is byte-identical, and **304s do
+not count against the rate limit**, so an idle archive costs nothing. When the
+tree does move, only blobs whose SHA changed are read — editing one note pulls
+one note.
+
+Reads go through `/git/blobs/{sha}`, never `raw.githubusercontent.com`. Raw URLs
+are branch-addressed and CDN-cached for five minutes, which is why a refresh
+used to show stale text; a blob SHA is its content and cannot be stale. All
+`api.github.com` requests use `cache: "no-store"` for the same reason.
+
+**Local work always wins.** A remote body only reaches the editor when nothing
+is queued for that note, and remote metadata is skipped while a metadata write
+is pending. When it is safe to apply, only the span that actually differs is
+replaced, so the caret does not move. Two people editing *the same note* at the
+same time is still last-write-wins at note granularity — there is no merge.
 
 ---
 

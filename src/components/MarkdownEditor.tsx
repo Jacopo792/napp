@@ -341,8 +341,40 @@ interface Props {
   placeholder: string;
   /** Changing this swaps the document wholesale — a different note, not an edit. */
   docKey: string;
+  /**
+   * Bumped by the page when `value` carries text pulled from another device.
+   * Only then is the document rewritten under a caret that is already in it.
+   */
+  revision?: number;
   onChange: (next: string) => void;
   onPasteImage?: (file: File) => Promise<{ src: string; alt: string } | null>;
+}
+
+/**
+ * Rewrites the document to `text` touching only the span that actually differs.
+ * Replacing the whole doc would work too, but CodeMirror maps the selection
+ * through the change it is given: a narrow change leaves a caret sitting after
+ * the edit exactly where it was, which is what makes a remote update land
+ * without shoving the reader somewhere else.
+ */
+function reconcileDoc(view: EditorView, text: string): void {
+  const doc = view.state.doc.toString();
+  if (doc === text) return;
+
+  let from = 0;
+  const shared = Math.min(doc.length, text.length);
+  while (from < shared && doc[from] === text[from]) from++;
+  let to = doc.length;
+  let end = text.length;
+  while (to > from && end > from && doc[to - 1] === text[end - 1]) {
+    to--;
+    end--;
+  }
+
+  view.dispatch({
+    changes: { from, to, insert: text.slice(from, end) },
+    annotations: [externalDocumentChange.of(true), Transaction.addToHistory.of(false)],
+  });
 }
 
 function insertImage(editor: EditorView, src: string, alt: string): void {
@@ -428,7 +460,7 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function MarkdownEditor(
-  { value, readOnly, placeholder, docKey, onChange, onPasteImage },
+  { value, readOnly, placeholder, docKey, revision = 0, onChange, onPasteImage },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -559,16 +591,27 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
   }, [docKey]);
 
   // An edit that arrived from outside this component (a pending draft being
-  // restored, say). Never fight the user's own keystrokes.
+  // restored, say). Never fight the user's own keystrokes: while the caret is
+  // in here, `value` can lag a render behind the document and writing it back
+  // would undo the characters just typed.
   useEffect(() => {
     const v = view.current;
     if (!v || v.hasFocus) return;
-    if (v.state.doc.toString() === value) return;
-    v.dispatch({
-      changes: { from: 0, to: v.state.doc.length, insert: value },
-      annotations: [externalDocumentChange.of(true), Transaction.addToHistory.of(false)],
-    });
+    reconcileDoc(v, value);
   }, [value]);
+
+  // Text pulled from the other device. The page raises `revision` only once it
+  // has established there is nothing unsaved for this note, so this is the one
+  // outside edit that may be applied while the caret is in the document.
+  const appliedRevision = useRef(revision);
+  useEffect(() => {
+    if (appliedRevision.current === revision) return;
+    appliedRevision.current = revision;
+    if (view.current) reconcileDoc(view.current, value);
+    // `value` is read for its current commit, not tracked: a revision bump is
+    // the only thing that authorises this write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision]);
 
   useEffect(() => {
     const v = view.current;
