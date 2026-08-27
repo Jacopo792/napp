@@ -1,103 +1,228 @@
 @import "tailwindcss" source(none);
 @source "../src";
 
-/* ── Color tokens ───────────────────────────────────────────────────────── */
+/* ── Color tokens ───────────────────────────────────────────────────────────
+   Three chrome layers, matching the three columns:
+     --rail        folder rail        (furthest from the writing)
+     --surface     note list          (middle)
+     --background  editor "paper"     (where the words go)
+   Light runs rail→paper dark→light; dark inverts it, so the editor is always
+   the calmest surface on screen. */
 :root {
   --background: #ffffff;
-  --surface:    #f7f7f8;
-  --raised:     #ffffff;
+  --surface: #f7f7f8;
+  --rail: #f2f2f4;
+  --raised: #ffffff;
   --foreground: #1c1c1e;
-  --muted:      #6e6e73;
-  --border:     #e5e5ea;
-  --selected:   #ebebf0;
-  --accent:     #007aff;
-  --danger:     #ff3b30;
-  --success:    #34c759;
+  --muted: #55555a;
+  --faint: #6e6e73;
+  --border: #e3e3e8;
+  --selected: #e4e4ea;
+  --accent: #007aff;
+  --on-accent: #ffffff;
+  --danger: #ff3b30;
+  --success: #34c759;
+  --skeleton: #e9e9ee;
 }
 
 .dark {
   --background: #111112;
-  --surface:    #1c1c1e;
-  --raised:     #2c2c2e;
+  --surface: #1a1a1c;
+  --rail: #1e1e20;
+  --raised: #2c2c2e;
   --foreground: #f2f2f7;
-  --muted:      #8e8e93;
-  --border:     #3a3a3c;
-  --selected:   #2c2c2e;
-  --accent:     #0a84ff;
-  --danger:     #ff453a;
-  --success:    #30d158;
+  --muted: #a1a1a8;
+  --faint: #8a8a92;
+  --border: #333336;
+  --selected: #313134;
+  --accent: #0a84ff;
+  --on-accent: #ffffff;
+  --danger: #ff453a;
+  --success: #30d158;
+  --skeleton: #242427;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-surface:    var(--surface);
-  --color-raised:     var(--raised);
+  --color-surface: var(--surface);
+  --color-rail: var(--rail);
+  --color-raised: var(--raised);
   --color-foreground: var(--foreground);
-  --color-muted:      var(--muted);
-  --color-border:     var(--border);
-  --color-selected:   var(--selected);
-  --color-accent:     var(--accent);
-  --color-danger:     var(--danger);
-  --color-success:    var(--success);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-selected: var(--selected);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-skeleton: var(--skeleton);
   --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
 @layer base {
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
 
-  html, body, #root { height: 100%; }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
   body {
     background: var(--background);
     color: var(--foreground);
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
     margin: 0;
   }
 
-  button, textarea, input, select { font-family: inherit; }
+  button,
+  textarea,
+  input,
+  select {
+    font-family: inherit;
+  }
 
-  /* Smooth color transitions for theme switching */
-  *, *::before, *::after {
+  /* Theme cross-fade is opt-in: theme.ts adds .theming to <html> for the
+     duration of a switch. A permanent transition on every node makes each
+     list re-render pay for animation it never uses. */
+  html.theming *,
+  html.theming *::before,
+  html.theming *::after {
     transition:
       background-color 0.18s ease,
       border-color 0.18s ease,
-      color 0.18s ease,
-      box-shadow 0.18s ease;
+      color 0.18s ease;
   }
 
-  /* Subtle custom scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  /* Browser surfaces we did not draw, themed rather than left to defaults. */
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    color: var(--foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input,
+  textarea {
+    caret-color: var(--accent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  :hover > ::-webkit-scrollbar-thumb,
+  *:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted) 38%, transparent);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted) 65%, transparent);
+    background-clip: content-box;
+  }
+
+  /* Tabular numerals wherever we print dates or counts. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95) translateY(-6px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.animate-fade-in   { animation: fade-in  0.15s ease-out both; }
-.animate-scale-in  { animation: scale-in 0.18s ease-out both; }
-.animate-slide-up  { animation: slide-up 0.15s ease-out both; }
-.animate-spin      { animation: spin 0.7s linear infinite; }
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out both;
+}
+.animate-scale-in {
+  animation: scale-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-slide-up {
+  animation: slide-up 0.15s ease-out both;
+}
+.animate-spin {
+  animation: spin 0.7s linear infinite;
+}
+
+.skeleton {
+  background: var(--skeleton);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-slide-up {
+    animation: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+}
 
 /* ── Markdown editor overrides ───────────────────────────────────────────── */
 
@@ -119,7 +244,9 @@
 .w-md-editor-toolbar li > button {
   color: var(--muted) !important;
   border-radius: 5px !important;
-  transition: background 0.12s, color 0.12s !important;
+  transition:
+    background 0.12s,
+    color 0.12s !important;
 }
 
 .w-md-editor-toolbar li > button:hover {
@@ -146,9 +273,9 @@
 .w-md-editor-text-input,
 .w-md-editor-text-pre,
 .w-md-editor-text-pre > code {
-  font-family: "SFMono-Regular", "SF Mono", ui-monospace,
-               Menlo, Monaco, Consolas, "Liberation Mono",
-               "Courier New", monospace !important;
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace !important;
 }
 
 .w-md-editor-text-pre > code {
@@ -168,7 +295,9 @@
   line-height: 1.7 !important;
 }
 
-.wmde-markdown h1, .wmde-markdown h2, .wmde-markdown h3 {
+.wmde-markdown h1,
+.wmde-markdown h2,
+.wmde-markdown h3 {
   border-bottom: 1px solid var(--border);
   color: var(--foreground);
 }
@@ -191,9 +320,13 @@
   color: var(--muted) !important;
 }
 
-.wmde-markdown a { color: var(--accent) !important; }
+.wmde-markdown a {
+  color: var(--accent) !important;
+}
 
-.wmde-markdown hr { border-color: var(--border) !important; }
+.wmde-markdown hr {
+  border-color: var(--border) !important;
+}
 
 .wmde-markdown table thead tr {
   background: var(--surface) !important;
@@ -218,4 +351,6 @@
 }
 
 /* Drag bar */
-.w-md-editor-resize { background: var(--border) !important; }
+.w-md-editor-resize {
+  background: var(--border) !important;
+}

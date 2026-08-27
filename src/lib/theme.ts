@@ -11,8 +11,19 @@ export function getTheme(): Theme {
 
 export function setTheme(t: Theme): void {
   localStorage.setItem(KEY, t);
-  applyTheme(t);
+  withCrossFade(() => applyTheme(t));
   window.dispatchEvent(new Event(EV));
+}
+
+/* Colour transitions cost something on every node, so they are only live
+   while a theme switch is actually in flight. */
+let fadeTimer: number | undefined;
+function withCrossFade(fn: () => void): void {
+  const root = document.documentElement;
+  root.classList.add("theming");
+  fn();
+  clearTimeout(fadeTimer);
+  fadeTimer = window.setTimeout(() => root.classList.remove("theming"), 220);
 }
 
 export function applyTheme(t: Theme): void {
