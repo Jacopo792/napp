@@ -8,46 +8,47 @@
 
 ## Design thesis
 
-The app is a **soft editorial workspace**. The note is the calmest, brightest, and most spacious place on screen; navigation and metadata recede around it. Familiar three-pane navigation stays efficient, but warm layered surfaces, generous pane rounding, fine rules, and restrained shadows replace a rigid productivity grid.
+The app is a **soft editorial workspace**. The note is the calmest, brightest, and most spacious place on screen; navigation and metadata recede around it. Familiar three-pane navigation stays efficient, but clean layered surfaces, generous pane rounding, fine rules, and restrained shadows replace a rigid productivity grid.
 
-The visual world uses warm paper, charcoal ink, and one azure accent. Azure owns selection, focus, active controls, links, slider progress, and caret color. Sienna and orange are not part of the interface palette and must not be reintroduced as primary, warning, or decorative accents.
+The visual world uses pure paper (≈white), charcoal ink, and one azure accent. Azure owns selection, focus, active controls, links, slider progress, and caret color. Sienna and orange are not part of the interface palette and must not be reintroduced as primary, warning, or decorative accents.
 
 ## Composition and density
 
 - The product is desktop-only. Preserve its compact mouse-and-keyboard rhythm rather than enlarging controls for touch or collapsing the hierarchy into mobile patterns.
 - The primary workspace is three rounded, elevated panes with 12 px breathing room: a fixed 224 px archive/folder/tag rail, a fixed 360 px note catalogue, and a flexible editor. All three use a fine border, large radius, clipped contents, and a restrained soft shadow.
-- The editor is visually dominant. Its page surface is the quietest layer and its content is centered to the active reading measure. The rail and catalogue share a slightly more recessive paper surface; the app background and axis controls sit on the furthest surface.
-- A compact 56 px top bar carries identity, the current archive, theme, and lock controls. A separate rounded axis bar anchors the bottom without intruding on the note.
+- The editor is visually dominant. Its page surface is the quietest layer and its content is left-aligned to the active reading measure. The rail and catalogue share a slightly more recessive paper surface; the app background and axis controls sit on the furthest surface. Both navigation panes can be collapsed together for a full-page writing focus.
+- A compact 56 px top bar carries identity, the current archive switch (My notes / Lisa's notes for u1), theme, and lock controls. A toggle beside the wordmark hides the navigation for focused writing. A separate rounded axis bar anchors the bottom without intruding on the note.
 - Controls are rounded throughout: pills for archive identity and tags, rounded rectangles for inputs and actions, and circular slider thumbs. Use borders and surface shifts before adding shadow or saturated color.
 
 ## Surface and color system
 
 The surfaces are ordered by proximity to the writing:
 
-| Token           | Light                        | Dark                    | Role                                    |
-| --------------- | ---------------------------- | ----------------------- | --------------------------------------- |
-| `--page`        | `oklch(0.995 0.002 84.57)`   | `oklch(0.215 0.006 70)` | Note and control surface; calmest layer |
-| `--paper`       | `oklch(0.982 0.004 84.57)`   | `oklch(0.185 0.006 70)` | Catalogue, rail, axis bar               |
-| `--surface`     | `oklch(0.955 0.007 84.57)`   | `oklch(0.145 0.005 70)` | App ground and recessed controls        |
-| `--ink`         | `oklch(0.2101 0.0086 65.36)` | `oklch(0.95 0.004 84)`  | Primary text                            |
-| `--accent`      | `oklch(0.51 0.155 242)`      | `oklch(0.7 0.145 242)`  | Azure interaction accent                |
-| `--accent-wash` | `oklch(0.955 0.028 242)`     | `oklch(0.29 0.06 242)`  | Selection and focus support             |
-| `--danger`      | `oklch(0.55 0.2 27)`         | `oklch(0.68 0.17 25)`   | Destructive and failed states only      |
-| `--ok`          | `oklch(0.5 0.12 155)`        | `oklch(0.72 0.13 158)`  | Confirmed-success state only            |
+| Token           | Light                    | Dark                    | Role                                    |
+| --------------- | ------------------------ | ----------------------- | --------------------------------------- |
+| `--page`        | `oklch(1 0 0)`           | `oklch(0.26 0.011 255)` | Note and control surface; calmest layer |
+| `--paper`       | `oklch(0.982 0.002 255)` | `oklch(0.22 0.01 255)`  | Catalogue, rail, axis bar               |
+| `--surface`     | `oklch(0.958 0.004 255)` | `oklch(0.16 0.011 255)` | App ground and recessed controls        |
+| `--ink`         | `oklch(0.195 0.014 255)` | `oklch(0.97 0.005 255)` | Primary text                            |
+| `--accent`      | `oklch(0.56 0.16 242)`   | `oklch(0.72 0.14 242)`  | Azure interaction accent                |
+| `--accent-wash` | `oklch(0.96 0.03 242)`   | `oklch(0.33 0.07 242)`  | Selection and focus support             |
+| `--danger`      | `oklch(0.55 0.2 27)`     | `oklch(0.68 0.17 25)`   | Destructive and failed states only      |
+| `--ok`          | `oklch(0.5 0.12 155)`    | `oklch(0.72 0.13 158)`  | Confirmed-success state only            |
 
 Light mode steps from a darker warm surround toward a nearly white note. Dark mode reverses the values while preserving the same hierarchy: the writing surface remains the calmest and most legible layer. Rules, muted inks, shadows, and accent values have theme-specific tokens; do not mechanically invert colors.
 
 ## Typography
 
 - **Bricolage Grotesque** is the display face for the app name, note title, empty-editor specimen, and rendered Markdown headings. It provides editorial character and uses tighter tracking at display sizes.
-- **DM Sans** is the interface and reading face. It carries navigation, controls, note-list titles, body copy, and rendered Markdown prose.
+- **DM Sans** is the interface face. It carries navigation, controls, note-list titles, and metadata.
+- **Source Serif 4 Variable** is the reading face for note body and continuous prose. It provides comfortable long-form reading with optical sizing and variable weight.
 - **JetBrains Mono** is reserved for genuine readouts: dates, counts, character totals, save timestamps, shortcut hints, axis values, and code. It is not a decorative all-caps UI voice.
 - The note body uses optical sizing and variable weight. Markdown headings use Bricolage at stronger weights and tighter leading; inline code and fences move to JetBrains Mono.
 - Long titles are a first-class layout case. Catalogue titles wrap for up to three lines instead of collapsing to a single ellipsis. The editor title wraps freely and its textarea auto-grows to its content; it must never become a fixed-height or horizontally scrolling field.
 
 ## Reading and writing
 
-Title, metadata, and body share one centered reading column. The reading bar controls four real axes through CSS custom properties:
+Title, metadata, and body share one left-aligned reading column capped at the active measure. The reading bar controls four real axes through CSS custom properties:
 
 - `--read-size` for body size;
 - `--read-measure` for line length;
@@ -56,7 +57,7 @@ Title, metadata, and body share one centered reading column. The reading bar con
 
 The collapsed bar always shows the current preset or custom state plus the size/measure/weight readout and the save state. Expanding it reveals native range inputs and presets. Keep native keyboard stepping and screen-reader semantics; the travelled track and thumb use azure.
 
-Markdown is edited in one continuous reading surface. Syntax is formatted in place: markers remain visible but muted, headings gain display hierarchy, links and list markers use azure, code gains a restrained inset surface, and horizontal-rule source draws a real rule. There is no toolbar, split preview, or separate mode chrome.
+Markdown is edited in one continuous reading surface. Syntax is formatted in place: markers remain visible but muted, headings gain display hierarchy, links and list markers use azure, code gains a restrained inset surface, and horizontal-rule source draws a real rule. A compact Format menu offers bold/italic/strike/heading/list/quote/link/code/divider plus a local “Import PDF as text” action that inserts extracted text without uploading. There is no always-visible toolbar or split preview.
 
 ## Navigation and interaction states
 
