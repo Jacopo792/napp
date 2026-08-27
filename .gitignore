@@ -42,3 +42,10 @@ frontend/
 *.njsproj
 *.sln
 *.sw?
+
+# Local AI agent tooling (impeccable skill, launch config, local settings).
+# Installed per-machine with `npx impeccable install`, not part of the app.
+.claude/
+.github/skills/
+.github/agents/
+.github/hooks/
