@@ -167,6 +167,22 @@ export function NoteEditor({
     }
   }
 
+  async function handlePastedImage(file: File): Promise<{ src: string; alt: string } | null> {
+    if (!draft || !canEdit) return null;
+    setPdfError("");
+    setPdfStatus("Preparing pasted image…");
+    try {
+      const src = await prepareImageForNote(file);
+      setPdfStatus("Image pasted and encrypted with this note");
+      window.setTimeout(() => setPdfStatus(""), 2600);
+      return { src, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
+    } catch (error) {
+      setPdfStatus("");
+      setPdfError(error instanceof Error ? error.message : "Could not paste image");
+      return null;
+    }
+  }
+
   function openLinkForm() {
     setLinkLabel(editorRef.current?.getSelectedText() ?? "");
     setLinkUrl("");
@@ -508,12 +524,14 @@ export function NoteEditor({
       {/* The text itself. */}
       <div className={`min-h-0 flex-1 ${mobile ? "px-5" : "px-10"}`}>
         <MarkdownEditor
+          key={entry.note.id}
           ref={editorRef}
           value={draft.body}
           docKey={entry.note.id}
           readOnly={!canEdit}
           placeholder="Start writing. Markdown formats itself as you type."
           onChange={(body) => canEdit && onChange(draft.title, body)}
+          onPasteImage={handlePastedImage}
         />
       </div>
     </section>

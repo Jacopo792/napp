@@ -24,7 +24,7 @@ import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { FolderRail, ALL, UNFILED } from "@/components/FolderRail";
+import { FolderRail, ALL, TRASH, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
 import { AxisBar } from "@/components/AxisBar";
 import { useIsCompact } from "@/lib/media";
@@ -181,12 +181,18 @@ function NotesPage() {
       return fid && meta.folders.some((f) => f.id === fid) ? fid : null;
     };
 
+    const trashedIds = new Set(meta.notes.filter((note) => note.trashedAt).map((note) => note.id));
     let list = entries.filter((e) => e.note.owner === viewAs);
 
-    if (selectedFolderId === UNFILED) {
-      list = list.filter((e) => folderOf(e.note.id) === null);
-    } else if (selectedFolderId !== ALL) {
-      list = list.filter((e) => folderOf(e.note.id) === selectedFolderId);
+    if (selectedFolderId === TRASH) {
+      list = list.filter((entry) => trashedIds.has(entry.note.id));
+    } else {
+      list = list.filter((entry) => !trashedIds.has(entry.note.id));
+      if (selectedFolderId === UNFILED) {
+        list = list.filter((e) => folderOf(e.note.id) === null);
+      } else if (selectedFolderId !== ALL) {
+        list = list.filter((e) => folderOf(e.note.id) === selectedFolderId);
+      }
     }
 
     if (filterTagIds.length > 0) {
@@ -210,14 +216,18 @@ function NotesPage() {
   }, [entries, activeMeta, viewAs, selectedFolderId, filterTagIds, query]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
-  const canEdit = selected ? session?.role === "u1" || selected.note.owner === "u2" : false;
+  const canEdit = selected
+    ? selectedFolderId !== TRASH && (session?.role === "u1" || selected.note.owner === "u2")
+    : false;
 
   const folderLabel =
     selectedFolderId === ALL
       ? "All notes"
       : selectedFolderId === UNFILED
         ? "Unfiled"
-        : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
+        : selectedFolderId === TRASH
+          ? "Trash"
+          : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
 
   // Load the selected note into the draft when the selection actually changes.
   const lastLoadedRef = useRef<string | null>(null);
@@ -372,7 +382,9 @@ function NotesPage() {
     const s = sessionRef.current;
     if (!s) return;
     const folderId =
-      selectedFolderId === ALL || selectedFolderId === UNFILED ? null : selectedFolderId;
+      selectedFolderId === ALL || selectedFolderId === UNFILED || selectedFolderId === TRASH
+        ? null
+        : selectedFolderId;
 
     const note: Note = {
       id: crypto.randomUUID(),
@@ -399,6 +411,7 @@ function NotesPage() {
       });
 
       setQuery("");
+      if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
       setSelectedId(note.id);
       setDraft({ title: "", body: "" });
       lastLoadedRef.current = note.id;
@@ -411,7 +424,53 @@ function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewAs, selectedFolderId, activeMeta]);
 
-  const handleDelete = useCallback(
+  const handleMoveToTrash = useCallback(
+    (entry: NoteEntry) => {
+      const existing = activeMeta.notes.find((note) => note.id === entry.note.id);
+      const notes: NoteMeta[] = existing
+        ? activeMeta.notes.map((note) =>
+            note.id === entry.note.id ? { ...note, trashedAt: new Date().toISOString() } : note,
+          )
+        : [
+            ...activeMeta.notes,
+            {
+              id: entry.note.id,
+              folderId: null,
+              tagIds: [],
+              trashedAt: new Date().toISOString(),
+            },
+          ];
+      handleMetaChange({ ...activeMeta, notes });
+
+      if (selectedId === entry.note.id) {
+        setSelectedId(null);
+        setDraft(null);
+        lastLoadedRef.current = null;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedId, activeMeta],
+  );
+
+  const handleRestore = useCallback(
+    (entry: NoteEntry) => {
+      handleMetaChange({
+        ...activeMeta,
+        notes: activeMeta.notes.map((note) =>
+          note.id === entry.note.id ? { ...note, trashedAt: undefined } : note,
+        ),
+      });
+      if (selectedId === entry.note.id) {
+        setSelectedId(null);
+        setDraft(null);
+        lastLoadedRef.current = null;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedId, activeMeta],
+  );
+
+  const handleDeleteForever = useCallback(
     async (entry: NoteEntry) => {
       const s = sessionRef.current;
       if (!s) return;
@@ -435,7 +494,7 @@ function NotesPage() {
           lastLoadedRef.current = null;
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to delete");
+        setError(e instanceof Error ? e.message : "Failed to delete permanently");
       } finally {
         setSaving(false);
       }
@@ -541,6 +600,7 @@ function NotesPage() {
     setDraft(null);
     lastLoadedRef.current = null;
     setMobilePane("notes");
+    if (id === TRASH) setFilterTagIds([]);
   }
 
   function handleSelectNote(id: string) {
@@ -690,11 +750,14 @@ function NotesPage() {
                 loading={loading}
                 busy={saving}
                 folderLabel={folderLabel}
+                trashMode={selectedFolderId === TRASH}
                 searchRef={searchRef}
                 onQueryChange={setQuery}
                 onSelect={handleSelectNote}
                 onNew={handleNew}
-                onDelete={handleDelete}
+                onMoveToTrash={handleMoveToTrash}
+                onRestore={handleRestore}
+                onDeleteForever={handleDeleteForever}
                 onTogglePin={handleTogglePin}
               />
             )}
@@ -702,6 +765,7 @@ function NotesPage() {
             {selectedId && (
               <Suspense fallback={<div className="h-full bg-page" />}>
                 <NoteEditor
+                  key={selected?.note.id ?? "empty"}
                   mobile
                   entry={selected}
                   meta={activeMeta}
@@ -832,11 +896,14 @@ function NotesPage() {
                 loading={loading}
                 busy={saving}
                 folderLabel={folderLabel}
+                trashMode={selectedFolderId === TRASH}
                 searchRef={searchRef}
                 onQueryChange={setQuery}
                 onSelect={setSelectedId}
                 onNew={handleNew}
-                onDelete={handleDelete}
+                onMoveToTrash={handleMoveToTrash}
+                onRestore={handleRestore}
+                onDeleteForever={handleDeleteForever}
                 onTogglePin={handleTogglePin}
               />
             </>
@@ -853,6 +920,7 @@ function NotesPage() {
             }
           >
             <NoteEditor
+              key={selected?.note.id ?? "empty"}
               entry={selected}
               meta={activeMeta}
               draft={draft}

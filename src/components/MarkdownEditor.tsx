@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { Annotation, EditorState, Compartment } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, Transaction } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -342,6 +342,20 @@ interface Props {
   /** Changing this swaps the document wholesale — a different note, not an edit. */
   docKey: string;
   onChange: (next: string) => void;
+  onPasteImage?: (file: File) => Promise<{ src: string; alt: string } | null>;
+}
+
+function insertImage(editor: EditorView, src: string, alt: string): void {
+  const { from, to } = editor.state.selection.main;
+  const before = editor.state.doc.sliceString(0, from);
+  const prefix = from > 0 && !before.endsWith("\n\n") ? "\n\n" : "";
+  const insert = `${prefix}![${alt}](${src})\n\n`;
+  editor.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+    scrollIntoView: true,
+  });
+  editor.focus();
 }
 
 function replaceSelection(
@@ -414,13 +428,15 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function MarkdownEditor(
-  { value, readOnly, placeholder, docKey, onChange },
+  { value, readOnly, placeholder, docKey, onChange, onPasteImage },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onPasteImageRef = useRef(onPasteImage);
+  onPasteImageRef.current = onPasteImage;
   const editable = useRef(new Compartment());
 
   useImperativeHandle(ref, () => ({
@@ -457,17 +473,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
     },
     insertImage(src, alt) {
       if (readOnly || !view.current) return;
-      const editor = view.current;
-      const { from, to } = editor.state.selection.main;
-      const before = editor.state.doc.sliceString(0, from);
-      const prefix = from > 0 && !before.endsWith("\n\n") ? "\n\n" : "";
-      const insert = `${prefix}![${alt}](${src})\n\n`;
-      editor.dispatch({
-        changes: { from, to, insert },
-        selection: { anchor: from + insert.length },
-        scrollIntoView: true,
-      });
-      editor.focus();
+      insertImage(view.current, src, alt);
     },
     focus() {
       view.current?.focus();
@@ -487,6 +493,23 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
           markdown({ base: markdownLanguage }),
           richMarkdown,
           cmPlaceholder(placeholder),
+          EditorView.domEventHandlers({
+            paste(event, editor) {
+              if (editor.state.readOnly || !onPasteImageRef.current) return false;
+              const item = Array.from(event.clipboardData?.items ?? []).find(
+                (candidate) => candidate.kind === "file" && candidate.type.startsWith("image/"),
+              );
+              const file = item?.getAsFile();
+              if (!file) return false;
+
+              event.preventDefault();
+              void onPasteImageRef.current(file).then((prepared) => {
+                if (!prepared || !editor.dom.isConnected) return;
+                insertImage(editor, prepared.src, prepared.alt);
+              });
+              return true;
+            },
+          }),
           keymap.of([
             { key: "Mod-b", run: (editor) => (formatSelection(editor, "bold"), true) },
             { key: "Mod-i", run: (editor) => (formatSelection(editor, "italic"), true) },
@@ -520,6 +543,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
   }, []);
 
   // A different note: replace the document and put the reader back at the top.
+  // External swaps must never enter the undo stack — otherwise Ctrl+Z would
+  // revert the current note to the previous note's content (the reported "Angel" bug).
   useEffect(() => {
     const v = view.current;
     if (!v) return;
@@ -528,7 +553,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       changes: { from: 0, to: v.state.doc.length, insert: value },
       selection: { anchor: 0 },
       scrollIntoView: true,
-      annotations: externalDocumentChange.of(true),
+      annotations: [externalDocumentChange.of(true), Transaction.addToHistory.of(false)],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docKey]);
@@ -541,7 +566,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
     if (v.state.doc.toString() === value) return;
     v.dispatch({
       changes: { from: 0, to: v.state.doc.length, insert: value },
-      annotations: externalDocumentChange.of(true),
+      annotations: [externalDocumentChange.of(true), Transaction.addToHistory.of(false)],
     });
   }, [value]);
 

@@ -7,6 +7,7 @@ import type { NoteEntry } from "@/lib/entries";
 
 export const ALL = "__all";
 export const UNFILED = "__unfiled";
+export const TRASH = "__trash";
 
 interface Props {
   mobile?: boolean;
@@ -43,7 +44,7 @@ function FolderRow({
   onRename?: (name: string) => void;
   onDelete?: () => void;
   mobile?: boolean;
-  icon?: "all" | "inbox" | "folder";
+  icon?: "all" | "inbox" | "folder" | "trash";
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: droppableId ?? `noop:${id}`,
@@ -89,6 +90,8 @@ function FolderRow({
             <Layers3 size={18} strokeWidth={1.9} />
           ) : icon === "inbox" ? (
             <Inbox size={18} strokeWidth={1.9} />
+          ) : icon === "trash" ? (
+            <Trash2 size={18} strokeWidth={1.9} />
           ) : (
             <Folder size={18} strokeWidth={1.9} />
           )}
@@ -163,15 +166,21 @@ export function FolderRail({
   const counts = useMemo(() => {
     const byFolder = new Map<string, number>();
     let unfiled = 0;
+    let trash = 0;
     for (const e of entries) {
-      const fid = meta.notes.find((n) => n.id === e.note.id)?.folderId ?? null;
+      const noteMeta = meta.notes.find((n) => n.id === e.note.id);
+      if (noteMeta?.trashedAt) {
+        trash += 1;
+        continue;
+      }
+      const fid = noteMeta?.folderId ?? null;
       if (fid && meta.folders.some((f) => f.id === fid)) {
         byFolder.set(fid, (byFolder.get(fid) ?? 0) + 1);
       } else {
         unfiled += 1;
       }
     }
-    return { byFolder, unfiled, all: entries.length };
+    return { byFolder, unfiled, all: entries.length - trash, trash };
   }, [entries, meta]);
 
   function addFolder() {
@@ -266,6 +275,17 @@ export function FolderRail({
               onDelete={() => deleteFolder(folder.id)}
             />
           ))}
+
+          <FolderRow
+            mobile
+            icon="trash"
+            id={TRASH}
+            droppableId={null}
+            label="Trash"
+            count={counts.trash}
+            selected={selectedFolderId === TRASH}
+            onSelect={() => onSelectFolder(TRASH)}
+          />
 
           {adding ? (
             <div className="flex min-h-14 items-center gap-3 px-4">
@@ -430,6 +450,14 @@ export function FolderRail({
             onDelete={() => deleteFolder(f.id)}
           />
         ))}
+        <FolderRow
+          id={TRASH}
+          droppableId={null}
+          label="Trash"
+          count={counts.trash}
+          selected={selectedFolderId === TRASH}
+          onSelect={() => onSelectFolder(TRASH)}
+        />
 
         {adding ? (
           <div className="mx-2 flex h-9 items-center gap-2 px-3">

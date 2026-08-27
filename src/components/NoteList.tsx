@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { ChevronRight, Pin, Search, SquarePen, Trash2, X } from "lucide-react";
+import { ChevronRight, Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
 import { useIsDark } from "@/lib/theme";
 import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
@@ -15,11 +15,14 @@ interface Props {
   loading: boolean;
   busy: boolean;
   folderLabel: string;
+  trashMode: boolean;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
   onNew: () => void;
-  onDelete: (entry: NoteEntry) => void;
+  onMoveToTrash: (entry: NoteEntry) => void;
+  onRestore: (entry: NoteEntry) => void;
+  onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (noteId: string) => void;
 }
 
@@ -35,7 +38,10 @@ function Row({
   meta,
   selected,
   onSelect,
-  onDelete,
+  trashMode,
+  onMoveToTrash,
+  onRestore,
+  onDeleteForever,
   onTogglePin,
 }: {
   mobile: boolean;
@@ -43,14 +49,17 @@ function Row({
   index: number;
   meta: Meta;
   selected: boolean;
+  trashMode: boolean;
   onSelect: () => void;
-  onDelete: () => void;
+  onMoveToTrash: () => void;
+  onRestore: () => void;
+  onDeleteForever: () => void;
   onTogglePin: () => void;
 }) {
   const isDark = useIsDark();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
-    disabled: mobile,
+    disabled: mobile || trashMode,
   });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -159,44 +168,72 @@ function Row({
         )}
       </div>
 
-      <button
-        aria-label={
-          pinned
-            ? `Unpin ${entry.note.title || "Untitled"}`
-            : `Pin ${entry.note.title || "Untitled"}`
-        }
-        title={pinned ? "Unpin note" : "Pin note to top"}
-        aria-pressed={pinned}
-        onClick={(event) => {
-          event.stopPropagation();
-          onTogglePin();
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
-        className={`icon-button h-7 w-7 shrink-0 transition-all ${
-          pinned
-            ? "text-accent opacity-100"
-            : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
-        }`}
-      >
-        <Pin size={13} strokeWidth={pinned ? 2.4 : 1.75} fill={pinned ? "currentColor" : "none"} />
-      </button>
+      {!trashMode && (
+        <button
+          aria-label={
+            pinned
+              ? `Unpin ${entry.note.title || "Untitled"}`
+              : `Pin ${entry.note.title || "Untitled"}`
+          }
+          title={pinned ? "Unpin note" : "Pin note to top"}
+          aria-pressed={pinned}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTogglePin();
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          className={`icon-button h-7 w-7 shrink-0 transition-all ${
+            pinned
+              ? "text-accent opacity-100"
+              : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+          }`}
+        >
+          <Pin
+            size={13}
+            strokeWidth={pinned ? 2.4 : 1.75}
+            fill={pinned ? "currentColor" : "none"}
+          />
+        </button>
+      )}
+      {trashMode && (
+        <button
+          aria-label={`Restore ${entry.note.title || "Untitled"}`}
+          title="Restore note"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRestore();
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          className="icon-button h-7 w-7 shrink-0 text-accent"
+        >
+          <RotateCcw size={14} strokeWidth={2} />
+        </button>
+      )}
       {mobile && <ChevronRight size={16} strokeWidth={2} className="mt-1 shrink-0 text-ink-4" />}
 
       <button
         aria-label={
           confirmDelete
-            ? `Confirm deletion of ${entry.note.title || "Untitled"}`
-            : `Delete ${entry.note.title || "Untitled"}`
+            ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
+            : trashMode
+              ? `Delete ${entry.note.title || "Untitled"} forever`
+              : `Move ${entry.note.title || "Untitled"} to Trash`
         }
         title={
           confirmDelete
-            ? "Click again to permanently delete"
-            : `Delete "${entry.note.title || "Untitled"}"`
+            ? trashMode
+              ? "Click again to permanently delete"
+              : "Click again to move to Trash"
+            : trashMode
+              ? `Delete "${entry.note.title || "Untitled"}" forever`
+              : `Move "${entry.note.title || "Untitled"}" to Trash`
         }
         onClick={(e) => {
           e.stopPropagation();
-          if (confirmDelete) onDelete();
-          else setConfirmDelete(true);
+          if (confirmDelete) {
+            if (trashMode) onDeleteForever();
+            else onMoveToTrash();
+          } else setConfirmDelete(true);
         }}
         onPointerDown={(e) => e.stopPropagation()}
         className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
@@ -206,7 +243,7 @@ function Row({
         }`}
       >
         {confirmDelete ? (
-          <span className="label text-[10px]">Delete?</span>
+          <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
         ) : (
           <Trash2 size={13} strokeWidth={1.75} />
         )}
@@ -240,11 +277,14 @@ export function NoteList({
   loading,
   busy,
   folderLabel,
+  trashMode,
   searchRef,
   onQueryChange,
   onSelect,
   onNew,
-  onDelete,
+  onMoveToTrash,
+  onRestore,
+  onDeleteForever,
   onTogglePin,
 }: Props) {
   const hasQuery = query.trim().length > 0;
@@ -304,12 +344,14 @@ export function NoteList({
                 <p className="text-[14px] text-ink-3">
                   {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
                 </p>
-                <button
-                  onClick={() => (hasQuery ? onQueryChange("") : onNew())}
-                  className="mt-3 text-[14px] font-medium text-accent"
-                >
-                  {hasQuery ? "Clear search" : "Write the first note"}
-                </button>
+                {(hasQuery || !trashMode) && (
+                  <button
+                    onClick={() => (hasQuery ? onQueryChange("") : onNew())}
+                    className="mt-3 text-[14px] font-medium text-accent"
+                  >
+                    {hasQuery ? "Clear search" : "Write the first note"}
+                  </button>
+                )}
               </div>
             ) : (
               entries.map((entry, index) => (
@@ -320,8 +362,11 @@ export function NoteList({
                   index={index}
                   meta={meta}
                   selected={selectedId === entry.note.id}
+                  trashMode={trashMode}
                   onSelect={() => onSelect(entry.note.id)}
-                  onDelete={() => onDelete(entry)}
+                  onMoveToTrash={() => onMoveToTrash(entry)}
+                  onRestore={() => onRestore(entry)}
+                  onDeleteForever={() => onDeleteForever(entry)}
                   onTogglePin={() => onTogglePin(entry.note.id)}
                 />
               ))
@@ -329,15 +374,17 @@ export function NoteList({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onNew}
-          disabled={busy || loading}
-          aria-label="New note"
-          className="mobile-compose absolute right-5 bottom-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-lg disabled:opacity-40"
-        >
-          <SquarePen size={23} strokeWidth={1.9} />
-        </button>
+        {!trashMode && (
+          <button
+            type="button"
+            onClick={onNew}
+            disabled={busy || loading}
+            aria-label="New note"
+            className="mobile-compose absolute right-5 bottom-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-lg disabled:opacity-40"
+          >
+            <SquarePen size={23} strokeWidth={1.9} />
+          </button>
+        )}
       </section>
     );
   }
@@ -374,15 +421,17 @@ export function NoteList({
             <X size={12} strokeWidth={2.5} />
           </button>
         )}
-        <button
-          onClick={onNew}
-          disabled={busy || loading}
-          title="New note · N"
-          className="label icon-button -mr-1 flex shrink-0 items-center gap-1.5 bg-accent px-2.5 py-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
-        >
-          <SquarePen size={14} strokeWidth={1.75} />
-          New note
-        </button>
+        {!trashMode && (
+          <button
+            onClick={onNew}
+            disabled={busy || loading}
+            title="New note · N"
+            className="label icon-button -mr-1 flex shrink-0 items-center gap-1.5 bg-accent px-2.5 py-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
+          >
+            <SquarePen size={14} strokeWidth={1.75} />
+            New note
+          </button>
+        )}
       </div>
 
       <div className="field-row shrink-0 px-4 pt-3 pb-2">
@@ -402,12 +451,14 @@ export function NoteList({
             <p className="readout text-ink-2">
               {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
             </p>
-            <button
-              onClick={() => (hasQuery ? onQueryChange("") : onNew())}
-              className="label mt-3 text-accent transition-opacity hover:opacity-70"
-            >
-              {hasQuery ? "Clear search" : "Write the first note"}
-            </button>
+            {(hasQuery || !trashMode) && (
+              <button
+                onClick={() => (hasQuery ? onQueryChange("") : onNew())}
+                className="label mt-3 text-accent transition-opacity hover:opacity-70"
+              >
+                {hasQuery ? "Clear search" : "Write the first note"}
+              </button>
+            )}
           </div>
         ) : (
           entries.map((e, i) => (
@@ -418,8 +469,11 @@ export function NoteList({
               index={i}
               meta={meta}
               selected={selectedId === e.note.id}
+              trashMode={trashMode}
               onSelect={() => onSelect(e.note.id)}
-              onDelete={() => onDelete(e)}
+              onMoveToTrash={() => onMoveToTrash(e)}
+              onRestore={() => onRestore(e)}
+              onDeleteForever={() => onDeleteForever(e)}
               onTogglePin={() => onTogglePin(e.note.id)}
             />
           ))
