@@ -16,7 +16,7 @@ dist-ssr
 .nitro
 *.local
 
-# Environment — NEVER commit; contains master seed and GitHub PAT
+# Environment — NEVER commit; migration credentials and service-role keys
 .env
 
 # Lock files for other package managers (project uses pnpm)
