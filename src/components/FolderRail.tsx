@@ -126,7 +126,7 @@ function FolderRow({
               className={`min-w-0 flex-1 truncate ${mobile ? "text-[15px]" : "text-[13px]"} ${
                 selected ? "text-accent" : "text-ink-2"
               }`}
-              style={{ fontVariationSettings: selected ? '"wght" 550' : '"wght" 450' }}
+              style={{ fontWeight: selected ? 600 : 450 }}
             >
               {label}
             </span>

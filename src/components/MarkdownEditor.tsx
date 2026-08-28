@@ -35,7 +35,7 @@ import {
    source is always one caret move away, so nothing about the note is a mystery.
 
    Sizing comes entirely from CSS custom properties written by lib/axes.ts, so
-   the axis bar drives real font-variation-settings on the text as it is typed
+   the axis bar drives the reading scale and weight on the text as it is typed
    rather than a preview of it. ─────────────────────────────────────────────── */
 
 export interface ImagePreview {

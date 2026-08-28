@@ -8,11 +8,6 @@ export interface AppSession {
   key: CryptoKey;
 }
 
-export interface PendingUnlock {
-  userId: string;
-  email: string;
-}
-
 const SESSION_KEY = "napp:archive-session";
 
 interface StoredSession {
@@ -22,41 +17,44 @@ interface StoredSession {
   rawDek: string;
 }
 
-export async function authenticate(email: string, password: string): Promise<PendingUnlock> {
+export async function authenticate(email: string, password: string): Promise<AppSession> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error("Email or password is incorrect");
-  return { userId: data.user.id, email: data.user.email ?? email };
-}
+  try {
+    const { data: rows, error: keyError } = await supabase
+      .from("vault_keys")
+      .select("archive_id, wrapped_dek, kdf_salt, kdf_iterations")
+      .eq("user_id", data.user.id)
+      .limit(2);
+    if (keyError) throw new Error(keyError.message);
+    if (!rows || rows.length !== 1) {
+      throw new Error("This account is not connected to the archive");
+    }
 
-export async function unlockSession(passphrase: string): Promise<AppSession> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw new Error("Sign in again to unlock the archive");
-
-  const { data, error } = await supabase
-    .from("vault_keys")
-    .select("archive_id, wrapped_dek, kdf_salt, kdf_iterations")
-    .eq("user_id", userData.user.id)
-    .limit(2);
-  if (error) throw new Error(error.message);
-  if (!data || data.length !== 1) throw new Error("This account is not connected to the archive");
-
-  const row = data[0];
-  const rawDek = await unwrapArchiveKey(
-    {
-      wrappedDek: row.wrapped_dek,
-      kdfSalt: row.kdf_salt,
-      kdfIterations: row.kdf_iterations,
-    },
-    passphrase,
-  );
-  const stored: StoredSession = {
-    userId: userData.user.id,
-    email: userData.user.email ?? "",
-    archiveId: row.archive_id,
-    rawDek: bytesToBase64(rawDek),
-  };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
-  return { ...stored, key: await importArchiveKey(rawDek) };
+    const row = rows[0];
+    const rawDek = await unwrapArchiveKey(
+      {
+        wrappedDek: row.wrapped_dek,
+        kdfSalt: row.kdf_salt,
+        kdfIterations: row.kdf_iterations,
+      },
+      password,
+    );
+    const stored: StoredSession = {
+      userId: data.user.id,
+      email: data.user.email ?? email,
+      archiveId: row.archive_id,
+      rawDek: bytesToBase64(rawDek),
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+    return { ...stored, key: await importArchiveKey(rawDek) };
+  } catch (reason) {
+    sessionStorage.removeItem(SESSION_KEY);
+    resetArchiveCache();
+    await supabase.auth.signOut({ scope: "local" });
+    if (reason instanceof Error && reason.message.includes("not connected")) throw reason;
+    throw new Error("Email or password could not unlock this archive");
+  }
 }
 
 export async function restoreSession(): Promise<AppSession | null> {

@@ -12,19 +12,17 @@ export interface Folder {
   name: string;
 }
 
-/* Dark-only since 2026-08-28. The eight ids are fixed — Postgres has a CHECK
-   constraint naming them — and the chrome is now chroma-zero, so these tags are
-   the only hue in the interface. Their foregrounds are calm pastels at
-   oklch(0.80 0.09 h): mutually distinct and every one ≥ 5.5:1 on --page. */
+/* The ids are fixed by the Postgres CHECK constraint. Tags keep their muted
+   semantic colours while the surrounding interface remains neutral. */
 export const TAG_COLORS = [
-  { id: "blue", darkFg: "#96BEF2" },
-  { id: "rose", darkFg: "#F2ABAF" },
-  { id: "emerald", darkFg: "#86D3AD" },
-  { id: "amber", darkFg: "#D6C084" },
-  { id: "violet", darkFg: "#DDABE0" },
-  { id: "sky", darkFg: "#8CC9E5" },
-  { id: "orange", darkFg: "#EBB593" },
-  { id: "slate", darkFg: "#B8BBC2" },
+  { id: "blue", darkFg: "#96bef2" },
+  { id: "rose", darkFg: "#f2abaf" },
+  { id: "emerald", darkFg: "#86d3ad" },
+  { id: "amber", darkFg: "#d6c084" },
+  { id: "violet", darkFg: "#ddabe0" },
+  { id: "sky", darkFg: "#8cc9e5" },
+  { id: "orange", darkFg: "#ebb593" },
+  { id: "slate", darkFg: "#b8bbc2" },
 ] as const;
 
 export type TagColorId = (typeof TAG_COLORS)[number]["id"];

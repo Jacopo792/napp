@@ -121,6 +121,7 @@ export function MainMenu({ onSettings, onLock }: { onSettings: () => void; onLoc
 
 export function CollectionMenu({
   preferences,
+  galleryOnly = false,
   folderName,
   canManageFolder,
   onChange,
@@ -129,6 +130,7 @@ export function CollectionMenu({
   onDeleteFolder,
 }: {
   preferences: ListPreferences;
+  galleryOnly?: boolean;
   folderName: string;
   canManageFolder: boolean;
   onChange: (next: ListPreferences) => void;
@@ -261,20 +263,24 @@ export function CollectionMenu({
                 <CalendarDays size={16} />
                 Group by date
               </MenuButton>
-              <MenuButton
-                active={preferences.view === "list"}
-                onClick={() => onChange({ ...preferences, view: "list" })}
-              >
-                <List size={16} />
-                List view
-              </MenuButton>
-              <MenuButton
-                active={preferences.view === "gallery"}
-                onClick={() => onChange({ ...preferences, view: "gallery" })}
-              >
-                <GalleryHorizontalEnd size={16} />
-                Gallery view
-              </MenuButton>
+              {!galleryOnly && (
+                <>
+                  <MenuButton
+                    active={preferences.view === "list"}
+                    onClick={() => onChange({ ...preferences, view: "list" })}
+                  >
+                    <List size={16} />
+                    List view
+                  </MenuButton>
+                  <MenuButton
+                    active={preferences.view === "gallery"}
+                    onClick={() => onChange({ ...preferences, view: "gallery" })}
+                  >
+                    <GalleryHorizontalEnd size={16} />
+                    Gallery view
+                  </MenuButton>
+                </>
+              )}
               {canManageFolder && (
                 <>
                   <div className="menu-separator" />
@@ -467,12 +473,14 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
 
 export function SettingsPanel({
   open,
+  mobile = false,
   preferences,
   onClose,
   onPreferencesChange,
   onLock,
 }: {
   open: boolean;
+  mobile?: boolean;
   preferences: ListPreferences;
   onClose: () => void;
   onPreferencesChange: (next: ListPreferences) => void;
@@ -536,24 +544,31 @@ export function SettingsPanel({
           </section>
           <section>
             <h3>List preferences</h3>
-            <div className="settings-choice">
-              <button
-                type="button"
-                className={preferences.view === "list" ? "is-active" : ""}
-                onClick={() => onPreferencesChange({ ...preferences, view: "list" })}
-              >
-                <List size={17} />
-                List
-              </button>
-              <button
-                type="button"
-                className={preferences.view === "gallery" ? "is-active" : ""}
-                onClick={() => onPreferencesChange({ ...preferences, view: "gallery" })}
-              >
+            {mobile ? (
+              <p className="settings-mobile-gallery">
                 <GalleryHorizontalEnd size={17} />
-                Gallery
-              </button>
-            </div>
+                Gallery is the fixed phone layout.
+              </p>
+            ) : (
+              <div className="settings-choice">
+                <button
+                  type="button"
+                  className={preferences.view === "list" ? "is-active" : ""}
+                  onClick={() => onPreferencesChange({ ...preferences, view: "list" })}
+                >
+                  <List size={17} />
+                  List
+                </button>
+                <button
+                  type="button"
+                  className={preferences.view === "gallery" ? "is-active" : ""}
+                  onClick={() => onPreferencesChange({ ...preferences, view: "gallery" })}
+                >
+                  <GalleryHorizontalEnd size={17} />
+                  Gallery
+                </button>
+              </div>
+            )}
             <label className="settings-toggle">
               <span>
                 <b>Group by date</b>

@@ -39,7 +39,7 @@ function client(url, key) {
   });
 }
 
-async function loginAndUnlock(supabase, email, password, passphrase) {
+async function loginAndUnlock(supabase, email, password) {
   const signedIn = await supabase.auth.signInWithPassword({ email, password });
   if (signedIn.error || !signedIn.data.user) throw signedIn.error ?? new Error("Login failed");
   const vault = await supabase
@@ -54,7 +54,7 @@ async function loginAndUnlock(supabase, email, password, passphrase) {
       kdfSalt: vault.data.kdf_salt,
       kdfIterations: vault.data.kdf_iterations,
     },
-    passphrase,
+    password,
   );
   return {
     archiveId: vault.data.archive_id,
@@ -84,10 +84,8 @@ for (const name of [
   "VITE_SUPABASE_PUBLISHABLE_KEY",
   "USER_ONE_EMAIL",
   "USER_ONE_PASSWORD",
-  "USER_ONE_PASSPHRASE",
   "USER_TWO_EMAIL",
   "USER_TWO_PASSWORD",
-  "USER_TWO_PASSPHRASE",
 ]) {
   assert(env[name], `Missing ${name}`);
 }
@@ -96,18 +94,8 @@ const firstClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_
 const secondClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const anonymousClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
 
-const first = await loginAndUnlock(
-  firstClient,
-  env.USER_ONE_EMAIL,
-  env.USER_ONE_PASSWORD,
-  env.USER_ONE_PASSPHRASE,
-);
-const second = await loginAndUnlock(
-  secondClient,
-  env.USER_TWO_EMAIL,
-  env.USER_TWO_PASSWORD,
-  env.USER_TWO_PASSPHRASE,
-);
+const first = await loginAndUnlock(firstClient, env.USER_ONE_EMAIL, env.USER_ONE_PASSWORD);
+const second = await loginAndUnlock(secondClient, env.USER_TWO_EMAIL, env.USER_TWO_PASSWORD);
 assert(first.archiveId === second.archiveId, "Accounts point to different archives");
 assert(
   Buffer.from(first.rawDek).equals(Buffer.from(second.rawDek)),

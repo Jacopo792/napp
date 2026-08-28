@@ -9,8 +9,9 @@ web
 ## Users
 
 Two people, and only two, with separate Supabase email/password accounts and full
-read/write access to one shared encrypted archive. Both unlock the same archive DEK
-with an independent passphrase-wrapped key and both can use the `viewAs` switch.
+read/write access to one shared encrypted archive. Each account password also unwraps
+that member's copy of the shared archive DEK, so sign-in is one step with no separate
+archive passphrase screen. Both can use the `viewAs` switch.
 
 `owner: "u1" | "u2"` remains a live organisational label. It powers **My notes /
 Partner's notes**, and folders and tags carry the same owner label, but it is never an
@@ -53,8 +54,8 @@ search and content processing remain local.
 
 Confirmed functionality: create / edit / delete notes, fast debounced autosave,
 pinning, folders, colored tags, full-text search, drag a note onto a folder,
-and u1's `viewAs` archive switch. **The interface is dark only** (decided 2026-08-28);
-there is no theme control and no light palette to maintain. Opening a note is read-only
+and u1's `viewAs` archive switch. **The interface is dark only**: near-white ink on
+opaque graphite surfaces, with no theme control or decorative colour palette. Opening a note is read-only
 state selection: it must never update `updatedAt` or trigger a database write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
@@ -79,7 +80,8 @@ Technical constraints that outlive any design:
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
 - Supabase Auth uses two pre-created email/password accounts; public signup is disabled.
 - One random 256-bit archive DEK is wrapped independently for each account with a
-  PBKDF2-SHA256-derived KEK (at least 600,000 iterations). The raw DEK is session-only.
+  PBKDF2-SHA256-derived KEK from that account's password (at least 600,000 iterations).
+  The raw DEK is session-only.
 - Concurrent edits remain last-write-wins at note granularity. The `version` column
   provides optimistic concurrency; the interface must never imply a merge happened.
 - Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
@@ -87,15 +89,12 @@ Technical constraints that outlive any design:
 
 ## Brand Commitments
 
-Jacopo directs the design system of **Pixel Services** (`Documents/Pixel Services/coding/Hosting/src/main/webui/app/assets/css/tailwind.css`) to be the visual
-authority for the interface: DM Sans / Bricolage Grotesque / JetBrains Mono, oklch
-tokens, `--radius: 0.45rem`, `--ease-premium`. The note body uses Source Serif 4 for
-more comfortable long-form writing, and the surfaces may move toward cleaner cool
-neutrals. Binding, but explicitly **not as a copy-paste**.
+The interface uses the operating system's native sans-serif and monospace faces for the
+sharpest platform rendering. Opaque graphite planes, neutral borders, restrained radii and
+`--ease-premium` remain the visual foundation.
 
-Standing exception: the sienna/orange `--primary` of that system is rejected. It was
-replaced by azure until 2026-08-28 and by a sage green after; the accent hue is being
-reconsidered in a coming redesign. What is fixed is that sienna and orange never return.
+Standing exception: coloured product accents are rejected. Selection and focus use white,
+gray or transparency; only tags, destructive states and success states retain semantic colour.
 
 Standing constraint (2026-08-28): decorative gradient washes — soft radial or mesh
 colour fields behind the interface — are rejected outright, in any palette.

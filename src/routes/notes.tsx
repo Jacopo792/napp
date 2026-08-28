@@ -39,6 +39,7 @@ import {
   takePending,
 } from "@/lib/draft";
 import { FolderRail, ALL, TRASH, UNFILED } from "@/components/FolderRail";
+import { MobileScopes } from "@/components/MobileScopes";
 import { NoteList } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { CollectionMenu, MainMenu, NoteMenu, SettingsPanel } from "@/components/WorkspaceMenus";
@@ -82,10 +83,9 @@ function metaShape(meta: Meta): string {
 }
 
 function NotesPage() {
-  /* Impeccable direction contract — Midnight Instrument / Operate:
-     a continuous three-pane graphite workspace on desktop; a folders →
-     collection → note stack on phone; pale gold only signals interaction;
-     glass belongs exclusively to floating controls, menus and settings. */
+  /* Direction contract: an opaque three-pane graphite workspace on desktop;
+     a notes-first gallery on phone; neutral emphasis for ordinary interaction;
+     translucency belongs only to temporary overlays. */
   const navigate = useNavigate();
   const compact = useIsCompact();
 
@@ -120,7 +120,8 @@ function NotesPage() {
     }
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mobileScreen, setMobileScreen] = useState<"folders" | "collection" | "note">("folders");
+  const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
+  const [mobileManageOpen, setMobileManageOpen] = useState(false);
   const [listPreferences, setListPreferences] = useState<Record<"u1" | "u2", ListPreferencesV1>>(
     () => ({ u1: loadListPreferences("u1"), u2: loadListPreferences("u2") }),
   );
@@ -774,13 +775,6 @@ function NotesPage() {
     }));
   }
 
-  function handleDefaultPreferencesChange(next: ListPreferences) {
-    setListPreferences((current) => ({
-      ...current,
-      [viewAs]: { ...current[viewAs], defaults: next },
-    }));
-  }
-
   function handleCreateFolder(name: string) {
     const folder = { id: crypto.randomUUID(), name };
     handleMetaChange({ ...activeMeta, folders: [...activeMeta.folders, folder] });
@@ -816,14 +810,17 @@ function NotesPage() {
     setSelectedFolderId(ALL);
     setFilterTagIds([]);
     setQuery("");
-    setMobileScreen("folders");
+    setMobileScreen("collection");
   }
 
   function handleSelectFolder(id: string) {
     setSelectedFolderId(id);
     setSelectedId(null);
     if (id === TRASH) setFilterTagIds([]);
-    if (compact) setMobileScreen("collection");
+    if (compact) {
+      setMobileManageOpen(false);
+      setMobileScreen("collection");
+    }
   }
 
   const handleSelectNote = useCallback(
@@ -847,12 +844,8 @@ function NotesPage() {
 
   function handleMobileBack() {
     saveNow();
-    if (mobileScreen === "note") {
-      setSelectedId(null);
-      setMobileScreen("collection");
-    } else {
-      setMobileScreen("folders");
-    }
+    setSelectedId(null);
+    setMobileScreen("collection");
   }
 
   function handleLock() {
@@ -905,6 +898,7 @@ function NotesPage() {
   const collectionActions = (
     <CollectionMenu
       preferences={activeListPreferences}
+      galleryOnly={compact}
       folderName={folderLabel}
       canManageFolder={canManageFolder}
       onChange={handleListPreferencesChange}
@@ -942,77 +936,55 @@ function NotesPage() {
       <div className="mobile-workspace overflow-hidden" style={{ height: "100dvh" }}>
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
           <main className="h-full overflow-hidden">
-            {mobileScreen === "folders" && (
-              <section className="mobile-screen mobile-folders-screen flex h-full flex-col">
-                <header
-                  className="mobile-screen-header shrink-0 px-5 pb-4"
-                  style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
-                >
-                  <div className="flex items-center">
-                    <MainMenu onSettings={() => setSettingsOpen(true)} onLock={handleLock} />
-                  </div>
-                  <h1 className="mt-8 font-display text-[2.6rem] font-semibold tracking-[-0.045em]">
-                    Folders
-                  </h1>
-                  <div
-                    role="group"
-                    aria-label="Archive"
-                    className="archive-switch glass-toolbar mt-5 flex p-1"
-                  >
-                    {(
-                      [
-                        ["u1", "My notes"],
-                        ["u2", `${partnerName}'s notes`],
-                      ] as const
-                    ).map(([owner, label]) => (
-                      <button
-                        key={owner}
-                        type="button"
-                        onClick={() => handleViewChange(owner)}
-                        aria-pressed={viewAs === owner}
-                        className={`min-w-0 flex-1 truncate px-3 py-2 text-sm ${viewAs === owner ? "is-active" : ""}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </header>
-                <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-                  <FolderRail
-                    mobile
-                    entries={ownedEntries}
-                    meta={activeMeta}
-                    selectedFolderId={selectedFolderId}
-                    filterTagIds={filterTagIds}
-                    onSelectFolder={handleSelectFolder}
-                    onFilterTagsChange={setFilterTagIds}
-                    onMetaChange={handleMetaChange}
-                  />
-                </div>
-              </section>
-            )}
-
             {mobileScreen === "collection" && (
               <section className="mobile-screen flex h-full flex-col">
-                <nav
-                  className="mobile-backbar flex shrink-0 items-center px-3"
-                  style={{ paddingTop: "env(safe-area-inset-top)" }}
+                <header
+                  className="mobile-appbar shrink-0 px-4 pb-2"
+                  style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleMobileBack}
-                    aria-label="Back to folders"
-                    className="mobile-back"
-                  >
-                    <ChevronLeft size={22} />
-                    Folders
-                  </button>
-                </nav>
+                  <div className="flex items-center gap-3">
+                    <MainMenu onSettings={() => setSettingsOpen(true)} onLock={handleLock} />
+                    <span className="font-display text-lg font-semibold tracking-[-0.03em]">
+                      Notes
+                    </span>
+                    <div
+                      role="group"
+                      aria-label="Archive"
+                      className="archive-switch ml-auto flex p-1"
+                    >
+                      {(
+                        [
+                          ["u1", "Mine"],
+                          ["u2", partnerName],
+                        ] as const
+                      ).map(([owner, label]) => (
+                        <button
+                          key={owner}
+                          type="button"
+                          onClick={() => handleViewChange(owner)}
+                          aria-pressed={viewAs === owner}
+                          className={`max-w-28 min-w-16 truncate px-3 py-1.5 text-xs ${viewAs === owner ? "is-active" : ""}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </header>
+                <MobileScopes
+                  entries={ownedEntries}
+                  meta={activeMeta}
+                  selectedFolderId={selectedFolderId}
+                  filterTagIds={filterTagIds}
+                  onSelectFolder={handleSelectFolder}
+                  onFilterTagsChange={setFilterTagIds}
+                  onManage={() => setMobileManageOpen(true)}
+                />
                 <NoteList
                   mobile
                   entries={visible}
                   groups={noteGroups}
-                  view={activeListPreferences.view}
+                  view="gallery"
                   toolbarActions={collectionActions}
                   meta={activeMeta}
                   selectedId={selectedId}
@@ -1073,11 +1045,48 @@ function NotesPage() {
             )}
           </main>
         </DndContext>
+        {mobileManageOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="Close folder and tag manager"
+              className="sheet-scrim"
+              onClick={() => setMobileManageOpen(false)}
+            />
+            <section className="sheet" aria-label="Folders and tags">
+              <span aria-hidden className="sheet-grip" />
+              <header className="flex items-center px-5 pt-3 pb-2">
+                <div>
+                  <h2 className="font-display text-xl font-semibold">Organize</h2>
+                  <p className="text-xs text-ink-3">Folders and tags</p>
+                </div>
+                <button
+                  type="button"
+                  className="toolbar-button ml-auto"
+                  onClick={() => setMobileManageOpen(false)}
+                >
+                  Done
+                </button>
+              </header>
+              <FolderRail
+                mobile
+                entries={ownedEntries}
+                meta={activeMeta}
+                selectedFolderId={selectedFolderId}
+                filterTagIds={filterTagIds}
+                onSelectFolder={handleSelectFolder}
+                onFilterTagsChange={setFilterTagIds}
+                onMetaChange={handleMetaChange}
+              />
+            </section>
+          </>
+        )}
         <SettingsPanel
+          mobile
           open={settingsOpen}
-          preferences={storedPreferences.defaults}
+          preferences={activeListPreferences}
           onClose={() => setSettingsOpen(false)}
-          onPreferencesChange={handleDefaultPreferencesChange}
+          onPreferencesChange={handleListPreferencesChange}
           onLock={handleLock}
         />
       </div>
@@ -1190,21 +1199,19 @@ function NotesPage() {
               onNew={handleNew}
               onUploadImage={handleUploadImage}
               resolveImage={resolveImage}
-              headerActions={
-                <>
-                  {!navigationOpen && (
-                    <button
-                      type="button"
-                      onClick={() => setNavigationOpen(true)}
-                      aria-label="Show navigation"
-                      className="toolbar-button mr-1"
-                    >
-                      <PanelLeftOpen size={16} />
-                    </button>
-                  )}
-                  {noteActions}
-                </>
+              navigationAction={
+                !navigationOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setNavigationOpen(true)}
+                    aria-label="Show navigation"
+                    className="toolbar-button"
+                  >
+                    <PanelLeftOpen size={16} />
+                  </button>
+                ) : null
               }
+              headerActions={noteActions}
             />
           </Suspense>
         </div>
@@ -1219,9 +1226,9 @@ function NotesPage() {
       </DndContext>
       <SettingsPanel
         open={settingsOpen}
-        preferences={storedPreferences.defaults}
+        preferences={activeListPreferences}
         onClose={() => setSettingsOpen(false)}
-        onPreferencesChange={handleDefaultPreferencesChange}
+        onPreferencesChange={handleListPreferencesChange}
         onLock={handleLock}
       />
     </div>

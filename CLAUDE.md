@@ -31,6 +31,11 @@ GitHub repository variables required by `.github/workflows/deploy.yml`:
 No Supabase service-role key, account password, archive passphrase or legacy
 GitHub credential belongs in GitHub Pages or its build.
 
+After upgrading an existing archive to single-step login, run
+`pnpm migrate:supabase` once with the legacy passphrases in the local migration
+environment. It rewraps the existing DEK with each account password; note rows
+and image objects are not re-encrypted.
+
 ## One-time migration tools
 
 The files in `scripts/` are local administrative tools, not part of the

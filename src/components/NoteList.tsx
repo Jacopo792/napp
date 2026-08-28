@@ -102,7 +102,7 @@ const Row = memo(function Row({
       aria-selected={selected}
       onClick={() => onSelect(entry)}
       style={{ opacity: isDragging ? 0.4 : 1 }}
-      className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex-col" : "flex gap-3"} ${
+      className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
@@ -137,7 +137,7 @@ const Row = memo(function Row({
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           style={{
-            fontVariationSettings: '"wght" 500, "opsz" 16',
+            fontWeight: 520,
             display: "-webkit-box",
             WebkitLineClamp: gallery ? 4 : 3,
             WebkitBoxOrient: "vertical",
@@ -177,85 +177,87 @@ const Row = memo(function Row({
         )}
       </div>
 
-      {!trashMode && (
+      <div className="note-row-actions flex shrink-0 items-center gap-0.5">
+        {!trashMode && (
+          <button
+            aria-label={
+              pinned
+                ? `Unpin ${entry.note.title || "Untitled"}`
+                : `Pin ${entry.note.title || "Untitled"}`
+            }
+            title={pinned ? "Unpin note" : "Pin note to top"}
+            aria-pressed={pinned}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePin(entry);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className={`icon-button h-7 w-7 shrink-0 transition-all ${
+              pinned
+                ? "text-accent opacity-100"
+                : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+            }`}
+          >
+            <Pin
+              size={13}
+              strokeWidth={pinned ? 2.4 : 1.75}
+              fill={pinned ? "currentColor" : "none"}
+            />
+          </button>
+        )}
+        {trashMode && (
+          <button
+            aria-label={`Restore ${entry.note.title || "Untitled"}`}
+            title="Restore note"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRestore(entry);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="icon-button h-7 w-7 shrink-0 text-accent"
+          >
+            <RotateCcw size={14} strokeWidth={2} />
+          </button>
+        )}
+
         <button
           aria-label={
-            pinned
-              ? `Unpin ${entry.note.title || "Untitled"}`
-              : `Pin ${entry.note.title || "Untitled"}`
+            confirmDelete
+              ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
+              : trashMode
+                ? `Delete ${entry.note.title || "Untitled"} forever`
+                : `Move ${entry.note.title || "Untitled"} to Trash`
           }
-          title={pinned ? "Unpin note" : "Pin note to top"}
-          aria-pressed={pinned}
-          onClick={(event) => {
-            event.stopPropagation();
-            onTogglePin(entry);
+          title={
+            confirmDelete
+              ? trashMode
+                ? "Click again to permanently delete"
+                : "Click again to move to Trash"
+              : trashMode
+                ? `Delete "${entry.note.title || "Untitled"}" forever`
+                : `Move "${entry.note.title || "Untitled"}" to Trash`
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirmDelete) {
+              if (trashMode) onDeleteForever(entry);
+              else onMoveToTrash(entry);
+            } else setConfirmDelete(true);
           }}
-          onPointerDown={(event) => event.stopPropagation()}
-          className={`icon-button h-7 w-7 shrink-0 transition-all ${
-            pinned
-              ? "text-accent opacity-100"
-              : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+          onPointerDown={(e) => e.stopPropagation()}
+          className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
+            confirmDelete
+              ? "bg-danger-fill text-on-danger opacity-100"
+              : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
           }`}
         >
-          <Pin
-            size={13}
-            strokeWidth={pinned ? 2.4 : 1.75}
-            fill={pinned ? "currentColor" : "none"}
-          />
+          {confirmDelete ? (
+            <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
+          ) : (
+            <Trash2 size={13} strokeWidth={1.75} />
+          )}
         </button>
-      )}
-      {trashMode && (
-        <button
-          aria-label={`Restore ${entry.note.title || "Untitled"}`}
-          title="Restore note"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRestore(entry);
-          }}
-          onPointerDown={(event) => event.stopPropagation()}
-          className="icon-button h-7 w-7 shrink-0 text-accent"
-        >
-          <RotateCcw size={14} strokeWidth={2} />
-        </button>
-      )}
-
-      <button
-        aria-label={
-          confirmDelete
-            ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
-            : trashMode
-              ? `Delete ${entry.note.title || "Untitled"} forever`
-              : `Move ${entry.note.title || "Untitled"} to Trash`
-        }
-        title={
-          confirmDelete
-            ? trashMode
-              ? "Click again to permanently delete"
-              : "Click again to move to Trash"
-            : trashMode
-              ? `Delete "${entry.note.title || "Untitled"}" forever`
-              : `Move "${entry.note.title || "Untitled"}" to Trash`
-        }
-        onClick={(e) => {
-          e.stopPropagation();
-          if (confirmDelete) {
-            if (trashMode) onDeleteForever(entry);
-            else onMoveToTrash(entry);
-          } else setConfirmDelete(true);
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
-          confirmDelete
-            ? "bg-danger-fill text-on-danger opacity-100"
-            : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
-        }`}
-      >
-        {confirmDelete ? (
-          <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
-        ) : (
-          <Trash2 size={13} strokeWidth={1.75} />
-        )}
-      </button>
+      </div>
     </div>
   );
 });

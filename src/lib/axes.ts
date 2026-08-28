@@ -23,7 +23,7 @@ export interface AxisSpec {
 export const AXIS_SPECS: AxisSpec[] = [
   { key: "size", label: "Size", min: 13, max: 22, step: 1, unit: "px" },
   { key: "measure", label: "Measure", min: 48, max: 92, step: 2, unit: "ch" },
-  { key: "weight", label: "Weight", min: 300, max: 600, step: 25, unit: "" },
+  { key: "weight", label: "Weight", min: 300, max: 600, step: 5, unit: "" },
   { key: "leading", label: "Leading", min: 1.35, max: 2.0, step: 0.05, unit: "" },
 ];
 

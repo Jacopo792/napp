@@ -1,60 +1,44 @@
-@import "./fonts.css";
 @import "tailwindcss" source(none);
 @source "../src";
 
-/* Chroma-zero graphite: neutral planes, ink carries every signal, hue appears
-   only in tags and error states. Planes rise from the --graphite-* scale of
-   Pixel Services; the accent is white, not a colour. */
+/* Graphite UI: opaque neutral planes, white ink and complete hairline borders. */
 :root {
   color-scheme: dark;
 
-  /* Piani — dalla scala --graphite-* di Pixel Services */
-  --surface: #131313;   /* oklch(0.185 0 0)  ground app                              */
-  --paper:   #1E1E1E;   /* oklch(0.237 0 0)  rail + catalogo   ← --graphite          */
-  --page:    #292929;   /* oklch(0.281 0 0)  piano nota        ← --graphite-elevated */
+  --surface: #131313;
+  --paper: #1e1e1e;
+  --page: #292929;
 
-  /* Inchiostro — la scala porta tutto il carico, essendo monocromatica */
-  --ink:   #E8E8E8;     /* 11.9:1 su --page · 15.2:1 su --surface ← --graphite-foreground */
-  --ink-2: #C7C7C7;     /*  7.6:1 su --page                                               */
-  --ink-3: #939393;     /*  4.7:1 su --page                      ← --graphite-muted       */
-  --ink-4: #747474;     /*  3.1:1 su --page — solo metadati, mai corpo                    */
+  --ink: #e8e8e8;
+  --ink-2: #c7c7c7;
+  --ink-3: #939393;
+  --ink-4: #747474;
 
-  --rule:      #3C3C3C; /* ← --graphite-border (#383838 nel tema Azzurro) */
-  --rule-soft: #2F2F2F;
+  --rule: #3c3c3c;
+  --rule-soft: #2f2f2f;
 
-  /* Enfasi — il ruolo "accent", senza hue */
-  --accent:        #FAFAFA;                  /* 8.3:1 su --page   ← --foreground */
-  --accent-strong: #FFFFFF;                  /* hover                            */
-  --accent-wash:   rgb(255 255 255 / 0.10);  /* sfondo stato attivo              */
-  --on-accent:     #131313;                  /* 17.9:1 su --accent               */
+  --accent: #fafafa;
+  --accent-strong: #ffffff;
+  --accent-wash: rgb(255 255 255 / 0.1);
+  --on-accent: #131313;
 
-  /* Semantica — l'unico colore rimasto nel chrome */
-  --danger:      #FFA5A8;  /* 4.6:1 su --page — testo di errore        */
-  --danger-fill: #B3272C;  /* 6.2:1 con --on-danger — pulsante distruttivo */
-  --on-danger:   #FAFAFA;
-  --ok:          #7FD1A8;
+  --danger: #ffa5a8;
+  --danger-fill: #b3272c;
+  --on-danger: #fafafa;
+  --ok: #7fd1a8;
 
-  /* Materiale — neutralizzato (era blu: rgb(37 39 46)) */
-  --glass:           rgb(41 41 41 / 0.72);
-  --glass-border:    rgb(255 255 255 / 0.12);
-  --glass-highlight: rgb(255 255 255 / 0.16);
+  --glass: #242424;
+  --glass-border: #3c3c3c;
+  --glass-highlight: rgb(255 255 255 / 0.06);
 
-  /* ── The material ─────────────────────────────────────────────────────────
-     Layered opaque surfaces with a lit top edge. The ground is flat, so depth
-     comes from the surface steps and the hairline, not from a filter. */
-  --glass: rgb(37 39 46 / 0.7);
-  --glass-border: rgb(255 255 255 / 0.13);
-  --glass-highlight: rgb(255 255 255 / 0.17);
-
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.45), 0 18px 40px -12px oklch(0 0 0 / 0.55);
-  --shadow-popover: 0 8px 20px oklch(0 0 0 / 0.3), 0 28px 64px -16px oklch(0 0 0 / 0.7);
-  --radius-sm: 0.625rem;
-  --radius-md: 0.9rem;
-  --radius-lg: 1.15rem;
+  --shadow-soft: 0 14px 40px rgb(0 0 0 / 0.22);
+  --shadow-popover: 0 22px 64px rgb(0 0 0 / 0.44);
+  --radius-sm: 0.7rem;
+  --radius-md: 0.95rem;
+  --radius-lg: 1rem;
   --radius-pill: 999px;
 
-  /* Reading axes — written by lib/axes.ts, read by the title and the editor.
-     These are real variable-font axes, not a size class. */
+  /* Reading controls — written by lib/axes.ts, read by title and editor. */
   --read-size: 17px;
   --read-measure: 68ch;
   --read-weight: 430;
@@ -85,10 +69,10 @@
 
   --radius-pill: var(--radius-pill);
 
-  --font-display: "Bricolage Grotesque", "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-reading: "Source Serif 4 Variable", Georgia, ui-serif, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --font-reading: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
@@ -109,6 +93,9 @@
     color: var(--ink);
     font-family: var(--font-sans);
     font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: auto;
     overscroll-behavior: none;
   }
 
@@ -327,9 +314,7 @@
   font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
   line-height: 1.14;
   letter-spacing: -0.028em;
-  font-variation-settings:
-    "wght" 620,
-    "opsz" 42;
+  font-weight: 680;
   /* Hyphenate only words long enough that breaking them beats a ragged hole.
      Without the limit a display title starts splitting "per-ché", which reads
      as damage rather than typesetting. */
@@ -344,7 +329,7 @@
 .soft-control {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: oklch(1 0 0 / 0.06);
+  background: var(--paper);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
@@ -356,7 +341,7 @@
   gap: 0.375rem;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: oklch(1 0 0 / 0.065);
+  background: var(--paper);
   padding: 0.25rem 0.625rem;
 }
 
@@ -382,6 +367,57 @@
   background: var(--page);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
+}
+
+.login-shell {
+  background: var(--surface);
+}
+
+.login-card {
+  border: 1px solid var(--rule);
+  border-radius: 1.25rem;
+  background: var(--paper);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 0.34);
+}
+
+.login-input {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  padding: 0.8rem 0.9rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+  outline: none;
+  transition:
+    border-color 160ms var(--ease),
+    background-color 160ms var(--ease);
+}
+
+.login-input:focus {
+  border-color: var(--accent);
+  background: var(--page);
+}
+
+.login-submit {
+  border: 1px solid var(--accent);
+  border-radius: 0.8rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  transition:
+    background-color 160ms var(--ease),
+    border-color 160ms var(--ease);
+}
+
+.login-submit:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 
 /* A label on the left, its value hard against the right edge — the specimen's
@@ -449,8 +485,9 @@
 }
 
 .workspace-grid {
-  border: 1px solid var(--rule);
-  background: var(--paper);
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface);
 }
 
 .folder-column,
@@ -458,11 +495,10 @@
 .editor-shell {
   min-height: 0;
   background: var(--paper);
-}
-
-.folder-column,
-.collection-column {
-  border-right: 1px solid var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .editor-shell {
@@ -470,12 +506,10 @@
 }
 
 .folder-column > .folder-rail,
-.collection-column,
-.workspace-grid > .editor-shell,
 .workspace-grid .soft-pane,
 .editor-shell.soft-pane {
   border: 0;
-  border-radius: 0;
+  border-radius: inherit;
   box-shadow: none;
 }
 
@@ -489,7 +523,11 @@
 .folder-toolbar,
 .collection-toolbar,
 .editor-toolbar {
-  background: rgb(30 30 30 / 0.92);
+  background: var(--paper);
+}
+
+.editor-toolbar {
+  background: var(--page);
 }
 
 .toolbar-button,
@@ -511,7 +549,7 @@
 .toolbar-button:hover,
 .icon-button:hover {
   border-color: var(--rule);
-  background: rgb(255 255 255 / 0.07);
+  background: var(--accent-wash);
   color: var(--ink);
 }
 
@@ -519,7 +557,7 @@
   gap: 0.15rem;
   border: 1px solid var(--rule);
   border-radius: 0.75rem;
-  background: rgb(19 19 19 / 0.5);
+  background: var(--surface);
 }
 
 .archive-switch button {
@@ -530,8 +568,8 @@
 
 .archive-switch button.is-active {
   background: var(--accent-wash);
-  color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
 }
 
 .glass-toolbar,
@@ -542,9 +580,7 @@
   background: var(--glass);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    0 10px 32px rgb(0 0 0 / 0.34);
-  -webkit-backdrop-filter: blur(22px) saturate(115%);
-  backdrop-filter: blur(22px) saturate(115%);
+    0 14px 36px rgb(0 0 0 / 0.24);
 }
 
 .glass-toolbar,
@@ -588,7 +624,7 @@
 
 .menu-row:hover,
 .menu-row:focus-visible {
-  background: rgb(255 255 255 / 0.09);
+  background: var(--accent-wash);
   color: var(--ink);
 }
 
@@ -682,8 +718,28 @@
 
 .note-gallery-item {
   min-height: 10.5rem;
-  border-radius: 0.85rem;
-  background: rgb(255 255 255 / 0.03);
+  border-radius: 0.95rem;
+  background: #232323;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+.note-gallery-item[aria-selected="true"] {
+  border-color: #777777;
+  background: #353535;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+.note-gallery-item .note-row-actions {
+  width: 100%;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.collection-column [role="option"]:focus-visible {
+  outline: 1px solid var(--ink-3);
+  outline-offset: -1px;
 }
 
 .find-bar {
@@ -695,9 +751,7 @@
   height: 2.35rem;
   gap: 0.1rem;
   border-radius: 0.85rem;
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 8px 22px rgb(0 0 0 / 0.24);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 .editor-tool-button {
@@ -739,8 +793,6 @@
   width: 100%;
   height: 100%;
   background: rgb(0 0 0 / 0.58);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
 }
 
 .settings-panel {
@@ -803,7 +855,7 @@
 
 .settings-presets button.is-active,
 .settings-choice button.is-active {
-  border-color: rgb(255 255 255 / 0.35);
+  border-color: var(--accent);
   background: var(--accent-wash);
   color: var(--accent-strong);
 }
@@ -878,6 +930,19 @@
   accent-color: var(--accent);
 }
 
+.settings-mobile-gallery {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
+  background: var(--accent-wash);
+  padding: 0.7rem 0.85rem;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+
 .settings-lock {
   display: flex;
   align-items: center;
@@ -899,9 +964,14 @@
   }
 }
 
+.mobile-appbar,
 .mobile-screen-header,
 .mobile-backbar {
   background: var(--surface);
+}
+
+.mobile-appbar {
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .mobile-backbar {
@@ -934,12 +1004,13 @@
 }
 
 .mobile-note-list {
-  background: var(--paper);
+  min-height: 0;
+  background: var(--surface);
 }
 
 .mobile-note-list .collection-toolbar {
-  min-height: 6.5rem;
-  background: var(--paper);
+  min-height: 5rem;
+  background: var(--surface);
 }
 
 .mobile-note-list .note-group-heading {
@@ -947,8 +1018,19 @@
 }
 
 .mobile-note-list .note-gallery-grid {
-  gap: 0.55rem;
-  padding-inline: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  padding-inline: 0.9rem;
+}
+
+.mobile-note-list .note-gallery-item {
+  min-height: 11.5rem;
+  padding: 1rem;
+}
+
+.mobile-note-list .note-gallery-item p:first-child {
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .mobile-compose {
@@ -960,7 +1042,7 @@
   .glass-search,
   .popover,
   .glass-sheet {
-    background: #2E2E2E;
+    background: var(--paper);
   }
 }
 
@@ -978,7 +1060,7 @@
   .glass-search,
   .popover,
   .glass-sheet {
-    background: #2E2E2E;
+    background: var(--paper);
   }
 }
 
@@ -993,7 +1075,7 @@
 /* ── The reading page ────────────────────────────────────────────────────────
    The editor is not a widget with a theme applied — it is a page of set text.
    Sizes, measure and weight all come from the reading axes, so the axis bar
-   drives real font-variation-settings rather than a t-shirt size. ────────── */
+   drives actual size, measure, weight and leading values. ───────────────── */
 .cm-editor {
   height: 100%;
   background: transparent;
@@ -1018,9 +1100,7 @@
 
 .cm-editor .cm-content {
   font-family: var(--font-reading);
-  font-variation-settings:
-    "wght" var(--read-weight),
-    "opsz" 20;
+  font-weight: var(--read-weight);
   width: 100%;
   max-width: var(--read-measure);
   margin-inline: auto;
@@ -1036,7 +1116,7 @@
 .cm-dropCursor {
   border-left: 2.5px solid var(--accent) !important;
   opacity: 1 !important;
-  box-shadow: 0 0 0 1px oklch(0.281 0 0 / 0.9);
+  box-shadow: 0 0 0 1px var(--page);
 }
 
 /* CodeMirror animation can dim the cursor to 0 — keep it legible. */
@@ -1089,33 +1169,23 @@
 }
 .cm-md-h1 {
   font-size: 1.72em;
-  font-variation-settings:
-    "wght" 650,
-    "opsz" 40;
+  font-weight: 700;
 }
 .cm-md-h2 {
   font-size: 1.36em;
-  font-variation-settings:
-    "wght" 620,
-    "opsz" 28;
+  font-weight: 680;
 }
 .cm-md-h3 {
   font-size: 1.14em;
-  font-variation-settings:
-    "wght" 600,
-    "opsz" 20;
+  font-weight: 650;
 }
 .cm-md-h4 {
   font-size: 1em;
-  font-variation-settings:
-    "wght" 600,
-    "opsz" 16;
+  font-weight: 650;
 }
 
 .cm-md-strong {
-  font-variation-settings:
-    "wght" 700,
-    "opsz" 20;
+  font-weight: 700;
 }
 .cm-md-em {
   font-style: italic;
@@ -1232,7 +1302,7 @@
   border: 0;
   border-radius: 0.45rem;
   background: transparent;
-  color: var(--ink-2);
+  color: #ffffff;
   cursor: pointer;
   transition:
     background-color 140ms var(--ease),
@@ -1241,7 +1311,7 @@
 
 .cm-md-image-action:hover {
   background: oklch(1 0 0 / 0.11);
-  color: var(--ink);
+  color: #ffffff;
 }
 
 .cm-md-image-action.is-danger:hover {
@@ -1317,7 +1387,7 @@
 }
 
 .lightbox-figure figcaption {
-  color: var(--ink-3);
+  color: #ffffff;
   text-align: center;
 }
 
@@ -1532,8 +1602,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: oklch(0.06 0 0 / 0.62);
-  backdrop-filter: blur(6px);
+  background: rgb(17 19 24 / 0.24);
   animation: sheet-scrim-in 200ms var(--ease) both;
 }
 
@@ -1547,7 +1616,7 @@
   border-top: 1px solid var(--rule);
   border-radius: 1.35rem 1.35rem 0 0;
   background: var(--surface);
-  box-shadow: 0 -20px 60px oklch(0 0 0 / 0.5);
+  box-shadow: 0 -20px 60px rgb(17 19 24 / 0.12);
   padding-bottom: env(safe-area-inset-bottom);
   animation: sheet-in 320ms var(--ease) both;
 }

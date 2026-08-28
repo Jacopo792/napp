@@ -37,7 +37,7 @@ function Notice({
             fontSize: "clamp(3.5rem, 10vw, 5.5rem)",
             lineHeight: 0.9,
             letterSpacing: "-0.045em",
-            fontVariationSettings: '"wght" 700, "opsz" 72',
+            fontWeight: 700,
           }}
         >
           {figure}

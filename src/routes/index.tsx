@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
-import { authenticate, unlockSession, type PendingUnlock } from "@/lib/session";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { authenticate } from "@/lib/session";
 
 export const Route = createFileRoute("/")({ component: Login });
 
@@ -9,8 +9,6 @@ function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-  const [pending, setPending] = useState<PendingUnlock | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,42 +17,29 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      setPending(await authenticate(email.trim(), password));
+      await authenticate(email.trim(), password);
       setPassword("");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Sign in failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleUnlock() {
-    if (!passphrase) return;
-    setLoading(true);
-    setError("");
-    try {
-      await unlockSession(passphrase);
       navigate({ to: "/notes" });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The archive could not be unlocked");
+      setError(reason instanceof Error ? reason.message : "Sign in failed");
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center px-5">
+    <div className="login-shell flex min-h-screen flex-col">
+      <header className="flex h-16 shrink-0 items-center px-6">
         <span
           className="font-display text-[15px] text-ink"
-          style={{ fontVariationSettings: '"wght" 640, "opsz" 16', letterSpacing: "-0.02em" }}
+          style={{ fontWeight: 650, letterSpacing: "-0.02em" }}
         >
           Notes
         </span>
       </header>
 
-      <main className="flex flex-1 items-center justify-center px-6 pb-14">
-        <div className="soft-pane pane-glass w-full max-w-[30rem] p-8">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-wash text-accent">
+      <main className="flex flex-1 items-center justify-center px-5 pb-16">
+        <div className="login-card w-full max-w-[28rem] p-8 sm:p-10">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-glass-border bg-accent-wash text-accent">
             <ShieldCheck size={21} strokeWidth={1.8} />
           </div>
 
@@ -62,98 +47,59 @@ function Login() {
             className="font-display mt-6 text-[2rem] leading-tight text-ink"
             style={{
               letterSpacing: "-0.035em",
-              fontVariationSettings: '"wght" 650, "opsz" 36',
+              fontWeight: 700,
             }}
           >
-            {pending ? "Unlock your archive" : "Sign in to your notes"}
+            Sign in to your notes
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-3">
-            {pending
-              ? `Signed in as ${pending.email}. Your passphrase decrypts the shared archive only in this tab.`
-              : "Use the email and password created for this private archive."}
+            One private workspace. Your email and password handle both access and decryption.
           </p>
 
-          {pending ? (
-            <>
-              <label className="field-row mt-7 mb-2" htmlFor="archive-passphrase">
-                <span className="label text-ink-2">Archive passphrase</span>
-              </label>
-              <input
-                id="archive-passphrase"
-                autoFocus
-                type="password"
-                autoComplete="current-password"
-                value={passphrase}
-                onChange={(event) => setPassphrase(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && void handleUnlock()}
-                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
-              />
-              <button
-                disabled={loading || !passphrase}
-                onClick={() => void handleUnlock()}
-                className="label mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-30"
-              >
-                {loading ? (
-                  "Unlocking…"
-                ) : (
-                  <>
-                    Unlock <ArrowRight size={12} strokeWidth={2.5} />
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPending(null);
-                  setPassphrase("");
-                  setError("");
-                }}
-                className="label mt-3 flex items-center gap-1.5 text-ink-3 transition-colors hover:text-accent"
-              >
-                <ArrowLeft size={12} /> Different account
-              </button>
-            </>
-          ) : (
-            <>
-              <label className="field-row mt-7 mb-2" htmlFor="email">
-                <span className="label text-ink-2">Email</span>
-              </label>
-              <input
-                id="email"
-                autoFocus
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
-              />
-              <label className="field-row mt-4 mb-2" htmlFor="password">
-                <span className="label text-ink-2">Password</span>
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && void handleSignIn()}
-                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
-              />
-              <button
-                disabled={loading || !email.trim() || !password}
-                onClick={() => void handleSignIn()}
-                className="label mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-30"
-              >
-                {loading ? (
-                  "Signing in…"
-                ) : (
-                  <>
-                    Continue <ArrowRight size={12} strokeWidth={2.5} />
-                  </>
-                )}
-              </button>
-            </>
-          )}
+          <form
+            className="mt-7"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSignIn();
+            }}
+          >
+            <label className="field-row mb-2" htmlFor="email">
+              <span className="label text-ink-2">Email</span>
+            </label>
+            <input
+              id="email"
+              autoFocus
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="login-input"
+            />
+            <label className="field-row mt-4 mb-2" htmlFor="password">
+              <span className="label text-ink-2">Password</span>
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="login-input"
+            />
+            <button
+              type="submit"
+              disabled={loading || !email.trim() || !password}
+              className="login-submit label mt-4 flex w-full items-center justify-center gap-2 py-3"
+            >
+              {loading ? (
+                "Opening…"
+              ) : (
+                <>
+                  Continue <ArrowRight size={13} strokeWidth={2.5} />
+                </>
+              )}
+            </button>
+          </form>
 
           {error && (
             <p role="alert" className="readout mt-3 text-danger">

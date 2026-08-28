@@ -214,8 +214,14 @@ async function prepareArchive(admin, env) {
   let rawDek;
   if (existingKeys.data.length > 0) {
     const candidates = [
-      { user: first, passphrase: env.USER_ONE_PASSPHRASE },
-      { user: second, passphrase: env.USER_TWO_PASSPHRASE },
+      {
+        user: first,
+        credentials: [env.USER_ONE_PASSWORD, env.USER_ONE_PASSPHRASE],
+      },
+      {
+        user: second,
+        credentials: [env.USER_TWO_PASSWORD, env.USER_TWO_PASSPHRASE],
+      },
     ];
     const candidate = candidates.find(({ user }) =>
       existingKeys.data.some((row) => row.user_id === user.id),
@@ -223,31 +229,41 @@ async function prepareArchive(admin, env) {
     const row = existingKeys.data.find((item) => item.user_id === candidate?.user.id);
     if (!candidate || !row)
       throw new Error("Existing vault key does not belong to either configured user");
-    rawDek = await unwrapArchiveKey(
-      {
-        wrappedDek: row.wrapped_dek,
-        kdfSalt: row.kdf_salt,
-        kdfIterations: row.kdf_iterations,
-      },
-      candidate.passphrase,
-    );
+    for (const credential of new Set(candidate.credentials)) {
+      try {
+        rawDek = await unwrapArchiveKey(
+          {
+            wrappedDek: row.wrapped_dek,
+            kdfSalt: row.kdf_salt,
+            kdfIterations: row.kdf_iterations,
+          },
+          credential,
+        );
+        break;
+      } catch {
+        // Existing installations may still use the legacy archive passphrase.
+      }
+    }
+    if (!rawDek) throw new Error("The existing archive key could not be unlocked");
   } else {
     rawDek = generateArchiveKeyBytes();
   }
 
-  for (const { user, passphrase } of [
-    { user: first, passphrase: env.USER_ONE_PASSPHRASE },
-    { user: second, passphrase: env.USER_TWO_PASSPHRASE },
+  for (const { user, password } of [
+    { user: first, password: env.USER_ONE_PASSWORD },
+    { user: second, password: env.USER_TWO_PASSWORD },
   ]) {
-    if (existingKeys.data.some((row) => row.user_id === user.id)) continue;
-    const wrapped = await wrapArchiveKey(rawDek, passphrase);
-    const result = await admin.from("vault_keys").insert({
-      user_id: user.id,
-      archive_id: archiveId,
-      wrapped_dek: wrapped.wrappedDek,
-      kdf_salt: wrapped.kdfSalt,
-      kdf_iterations: wrapped.kdfIterations,
-    });
+    const wrapped = await wrapArchiveKey(rawDek, password);
+    const result = await admin.from("vault_keys").upsert(
+      {
+        user_id: user.id,
+        archive_id: archiveId,
+        wrapped_dek: wrapped.wrappedDek,
+        kdf_salt: wrapped.kdfSalt,
+        kdf_iterations: wrapped.kdfIterations,
+      },
+      { onConflict: "user_id,archive_id" },
+    );
     if (result.error) throw result.error;
   }
 

@@ -75,6 +75,7 @@ interface Props {
   onNew: () => void;
   onUploadImage: (file: File) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
+  navigationAction?: ReactNode;
   headerActions?: ReactNode;
 }
 
@@ -103,6 +104,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onNew,
     onUploadImage,
     resolveImage,
+    navigationAction,
     headerActions,
   },
   ref,
@@ -269,11 +271,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <section
         className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
+        {(navigationAction || headerActions) && (
+          <header className="editor-toolbar flex h-13 shrink-0 items-center border-b border-rule px-4">
+            {navigationAction && <span className="flex items-center">{navigationAction}</span>}
+            <span className="ml-auto flex items-center gap-1">{headerActions}</span>
+          </header>
+        )}
         <div className="flex flex-1 items-center justify-center px-8">
           <div className="measure px-8 py-12 text-center font-sans">
             <p
               className="font-display text-ink-4"
-              style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontVariationSettings: '"wght" 300' }}
+              style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 300 }}
             >
               Aa
             </p>
@@ -297,6 +305,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <div className="editor-toolbar relative flex h-13 shrink-0 items-center border-b border-rule px-4">
+        {navigationAction && <span className="mr-2 flex items-center">{navigationAction}</span>}
         <span className="label text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
 
         {!mobile && canEdit && (
