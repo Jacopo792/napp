@@ -6,7 +6,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import {
-  bytesToBase64,
   decryptFile,
   decryptMeta,
   deriveLegacySessionKeys,
@@ -25,6 +24,7 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dryRun = process.argv.includes("--dry-run");
+const provisionOnly = process.argv.includes("--provision-only");
 const IMAGE_PATTERN =
   /!\[([^\]]*)\]\((data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=\s]+))\)/gi;
 
@@ -121,7 +121,15 @@ async function ensureUser(admin, email, password) {
   const existing = (await listUsers(admin)).find(
     (user) => user.email?.toLowerCase() === email.toLowerCase(),
   );
-  if (existing) return existing;
+  if (existing) {
+    const updated = await admin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+    });
+    if (updated.error || !updated.data.user)
+      throw updated.error ?? new Error(`Could not update ${email}`);
+    return updated.data.user;
+  }
   const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -362,60 +370,79 @@ async function migrate(env, legacy, admin, archiveId, rawDek) {
 }
 
 const env = await loadEnv();
-requireValues(env, ["MASTER_SEED", "GITHUB_PAT", "GITHUB_REPO"]);
-if (!/^[0-9a-f]{64}$/i.test(env.MASTER_SEED))
-  throw new Error("MASTER_SEED must be 64 hex characters");
-
-const legacy = await readLegacyArchive(env);
-if (dryRun) {
-  const rawDek = generateArchiveKeyBytes();
-  const fakeAdmin = {
-    from: () => ({
-      select: () => ({ eq: async () => ({ data: [], error: null }) }),
-    }),
-    storage: {
-      from: () => ({ upload: async () => ({ error: null }) }),
-    },
-  };
-  const result = await migrate(env, legacy, fakeAdmin, crypto.randomUUID(), rawDek);
+if (provisionOnly) {
+  requireValues(env, ["VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
+  const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { archiveId } = await prepareArchive(admin, env);
   console.log(
     JSON.stringify(
       {
-        dryRun: true,
-        notesIn: legacy.notes.length,
-        notesOut: result.notesWritten,
-        imagesExtracted: result.imagesExtracted,
-        bytesSaved: result.bytesSaved,
+        provisioned: true,
+        archiveId,
+        accounts: [env.USER_ONE_EMAIL, env.USER_TWO_EMAIL],
       },
       null,
       2,
     ),
   );
 } else {
-  requireValues(env, ["VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
-  const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { archiveId, rawDek } = await prepareArchive(admin, env);
-  const result = await migrate(env, legacy, admin, archiveId, rawDek);
-  const total = await admin
-    .from("notes")
-    .select("id", { count: "exact", head: true })
-    .eq("archive_id", archiveId);
-  if (total.error) throw total.error;
-  console.log(
-    JSON.stringify(
-      {
-        dryRun: false,
-        archiveId,
-        notesIn: legacy.notes.length,
-        notesWritten: result.notesWritten,
-        notesOut: total.count,
-        imagesExtracted: result.imagesExtracted,
-        bytesSaved: result.bytesSaved,
+  requireValues(env, ["MASTER_SEED", "GITHUB_PAT", "GITHUB_REPO"]);
+  if (!/^[0-9a-f]{64}$/i.test(env.MASTER_SEED))
+    throw new Error("MASTER_SEED must be 64 hex characters");
+
+  const legacy = await readLegacyArchive(env);
+  if (dryRun) {
+    const rawDek = generateArchiveKeyBytes();
+    const fakeAdmin = {
+      from: () => ({
+        select: () => ({ eq: async () => ({ data: [], error: null }) }),
+      }),
+      storage: {
+        from: () => ({ upload: async () => ({ error: null }) }),
       },
-      null,
-      2,
-    ),
-  );
+    };
+    const result = await migrate(env, legacy, fakeAdmin, crypto.randomUUID(), rawDek);
+    console.log(
+      JSON.stringify(
+        {
+          dryRun: true,
+          notesIn: legacy.notes.length,
+          notesOut: result.notesWritten,
+          imagesExtracted: result.imagesExtracted,
+          bytesSaved: result.bytesSaved,
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    requireValues(env, ["VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
+    const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { archiveId, rawDek } = await prepareArchive(admin, env);
+    const result = await migrate(env, legacy, admin, archiveId, rawDek);
+    const total = await admin
+      .from("notes")
+      .select("id", { count: "exact", head: true })
+      .eq("archive_id", archiveId);
+    if (total.error) throw total.error;
+    console.log(
+      JSON.stringify(
+        {
+          dryRun: false,
+          archiveId,
+          notesIn: legacy.notes.length,
+          notesWritten: result.notesWritten,
+          notesOut: total.count,
+          imagesExtracted: result.imagesExtracted,
+          bytesSaved: result.bytesSaved,
+        },
+        null,
+        2,
+      ),
+    );
+  }
 }

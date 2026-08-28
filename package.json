@@ -8,7 +8,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "migrate:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs"
+    "provision:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs --provision-only",
+    "migrate:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs",
+    "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",
