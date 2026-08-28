@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+import { execFile } from "node:child_process";
 import { createHash, webcrypto } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import {
   decryptFile,
@@ -21,6 +23,8 @@ import {
 } from "../src/lib/crypto.ts";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
+
+const run = promisify(execFile);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dryRun = process.argv.includes("--dry-run");
@@ -67,12 +71,12 @@ async function githubRequest(env, path, accept = "application/vnd.github+json") 
   return response;
 }
 
-async function readLegacyArchive(env) {
+async function readFilesFromGitHub(env) {
   const listing = await githubRequest(env, `/repos/${env.GITHUB_REPO}/git/trees/data:notes`);
   const tree = (await listing.json()).tree.filter(
     (entry) => entry.type === "blob" && entry.path.endsWith(".napp"),
   );
-  const files = await Promise.all(
+  return Promise.all(
     tree.map(async (entry) => ({
       name: entry.path,
       content: await (
@@ -84,6 +88,39 @@ async function readLegacyArchive(env) {
       ).text(),
     })),
   );
+}
+
+/**
+ * The `data` branch is an ordinary git ref, so a clone that already has it
+ * needs no API call and no token to read the archive. This is the default:
+ * a personal access token is only required when reading a branch this
+ * working copy does not have.
+ */
+async function readFilesFromGit(ref) {
+  const listing = await run("git", ["ls-tree", "-r", "--name-only", ref], { cwd: root });
+  const paths = listing.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("notes/") && line.endsWith(".napp"));
+  if (paths.length === 0) throw new Error(`No .napp files found on ${ref}`);
+
+  return Promise.all(
+    paths.map(async (path) => ({
+      name: path.slice("notes/".length),
+      // A note carrying an embedded screenshot is comfortably over a megabyte
+      // of base64, so the default pipe buffer is not enough.
+      content: (
+        await run("git", ["show", `${ref}:${path}`], { cwd: root, maxBuffer: 256 * 1024 * 1024 })
+      ).stdout,
+    })),
+  );
+}
+
+async function readLegacyArchive(env) {
+  const useGitHub = Boolean(env.GITHUB_PAT && env.GITHUB_REPO);
+  const ref = env.LEGACY_GIT_REF ?? "origin/data";
+  const files = useGitHub ? await readFilesFromGitHub(env) : await readFilesFromGit(ref);
+  console.error(`Reading ${files.length} files from ${useGitHub ? "the GitHub API" : ref}`);
 
   const keys = await deriveLegacySessionKeys(env.MASTER_SEED);
   const notes = [];
@@ -388,7 +425,7 @@ if (provisionOnly) {
     ),
   );
 } else {
-  requireValues(env, ["MASTER_SEED", "GITHUB_PAT", "GITHUB_REPO"]);
+  requireValues(env, ["MASTER_SEED"]);
   if (!/^[0-9a-f]{64}$/i.test(env.MASTER_SEED))
     throw new Error("MASTER_SEED must be 64 hex characters");
 
