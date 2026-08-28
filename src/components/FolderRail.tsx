@@ -61,49 +61,27 @@ function FolderRow({
   }
 
   return (
+    /* The row is a container, not a control. It used to be a div with
+       role="button" wrapping a real delete button and, while renaming, a text
+       input — interactive content inside a button role, which is invalid and
+       leaves the row with no accessible name at all. Now the scope itself is a
+       real button and the delete action is its sibling. */
     <div
       ref={setNodeRef}
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      onDoubleClick={() => {
-        if (!onRename) return;
-        setEditing(true);
-        setTimeout(() => inputRef.current?.select(), 0);
-      }}
-      className={`group flex cursor-pointer items-center gap-3 transition-colors select-none ${
-        mobile ? "mobile-folder-row min-h-12 px-4" : "mx-2 h-9 rounded-lg px-3"
+      className={`group flex items-center transition-colors select-none ${
+        mobile ? "mobile-folder-row min-h-12 pr-4 pl-0" : "mx-2 h-9 rounded-lg pr-2"
       } ${
         selected ? "bg-accent-wash" : mobile ? "hover:bg-page" : "hover:bg-paper"
       } ${isOver ? "ring-1 ring-accent ring-inset" : ""}`}
     >
-      {mobile && (
-        <span className={`shrink-0 ${selected ? "text-accent" : "text-ink-4"}`}>
-          {icon === "all" ? (
-            <Layers3 size={16} strokeWidth={1.9} />
-          ) : icon === "inbox" ? (
-            <Inbox size={16} strokeWidth={1.9} />
-          ) : icon === "trash" ? (
-            <Trash2 size={16} strokeWidth={1.9} />
-          ) : (
-            <Folder size={16} strokeWidth={1.9} />
-          )}
-        </span>
-      )}
       {editing ? (
         <input
           ref={inputRef}
           value={value}
           autoFocus
+          aria-label={`Rename folder ${label}`}
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
-          onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Enter") commit();
@@ -112,34 +90,63 @@ function FolderRow({
               setEditing(false);
             }
           }}
-          className="min-w-0 flex-1 rounded-md border border-accent bg-page px-2 py-1 text-[13px] outline-none"
+          className={`min-w-0 flex-1 rounded-md border border-accent bg-page px-2 py-1 outline-none ${
+            mobile ? "mx-4 text-[16px]" : "mx-1 text-[13px]"
+          }`}
         />
       ) : (
-        <span
-          className={`min-w-0 flex-1 truncate ${mobile ? "text-[15px]" : "text-[13px]"} ${selected ? "text-accent" : "text-ink-2"}`}
-          style={{ fontVariationSettings: selected ? '"wght" 550' : '"wght" 450' }}
-        >
-          {label}
-        </span>
-      )}
+        <>
+          <button
+            type="button"
+            aria-pressed={selected}
+            onClick={onSelect}
+            onDoubleClick={() => {
+              if (!onRename) return;
+              setEditing(true);
+              setTimeout(() => inputRef.current?.select(), 0);
+            }}
+            className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left ${
+              mobile ? "h-12 px-4" : "h-9 px-3"
+            }`}
+          >
+            {mobile && (
+              <span aria-hidden className={`shrink-0 ${selected ? "text-accent" : "text-ink-4"}`}>
+                {icon === "all" ? (
+                  <Layers3 size={16} strokeWidth={1.9} />
+                ) : icon === "inbox" ? (
+                  <Inbox size={16} strokeWidth={1.9} />
+                ) : icon === "trash" ? (
+                  <Trash2 size={16} strokeWidth={1.9} />
+                ) : (
+                  <Folder size={16} strokeWidth={1.9} />
+                )}
+              </span>
+            )}
+            <span
+              className={`min-w-0 flex-1 truncate ${mobile ? "text-[15px]" : "text-[13px]"} ${
+                selected ? "text-accent" : "text-ink-2"
+              }`}
+              style={{ fontVariationSettings: selected ? '"wght" 550' : '"wght" 450' }}
+            >
+              {label}
+            </span>
+            <span className={`readout shrink-0 ${selected ? "text-accent" : "text-ink-4"}`}>
+              {count || "\u2014"}
+            </span>
+          </button>
 
-      {onDelete && !editing && (
-        <button
-          title={`Delete “${label}”`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="icon-button shrink-0 p-1 text-ink-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
-        >
-          <Trash2 size={12} strokeWidth={1.75} />
-        </button>
-      )}
-
-      {!editing && (
-        <span className={`readout shrink-0 ${selected ? "text-accent" : "text-ink-4"}`}>
-          {count || "—"}
-        </span>
+          {onDelete && (
+            <button
+              type="button"
+              aria-label={`Delete folder ${label}`}
+              title={`Delete \u201c${label}\u201d`}
+              onClick={onDelete}
+              className="icon-button ml-1 shrink-0 p-1 text-ink-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+            >
+              <Trash2 size={12} strokeWidth={1.75} />
+            </button>
+          )}
+        </>
       )}
     </div>
   );

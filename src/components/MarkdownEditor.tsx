@@ -856,7 +856,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
 
   return (
     <>
-      <div ref={host} className="h-full" />
+      <div ref={host} lang="it" className="h-full" />
       {preview && <ImageLightbox preview={preview} onClose={() => setPreview(null)} />}
     </>
   );

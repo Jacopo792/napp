@@ -29,10 +29,10 @@ export const supabase = createClient(url, publishableKey, {
 
 type Owner = "u1" | "u2";
 
+/** What the cheap first pass selects: everything except the payload. */
 interface NoteRow {
   id: string;
   owner: Owner;
-  ciphertext: string;
   created_at: string;
   updated_at: string;
   trashed_at: string | null;
@@ -59,6 +59,55 @@ interface NoteTagRow {
   tag_id: string;
 }
 
+/* ── The decrypted-note cache ────────────────────────────────────────────────
+   Realtime is only a wake-up signal, so every event used to re-download and
+   re-decrypt the entire archive. With two people writing at once that means one
+   person's keystrokes pay for a full decrypt of the other's corpus, several
+   times a minute.
+
+   `version` already exists for optimistic concurrency, and it changes on every
+   write — so it is exactly the cache key this needs. A cheap metadata query
+   says which rows moved; only those have their ciphertext fetched and decrypted.
+
+   Reusing the cached Note object also preserves its identity across snapshots,
+   which is what lets the WeakMap in lib/derived.ts keep the preview and search
+   text it already computed for an unchanged note. ─────────────────────────── */
+
+interface CachedNote {
+  version: number;
+  note: Note;
+}
+
+let cacheArchiveId: string | null = null;
+const noteCache = new Map<string, CachedNote>();
+/** Folder and tag names are keyed by their own ciphertext: it changes if and
+ *  only if the name did. */
+const nameCache = new Map<string, string>();
+
+export function resetArchiveCache(): void {
+  cacheArchiveId = null;
+  noteCache.clear();
+  nameCache.clear();
+}
+
+function adoptArchiveCache(archiveId: string): void {
+  if (cacheArchiveId === archiveId) return;
+  resetArchiveCache();
+  cacheArchiveId = archiveId;
+}
+
+async function decryptName(
+  ciphertext: string,
+  decrypt: (value: string, key: CryptoKey) => Promise<{ name: string }>,
+  key: CryptoKey,
+): Promise<string> {
+  const hit = nameCache.get(ciphertext);
+  if (hit !== undefined) return hit;
+  const { name } = await decrypt(ciphertext, key);
+  nameCache.set(ciphertext, name);
+  return name;
+}
+
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   metas: Record<Owner, Meta>;
@@ -70,9 +119,13 @@ function fail(error: { message: string } | null): void {
 
 export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot> {
   const archiveId = session.archiveId;
+  adoptArchiveCache(archiveId);
   const [notesResult, foldersResult, tagsResult, noteTagsResult, archiveResult] = await Promise.all(
     [
-      supabase.from("notes").select("*").eq("archive_id", archiveId),
+      supabase
+        .from("notes")
+        .select("id, owner, created_at, updated_at, trashed_at, pinned, folder_id, version")
+        .eq("archive_id", archiveId),
       supabase
         .from("folders")
         .select("id, owner, ciphertext, position")
@@ -92,9 +145,38 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const tagRows = (tagsResult.data ?? []) as TagRow[];
   const noteTagRows = (noteTagsResult.data ?? []) as NoteTagRow[];
 
+  // Only the rows whose version moved need their ciphertext at all.
+  const staleIds = noteRows
+    .filter((row) => noteCache.get(row.id)?.version !== row.version)
+    .map((row) => row.id);
+
+  const ciphertexts = new Map<string, string>();
+  if (staleIds.length > 0) {
+    const changed = await supabase
+      .from("notes")
+      .select("id, ciphertext")
+      .eq("archive_id", archiveId)
+      .in("id", staleIds);
+    fail(changed.error);
+    for (const row of (changed.data ?? []) as { id: string; ciphertext: string }[]) {
+      ciphertexts.set(row.id, row.ciphertext);
+    }
+  }
+
   const entries = await Promise.all(
     noteRows.map(async (row) => {
-      const decrypted = await decryptNote(row.ciphertext, session.key);
+      const cached = noteCache.get(row.id);
+      if (cached?.version === row.version) {
+        return { note: cached.note, version: row.version } satisfies NoteEntry;
+      }
+      const ciphertext = ciphertexts.get(row.id);
+      // A row that appeared between the two queries: keep whatever is cached
+      // rather than inventing a note, and let the next wake-up collect it.
+      if (ciphertext === undefined) {
+        if (!cached) throw new Error("A note changed while the archive was loading");
+        return { note: cached.note, version: cached.version } satisfies NoteEntry;
+      }
+      const decrypted = await decryptNote(ciphertext, session.key);
       const note: Note = {
         ...decrypted,
         id: row.id,
@@ -102,14 +184,19 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
+      noteCache.set(row.id, { version: row.version, note });
       return { note, version: row.version } satisfies NoteEntry;
     }),
   );
 
+  // Notes deleted elsewhere should not keep their plaintext alive in this tab.
+  const present = new Set(noteRows.map((row) => row.id));
+  for (const id of [...noteCache.keys()]) if (!present.has(id)) noteCache.delete(id);
+
   const foldersByOwner: Record<Owner, Folder[]> = { u1: [], u2: [] };
   const decryptedFolders = await Promise.all(
     folderRows.map(async (row) => {
-      const { name } = await decryptFolder(row.ciphertext, session.key);
+      const name = await decryptName(row.ciphertext, decryptFolder, session.key);
       return { owner: row.owner, folder: { id: row.id, name } satisfies Folder };
     }),
   );
@@ -118,7 +205,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const tagsByOwner: Record<Owner, Tag[]> = { u1: [], u2: [] };
   const decryptedTags = await Promise.all(
     tagRows.map(async (row) => {
-      const { name } = await decryptTag(row.ciphertext, session.key);
+      const name = await decryptName(row.ciphertext, decryptTag, session.key);
       return {
         owner: row.owner,
         tag: { id: row.id, name, color: row.color } satisfies Tag,
@@ -195,6 +282,7 @@ export async function createNote(
     .select("version")
     .single();
   fail(error);
+  noteCache.set(note.id, { version: data!.version, note });
   return { note, version: data!.version };
 }
 
@@ -215,7 +303,10 @@ export async function saveNote(
       .select("version")
       .maybeSingle();
     fail(result.error);
-    if (result.data) return result.data.version;
+    if (result.data) {
+      noteCache.set(note.id, { version: result.data.version, note });
+      return result.data.version;
+    }
 
     const current = await supabase
       .from("notes")
@@ -236,12 +327,28 @@ export async function deleteNote(session: AppSession, noteId: string): Promise<v
     .eq("archive_id", session.archiveId)
     .eq("id", noteId);
   fail(result.error);
+  noteCache.delete(noteId);
 }
 
 function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+/** Runs independent writes together and reports the first failure. */
+async function all(work: PromiseLike<{ error: { message: string } | null }>[]): Promise<void> {
+  for (const result of await Promise.all(work)) fail(result.error);
+}
+
+/* Renaming three folders used to be three sequential round trips, and retagging
+   a note two more — every await waiting on the one before it although nothing
+   depended on it. The work is now grouped: rows of a kind go up in one batched
+   call, independent calls run together, and the only sequencing left is the one
+   the foreign keys actually require —
+
+     1. folders and tags exist,      before
+     2. notes point at them and old tag links go,   before
+     3. new tag links are written,   before
+     4. emptied folders and tags are deleted. */
 export async function persistMetaDiff(
   session: AppSession,
   owner: Owner,
@@ -260,116 +367,113 @@ export async function persistMetaDiff(
   const beforeNotes = new Map(before.notes.map((note) => [note.id, note]));
   const afterNotes = new Map(after.notes.map((note) => [note.id, note]));
 
-  if (owner === "u1" && before.partnerName !== after.partnerName) {
-    const settings = await encryptJson(session.key, { partnerName: after.partnerName });
-    fail(
-      (
-        await supabase
-          .from("archives")
-          .update({ settings_ciphertext: settings })
-          .eq("id", archiveId)
-      ).error,
-    );
-  }
-
-  for (const { folder, position } of afterFolders.values()) {
+  // ── 1. Names and structure the rest will reference ──────────────────────
+  const changedFolders = [...afterFolders.values()].filter(({ folder, position }) => {
     const previous = beforeFolders.get(folder.id);
-    if (previous && sameJson(previous, { folder, position })) continue;
-    const ciphertext = await encryptFolder(folder, session.key);
-    fail(
-      (
-        await supabase.from("folders").upsert({
-          id: folder.id,
-          archive_id: archiveId,
-          owner,
-          ciphertext,
-          position,
-        })
-      ).error,
-    );
-  }
-
-  for (const tag of afterTags.values()) {
+    return !previous || !sameJson(previous, { folder, position });
+  });
+  const changedTags = [...afterTags.values()].filter((tag) => {
     const previous = beforeTags.get(tag.id);
-    if (previous && sameJson(previous, tag)) continue;
-    const ciphertext = await encryptTag(tag, session.key);
-    fail(
-      (
-        await supabase.from("tags").upsert({
-          id: tag.id,
-          archive_id: archiveId,
-          owner,
-          ciphertext,
-          color: tag.color,
-        })
-      ).error,
-    );
-  }
+    return !previous || !sameJson(previous, tag);
+  });
 
-  for (const metadata of afterNotes.values()) {
+  const [folderRows, tagRows, settings] = await Promise.all([
+    Promise.all(
+      changedFolders.map(async ({ folder, position }) => ({
+        id: folder.id,
+        archive_id: archiveId,
+        owner,
+        ciphertext: await encryptFolder(folder, session.key),
+        position,
+      })),
+    ),
+    Promise.all(
+      changedTags.map(async (tag) => ({
+        id: tag.id,
+        archive_id: archiveId,
+        owner,
+        ciphertext: await encryptTag(tag, session.key),
+        color: tag.color,
+      })),
+    ),
+    owner === "u1" && before.partnerName !== after.partnerName
+      ? encryptJson(session.key, { partnerName: after.partnerName })
+      : Promise.resolve(null),
+  ]);
+
+  await all([
+    ...(folderRows.length ? [supabase.from("folders").upsert(folderRows)] : []),
+    ...(tagRows.length ? [supabase.from("tags").upsert(tagRows)] : []),
+    ...(settings
+      ? [supabase.from("archives").update({ settings_ciphertext: settings }).eq("id", archiveId)]
+      : []),
+  ]);
+
+  // ── 2. Note placement, and the tag links that are being replaced ────────
+  const movedNotes = [...afterNotes.values()].filter((metadata) => {
     const previous = beforeNotes.get(metadata.id);
-    if (
+    return (
       !previous ||
       previous.folderId !== metadata.folderId ||
       previous.pinned !== metadata.pinned ||
       previous.trashedAt !== metadata.trashedAt
-    ) {
-      fail(
-        (
-          await supabase
-            .from("notes")
-            .update({
-              folder_id: metadata.folderId,
-              pinned: metadata.pinned ?? false,
-              trashed_at: metadata.trashedAt ?? null,
-            })
-            .eq("archive_id", archiveId)
-            .eq("id", metadata.id)
-        ).error,
-      );
-    }
-    if (!previous || !sameJson(previous.tagIds, metadata.tagIds)) {
-      fail(
-        (
-          await supabase
+    );
+  });
+  const retagged = [...afterNotes.values()].filter((metadata) => {
+    const previous = beforeNotes.get(metadata.id);
+    return !previous || !sameJson(previous.tagIds, metadata.tagIds);
+  });
+
+  await all([
+    // Each note carries its own values, so these stay separate statements —
+    // but they no longer wait on one another.
+    ...movedNotes.map((metadata) =>
+      supabase
+        .from("notes")
+        .update({
+          folder_id: metadata.folderId,
+          pinned: metadata.pinned ?? false,
+          trashed_at: metadata.trashedAt ?? null,
+        })
+        .eq("archive_id", archiveId)
+        .eq("id", metadata.id),
+    ),
+    ...(retagged.length
+      ? [
+          supabase
             .from("note_tags")
             .delete()
             .eq("archive_id", archiveId)
-            .eq("note_id", metadata.id)
-        ).error,
-      );
-      if (metadata.tagIds.length > 0) {
-        fail(
-          (
-            await supabase.from("note_tags").insert(
-              metadata.tagIds.map((tagId) => ({
-                note_id: metadata.id,
-                tag_id: tagId,
-                archive_id: archiveId,
-                owner,
-              })),
-            )
-          ).error,
-        );
-      }
-    }
-  }
+            .in(
+              "note_id",
+              retagged.map((metadata) => metadata.id),
+            ),
+        ]
+      : []),
+  ]);
 
-  for (const folderId of beforeFolders.keys()) {
-    if (!afterFolders.has(folderId)) {
-      fail(
-        (await supabase.from("folders").delete().eq("id", folderId).eq("archive_id", archiveId))
-          .error,
-      );
-    }
-  }
-  for (const tagId of beforeTags.keys()) {
-    if (!afterTags.has(tagId)) {
-      fail(
-        (await supabase.from("tags").delete().eq("id", tagId).eq("archive_id", archiveId)).error,
-      );
-    }
-  }
+  // ── 3. The new tag links, all of them in one insert ─────────────────────
+  const links = retagged.flatMap((metadata) =>
+    metadata.tagIds.map((tagId) => ({
+      note_id: metadata.id,
+      tag_id: tagId,
+      archive_id: archiveId,
+      owner,
+    })),
+  );
+  if (links.length > 0) await all([supabase.from("note_tags").insert(links)]);
+
+  // ── 4. What nothing points at any more ──────────────────────────────────
+  const goneFolders = [...beforeFolders.keys()].filter((id) => !afterFolders.has(id));
+  const goneTags = [...beforeTags.keys()].filter((id) => !afterTags.has(id));
+  await all([
+    ...(goneFolders.length
+      ? [supabase.from("folders").delete().eq("archive_id", archiveId).in("id", goneFolders)]
+      : []),
+    ...(goneTags.length
+      ? [supabase.from("tags").delete().eq("archive_id", archiveId).in("id", goneTags)]
+      : []),
+  ]);
 }
 
 const IMAGE_BUCKET = "note-images";

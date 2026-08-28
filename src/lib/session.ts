@@ -1,5 +1,5 @@
 import { base64ToBytes, bytesToBase64, importArchiveKey, unwrapArchiveKey } from "./crypto";
-import { supabase } from "./supabase";
+import { resetArchiveCache, supabase } from "./supabase";
 
 export interface AppSession {
   userId: string;
@@ -75,5 +75,6 @@ export async function restoreSession(): Promise<AppSession | null> {
 
 export async function clearSession(): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY);
+  resetArchiveCache();
   await supabase.auth.signOut({ scope: "local" });
 }

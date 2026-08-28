@@ -271,6 +271,35 @@
   background-clip: padding-box;
 }
 
+/* The frontispiece.
+
+   The title used to size against the viewport, which knows nothing about how
+   wide the editor actually is: with both navigation panes open on a 900px
+   window the reading column is 186px, and a 28px "CONGLOMERATI" had nowhere to
+   go but a mid-word break. Sizing against the pane itself keeps the display
+   line proportional to the column it introduces, at any pane width. Hyphens
+   handle the residual case honestly instead of guillotining a word. */
+.editor-shell {
+  container-type: inline-size;
+  container-name: editor;
+}
+
+.note-title {
+  font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
+  line-height: 1.14;
+  letter-spacing: -0.028em;
+  font-variation-settings: "wght" 620, "opsz" 42;
+  /* Hyphenate only words long enough that breaking them beats a ragged hole.
+     Without the limit a display title starts splitting "per-ché", which reads
+     as damage rather than typesetting. */
+  hyphens: auto;
+  hyphenate-limit-chars: 10 5 4;
+}
+
+.note-title-mobile {
+  font-size: 2rem;
+}
+
 .soft-control {
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);

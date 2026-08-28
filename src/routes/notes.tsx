@@ -27,6 +27,18 @@ import { prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
+import { derivedOf, indexOf } from "@/lib/derived";
+import {
+  clearDrafts,
+  dropDraft,
+  ensureDraft,
+  hasPending,
+  isDirty,
+  readDraft,
+  replaceDraft,
+  requeue,
+  takePending,
+} from "@/lib/draft";
 import { FolderRail, ALL, TRASH, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
 import { AxisBar } from "@/components/AxisBar";
@@ -43,7 +55,22 @@ export const Route = createFileRoute("/notes")({
 /** A Postgres row write is cheap enough to commit shortly after typing stops. */
 const AUTOSAVE_MS = 250;
 
-type Draft = { title: string; body: string };
+/* A failed write is retried on its own, backing off so a server that is down
+   is not hammered — but never so slowly that a recovered connection is missed. */
+const RETRY_MIN_MS = 4000;
+const RETRY_MAX_MS = 60_000;
+
+/* Enough of a fingerprint to notice that folders, tags or note placement moved,
+   without serialising every note's metadata on every realtime wake-up. */
+function metaShape(meta: Meta): string {
+  let shape = `${meta.partnerName ?? ""}|${meta.folders.length}|${meta.tags.length}`;
+  for (const folder of meta.folders) shape += `|${folder.id}:${folder.name}`;
+  for (const tag of meta.tags) shape += `|${tag.id}:${tag.name}:${tag.color}`;
+  for (const note of meta.notes) {
+    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.tagIds.join(",")}`;
+  }
+  return shape;
+}
 
 function NotesPage() {
   const navigate = useNavigate();
@@ -61,7 +88,6 @@ function NotesPage() {
   const [myMeta, setMyMeta] = useState<Meta>({ ...EMPTY_META });
   const [partnerMeta, setPartnerMeta] = useState<Meta>({ ...EMPTY_META });
 
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -96,12 +122,14 @@ function NotesPage() {
   const sessionRef = useRef<AppSession | null>(null);
   sessionRef.current = session;
 
-  /** Edits waiting to be written, keyed so switching notes or archive labels
-   * never strands a pending change. */
-  const pendingNotesRef = useRef<Map<string, Draft>>(new Map());
+  /** Note edits waiting to be written live in the draft store (lib/draft.ts),
+   *  keyed by note so switching notes or archive labels never strands one. */
   const pendingMetaRef = useRef<Map<"u1" | "u2", { before: Meta; after: Meta }>>(new Map());
   const inFlightRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
+  /** Retry after a failed write, backing off and giving up on unmount. */
+  const retryRef = useRef<number | undefined>(undefined);
+  const retryDelayRef = useRef(RETRY_MIN_MS);
 
   // ── Realtime side ───────────────────────────────────────────────────────
   const selectedIdRef = useRef<string | null>(null);
@@ -156,14 +184,10 @@ function NotesPage() {
     }
 
     const next = snapshot.entries
-      .map((entry) =>
-        pendingNotesRef.current.has(entry.note.id)
-          ? (localById.get(entry.note.id) ?? entry)
-          : entry,
-      )
+      .map((entry) => (isDirty(entry.note.id) ? (localById.get(entry.note.id) ?? entry) : entry))
       .concat(
         entriesRef.current.filter(
-          (entry) => pendingNotesRef.current.has(entry.note.id) && !remoteById.has(entry.note.id),
+          (entry) => isDirty(entry.note.id) && !remoteById.has(entry.note.id),
         ),
       )
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
@@ -177,8 +201,8 @@ function NotesPage() {
     }
 
     const metadataChanged =
-      JSON.stringify(myMetaRef.current) !== JSON.stringify(snapshot.metas.u1) ||
-      JSON.stringify(partnerMetaRef.current) !== JSON.stringify(snapshot.metas.u2);
+      metaShape(myMetaRef.current) !== metaShape(snapshot.metas.u1) ||
+      metaShape(partnerMetaRef.current) !== metaShape(snapshot.metas.u2);
     if (remote && (entrySetChanged || changedIds.size > 0 || metadataChanged)) {
       setSyncFlash(true);
       window.setTimeout(() => setSyncFlash(false), 2000);
@@ -186,7 +210,7 @@ function NotesPage() {
 
     // The open note, if the other device moved it and nothing local is queued.
     const open = selectedIdRef.current;
-    if (!open || pendingNotesRef.current.has(open)) return;
+    if (!open || isDirty(open)) return;
     if (!changedIds.has(open)) return;
     const fresh = next.find((e) => e.note.id === open);
     if (!fresh) return;
@@ -194,9 +218,11 @@ function NotesPage() {
     // Retyping the title under a caret sitting in it would send that caret to
     // the end, so an in-use title field keeps what it shows.
     const titleBusy = document.activeElement === titleRef.current;
-    setDraft((d) =>
-      d ? { title: titleBusy ? d.title : fresh.note.title, body: fresh.note.body } : d,
-    );
+    const current = readDraft(open);
+    replaceDraft(open, {
+      title: titleBusy && current ? current.title : fresh.note.title,
+      body: fresh.note.body,
+    });
     setSyncRevision((n) => n + 1);
   }, []);
 
@@ -250,17 +276,26 @@ function NotesPage() {
     return () => void unsubscribeFromArchive(channel);
   }, [session, refreshRemote]);
 
-  // ── The visible slice: owner → folder → tags → search, newest first ─────
+  /** The owner's whole catalogue, unfiltered — what the rail and the scope
+   *  strip count against. Memoised so their counts are not recomputed for an
+   *  array that holds exactly the same notes as the render before. */
+  const ownedEntries = useMemo(
+    () => entries.filter((entry) => entry.note.owner === viewAs),
+    [entries, viewAs],
+  );
+
+  // ── The visible slice: folder → tags → search, newest first ─────────────
   const visible = useMemo(() => {
     const meta = activeMeta;
+    const index = indexOf(meta);
     const pinnedIds = new Set(meta.notes.filter((note) => note.pinned).map((note) => note.id));
     const folderOf = (id: string) => {
-      const fid = meta.notes.find((n) => n.id === id)?.folderId ?? null;
-      return fid && meta.folders.some((f) => f.id === fid) ? fid : null;
+      const fid = index.byNote.get(id)?.folderId ?? null;
+      return fid && index.byFolder.has(fid) ? fid : null;
     };
 
     const trashedIds = new Set(meta.notes.filter((note) => note.trashedAt).map((note) => note.id));
-    let list = entries.filter((e) => e.note.owner === viewAs);
+    let list = ownedEntries;
 
     if (selectedFolderId === TRASH) {
       list = list.filter((entry) => trashedIds.has(entry.note.id));
@@ -275,23 +310,21 @@ function NotesPage() {
 
     if (filterTagIds.length > 0) {
       list = list.filter((e) => {
-        const ids = meta.notes.find((n) => n.id === e.note.id)?.tagIds ?? [];
+        const ids = index.byNote.get(e.note.id)?.tagIds ?? [];
         return filterTagIds.some((t) => ids.includes(t));
       });
     }
 
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter(
-        (e) => e.note.title.toLowerCase().includes(q) || e.note.body.toLowerCase().includes(q),
-      );
+      list = list.filter((e) => derivedOf(e.note).haystack.includes(q));
     }
 
     return [...list].sort((a, b) => {
       const pinOrder = Number(pinnedIds.has(b.note.id)) - Number(pinnedIds.has(a.note.id));
       return pinOrder || b.note.updatedAt.localeCompare(a.note.updatedAt);
     });
-  }, [entries, activeMeta, viewAs, selectedFolderId, filterTagIds, query]);
+  }, [ownedEntries, activeMeta, selectedFolderId, filterTagIds, query]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
   const canEdit = selected ? selectedFolderId !== TRASH : false;
@@ -305,35 +338,31 @@ function NotesPage() {
           ? "Trash"
           : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
 
-  // Load the selected note into the draft when the selection actually changes.
-  const lastLoadedRef = useRef<string | null>(null);
+  // Seed the store from the stored note. `ensureDraft` leaves unsaved work
+  // alone, so this is safe to run whenever the selection or the entry changes.
   useEffect(() => {
-    if (selected && selected.note.id !== lastLoadedRef.current) {
-      const pending = pendingNotesRef.current.get(selected.note.id);
-      setDraft(pending ?? { title: selected.note.title, body: selected.note.body });
-      lastLoadedRef.current = selected.note.id;
-    } else if (!selected && lastLoadedRef.current !== null) {
-      setDraft(null);
-      lastLoadedRef.current = null;
-    }
+    if (!selected) return;
+    ensureDraft(selected.note.id, { title: selected.note.title, body: selected.note.body });
   }, [selected]);
 
   // ── Save pipeline ───────────────────────────────────────────────────────
   const drain = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || inFlightRef.current) return;
-    if (pendingNotesRef.current.size === 0 && pendingMetaRef.current.size === 0) return;
+    if (!hasPending() && pendingMetaRef.current.size === 0) return;
 
     inFlightRef.current = true;
     setSaving(true);
     let failed = false;
 
     try {
-      while (pendingNotesRef.current.size > 0 || pendingMetaRef.current.size > 0) {
-        for (const [id, d] of [...pendingNotesRef.current]) {
-          pendingNotesRef.current.delete(id);
+      while (hasPending() || pendingMetaRef.current.size > 0) {
+        for (const [id, d] of takePending()) {
           const entry = entriesRef.current.find((e) => e.note.id === id);
-          if (!entry) continue;
+          if (!entry) {
+            dropDraft(id);
+            continue;
+          }
 
           const updated: Note = {
             ...entry.note,
@@ -349,7 +378,7 @@ function NotesPage() {
             );
             setEntries(entriesRef.current);
           } catch (err) {
-            pendingNotesRef.current.set(id, d);
+            requeue(id);
             throw err;
           }
         }
@@ -369,6 +398,7 @@ function NotesPage() {
         }
       }
       setError("");
+      retryDelayRef.current = RETRY_MIN_MS;
       setLastSavedAt(new Date().toISOString());
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 1800);
@@ -378,8 +408,12 @@ function NotesPage() {
     } finally {
       inFlightRef.current = false;
       setSaving(false);
-      setDirty(pendingNotesRef.current.size > 0 || pendingMetaRef.current.size > 0);
-      if (failed) window.setTimeout(() => void drain(), 4000);
+      setDirty(hasPending() || pendingMetaRef.current.size > 0);
+      if (failed) {
+        window.clearTimeout(retryRef.current);
+        retryRef.current = window.setTimeout(() => void drain(), retryDelayRef.current);
+        retryDelayRef.current = Math.min(RETRY_MAX_MS, retryDelayRef.current * 2);
+      }
       if (realtimePendingRef.current) {
         realtimePendingRef.current = false;
         window.setTimeout(() => void refreshRemote(), 0);
@@ -397,6 +431,14 @@ function NotesPage() {
     window.clearTimeout(timerRef.current);
     void drain();
   }, [drain]);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(timerRef.current);
+      window.clearTimeout(retryRef.current);
+    },
+    [],
+  );
 
   // Never leave the tab holding unsaved words.
   useEffect(() => {
@@ -428,40 +470,45 @@ function NotesPage() {
     return downloadEncryptedImage(current, imageId);
   }, []);
 
-  function handleDraftChange(title: string, body: string) {
-    if (!selectedId) return;
-    setDraft({ title, body });
-    pendingNotesRef.current.set(selectedId, { title, body });
-    schedule();
-  }
+  /* The editor has already written the words into the draft store; the page
+     only has to decide when they reach Postgres. */
 
-  function handleMetaChange(m: Meta) {
-    const pending = pendingMetaRef.current.get(viewAs);
-    pendingMetaRef.current.set(viewAs, {
-      before: pending?.before ?? activeMeta,
-      after: m,
-    });
-    setActiveMeta(m);
-    schedule();
-  }
+  const handleMetaChange = useCallback(
+    (m: Meta) => {
+      const pending = pendingMetaRef.current.get(viewAs);
+      pendingMetaRef.current.set(viewAs, {
+        before: pending?.before ?? activeMeta,
+        after: m,
+      });
+      setActiveMeta(m);
+      schedule();
+    },
+    [viewAs, activeMeta, setActiveMeta, schedule],
+  );
 
-  function handleTagsChange(noteId: string, tagIds: string[]) {
-    const existing = activeMeta.notes.find((n) => n.id === noteId);
-    const notes: NoteMeta[] = existing
-      ? activeMeta.notes.map((n) => (n.id === noteId ? { ...n, tagIds } : n))
-      : [...activeMeta.notes, { id: noteId, folderId: null, tagIds }];
-    handleMetaChange({ ...activeMeta, notes });
-  }
+  const handleTagsChange = useCallback(
+    (noteId: string, tagIds: string[]) => {
+      const existing = indexOf(activeMeta).byNote.get(noteId);
+      const notes: NoteMeta[] = existing
+        ? activeMeta.notes.map((n) => (n.id === noteId ? { ...n, tagIds } : n))
+        : [...activeMeta.notes, { id: noteId, folderId: null, tagIds }];
+      handleMetaChange({ ...activeMeta, notes });
+    },
+    [activeMeta, handleMetaChange],
+  );
 
-  function handleTogglePin(noteId: string) {
-    const existing = activeMeta.notes.find((note) => note.id === noteId);
-    const notes: NoteMeta[] = existing
-      ? activeMeta.notes.map((note) =>
-          note.id === noteId ? { ...note, pinned: !note.pinned } : note,
-        )
-      : [...activeMeta.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
-    handleMetaChange({ ...activeMeta, notes });
-  }
+  const handleTogglePin = useCallback(
+    (noteId: string) => {
+      const existing = indexOf(activeMeta).byNote.get(noteId);
+      const notes: NoteMeta[] = existing
+        ? activeMeta.notes.map((note) =>
+            note.id === noteId ? { ...note, pinned: !note.pinned } : note,
+          )
+        : [...activeMeta.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
+      handleMetaChange({ ...activeMeta, notes });
+    },
+    [activeMeta, handleMetaChange],
+  );
 
   // ── Create / delete ─────────────────────────────────────────────────────
   const handleNew = useCallback(async () => {
@@ -494,8 +541,7 @@ function NotesPage() {
       setQuery("");
       if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
       setSelectedId(note.id);
-      setDraft({ title: "", body: "" });
-      lastLoadedRef.current = note.id;
+      ensureDraft(note.id, { title: "", body: "" });
       window.setTimeout(() => titleRef.current?.focus(), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create note");
@@ -525,8 +571,6 @@ function NotesPage() {
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
-        setDraft(null);
-        lastLoadedRef.current = null;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -543,8 +587,6 @@ function NotesPage() {
       });
       if (selectedId === entry.note.id) {
         setSelectedId(null);
-        setDraft(null);
-        lastLoadedRef.current = null;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -558,7 +600,7 @@ function NotesPage() {
       setSaving(true);
       setError("");
       try {
-        pendingNotesRef.current.delete(entry.note.id);
+        dropDraft(entry.note.id);
         await deleteNote(s, entry.note.id);
 
         entriesRef.current = entriesRef.current.filter((e) => e.note.id !== entry.note.id);
@@ -571,8 +613,6 @@ function NotesPage() {
 
         if (selectedId === entry.note.id) {
           setSelectedId(null);
-          setDraft(null);
-          lastLoadedRef.current = null;
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete permanently");
@@ -667,8 +707,6 @@ function NotesPage() {
     saveNow();
     setViewAs(v);
     setSelectedId(null);
-    setDraft(null);
-    lastLoadedRef.current = null;
     setSelectedFolderId(ALL);
     setFilterTagIds([]);
     setQuery("");
@@ -678,25 +716,20 @@ function NotesPage() {
   function handleSelectFolder(id: string) {
     setSelectedFolderId(id);
     setSelectedId(null);
-    setDraft(null);
-    lastLoadedRef.current = null;
     setManageOpen(false);
     if (id === TRASH) setFilterTagIds([]);
   }
 
-  function handleSelectNote(id: string) {
-    setSelectedId(id);
-  }
+  const handleSelectNote = useCallback((id: string) => setSelectedId(id), []);
 
   function handleMobileBack() {
     saveNow();
     setSelectedId(null);
-    setDraft(null);
-    lastLoadedRef.current = null;
   }
 
   function handleLock() {
     saveNow();
+    clearDrafts();
     void clearSession();
     navigate({ to: "/" });
   }
@@ -816,7 +849,7 @@ function NotesPage() {
                 onTogglePin={handleTogglePin}
                 scopes={
                   <MobileScopes
-                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
+                    entries={ownedEntries}
                     meta={activeMeta}
                     selectedFolderId={selectedFolderId}
                     filterTagIds={filterTagIds}
@@ -835,16 +868,17 @@ function NotesPage() {
                   mobile
                   entry={selected}
                   meta={activeMeta}
-                  draft={draft}
                   syncRevision={syncRevision}
                   canEdit={canEdit}
                   viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}
                   titleRef={titleRef}
-                  onChange={handleDraftChange}
+                  onEdited={schedule}
                   onTagsChange={handleTagsChange}
                   pinned={
-                    activeMeta.notes.find((note) => note.id === selected?.note.id)?.pinned === true
+                    selected
+                      ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true
+                      : false
                   }
                   onTogglePin={() => selected && handleTogglePin(selected.note.id)}
                   onNew={handleNew}
@@ -878,7 +912,7 @@ function NotesPage() {
                 <div className="min-h-0 flex-1 overflow-y-auto pb-4">
                   <FolderRail
                     mobile
-                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
+                    entries={ownedEntries}
                     meta={activeMeta}
                     selectedFolderId={selectedFolderId}
                     filterTagIds={filterTagIds}
@@ -970,7 +1004,7 @@ function NotesPage() {
           {navigationOpen && (
             <>
               <FolderRail
-                entries={entries.filter((e) => e.note.owner === viewAs)}
+                entries={ownedEntries}
                 meta={activeMeta}
                 selectedFolderId={selectedFolderId}
                 filterTagIds={filterTagIds}
@@ -1014,16 +1048,15 @@ function NotesPage() {
               key={selected?.note.id ?? "empty"}
               entry={selected}
               meta={activeMeta}
-              draft={draft}
               syncRevision={syncRevision}
               canEdit={canEdit}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}
-              onChange={handleDraftChange}
+              onEdited={schedule}
               onTagsChange={handleTagsChange}
               pinned={
-                activeMeta.notes.find((note) => note.id === selected?.note.id)?.pinned === true
+                selected ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true : false
               }
               onTogglePin={() => selected && handleTogglePin(selected.note.id)}
               onNew={handleNew}

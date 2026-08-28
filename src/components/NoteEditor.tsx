@@ -19,10 +19,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Meta, Tag } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { countChars, countWords, formatCount, formatStamp } from "@/lib/format";
+import { formatCount, formatStamp } from "@/lib/format";
+import { editBody, readDraft, useDraftMetrics } from "@/lib/draft";
 import { extractPdfText } from "@/lib/pdf";
 import { imageAltFromFilename } from "@/lib/image";
 import { TagBadge } from "./TagBadge";
+import { TitleField } from "./TitleField";
 import { MarkdownEditor, type FormatAction, type MarkdownEditorHandle } from "./MarkdownEditor";
 
 const FORMAT_ITEMS: {
@@ -47,14 +49,14 @@ interface Props {
   mobile?: boolean;
   entry: NoteEntry | null;
   meta: Meta;
-  draft: { title: string; body: string } | null;
-  /** Raised when `draft` carries text pulled from the other device. */
+  /** Raised when the draft store carries text pulled from the other device. */
   syncRevision: number;
   canEdit: boolean;
   viewingAsPartner: boolean;
   partnerName: string;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
-  onChange: (title: string, body: string) => void;
+  /** The draft store already holds the words; this only asks for a save. */
+  onEdited: () => void;
   onTagsChange: (noteId: string, tagIds: string[]) => void;
   pinned: boolean;
   onTogglePin: () => void;
@@ -72,13 +74,12 @@ export function NoteEditor({
   mobile = false,
   entry,
   meta,
-  draft,
   syncRevision,
   canEdit,
   viewingAsPartner,
   partnerName,
   titleRef,
-  onChange,
+  onEdited,
   onTagsChange,
   pinned,
   onTogglePin,
@@ -114,18 +115,9 @@ export function NoteEditor({
     return () => document.removeEventListener("mousedown", onDown);
   }, [pickerOpen, formatOpen, linkOpen]);
 
-  useEffect(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    const resize = () => {
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(el.parentElement ?? el);
-    return () => observer.disconnect();
-  }, [entry?.note.id, draft?.title, titleRef]);
+  /* Subscribed, not computed: the body is not React state, and this readout is
+     the only thing in the page that tracks it while the words are being typed. */
+  const { words, chars } = useDraftMetrics(entry?.note.id ?? null);
 
   const assignedIds = useMemo(
     () => (entry ? (meta.notes.find((n) => n.id === entry.note.id)?.tagIds ?? []) : []),
@@ -137,7 +129,7 @@ export function NoteEditor({
   const available = meta.tags.filter((t) => !assignedIds.includes(t.id));
 
   async function handlePdf(file: File | undefined) {
-    if (!file || !draft || !canEdit) return;
+    if (!file || !entry || !canEdit) return;
     setPdfError("");
     setPdfStatus("Reading PDF…");
     setFormatOpen(false);
@@ -157,7 +149,7 @@ export function NoteEditor({
   }
 
   async function handleImage(file: File | undefined) {
-    if (!file || !draft || !canEdit) return;
+    if (!file || !entry || !canEdit) return;
     setPdfError("");
     setPdfStatus("Preparing image…");
     setFormatOpen(false);
@@ -175,7 +167,7 @@ export function NoteEditor({
   }
 
   async function handlePastedImage(file: File): Promise<{ src: string; alt: string } | null> {
-    if (!draft || !canEdit) return null;
+    if (!entry || !canEdit) return null;
     setPdfError("");
     setPdfStatus("Preparing pasted image…");
     try {
@@ -219,10 +211,10 @@ export function NoteEditor({
     setLinkOpen(false);
   }
 
-  if (!entry || !draft) {
+  if (!entry) {
     return (
       <section
-        className={`flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
+        className={`editor-shell flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
       >
         <div className="flex flex-1 items-center justify-center px-8">
           <div className="measure rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center font-sans">
@@ -245,13 +237,10 @@ export function NoteEditor({
     );
   }
 
-  const words = countWords(draft.body);
-  const chars = countChars(draft.body);
-
   return (
     <section
       key={entry.note.id}
-      className={`page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
+      className={`editor-shell page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <header className={`shrink-0 ${mobile ? "px-5 pt-4 pb-3" : "px-10 pt-10 pb-5"}`}>
@@ -263,31 +252,12 @@ export function NoteEditor({
               </p>
             )}
 
-            <textarea
-              ref={titleRef}
-              rows={1}
-              value={draft.title}
-              onChange={(e) => canEdit && onChange(e.target.value, draft.body)}
-              onInput={(e) => {
-                e.currentTarget.style.height = "auto";
-                e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-              }}
-              placeholder="Untitled"
-              readOnly={!canEdit}
-              aria-label="Note title"
-              className="font-display block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-4"
-              style={{
-                fontSize: mobile ? "2rem" : "clamp(1.75rem, 2.6vw, 2.5rem)",
-                lineHeight: 1.14,
-                letterSpacing: "-0.028em",
-                fontVariationSettings: '"wght" 620, "opsz" 42',
-              }}
+            <TitleField
+              mobile={mobile}
+              noteId={entry.note.id}
+              canEdit={canEdit}
+              titleRef={titleRef}
+              onEdited={onEdited}
             />
 
             {/* Measurements. Every value right of its own label, tabular. */}
@@ -536,12 +506,16 @@ export function NoteEditor({
         <MarkdownEditor
           key={entry.note.id}
           ref={editorRef}
-          value={draft.body}
+          value={readDraft(entry.note.id)?.body ?? ""}
           docKey={entry.note.id}
           revision={syncRevision}
           readOnly={!canEdit}
           placeholder="Start writing. Markdown formats itself as you type."
-          onChange={(body) => canEdit && onChange(draft.title, body)}
+          onChange={(body) => {
+            if (!canEdit) return;
+            editBody(entry.note.id, body);
+            onEdited();
+          }}
           onPasteImage={handlePastedImage}
           resolveImage={resolveImage}
         />

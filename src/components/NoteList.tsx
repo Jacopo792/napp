@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
-import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
+import { formatCount, formatStamp } from "@/lib/format";
+import { derivedOf, indexOf } from "@/lib/derived";
 import type { NoteEntry } from "@/lib/entries";
 
 interface Props {
@@ -32,7 +33,7 @@ interface Props {
    pezzi giusti)", and a list that cuts that at 30 characters throws away the
    naming scheme its owner built. Three lines, then it stops. */
 
-function Row({
+const Row = memo(function Row({
   mobile,
   entry,
   index,
@@ -51,11 +52,13 @@ function Row({
   meta: Meta;
   selected: boolean;
   trashMode: boolean;
-  onSelect: () => void;
-  onMoveToTrash: () => void;
-  onRestore: () => void;
-  onDeleteForever: () => void;
-  onTogglePin: () => void;
+  /* Every handler takes the entry it acts on, so the parent can pass one stable
+     function per action instead of minting a closure per row per render. */
+  onSelect: (entry: NoteEntry) => void;
+  onMoveToTrash: (entry: NoteEntry) => void;
+  onRestore: (entry: NoteEntry) => void;
+  onDeleteForever: (entry: NoteEntry) => void;
+  onTogglePin: (entry: NoteEntry) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -64,10 +67,11 @@ function Row({
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const tags = useMemo(() => {
-    const ids = meta.notes.find((n) => n.id === entry.note.id)?.tagIds ?? [];
-    return ids.map((id) => meta.tags.find((t) => t.id === id)).filter(Boolean) as TagType[];
-  }, [meta, entry.note.id]);
+  const index_ = indexOf(meta);
+  const noteMeta = index_.byNote.get(entry.note.id);
+  const tags = (noteMeta?.tagIds ?? [])
+    .map((id) => index_.byTag.get(id))
+    .filter(Boolean) as TagType[];
 
   useEffect(() => {
     if (selected) rowRef.current?.scrollIntoView({ block: "nearest" });
@@ -79,9 +83,8 @@ function Row({
     return () => window.clearTimeout(timer);
   }, [confirmDelete]);
 
-  const preview = previewOf(entry.note.body);
-  const words = countWords(entry.note.body);
-  const pinned = meta.notes.find((note) => note.id === entry.note.id)?.pinned === true;
+  const { preview, words } = derivedOf(entry.note);
+  const pinned = noteMeta?.pinned === true;
 
   return (
     <div
@@ -93,7 +96,7 @@ function Row({
       {...(!mobile ? attributes : {})}
       role="option"
       aria-selected={selected}
-      onClick={onSelect}
+      onClick={() => onSelect(entry)}
       style={{ opacity: isDragging ? 0.4 : 1 }}
       className={`group relative flex cursor-pointer gap-3 transition-colors ${
         mobile
@@ -179,7 +182,7 @@ function Row({
           aria-pressed={pinned}
           onClick={(event) => {
             event.stopPropagation();
-            onTogglePin();
+            onTogglePin(entry);
           }}
           onPointerDown={(event) => event.stopPropagation()}
           className={`icon-button h-7 w-7 shrink-0 transition-all ${
@@ -201,7 +204,7 @@ function Row({
           title="Restore note"
           onClick={(event) => {
             event.stopPropagation();
-            onRestore();
+            onRestore(entry);
           }}
           onPointerDown={(event) => event.stopPropagation()}
           className="icon-button h-7 w-7 shrink-0 text-accent"
@@ -230,8 +233,8 @@ function Row({
         onClick={(e) => {
           e.stopPropagation();
           if (confirmDelete) {
-            if (trashMode) onDeleteForever();
-            else onMoveToTrash();
+            if (trashMode) onDeleteForever(entry);
+            else onMoveToTrash(entry);
           } else setConfirmDelete(true);
         }}
         onPointerDown={(e) => e.stopPropagation()}
@@ -249,7 +252,7 @@ function Row({
       </button>
     </div>
   );
-}
+});
 
 function Skeletons() {
   return (
@@ -288,6 +291,13 @@ export function NoteList({
   onTogglePin,
 }: Props) {
   const hasQuery = query.trim().length > 0;
+  /* The page speaks in note ids; the rows hand back the whole entry. One stable
+     adapter per action beats one fresh closure per row per render. */
+  const selectEntry = useCallback((entry: NoteEntry) => onSelect(entry.note.id), [onSelect]);
+  const togglePinEntry = useCallback(
+    (entry: NoteEntry) => onTogglePin(entry.note.id),
+    [onTogglePin],
+  );
 
   if (mobile) {
     return (
@@ -356,11 +366,11 @@ export function NoteList({
                   meta={meta}
                   selected={selectedId === entry.note.id}
                   trashMode={trashMode}
-                  onSelect={() => onSelect(entry.note.id)}
-                  onMoveToTrash={() => onMoveToTrash(entry)}
-                  onRestore={() => onRestore(entry)}
-                  onDeleteForever={() => onDeleteForever(entry)}
-                  onTogglePin={() => onTogglePin(entry.note.id)}
+                  onSelect={selectEntry}
+                  onMoveToTrash={onMoveToTrash}
+                  onRestore={onRestore}
+                  onDeleteForever={onDeleteForever}
+                  onTogglePin={togglePinEntry}
                 />
               ))
             )}
@@ -463,11 +473,11 @@ export function NoteList({
               meta={meta}
               selected={selectedId === e.note.id}
               trashMode={trashMode}
-              onSelect={() => onSelect(e.note.id)}
-              onMoveToTrash={() => onMoveToTrash(e)}
-              onRestore={() => onRestore(e)}
-              onDeleteForever={() => onDeleteForever(e)}
-              onTogglePin={() => onTogglePin(e.note.id)}
+              onSelect={selectEntry}
+              onMoveToTrash={onMoveToTrash}
+              onRestore={onRestore}
+              onDeleteForever={onDeleteForever}
+              onTogglePin={togglePinEntry}
             />
           ))
         )}
