@@ -15,12 +15,8 @@ import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
 
-const url =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ??
-  "https://uftkmoboidcshzoudwzj.supabase.co";
-const publishableKey =
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
-  "sb_publishable_X3etQwXMht2ZVDnztfBDPQ_LLc_cG4m";
+const url = import.meta.env.VITE_SUPABASE_URL as string;
+const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export const supabase = createClient(url, publishableKey, {
   auth: {

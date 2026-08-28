@@ -7,30 +7,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-.output
-.vinxi
-.tanstack/**
-.nitro
-*.local
+node_modules/
+dist/
+.tanstack/
+.pnpm-store/
 
-# Environment — NEVER commit; migration credentials and service-role keys
+# Environment
 .env
+.env.*
+!.env.example
+!.env.migration.example
 
-# Lock files for other package managers (project uses pnpm)
+# Lock files for other package managers
 bun.lock
 package-lock.json
 yarn.lock
-
-# Java leftovers (backend removed)
-target/
-frontend/
-
-# Wrangler / Cloudflare
-.wrangler/
-.dev.vars
 
 # Editor directories and files
 .vscode/*
@@ -43,18 +34,14 @@ frontend/
 *.sln
 *.sw?
 
-# Local AI agent tooling (impeccable skill, launch config, local settings).
-# Installed per-machine with `npx impeccable install`, not part of the app.
+# Local tooling
 .claude/
 .github/skills/
 .github/agents/
 .github/hooks/
 .impeccable/
-.pnpm-store/
 
-# Screenshot harness — mocks for local inspection, never shipped
+# Local previews and scratch
 preview/
 vite.preview.config.ts
-
-# Local scratch
 tmp/

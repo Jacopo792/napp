@@ -17,6 +17,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VITE_BASE_PATH: /note-sharing-app/
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -36,12 +40,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Build
         run: pnpm run build
-        env:
-          # GitHub Pages serves from /<repo-name>/ by default.
-          # Change to / if you set up a custom domain at repo root.
-          VITE_BASE_PATH: /note-sharing-app/
 
       - uses: actions/configure-pages@v5
 
