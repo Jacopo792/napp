@@ -246,7 +246,7 @@ const Row = memo(function Row({
         onPointerDown={(e) => e.stopPropagation()}
         className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
           confirmDelete
-            ? "bg-danger text-white opacity-100"
+            ? "bg-danger-fill text-on-danger opacity-100"
             : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
         }`}
       >

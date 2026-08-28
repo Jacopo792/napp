@@ -40,31 +40,31 @@ export const PRESETS: Preset[] = [
     id: "compact",
     name: "Compact",
     role: "Dense & fast",
-    axes: { size: 14, measure: 62, weight: 400, leading: 1.5 },
+    axes: { size: 14, measure: 62, weight: 430, leading: 1.5 },
   },
   {
     id: "reading",
     name: "Reading",
     role: "Long-form",
-    axes: { size: 16, measure: 68, weight: 400, leading: 1.65 },
+    axes: { size: 17, measure: 68, weight: 430, leading: 1.65 },
   },
   {
     id: "study",
     name: "Study",
     role: "Large & airy",
-    axes: { size: 18, measure: 74, weight: 400, leading: 1.85 },
+    axes: { size: 18, measure: 74, weight: 430, leading: 1.85 },
   },
   {
     id: "focus",
     name: "Focus",
     role: "Narrow column",
-    axes: { size: 17, measure: 52, weight: 425, leading: 1.75 },
+    axes: { size: 17, measure: 52, weight: 455, leading: 1.75 },
   },
 ];
 
 export const DEFAULT_AXES: Axes = PRESETS[1].axes;
 
-const KEY = "napp:axes";
+const KEY = "napp:axes:v2";
 
 function read(): Axes {
   try {

@@ -2,30 +2,42 @@
 @import "tailwindcss" source(none);
 @source "../src";
 
-/* Midnight Instrument: graphite architecture with a single pale-gold signal.
-   The note is the lightest plane; glass appears only on controls that float. */
+/* Chroma-zero graphite: neutral planes, ink carries every signal, hue appears
+   only in tags and error states. Planes rise from the --graphite-* scale of
+   Pixel Services; the accent is white, not a colour. */
 :root {
   color-scheme: dark;
 
-  --page: #17191f;
-  --paper: #111318;
-  --surface: #090a0d;
+  /* Piani — dalla scala --graphite-* di Pixel Services */
+  --surface: #131313;   /* oklch(0.185 0 0)  ground app                              */
+  --paper:   #1E1E1E;   /* oklch(0.237 0 0)  rail + catalogo   ← --graphite          */
+  --page:    #292929;   /* oklch(0.281 0 0)  piano nota        ← --graphite-elevated */
 
-  --ink: #f3f2ed;
-  --ink-2: #d3d1ca;
-  --ink-3: #aaa9a4;
-  --ink-4: #858681;
+  /* Inchiostro — la scala porta tutto il carico, essendo monocromatica */
+  --ink:   #E8E8E8;     /* 11.9:1 su --page · 15.2:1 su --surface ← --graphite-foreground */
+  --ink-2: #C7C7C7;     /*  7.6:1 su --page                                               */
+  --ink-3: #939393;     /*  4.7:1 su --page                      ← --graphite-muted       */
+  --ink-4: #747474;     /*  3.1:1 su --page — solo metadati, mai corpo                    */
 
-  --rule: #2b2d34;
-  --rule-soft: #23252b;
+  --rule:      #3C3C3C; /* ← --graphite-border (#383838 nel tema Azzurro) */
+  --rule-soft: #2F2F2F;
 
-  --accent: #d8b866;
-  --accent-strong: #e7ca7b;
-  --accent-wash: rgb(216 184 102 / 0.15);
-  --on-accent: #17130a;
+  /* Enfasi — il ruolo "accent", senza hue */
+  --accent:        #FAFAFA;                  /* 8.3:1 su --page   ← --foreground */
+  --accent-strong: #FFFFFF;                  /* hover                            */
+  --accent-wash:   rgb(255 255 255 / 0.10);  /* sfondo stato attivo              */
+  --on-accent:     #131313;                  /* 17.9:1 su --accent               */
 
-  --danger: #ff6b72;
-  --ok: #8fd6c2;
+  /* Semantica — l'unico colore rimasto nel chrome */
+  --danger:      #FFA5A8;  /* 4.6:1 su --page — testo di errore        */
+  --danger-fill: #B3272C;  /* 6.2:1 con --on-danger — pulsante distruttivo */
+  --on-danger:   #FAFAFA;
+  --ok:          #7FD1A8;
+
+  /* Materiale — neutralizzato (era blu: rgb(37 39 46)) */
+  --glass:           rgb(41 41 41 / 0.72);
+  --glass-border:    rgb(255 255 255 / 0.12);
+  --glass-highlight: rgb(255 255 255 / 0.16);
 
   /* ── The material ─────────────────────────────────────────────────────────
      Layered opaque surfaces with a lit top edge. The ground is flat, so depth
@@ -43,9 +55,9 @@
 
   /* Reading axes — written by lib/axes.ts, read by the title and the editor.
      These are real variable-font axes, not a size class. */
-  --read-size: 16px;
+  --read-size: 17px;
   --read-measure: 68ch;
-  --read-weight: 400;
+  --read-weight: 430;
   --read-leading: 1.65;
 
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -66,6 +78,8 @@
   --color-accent-wash: var(--accent-wash);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
+  --color-danger-fill: var(--danger-fill);
+  --color-on-danger: var(--on-danger);
   --color-ok: var(--ok);
   --color-glass-border: var(--glass-border);
 
@@ -95,8 +109,6 @@
     color: var(--ink);
     font-family: var(--font-sans);
     font-optical-sizing: auto;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
     overscroll-behavior: none;
   }
 
@@ -110,8 +122,8 @@
 
   /* Surfaces the browser draws for us still belong to the design. */
   ::selection {
-    background: var(--accent-wash);
-    color: var(--ink);
+    background: rgb(255 255 255 / 0.18);
+    color: var(--accent);
   }
 
   :focus-visible {
@@ -148,7 +160,7 @@
 
 @media (max-width: 767px), (max-height: 520px) {
   :root {
-    --read-size: 17px;
+    --read-size: 18px;
     --read-measure: 100%;
     --read-leading: 1.62;
   }
@@ -188,7 +200,7 @@
   .mobile-card {
     border: 1px solid var(--rule-soft);
     border-radius: 1.1rem;
-    box-shadow: 0 1px 2px oklch(0.1 0.006 68 / 0.35);
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.4);
   }
 
   .mobile-folder-row + .mobile-folder-row,
@@ -203,7 +215,7 @@
 
   .mobile-compose {
     bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem));
-    box-shadow: 0 8px 26px oklch(0.2 0.05 152 / 0.45);
+    box-shadow: 0 8px 26px oklch(0 0 0 / 0.5);
   }
 
   .mobile-statusbar {
@@ -332,7 +344,7 @@
 .soft-control {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: oklch(1 0 0 / 0.045);
+  background: oklch(1 0 0 / 0.06);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
@@ -344,7 +356,7 @@
   gap: 0.375rem;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: oklch(1 0 0 / 0.05);
+  background: oklch(1 0 0 / 0.065);
   padding: 0.25rem 0.625rem;
 }
 
@@ -477,7 +489,7 @@
 .folder-toolbar,
 .collection-toolbar,
 .editor-toolbar {
-  background: rgb(18 20 25 / 0.92);
+  background: rgb(30 30 30 / 0.92);
 }
 
 .toolbar-button,
@@ -499,7 +511,7 @@
 .toolbar-button:hover,
 .icon-button:hover {
   border-color: var(--rule);
-  background: rgb(255 255 255 / 0.045);
+  background: rgb(255 255 255 / 0.07);
   color: var(--ink);
 }
 
@@ -507,7 +519,7 @@
   gap: 0.15rem;
   border: 1px solid var(--rule);
   border-radius: 0.75rem;
-  background: rgb(9 10 13 / 0.5);
+  background: rgb(19 19 19 / 0.5);
 }
 
 .archive-switch button {
@@ -519,7 +531,7 @@
 .archive-switch button.is-active {
   background: var(--accent-wash);
   color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px rgb(216 184 102 / 0.24);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.24);
 }
 
 .glass-toolbar,
@@ -576,7 +588,7 @@
 
 .menu-row:hover,
 .menu-row:focus-visible {
-  background: rgb(255 255 255 / 0.065);
+  background: rgb(255 255 255 / 0.09);
   color: var(--ink);
 }
 
@@ -617,7 +629,7 @@
 }
 
 .menu-small-button.is-primary {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: var(--on-accent);
   font-weight: 650;
 }
@@ -671,7 +683,7 @@
 .note-gallery-item {
   min-height: 10.5rem;
   border-radius: 0.85rem;
-  background: rgb(255 255 255 / 0.018);
+  background: rgb(255 255 255 / 0.03);
 }
 
 .find-bar {
@@ -791,7 +803,7 @@
 
 .settings-presets button.is-active,
 .settings-choice button.is-active {
-  border-color: rgb(216 184 102 / 0.45);
+  border-color: rgb(255 255 255 / 0.35);
   background: var(--accent-wash);
   color: var(--accent-strong);
 }
@@ -948,7 +960,7 @@
   .glass-search,
   .popover,
   .glass-sheet {
-    background: #25272e;
+    background: #2E2E2E;
   }
 }
 
@@ -966,7 +978,7 @@
   .glass-search,
   .popover,
   .glass-sheet {
-    background: #25272e;
+    background: #2E2E2E;
   }
 }
 
@@ -1024,7 +1036,7 @@
 .cm-dropCursor {
   border-left: 2.5px solid var(--accent) !important;
   opacity: 1 !important;
-  box-shadow: 0 0 0 1px oklch(0.238 0.006 68 / 0.9);
+  box-shadow: 0 0 0 1px oklch(0.281 0 0 / 0.9);
 }
 
 /* CodeMirror animation can dim the cursor to 0 — keep it legible. */
@@ -1138,14 +1150,14 @@
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-thickness: 1px;
+  text-decoration-thickness: 1.5px;
 }
 
 .cm-md-link-widget {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-thickness: 1px;
+  text-decoration-thickness: 1.5px;
   cursor: pointer;
 }
 
@@ -1196,7 +1208,7 @@
   gap: 0.3rem;
   padding: 0.2rem;
   border-radius: 0.6rem;
-  background: oklch(0.152 0.006 68 / 0.72);
+  background: oklch(0.185 0 0 / 0.75);
   backdrop-filter: blur(10px);
   opacity: 0;
   transform: translateY(-2px);
@@ -1228,7 +1240,7 @@
 }
 
 .cm-md-image-action:hover {
-  background: oklch(1 0 0 / 0.09);
+  background: oklch(1 0 0 / 0.11);
   color: var(--ink);
 }
 
@@ -1279,7 +1291,7 @@
   align-items: center;
   justify-content: center;
   padding: clamp(1rem, 5vw, 3.5rem);
-  background: oklch(0.07 0.004 68 / 0.82);
+  background: oklch(0.06 0 0 / 0.85);
   backdrop-filter: blur(18px) saturate(0.9);
   animation: lightbox-in 220ms var(--ease) both;
 }
@@ -1354,7 +1366,7 @@
 }
 
 .cm-md-list {
-  color: var(--accent);
+  color: var(--ink-3);
 }
 
 /* A horizontal rule in the source draws a real rule across the measure. */
@@ -1482,7 +1494,7 @@
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.62;
+  color: var(--ink-4);
 }
 
 .scope-divider {
@@ -1520,7 +1532,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: oklch(0.07 0.004 68 / 0.6);
+  background: oklch(0.06 0 0 / 0.62);
   backdrop-filter: blur(6px);
   animation: sheet-scrim-in 200ms var(--ease) both;
 }

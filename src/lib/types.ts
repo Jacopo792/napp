@@ -12,19 +12,19 @@ export interface Folder {
   name: string;
 }
 
-/* Dark-only since 2026-08-28: the light `bg`/`fg` pairs this list used to carry
-   were never read again, so they are gone. The eight ids are fixed — Postgres
-   has a CHECK constraint naming them — but the values are tuned to the warm,
-   herbal palette rather than to the primary hues they started as. */
+/* Dark-only since 2026-08-28. The eight ids are fixed — Postgres has a CHECK
+   constraint naming them — and the chrome is now chroma-zero, so these tags are
+   the only hue in the interface. Their foregrounds are calm pastels at
+   oklch(0.80 0.09 h): mutually distinct and every one ≥ 5.5:1 on --page. */
 export const TAG_COLORS = [
-  { id: "blue", darkBg: "#1b3040", darkFg: "#8fbcd4" },
-  { id: "rose", darkBg: "#41202a", darkFg: "#e2a0a8" },
-  { id: "emerald", darkBg: "#1c3a2b", darkFg: "#96caa3" },
-  { id: "amber", darkBg: "#3d2c12", darkFg: "#d9b878" },
-  { id: "violet", darkBg: "#2f2540", darkFg: "#bda8d4" },
-  { id: "sky", darkBg: "#1d3739", darkFg: "#8ec7c4" },
-  { id: "orange", darkBg: "#402713", darkFg: "#dfa97e" },
-  { id: "slate", darkBg: "#2b2724", darkFg: "#a9a29a" },
+  { id: "blue", darkFg: "#96BEF2" },
+  { id: "rose", darkFg: "#F2ABAF" },
+  { id: "emerald", darkFg: "#86D3AD" },
+  { id: "amber", darkFg: "#D6C084" },
+  { id: "violet", darkFg: "#DDABE0" },
+  { id: "sky", darkFg: "#8CC9E5" },
+  { id: "orange", darkFg: "#EBB593" },
+  { id: "slate", darkFg: "#B8BBC2" },
 ] as const;
 
 export type TagColorId = (typeof TAG_COLORS)[number]["id"];
