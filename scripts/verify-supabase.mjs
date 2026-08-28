@@ -48,6 +48,13 @@ async function loginAndUnlock(supabase, email, password) {
     .eq("user_id", signedIn.data.user.id)
     .single();
   if (vault.error) throw vault.error;
+  const membership = await supabase
+    .from("archive_members")
+    .select("owner")
+    .eq("archive_id", vault.data.archive_id)
+    .eq("user_id", signedIn.data.user.id)
+    .single();
+  if (membership.error) throw membership.error;
   const rawDek = await unwrapArchiveKey(
     {
       wrappedDek: vault.data.wrapped_dek,
@@ -60,6 +67,7 @@ async function loginAndUnlock(supabase, email, password) {
     archiveId: vault.data.archive_id,
     key: await importArchiveKey(rawDek),
     rawDek,
+    owner: membership.data.owner,
   };
 }
 
@@ -96,6 +104,8 @@ const anonymousClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHA
 
 const first = await loginAndUnlock(firstClient, env.USER_ONE_EMAIL, env.USER_ONE_PASSWORD);
 const second = await loginAndUnlock(secondClient, env.USER_TWO_EMAIL, env.USER_TWO_PASSWORD);
+assert(first.owner === "u1", "Jacopo account did not resolve to u1");
+assert(second.owner === "u2", "Lisa account did not resolve to u2");
 assert(first.archiveId === second.archiveId, "Accounts point to different archives");
 assert(
   Buffer.from(first.rawDek).equals(Buffer.from(second.rawDek)),
@@ -205,6 +215,8 @@ console.log(
       lisaLogin: true,
       sameArchive: true,
       sameDek: true,
+      jacopoOwner: first.owner,
+      lisaOwner: second.owner,
       members: 2,
       realtime: realtimeReceived,
       lisaReadJacopoNote: true,

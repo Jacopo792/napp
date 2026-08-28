@@ -13,9 +13,11 @@ read/write access to one shared encrypted archive. Each account password also un
 that member's copy of the shared archive DEK, so sign-in is one step with no separate
 archive passphrase screen. Both can use the `viewAs` switch.
 
-`owner: "u1" | "u2"` remains a live organisational label. It powers **My notes /
-Partner's notes**, and folders and tags carry the same owner label, but it is never an
+`owner: "u1" | "u2"` remains a live organisational label. It powers **Jacopo /
+Lisa**, and folders and tags carry the same owner label, but it is never an
 authorization boundary. RLS checks only membership in the shared archive.
+Jacopo's account opens on `u1`; Lisa's account opens on `u2`. Either person can still
+switch views manually.
 
 ## Product Purpose
 

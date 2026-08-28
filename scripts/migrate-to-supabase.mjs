@@ -204,9 +204,10 @@ async function prepareArchive(admin, env) {
     archiveId = created.data.id;
   }
 
-  const membership = await admin
-    .from("archive_members")
-    .upsert([first, second].map((user) => ({ archive_id: archiveId, user_id: user.id })));
+  const membership = await admin.from("archive_members").upsert([
+    { archive_id: archiveId, user_id: first.id, owner: "u1" },
+    { archive_id: archiveId, user_id: second.id, owner: "u2" },
+  ]);
   if (membership.error) throw membership.error;
 
   const existingKeys = await admin.from("vault_keys").select("*").eq("archive_id", archiveId);

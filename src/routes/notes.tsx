@@ -158,7 +158,7 @@ function NotesPage() {
   const realtimePendingRef = useRef(false);
 
   const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
-  const partnerName = myMeta.partnerName?.trim() || "Partner";
+  const partnerName = "Lisa";
   const storedPreferences = listPreferences[viewAs];
   const activeListPreferences = preferencesForFolder(storedPreferences, selectedFolderId);
 
@@ -191,7 +191,7 @@ function NotesPage() {
         return;
       }
       setSession(s);
-      setViewAs("u1");
+      setViewAs(s.owner);
     });
   }, [navigate]);
 
@@ -954,8 +954,8 @@ function NotesPage() {
                     >
                       {(
                         [
-                          ["u1", "Mine"],
-                          ["u2", partnerName],
+                          ["u1", "Jacopo"],
+                          ["u2", "Lisa"],
                         ] as const
                       ).map(([owner, label]) => (
                         <button
@@ -1115,8 +1115,8 @@ function NotesPage() {
                   >
                     {(
                       [
-                        ["u1", "Mine"],
-                        ["u2", partnerName],
+                        ["u1", "Jacopo"],
+                        ["u2", "Lisa"],
                       ] as const
                     ).map(([owner, label]) => (
                       <button
