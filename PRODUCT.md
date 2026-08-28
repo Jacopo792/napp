@@ -8,41 +8,36 @@ web
 
 ## Users
 
-Two people, and only two, with asymmetric roles baked into the key model:
+Two people, and only two, with separate Supabase email/password accounts and full
+read/write access to one shared encrypted archive. Both unlock the same archive DEK
+with an independent passphrase-wrapped key and both can use the `viewAs` switch.
 
-- **u1 (Jacopo, master).** Derives both keys at login, reads and writes every note in
-  both archives, and switches between them with a `viewAs` toggle. This is the owner
-  of the deployment and the person the interface is tuned for.
-- **u2 (the second person).** Holds a single pre-derived key bundle. Sees only notes
-  tagged `u2` and cannot read u1's archive.
-
-Confirmed 2026-08-27: this arrangement stays exactly as it is. The redesign must not
-merge the two archives, must not add co-presence or "shared with you" affordances, and
-must keep the `viewAs` switch a u1-only control.
+`owner: "u1" | "u2"` remains a live organisational label. It powers **My notes /
+Partner's notes**, and folders and tags carry the same owner label, but it is never an
+authorization boundary. RLS checks only membership in the shared archive.
 
 ## Product Purpose
 
-A private place to keep and write notes that no server operator can read. Notes live
-encrypted (AES-256-GCM) as `.napp` files on a GitHub `data` branch; the SPA holds the
-keys and does the crypto in the browser. There is no backend to trust, and no account
-to create — a pasted login bundle is the whole authentication story.
+A private place to keep and write notes that no server operator can read. Supabase
+stores AES-256-GCM ciphertext, structural metadata and encrypted image objects; the SPA
+holds the archive key and performs all encryption and decryption in the browser.
 
 Success is that writing in it feels better than the alternatives Jacopo already has
 open, so the notes actually land here instead of in Apple Notes.
 
 ## Positioning
 
-End-to-end encrypted notes with **zero infrastructure**: no server, no database, no
-vendor account, hosted free on GitHub Pages with GitHub itself as the dumb encrypted
-blob store. Competing note apps either hold the plaintext (Apple Notes, Notion) or
-require a server to run (Obsidian Sync, Standard Notes). This one can be forked and
-self-hosted by anyone with a GitHub account in ten minutes.
+End-to-end encrypted notes with a deliberately small backend surface: Supabase Auth,
+Postgres, Realtime and private Storage act as an encrypted persistence layer while
+search and content processing remain local.
 
 ## Operating Context
 
-- **Desktop only** (confirmed 2026-08-27). The window is wide, the input is a mouse
-  and a keyboard, and touch targets are not a constraint. Design spends its whole
-  budget on the large viewport.
+- **Two real surfaces** (updated 2026-08-28). The desktop window is wide, driven by
+  mouse and keyboard, and stays the surface the density is tuned for. The phone is no
+  longer an afterthought: it is used for reading and quick capture, so it gets its own
+  composition rather than a narrowed copy of the desktop one — notes first, folders and
+  tags as scope rather than as a screen to pass through.
 - Sessions are long and reading-heavy, not stack-of-index-cards quick capture. The
   real corpus (observed in Jacopo's Apple Notes, 2026-08-27) is long-form study and
   research material in Italian: multi-section research maps, aphorism collections,
@@ -51,15 +46,16 @@ self-hosted by anyone with a GitHub account in ten minutes.
   (`MAPPA 5: SK GROUP (il chaebol che ha catturato i pezzi giusti)`). A note list that
   truncates titles to one short line destroys the user's own naming scheme.
 - Content language is Italian; the interface language is English today.
-- Every save is a commit to the `data` branch. Writes are visible, permanent, and
-  network-bound — latency and save state are real facts the interface must not hide.
+- Saves are Postgres row writes and cross-device changes arrive through Realtime.
+  Persistence is still network-bound, so save state remains a visible fact.
 
 ## Capabilities and Constraints
 
-Confirmed functionality: create / edit / delete notes, autosave (1.5s debounce),
+Confirmed functionality: create / edit / delete notes, fast debounced autosave,
 pinning, folders, colored tags, full-text search, drag a note onto a folder,
-light/dark theme, and u1's `viewAs` archive switch. Opening a note is read-only
-state selection: it must never update `updatedAt` or trigger a GitHub write.
+and u1's `viewAs` archive switch. **The interface is dark only** (decided 2026-08-28);
+there is no theme control and no light palette to maintain. Opening a note is read-only
+state selection: it must never update `updatedAt` or trigger a database write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
 Bear model — markdown syntax renders as formatting while you type in one pane, with no
@@ -70,22 +66,24 @@ PDFs with selectable text may be imported locally into the current note. The bro
 extracts the text without uploading the document; OCR and AI document analysis are not
 part of this capability.
 
-JPG, PNG, and WebP images may be inserted locally. They are resized in the browser and
-embedded inside the encrypted note rather than uploaded as a separate plaintext file.
+JPG, PNG, and WebP images may be inserted locally. They are resized, encrypted with the
+archive DEK and uploaded to a private Storage bucket; the note stores only a
+`napp-image:<uuid>` reference. An embedded image remains a reading object: it opens full
+size, can be removed whole, and its storage reference is never exposed in the editor.
 Markdown image URLs render in place, and Markdown links plus bare HTTP(S) URLs become
 clickable when their source line is not being edited. Link insertion uses explicit text
 and URL fields instead of leaving an editable Markdown placeholder in the note.
 
 Technical constraints that outlive any design:
 
-- React 19 + TanStack Router + Vite + Tailwind v4, deployed to GitHub Pages under a
-  base path. No server-side anything.
-- The GitHub PAT lives in `sessionStorage` inside the login bundle. Known weakness,
-  recorded, not solved by design work.
-- Concurrent edits are last-write-wins: a 409 is resolved by re-reading the SHA and
-  overwriting. Undecided how to fix; the interface must not imply a merge happens.
-- `notes/meta-{owner}.napp` holds folders, tags, and note→folder assignment as one
-  encrypted blob per archive, saved whole.
+- React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
+- Supabase Auth uses two pre-created email/password accounts; public signup is disabled.
+- One random 256-bit archive DEK is wrapped independently for each account with a
+  PBKDF2-SHA256-derived KEK (at least 600,000 iterations). The raw DEK is session-only.
+- Concurrent edits remain last-write-wins at note granularity. The `version` column
+  provides optimistic concurrency; the interface must never imply a merge happened.
+- Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
+  and tag names remain encrypted, and `owner` remains organisational only.
 
 ## Brand Commitments
 
@@ -110,14 +108,15 @@ replaces it everywhere, including anywhere orange hides in warning tokens.
 
 1. **The words outrank the app.** Every surface that is not the note itself recedes:
    chrome is quiet, the writing area is the brightest and calmest thing on screen.
-2. **Two archives, never blended.** The separation between u1 and u2 is a security
-   boundary, so it is also a visual one. Never imply shared editing.
-3. **Honest about the network.** Saving is a commit to GitHub and can fail. Show real
+2. **Two labelled scopes, never blended.** u1 and u2 remain distinct organisational
+   views inside one shared archive, available to both authenticated members.
+3. **Honest about the network.** Saving is a database write and can fail. Show real
    save state; never fake instant persistence.
 4. **Built for long notes and long titles.** Density decisions are validated against
    real 55-character titles and multi-screen bodies, not against synthetic short data.
-5. **Keyboard-first on a wide screen.** Desktop-only is a licence to be dense, precise,
-   and shortcut-driven rather than tap-friendly.
+5. **Dense on the desk, direct on the phone.** The wide screen is a licence to be
+   dense, precise, and shortcut-driven. The phone earns the opposite: the fewest
+   screens between opening the app and reading or writing a note.
 
 ## Accessibility & Inclusion
 
