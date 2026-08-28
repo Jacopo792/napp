@@ -28,8 +28,8 @@ function Notice({
   action: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-6">
-      <div className="soft-pane w-full max-w-[26rem] bg-page p-8">
+    <div className="flex min-h-screen items-center justify-center px-6">
+      <div className="soft-pane pane-glass w-full max-w-[26rem] p-8">
         <p
           aria-hidden
           className="font-display text-ink"

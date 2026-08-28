@@ -59,7 +59,7 @@ export function AxisBar({ children, compact = false }: Props) {
 
   return (
     <div
-      className={`shrink-0 bg-paper ${compact ? "border-t border-rule" : "soft-pane mx-3 mb-3"}`}
+      className={`shrink-0 ${compact ? "border-t border-rule bg-paper" : "soft-pane pane-glass mx-3 mb-3"}`}
     >
       {!compact && open && (
         <div className="flex items-start gap-8 border-b border-rule-soft px-5 pt-4 pb-4">

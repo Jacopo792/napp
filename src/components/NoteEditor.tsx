@@ -214,7 +214,7 @@ export function NoteEditor({
   if (!entry) {
     return (
       <section
-        className={`editor-shell flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
+        className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
         <div className="flex flex-1 items-center justify-center px-8">
           <div className="measure rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center font-sans">
@@ -240,7 +240,7 @@ export function NoteEditor({
   return (
     <section
       key={entry.note.id}
-      className={`editor-shell page-in flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
+      className={`editor-shell page-in flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <header className={`shrink-0 ${mobile ? "px-5 pt-4 pb-3" : "px-10 pt-10 pb-5"}`}>

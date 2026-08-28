@@ -769,11 +769,11 @@ function NotesPage() {
     const listing = !selectedId;
 
     return (
-      <div className="flex flex-col overflow-hidden bg-surface" style={{ height: "100dvh" }}>
+      <div className="flex flex-col overflow-hidden" style={{ height: "100dvh" }}>
         {/* The phone has two screens: the notes, and a note. The archive is the
             one piece of state worth a permanent place in the bar. */}
         <header
-          className="mobile-topbar flex min-h-14 shrink-0 items-center gap-2 bg-surface px-3"
+          className="mobile-topbar flex min-h-14 shrink-0 items-center gap-2 px-3"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           {listing ? (
@@ -827,7 +827,7 @@ function NotesPage() {
         </header>
 
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
-          <main className="flex min-h-0 flex-1 overflow-hidden bg-surface">
+          <main className="flex min-h-0 flex-1 overflow-hidden">
             {listing && (
               <NoteList
                 mobile
@@ -932,7 +932,7 @@ function NotesPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-surface">
+    <div className="flex h-screen flex-col">
       <header className="flex h-14 shrink-0 items-center gap-4 px-5">
         <span
           className="font-display text-[15px] text-ink"
@@ -1036,7 +1036,7 @@ function NotesPage() {
 
           <Suspense
             fallback={
-              <div className="soft-pane flex min-w-0 flex-1 flex-col gap-4 bg-page px-10 pt-10">
+              <div className="soft-pane pane-page flex min-w-0 flex-1 flex-col gap-4 px-10 pt-10">
                 <div className="measure">
                   <div className="skeleton h-9 w-2/3" />
                   <div className="skeleton mt-5 h-2.5 w-40" />

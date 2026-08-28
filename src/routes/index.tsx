@@ -42,7 +42,7 @@ function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface">
+    <div className="flex min-h-screen flex-col">
       <header className="flex h-14 shrink-0 items-center px-5">
         <span
           className="font-display text-[15px] text-ink"
@@ -53,7 +53,7 @@ function Login() {
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6 pb-14">
-        <div className="soft-pane w-full max-w-[30rem] bg-page p-8">
+        <div className="soft-pane pane-glass w-full max-w-[30rem] p-8">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-wash text-accent">
             <ShieldCheck size={21} strokeWidth={1.8} />
           </div>

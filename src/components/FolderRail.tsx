@@ -406,8 +406,8 @@ export function FolderRail({
 
   return (
     <aside
-      className={`flex shrink-0 flex-col bg-paper ${
-        mobile ? "mobile-folder-rail h-full w-full border-0" : "soft-pane w-[224px]"
+      className={`flex shrink-0 flex-col ${
+        mobile ? "mobile-folder-rail h-full w-full border-0" : "soft-pane pane-glass w-[224px]"
       }`}
     >
       <div className="flex-1 overflow-y-auto">

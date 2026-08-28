@@ -301,7 +301,7 @@ export function NoteList({
 
   if (mobile) {
     return (
-      <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden bg-surface">
+      <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden">
         <div className="shrink-0 px-4 pt-1">
           <div className="flex h-11 items-center gap-2 rounded-xl bg-paper px-3.5 ring-1 ring-rule-soft">
             <Search size={16} strokeWidth={2} className="shrink-0 text-ink-4" />
@@ -394,8 +394,8 @@ export function NoteList({
 
   return (
     <section
-      className={`flex shrink-0 flex-col bg-paper ${
-        mobile ? "mobile-note-list h-full w-full border-0" : "soft-pane w-[360px]"
+      className={`flex shrink-0 flex-col ${
+        mobile ? "mobile-note-list h-full w-full border-0" : "soft-pane pane-glass w-[360px]"
       }`}
     >
       <div className="soft-control mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3 shadow-sm">

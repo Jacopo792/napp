@@ -93,8 +93,12 @@ tokens, `--radius: 0.45rem`, `--ease-premium`. The note body uses Source Serif 4
 more comfortable long-form writing, and the surfaces may move toward cleaner cool
 neutrals. Binding, but explicitly **not as a copy-paste**.
 
-Standing exception: the sienna/orange `--primary` of that system is rejected. Azure
-replaces it everywhere, including anywhere orange hides in warning tokens.
+Standing exception: the sienna/orange `--primary` of that system is rejected. It was
+replaced by azure until 2026-08-28 and by a sage green after; the accent hue is being
+reconsidered in a coming redesign. What is fixed is that sienna and orange never return.
+
+Standing constraint (2026-08-28): decorative gradient washes — soft radial or mesh
+colour fields behind the interface — are rejected outright, in any palette.
 
 ## Evidence on Hand
 

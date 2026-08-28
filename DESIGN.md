@@ -4,6 +4,20 @@
 
 `PRODUCT.md` is the source of truth for users, permissions, capabilities, security boundaries, and product behavior. This document records the durable visual decisions embodied by the shipped interface; it does not add product scope.
 
+> **Status, 2026-08-28 — this document is out of date and is being replaced.**
+> The shipped interface no longer matches the palette described below. The
+> blue-charcoal grounds and the azure accent were replaced with warm near-black
+> grounds and a sage accent, pane radii went to 24 px, and controls moved to
+> pills. Jacopo has judged that new world unsatisfactory and intends to redesign
+> it in a later session, so it was deliberately **not** written up here: the
+> composition rules in this document (three dense desktop panes, three-line
+> catalogue titles, honest save state, the separate phone composition,
+> two-step deletion, focus and motion rules) all still hold and are the part
+> worth carrying into whatever replaces the palette.
+>
+> One rule is new and permanent: **no decorative gradient washes.** Soft radial
+> or mesh colour fields are banned from this interface.
+
 **Finish review disposition: ship.** The desktop composition, typography, hierarchy, and interaction states are the accepted visual baseline. The palette became dark-only on 2026-08-28; the light-theme reference in `.impeccable/review/desktop.png` is historical and no longer describes the build.
 
 ## Design thesis
