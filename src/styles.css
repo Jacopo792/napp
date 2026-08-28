@@ -27,6 +27,17 @@
   --on-danger: #fafafa;
   --ok: #7fd1a8;
 
+  /* Highlight washes. Translucent, so the ink underneath is still the ink. */
+  /* Text colours. These are ink, not wash: bright enough to hold a sentence
+     against the page at reading weight, and close enough in lightness to each
+     other that a coloured line does not out-shout the paragraph around it. */
+  --tint-yellow: #e8c46a;
+  --tint-purple: #c69cf0;
+  --tint-pink: #f095b7;
+  --tint-orange: #efa86f;
+  --tint-mint: #79ddb2;
+  --tint-blue: #8fb6f5;
+
   --glass: #242424;
   --glass-border: #3c3c3c;
   --glass-highlight: rgb(255 255 255 / 0.06);
@@ -44,7 +55,27 @@
   --read-weight: 430;
   --read-leading: 1.65;
 
+  /* ── Motion ────────────────────────────────────────────────────────────────
+     Four curves and four durations, and nothing in the app is allowed a fifth.
+     `--ease` is the curve macOS and iOS use for anything that slides — a hard
+     start and a very long settle, which is what makes a panel read as a thing
+     with mass rather than a fade. `--ease-out` lands overlays, `--ease-spring`
+     gives an appearing menu the small overshoot a real one has, and
+     `--ease-press` is the immediate one, for the finger already on the button.
+
+     Durations are short on purpose: 90ms is below the threshold where a press
+     feels reported rather than felt, and nothing that appears under a pointer
+     is allowed to take longer than 240ms. */
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --dur-press: 90ms;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 360ms;
 }
 
 @theme inline {
@@ -171,31 +202,14 @@
     touch-action: manipulation;
   }
 
-  .mobile-folder-rail [role="button"],
-  .mobile-folder-rail > div > button {
-    min-height: 44px;
-  }
-
   .mobile-note-list [role="option"] {
     min-height: 72px;
   }
 
-  .mobile-topbar {
-    border-bottom: 0;
-  }
-
-  .mobile-card {
-    border: 1px solid var(--rule-soft);
-    border-radius: 1.1rem;
-    box-shadow: 0 1px 2px oklch(0 0 0 / 0.4);
-  }
-
-  .mobile-folder-row + .mobile-folder-row,
   .mobile-note-row + .mobile-note-row {
     border-top: 1px solid var(--rule-soft);
   }
 
-  .mobile-folder-row:active,
   .mobile-note-row:active {
     background: var(--accent-wash);
   }
@@ -205,17 +219,13 @@
     box-shadow: 0 8px 26px oklch(0 0 0 / 0.5);
   }
 
-  .mobile-statusbar {
-    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
-  }
-
   .mobile-editor-meta > .readout:nth-of-type(1),
   .mobile-editor-meta > .readout:nth-of-type(4) {
     display: none;
   }
 
   .mobile-editor .popover {
-    width: min(18rem, calc(100vw - 2rem));
+    width: min(19rem, calc(100vw - 1.5rem));
     max-height: min(26rem, calc(100dvh - 7rem));
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -429,24 +439,9 @@
   gap: 0.75rem;
 }
 
-/* ── Motion ─────────────────────────────────────────────────────────────────
-   One authored moment: the page arriving under the cursor when a note is
-   opened. Everything else is a state change with no entrance of its own. */
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.page-in {
-  animation: page-in 0.42s var(--ease) both;
-}
-
+/* ── Indeterminate motion ───────────────────────────────────────────────────
+   Loops that report work in progress. Everything with a beginning and an end
+   lives in the Motion section at the foot of this file. */
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -472,7 +467,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-in,
   .skeleton {
     animation: none;
   }
@@ -485,12 +479,57 @@
 }
 
 .workspace-grid {
-  gap: 10px;
   padding: 10px;
   background: var(--surface);
 }
 
-.folder-column,
+.pane-frame {
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.pane-resizer {
+  position: relative;
+  z-index: 35;
+  width: 10px;
+  flex: 0 0 10px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-resizer::before {
+  position: absolute;
+  inset-block: 0.65rem;
+  left: 50%;
+  width: 1px;
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+  transform: translateX(-50%);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.pane-resizer:hover::before,
+.pane-resizer:focus-visible::before,
+.is-pane-resizing .pane-resizer::before {
+  background: var(--ink-4);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.pane-resizer:focus-visible {
+  outline: none;
+}
+
+.is-pane-resizing,
+.is-pane-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.sidebar-column,
 .collection-column,
 .editor-shell {
   min-height: 0;
@@ -505,22 +544,18 @@
   background: var(--page);
 }
 
-.folder-column > .folder-rail,
+/* A pane inside the workspace grid drops its own border and shadow — the grid
+   cell already draws both — but it keeps the radius. Inheriting it was the bug
+   behind the square-cornered writing surface: the grid is a plain flex row with
+   no radius of its own, so `inherit` resolved to zero and the editor sat in a
+   rounded frame with sharp corners. */
 .workspace-grid .soft-pane,
 .editor-shell.soft-pane {
   border: 0;
-  border-radius: inherit;
+  border-radius: var(--radius-lg);
   box-shadow: none;
 }
 
-.folder-column > .folder-rail {
-  width: 100%;
-  min-height: 0;
-  flex: 1 1 auto;
-  background: transparent;
-}
-
-.folder-toolbar,
 .collection-toolbar,
 .editor-toolbar {
   background: var(--paper);
@@ -528,6 +563,30 @@
 
 .editor-toolbar {
   background: var(--page);
+}
+
+/* ── Toolbars stand above what they act on ───────────────────────────────────
+   A menu hanging off a toolbar was being painted *under* the note and under the
+   notes list, which looked like the panel had gone half-transparent and meant
+   the lower half of every menu could not be clicked at all: the text
+   underneath was taking the click.
+
+   The cause is stacking order, not opacity. CodeMirror gives `.cm-editor` its
+   own `position: relative`, and each row of the notes list is positioned too;
+   a positioned element that comes later in the document paints over an earlier
+   positioned one whenever both are at `z-index: auto`, however large the
+   z-index inside the earlier one is. The menu's own `z-40` never got a chance,
+   because it only ranks against its siblings inside the toolbar.
+
+   So the toolbars themselves are given a rank. Everything they open then sits
+   above the surface it is formatting. ───────────────────────────────────── */
+.editor-toolbar,
+.editor-format-bar,
+.collection-toolbar,
+.collection-topbar,
+.filter-strip {
+  position: relative;
+  z-index: 30;
 }
 
 .toolbar-button,
@@ -595,15 +654,6 @@
 
 .menu-popover {
   overflow: hidden;
-  transform-origin: top right;
-  animation: menu-reveal 190ms var(--ease) both;
-}
-
-@keyframes menu-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.985);
-  }
 }
 
 .menu-row {
@@ -670,10 +720,6 @@
   font-weight: 650;
 }
 
-.collection-column.is-gallery {
-  width: clamp(32rem, 43vw, 46rem);
-}
-
 .note-group-heading {
   display: flex;
   align-items: baseline;
@@ -699,6 +745,40 @@
   font-size: 0.63rem;
 }
 
+.note-row-summary {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.note-row-summary > span:first-child {
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  font-weight: 520;
+}
+
+.note-row-preview {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-date {
+  margin-bottom: 1.15rem;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .note-gallery-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -707,10 +787,6 @@
 }
 
 @media (min-width: 1500px) {
-  .collection-column.is-gallery {
-    width: min(48vw, 58rem);
-  }
-
   .note-gallery-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -773,10 +849,6 @@
   color: var(--accent-strong);
 }
 
-.page-in {
-  animation: none;
-}
-
 /* Settings are part of the app shell, not a footer bolted beneath it. */
 .settings-layer {
   position: fixed;
@@ -802,14 +874,6 @@
   max-height: min(46rem, calc(100dvh - 2.5rem));
   flex-direction: column;
   overflow: hidden;
-  animation: settings-reveal 220ms var(--ease) both;
-}
-
-@keyframes settings-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
-  }
 }
 
 .settings-scroll {
@@ -943,6 +1007,14 @@
   font-size: 0.8rem;
 }
 
+/* One line under a heading saying what the section is for. */
+.settings-note {
+  margin-bottom: 0.75rem;
+  color: var(--ink-4);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
 .settings-lock {
   display: flex;
   align-items: center;
@@ -954,14 +1026,6 @@
 /* Phone navigation is a real stack: folders, collection, then note. */
 .mobile-screen {
   background: var(--surface);
-  animation: mobile-push 220ms var(--ease) both;
-}
-
-@keyframes mobile-push {
-  from {
-    opacity: 0.92;
-    transform: translateX(14px);
-  }
 }
 
 .mobile-appbar,
@@ -992,15 +1056,6 @@
   height: auto;
   min-height: 0;
   flex: 1 1 auto;
-}
-
-.mobile-folders-screen .mobile-folder-row {
-  margin: 0 0.75rem;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.mobile-folders-screen .mobile-folder-row:first-child {
-  border-top: 0;
 }
 
 .mobile-note-list {
@@ -1061,14 +1116,6 @@
   .popover,
   .glass-sheet {
     background: var(--paper);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .menu-popover,
-  .settings-panel,
-  .mobile-screen {
-    animation: none;
   }
 }
 
@@ -1166,22 +1213,33 @@
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.22;
+  /* Space above a heading is what makes it read as the start of something.
+     Padding rather than margin: a CodeMirror line is a block whose height the
+     editor measures, and collapsing margins would make it measure wrong. */
+  padding-top: 0.5em;
 }
 .cm-md-h1 {
-  font-size: 1.72em;
+  font-size: 1.8em;
   font-weight: 700;
+  padding-top: 0.35em;
 }
 .cm-md-h2 {
-  font-size: 1.36em;
+  font-size: 1.4em;
   font-weight: 680;
 }
+/* Subheading has to be visibly a step down from Heading and a step up from
+   body, or choosing it looks like it did nothing. Size alone was not enough of
+   a step, so it takes the accent's lighter ink as well. */
 .cm-md-h3 {
-  font-size: 1.14em;
-  font-weight: 650;
+  font-size: 1.15em;
+  font-weight: 660;
+  color: var(--ink);
+  letter-spacing: 0.005em;
 }
 .cm-md-h4 {
   font-size: 1em;
   font-weight: 650;
+  color: var(--ink-2);
 }
 
 .cm-md-strong {
@@ -1435,8 +1493,138 @@
   }
 }
 
-.cm-md-list {
+/* ── Lists ───────────────────────────────────────────────────────────────────
+   A list item hangs: the marker sits in the left margin and every wrapped line
+   of the item lines up under the first word, not under the bullet. The marker
+   itself is drawn — a real dot, a real checkbox — because `- ` and `- [ ] ` are
+   a file format, not something anyone wants to read. */
+.cm-md-item {
+  padding-left: 1.5em;
+  text-indent: -1.5em;
+}
+
+.cm-md-item.is-task {
+  padding-left: 1.75em;
+  text-indent: -1.75em;
+}
+
+.cm-md-bullet {
+  display: inline-block;
+  width: 1.5em;
+  text-indent: 0;
   color: var(--ink-3);
+  font-size: 1.05em;
+  line-height: inherit;
+}
+
+/* The number is content, so it is set rather than replaced — just quieter than
+   the words it counts. */
+.cm-md-number {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-md-task {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.7em;
+  vertical-align: -0.14em;
+  text-indent: 0;
+  border-radius: 0.35em;
+  border: 1.5px solid var(--rule);
+  background: var(--surface);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-press) var(--ease-spring);
+}
+
+.cm-md-task:hover {
+  border-color: var(--ink-3);
+}
+
+.cm-md-task:active {
+  transform: scale(0.88);
+}
+
+.cm-md-task.is-done {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* A finished item reads as finished. */
+.cm-md-done {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+  text-decoration-thickness: 1px;
+}
+
+/* ── Quotes ──────────────────────────────────────────────────────────────── */
+.cm-md-quote-line {
+  padding-left: 1.15em;
+  box-shadow: inset 2px 0 0 var(--ink-4);
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────────
+   Pipes and dashes never line up into columns, however they are styled, so the
+   block is drawn as a grid instead. Clicking a cell hands the caret back to
+   that cell's source, which is the only moment the pipes are worth seeing. */
+.cm-md-table {
+  margin-block: 0.9rem 1.2rem;
+  overflow-x: auto;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.cm-md-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  line-height: 1.5;
+}
+
+.cm-md-table th,
+.cm-md-table td {
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule-soft);
+  border-right: 1px solid var(--rule-soft);
+  cursor: text;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.cm-md-table th:last-child,
+.cm-md-table td:last-child {
+  border-right: 0;
+}
+
+.cm-md-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cm-md-table th {
+  font-weight: 640;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.cm-md-table td {
+  color: var(--ink-2);
+}
+
+.cm-md-table th:hover,
+.cm-md-table td:hover {
+  background: var(--accent-wash);
 }
 
 /* A horizontal rule in the source draws a real rule across the measure. */
@@ -1510,140 +1698,916 @@
   box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
-/* ── Phone ──────────────────────────────────────────────────────────────────
-   The phone lands on the notes, not on a folder tree. Scope lives in one
-   scrolling strip above the list, so reading and writing are the only two
-   screens the thumb ever moves between. ─────────────────────────────────── */
-.scope-strip {
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: 1rem;
-  /* The strip runs under the manage button, so the last chip fades rather
-     than colliding with it. */
-  mask-image: linear-gradient(to right, #000 calc(100% - 4rem), transparent 100%);
-}
+/* ══ Motion ═══════════════════════════════════════════════════════════════════
+   Interface motion here answers one question: did the thing I touched notice?
+   The app had almost none of it — a menu appeared, a panel existed, a row
+   changed colour — which is what "lifeless" describes. What follows is the
+   platform's own vocabulary: a press scales under the finger and springs back,
+   things that appear scale up from the corner they belong to, things that
+   arrive from an edge keep travelling on the long tail of `--ease`, and screens
+   push and pop in the direction the reader is going.
 
-.scope-strip::-webkit-scrollbar {
-  display: none;
-}
+   Every rule below is suppressed wholesale under prefers-reduced-motion at the
+   end of this section. ═══════════════════════════════════════════════════════ */
 
-.scope-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex: 0 0 auto;
-  height: 2rem;
-  padding-inline: 0.7rem;
-  border: 1px solid var(--rule-soft);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink-3);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
+/* The press. On the pointer it is a hint; on the finger it is the whole of the
+   feedback, because there is no hover state to have preceded it. */
+.press {
   transition:
-    background-color 140ms var(--ease),
-    border-color 140ms var(--ease),
-    color 140ms var(--ease);
+    transform var(--dur-press) var(--ease-press),
+    opacity var(--dur-press) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press);
 }
 
-.scope-chip.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+.press:active:not(:disabled) {
+  transform: scale(0.955);
 }
 
-.scope-chip.is-tag-active {
-  background: var(--accent-wash);
-  border-color: var(--accent-wash);
-  color: var(--ink);
+.press:disabled {
+  transform: none;
 }
 
-.scope-count {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-4);
+/* Menus grow from the corner they hang off, which is what makes them read as
+   unfolding out of their button rather than materialising beside it. */
+.menu-popover {
+  transform-origin: top right;
+  animation: menu-reveal var(--dur-base) var(--ease-spring) both;
 }
 
-.scope-divider {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 1.1rem;
-  margin-inline: 0.25rem;
-  background: var(--rule);
+.menu-popover.left-0 {
+  transform-origin: top left;
 }
 
-.scope-manage {
-  position: absolute;
-  top: 50%;
-  right: 0.6rem;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink-3);
+@keyframes menu-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.94);
+  }
 }
 
-.scope-manage:active {
-  color: var(--accent);
-  border-color: var(--accent);
+.menu-row,
+.sidebar-target,
+.sidebar-footer-button,
+.filter-chip,
+.new-note-button {
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
 }
 
-/* The manage sheet. Folders and tags are maintenance, so they arrive over the
-   list and leave again rather than owning a screen of their own. */
-.sheet-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgb(17 19 24 / 0.24);
-  animation: sheet-scrim-in 200ms var(--ease) both;
+.menu-row:active {
+  transform: scale(0.985);
 }
 
-.sheet {
-  position: fixed;
-  inset: auto 0 0 0;
-  z-index: 51;
-  display: flex;
-  flex-direction: column;
-  max-height: min(80dvh, 40rem);
-  border-top: 1px solid var(--rule);
-  border-radius: 1.35rem 1.35rem 0 0;
-  background: var(--surface);
-  box-shadow: 0 -20px 60px rgb(17 19 24 / 0.12);
-  padding-bottom: env(safe-area-inset-bottom);
-  animation: sheet-in 320ms var(--ease) both;
+/* The overlay pair: the scrim fades, the panel comes up on the long curve. */
+.settings-scrim {
+  animation: fade-in var(--dur-base) var(--ease-out) both;
 }
 
-.sheet-grip {
-  width: 2.25rem;
-  height: 0.25rem;
-  margin: 0.6rem auto 0;
-  border-radius: 999px;
-  background: var(--rule);
+.settings-panel {
+  animation: settings-reveal var(--dur-slow) var(--ease) both;
 }
 
-@keyframes sheet-scrim-in {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes sheet-in {
+@keyframes settings-reveal {
   from {
-    transform: translateY(100%);
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+/* A note opening is the one entrance the reader is waiting on, so it is the
+   slowest thing in the app — and still under half a second. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-in {
+  animation: page-in var(--dur-slow) var(--ease) both;
+}
+
+/* Phone screens push and pop the way the platform does: the incoming screen
+   travels, it does not dissolve. */
+@keyframes mobile-push {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+.mobile-screen {
+  animation: mobile-push var(--dur-base) var(--ease) both;
+}
+
+.mobile-note-row,
+.note-gallery-item {
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.mobile-note-row:active,
+.note-gallery-item:active {
+  transform: scale(0.985);
+}
+
+.mobile-compose {
+  transition: transform var(--dur-press) var(--ease-press);
+}
+
+.mobile-compose:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+/* Row actions used to snap from invisible to visible on hover. */
+.note-row-actions button {
+  transition:
+    opacity var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.note-row-actions button:active {
+  transform: scale(0.88);
+}
+
+.archive-switch button {
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    box-shadow var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.archive-switch button:active {
+  transform: scale(0.97);
+}
+
+.editor-tool-button {
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.editor-tool-button:active {
+  transform: scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press,
+  .press:active,
+  .menu-row:active,
+  .mobile-note-row:active,
+  .note-gallery-item:active,
+  .mobile-compose:active,
+  .note-row-actions button:active,
+  .archive-switch button:active,
+  .editor-tool-button:active {
+    transform: none;
+  }
+
+  .menu-popover,
+  .settings-scrim,
+  .settings-panel,
+  .page-in,
+  .mobile-screen {
+    animation: none;
+  }
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────────
+   Movement here is doing one job: telling you that the thing you are looking at
+   was replaced, and by what. Changing folder swaps the whole list, so the list
+   settles in rather than cutting; a row you are pointing at answers under the
+   cursor; a checkbox you tick acknowledges the tick. Nothing loops, nothing
+   waits for the interface to catch up, and every one of these is suppressed
+   under `prefers-reduced-motion`. ───────────────────────────────────────── */
+@keyframes list-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.list-in {
+  animation: list-in var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes glyph-pop {
+  50% {
+    transform: scale(1.22);
+  }
+}
+
+.cm-md-task.is-done {
+  animation: glyph-pop var(--dur-base) var(--ease-spring);
+}
+
+.collection-column [role="option"],
+.sidebar-row,
+.note-row-glyph {
+  will-change: auto;
+}
+
+.cm-scroller,
+.sidebar-scroll,
+.collection-column [role="listbox"] {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-in,
+  .cm-md-task.is-done {
+    animation: none;
+  }
+
+  .cm-scroller,
+  .sidebar-scroll,
+  .collection-column [role="listbox"] {
+    scroll-behavior: auto;
+  }
+}
+
+/* ══ The sidebar ══════════════════════════════════════════════════════════════
+   The column of destinations: All notes, then the folder tree, then the
+   wastebasket. These are the names of your own material, so they are set at
+   reading weight and full ink — a column of small grey labels reads as chrome,
+   and this is content. Rows are compact and evenly pitched so a tree of a dozen
+   folders is one shape rather than a scattering. ─────────────────────────── */
+.sidebar-topbar {
+  position: relative;
+  z-index: 30;
+  background: var(--paper);
+}
+
+.sidebar-scroll {
+  scrollbar-gutter: stable;
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0 0.6rem 0.3rem 1.55rem;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sidebar-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem 0.5rem 1.55rem;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.sidebar-separator {
+  margin: 0.5rem 0.6rem;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.sidebar-tail {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem 0.35rem;
+}
+
+.sidebar-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 0.6rem;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.sidebar-row:hover {
+  background: var(--accent-wash);
+}
+
+.sidebar-row.is-active {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+/* The folder a note is being dragged onto says so before it is dropped. */
+.sidebar-row.is-over {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.sidebar-row.is-editing {
+  gap: 0.35rem;
+  padding-right: 0.3rem;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+/* The disclosure column is always there, occupied or not, so every name in the
+   tree starts on the same vertical line whatever its depth. */
+.sidebar-twisty {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1rem;
+  justify-content: center;
+}
+
+.sidebar-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.3rem;
+  color: var(--ink-4);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease);
+}
+
+.sidebar-disclosure:hover {
+  color: var(--ink);
+}
+
+.sidebar-disclosure.is-open {
+  transform: rotate(90deg);
+}
+
+/* A branch is drawn as a branch: one hairline running under the parent's
+   glyph, so depth is legible without counting indents. */
+.sidebar-branch {
+  position: relative;
+  margin-left: 1.05rem;
+  border-left: 1px solid var(--rule-soft);
+}
+
+.sidebar-branch .sidebar-row {
+  margin-left: -1.05rem;
+}
+
+.sidebar-target {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.6rem 0.42rem 0.15rem;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: 480;
+  text-align: left;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.sidebar-row:hover .sidebar-target {
+  color: var(--ink);
+}
+
+.sidebar-row.is-active .sidebar-target {
+  color: var(--ink);
+  font-weight: 620;
+}
+
+.sidebar-glyph {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  transition:
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.sidebar-row:hover .sidebar-glyph,
+.sidebar-row.is-active .sidebar-glyph {
+  color: var(--accent);
+}
+
+.sidebar-row.is-active .sidebar-glyph {
+  transform: scale(1.06);
+}
+
+.sidebar-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-count {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ⋯ stays out of the way until the row is pointed at — but never while its
+   own menu is open, which would be the control vanishing under your cursor. */
+.sidebar-actions {
+  position: absolute;
+  right: 0.25rem;
+  display: flex;
+  align-items: center;
+  padding-right: 0.25rem;
+  opacity: 0;
+  transform: translateX(3px);
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.sidebar-row:hover .sidebar-actions,
+.sidebar-actions:focus-within,
+.sidebar-actions:has(.is-open) {
+  opacity: 1;
+  transform: none;
+}
+
+.sidebar-row:hover .sidebar-count,
+.sidebar-row:focus-within .sidebar-count {
+  opacity: 0;
+}
+
+.sidebar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.4rem;
+  color: var(--ink-3);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.sidebar-action:hover,
+.sidebar-action.is-open {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* The folder menu escapes the scrolling column it is anchored in. */
+.sidebar-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 60;
+  width: 14.5rem;
+  padding: 0.35rem;
+  text-align: left;
+}
+
+.sidebar-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0.42rem 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+/* Settings and the lock are destinations too, so they are set like the rows
+   above them rather than as a dim strip of small print. */
+.sidebar-footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--rule-soft);
+  background: var(--paper);
+}
+
+.sidebar-footer-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  font-weight: 480;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.sidebar-footer-button:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.sidebar-footer-button svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.sidebar-footer-button:hover svg {
+  color: var(--accent);
+}
+
+/* On the phone the same column arrives as a drawer. */
+.mobile-nav-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.mobile-nav-drawer {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  display: flex;
+  width: min(18rem, 84vw);
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+  box-shadow: var(--shadow-popover);
+  animation: drawer-in var(--dur-base) var(--ease-out) both;
+}
+
+.mobile-nav-drawer > .sidebar-column {
+  width: 100%;
+  padding-top: env(safe-area-inset-top);
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet,
-  .sheet-scrim {
+  .mobile-nav-drawer {
     animation: none;
   }
+}
+
+/* The list's own glyph, in the same alphabet as the sidebar's. */
+.note-row-glyph {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.05rem;
+  border-radius: 0.55rem;
+  background: var(--surface);
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+[role="option"]:hover .note-row-glyph {
+  color: var(--ink-2);
+}
+
+.note-row-glyph.is-pinned {
+  color: var(--accent);
+}
+
+.note-row-glyph.is-selected {
+  background: var(--accent);
+  color: var(--on-accent);
+  transform: scale(1.04);
+}
+
+/* A gallery card is a column, so the glyph sits above the title rather than
+   beside it — same sign, same meaning, different arrangement. */
+.note-row-glyph.is-gallery {
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-bottom: 0.55rem;
+}
+
+/* ══ The collection column ════════════════════════════════════════════════════ */
+.collection-topbar {
+  background: var(--paper);
+}
+
+/* Compose stands beside the list it adds to. It used to be crammed inside the
+   search field, on top of the text being typed. */
+.new-note-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  padding: 0 0.7rem;
+  color: var(--on-accent);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 620;
+}
+
+.new-note-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.new-note-button:disabled {
+  opacity: 0.3;
+}
+
+/* What is narrowing the list right now, and how to widen it again. */
+.filter-strip {
+  padding-bottom: 0.125rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 12rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  padding: 0.2rem 0.5rem 0.2rem 0.65rem;
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 560;
+}
+
+.filter-chip:hover {
+  border-color: var(--accent);
+}
+
+.drag-chip {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--page);
+  box-shadow: var(--shadow-popover);
+}
+
+/* ══ The writing toolbar ══════════════════════════════════════════════════════ */
+.editor-format-bar {
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.editor-tool-cluster.is-mobile {
+  height: 2.6rem;
+}
+
+.editor-tool-cluster.is-mobile .editor-tool-button {
+  width: 2.5rem;
+  height: 2.1rem;
+}
+
+/* A menu hanging off a toolbar that is optically centred has to be allowed to
+   leave its parent's box, and on a phone it has to be allowed to scroll. */
+.editor-tool-menu {
+  width: 15rem;
+  max-height: min(30rem, calc(100dvh - 9rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The character row: four toggles that read as one control. */
+.menu-segments {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.2rem;
+  padding: 0.15rem;
+}
+
+.menu-segments button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.menu-segments button:hover {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.menu-segments button:active {
+  transform: scale(0.92);
+}
+
+.menu-swatches {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem 0.5rem;
+}
+
+/* A swatch shows the colour doing its job — a letter set in it — rather than a
+   dot of paint whose relationship to the text is left to the imagination. */
+.menu-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 0.55rem;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    transform var(--dur-press) var(--ease-spring),
+    box-shadow var(--dur-fast) var(--ease-press);
+}
+
+.menu-swatch:hover {
+  transform: translateY(-1px) scale(1.08);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.menu-swatch:active {
+  transform: scale(0.94);
+}
+
+.menu-swatch.is-yellow {
+  color: var(--tint-yellow);
+}
+.menu-swatch.is-purple {
+  color: var(--tint-purple);
+}
+.menu-swatch.is-pink {
+  color: var(--tint-pink);
+}
+.menu-swatch.is-orange {
+  color: var(--tint-orange);
+}
+.menu-swatch.is-mint {
+  color: var(--tint-mint);
+}
+.menu-swatch.is-blue {
+  color: var(--tint-blue);
+}
+
+.menu-swatch.is-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--ink-3);
+}
+
+/* One sentence saying what a menu will actually do, where a menu of verbs is
+   otherwise ambiguous about its target. */
+.menu-note {
+  padding: 0.35rem 0.7rem 0.5rem;
+  color: var(--ink-4);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+/* ══ Coloured text ═══════════════════════════════════════════════════════════
+   Colour belongs to the letters. A wash behind them was the old behaviour and
+   it fought the dark page in both directions: too faint to see, and heavy
+   enough to repaint the type when it was visible. */
+.cm-md-tint {
+  color: var(--tint-yellow);
+}
+
+.cm-md-tint-yellow {
+  color: var(--tint-yellow);
+}
+.cm-md-tint-purple {
+  color: var(--tint-purple);
+}
+.cm-md-tint-pink {
+  color: var(--tint-pink);
+}
+.cm-md-tint-orange {
+  color: var(--tint-orange);
+}
+.cm-md-tint-mint {
+  color: var(--tint-mint);
+}
+.cm-md-tint-blue {
+  color: var(--tint-blue);
+}
+
+/* ══ Attachments ══════════════════════════════════════════════════════════════
+   A stored document, shown as a document. */
+.cm-md-file-widget {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.55rem 0.65rem;
+  max-width: 26rem;
+  transition:
+    border-color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.cm-md-file-widget:hover {
+  border-color: var(--ink-4);
+}
+
+.cm-md-file-widget.is-error {
+  border-color: var(--danger);
+}
+
+.cm-md-file-open {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.cm-md-file-open:active {
+  transform: scale(0.99);
+}
+
+.cm-md-file-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.1rem;
+  height: 2.4rem;
+  border-radius: 0.45rem;
+  background: var(--danger-fill);
+  color: var(--on-danger);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cm-md-file-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.cm-md-file-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-md-file-hint {
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.cm-md-file-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.cm-md-file-actions .cm-md-image-action {
+  position: static;
 }

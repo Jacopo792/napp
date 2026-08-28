@@ -180,9 +180,9 @@ export const encryptNote = (note: Note, key: CryptoKey) => encryptJson(key, note
 export const decryptNote = (ciphertext: string, key: CryptoKey) =>
   decryptJson<Note>(key, ciphertext);
 export const encryptFolder = (folder: Folder, key: CryptoKey) =>
-  encryptJson(key, { name: folder.name });
+  encryptJson(key, { name: folder.name, parentId: folder.parentId ?? null });
 export const decryptFolder = (ciphertext: string, key: CryptoKey) =>
-  decryptJson<{ name: string }>(key, ciphertext);
+  decryptJson<{ name: string; parentId?: string | null }>(key, ciphertext);
 export const encryptTag = (tag: Tag, key: CryptoKey) => encryptJson(key, { name: tag.name });
 export const decryptTag = (ciphertext: string, key: CryptoKey) =>
   decryptJson<{ name: string }>(key, ciphertext);

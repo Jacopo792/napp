@@ -6,7 +6,9 @@ export function previewOf(body: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
     .replace(/^\s{0,3}>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+\[[ xX]\]\s+/gm, "")
     .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/==(?:(?:yellow|purple|pink|orange|mint|blue):)?([^\n]*?)==/g, "$1")
     .replace(/[*_`~]/g, "")
     .replace(/\s+/g, " ")
     .trim();

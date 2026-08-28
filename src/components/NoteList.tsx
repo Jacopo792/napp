@@ -1,11 +1,29 @@
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
-import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
-import { formatCount, formatStamp } from "@/lib/format";
+import {
+  FileText,
+  Image as ImageIcon,
+  ListChecks,
+  Paperclip,
+  Pin,
+  RotateCcw,
+  Search,
+  SquarePen,
+  Table2,
+  Trash2,
+  X,
+} from "lucide-react";
+import type { Meta } from "@/lib/types";
+import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
+
+export interface ActiveFilter {
+  id: string;
+  label: string;
+  onClear: () => void;
+}
 
 interface Props {
   mobile?: boolean;
@@ -13,6 +31,12 @@ interface Props {
   groups?: NoteGroup[];
   view?: ListView;
   toolbarActions?: ReactNode;
+  /** Row above the collection header — the archive switch, the pane toggle. */
+  topBar?: ReactNode;
+  /** Row below the list — where Settings and the lock stand. */
+  footer?: ReactNode;
+  /** Scope and tag narrowing currently in force, each one dismissible. */
+  filters?: ActiveFilter[];
   meta: Meta;
   selectedId: string | null;
   query: string;
@@ -30,6 +54,28 @@ interface Props {
   onTogglePin: (noteId: string) => void;
 }
 
+/* ── What a note is, at a glance ─────────────────────────────────────────────
+   The rows used to lead with their position in the sort, which is a number
+   about the list rather than about the note. A glyph says what you are about to
+   open — a checklist, a note with a picture in it, a note carrying a file — the
+   way the sidebar's glyphs say what a scope is. Same alphabet in both columns,
+   so the two read as one interface. ──────────────────────────────────────── */
+const GLYPHS = {
+  attachment: { icon: Paperclip, label: "Has an attachment" },
+  image: { icon: ImageIcon, label: "Has a picture" },
+  checklist: { icon: ListChecks, label: "Checklist" },
+  table: { icon: Table2, label: "Has a table" },
+  text: { icon: FileText, label: "Note" },
+} as const;
+
+function glyphFor(body: string): (typeof GLYPHS)[keyof typeof GLYPHS] {
+  if (body.includes("napp-file:")) return GLYPHS.attachment;
+  if (body.includes("](napp-image:") || body.includes("![")) return GLYPHS.image;
+  if (/^\s*[-*+]\s\[[ xX]\]\s/m.test(body)) return GLYPHS.checklist;
+  if (/^\s*\|.*\|\s*$/m.test(body)) return GLYPHS.table;
+  return GLYPHS.text;
+}
+
 /* The catalogue. Titles here are never truncated to one line: the real corpus
    names notes things like "MAPPA 5: SK GROUP (il chaebol che ha catturato i
    pezzi giusti)", and a list that cuts that at 30 characters throws away the
@@ -39,7 +85,6 @@ const Row = memo(function Row({
   mobile,
   gallery,
   entry,
-  index,
   meta,
   selected,
   onSelect,
@@ -52,7 +97,6 @@ const Row = memo(function Row({
   mobile: boolean;
   gallery: boolean;
   entry: NoteEntry;
-  index: number;
   meta: Meta;
   selected: boolean;
   trashMode: boolean;
@@ -71,11 +115,7 @@ const Row = memo(function Row({
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const index_ = indexOf(meta);
-  const noteMeta = index_.byNote.get(entry.note.id);
-  const tags = (noteMeta?.tagIds ?? [])
-    .map((id) => index_.byTag.get(id))
-    .filter(Boolean) as TagType[];
+  const noteMeta = indexOf(meta).byNote.get(entry.note.id);
 
   useEffect(() => {
     if (selected) rowRef.current?.scrollIntoView({ block: "nearest" });
@@ -87,8 +127,10 @@ const Row = memo(function Row({
     return () => window.clearTimeout(timer);
   }, [confirmDelete]);
 
-  const { preview, words } = derivedOf(entry.note);
+  const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
+  const glyph = glyphFor(entry.note.body);
+  const Glyph = glyph.icon;
 
   return (
     <div
@@ -118,18 +160,16 @@ const Row = memo(function Row({
             : "hover:bg-page"
       }`}
     >
-      {/* The running number is the keyboard target and the position in the
-          current sort — information, not ornament. */}
-      {!mobile && !gallery && (
-        <span
-          aria-hidden
-          className={`readout flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-            selected ? "bg-accent text-on-accent" : "bg-surface text-ink-4"
-          }`}
-        >
-          {index + 1}
-        </span>
-      )}
+      <span
+        title={glyph.label}
+        aria-label={glyph.label}
+        role="img"
+        className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
+          selected ? "is-selected" : ""
+        } ${pinned ? "is-pinned" : ""}`}
+      >
+        <Glyph size={mobile && !gallery ? 15 : 14} strokeWidth={1.8} />
+      </span>
 
       <div className="min-w-0 flex-1">
         <p
@@ -147,34 +187,10 @@ const Row = memo(function Row({
           {entry.note.title || "Untitled"}
         </p>
 
-        <p className="readout mt-1.5 truncate text-ink-3">
-          {formatStamp(entry.note.updatedAt)}
-          <span className="text-ink-4"> · </span>
-          {formatCount(words)}w
-          {preview && (
-            <>
-              <span className="text-ink-4"> · </span>
-              <span className="text-ink-4">{preview}</span>
-            </>
-          )}
+        <p className="note-row-summary mt-1 truncate">
+          <span>{formatStamp(entry.note.updatedAt)}</span>
+          {preview && <span className="note-row-preview">{preview}</span>}
         </p>
-
-        {tags.length > 0 && (
-          <span className="mt-1.5 flex items-center gap-1">
-            {tags.slice(0, 5).map((t) => {
-              const p = TAG_COLORS.find((c) => c.id === t.color) ?? TAG_COLORS[0];
-              return (
-                <span
-                  key={t.id}
-                  title={t.name}
-                  aria-label={t.name}
-                  className="h-1.5 w-4 rounded-full"
-                  style={{ background: p.darkFg }}
-                />
-              );
-            })}
-          </span>
-        )}
       </div>
 
       <div className="note-row-actions flex shrink-0 items-center gap-0.5">
@@ -284,6 +300,9 @@ export function NoteList({
   groups = [{ id: "notes", label: "Notes", entries }],
   view = "list",
   toolbarActions,
+  topBar,
+  footer,
+  filters = [],
   meta,
   selectedId,
   query,
@@ -317,13 +336,12 @@ export function NoteList({
         <span>{group.entries.length}</span>
       </div>
       <div className={gallery ? "note-gallery-grid" : ""}>
-        {group.entries.map((entry, index) => (
+        {group.entries.map((entry) => (
           <Row
             mobile={mobile}
             gallery={gallery}
             key={entry.note.id}
             entry={entry}
-            index={index}
             meta={meta}
             selected={selectedId === entry.note.id}
             trashMode={trashMode}
@@ -337,6 +355,26 @@ export function NoteList({
       </div>
     </section>
   ));
+
+  /* What is narrowing the list, and how to stop it narrowing. With the folder
+     rail gone this is the only standing sign of a scope that is not "everything",
+     so it is never hidden behind the menu that set it. */
+  const filterStrip = filters.length > 0 && (
+    <div className="filter-strip flex shrink-0 flex-wrap items-center gap-1.5 px-4 pt-2">
+      {filters.map((filter) => (
+        <button
+          key={filter.id}
+          type="button"
+          className="filter-chip press"
+          onClick={filter.onClear}
+          aria-label={`Stop showing ${filter.label}`}
+        >
+          <span className="truncate">{filter.label}</span>
+          <X size={12} strokeWidth={2.5} className="shrink-0" />
+        </button>
+      ))}
+    </div>
+  );
 
   if (mobile) {
     return (
@@ -352,6 +390,8 @@ export function NoteList({
           </div>
           <span className="flex items-center gap-1">{toolbarActions}</span>
         </header>
+
+        {filterStrip}
 
         <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
           <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
@@ -384,9 +424,10 @@ export function NoteList({
         </div>
 
         <div
+          key={`${folderLabel}:${query.trim()}`}
           role="listbox"
           aria-label={`Notes in ${folderLabel}`}
-          className="min-h-0 flex-1 overflow-y-auto pb-24"
+          className="list-in min-h-0 flex-1 overflow-y-auto pb-24"
         >
           <div>
             {loading ? (
@@ -428,17 +469,33 @@ export function NoteList({
 
   return (
     <section
-      className={`collection-column flex shrink-0 flex-col ${gallery ? "is-gallery" : "w-[380px]"}`}
+      className={`collection-column flex h-full w-full shrink-0 flex-col ${gallery ? "is-gallery" : ""}`}
     >
-      <header className="collection-toolbar flex h-13 shrink-0 items-center border-b border-rule px-4">
+      {topBar}
+      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 border-b border-rule px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">
             {loading ? "Loading" : `${entries.length} notes`}
           </p>
         </div>
-        <span className="flex items-center gap-1">{toolbarActions}</span>
+        {/* The compose control belongs beside the thing it adds to, not wedged
+            into the search field where it covered the text being typed. */}
+        {!trashMode && (
+          <button
+            onClick={onNew}
+            disabled={busy || loading}
+            title="New note · N"
+            className="new-note-button press shrink-0"
+          >
+            <SquarePen size={14} strokeWidth={1.9} />
+            <span>New note</span>
+          </button>
+        )}
+        <span className="flex shrink-0 items-center gap-1">{toolbarActions}</span>
       </header>
+
+      {filterStrip}
 
       <div className="glass-search mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3">
         <Search size={13} strokeWidth={2} className="shrink-0 text-ink-4" />
@@ -466,23 +523,13 @@ export function NoteList({
             <X size={12} strokeWidth={2.5} />
           </button>
         )}
-        {!trashMode && (
-          <button
-            onClick={onNew}
-            disabled={busy || loading}
-            title="New note · N"
-            className="label icon-button -mr-1 flex shrink-0 items-center gap-1.5 bg-accent px-2.5 py-2 text-on-accent transition-opacity hover:bg-accent-strong hover:text-on-accent disabled:opacity-30"
-          >
-            <SquarePen size={14} strokeWidth={1.75} />
-            New note
-          </button>
-        )}
       </div>
 
       <div
+        key={`${folderLabel}:${query.trim()}`}
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
-        className="flex-1 overflow-y-auto pt-2 pb-2"
+        className="list-in flex-1 overflow-y-auto pt-2 pb-2"
       >
         {loading ? (
           <Skeletons />
@@ -504,6 +551,7 @@ export function NoteList({
           renderedGroups
         )}
       </div>
+      {footer}
     </section>
   );
 }

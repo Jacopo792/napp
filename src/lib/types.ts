@@ -10,6 +10,14 @@ export interface Note {
 export interface Folder {
   id: string;
   name: string;
+  /**
+   * The folder this one sits inside, or null at the top level.
+   *
+   * It travels inside the folder's own ciphertext rather than in a column, so
+   * the shape of the archive is as private as the names in it — the server
+   * learns that folders exist and nothing about how they are arranged.
+   */
+  parentId?: string | null;
 }
 
 /* The ids are fixed by the Postgres CHECK constraint. Tags keep their muted

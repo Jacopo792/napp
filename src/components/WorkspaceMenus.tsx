@@ -13,7 +13,6 @@ import {
   Pin,
   Search,
   Settings,
-  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
@@ -74,94 +73,65 @@ function MenuButton({
   );
 }
 
-export function MainMenu({ onSettings, onLock }: { onSettings: () => void; onLock: () => void }) {
-  const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
-  const ref = useDismiss(open, close);
+/**
+ * Settings and the lock, at the bottom of the leftmost column.
+ *
+ * They used to hide behind a three-dot button at the top of a rail that no
+ * longer exists — two destinations behind a menu that existed only to hold
+ * them. Standing where an application's account controls stand, they are one
+ * click each and the menu is gone.
+ */
+export function WorkspaceFooter({
+  compact = false,
+  onSettings,
+  onLock,
+}: {
+  compact?: boolean;
+  onSettings: () => void;
+  onLock: () => void;
+}) {
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label="Main menu"
-        aria-expanded={open}
-        className="toolbar-button"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <MoreHorizontal size={17} />
+    <div className={`workspace-footer ${compact ? "is-compact" : ""}`}>
+      <button type="button" className="workspace-footer-button press" onClick={onSettings}>
+        <Settings size={16} strokeWidth={1.9} />
+        <span>Settings</span>
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="popover menu-popover absolute top-full left-0 z-50 mt-2 w-52 p-1.5"
-        >
-          <MenuButton
-            onClick={() => {
-              close();
-              onSettings();
-            }}
-          >
-            <Settings size={16} />
-            Settings
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton
-            onClick={() => {
-              close();
-              onLock();
-            }}
-          >
-            <Lock size={16} />
-            Lock &amp; sign out
-          </MenuButton>
-        </div>
-      )}
+      <button type="button" className="workspace-footer-button press" onClick={onLock}>
+        <Lock size={16} strokeWidth={1.9} />
+        <span>Lock &amp; sign out</span>
+      </button>
     </div>
   );
 }
 
+/**
+ * How the list is ordered, and how it is drawn.
+ *
+ * *What* it shows is the sidebar's job now, so the scope list and the tag
+ * filter have both left this menu: it is about sorting and view, which is what
+ * the icon on the collection header has always promised.
+ */
 export function CollectionMenu({
   preferences,
   galleryOnly = false,
-  folderName,
-  canManageFolder,
   onChange,
-  onNewFolder,
-  onRenameFolder,
-  onDeleteFolder,
 }: {
   preferences: ListPreferences;
   galleryOnly?: boolean;
-  folderName: string;
-  canManageFolder: boolean;
   onChange: (next: ListPreferences) => void;
-  onNewFolder: (name: string) => void;
-  onRenameFolder: (name: string) => void;
-  onDeleteFolder: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<"new" | "rename" | null>(null);
-  const [value, setValue] = useState("");
-  const close = () => {
-    setOpen(false);
-    setEditing(null);
-  };
+  const close = () => setOpen(false);
   const ref = useDismiss(open, close);
-
-  function submit() {
-    const name = value.trim();
-    if (!name) return;
-    if (editing === "new") onNewFolder(name);
-    if (editing === "rename") onRenameFolder(name);
-    close();
-  }
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        aria-label={`Options for ${folderName}`}
+        aria-label="List options"
+        title="Sort and view"
         aria-expanded={open}
-        className="toolbar-button"
+        className="toolbar-button press"
         onClick={() => setOpen((current) => !current)}
       >
         <MoreHorizontal size={17} />
@@ -169,133 +139,62 @@ export function CollectionMenu({
       {open && (
         <div
           role="menu"
-          className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-64 p-1.5"
+          className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
         >
-          {editing ? (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                submit();
-              }}
-              className="p-2"
+          <p className="menu-label">Sort by</p>
+          {(["updated", "created", "title"] as const).map((criterion) => (
+            <MenuButton
+              key={criterion}
+              active={preferences.sortBy === criterion}
+              onClick={() => onChange({ ...preferences, sortBy: criterion })}
             >
-              <label className="label mb-2 block text-ink-3">
-                {editing === "new" ? "New folder" : "Rename folder"}
-              </label>
-              <input
-                autoFocus
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                className="menu-input"
-                placeholder="Folder name"
-              />
-              <div className="mt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="menu-small-button"
-                  onClick={() => setEditing(null)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="menu-small-button is-primary">
-                  Save
-                </button>
-              </div>
-            </form>
-          ) : (
+              {criterion === "title" ? <ArrowDownAZ size={16} /> : <Clock3 size={16} />}
+              {criterion === "updated"
+                ? "Date edited"
+                : criterion === "created"
+                  ? "Date created"
+                  : "Title"}
+            </MenuButton>
+          ))}
+          <div className="menu-separator" />
+          <MenuButton
+            active={preferences.direction === "desc"}
+            onClick={() => onChange({ ...preferences, direction: "desc" })}
+          >
+            <ArrowDownUp size={16} />
+            Newest first
+          </MenuButton>
+          <MenuButton
+            active={preferences.direction === "asc"}
+            onClick={() => onChange({ ...preferences, direction: "asc" })}
+          >
+            <ArrowDownUp size={16} className="rotate-180" />
+            Oldest first
+          </MenuButton>
+          <div className="menu-separator" />
+          <MenuButton
+            active={preferences.groupByDate}
+            onClick={() => onChange({ ...preferences, groupByDate: !preferences.groupByDate })}
+          >
+            <CalendarDays size={16} />
+            Group by date
+          </MenuButton>
+          {!galleryOnly && (
             <>
               <MenuButton
-                onClick={() => {
-                  setValue("");
-                  setEditing("new");
-                }}
+                active={preferences.view === "list"}
+                onClick={() => onChange({ ...preferences, view: "list" })}
               >
-                <FolderInput size={16} />
-                New folder
-              </MenuButton>
-              {canManageFolder && (
-                <MenuButton
-                  onClick={() => {
-                    setValue(folderName);
-                    setEditing("rename");
-                  }}
-                >
-                  <SlidersHorizontal size={16} />
-                  Rename folder
-                </MenuButton>
-              )}
-              <div className="menu-separator" />
-              <p className="menu-label">Sort by</p>
-              {(["updated", "created", "title"] as const).map((criterion) => (
-                <MenuButton
-                  key={criterion}
-                  active={preferences.sortBy === criterion}
-                  onClick={() => onChange({ ...preferences, sortBy: criterion })}
-                >
-                  {criterion === "title" ? <ArrowDownAZ size={16} /> : <Clock3 size={16} />}
-                  {criterion === "updated"
-                    ? "Date edited"
-                    : criterion === "created"
-                      ? "Date created"
-                      : "Title"}
-                </MenuButton>
-              ))}
-              <div className="menu-separator" />
-              <MenuButton
-                active={preferences.direction === "desc"}
-                onClick={() => onChange({ ...preferences, direction: "desc" })}
-              >
-                <ArrowDownUp size={16} />
-                Newest first
+                <List size={16} />
+                List view
               </MenuButton>
               <MenuButton
-                active={preferences.direction === "asc"}
-                onClick={() => onChange({ ...preferences, direction: "asc" })}
+                active={preferences.view === "gallery"}
+                onClick={() => onChange({ ...preferences, view: "gallery" })}
               >
-                <ArrowDownUp size={16} className="rotate-180" />
-                Oldest first
+                <GalleryHorizontalEnd size={16} />
+                Gallery view
               </MenuButton>
-              <div className="menu-separator" />
-              <MenuButton
-                active={preferences.groupByDate}
-                onClick={() => onChange({ ...preferences, groupByDate: !preferences.groupByDate })}
-              >
-                <CalendarDays size={16} />
-                Group by date
-              </MenuButton>
-              {!galleryOnly && (
-                <>
-                  <MenuButton
-                    active={preferences.view === "list"}
-                    onClick={() => onChange({ ...preferences, view: "list" })}
-                  >
-                    <List size={16} />
-                    List view
-                  </MenuButton>
-                  <MenuButton
-                    active={preferences.view === "gallery"}
-                    onClick={() => onChange({ ...preferences, view: "gallery" })}
-                  >
-                    <GalleryHorizontalEnd size={16} />
-                    Gallery view
-                  </MenuButton>
-                </>
-              )}
-              {canManageFolder && (
-                <>
-                  <div className="menu-separator" />
-                  <MenuButton
-                    danger
-                    onClick={() => {
-                      close();
-                      onDeleteFolder();
-                    }}
-                  >
-                    <Trash2 size={16} />
-                    Delete folder
-                  </MenuButton>
-                </>
-              )}
             </>
           )}
         </div>
@@ -471,6 +370,14 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
   );
 }
 
+/**
+ * Settings: what is stored on this device, and nothing else.
+ *
+ * Trash and the folder list have moved into the sidebar, where they are one
+ * click from the notes they act on rather than behind a modal. What is left
+ * here is the only thing that genuinely belongs in a preferences sheet — how
+ * the notes read on this machine — plus the way out.
+ */
 export function SettingsPanel({
   open,
   mobile = false,
@@ -508,12 +415,12 @@ export function SettingsPanel({
             <h2 id="settings-title" className="font-display text-xl font-semibold">
               Settings
             </h2>
-            <p className="mt-0.5 text-sm text-ink-4">Local reading and list preferences</p>
+            <p className="mt-0.5 text-sm text-ink-4">How notes read on this device</p>
           </div>
           <button
             type="button"
             aria-label="Close"
-            className="icon-button ml-auto h-9 w-9"
+            className="icon-button press ml-auto h-9 w-9"
             onClick={onClose}
           >
             <X size={18} />
@@ -522,13 +429,16 @@ export function SettingsPanel({
         <div className="settings-scroll">
           <section>
             <h3>Reading appearance</h3>
+            <p className="settings-note">
+              Type size, measure and weight for the notes on this device only.
+            </p>
             <div className="settings-presets">
               {PRESETS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   aria-pressed={preset?.id === item.id}
-                  className={preset?.id === item.id ? "is-active" : ""}
+                  className={`press ${preset?.id === item.id ? "is-active" : ""}`}
                   onClick={() => setAxes(item.axes)}
                 >
                   <span>{item.name}</span>
@@ -542,8 +452,9 @@ export function SettingsPanel({
               ))}
             </div>
           </section>
+
           <section>
-            <h3>List preferences</h3>
+            <h3>The notes list</h3>
             {mobile ? (
               <p className="settings-mobile-gallery">
                 <GalleryHorizontalEnd size={17} />
@@ -553,7 +464,7 @@ export function SettingsPanel({
               <div className="settings-choice">
                 <button
                   type="button"
-                  className={preferences.view === "list" ? "is-active" : ""}
+                  className={`press ${preferences.view === "list" ? "is-active" : ""}`}
                   onClick={() => onPreferencesChange({ ...preferences, view: "list" })}
                 >
                   <List size={17} />
@@ -561,7 +472,7 @@ export function SettingsPanel({
                 </button>
                 <button
                   type="button"
-                  className={preferences.view === "gallery" ? "is-active" : ""}
+                  className={`press ${preferences.view === "gallery" ? "is-active" : ""}`}
                   onClick={() => onPreferencesChange({ ...preferences, view: "gallery" })}
                 >
                   <GalleryHorizontalEnd size={17} />
@@ -583,9 +494,10 @@ export function SettingsPanel({
               />
             </label>
           </section>
+
           <section>
-            <h3>Archive</h3>
-            <button type="button" className="settings-lock" onClick={onLock}>
+            <h3>This session</h3>
+            <button type="button" className="settings-lock press" onClick={onLock}>
               <Lock size={17} />
               Lock &amp; sign out
             </button>

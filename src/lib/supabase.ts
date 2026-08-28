@@ -108,6 +108,23 @@ async function decryptName(
   return name;
 }
 
+/* A folder carries its place in the tree as well as its name, and both are
+   inside the ciphertext. Cached on the ciphertext like the names are, so a
+   reload that changed nothing does no extra AES work. */
+const folderCache = new Map<string, { name: string; parentId: string | null }>();
+
+async function decryptFolderRow(
+  ciphertext: string,
+  key: CryptoKey,
+): Promise<{ name: string; parentId: string | null }> {
+  const hit = folderCache.get(ciphertext);
+  if (hit) return hit;
+  const { name, parentId } = await decryptFolder(ciphertext, key);
+  const value = { name, parentId: parentId ?? null };
+  folderCache.set(ciphertext, value);
+  return value;
+}
+
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   metas: Record<Owner, Meta>;
@@ -196,8 +213,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const foldersByOwner: Record<Owner, Folder[]> = { u1: [], u2: [] };
   const decryptedFolders = await Promise.all(
     folderRows.map(async (row) => {
-      const name = await decryptName(row.ciphertext, decryptFolder, session.key);
-      return { owner: row.owner, folder: { id: row.id, name } satisfies Folder };
+      const { name, parentId } = await decryptFolderRow(row.ciphertext, session.key);
+      return { owner: row.owner, folder: { id: row.id, name, parentId } satisfies Folder };
     }),
   );
   for (const item of decryptedFolders) foldersByOwner[item.owner].push(item.folder);
@@ -476,31 +493,46 @@ export async function persistMetaDiff(
   ]);
 }
 
-const IMAGE_BUCKET = "note-images";
+/* One private bucket holds every encrypted blob a note can carry. Objects are
+   always uploaded as `application/octet-stream` — the bucket's only allowed
+   type, and the truth about the bytes, which are ciphertext until the browser
+   that holds the archive key decrypts them. What the plaintext actually is
+   (a WebP image, a PDF) is known only to the note that references it. */
+const OBJECT_BUCKET = "note-images";
 
-export async function uploadEncryptedImage(
+export async function uploadEncryptedObject(
   session: AppSession,
-  imageId: string,
+  objectId: string,
   blob: Blob,
 ): Promise<void> {
   const encrypted = await encryptBytes(session.key, new Uint8Array(await blob.arrayBuffer()));
   const result = await supabase.storage
-    .from(IMAGE_BUCKET)
-    .upload(`${session.archiveId}/${imageId}`, encrypted, {
+    .from(OBJECT_BUCKET)
+    .upload(`${session.archiveId}/${objectId}`, encrypted, {
       contentType: "application/octet-stream",
       upsert: false,
     });
   fail(result.error);
 }
 
-export async function downloadEncryptedImage(session: AppSession, imageId: string): Promise<Blob> {
+export async function downloadEncryptedObject(
+  session: AppSession,
+  objectId: string,
+  type: string,
+): Promise<Blob> {
   const result = await supabase.storage
-    .from(IMAGE_BUCKET)
-    .download(`${session.archiveId}/${imageId}`);
+    .from(OBJECT_BUCKET)
+    .download(`${session.archiveId}/${objectId}`);
   fail(result.error);
   const plaintext = await decryptBytes(
     session.key,
     new Uint8Array(await result.data!.arrayBuffer()),
   );
-  return new Blob([plaintext.slice().buffer as ArrayBuffer], { type: "image/webp" });
+  return new Blob([plaintext.slice().buffer as ArrayBuffer], { type });
+}
+
+export const uploadEncryptedImage = uploadEncryptedObject;
+
+export function downloadEncryptedImage(session: AppSession, imageId: string): Promise<Blob> {
+  return downloadEncryptedObject(session, imageId, "image/webp");
 }
