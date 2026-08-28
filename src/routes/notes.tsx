@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, Lock, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { MobileScopes } from "@/components/MobileScopes";
 import {
   DndContext,
   DragEndEvent,
@@ -11,14 +12,21 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
-import { encryptNote } from "@/lib/crypto";
-import { writeNoteFile, deleteNoteFile, ensureDataBranch, listNotesTree } from "@/lib/github";
-import { saveMeta } from "@/lib/meta";
-import { pullRemote, EMPTY_CURSOR, type PullUpdate } from "@/lib/sync";
+import {
+  createNote,
+  deleteNote,
+  downloadEncryptedImage,
+  loadArchive,
+  persistMetaDiff,
+  saveNote,
+  uploadEncryptedImage,
+  type ArchiveSnapshot,
+} from "@/lib/supabase";
+import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import { prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { FolderRail, ALL, TRASH, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
 import { AxisBar } from "@/components/AxisBar";
@@ -32,23 +40,8 @@ export const Route = createFileRoute("/notes")({
   component: NotesPage,
 });
 
-/** How long the typing has to stop before a note is pushed to GitHub. */
-const AUTOSAVE_MS = 1500;
-
-/* ── Reading the other device ─────────────────────────────────────────────
-   The branch is polled, because a static site has nothing to be pushed to.
-   Each poll is one conditional request that GitHub answers 304 while the
-   archive is untouched, and 304s cost no rate limit — so the cadence can be
-   brisk while two people are actually writing to each other and slack off
-   when nobody is. ─────────────────────────────────────────────────────── */
-const SYNC_FAST_MS = 4000;
-const SYNC_IDLE_MS = 16_000;
-/** How long the fast cadence holds after the last edit, local or remote. */
-const SYNC_ACTIVE_MS = 90_000;
-/** Quiet period after a failed poll, so a flaky network is not hammered. */
-const SYNC_BACKOFF_MS = 30_000;
-/** A note written from this tab cannot be pulled away by a lagging read. */
-const WRITE_GRACE_MS = 30_000;
+/** A Postgres row write is cheap enough to commit shortly after typing stops. */
+const AUTOSAVE_MS = 250;
 
 type Draft = { title: string; body: string };
 
@@ -87,7 +80,7 @@ function NotesPage() {
       return true;
     }
   });
-  const [mobilePane, setMobilePane] = useState<"folders" | "notes">("folders");
+  const [manageOpen, setManageOpen] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -96,33 +89,26 @@ function NotesPage() {
   //    synchronously without waiting for a React commit. ───────────────────
   const entriesRef = useRef<NoteEntry[]>([]);
   entriesRef.current = entries;
-  const metaShaRef = useRef<{ u1?: string; u2?: string }>({});
+  const myMetaRef = useRef(myMeta);
+  myMetaRef.current = myMeta;
+  const partnerMetaRef = useRef(partnerMeta);
+  partnerMetaRef.current = partnerMeta;
   const sessionRef = useRef<AppSession | null>(null);
   sessionRef.current = session;
 
-  /** Edits waiting to be pushed, keyed by note id so switching notes never
-   *  strands a pending change. Meta is whole-object, so last write wins. */
+  /** Edits waiting to be written, keyed so switching notes or archive labels
+   * never strands a pending change. */
   const pendingNotesRef = useRef<Map<string, Draft>>(new Map());
-  const pendingMetaRef = useRef<{ owner: "u1" | "u2"; meta: Meta } | null>(null);
+  const pendingMetaRef = useRef<Map<"u1" | "u2", { before: Meta; after: Meta }>>(new Map());
   const inFlightRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
 
-  // ── Pull side ───────────────────────────────────────────────────────────
+  // ── Realtime side ───────────────────────────────────────────────────────
   const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
-  const cursorEtagRef = useRef<string | undefined>(undefined);
-  const foreignRef = useRef<Record<string, string>>({});
   const readyRef = useRef(false);
   const syncingRef = useRef(false);
-  const lastSyncRef = useRef(0);
-  const activeUntilRef = useRef(0);
-  const backoffUntilRef = useRef(0);
-  /** Counter bumped around every local write. A pull that straddles one is
-   *  describing a branch that has already moved, so its result is discarded. */
-  const writeSeqRef = useRef(0);
-  /** Paths this tab wrote recently, so an eventually-consistent read cannot
-   *  mistake a brand-new note for one the other device deleted. */
-  const justWrittenRef = useRef<Map<string, number>>(new Map());
+  const realtimePendingRef = useRef(false);
 
   const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
   const partnerName = myMeta.partnerName?.trim() || "Partner";
@@ -151,48 +137,57 @@ function NotesPage() {
         return;
       }
       setSession(s);
-      setViewAs(s.role);
+      setViewAs("u1");
     });
   }, [navigate]);
 
   /**
-   * Folds a pull into the page. The rule throughout is that unpushed local work
+   * Folds a remote snapshot into the page. The rule is that unpushed local work
    * wins: a remote body only reaches the editor when nothing is queued for that
    * note, and remote metadata is skipped while a metadata write is waiting.
    */
-  const applyPull = useCallback((result: PullUpdate) => {
-    cursorEtagRef.current = result.etag;
-    foreignRef.current = result.foreign;
-
-    const now = Date.now();
-    for (const [path, at] of justWrittenRef.current) {
-      if (now - at > WRITE_GRACE_MS) justWrittenRef.current.delete(path);
+  const applySnapshot = useCallback((snapshot: ArchiveSnapshot, remote = true) => {
+    const localById = new Map(entriesRef.current.map((entry) => [entry.note.id, entry]));
+    const remoteById = new Map(snapshot.entries.map((entry) => [entry.note.id, entry]));
+    const changedIds = new Set<string>();
+    const entrySetChanged = localById.size !== remoteById.size;
+    for (const entry of snapshot.entries) {
+      if (localById.get(entry.note.id)?.version !== entry.version) changedIds.add(entry.note.id);
     }
-    // A note this tab wrote seconds ago is not one the other device deleted —
-    // GitHub may still be answering from before our own commit. Keep it, and
-    // drop the ETag so the listing is taken again rather than trusted as final.
-    const rescued = entriesRef.current.filter(
-      (e) => result.removedIds.includes(e.note.id) && justWrittenRef.current.has(e.path),
-    );
-    if (rescued.length > 0) cursorEtagRef.current = undefined;
 
-    const next = [...result.entries, ...rescued].sort((a, b) =>
-      b.note.updatedAt.localeCompare(a.note.updatedAt),
-    );
+    const next = snapshot.entries
+      .map((entry) =>
+        pendingNotesRef.current.has(entry.note.id)
+          ? (localById.get(entry.note.id) ?? entry)
+          : entry,
+      )
+      .concat(
+        entriesRef.current.filter(
+          (entry) => pendingNotesRef.current.has(entry.note.id) && !remoteById.has(entry.note.id),
+        ),
+      )
+      .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
     entriesRef.current = next;
     setEntries(next);
 
-    for (const { owner, meta, sha } of result.metas) {
-      if (pendingMetaRef.current?.owner === owner) continue;
-      metaShaRef.current[owner] = sha;
-      if (owner === "u1") setMyMeta(meta);
-      else setPartnerMeta(meta);
+    for (const owner of ["u1", "u2"] as const) {
+      if (pendingMetaRef.current.has(owner)) continue;
+      if (owner === "u1") setMyMeta(snapshot.metas.u1);
+      else setPartnerMeta(snapshot.metas.u2);
+    }
+
+    const metadataChanged =
+      JSON.stringify(myMetaRef.current) !== JSON.stringify(snapshot.metas.u1) ||
+      JSON.stringify(partnerMetaRef.current) !== JSON.stringify(snapshot.metas.u2);
+    if (remote && (entrySetChanged || changedIds.size > 0 || metadataChanged)) {
+      setSyncFlash(true);
+      window.setTimeout(() => setSyncFlash(false), 2000);
     }
 
     // The open note, if the other device moved it and nothing local is queued.
     const open = selectedIdRef.current;
     if (!open || pendingNotesRef.current.has(open)) return;
-    if (!result.updatedIds.includes(open)) return;
+    if (!changedIds.has(open)) return;
     const fresh = next.find((e) => e.note.id === open);
     if (!fresh) return;
 
@@ -205,42 +200,23 @@ function NotesPage() {
     setSyncRevision((n) => n + 1);
   }, []);
 
-  const syncRemote = useCallback(async () => {
+  const refreshRemote = useCallback(async () => {
     const s = sessionRef.current;
-    // A push in flight owns the branch; reading across it only invites conflict.
-    if (!s || !readyRef.current || syncingRef.current || inFlightRef.current) return;
-    if (Date.now() < backoffUntilRef.current) return;
+    if (!s || !readyRef.current || syncingRef.current) return;
+    if (inFlightRef.current) {
+      realtimePendingRef.current = true;
+      return;
+    }
 
     syncingRef.current = true;
-    lastSyncRef.current = Date.now();
-    const seq = writeSeqRef.current;
     try {
-      const result = await pullRemote(s, {
-        etag: cursorEtagRef.current,
-        entries: entriesRef.current,
-        metaShas: metaShaRef.current,
-        foreign: foreignRef.current,
-      });
-      if (!result.changed) return;
-      if (seq !== writeSeqRef.current) {
-        cursorEtagRef.current = undefined;
-        return;
-      }
-
-      applyPull(result);
-      if (result.updatedIds.length + result.removedIds.length + result.metas.length > 0) {
-        activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
-        setSyncFlash(true);
-        window.setTimeout(() => setSyncFlash(false), 2000);
-      }
+      applySnapshot(await loadArchive(s));
     } catch {
-      // Offline, throttled, or a transient 5xx. The status line reports writes
-      // the user asked for, not background reads: back off quietly and retry.
-      backoffUntilRef.current = Date.now() + SYNC_BACKOFF_MS;
+      // Realtime retries automatically. Save errors remain visible separately.
     } finally {
       syncingRef.current = false;
     }
-  }, [applyPull]);
+  }, [applySnapshot]);
 
   useEffect(() => {
     if (!session) return;
@@ -250,15 +226,10 @@ function NotesPage() {
       setLoading(true);
       setError("");
       try {
-        await ensureDataBranch(session.repo, session.pat);
-        // A first pull with no cursor is a full load: every note and both
-        // metadata files, read by blob SHA so nothing can be served stale.
-        const result = await pullRemote(session, EMPTY_CURSOR);
+        const snapshot = await loadArchive(session);
         if (cancelled) return;
-        if (result.changed) applyPull(result);
+        applySnapshot(snapshot, false);
         readyRef.current = true;
-        lastSyncRef.current = Date.now();
-        activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       } finally {
@@ -270,37 +241,14 @@ function NotesPage() {
       cancelled = true;
       readyRef.current = false;
     };
-  }, [session, applyPull]);
+  }, [session, applySnapshot]);
 
-  // ── Polling the branch ──────────────────────────────────────────────────
+  // ── Realtime subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
-
-    const tick = () => {
-      if (document.visibilityState !== "visible") return;
-      const cadence = Date.now() < activeUntilRef.current ? SYNC_FAST_MS : SYNC_IDLE_MS;
-      if (Date.now() - lastSyncRef.current >= cadence) void syncRemote();
-    };
-    const timer = window.setInterval(tick, SYNC_FAST_MS);
-
-    // Returning to the tab, or to the network, is exactly when the page is most
-    // likely to be out of date — catch up at once rather than on the next tick.
-    const wake = () => {
-      if (document.visibilityState !== "visible") return;
-      activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
-      backoffUntilRef.current = 0;
-      void syncRemote();
-    };
-    document.addEventListener("visibilitychange", wake);
-    window.addEventListener("focus", wake);
-    window.addEventListener("online", wake);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", wake);
-      window.removeEventListener("focus", wake);
-      window.removeEventListener("online", wake);
-    };
-  }, [session, syncRemote]);
+    const channel = subscribeToArchive(session.archiveId, () => void refreshRemote());
+    return () => void unsubscribeFromArchive(channel);
+  }, [session, refreshRemote]);
 
   // ── The visible slice: owner → folder → tags → search, newest first ─────
   const visible = useMemo(() => {
@@ -346,9 +294,7 @@ function NotesPage() {
   }, [entries, activeMeta, viewAs, selectedFolderId, filterTagIds, query]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
-  const canEdit = selected
-    ? selectedFolderId !== TRASH && (session?.role === "u1" || selected.note.owner === "u2")
-    : false;
+  const canEdit = selected ? selectedFolderId !== TRASH : false;
 
   const folderLabel =
     selectedFolderId === ALL
@@ -376,15 +322,14 @@ function NotesPage() {
   const drain = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || inFlightRef.current) return;
-    if (pendingNotesRef.current.size === 0 && !pendingMetaRef.current) return;
+    if (pendingNotesRef.current.size === 0 && pendingMetaRef.current.size === 0) return;
 
     inFlightRef.current = true;
-    writeSeqRef.current++;
     setSaving(true);
     let failed = false;
 
     try {
-      while (pendingNotesRef.current.size > 0 || pendingMetaRef.current) {
+      while (pendingNotesRef.current.size > 0 || pendingMetaRef.current.size > 0) {
         for (const [id, d] of [...pendingNotesRef.current]) {
           pendingNotesRef.current.delete(id);
           const entry = entriesRef.current.find((e) => e.note.id === id);
@@ -396,48 +341,29 @@ function NotesPage() {
             body: d.body,
             updatedAt: new Date().toISOString(),
           };
-          const content = await encryptNote(updated, s.keys);
-
-          let newSha: string;
           try {
-            newSha = await writeNoteFile(s.repo, s.pat, entry.path, content, entry.sha);
+            const version = await saveNote(s, updated, entry.version);
+            const saved: NoteEntry = { note: updated, version };
+            entriesRef.current = entriesRef.current.map((current) =>
+              current.note.id === id ? saved : current,
+            );
+            setEntries(entriesRef.current);
           } catch (err) {
-            // Stale blob SHA: the other device wrote this note while we held it
-            // open. Their text loses — this is what the user just typed — but
-            // the write has to be re-aimed at the SHA that is actually there.
-            if (err instanceof Error && err.message.includes("409")) {
-              const listing = await listNotesTree(s.repo, s.pat);
-              const current = listing.unchanged
-                ? undefined
-                : listing.files.find((f) => f.path === entry.path);
-              newSha = await writeNoteFile(s.repo, s.pat, entry.path, content, current?.sha);
-            } else {
-              pendingNotesRef.current.set(id, d);
-              throw err;
-            }
+            pendingNotesRef.current.set(id, d);
+            throw err;
           }
-
-          justWrittenRef.current.set(entry.path, Date.now());
-          const saved: NoteEntry = { ...entry, note: updated, sha: newSha };
-          entriesRef.current = entriesRef.current.map((e) => (e.note.id === id ? saved : e));
-          setEntries(entriesRef.current);
         }
 
-        if (pendingMetaRef.current) {
-          const p = pendingMetaRef.current;
-          pendingMetaRef.current = null;
+        for (const [owner, pending] of [...pendingMetaRef.current]) {
+          pendingMetaRef.current.delete(owner);
           try {
-            const sha = await saveMeta(
-              s.repo,
-              s.pat,
-              s.keys,
-              p.owner,
-              p.meta,
-              metaShaRef.current[p.owner],
-            );
-            metaShaRef.current[p.owner] = sha;
+            await persistMetaDiff(s, owner, pending.before, pending.after);
           } catch (err) {
-            pendingMetaRef.current = p;
+            const newer = pendingMetaRef.current.get(owner);
+            pendingMetaRef.current.set(owner, {
+              before: pending.before,
+              after: newer?.after ?? pending.after,
+            });
             throw err;
           }
         }
@@ -451,17 +377,18 @@ function NotesPage() {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
       inFlightRef.current = false;
-      writeSeqRef.current++;
       setSaving(false);
-      setDirty(pendingNotesRef.current.size > 0 || pendingMetaRef.current !== null);
+      setDirty(pendingNotesRef.current.size > 0 || pendingMetaRef.current.size > 0);
       if (failed) window.setTimeout(() => void drain(), 4000);
+      if (realtimePendingRef.current) {
+        realtimePendingRef.current = false;
+        window.setTimeout(() => void refreshRemote(), 0);
+      }
     }
-  }, []);
+  }, [refreshRemote]);
 
   const schedule = useCallback(() => {
     setDirty(true);
-    // Someone is writing, so the other device is worth checking on often.
-    activeUntilRef.current = Date.now() + SYNC_ACTIVE_MS;
     window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => void drain(), AUTOSAVE_MS);
   }, [drain]);
@@ -486,6 +413,21 @@ function NotesPage() {
     };
   }, [saveNow]);
 
+  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
+    const current = sessionRef.current;
+    if (!current) throw new Error("Sign in again before uploading an image");
+    const blob = await prepareImageForNote(file);
+    const imageId = crypto.randomUUID();
+    await uploadEncryptedImage(current, imageId, blob);
+    return `napp-image:${imageId}`;
+  }, []);
+
+  const resolveImage = useCallback(async (imageId: string): Promise<Blob> => {
+    const current = sessionRef.current;
+    if (!current) throw new Error("Sign in again to view this image");
+    return downloadEncryptedImage(current, imageId);
+  }, []);
+
   function handleDraftChange(title: string, body: string) {
     if (!selectedId) return;
     setDraft({ title, body });
@@ -494,8 +436,12 @@ function NotesPage() {
   }
 
   function handleMetaChange(m: Meta) {
+    const pending = pendingMetaRef.current.get(viewAs);
+    pendingMetaRef.current.set(viewAs, {
+      before: pending?.before ?? activeMeta,
+      after: m,
+    });
     setActiveMeta(m);
-    pendingMetaRef.current = { owner: viewAs, meta: m };
     schedule();
   }
 
@@ -537,20 +483,13 @@ function NotesPage() {
 
     setSaving(true);
     setError("");
-    writeSeqRef.current++;
     try {
-      const content = await encryptNote(note, s.keys);
-      const path = `notes/${note.id}.napp`;
-      const sha = await writeNoteFile(s.repo, s.pat, path, content);
-
-      justWrittenRef.current.set(path, Date.now());
-      entriesRef.current = [{ note, sha, path }, ...entriesRef.current];
+      const metadata: NoteMeta = { id: note.id, folderId, tagIds: [] };
+      const entry = await createNote(s, note, metadata);
+      entriesRef.current = [entry, ...entriesRef.current];
       setEntries(entriesRef.current);
 
-      handleMetaChange({
-        ...activeMeta,
-        notes: [...activeMeta.notes, { id: note.id, folderId, tagIds: [] }],
-      });
+      setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, metadata] });
 
       setQuery("");
       if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
@@ -561,7 +500,6 @@ function NotesPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create note");
     } finally {
-      writeSeqRef.current++;
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -619,18 +557,16 @@ function NotesPage() {
       if (!s) return;
       setSaving(true);
       setError("");
-      writeSeqRef.current++;
       try {
         pendingNotesRef.current.delete(entry.note.id);
-        await deleteNoteFile(s.repo, s.pat, entry.path, entry.sha);
+        await deleteNote(s, entry.note.id);
 
-        justWrittenRef.current.delete(entry.path);
         entriesRef.current = entriesRef.current.filter((e) => e.note.id !== entry.note.id);
         setEntries(entriesRef.current);
 
-        handleMetaChange({
+        setActiveMeta({
           ...activeMeta,
-          notes: activeMeta.notes.filter((n) => n.id !== entry.note.id),
+          notes: activeMeta.notes.filter((note) => note.id !== entry.note.id),
         });
 
         if (selectedId === entry.note.id) {
@@ -641,7 +577,6 @@ function NotesPage() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete permanently");
       } finally {
-        writeSeqRef.current++;
         setSaving(false);
       }
     },
@@ -737,7 +672,7 @@ function NotesPage() {
     setSelectedFolderId(ALL);
     setFilterTagIds([]);
     setQuery("");
-    setMobilePane("folders");
+    setManageOpen(false);
   }
 
   function handleSelectFolder(id: string) {
@@ -745,7 +680,7 @@ function NotesPage() {
     setSelectedId(null);
     setDraft(null);
     lastLoadedRef.current = null;
-    setMobilePane("notes");
+    setManageOpen(false);
     if (id === TRASH) setFilterTagIds([]);
   }
 
@@ -754,20 +689,15 @@ function NotesPage() {
   }
 
   function handleMobileBack() {
-    if (selectedId) {
-      saveNow();
-      setSelectedId(null);
-      setDraft(null);
-      lastLoadedRef.current = null;
-      setMobilePane("notes");
-    } else {
-      setMobilePane("folders");
-    }
+    saveNow();
+    setSelectedId(null);
+    setDraft(null);
+    lastLoadedRef.current = null;
   }
 
   function handleLock() {
     saveNow();
-    clearSession();
+    void clearSession();
     navigate({ to: "/" });
   }
 
@@ -803,36 +733,56 @@ function NotesPage() {
   );
 
   if (compact) {
-    const showFolders = !selectedId && mobilePane === "folders";
-    const showNotes = !selectedId && mobilePane === "notes";
+    const listing = !selectedId;
 
     return (
       <div className="flex flex-col overflow-hidden bg-surface" style={{ height: "100dvh" }}>
+        {/* The phone has two screens: the notes, and a note. The archive is the
+            one piece of state worth a permanent place in the bar. */}
         <header
           className="mobile-topbar flex min-h-14 shrink-0 items-center gap-2 bg-surface px-3"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
-          {!showFolders ? (
-            <button
-              type="button"
-              onClick={handleMobileBack}
-              aria-label={selectedId ? "Back to notes" : "Back to folders"}
-              className="icon-button flex h-11 min-w-11 shrink-0 items-center gap-0.5 px-1 text-accent"
+          {listing ? (
+            <div
+              role="group"
+              aria-label="Archive"
+              className="flex min-w-0 flex-1 rounded-xl border border-rule bg-paper p-1"
             >
-              <ChevronLeft size={21} strokeWidth={2.2} />
-              <span className="max-w-28 truncate text-[14px] font-medium">
-                {selectedId ? folderLabel : "Folders"}
-              </span>
-            </button>
+              {(
+                [
+                  ["u1", "My notes"],
+                  ["u2", `${partnerName}'s notes`],
+                ] as const
+              ).map(([owner, label]) => (
+                <button
+                  key={owner}
+                  type="button"
+                  onClick={() => handleViewChange(owner)}
+                  aria-pressed={viewAs === owner}
+                  className={`label min-h-9 min-w-0 flex-1 truncate rounded-lg px-3 transition-colors ${
+                    viewAs === owner ? "bg-accent text-on-accent" : "text-ink-3"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ) : (
-            <span className="font-display min-w-0 flex-1 truncate px-1 text-[15px] font-semibold text-ink-3">
-              Notes
-            </span>
+            <>
+              <button
+                type="button"
+                onClick={handleMobileBack}
+                aria-label="Back to notes"
+                className="icon-button flex h-11 min-w-11 shrink-0 items-center gap-0.5 px-1 text-accent"
+              >
+                <ChevronLeft size={21} strokeWidth={2.2} />
+                <span className="max-w-32 truncate text-[14px] font-medium">{folderLabel}</span>
+              </button>
+              <span className="min-w-0 flex-1" />
+            </>
           )}
 
-          {!showFolders && <span className="min-w-0 flex-1" />}
-
-          <ThemeToggle />
           <button
             type="button"
             onClick={handleLock}
@@ -845,50 +795,7 @@ function NotesPage() {
 
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
           <main className="flex min-h-0 flex-1 overflow-hidden bg-surface">
-            {showFolders && (
-              <div className="flex h-full min-h-0 flex-col">
-                {session.role === "u1" && (
-                  <div
-                    role="group"
-                    aria-label="Archive"
-                    className="mx-4 mt-2 flex shrink-0 rounded-xl border border-rule bg-paper p-1"
-                  >
-                    {(
-                      [
-                        ["u1", "My notes"],
-                        ["u2", `${partnerName}'s notes`],
-                      ] as const
-                    ).map(([owner, label]) => (
-                      <button
-                        key={owner}
-                        type="button"
-                        onClick={() => handleViewChange(owner)}
-                        aria-pressed={viewAs === owner}
-                        className={`label min-h-10 min-w-0 flex-1 truncate rounded-lg px-3 transition-colors ${
-                          viewAs === owner ? "bg-accent text-on-accent" : "text-ink-3"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="min-h-0 flex-1">
-                  <FolderRail
-                    mobile
-                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
-                    meta={activeMeta}
-                    selectedFolderId={selectedFolderId}
-                    filterTagIds={filterTagIds}
-                    onSelectFolder={handleSelectFolder}
-                    onFilterTagsChange={setFilterTagIds}
-                    onMetaChange={handleMetaChange}
-                  />
-                </div>
-              </div>
-            )}
-
-            {showNotes && (
+            {listing && (
               <NoteList
                 mobile
                 entries={visible}
@@ -907,11 +814,22 @@ function NotesPage() {
                 onRestore={handleRestore}
                 onDeleteForever={handleDeleteForever}
                 onTogglePin={handleTogglePin}
+                scopes={
+                  <MobileScopes
+                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
+                    meta={activeMeta}
+                    selectedFolderId={selectedFolderId}
+                    filterTagIds={filterTagIds}
+                    onSelectFolder={handleSelectFolder}
+                    onFilterTagsChange={setFilterTagIds}
+                    onManage={() => setManageOpen(true)}
+                  />
+                }
               />
             )}
 
             {selectedId && (
-              <Suspense fallback={<div className="h-full bg-page" />}>
+              <Suspense fallback={<div className="h-full w-full bg-page" />}>
                 <NoteEditor
                   key={selected?.note.id ?? "empty"}
                   mobile
@@ -920,7 +838,7 @@ function NotesPage() {
                   draft={draft}
                   syncRevision={syncRevision}
                   canEdit={canEdit}
-                  viewingAsPartner={session.role === "u1" && viewAs === "u2"}
+                  viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}
                   titleRef={titleRef}
                   onChange={handleDraftChange}
@@ -930,22 +848,51 @@ function NotesPage() {
                   }
                   onTogglePin={() => selected && handleTogglePin(selected.note.id)}
                   onNew={handleNew}
+                  onUploadImage={handleUploadImage}
+                  resolveImage={resolveImage}
                 />
               </Suspense>
             )}
           </main>
+
+          {/* Folders and tags are maintenance. They come up over the list and
+              go away again; they are not a screen the reader passes through. */}
+          {manageOpen && (
+            <>
+              <div className="sheet-scrim" onClick={() => setManageOpen(false)} aria-hidden />
+              <div role="dialog" aria-modal="true" aria-label="Folders and tags" className="sheet">
+                <span aria-hidden className="sheet-grip" />
+                <div className="flex shrink-0 items-center justify-between px-5 pt-3 pb-1">
+                  <h2 className="font-display text-[17px] font-semibold text-ink">
+                    Folders and tags
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setManageOpen(false)}
+                    aria-label="Close"
+                    className="icon-button flex h-9 w-9 items-center justify-center text-ink-3"
+                  >
+                    <X size={17} strokeWidth={2.2} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+                  <FolderRail
+                    mobile
+                    entries={entries.filter((entry) => entry.note.owner === viewAs)}
+                    meta={activeMeta}
+                    selectedFolderId={selectedFolderId}
+                    filterTagIds={filterTagIds}
+                    onSelectFolder={handleSelectFolder}
+                    onFilterTagsChange={setFilterTagIds}
+                    onMetaChange={handleMetaChange}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </DndContext>
 
-        {selectedId ? (
-          <AxisBar compact>{saveReadout}</AxisBar>
-        ) : (
-          <footer
-            className="mobile-statusbar flex min-h-9 shrink-0 items-center justify-start bg-surface px-5"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-          >
-            {saveReadout}
-          </footer>
-        )}
+        {selectedId && <AxisBar compact>{saveReadout}</AxisBar>}
       </div>
     );
   }
@@ -974,38 +921,33 @@ function NotesPage() {
           )}
         </button>
 
-        {session.role === "u1" ? (
-          <div
-            role="group"
-            aria-label="Archive"
-            className="flex min-w-52 rounded-xl border border-rule bg-paper p-1"
-          >
-            {(
-              [
-                ["u1", "My notes"],
-                ["u2", `${partnerName}'s notes`],
-              ] as const
-            ).map(([owner, label]) => (
-              <button
-                key={owner}
-                onClick={() => handleViewChange(owner)}
-                aria-pressed={viewAs === owner}
-                className={`label min-w-0 flex-1 truncate rounded-lg px-3 py-1.5 transition-colors ${
-                  viewAs === owner
-                    ? "bg-accent text-on-accent"
-                    : "text-ink-3 hover:bg-page hover:text-ink"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span className="label rounded-full bg-paper px-3 py-1.5 text-ink-3">My notes</span>
-        )}
+        <div
+          role="group"
+          aria-label="Archive"
+          className="flex min-w-52 rounded-xl border border-rule bg-paper p-1"
+        >
+          {(
+            [
+              ["u1", "My notes"],
+              ["u2", `${partnerName}'s notes`],
+            ] as const
+          ).map(([owner, label]) => (
+            <button
+              key={owner}
+              onClick={() => handleViewChange(owner)}
+              aria-pressed={viewAs === owner}
+              className={`label min-w-0 flex-1 truncate rounded-lg px-3 py-1.5 transition-colors ${
+                viewAs === owner
+                  ? "bg-accent text-on-accent"
+                  : "text-ink-3 hover:bg-page hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <span className="ml-auto flex items-center gap-3">
-          <ThemeToggle />
           <button
             onClick={handleLock}
             title="Lock and sign out"
@@ -1061,7 +1003,7 @@ function NotesPage() {
           <Suspense
             fallback={
               <div className="soft-pane flex min-w-0 flex-1 flex-col gap-4 bg-page px-10 pt-10">
-                <div className="w-full" style={{ maxWidth: "var(--read-measure)" }}>
+                <div className="measure">
                   <div className="skeleton h-9 w-2/3" />
                   <div className="skeleton mt-5 h-2.5 w-40" />
                 </div>
@@ -1075,7 +1017,7 @@ function NotesPage() {
               draft={draft}
               syncRevision={syncRevision}
               canEdit={canEdit}
-              viewingAsPartner={session.role === "u1" && viewAs === "u2"}
+              viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}
               onChange={handleDraftChange}
@@ -1085,6 +1027,8 @@ function NotesPage() {
               }
               onTogglePin={() => selected && handleTogglePin(selected.note.id)}
               onNew={handleNew}
+              onUploadImage={handleUploadImage}
+              resolveImage={resolveImage}
             />
           </Suspense>
         </div>

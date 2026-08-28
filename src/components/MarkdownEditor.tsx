@@ -1,5 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { Annotation, Compartment, EditorState, Transaction } from "@codemirror/state";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Annotation, Compartment, EditorState, Facet, Transaction } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -28,6 +29,14 @@ import { syntaxTree } from "@codemirror/language";
    Sizing comes entirely from CSS custom properties written by lib/axes.ts, so
    the axis bar drives real font-variation-settings on the text as it is typed
    rather than a preview of it. ─────────────────────────────────────────────── */
+
+export interface ImagePreview {
+  src: string;
+  alt: string;
+}
+
+/** Raised by an image widget when the reader asks to see it full size. */
+const IMAGE_OPEN_EVENT = "napp:image-open";
 
 /** Marker node types that vanish when the caret is elsewhere. */
 const HIDDEN_MARKS = new Set([
@@ -68,6 +77,10 @@ const dimMark = Decoration.mark({ class: "cm-md-mark" });
 
 /** Document replacements caused by opening/syncing a note are not user edits. */
 const externalDocumentChange = Annotation.define<boolean>();
+type ImageResolver = (imageId: string) => Promise<Blob>;
+const imageResolver = Facet.define<ImageResolver | undefined, ImageResolver | undefined>({
+  combine: (values) => values[0],
+});
 
 function safeLinkUrl(raw: string): string | null {
   try {
@@ -80,6 +93,13 @@ function safeLinkUrl(raw: string): string | null {
 
 function safeImageUrl(raw: string): string | null {
   if (/^data:image\/(?:jpeg|png|webp);base64,/i.test(raw)) return raw;
+  if (
+    /^napp-image:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      raw,
+    )
+  ) {
+    return raw;
+  }
   try {
     const url = new URL(raw, window.location.href);
     return ["http:", "https:"].includes(url.protocol) ? url.href : null;
@@ -118,66 +138,189 @@ class LinkWidget extends WidgetType {
   }
 }
 
+const ICON = {
+  expand:
+    '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  trash:
+    '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+};
+
+function iconButton(icon: keyof typeof ICON, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cm-md-image-action";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.innerHTML =
+    `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ` +
+    `stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+    `${ICON[icon]}</svg>`;
+  // Keep the caret where it was: pressing an action must not move the selection
+  // into the source it is acting on.
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  return button;
+}
+
+/**
+ * An embedded image is a reading object, never a span of text. Its source is a
+ * storage reference rather than encoded bytes. The widget replaces the Markdown
+ * unconditionally and carries its own actions: open the image full size, or
+ * remove it whole.
+ */
 class ImageWidget extends WidgetType {
   constructor(
     readonly alt: string,
     readonly url: string,
-    readonly sourceFrom: number,
+    readonly from: number,
+    readonly to: number,
+    readonly resolveImage: ImageResolver | undefined,
   ) {
     super();
   }
 
   eq(other: ImageWidget): boolean {
-    return other.alt === this.alt && other.url === this.url && other.sourceFrom === this.sourceFrom;
+    return (
+      other.alt === this.alt &&
+      other.url === this.url &&
+      other.from === this.from &&
+      other.to === this.to &&
+      other.resolveImage === this.resolveImage
+    );
   }
 
   toDOM(view: EditorView): HTMLElement {
     const frame = document.createElement("span");
     frame.className = "cm-md-image-widget";
 
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cm-md-image-open";
+    button.title = "Open full size";
+    button.setAttribute("aria-label", `Open image full size: ${this.alt}`);
+
     const image = document.createElement("img");
-    image.src = this.url;
     image.alt = this.alt;
     image.loading = "lazy";
     image.decoding = "async";
-    frame.append(image);
+    if (this.url.startsWith("napp-image:")) {
+      const imageId = this.url.slice("napp-image:".length);
+      if (!this.resolveImage) {
+        queueMicrotask(() => image.dispatchEvent(new Event("error")));
+      } else {
+        void this.resolveImage(imageId)
+          .then((blob) => {
+            if (!image.isConnected) return;
+            const objectUrl = URL.createObjectURL(blob);
+            image.dataset.objectUrl = objectUrl;
+            image.src = objectUrl;
+          })
+          .catch(() => image.dispatchEvent(new Event("error")));
+      }
+    } else {
+      image.src = this.url;
+    }
+    button.append(image);
+    frame.append(button);
 
     const error = document.createElement("span");
     error.className = "cm-md-image-error";
-    error.textContent = "Image could not be loaded";
+    error.textContent = "This image could not be displayed.";
     error.hidden = true;
     frame.append(error);
 
     image.addEventListener("error", () => {
-      image.hidden = true;
+      button.hidden = true;
       error.hidden = false;
       frame.classList.add("is-error");
     });
 
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      frame.dispatchEvent(
+        new CustomEvent<ImagePreview>(IMAGE_OPEN_EVENT, {
+          bubbles: true,
+          detail: { src: image.currentSrc || image.src, alt: this.alt },
+        }),
+      );
+    });
+
+    const actions = document.createElement("span");
+    actions.className = "cm-md-image-actions";
+
+    const open = iconButton("expand", "Open full size");
+    open.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      button.click();
+    });
+    actions.append(open);
+
     if (!view.state.readOnly) {
-      const edit = document.createElement("button");
-      edit.type = "button";
-      edit.className = "cm-md-image-edit";
-      edit.textContent = "Edit source";
-      edit.addEventListener("mousedown", (event) => {
+      const remove = iconButton("trash", "Remove image");
+      remove.classList.add("is-danger");
+      remove.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        removeImageAt(view, this.from, this.to);
       });
-      edit.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        view.dispatch({ selection: { anchor: this.sourceFrom }, scrollIntoView: true });
-        view.focus();
-      });
-      frame.append(edit);
+      actions.append(remove);
+    }
+
+    frame.append(actions);
+
+    if (this.alt && this.alt !== "Image") {
+      const caption = document.createElement("span");
+      caption.className = "cm-md-image-caption";
+      caption.textContent = this.alt;
+      frame.append(caption);
     }
 
     return frame;
   }
 
+  destroy(dom: HTMLElement): void {
+    const objectUrl = dom.querySelector("img")?.dataset.objectUrl;
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+
   ignoreEvent(): boolean {
     return true;
   }
+}
+
+/**
+ * Takes the whole image out, and the line with it when the image was all the
+ * line held — otherwise removing a picture leaves a blank paragraph behind. A
+ * picture sitting between two blank lines takes one of them along too, so the
+ * paragraphs it separated close up to a single gap.
+ */
+function removeImageAt(view: EditorView, from: number, to: number): void {
+  const doc = view.state.doc;
+  const line = doc.lineAt(from);
+
+  if (line.from !== from || line.to !== to) {
+    view.dispatch({ changes: { from, to, insert: "" }, selection: { anchor: from } });
+    view.focus();
+    return;
+  }
+
+  const before = line.number > 1 ? doc.line(line.number - 1) : null;
+  const after = line.number < doc.lines ? doc.line(line.number + 1) : null;
+
+  let start = line.from;
+  let end = line.to;
+  if (before) start = before.to;
+  else if (after) end = after.from;
+  if (before && after && before.length === 0 && after.length === 0) end = after.from;
+
+  view.dispatch({
+    changes: { from: start, to: end, insert: "" },
+    selection: { anchor: start },
+    scrollIntoView: true,
+  });
+  view.focus();
 }
 
 function markdownLink(source: string): { label: string; url: string } | null {
@@ -194,9 +337,17 @@ function markdownImage(source: string): { alt: string; url: string } | null {
   return url ? { alt: match[1] || "Image", url } : null;
 }
 
-function buildDecorations(view: EditorView): DecorationSet {
+interface MarkdownDecorations {
+  decorations: DecorationSet;
+  /** Image widgets, kept apart so the caret can step over them as one unit. */
+  images: DecorationSet;
+}
+
+function buildDecorations(view: EditorView): MarkdownDecorations {
   const ranges: { from: number; to: number; deco: Decoration }[] = [];
+  const images: { from: number; to: number; deco: Decoration }[] = [];
   const doc = view.state.doc;
+  const resolveImage = view.state.facet(imageResolver);
 
   // Lines the caret or a selection currently touches. Markers on these lines
   // stay visible, so editing the syntax never fights with rendering it.
@@ -218,16 +369,16 @@ function buildDecorations(view: EditorView): DecorationSet {
         const sourceLine = doc.lineAt(node.from).number;
         const onActiveLine = activeLines.has(sourceLine);
 
-        if (node.name === "Image" && !onActiveLine) {
+        // Images never yield to the caret. Their source is encoded bytes, not
+        // prose, so there is nothing useful on the other side of revealing it.
+        if (node.name === "Image") {
           const image = markdownImage(source);
           if (image) {
-            ranges.push({
-              from: node.from,
-              to: node.to,
-              deco: Decoration.replace({
-                widget: new ImageWidget(image.alt, image.url, node.from),
-              }),
+            const deco = Decoration.replace({
+              widget: new ImageWidget(image.alt, image.url, node.from, node.to, resolveImage),
             });
+            ranges.push({ from: node.from, to: node.to, deco });
+            images.push({ from: node.from, to: node.to, deco });
             return false;
           }
         }
@@ -289,30 +440,95 @@ function buildDecorations(view: EditorView): DecorationSet {
 
   // Sorted on the way in: line decorations and nested marks can share a start
   // offset, and Decoration.set resolves the ordering rules for us.
-  return Decoration.set(
-    ranges.map((r) => r.deco.range(r.from, r.to)),
-    true,
-  );
+  return {
+    decorations: Decoration.set(
+      ranges.map((r) => r.deco.range(r.from, r.to)),
+      true,
+    ),
+    images: Decoration.set(
+      images.map((r) => r.deco.range(r.from, r.to)),
+      true,
+    ),
+  };
 }
 
 const richMarkdown = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    images: DecorationSet;
 
     constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
+      ({ decorations: this.decorations, images: this.images } = buildDecorations(view));
     }
 
     update(u: ViewUpdate) {
       // Selection is in the dependency list on purpose: moving the caret onto
       // a line is what brings that line's markers back.
       if (u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) {
-        this.decorations = buildDecorations(u.view);
+        ({ decorations: this.decorations, images: this.images } = buildDecorations(u.view));
       }
     }
   },
   { decorations: (v) => v.decorations },
 );
+
+/* An arrow key steps over a picture, and one backspace deletes it. The storage
+   reference (or a legacy base64 payload) is never exposed character by character. */
+const atomicImages = EditorView.atomicRanges.of(
+  (view) => view.plugin(richMarkdown)?.images ?? Decoration.none,
+);
+
+/**
+ * Full-size view of an embedded image. The note stays exactly as it was — this
+ * is a reading affordance, not an edit — so the overlay closes on Escape, on a
+ * click outside the picture, and on the one visible control.
+ */
+function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={preview.alt}
+      className="lightbox"
+      onClick={onClose}
+    >
+      <figure className="lightbox-figure" onClick={(event) => event.stopPropagation()}>
+        <img src={preview.src} alt={preview.alt} />
+        {preview.alt && preview.alt !== "Image" && (
+          <figcaption className="readout">{preview.alt}</figcaption>
+        )}
+      </figure>
+      <button type="button" onClick={onClose} className="lightbox-close" aria-label="Close image">
+        <svg
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.9}
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>,
+    document.body,
+  );
+}
 
 export type FormatAction =
   | "bold"
@@ -348,6 +564,7 @@ interface Props {
   revision?: number;
   onChange: (next: string) => void;
   onPasteImage?: (file: File) => Promise<{ src: string; alt: string } | null>;
+  resolveImage?: ImageResolver;
 }
 
 /**
@@ -460,11 +677,12 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function MarkdownEditor(
-  { value, readOnly, placeholder, docKey, revision = 0, onChange, onPasteImage },
+  { value, readOnly, placeholder, docKey, revision = 0, onChange, onPasteImage, resolveImage },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
+  const [preview, setPreview] = useState<ImagePreview | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onPasteImageRef = useRef(onPasteImage);
@@ -523,7 +741,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
           drawSelection(),
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
+          imageResolver.of(resolveImage),
           richMarkdown,
+          atomicImages,
           cmPlaceholder(placeholder),
           EditorView.domEventHandlers({
             paste(event, editor) {
@@ -624,5 +844,20 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
     });
   }, [readOnly]);
 
-  return <div ref={host} className="h-full" />;
+  // An image widget lives in CodeMirror's DOM, outside React. It asks for a
+  // full-size view by raising an event that bubbles up to this host.
+  useEffect(() => {
+    const node = host.current;
+    if (!node) return;
+    const open = (event: Event) => setPreview((event as CustomEvent<ImagePreview>).detail);
+    node.addEventListener(IMAGE_OPEN_EVENT, open);
+    return () => node.removeEventListener(IMAGE_OPEN_EVENT, open);
+  }, []);
+
+  return (
+    <>
+      <div ref={host} className="h-full" />
+      {preview && <ImageLightbox preview={preview} onClose={() => setPreview(null)} />}
+    </>
+  );
 });

@@ -1,8 +1,7 @@
 import type { Note } from "./types";
 
-/** A decrypted note plus the GitHub blob identity needed to write it back. */
+/** A decrypted note plus the optimistic-concurrency version stored in Postgres. */
 export interface NoteEntry {
   note: Note;
-  sha: string;
-  path: string;
+  version: number;
 }

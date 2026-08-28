@@ -1,16 +1,7 @@
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
-const MAX_OUTPUT_BYTES = 700 * 1024;
-const MAX_EDGE = 1600;
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Could not read image"));
-    reader.readAsDataURL(blob);
-  });
-}
+const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+const MAX_EDGE = 2560;
 
 function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -23,10 +14,9 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 }
 
 /**
- * Downscales local images before embedding them in the encrypted note. The
- * resulting data URL never leaves the note as a separate plaintext asset.
+ * Downscales local images before their bytes are encrypted and uploaded.
  */
-export async function prepareImageForNote(file: File): Promise<string> {
+export async function prepareImageForNote(file: File): Promise<Blob> {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Use a JPG, PNG or WebP image");
   }
@@ -48,7 +38,7 @@ export async function prepareImageForNote(file: File): Promise<string> {
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
       const blob = await canvasToBlob(canvas, quality);
-      if (blob.size <= MAX_OUTPUT_BYTES) return blobToDataUrl(blob);
+      if (blob.size <= MAX_OUTPUT_BYTES) return blob;
 
       if (quality > 0.58) quality -= 0.09;
       else scale *= 0.82;
@@ -57,7 +47,7 @@ export async function prepareImageForNote(file: File): Promise<string> {
     bitmap.close();
   }
 
-  throw new Error("Image could not be reduced below 700 KB");
+  throw new Error("Image could not be reduced below 4 MB");
 }
 
 export function imageAltFromFilename(filename: string): string {

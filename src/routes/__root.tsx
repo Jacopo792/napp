@@ -1,6 +1,5 @@
 import { createRootRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { initTheme } from "@/lib/theme";
 import { initAxes } from "@/lib/axes";
 
 export const Route = createRootRoute({
@@ -11,7 +10,6 @@ export const Route = createRootRoute({
 
 function Root() {
   useEffect(() => {
-    initTheme();
     initAxes();
   }, []);
   return <Outlet />;

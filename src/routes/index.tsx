@@ -1,44 +1,55 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, ShieldCheck } from "lucide-react";
-import { createSession } from "@/lib/session";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { authenticate, unlockSession, type PendingUnlock } from "@/lib/session";
 
-export const Route = createFileRoute("/")({
-  component: Login,
-});
-
-/* A calm, explicit unlock screen. The access bundle remains session-only. */
+export const Route = createFileRoute("/")({ component: Login });
 
 function Login() {
   const navigate = useNavigate();
-  const [token, setToken] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [pending, setPending] = useState<PendingUnlock | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleUnlock() {
-    if (!token.trim()) return;
+  async function handleSignIn() {
+    if (!email.trim() || !password) return;
     setLoading(true);
     setError("");
     try {
-      await createSession(token.trim());
+      setPending(await authenticate(email.trim(), password));
+      setPassword("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Sign in failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUnlock() {
+    if (!passphrase) return;
+    setLoading(true);
+    setError("");
+    try {
+      await unlockSession(passphrase);
       navigate({ to: "/notes" });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "That key was not readable");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The archive could not be unlocked");
       setLoading(false);
     }
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <header className="flex h-14 shrink-0 items-center justify-between px-5">
+      <header className="flex h-14 shrink-0 items-center px-5">
         <span
           className="font-display text-[15px] text-ink"
           style={{ fontVariationSettings: '"wght" 640, "opsz" 16', letterSpacing: "-0.02em" }}
         >
           Notes
         </span>
-        <ThemeToggle />
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6 pb-14">
@@ -54,59 +65,104 @@ function Login() {
               fontVariationSettings: '"wght" 650, "opsz" 36',
             }}
           >
-            Unlock your notes
+            {pending ? "Unlock your archive" : "Sign in to your notes"}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-3">
-            Paste your access bundle. It stays in this browser tab and unlocks your encrypted
-            archive locally.
+            {pending
+              ? `Signed in as ${pending.email}. Your passphrase decrypts the shared archive only in this tab.`
+              : "Use the email and password created for this private archive."}
           </p>
 
-          <label className="field-row mt-7 mb-2">
-            <span className="label text-ink-2">Access bundle</span>
-            <span className="readout text-ink-4">{token.trim().length || 0} ch</span>
-          </label>
-
-          <textarea
-            autoFocus
-            rows={3}
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleUnlock();
-            }}
-            placeholder="eyJ0eXBlIjoidTEi…"
-            aria-label="Access bundle"
-            spellCheck={false}
-            className="w-full resize-none rounded-xl border border-rule bg-paper px-3.5 py-3 font-mono text-[12px] leading-relaxed text-ink outline-none transition-colors focus:border-accent focus:bg-page placeholder:text-ink-4"
-          />
-
-          <button
-            disabled={loading || !token.trim()}
-            onClick={handleUnlock}
-            className="label mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-30"
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin inline-block h-3 w-3 rounded-full border-2 border-current border-t-transparent" />
-                Unlocking
-              </>
-            ) : (
-              <>
-                Unlock
-                <ArrowRight size={12} strokeWidth={2.5} />
-              </>
-            )}
-          </button>
+          {pending ? (
+            <>
+              <label className="field-row mt-7 mb-2" htmlFor="archive-passphrase">
+                <span className="label text-ink-2">Archive passphrase</span>
+              </label>
+              <input
+                id="archive-passphrase"
+                autoFocus
+                type="password"
+                autoComplete="current-password"
+                value={passphrase}
+                onChange={(event) => setPassphrase(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && void handleUnlock()}
+                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
+              />
+              <button
+                disabled={loading || !passphrase}
+                onClick={() => void handleUnlock()}
+                className="label mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-30"
+              >
+                {loading ? (
+                  "Unlocking…"
+                ) : (
+                  <>
+                    Unlock <ArrowRight size={12} strokeWidth={2.5} />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPending(null);
+                  setPassphrase("");
+                  setError("");
+                }}
+                className="label mt-3 flex items-center gap-1.5 text-ink-3 transition-colors hover:text-accent"
+              >
+                <ArrowLeft size={12} /> Different account
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="field-row mt-7 mb-2" htmlFor="email">
+                <span className="label text-ink-2">Email</span>
+              </label>
+              <input
+                id="email"
+                autoFocus
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
+              />
+              <label className="field-row mt-4 mb-2" htmlFor="password">
+                <span className="label text-ink-2">Password</span>
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && void handleSignIn()}
+                className="w-full rounded-xl border border-rule bg-paper px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-accent focus:bg-page"
+              />
+              <button
+                disabled={loading || !email.trim() || !password}
+                onClick={() => void handleSignIn()}
+                className="label mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-on-accent transition-colors hover:bg-accent-strong disabled:opacity-30"
+              >
+                {loading ? (
+                  "Signing in…"
+                ) : (
+                  <>
+                    Continue <ArrowRight size={12} strokeWidth={2.5} />
+                  </>
+                )}
+              </button>
+            </>
+          )}
 
           {error && (
             <p role="alert" className="readout mt-3 text-danger">
               {error}
             </p>
           )}
-
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-3">
             <ShieldCheck size={13} className="shrink-0 text-ok" />
-            Decryption happens in this tab. <span className="ml-auto readout text-ink-4">⌘↵</span>
+            Notes are decrypted locally. Supabase stores ciphertext only.
           </p>
         </div>
       </main>

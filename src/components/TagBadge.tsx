@@ -1,6 +1,5 @@
 import { X } from "lucide-react";
 import { TAG_COLORS, type Tag } from "@/lib/types";
-import { useIsDark } from "@/lib/theme";
 
 interface Props {
   tag: Tag;
@@ -9,9 +8,8 @@ interface Props {
 
 /** Compact, readable tag treatment for metadata around the writing surface. */
 export function TagBadge({ tag, onRemove }: Props) {
-  const isDark = useIsDark();
   const p = TAG_COLORS.find((c) => c.id === tag.color) ?? TAG_COLORS[0];
-  const swatch = isDark ? p.darkFg : p.fg;
+  const swatch = p.darkFg;
 
   return (
     <span className="group inline-flex items-center gap-1.5 rounded-full border border-rule-soft bg-paper px-2 py-1">

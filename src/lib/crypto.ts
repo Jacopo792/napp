@@ -1,153 +1,242 @@
-import type { Note, Meta } from "./types";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-export type { Note };
+import type { Folder, Meta, Note, Tag } from "./types";
 
 export interface SessionKeys {
   u1?: CryptoKey;
   u2: CryptoKey;
 }
 
-export type U1Bundle = { type: "u1"; seed: string; pat: string; repo: string };
-export type U2Bundle = { type: "u2"; key: string; pat: string; repo: string };
-export type Bundle = U1Bundle | U2Bundle;
+export interface WrappedArchiveKey {
+  wrappedDek: string;
+  kdfSalt: string;
+  kdfIterations: number;
+}
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+export const MIN_KDF_ITERATIONS = 600_000;
+
+function ownedBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.slice().buffer as ArrayBuffer;
+}
 
 function hexToBytes(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return out;
 }
 
-function toBin(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return s;
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk));
+  }
+  return btoa(binary);
 }
 
-// ── Key derivation ─────────────────────────────────────────────────────────
+export function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value.trim());
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
 
-async function hkdfAesKey(seedHex: string, userId: "u1" | "u2"): Promise<CryptoKey> {
-  const km = await crypto.subtle.importKey("raw", hexToBytes(seedHex), "HKDF", false, [
-    "deriveKey",
+export async function importArchiveKey(raw: Uint8Array, extractable = false): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", ownedBuffer(raw), { name: "AES-GCM" }, extractable, [
+    "encrypt",
+    "decrypt",
   ]);
+}
+
+export function generateArchiveKeyBytes(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(32));
+}
+
+async function deriveKek(
+  passphrase: string,
+  salt: Uint8Array,
+  iterations: number,
+): Promise<CryptoKey> {
+  if (iterations < MIN_KDF_ITERATIONS) throw new Error("Archive key uses an unsafe KDF setting");
+  const material = await crypto.subtle.importKey(
+    "raw",
+    ownedBuffer(encoder.encode(passphrase)),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
   return crypto.subtle.deriveKey(
     {
-      name: "HKDF",
+      name: "PBKDF2",
       hash: "SHA-256",
-      salt: new TextEncoder().encode("napp-v1"),
-      info: new TextEncoder().encode(userId),
+      salt: ownedBuffer(salt),
+      iterations,
     },
-    km,
+    material,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
   );
 }
 
-async function importRawAesKey(keyHex: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", hexToBytes(keyHex), { name: "AES-GCM" }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
-}
-
-// ── Bundle parsing ─────────────────────────────────────────────────────────
-
-export function parseBundle(token: string): Bundle {
-  let obj: unknown;
-  try {
-    obj = JSON.parse(atob(token.trim()));
-  } catch {
-    throw new Error("Invalid key — paste the full token from keygen");
-  }
-  if (!obj || typeof obj !== "object" || !("type" in obj) || !("pat" in obj) || !("repo" in obj))
-    throw new Error("Malformed key bundle");
-  const b = obj as Record<string, unknown>;
-  if (b.type !== "u1" && b.type !== "u2") throw new Error("Unknown bundle type");
-  if (b.type === "u1" && !b.seed) throw new Error("u1 bundle missing seed");
-  if (b.type === "u2" && !b.key) throw new Error("u2 bundle missing key");
-  return obj as Bundle;
-}
-
-export async function deriveSessionKeys(bundle: Bundle): Promise<SessionKeys> {
-  if (bundle.type === "u1") {
-    const [u1, u2] = await Promise.all([
-      hkdfAesKey(bundle.seed, "u1"),
-      hkdfAesKey(bundle.seed, "u2"),
-    ]);
-    return { u1, u2 };
-  }
-  return { u2: await importRawAesKey(bundle.key) };
-}
-
-// ── Generic encrypt / decrypt ──────────────────────────────────────────────
-
-async function aesEncrypt(key: CryptoKey, header: string, payload: unknown): Promise<string> {
+export async function wrapArchiveKey(
+  rawDek: Uint8Array,
+  passphrase: string,
+  salt = crypto.getRandomValues(new Uint8Array(16)),
+  iterations = MIN_KDF_ITERATIONS,
+): Promise<WrappedArchiveKey> {
+  const kek = await deriveKek(passphrase, salt, iterations);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plain = new TextEncoder().encode(JSON.stringify(payload));
-  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
-  const combined = new Uint8Array(12 + cipher.byteLength);
-  combined.set(iv);
-  combined.set(new Uint8Array(cipher), 12);
-  return `${header}\n${btoa(toBin(combined.buffer))}`;
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: ownedBuffer(iv) },
+    kek,
+    ownedBuffer(rawDek),
+  );
+  const wrapped = new Uint8Array(iv.length + ciphertext.byteLength);
+  wrapped.set(iv);
+  wrapped.set(new Uint8Array(ciphertext), iv.length);
+  return {
+    wrappedDek: bytesToBase64(wrapped),
+    kdfSalt: bytesToBase64(salt),
+    kdfIterations: iterations,
+  };
 }
 
-async function aesDecrypt<T>(content: string, key: CryptoKey): Promise<T | null> {
-  const nl = content.indexOf("\n");
-  if (nl === -1) return null;
+export async function unwrapArchiveKey(
+  wrapped: WrappedArchiveKey,
+  passphrase: string,
+): Promise<Uint8Array> {
+  const combined = base64ToBytes(wrapped.wrappedDek);
+  if (combined.length < 29) throw new Error("Archive key is malformed");
+  const kek = await deriveKek(passphrase, base64ToBytes(wrapped.kdfSalt), wrapped.kdfIterations);
   try {
-    const bytes = Uint8Array.from(atob(content.slice(nl + 1).trim()), (c) => c.charCodeAt(0));
-    const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: bytes.slice(0, 12) },
-      key,
-      bytes.slice(12),
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: ownedBuffer(combined.slice(0, 12)) },
+      kek,
+      ownedBuffer(combined.slice(12)),
     );
-    return JSON.parse(new TextDecoder().decode(plain)) as T;
+    const raw = new Uint8Array(plaintext);
+    if (raw.length !== 32) throw new Error("Archive key has the wrong length");
+    return raw;
+  } catch {
+    throw new Error("The archive passphrase is incorrect");
+  }
+}
+
+export async function encryptJson(key: CryptoKey, payload: unknown): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: ownedBuffer(iv) },
+    key,
+    ownedBuffer(encoder.encode(JSON.stringify(payload))),
+  );
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  return bytesToBase64(combined);
+}
+
+export async function decryptJson<T>(key: CryptoKey, ciphertext: string): Promise<T> {
+  const combined = base64ToBytes(ciphertext);
+  if (combined.length < 29) throw new Error("Encrypted value is malformed");
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: ownedBuffer(combined.slice(0, 12)) },
+      key,
+      ownedBuffer(combined.slice(12)),
+    );
+    return JSON.parse(decoder.decode(plaintext)) as T;
+  } catch {
+    throw new Error("Encrypted archive data could not be decrypted");
+  }
+}
+
+export async function encryptBytes(key: CryptoKey, bytes: Uint8Array): Promise<Uint8Array> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: ownedBuffer(iv) },
+    key,
+    ownedBuffer(bytes),
+  );
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  return combined;
+}
+
+export async function decryptBytes(key: CryptoKey, bytes: Uint8Array): Promise<Uint8Array> {
+  if (bytes.length < 29) throw new Error("Encrypted image is malformed");
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: ownedBuffer(bytes.slice(0, 12)) },
+      key,
+      ownedBuffer(bytes.slice(12)),
+    );
+    return new Uint8Array(plaintext);
+  } catch {
+    throw new Error("Encrypted image could not be decrypted");
+  }
+}
+
+export const encryptNote = (note: Note, key: CryptoKey) => encryptJson(key, note);
+export const decryptNote = (ciphertext: string, key: CryptoKey) =>
+  decryptJson<Note>(key, ciphertext);
+export const encryptFolder = (folder: Folder, key: CryptoKey) =>
+  encryptJson(key, { name: folder.name });
+export const decryptFolder = (ciphertext: string, key: CryptoKey) =>
+  decryptJson<{ name: string }>(key, ciphertext);
+export const encryptTag = (tag: Tag, key: CryptoKey) => encryptJson(key, { name: tag.name });
+export const decryptTag = (ciphertext: string, key: CryptoKey) =>
+  decryptJson<{ name: string }>(key, ciphertext);
+
+// Legacy GitHub archive support, retained only for the one-time migration.
+async function hkdfAesKey(seedHex: string, owner: "u1" | "u2"): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    ownedBuffer(hexToBytes(seedHex)),
+    "HKDF",
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: ownedBuffer(encoder.encode("napp-v1")),
+      info: ownedBuffer(encoder.encode(owner)),
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+export async function deriveLegacySessionKeys(seedHex: string): Promise<SessionKeys> {
+  const [u1, u2] = await Promise.all([hkdfAesKey(seedHex, "u1"), hkdfAesKey(seedHex, "u2")]);
+  return { u1, u2 };
+}
+
+async function decryptLegacyPayload<T>(content: string, key: CryptoKey): Promise<T | null> {
+  const newline = content.indexOf("\n");
+  if (newline === -1) return null;
+  try {
+    return await decryptJson<T>(key, content.slice(newline + 1).trim());
   } catch {
     return null;
   }
 }
 
-// ── Note file format ───────────────────────────────────────────────────────
-//  Line 1: NAPP:1:<owner>   e.g. NAPP:1:u2
-//  Line 2: base64(IV[12] || AES-GCM ciphertext)
-
-export async function encryptNote(note: Note, keys: SessionKeys): Promise<string> {
-  const key = note.owner === "u1" ? keys.u1! : keys.u2;
-  return aesEncrypt(key, `NAPP:1:${note.owner}`, note);
-}
-
 export async function decryptFile(content: string, keys: SessionKeys): Promise<Note | null> {
-  const m = content.match(/^NAPP:1:(u[12])\n/);
-  if (!m) return null;
-  const tag = m[1] as "u1" | "u2";
-  const key = tag === "u1" ? keys.u1 : keys.u2;
-  if (!key) return null;
-  return aesDecrypt<Note>(content, key);
-}
-
-// ── Meta file format ───────────────────────────────────────────────────────
-//  Line 1: NAPP:1:meta-<owner>
-//  Line 2: base64(IV[12] || AES-GCM ciphertext)
-
-export async function encryptMeta(
-  meta: Meta,
-  keys: SessionKeys,
-  owner: "u1" | "u2",
-): Promise<string> {
-  const key = owner === "u1" ? keys.u1! : keys.u2;
-  return aesEncrypt(key, `NAPP:1:meta-${owner}`, meta);
+  const match = content.match(/^NAPP:1:(u[12])\n/);
+  if (!match) return null;
+  const owner = match[1] as "u1" | "u2";
+  const key = owner === "u1" ? keys.u1 : keys.u2;
+  return key ? decryptLegacyPayload<Note>(content, key) : null;
 }
 
 export async function decryptMeta(content: string, keys: SessionKeys): Promise<Meta | null> {
-  const m = content.match(/^NAPP:1:meta-(u[12])\n/);
-  if (!m) return null;
-  const owner = m[1] as "u1" | "u2";
+  const match = content.match(/^NAPP:1:meta-(u[12])\n/);
+  if (!match) return null;
+  const owner = match[1] as "u1" | "u2";
   const key = owner === "u1" ? keys.u1 : keys.u2;
-  if (!key) return null;
-  return aesDecrypt<Meta>(content, key);
+  return key ? decryptLegacyPayload<Meta>(content, key) : null;
 }

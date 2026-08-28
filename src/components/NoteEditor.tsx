@@ -21,7 +21,7 @@ import type { Meta, Tag } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { countChars, countWords, formatCount, formatStamp } from "@/lib/format";
 import { extractPdfText } from "@/lib/pdf";
-import { imageAltFromFilename, prepareImageForNote } from "@/lib/image";
+import { imageAltFromFilename } from "@/lib/image";
 import { TagBadge } from "./TagBadge";
 import { MarkdownEditor, type FormatAction, type MarkdownEditorHandle } from "./MarkdownEditor";
 
@@ -59,6 +59,8 @@ interface Props {
   pinned: boolean;
   onTogglePin: () => void;
   onNew: () => void;
+  onUploadImage: (file: File) => Promise<string>;
+  resolveImage: (imageId: string) => Promise<Blob>;
 }
 
 /* The page. Title, measurements and body all sit inside one column whose width
@@ -81,6 +83,8 @@ export function NoteEditor({
   pinned,
   onTogglePin,
   onNew,
+  onUploadImage,
+  resolveImage,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
@@ -158,8 +162,8 @@ export function NoteEditor({
     setPdfStatus("Preparing image…");
     setFormatOpen(false);
     try {
-      const dataUrl = await prepareImageForNote(file);
-      editorRef.current?.insertImage(dataUrl, imageAltFromFilename(file.name));
+      const src = await onUploadImage(file);
+      editorRef.current?.insertImage(src, imageAltFromFilename(file.name));
       setPdfStatus("Image inserted and encrypted with this note");
       window.setTimeout(() => setPdfStatus(""), 2600);
     } catch (error) {
@@ -175,7 +179,7 @@ export function NoteEditor({
     setPdfError("");
     setPdfStatus("Preparing pasted image…");
     try {
-      const src = await prepareImageForNote(file);
+      const src = await onUploadImage(file);
       setPdfStatus("Image pasted and encrypted with this note");
       window.setTimeout(() => setPdfStatus(""), 2600);
       return { src, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
@@ -221,10 +225,7 @@ export function NoteEditor({
         className={`flex min-w-0 flex-1 flex-col bg-page ${mobile ? "mobile-editor h-full w-full border-0" : "soft-pane"}`}
       >
         <div className="flex flex-1 items-center justify-center px-8">
-          <div
-            className="w-full rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center"
-            style={{ maxWidth: "var(--read-measure)" }}
-          >
+          <div className="measure rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center font-sans">
             <p
               className="font-display text-ink-4"
               style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontVariationSettings: '"wght" 300' }}
@@ -254,273 +255,279 @@ export function NoteEditor({
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <header className={`shrink-0 ${mobile ? "px-5 pt-4 pb-3" : "px-10 pt-10 pb-5"}`}>
-        <div className="w-full" style={{ maxWidth: "var(--read-measure)" }}>
-          {viewingAsPartner && (
-            <p className="label mb-3 text-ink-3">
-              {partnerName}&apos;s archive{!canEdit && " · read only"}
-            </p>
-          )}
+        <div className="measure">
+          <div className="font-sans text-base">
+            {viewingAsPartner && (
+              <p className="label mb-3 text-ink-3">
+                {partnerName}&apos;s archive{!canEdit && " · read only"}
+              </p>
+            )}
 
-          <textarea
-            ref={titleRef}
-            rows={1}
-            value={draft.title}
-            onChange={(e) => canEdit && onChange(e.target.value, draft.body)}
-            onInput={(e) => {
-              e.currentTarget.style.height = "auto";
-              e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }
-            }}
-            placeholder="Untitled"
-            readOnly={!canEdit}
-            aria-label="Note title"
-            className="font-display block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-4"
-            style={{
-              fontSize: mobile ? "2rem" : "clamp(1.75rem, 2.6vw, 2.5rem)",
-              lineHeight: 1.14,
-              letterSpacing: "-0.028em",
-              fontVariationSettings: '"wght" 620, "opsz" 42',
-            }}
-          />
+            <textarea
+              ref={titleRef}
+              rows={1}
+              value={draft.title}
+              onChange={(e) => canEdit && onChange(e.target.value, draft.body)}
+              onInput={(e) => {
+                e.currentTarget.style.height = "auto";
+                e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="Untitled"
+              readOnly={!canEdit}
+              aria-label="Note title"
+              className="font-display block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-4"
+              style={{
+                fontSize: mobile ? "2rem" : "clamp(1.75rem, 2.6vw, 2.5rem)",
+                lineHeight: 1.14,
+                letterSpacing: "-0.028em",
+                fontVariationSettings: '"wght" 620, "opsz" 42',
+              }}
+            />
 
-          {/* Measurements. Every value right of its own label, tabular. */}
-          <div
-            className={`flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-3 ${mobile ? "mobile-editor-meta mt-4" : "mt-5"}`}
-          >
-            <span className="readout text-ink-3">
-              Created <span className="text-ink-2">{formatStamp(entry.note.createdAt)}</span>
-            </span>
-            <span className="readout text-ink-3">
-              Edited <span className="text-ink-2">{formatStamp(entry.note.updatedAt)}</span>
-            </span>
-            <span className="readout text-ink-3">
-              Words <span className="text-ink-2">{formatCount(words)}</span>
-            </span>
-            <span className="readout text-ink-3">
-              Chars <span className="text-ink-2">{formatCount(chars)}</span>
-            </span>
-
-            {assigned.length > 0 && (
-              <span className="flex flex-wrap items-center gap-3">
-                {assigned.map((tag) => (
-                  <TagBadge
-                    key={tag.id}
-                    tag={tag}
-                    onRemove={
-                      canEdit
-                        ? () =>
-                            onTagsChange(
-                              entry.note.id,
-                              assignedIds.filter((t) => t !== tag.id),
-                            )
-                        : undefined
-                    }
-                  />
-                ))}
+            {/* Measurements. Every value right of its own label, tabular. */}
+            <div
+              className={`flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule-soft pt-3 ${mobile ? "mobile-editor-meta mt-4" : "mt-5"}`}
+            >
+              <span className="readout text-ink-3">
+                Created <span className="text-ink-2">{formatStamp(entry.note.createdAt)}</span>
               </span>
-            )}
+              <span className="readout text-ink-3">
+                Edited <span className="text-ink-2">{formatStamp(entry.note.updatedAt)}</span>
+              </span>
+              <span className="readout text-ink-3">
+                Words <span className="text-ink-2">{formatCount(words)}</span>
+              </span>
+              <span className="readout text-ink-3">
+                Chars <span className="text-ink-2">{formatCount(chars)}</span>
+              </span>
 
-            {canEdit && available.length > 0 && (
-              <div className="relative" ref={pickerRef}>
-                <button
-                  onClick={() => setPickerOpen((v) => !v)}
-                  aria-expanded={pickerOpen}
-                  className="label flex items-center gap-1 text-ink-3 transition-colors hover:text-accent"
-                >
-                  <Plus size={10} strokeWidth={2.5} />
-                  Tag
-                </button>
-                {pickerOpen && (
-                  <div className="popover absolute top-full left-0 z-20 mt-2 min-w-40 p-1">
-                    {available.map((tag) => (
-                      <button
-                        key={tag.id}
-                        onClick={() => {
-                          onTagsChange(entry.note.id, [...assignedIds, tag.id]);
-                          setPickerOpen(false);
-                        }}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface"
-                      >
-                        <TagBadge tag={tag} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+              {assigned.length > 0 && (
+                <span className="flex flex-wrap items-center gap-3">
+                  {assigned.map((tag) => (
+                    <TagBadge
+                      key={tag.id}
+                      tag={tag}
+                      onRemove={
+                        canEdit
+                          ? () =>
+                              onTagsChange(
+                                entry.note.id,
+                                assignedIds.filter((t) => t !== tag.id),
+                              )
+                          : undefined
+                      }
+                    />
+                  ))}
+                </span>
+              )}
 
-            {canEdit && (
-              <button
-                onClick={onTogglePin}
-                aria-pressed={pinned}
-                title={pinned ? "Unpin note" : "Pin note to top"}
-                className={`label soft-control ml-auto flex items-center gap-1.5 px-2.5 py-1.5 transition-colors ${
-                  pinned
-                    ? "border-accent text-accent"
-                    : "text-ink-2 hover:border-accent hover:text-accent"
-                }`}
-              >
-                <Pin
-                  size={13}
-                  strokeWidth={pinned ? 2.4 : 1.8}
-                  fill={pinned ? "currentColor" : "none"}
-                />
-                {pinned ? "Pinned" : "Pin"}
-              </button>
-            )}
-
-            {canEdit && (
-              <div className="relative" ref={formatRef}>
-                <button
-                  onClick={() => setFormatOpen((value) => !value)}
-                  aria-expanded={formatOpen}
-                  aria-haspopup="menu"
-                  className="label soft-control flex items-center gap-1.5 px-2.5 py-1.5 text-ink-2 transition-colors hover:border-accent hover:text-accent"
-                >
-                  <Type size={13} strokeWidth={2} />
-                  Format
-                  <ChevronDown
-                    size={12}
-                    className={`transition-transform ${formatOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                {formatOpen && (
-                  <div
-                    role="menu"
-                    aria-label="Formatting"
-                    className="popover absolute top-full right-0 z-30 mt-2 w-56 p-1.5"
+              {canEdit && available.length > 0 && (
+                <div className="relative" ref={pickerRef}>
+                  <button
+                    onClick={() => setPickerOpen((v) => !v)}
+                    aria-expanded={pickerOpen}
+                    className="label flex items-center gap-1 text-ink-3 transition-colors hover:text-accent"
                   >
-                    {FORMAT_ITEMS.map(({ action, label, shortcut, icon: Icon }) => (
-                      <button
-                        key={action}
-                        role="menuitem"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          if (action === "link") openLinkForm();
-                          else {
-                            editorRef.current?.format(action);
-                            setFormatOpen(false);
-                          }
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                      >
-                        <Icon size={14} strokeWidth={1.8} className="text-ink-3" />
-                        <span>{label}</span>
-                        {shortcut && <span className="readout ml-auto text-ink-4">{shortcut}</span>}
-                      </button>
-                    ))}
-
-                    <div className="my-1 border-t border-rule-soft" />
-                    <button
-                      role="menuitem"
-                      onClick={() => imageRef.current?.click()}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                    >
-                      <ImagePlus size={14} strokeWidth={1.8} className="text-accent" />
-                      <span>Insert image</span>
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => fileRef.current?.click()}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                    >
-                      <FileUp size={14} strokeWidth={1.8} className="text-accent" />
-                      <span>Import PDF as text</span>
-                    </button>
-                    <p className="px-2.5 pt-1 pb-1.5 text-[10px] leading-relaxed text-ink-4">
-                      Files are processed locally. JPG, PNG, WebP and text PDFs.
-                    </p>
-                  </div>
-                )}
-
-                {linkOpen && (
-                  <div className="popover absolute top-full right-0 z-30 mt-2 w-72 p-3">
-                    <p className="label mb-2 text-ink-2">Insert link</p>
-                    <label className="mb-2 block">
-                      <span className="label mb-1 block text-ink-4">Text</span>
-                      <input
-                        value={linkLabel}
-                        onChange={(event) => setLinkLabel(event.target.value)}
-                        placeholder="Link text (optional)"
-                        className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="label mb-1 block text-ink-4">URL</span>
-                      <input
-                        ref={linkUrlRef}
-                        value={linkUrl}
-                        onChange={(event) => {
-                          setLinkUrl(event.target.value);
-                          setLinkError("");
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            handleInsertLink();
-                          } else if (event.key === "Escape") {
-                            setLinkOpen(false);
-                          }
-                        }}
-                        placeholder="https://example.com"
-                        aria-invalid={linkError ? true : undefined}
-                        className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
-                      />
-                    </label>
-                    {linkError && (
-                      <p role="alert" className="mt-1.5 text-[11px] text-danger">
-                        {linkError}
-                      </p>
-                    )}
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button
-                        onClick={() => setLinkOpen(false)}
-                        className="label rounded-lg px-3 py-2 text-ink-3 hover:bg-surface"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleInsertLink}
-                        className="label rounded-lg bg-accent px-3 py-2 text-on-accent hover:bg-accent-strong"
-                      >
-                        Insert
-                      </button>
+                    <Plus size={10} strokeWidth={2.5} />
+                    Tag
+                  </button>
+                  {pickerOpen && (
+                    <div className="popover absolute top-full left-0 z-20 mt-2 min-w-40 p-1">
+                      {available.map((tag) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => {
+                            onTagsChange(entry.note.id, [...assignedIds, tag.id]);
+                            setPickerOpen(false);
+                          }}
+                          className="flex w-full items-center rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface"
+                        >
+                          <TagBadge tag={tag} />
+                        </button>
+                      ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
 
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  className="hidden"
-                  onChange={(event) => void handlePdf(event.target.files?.[0])}
-                />
-                <input
-                  ref={imageRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                  className="hidden"
-                  onChange={(event) => void handleImage(event.target.files?.[0])}
-                />
-              </div>
+              {/* Pin and Format read as one group of actions; wrapping them
+                  apart stranded Format alone on a line in the phone column. */}
+              {canEdit && (
+                <span className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={onTogglePin}
+                    aria-pressed={pinned}
+                    title={pinned ? "Unpin note" : "Pin note to top"}
+                    className={`label soft-control flex items-center gap-1.5 px-2.5 py-1.5 transition-colors ${
+                      pinned
+                        ? "border-accent text-accent"
+                        : "text-ink-2 hover:border-accent hover:text-accent"
+                    }`}
+                  >
+                    <Pin
+                      size={13}
+                      strokeWidth={pinned ? 2.4 : 1.8}
+                      fill={pinned ? "currentColor" : "none"}
+                    />
+                    {pinned ? "Pinned" : "Pin"}
+                  </button>
+
+                  <div className="relative" ref={formatRef}>
+                    <button
+                      onClick={() => setFormatOpen((value) => !value)}
+                      aria-expanded={formatOpen}
+                      aria-haspopup="menu"
+                      className="label soft-control flex items-center gap-1.5 px-2.5 py-1.5 text-ink-2 transition-colors hover:border-accent hover:text-accent"
+                    >
+                      <Type size={13} strokeWidth={2} />
+                      Format
+                      <ChevronDown
+                        size={12}
+                        className={`transition-transform ${formatOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {formatOpen && (
+                      <div
+                        role="menu"
+                        aria-label="Formatting"
+                        className="popover absolute top-full right-0 z-30 mt-2 w-56 p-1.5"
+                      >
+                        {FORMAT_ITEMS.map(({ action, label, shortcut, icon: Icon }) => (
+                          <button
+                            key={action}
+                            role="menuitem"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              if (action === "link") openLinkForm();
+                              else {
+                                editorRef.current?.format(action);
+                                setFormatOpen(false);
+                              }
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+                          >
+                            <Icon size={14} strokeWidth={1.8} className="text-ink-3" />
+                            <span>{label}</span>
+                            {shortcut && (
+                              <span className="readout ml-auto text-ink-4">{shortcut}</span>
+                            )}
+                          </button>
+                        ))}
+
+                        <div className="my-1 border-t border-rule-soft" />
+                        <button
+                          role="menuitem"
+                          onClick={() => imageRef.current?.click()}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+                        >
+                          <ImagePlus size={14} strokeWidth={1.8} className="text-accent" />
+                          <span>Insert image</span>
+                        </button>
+                        <button
+                          role="menuitem"
+                          onClick={() => fileRef.current?.click()}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
+                        >
+                          <FileUp size={14} strokeWidth={1.8} className="text-accent" />
+                          <span>Import PDF as text</span>
+                        </button>
+                        <p className="px-2.5 pt-1 pb-1.5 text-[10px] leading-relaxed text-ink-4">
+                          Files are processed locally. JPG, PNG, WebP and text PDFs.
+                        </p>
+                      </div>
+                    )}
+
+                    {linkOpen && (
+                      <div className="popover absolute top-full right-0 z-30 mt-2 w-72 p-3">
+                        <p className="label mb-2 text-ink-2">Insert link</p>
+                        <label className="mb-2 block">
+                          <span className="label mb-1 block text-ink-4">Text</span>
+                          <input
+                            value={linkLabel}
+                            onChange={(event) => setLinkLabel(event.target.value)}
+                            placeholder="Link text (optional)"
+                            className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="label mb-1 block text-ink-4">URL</span>
+                          <input
+                            ref={linkUrlRef}
+                            value={linkUrl}
+                            onChange={(event) => {
+                              setLinkUrl(event.target.value);
+                              setLinkError("");
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleInsertLink();
+                              } else if (event.key === "Escape") {
+                                setLinkOpen(false);
+                              }
+                            }}
+                            placeholder="https://example.com"
+                            aria-invalid={linkError ? true : undefined}
+                            className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                          />
+                        </label>
+                        {linkError && (
+                          <p role="alert" className="mt-1.5 text-[11px] text-danger">
+                            {linkError}
+                          </p>
+                        )}
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button
+                            onClick={() => setLinkOpen(false)}
+                            className="label rounded-lg px-3 py-2 text-ink-3 hover:bg-surface"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleInsertLink}
+                            className="label rounded-lg bg-accent px-3 py-2 text-on-accent hover:bg-accent-strong"
+                          >
+                            Insert
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="hidden"
+                      onChange={(event) => void handlePdf(event.target.files?.[0])}
+                    />
+                    <input
+                      ref={imageRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(event) => void handleImage(event.target.files?.[0])}
+                    />
+                  </div>
+                </span>
+              )}
+            </div>
+
+            {(pdfStatus || pdfError) && (
+              <p
+                role={pdfError ? "alert" : "status"}
+                className={`mt-2 text-[11px] ${pdfError ? "text-danger" : "text-accent"}`}
+              >
+                {pdfError || pdfStatus}
+              </p>
             )}
           </div>
-
-          {(pdfStatus || pdfError) && (
-            <p
-              role={pdfError ? "alert" : "status"}
-              className={`mt-2 text-[11px] ${pdfError ? "text-danger" : "text-accent"}`}
-            >
-              {pdfError || pdfStatus}
-            </p>
-          )}
         </div>
       </header>
 
@@ -536,6 +543,7 @@ export function NoteEditor({
           placeholder="Start writing. Markdown formats itself as you type."
           onChange={(body) => canEdit && onChange(draft.title, body)}
           onPasteImage={handlePastedImage}
+          resolveImage={resolveImage}
         />
       </div>
     </section>

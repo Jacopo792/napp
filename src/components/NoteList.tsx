@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { ChevronRight, Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
+import { Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
-import { useIsDark } from "@/lib/theme";
 import { countWords, formatCount, formatStamp, previewOf } from "@/lib/format";
 import type { NoteEntry } from "@/lib/entries";
 
 interface Props {
   mobile?: boolean;
+  /** The phone's scope strip, rendered under the search field. */
+  scopes?: React.ReactNode;
   entries: NoteEntry[];
   meta: Meta;
   selectedId: string | null;
@@ -56,7 +57,6 @@ function Row({
   onDeleteForever: () => void;
   onTogglePin: () => void;
 }) {
-  const isDark = useIsDark();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
     disabled: mobile || trashMode,
@@ -97,7 +97,7 @@ function Row({
       style={{ opacity: isDragging ? 0.4 : 1 }}
       className={`group relative flex cursor-pointer gap-3 transition-colors ${
         mobile
-          ? "mobile-note-row min-h-[5.25rem] touch-pan-y px-4 py-3"
+          ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : "mx-2 mb-1 touch-none rounded-xl border px-3 py-3"
       } ${
         selected
@@ -160,7 +160,7 @@ function Row({
                   title={t.name}
                   aria-label={t.name}
                   className="h-1.5 w-4 rounded-full"
-                  style={{ background: isDark ? p.darkFg : p.fg }}
+                  style={{ background: p.darkFg }}
                 />
               );
             })}
@@ -209,7 +209,6 @@ function Row({
           <RotateCcw size={14} strokeWidth={2} />
         </button>
       )}
-      {mobile && <ChevronRight size={16} strokeWidth={2} className="mt-1 shrink-0 text-ink-4" />}
 
       <button
         aria-label={
@@ -270,6 +269,7 @@ function Skeletons() {
 
 export function NoteList({
   mobile = false,
+  scopes,
   entries,
   meta,
   selectedId,
@@ -292,17 +292,8 @@ export function NoteList({
   if (mobile) {
     return (
       <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden bg-surface">
-        <div className="shrink-0 px-5 pt-4 pb-3">
-          <div className="flex items-end justify-between gap-4">
-            <h1 className="font-display min-w-0 truncate text-[2.15rem] leading-none tracking-[-0.04em] text-ink">
-              {hasQuery ? "Search" : folderLabel}
-            </h1>
-            <span className="readout mb-1 shrink-0 text-ink-4">
-              {loading ? "—" : entries.length}
-            </span>
-          </div>
-
-          <div className="mt-5 flex h-11 items-center gap-2 rounded-xl bg-paper px-3.5 shadow-sm ring-1 ring-rule-soft">
+        <div className="shrink-0 px-4 pt-1">
+          <div className="flex h-11 items-center gap-2 rounded-xl bg-paper px-3.5 ring-1 ring-rule-soft">
             <Search size={16} strokeWidth={2} className="shrink-0 text-ink-4" />
             <input
               ref={searchRef}
@@ -330,6 +321,8 @@ export function NoteList({
             )}
           </div>
         </div>
+
+        {scopes}
 
         <div
           role="listbox"

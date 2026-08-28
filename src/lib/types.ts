@@ -37,7 +37,7 @@ export interface NoteMeta {
   tagIds: string[];
   /** Optional for backward compatibility with metadata written before pinning existed. */
   pinned?: boolean;
-  /** Soft-deleted notes remain encrypted on GitHub until removed from Trash. */
+  /** Soft-deleted notes remain encrypted in Postgres until removed from Trash. */
   trashedAt?: string;
 }
 

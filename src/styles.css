@@ -3,39 +3,41 @@
 @source "../src";
 
 /* ── The specimen palette ────────────────────────────────────────────────────
-   Three grounds, ordered by how close they sit to the writing:
+   One world, and it is dark. Three grounds, ordered by how close they sit to
+   the writing:
 
-     --surface   index rail and axis bar   (furthest from the words)
-     --paper     catalogue column          (middle)
-     --page      the note itself           (where the words go)
+     --surface   app ground, rail, axis bar   (furthest from the words)
+     --paper     catalogue column             (middle)
+     --page      the note itself              (where the words go)
 
-   Light runs surface→page dark→light. Dark inverts it, so in both themes the
-   page the words live on is the calmest surface on screen. Hues come from the
-   Pixel Services system (warm neutrals, oklch); the accent is azure, never the
-   system's sienna. ────────────────────────────────────────────────────────── */
+   The page the words live on stays the calmest and lightest surface on screen.
+   Hues are cool blue-charcoal from the Pixel Services system (oklch); the
+   accent is azure, never the system's sienna. ───────────────────────────── */
 :root {
-  --page: oklch(1 0 0);
-  --paper: oklch(0.982 0.002 255);
-  --surface: oklch(0.958 0.004 255);
+  color-scheme: dark;
 
-  --ink: oklch(0.195 0.014 255);
-  --ink-2: oklch(0.38 0.014 255);
-  --ink-3: oklch(0.52 0.012 255);
-  --ink-4: oklch(0.62 0.01 255);
+  --page: oklch(0.233 0.009 258);
+  --paper: oklch(0.196 0.009 258);
+  --surface: oklch(0.148 0.009 258);
 
-  --rule: oklch(0.89 0.008 255);
-  --rule-soft: oklch(0.94 0.005 255);
+  --ink: oklch(0.955 0.004 258);
+  --ink-2: oklch(0.815 0.008 258);
+  --ink-3: oklch(0.7 0.01 258);
+  --ink-4: oklch(0.675 0.011 258);
 
-  --accent: oklch(0.56 0.16 242);
-  --accent-strong: oklch(0.48 0.16 242);
-  --accent-wash: oklch(0.96 0.03 242);
-  --on-accent: oklch(0.99 0.002 242);
+  --rule: oklch(0.335 0.011 258);
+  --rule-soft: oklch(0.275 0.01 258);
 
-  --danger: oklch(0.55 0.2 27);
-  --ok: oklch(0.5 0.12 155);
+  --accent: oklch(0.715 0.132 245);
+  --accent-strong: oklch(0.8 0.115 245);
+  --accent-wash: oklch(0.315 0.058 245);
+  --on-accent: oklch(0.16 0.02 245);
 
-  --shadow-soft: 0 1px 2px oklch(0.2 0.015 255 / 0.05), 0 8px 24px oklch(0.2 0.015 255 / 0.06);
-  --shadow-popover: 0 18px 50px oklch(0.2 0.015 255 / 0.12);
+  --danger: oklch(0.7 0.16 25);
+  --ok: oklch(0.74 0.125 158);
+
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.4), 0 14px 34px oklch(0 0 0 / 0.3);
+  --shadow-popover: 0 22px 60px oklch(0 0 0 / 0.55);
   --radius-sm: 0.6rem;
   --radius-md: 0.85rem;
   --radius-lg: 1.15rem;
@@ -49,32 +51,6 @@
 
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
-
-.dark {
-  --page: oklch(0.26 0.011 255);
-  --paper: oklch(0.22 0.01 255);
-  --surface: oklch(0.16 0.011 255);
-
-  --ink: oklch(0.97 0.005 255);
-  --ink-2: oklch(0.82 0.01 255);
-  --ink-3: oklch(0.72 0.011 255);
-  --ink-4: oklch(0.64 0.01 255);
-
-  --rule: oklch(0.36 0.013 255);
-  --rule-soft: oklch(0.3 0.011 255);
-
-  --accent: oklch(0.72 0.14 242);
-  --accent-strong: oklch(0.8 0.12 242);
-  --accent-wash: oklch(0.33 0.07 242);
-  --on-accent: oklch(0.17 0.02 242);
-
-  --danger: oklch(0.68 0.17 25);
-  --ok: oklch(0.72 0.13 158);
-
-  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.35), 0 14px 34px oklch(0 0 0 / 0.28);
-  --shadow-popover: 0 22px 60px oklch(0 0 0 / 0.5);
-}
-
 @theme inline {
   --color-page: var(--page);
   --color-paper: var(--paper);
@@ -129,17 +105,6 @@
     color: inherit;
   }
 
-  /* Theme cross-fade is opt-in: theme.ts adds .theming to <html> for the
-     duration of a switch, so long lists never pay for a transition they
-     do not use. */
-  html.theming *,
-  html.theming *::before,
-  html.theming *::after {
-    transition:
-      background-color 0.18s ease,
-      border-color 0.18s ease,
-      color 0.18s ease;
-  }
 
   /* Surfaces the browser draws for us still belong to the design. */
   ::selection {
@@ -154,12 +119,6 @@
 
   input,
   textarea {
-    caret-color: var(--accent);
-  }
-
-  /* Ensure the compositor never dims the caret in dark mode */
-  .dark input,
-  .dark textarea {
     caret-color: var(--accent);
   }
 
@@ -275,6 +234,16 @@
    Every label, unit and readout in this app is JetBrains Mono, uppercase and
    tracked. It is measurement type, not a costume: these strings are all counts,
    states, dates and axis values. ──────────────────────────────────────────── */
+@utility measure {
+  width: 100%;
+  max-width: var(--read-measure);
+  margin-inline: auto;
+  /* `ch` resolves against this element's own font, so the column is measured
+     in the face the body is actually set in. Content restores its own. */
+  font-family: var(--font-reading);
+  font-size: var(--read-size);
+}
+
 @utility label {
   font-family: var(--font-sans);
   font-size: 11.5px;
@@ -424,7 +393,7 @@
     "opsz" 20;
   width: 100%;
   max-width: var(--read-measure);
-  margin-inline: 0;
+  margin-inline: auto;
   padding: 0;
   caret-color: var(--accent);
 }
@@ -437,15 +406,10 @@
 .cm-dropCursor {
   border-left: 2.5px solid var(--accent) !important;
   opacity: 1 !important;
+  box-shadow: 0 0 0 1px oklch(0.233 0.009 258 / 0.9);
 }
 
-.dark .cm-cursor,
-.dark .cm-dropCursor {
-  border-left-color: var(--accent) !important;
-  box-shadow: 0 0 0 1px oklch(0.26 0.011 255 / 0.9);
-}
-
-/* CodeMirror animation can dim the cursor to 0 — keep it legible in both themes */
+/* CodeMirror animation can dim the cursor to 0 — keep it legible. */
 @keyframes cm-blink {
   0%,
   50% {
@@ -573,50 +537,202 @@
 
 .cm-md-image-widget {
   position: relative;
-  display: inline-block;
+  display: block;
   width: min(100%, 46rem);
-  margin-block: 0.75rem 1.1rem;
-  overflow: hidden;
-  border: 1px solid var(--rule-soft);
-  border-radius: 0.75rem;
-  background: var(--paper);
+  margin-block: 1rem 1.35rem;
 }
 
-.cm-md-image-widget img {
+.cm-md-image-open {
   display: block;
   width: 100%;
-  max-height: 38rem;
-  object-fit: contain;
+  padding: 0;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.75rem;
   background: var(--surface);
+  overflow: hidden;
+  cursor: zoom-in;
+  transition:
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease);
 }
 
-.cm-md-image-edit {
+.cm-md-image-open:hover,
+.cm-md-image-open:focus-visible {
+  border-color: var(--rule);
+  box-shadow: var(--shadow-soft);
+}
+
+.cm-md-image-open img {
+  display: block;
+  width: 100%;
+  max-height: 34rem;
+  object-fit: contain;
+}
+
+/* Actions ride the corner of the picture, quiet until it is hovered. */
+.cm-md-image-actions {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  border: 1px solid var(--rule);
-  border-radius: 0.45rem;
-  background: var(--page);
-  color: var(--ink-2);
-  padding: 0.35rem 0.55rem;
-  font-family: var(--font-ui);
-  font-size: 0.68rem;
-  line-height: 1;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.2rem;
+  border-radius: 0.6rem;
+  background: oklch(0.148 0.009 258 / 0.72);
+  backdrop-filter: blur(10px);
   opacity: 0;
-  transition: opacity 140ms ease;
+  transform: translateY(-2px);
+  transition:
+    opacity 160ms var(--ease),
+    transform 160ms var(--ease);
 }
 
-.cm-md-image-widget:hover .cm-md-image-edit,
-.cm-md-image-edit:focus-visible {
+.cm-md-image-widget:hover .cm-md-image-actions,
+.cm-md-image-actions:focus-within {
   opacity: 1;
+  transform: none;
+}
+
+.cm-md-image-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--ease),
+    color 140ms var(--ease);
+}
+
+.cm-md-image-action:hover {
+  background: oklch(1 0 0 / 0.09);
+  color: var(--ink);
+}
+
+.cm-md-image-action.is-danger:hover {
+  color: var(--danger);
+}
+
+/* Touch has no hover: the actions are simply always there. */
+@media (hover: none) {
+  .cm-md-image-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cm-md-image-action {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+}
+
+.cm-md-image-caption {
+  display: block;
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--ink-4);
 }
 
 .cm-md-image-error {
   display: block;
-  padding: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.75rem;
   color: var(--danger);
-  font-family: var(--font-ui);
+  font-family: var(--font-sans);
   font-size: 0.8rem;
+}
+
+/* ── Full-size image ────────────────────────────────────────────────────────
+   The note is still there behind the scrim; the picture is simply lifted off
+   it for a moment. One entrance, eased out from an already-placed frame. ─── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 5vw, 3.5rem);
+  background: oklch(0.08 0.006 258 / 0.8);
+  backdrop-filter: blur(18px) saturate(0.9);
+  animation: lightbox-in 220ms var(--ease) both;
+}
+
+.lightbox-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 100%;
+  max-height: 100%;
+  animation: lightbox-lift 320ms var(--ease) both;
+}
+
+.lightbox-figure img {
+  display: block;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0.85rem;
+  box-shadow: 0 24px 70px oklch(0 0 0 / 0.55);
+}
+
+.lightbox-figure figcaption {
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: clamp(0.75rem, 3vw, 1.5rem);
+  right: clamp(0.75rem, 3vw, 1.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.7rem;
+  background: var(--paper);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    color 140ms var(--ease),
+    border-color 140ms var(--ease);
+}
+
+.lightbox-close:hover {
+  color: var(--ink);
+  border-color: var(--ink-4);
+}
+
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes lightbox-lift {
+  from {
+    opacity: 0;
+    transform: scale(0.965) translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox,
+  .lightbox-figure {
+    animation: none;
+  }
 }
 
 .cm-md-list {
@@ -692,4 +808,143 @@
 }
 .axis-range:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+/* ── Phone ──────────────────────────────────────────────────────────────────
+   The phone lands on the notes, not on a folder tree. Scope lives in one
+   scrolling strip above the list, so reading and writing are the only two
+   screens the thumb ever moves between. ─────────────────────────────────── */
+.scope-strip {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 1rem;
+  /* The strip runs under the manage button, so the last chip fades rather
+     than colliding with it. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 4rem), transparent 100%);
+}
+
+.scope-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  height: 2rem;
+  padding-inline: 0.7rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 140ms var(--ease),
+    border-color 140ms var(--ease),
+    color 140ms var(--ease);
+}
+
+.scope-chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.scope-chip.is-tag-active {
+  background: var(--accent-wash);
+  border-color: var(--accent-wash);
+  color: var(--ink);
+}
+
+.scope-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.62;
+}
+
+.scope-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1.1rem;
+  margin-inline: 0.25rem;
+  background: var(--rule);
+}
+
+.scope-manage {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.scope-manage:active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* The manage sheet. Folders and tags are maintenance, so they arrive over the
+   list and leave again rather than owning a screen of their own. */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: oklch(0.08 0.006 258 / 0.55);
+  backdrop-filter: blur(6px);
+  animation: sheet-scrim-in 200ms var(--ease) both;
+}
+
+.sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  max-height: min(80dvh, 40rem);
+  border-top: 1px solid var(--rule);
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: var(--surface);
+  box-shadow: 0 -20px 60px oklch(0 0 0 / 0.5);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-in 320ms var(--ease) both;
+}
+
+.sheet-grip {
+  width: 2.25rem;
+  height: 0.25rem;
+  margin: 0.6rem auto 0;
+  border-radius: 999px;
+  background: var(--rule);
+}
+
+@keyframes sheet-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-scrim {
+    animation: none;
+  }
 }
