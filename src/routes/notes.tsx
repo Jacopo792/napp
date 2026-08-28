@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Lock, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
-import { MobileScopes } from "@/components/MobileScopes";
+import { ChevronLeft, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -41,8 +40,18 @@ import {
 } from "@/lib/draft";
 import { FolderRail, ALL, TRASH, UNFILED } from "@/components/FolderRail";
 import { NoteList } from "@/components/NoteList";
-import { AxisBar } from "@/components/AxisBar";
 import { useIsCompact } from "@/lib/media";
+import { CollectionMenu, MainMenu, NoteMenu, SettingsPanel } from "@/components/WorkspaceMenus";
+import type { NoteEditorHandle } from "@/components/NoteEditor";
+import {
+  groupEntries,
+  loadListPreferences,
+  preferencesForFolder,
+  rememberRecent,
+  saveListPreferences,
+  type ListPreferences,
+  type ListPreferencesV1,
+} from "@/lib/listPreferences";
 
 const NoteEditor = lazy(() =>
   import("@/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
@@ -73,6 +82,10 @@ function metaShape(meta: Meta): string {
 }
 
 function NotesPage() {
+  /* Impeccable direction contract — Midnight Instrument / Operate:
+     a continuous three-pane graphite workspace on desktop; a folders →
+     collection → note stack on phone; pale gold only signals interaction;
+     glass belongs exclusively to floating controls, menus and settings. */
   const navigate = useNavigate();
   const compact = useIsCompact();
 
@@ -106,10 +119,15 @@ function NotesPage() {
       return true;
     }
   });
-  const [manageOpen, setManageOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileScreen, setMobileScreen] = useState<"folders" | "collection" | "note">("folders");
+  const [listPreferences, setListPreferences] = useState<Record<"u1" | "u2", ListPreferencesV1>>(
+    () => ({ u1: loadListPreferences("u1"), u2: loadListPreferences("u2") }),
+  );
 
   const searchRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const noteEditorRef = useRef<NoteEditorHandle>(null);
 
   // ── Refs mirroring state, so the save pipeline can read the truth
   //    synchronously without waiting for a React commit. ───────────────────
@@ -140,6 +158,8 @@ function NotesPage() {
 
   const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
   const partnerName = myMeta.partnerName?.trim() || "Partner";
+  const storedPreferences = listPreferences[viewAs];
+  const activeListPreferences = preferencesForFolder(storedPreferences, selectedFolderId);
 
   useEffect(() => {
     try {
@@ -148,6 +168,11 @@ function NotesPage() {
       /* The preference is optional; writing still works without local storage. */
     }
   }, [navigationOpen]);
+
+  useEffect(() => {
+    saveListPreferences(listPreferences.u1);
+    saveListPreferences(listPreferences.u2);
+  }, [listPreferences]);
 
   const setActiveMeta = useCallback(
     (m: Meta) => {
@@ -288,7 +313,6 @@ function NotesPage() {
   const visible = useMemo(() => {
     const meta = activeMeta;
     const index = indexOf(meta);
-    const pinnedIds = new Set(meta.notes.filter((note) => note.pinned).map((note) => note.id));
     const folderOf = (id: string) => {
       const fid = index.byNote.get(id)?.folderId ?? null;
       return fid && index.byFolder.has(fid) ? fid : null;
@@ -320,11 +344,16 @@ function NotesPage() {
       list = list.filter((e) => derivedOf(e.note).haystack.includes(q));
     }
 
-    return [...list].sort((a, b) => {
-      const pinOrder = Number(pinnedIds.has(b.note.id)) - Number(pinnedIds.has(a.note.id));
-      return pinOrder || b.note.updatedAt.localeCompare(a.note.updatedAt);
-    });
+    return list;
   }, [ownedEntries, activeMeta, selectedFolderId, filterTagIds, query]);
+
+  const noteGroups = useMemo(() => {
+    const pinnedIds = new Set(
+      activeMeta.notes.filter((note) => note.pinned).map((note) => note.id),
+    );
+    return groupEntries(visible, pinnedIds, activeListPreferences);
+  }, [visible, activeMeta.notes, activeListPreferences]);
+  const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
   const canEdit = selected ? selectedFolderId !== TRASH : false;
@@ -541,6 +570,11 @@ function NotesPage() {
       setQuery("");
       if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
       setSelectedId(note.id);
+      setListPreferences((current) => ({
+        ...current,
+        [viewAs]: rememberRecent(current[viewAs], note.id),
+      }));
+      if (compact) setMobileScreen("note");
       ensureDraft(note.id, { title: "", body: "" });
       window.setTimeout(() => titleRef.current?.focus(), 0);
     } catch (e) {
@@ -571,6 +605,7 @@ function NotesPage() {
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
+        if (compact) setMobileScreen("collection");
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -613,6 +648,7 @@ function NotesPage() {
 
         if (selectedId === entry.note.id) {
           setSelectedId(null);
+          if (compact) setMobileScreen("collection");
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to delete permanently");
@@ -627,12 +663,17 @@ function NotesPage() {
   // ── Keyboard ────────────────────────────────────────────────────────────
   const moveSelection = useCallback(
     (delta: number) => {
-      if (visible.length === 0) return;
-      const i = visible.findIndex((e) => e.note.id === selectedId);
-      const next = i === -1 ? 0 : Math.min(visible.length - 1, Math.max(0, i + delta));
-      setSelectedId(visible[next].note.id);
+      if (orderedVisible.length === 0) return;
+      const i = orderedVisible.findIndex((e) => e.note.id === selectedId);
+      const next = i === -1 ? 0 : Math.min(orderedVisible.length - 1, Math.max(0, i + delta));
+      const id = orderedVisible[next].note.id;
+      setSelectedId(id);
+      setListPreferences((current) => ({
+        ...current,
+        [viewAs]: rememberRecent(current[viewAs], id),
+      }));
     },
-    [visible, selectedId],
+    [orderedVisible, selectedId, viewAs],
   );
 
   useEffect(() => {
@@ -651,7 +692,16 @@ function NotesPage() {
         saveNow();
         return;
       }
-      if (mod && (e.key.toLowerCase() === "f" || e.key.toLowerCase() === "k")) {
+      if (mod && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (selected) noteEditorRef.current?.openFind();
+        else {
+          searchRef.current?.focus();
+          searchRef.current?.select();
+        }
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
@@ -683,7 +733,7 @@ function NotesPage() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [moveSelection, handleNew, saveNow, selectedId]);
+  }, [moveSelection, handleNew, saveNow, selectedId, selected]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -703,6 +753,62 @@ function NotesPage() {
     });
   }
 
+  function handleMoveNote(noteId: string, folderId: string | null) {
+    const existing = activeMeta.notes.find((note) => note.id === noteId);
+    handleMetaChange({
+      ...activeMeta,
+      notes: existing
+        ? activeMeta.notes.map((note) => (note.id === noteId ? { ...note, folderId } : note))
+        : [...activeMeta.notes, { id: noteId, folderId, tagIds: [] }],
+    });
+    if (selectedFolderId !== ALL) setSelectedFolderId(folderId ?? UNFILED);
+  }
+
+  function handleListPreferencesChange(next: ListPreferences) {
+    setListPreferences((current) => ({
+      ...current,
+      [viewAs]: {
+        ...current[viewAs],
+        folders: { ...current[viewAs].folders, [selectedFolderId]: next },
+      },
+    }));
+  }
+
+  function handleDefaultPreferencesChange(next: ListPreferences) {
+    setListPreferences((current) => ({
+      ...current,
+      [viewAs]: { ...current[viewAs], defaults: next },
+    }));
+  }
+
+  function handleCreateFolder(name: string) {
+    const folder = { id: crypto.randomUUID(), name };
+    handleMetaChange({ ...activeMeta, folders: [...activeMeta.folders, folder] });
+    handleSelectFolder(folder.id);
+  }
+
+  function handleRenameFolder(name: string) {
+    if ([ALL, UNFILED, TRASH].includes(selectedFolderId)) return;
+    handleMetaChange({
+      ...activeMeta,
+      folders: activeMeta.folders.map((folder) =>
+        folder.id === selectedFolderId ? { ...folder, name } : folder,
+      ),
+    });
+  }
+
+  function handleDeleteFolder() {
+    if ([ALL, UNFILED, TRASH].includes(selectedFolderId)) return;
+    handleMetaChange({
+      ...activeMeta,
+      folders: activeMeta.folders.filter((folder) => folder.id !== selectedFolderId),
+      notes: activeMeta.notes.map((note) =>
+        note.folderId === selectedFolderId ? { ...note, folderId: null } : note,
+      ),
+    });
+    handleSelectFolder(ALL);
+  }
+
   function handleViewChange(v: "u1" | "u2") {
     saveNow();
     setViewAs(v);
@@ -710,21 +816,43 @@ function NotesPage() {
     setSelectedFolderId(ALL);
     setFilterTagIds([]);
     setQuery("");
-    setManageOpen(false);
+    setMobileScreen("folders");
   }
 
   function handleSelectFolder(id: string) {
     setSelectedFolderId(id);
     setSelectedId(null);
-    setManageOpen(false);
     if (id === TRASH) setFilterTagIds([]);
+    if (compact) setMobileScreen("collection");
   }
 
-  const handleSelectNote = useCallback((id: string) => setSelectedId(id), []);
+  const handleSelectNote = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      setListPreferences((current) => ({
+        ...current,
+        [viewAs]: rememberRecent(current[viewAs], id),
+      }));
+      if (compact) setMobileScreen("note");
+    },
+    [compact, viewAs],
+  );
+
+  function handleOpenRecent(id: string) {
+    setQuery("");
+    setFilterTagIds([]);
+    setSelectedFolderId(ALL);
+    handleSelectNote(id);
+  }
 
   function handleMobileBack() {
     saveNow();
-    setSelectedId(null);
+    if (mobileScreen === "note") {
+      setSelectedId(null);
+      setMobileScreen("collection");
+    } else {
+      setMobileScreen("folders");
+    }
   }
 
   function handleLock() {
@@ -765,151 +893,91 @@ function NotesPage() {
     </span>
   );
 
+  const pinned = selected
+    ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true
+    : false;
+  const recentNotes = storedPreferences.recentNoteIds
+    .filter((id) => id !== selectedId)
+    .map((id) => entries.find((entry) => entry.note.id === id)?.note)
+    .filter((note): note is Note => Boolean(note))
+    .map((note) => ({ id: note.id, title: note.title }));
+  const canManageFolder = ![ALL, UNFILED, TRASH].includes(selectedFolderId);
+  const collectionActions = (
+    <CollectionMenu
+      preferences={activeListPreferences}
+      folderName={folderLabel}
+      canManageFolder={canManageFolder}
+      onChange={handleListPreferencesChange}
+      onNewFolder={handleCreateFolder}
+      onRenameFolder={handleRenameFolder}
+      onDeleteFolder={handleDeleteFolder}
+    />
+  );
+  const noteActions = selected ? (
+    <>
+      <span className="mr-2">{saveReadout}</span>
+      <button
+        type="button"
+        aria-label="Find in note"
+        className="toolbar-button"
+        onClick={() => noteEditorRef.current?.openFind()}
+      >
+        <Search size={16} />
+      </button>
+      <NoteMenu
+        pinned={pinned}
+        folders={activeMeta.folders}
+        recent={recentNotes}
+        onTogglePin={() => handleTogglePin(selected.note.id)}
+        onFind={() => noteEditorRef.current?.openFind()}
+        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+        onRecent={handleOpenRecent}
+        onDelete={() => handleMoveToTrash(selected)}
+      />
+    </>
+  ) : null;
+
   if (compact) {
-    const listing = !selectedId;
-
     return (
-      <div className="flex flex-col overflow-hidden" style={{ height: "100dvh" }}>
-        {/* The phone has two screens: the notes, and a note. The archive is the
-            one piece of state worth a permanent place in the bar. */}
-        <header
-          className="mobile-topbar flex min-h-14 shrink-0 items-center gap-2 px-3"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
-        >
-          {listing ? (
-            <div
-              role="group"
-              aria-label="Archive"
-              className="flex min-w-0 flex-1 rounded-xl border border-rule bg-paper p-1"
-            >
-              {(
-                [
-                  ["u1", "My notes"],
-                  ["u2", `${partnerName}'s notes`],
-                ] as const
-              ).map(([owner, label]) => (
-                <button
-                  key={owner}
-                  type="button"
-                  onClick={() => handleViewChange(owner)}
-                  aria-pressed={viewAs === owner}
-                  className={`label min-h-9 min-w-0 flex-1 truncate rounded-lg px-3 transition-colors ${
-                    viewAs === owner ? "bg-accent text-on-accent" : "text-ink-3"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleMobileBack}
-                aria-label="Back to notes"
-                className="icon-button flex h-11 min-w-11 shrink-0 items-center gap-0.5 px-1 text-accent"
-              >
-                <ChevronLeft size={21} strokeWidth={2.2} />
-                <span className="max-w-32 truncate text-[14px] font-medium">{folderLabel}</span>
-              </button>
-              <span className="min-w-0 flex-1" />
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={handleLock}
-            aria-label="Lock and sign out"
-            className="icon-button flex h-11 w-11 shrink-0 items-center justify-center text-ink-3"
-          >
-            <Lock size={16} strokeWidth={2} />
-          </button>
-        </header>
-
+      <div className="mobile-workspace overflow-hidden" style={{ height: "100dvh" }}>
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
-          <main className="flex min-h-0 flex-1 overflow-hidden">
-            {listing && (
-              <NoteList
-                mobile
-                entries={visible}
-                meta={activeMeta}
-                selectedId={selectedId}
-                query={query}
-                loading={loading}
-                busy={saving}
-                folderLabel={folderLabel}
-                trashMode={selectedFolderId === TRASH}
-                searchRef={searchRef}
-                onQueryChange={setQuery}
-                onSelect={handleSelectNote}
-                onNew={handleNew}
-                onMoveToTrash={handleMoveToTrash}
-                onRestore={handleRestore}
-                onDeleteForever={handleDeleteForever}
-                onTogglePin={handleTogglePin}
-                scopes={
-                  <MobileScopes
-                    entries={ownedEntries}
-                    meta={activeMeta}
-                    selectedFolderId={selectedFolderId}
-                    filterTagIds={filterTagIds}
-                    onSelectFolder={handleSelectFolder}
-                    onFilterTagsChange={setFilterTagIds}
-                    onManage={() => setManageOpen(true)}
-                  />
-                }
-              />
-            )}
-
-            {selectedId && (
-              <Suspense fallback={<div className="h-full w-full bg-page" />}>
-                <NoteEditor
-                  key={selected?.note.id ?? "empty"}
-                  mobile
-                  entry={selected}
-                  meta={activeMeta}
-                  syncRevision={syncRevision}
-                  canEdit={canEdit}
-                  viewingAsPartner={viewAs === "u2"}
-                  partnerName={partnerName}
-                  titleRef={titleRef}
-                  onEdited={schedule}
-                  onTagsChange={handleTagsChange}
-                  pinned={
-                    selected
-                      ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true
-                      : false
-                  }
-                  onTogglePin={() => selected && handleTogglePin(selected.note.id)}
-                  onNew={handleNew}
-                  onUploadImage={handleUploadImage}
-                  resolveImage={resolveImage}
-                />
-              </Suspense>
-            )}
-          </main>
-
-          {/* Folders and tags are maintenance. They come up over the list and
-              go away again; they are not a screen the reader passes through. */}
-          {manageOpen && (
-            <>
-              <div className="sheet-scrim" onClick={() => setManageOpen(false)} aria-hidden />
-              <div role="dialog" aria-modal="true" aria-label="Folders and tags" className="sheet">
-                <span aria-hidden className="sheet-grip" />
-                <div className="flex shrink-0 items-center justify-between px-5 pt-3 pb-1">
-                  <h2 className="font-display text-[17px] font-semibold text-ink">
-                    Folders and tags
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setManageOpen(false)}
-                    aria-label="Close"
-                    className="icon-button flex h-9 w-9 items-center justify-center text-ink-3"
+          <main className="h-full overflow-hidden">
+            {mobileScreen === "folders" && (
+              <section className="mobile-screen mobile-folders-screen flex h-full flex-col">
+                <header
+                  className="mobile-screen-header shrink-0 px-5 pb-4"
+                  style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+                >
+                  <div className="flex items-center">
+                    <MainMenu onSettings={() => setSettingsOpen(true)} onLock={handleLock} />
+                  </div>
+                  <h1 className="mt-8 font-display text-[2.6rem] font-semibold tracking-[-0.045em]">
+                    Folders
+                  </h1>
+                  <div
+                    role="group"
+                    aria-label="Archive"
+                    className="archive-switch glass-toolbar mt-5 flex p-1"
                   >
-                    <X size={17} strokeWidth={2.2} />
-                  </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+                    {(
+                      [
+                        ["u1", "My notes"],
+                        ["u2", `${partnerName}'s notes`],
+                      ] as const
+                    ).map(([owner, label]) => (
+                      <button
+                        key={owner}
+                        type="button"
+                        onClick={() => handleViewChange(owner)}
+                        aria-pressed={viewAs === owner}
+                        className={`min-w-0 flex-1 truncate px-3 py-2 text-sm ${viewAs === owner ? "is-active" : ""}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </header>
+                <div className="min-h-0 flex-1 overflow-y-auto pb-8">
                   <FolderRail
                     mobile
                     entries={ownedEntries}
@@ -921,78 +989,103 @@ function NotesPage() {
                     onMetaChange={handleMetaChange}
                   />
                 </div>
-              </div>
-            </>
-          )}
-        </DndContext>
+              </section>
+            )}
 
-        {selectedId && <AxisBar compact>{saveReadout}</AxisBar>}
+            {mobileScreen === "collection" && (
+              <section className="mobile-screen flex h-full flex-col">
+                <nav
+                  className="mobile-backbar flex shrink-0 items-center px-3"
+                  style={{ paddingTop: "env(safe-area-inset-top)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleMobileBack}
+                    aria-label="Back to folders"
+                    className="mobile-back"
+                  >
+                    <ChevronLeft size={22} />
+                    Folders
+                  </button>
+                </nav>
+                <NoteList
+                  mobile
+                  entries={visible}
+                  groups={noteGroups}
+                  view={activeListPreferences.view}
+                  toolbarActions={collectionActions}
+                  meta={activeMeta}
+                  selectedId={selectedId}
+                  query={query}
+                  loading={loading}
+                  busy={saving}
+                  folderLabel={folderLabel}
+                  trashMode={selectedFolderId === TRASH}
+                  searchRef={searchRef}
+                  onQueryChange={setQuery}
+                  onSelect={handleSelectNote}
+                  onNew={handleNew}
+                  onMoveToTrash={handleMoveToTrash}
+                  onRestore={handleRestore}
+                  onDeleteForever={handleDeleteForever}
+                  onTogglePin={handleTogglePin}
+                />
+              </section>
+            )}
+
+            {mobileScreen === "note" && selectedId && (
+              <section className="mobile-screen flex h-full flex-col">
+                <nav
+                  className="mobile-backbar flex shrink-0 items-center px-3"
+                  style={{ paddingTop: "env(safe-area-inset-top)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleMobileBack}
+                    aria-label={`Back to ${folderLabel}`}
+                    className="mobile-back"
+                  >
+                    <ChevronLeft size={22} />
+                    <span className="max-w-48 truncate">{folderLabel}</span>
+                  </button>
+                </nav>
+                <Suspense fallback={<div className="h-full w-full bg-page" />}>
+                  <NoteEditor
+                    ref={noteEditorRef}
+                    key={selected?.note.id ?? "empty"}
+                    mobile
+                    entry={selected}
+                    meta={activeMeta}
+                    syncRevision={syncRevision}
+                    canEdit={canEdit}
+                    viewingAsPartner={viewAs === "u2"}
+                    partnerName={partnerName}
+                    titleRef={titleRef}
+                    onEdited={schedule}
+                    onTagsChange={handleTagsChange}
+                    onNew={handleNew}
+                    onUploadImage={handleUploadImage}
+                    resolveImage={resolveImage}
+                    headerActions={noteActions}
+                  />
+                </Suspense>
+              </section>
+            )}
+          </main>
+        </DndContext>
+        <SettingsPanel
+          open={settingsOpen}
+          preferences={storedPreferences.defaults}
+          onClose={() => setSettingsOpen(false)}
+          onPreferencesChange={handleDefaultPreferencesChange}
+          onLock={handleLock}
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-4 px-5">
-        <span
-          className="font-display text-[15px] text-ink"
-          style={{ fontVariationSettings: '"wght" 640, "opsz" 16', letterSpacing: "-0.02em" }}
-        >
-          Notes
-        </span>
-
-        <button
-          onClick={() => setNavigationOpen((open) => !open)}
-          aria-label={navigationOpen ? "Hide navigation" : "Show navigation"}
-          aria-pressed={!navigationOpen}
-          title={navigationOpen ? "Hide navigation" : "Show navigation"}
-          className="icon-button p-2 text-ink-3"
-        >
-          {navigationOpen ? (
-            <PanelLeftClose size={16} strokeWidth={1.9} />
-          ) : (
-            <PanelLeftOpen size={16} strokeWidth={1.9} />
-          )}
-        </button>
-
-        <div
-          role="group"
-          aria-label="Archive"
-          className="flex min-w-52 rounded-xl border border-rule bg-paper p-1"
-        >
-          {(
-            [
-              ["u1", "My notes"],
-              ["u2", `${partnerName}'s notes`],
-            ] as const
-          ).map(([owner, label]) => (
-            <button
-              key={owner}
-              onClick={() => handleViewChange(owner)}
-              aria-pressed={viewAs === owner}
-              className={`label min-w-0 flex-1 truncate rounded-lg px-3 py-1.5 transition-colors ${
-                viewAs === owner
-                  ? "bg-accent text-on-accent"
-                  : "text-ink-3 hover:bg-page hover:text-ink"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <span className="ml-auto flex items-center gap-3">
-          <button
-            onClick={handleLock}
-            title="Lock and sign out"
-            className="label icon-button flex items-center gap-1.5 px-2.5 py-1.5 text-ink-3"
-          >
-            <Lock size={12} strokeWidth={2} />
-            Lock
-          </button>
-        </span>
-      </header>
-
+    <div className="workspace-shell h-screen overflow-hidden">
       <DndContext
         key="desktop-dnd"
         sensors={sensors}
@@ -1000,21 +1093,59 @@ function NotesPage() {
         onDragCancel={() => setDragId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex min-h-0 flex-1 gap-3 px-3 pb-3">
+        <div className="workspace-grid flex h-full min-h-0">
           {navigationOpen && (
             <>
-              <FolderRail
-                entries={ownedEntries}
-                meta={activeMeta}
-                selectedFolderId={selectedFolderId}
-                filterTagIds={filterTagIds}
-                onSelectFolder={handleSelectFolder}
-                onFilterTagsChange={setFilterTagIds}
-                onMetaChange={handleMetaChange}
-              />
+              <section className="folder-column flex w-[248px] shrink-0 flex-col">
+                <header className="folder-toolbar flex h-13 shrink-0 items-center border-b border-rule px-3">
+                  <MainMenu onSettings={() => setSettingsOpen(true)} onLock={handleLock} />
+                  <div
+                    role="group"
+                    aria-label="Archive"
+                    className="archive-switch ml-2 flex min-w-0 flex-1"
+                  >
+                    {(
+                      [
+                        ["u1", "Mine"],
+                        ["u2", partnerName],
+                      ] as const
+                    ).map(([owner, label]) => (
+                      <button
+                        key={owner}
+                        type="button"
+                        onClick={() => handleViewChange(owner)}
+                        aria-pressed={viewAs === owner}
+                        className={`min-w-0 flex-1 truncate px-2 py-1.5 text-xs ${viewAs === owner ? "is-active" : ""}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNavigationOpen(false)}
+                    aria-label="Hide navigation"
+                    className="toolbar-button ml-1"
+                  >
+                    <PanelLeftClose size={16} />
+                  </button>
+                </header>
+                <FolderRail
+                  entries={ownedEntries}
+                  meta={activeMeta}
+                  selectedFolderId={selectedFolderId}
+                  filterTagIds={filterTagIds}
+                  onSelectFolder={handleSelectFolder}
+                  onFilterTagsChange={setFilterTagIds}
+                  onMetaChange={handleMetaChange}
+                />
+              </section>
 
               <NoteList
                 entries={visible}
+                groups={noteGroups}
+                view={activeListPreferences.view}
+                toolbarActions={collectionActions}
                 meta={activeMeta}
                 selectedId={selectedId}
                 query={query}
@@ -1024,7 +1155,7 @@ function NotesPage() {
                 trashMode={selectedFolderId === TRASH}
                 searchRef={searchRef}
                 onQueryChange={setQuery}
-                onSelect={setSelectedId}
+                onSelect={handleSelectNote}
                 onNew={handleNew}
                 onMoveToTrash={handleMoveToTrash}
                 onRestore={handleRestore}
@@ -1045,6 +1176,7 @@ function NotesPage() {
             }
           >
             <NoteEditor
+              ref={noteEditorRef}
               key={selected?.note.id ?? "empty"}
               entry={selected}
               meta={activeMeta}
@@ -1055,13 +1187,24 @@ function NotesPage() {
               titleRef={titleRef}
               onEdited={schedule}
               onTagsChange={handleTagsChange}
-              pinned={
-                selected ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true : false
-              }
-              onTogglePin={() => selected && handleTogglePin(selected.note.id)}
               onNew={handleNew}
               onUploadImage={handleUploadImage}
               resolveImage={resolveImage}
+              headerActions={
+                <>
+                  {!navigationOpen && (
+                    <button
+                      type="button"
+                      onClick={() => setNavigationOpen(true)}
+                      aria-label="Show navigation"
+                      className="toolbar-button mr-1"
+                    >
+                      <PanelLeftOpen size={16} />
+                    </button>
+                  )}
+                  {noteActions}
+                </>
+              }
             />
           </Suspense>
         </div>
@@ -1074,8 +1217,13 @@ function NotesPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      <AxisBar>{saveReadout}</AxisBar>
+      <SettingsPanel
+        open={settingsOpen}
+        preferences={storedPreferences.defaults}
+        onClose={() => setSettingsOpen(false)}
+        onPreferencesChange={handleDefaultPreferencesChange}
+        onLock={handleLock}
+      />
     </div>
   );
 }

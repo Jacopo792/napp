@@ -2,56 +2,43 @@
 @import "tailwindcss" source(none);
 @source "../src";
 
-/* ── The palette ─────────────────────────────────────────────────────────────
-   One world, and it is a warm near-black. Three grounds, ordered by how close
-   they sit to the writing:
-
-     --surface   app ground, behind everything   (furthest from the words)
-     --paper     rail and catalogue              (middle)
-     --page      the note itself                 (where the words go)
-
-   The page the words live on stays the calmest and lightest surface on screen.
-   Hues are warm charcoal at almost no chroma, so the grounds read as ink and
-   paper rather than as blue steel; the accent is a herbal sage that belongs to
-   the same world as the botanical drawing on the sign-in screen.
-
-   Every text pair clears AA. The weakest, --ink-4 on --page, measures 5.6:1.
-   ──────────────────────────────────────────────────────────────────────────── */
+/* Midnight Instrument: graphite architecture with a single pale-gold signal.
+   The note is the lightest plane; glass appears only on controls that float. */
 :root {
   color-scheme: dark;
 
-  --page: oklch(0.238 0.006 68);
-  --paper: oklch(0.196 0.006 68);
-  --surface: oklch(0.152 0.006 68);
+  --page: #17191f;
+  --paper: #111318;
+  --surface: #090a0d;
 
-  --ink: oklch(0.965 0.004 80);
-  --ink-2: oklch(0.828 0.007 80);
-  --ink-3: oklch(0.715 0.009 80);
-  --ink-4: oklch(0.672 0.01 80);
+  --ink: #f3f2ed;
+  --ink-2: #d3d1ca;
+  --ink-3: #aaa9a4;
+  --ink-4: #858681;
 
-  --rule: oklch(0.345 0.008 68);
-  --rule-soft: oklch(0.278 0.007 68);
+  --rule: #2b2d34;
+  --rule-soft: #23252b;
 
-  --accent: oklch(0.792 0.078 152);
-  --accent-strong: oklch(0.872 0.062 152);
-  --accent-wash: oklch(0.325 0.045 152);
-  --on-accent: oklch(0.175 0.03 152);
+  --accent: #d8b866;
+  --accent-strong: #e7ca7b;
+  --accent-wash: rgb(216 184 102 / 0.15);
+  --on-accent: #17130a;
 
-  --danger: oklch(0.712 0.15 25);
-  --ok: oklch(0.845 0.14 148);
+  --danger: #ff6b72;
+  --ok: #8fd6c2;
 
   /* ── The material ─────────────────────────────────────────────────────────
      Layered opaque surfaces with a lit top edge. The ground is flat, so depth
      comes from the surface steps and the hairline, not from a filter. */
-  --glass-border: oklch(1 0 0 / 0.095);
-  --glass-highlight: oklch(1 0 0 / 0.11);
+  --glass: rgb(37 39 46 / 0.7);
+  --glass-border: rgb(255 255 255 / 0.13);
+  --glass-highlight: rgb(255 255 255 / 0.17);
 
-  --shadow-soft:
-    0 1px 2px oklch(0 0 0 / 0.45), 0 18px 40px -12px oklch(0 0 0 / 0.55);
+  --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.45), 0 18px 40px -12px oklch(0 0 0 / 0.55);
   --shadow-popover: 0 8px 20px oklch(0 0 0 / 0.3), 0 28px 64px -16px oklch(0 0 0 / 0.7);
   --radius-sm: 0.625rem;
   --radius-md: 0.9rem;
-  --radius-lg: 1.5rem;
+  --radius-lg: 1.15rem;
   --radius-pill: 999px;
 
   /* Reading axes — written by lib/axes.ts, read by the title and the editor.
@@ -120,7 +107,6 @@
     font-family: inherit;
     color: inherit;
   }
-
 
   /* Surfaces the browser draws for us still belong to the design. */
   ::selection {
@@ -329,7 +315,9 @@
   font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
   line-height: 1.14;
   letter-spacing: -0.028em;
-  font-variation-settings: "wght" 620, "opsz" 42;
+  font-variation-settings:
+    "wght" 620,
+    "opsz" 42;
   /* Hyphenate only words long enough that breaking them beats a ragged hole.
      Without the limit a display title starts splitting "per-ché", which reads
      as damage rather than typesetting. */
@@ -438,6 +426,554 @@
 @media (prefers-reduced-motion: reduce) {
   .page-in,
   .skeleton {
+    animation: none;
+  }
+}
+
+/* ── Midnight Instrument shell ─────────────────────────────────────────── */
+.workspace-shell,
+.mobile-workspace {
+  background: var(--surface);
+}
+
+.workspace-grid {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.folder-column,
+.collection-column,
+.editor-shell {
+  min-height: 0;
+  background: var(--paper);
+}
+
+.folder-column,
+.collection-column {
+  border-right: 1px solid var(--rule);
+}
+
+.editor-shell {
+  background: var(--page);
+}
+
+.folder-column > .folder-rail,
+.collection-column,
+.workspace-grid > .editor-shell,
+.workspace-grid .soft-pane,
+.editor-shell.soft-pane {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.folder-column > .folder-rail {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  background: transparent;
+}
+
+.folder-toolbar,
+.collection-toolbar,
+.editor-toolbar {
+  background: rgb(18 20 25 / 0.92);
+}
+
+.toolbar-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  color: var(--ink-3);
+  transition:
+    color 180ms var(--ease),
+    background-color 180ms var(--ease),
+    border-color 180ms var(--ease);
+}
+
+.toolbar-button:hover,
+.icon-button:hover {
+  border-color: var(--rule);
+  background: rgb(255 255 255 / 0.045);
+  color: var(--ink);
+}
+
+.archive-switch {
+  gap: 0.15rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  background: rgb(9 10 13 / 0.5);
+}
+
+.archive-switch button {
+  border-radius: 0.55rem;
+  color: var(--ink-4);
+  transition: 180ms var(--ease);
+}
+
+.archive-switch button.is-active {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgb(216 184 102 / 0.24);
+}
+
+.glass-toolbar,
+.glass-search,
+.popover,
+.glass-sheet {
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 10px 32px rgb(0 0 0 / 0.34);
+  -webkit-backdrop-filter: blur(22px) saturate(115%);
+  backdrop-filter: blur(22px) saturate(115%);
+}
+
+.glass-toolbar,
+.glass-search {
+  border-radius: 1rem;
+}
+
+.popover,
+.glass-sheet {
+  border-radius: 1.05rem;
+}
+
+.menu-popover {
+  overflow: hidden;
+  transform-origin: top right;
+  animation: menu-reveal 190ms var(--ease) both;
+}
+
+@keyframes menu-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+
+.menu-row {
+  display: flex;
+  width: 100%;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.7rem;
+  border-radius: 0.72rem;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 520;
+  transition:
+    background-color 160ms var(--ease),
+    color 160ms var(--ease);
+}
+
+.menu-row:hover,
+.menu-row:focus-visible {
+  background: rgb(255 255 255 / 0.065);
+  color: var(--ink);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 0.35rem 0.45rem;
+  background: var(--rule);
+}
+
+.menu-label {
+  padding: 0.45rem 0.7rem 0.25rem;
+  color: var(--ink-4);
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.menu-input {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  padding: 0.55rem 0.65rem;
+  font-size: 0.85rem;
+  outline: 0;
+}
+
+.menu-input:focus {
+  border-color: var(--accent);
+}
+
+.menu-small-button {
+  border-radius: 0.55rem;
+  padding: 0.4rem 0.65rem;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+}
+
+.menu-small-button.is-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 650;
+}
+
+.collection-column.is-gallery {
+  width: clamp(32rem, 43vw, 46rem);
+}
+
+.note-group-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 1.2rem 1rem 0.55rem;
+}
+
+.note-group-heading.is-first {
+  padding-top: 0.45rem;
+}
+
+.note-group-heading h3 {
+  color: var(--ink-2);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.note-group-heading span {
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+}
+
+.note-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding: 0 0.75rem;
+}
+
+@media (min-width: 1500px) {
+  .collection-column.is-gallery {
+    width: min(48vw, 58rem);
+  }
+
+  .note-gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.note-gallery-item {
+  min-height: 10.5rem;
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 0.018);
+}
+
+.find-bar {
+  position: relative;
+  z-index: 20;
+}
+
+.editor-tool-cluster {
+  height: 2.35rem;
+  gap: 0.1rem;
+  border-radius: 0.85rem;
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 8px 22px rgb(0 0 0 / 0.24);
+}
+
+.editor-tool-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.55rem;
+  color: var(--ink-2);
+  transition:
+    color 160ms var(--ease),
+    background-color 160ms var(--ease);
+}
+
+.editor-tool-button:hover,
+.editor-tool-button.is-active {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.page-in {
+  animation: none;
+}
+
+/* Settings are part of the app shell, not a footer bolted beneath it. */
+.settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.settings-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgb(0 0 0 / 0.58);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.settings-panel {
+  position: relative;
+  display: flex;
+  width: min(34rem, 100%);
+  max-height: min(46rem, calc(100dvh - 2.5rem));
+  flex-direction: column;
+  overflow: hidden;
+  animation: settings-reveal 220ms var(--ease) both;
+}
+
+@keyframes settings-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+.settings-scroll {
+  overflow-y: auto;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.settings-scroll > section {
+  padding: 1.4rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.settings-scroll > section:last-child {
+  border-bottom: 0;
+}
+
+.settings-scroll h3 {
+  margin-bottom: 0.8rem;
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.settings-presets,
+.settings-choice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.settings-presets button,
+.settings-choice button {
+  display: flex;
+  min-height: 3.4rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.settings-presets button.is-active,
+.settings-choice button.is-active {
+  border-color: rgb(216 184 102 / 0.45);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.settings-presets small {
+  color: var(--ink-4);
+  font-size: 0.62rem;
+}
+
+.settings-sliders {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 1rem;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+}
+
+.settings-field output {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+}
+
+.settings-field input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings-choice {
+  grid-template-columns: 1fr 1fr;
+}
+
+.settings-choice button {
+  min-height: 2.7rem;
+  flex-direction: row;
+  align-items: center;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.settings-toggle span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.settings-toggle b {
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.settings-toggle small {
+  color: var(--ink-4);
+  font-size: 0.72rem;
+}
+
+.settings-toggle input {
+  accent-color: var(--accent);
+}
+
+.settings-lock {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--ink-2);
+  font-size: 0.84rem;
+}
+
+/* Phone navigation is a real stack: folders, collection, then note. */
+.mobile-screen {
+  background: var(--surface);
+  animation: mobile-push 220ms var(--ease) both;
+}
+
+@keyframes mobile-push {
+  from {
+    opacity: 0.92;
+    transform: translateX(14px);
+  }
+}
+
+.mobile-screen-header,
+.mobile-backbar {
+  background: var(--surface);
+}
+
+.mobile-backbar {
+  min-height: 3.25rem;
+}
+
+.mobile-back {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 550;
+}
+
+.mobile-screen > .editor-shell {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.mobile-folders-screen .mobile-folder-row {
+  margin: 0 0.75rem;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.mobile-folders-screen .mobile-folder-row:first-child {
+  border-top: 0;
+}
+
+.mobile-note-list {
+  background: var(--paper);
+}
+
+.mobile-note-list .collection-toolbar {
+  min-height: 6.5rem;
+  background: var(--paper);
+}
+
+.mobile-note-list .note-group-heading {
+  padding-inline: 1.25rem;
+}
+
+.mobile-note-list .note-gallery-grid {
+  gap: 0.55rem;
+  padding-inline: 0.75rem;
+}
+
+.mobile-compose {
+  color: var(--accent);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-toolbar,
+  .glass-search,
+  .popover,
+  .glass-sheet {
+    background: #25272e;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-toolbar,
+  .glass-search,
+  .popover,
+  .glass-sheet,
+  .settings-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .glass-toolbar,
+  .glass-search,
+  .popover,
+  .glass-sheet {
+    background: #25272e;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-popover,
+  .settings-panel,
+  .mobile-screen {
     animation: none;
   }
 }

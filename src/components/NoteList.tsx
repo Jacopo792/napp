@@ -1,16 +1,18 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Pin, RotateCcw, Search, SquarePen, Trash2, X } from "lucide-react";
 import { TAG_COLORS, type Meta, type Tag as TagType } from "@/lib/types";
 import { formatCount, formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import type { NoteEntry } from "@/lib/entries";
+import type { ListView, NoteGroup } from "@/lib/listPreferences";
 
 interface Props {
   mobile?: boolean;
-  /** The phone's scope strip, rendered under the search field. */
-  scopes?: React.ReactNode;
   entries: NoteEntry[];
+  groups?: NoteGroup[];
+  view?: ListView;
+  toolbarActions?: ReactNode;
   meta: Meta;
   selectedId: string | null;
   query: string;
@@ -35,6 +37,7 @@ interface Props {
 
 const Row = memo(function Row({
   mobile,
+  gallery,
   entry,
   index,
   meta,
@@ -47,6 +50,7 @@ const Row = memo(function Row({
   onTogglePin,
 }: {
   mobile: boolean;
+  gallery: boolean;
   entry: NoteEntry;
   index: number;
   meta: Meta;
@@ -98,23 +102,25 @@ const Row = memo(function Row({
       aria-selected={selected}
       onClick={() => onSelect(entry)}
       style={{ opacity: isDragging ? 0.4 : 1 }}
-      className={`group relative flex cursor-pointer gap-3 transition-colors ${
-        mobile
+      className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex-col" : "flex gap-3"} ${
+        mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
-          : "mx-2 mb-1 touch-none rounded-xl border px-3 py-3"
+          : gallery
+            ? "touch-pan-y border border-rule-soft p-4"
+            : "mx-2 mb-1 touch-none border-b border-rule-soft px-3 py-3"
       } ${
         selected
           ? mobile
             ? "bg-accent-wash"
-            : "border-rule bg-page shadow-sm"
+            : "bg-accent-wash"
           : mobile
             ? "hover:bg-page"
-            : "border-transparent hover:border-rule-soft hover:bg-page"
+            : "hover:bg-page"
       }`}
     >
       {/* The running number is the keyboard target and the position in the
           current sort — information, not ornament. */}
-      {!mobile && (
+      {!mobile && !gallery && (
         <span
           aria-hidden
           className={`readout flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
@@ -127,13 +133,13 @@ const Row = memo(function Row({
 
       <div className="min-w-0 flex-1">
         <p
-          className={`${mobile ? "text-[16px]" : "text-[13.5px]"} leading-[1.35] ${
+          className={`${gallery ? "text-[15px]" : mobile ? "text-[16px]" : "text-[13.5px]"} leading-[1.35] ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           style={{
             fontVariationSettings: '"wght" 500, "opsz" 16',
             display: "-webkit-box",
-            WebkitLineClamp: 3,
+            WebkitLineClamp: gallery ? 4 : 3,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}
@@ -272,8 +278,10 @@ function Skeletons() {
 
 export function NoteList({
   mobile = false,
-  scopes,
   entries,
+  groups = [{ id: "notes", label: "Notes", entries }],
+  view = "list",
+  toolbarActions,
   meta,
   selectedId,
   query,
@@ -298,12 +306,53 @@ export function NoteList({
     (entry: NoteEntry) => onTogglePin(entry.note.id),
     [onTogglePin],
   );
+  const gallery = view === "gallery";
+
+  const renderedGroups = groups.map((group, groupIndex) => (
+    <section key={group.id} className="note-group" aria-labelledby={`note-group-${group.id}`}>
+      <div className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}>
+        <h3 id={`note-group-${group.id}`}>{group.label}</h3>
+        <span>{group.entries.length}</span>
+      </div>
+      <div className={gallery ? "note-gallery-grid" : ""}>
+        {group.entries.map((entry, index) => (
+          <Row
+            mobile={mobile}
+            gallery={gallery}
+            key={entry.note.id}
+            entry={entry}
+            index={index}
+            meta={meta}
+            selected={selectedId === entry.note.id}
+            trashMode={trashMode}
+            onSelect={selectEntry}
+            onMoveToTrash={onMoveToTrash}
+            onRestore={onRestore}
+            onDeleteForever={onDeleteForever}
+            onTogglePin={togglePinEntry}
+          />
+        ))}
+      </div>
+    </section>
+  ));
 
   if (mobile) {
     return (
       <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden">
-        <div className="shrink-0 px-4 pt-1">
-          <div className="flex h-11 items-center gap-2 rounded-xl bg-paper px-3.5 ring-1 ring-rule-soft">
+        <header className="collection-toolbar flex shrink-0 items-end px-5 pt-5 pb-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-[2rem] font-semibold leading-none tracking-[-0.035em]">
+              {folderLabel}
+            </h1>
+            <p className="readout mt-1.5 text-ink-4">
+              {loading ? "Loading" : `${entries.length} notes`}
+            </p>
+          </div>
+          <span className="flex items-center gap-1">{toolbarActions}</span>
+        </header>
+
+        <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
+          <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
             <Search size={16} strokeWidth={2} className="shrink-0 text-ink-4" />
             <input
               ref={searchRef}
@@ -332,14 +381,12 @@ export function NoteList({
           </div>
         </div>
 
-        {scopes}
-
         <div
           role="listbox"
           aria-label={`Notes in ${folderLabel}`}
-          className="min-h-0 flex-1 overflow-y-auto px-4 pb-24"
+          className="min-h-0 flex-1 overflow-y-auto pb-24"
         >
-          <div className="mobile-card overflow-hidden bg-paper">
+          <div>
             {loading ? (
               <Skeletons />
             ) : entries.length === 0 ? (
@@ -357,22 +404,7 @@ export function NoteList({
                 )}
               </div>
             ) : (
-              entries.map((entry, index) => (
-                <Row
-                  mobile
-                  key={entry.note.id}
-                  entry={entry}
-                  index={index}
-                  meta={meta}
-                  selected={selectedId === entry.note.id}
-                  trashMode={trashMode}
-                  onSelect={selectEntry}
-                  onMoveToTrash={onMoveToTrash}
-                  onRestore={onRestore}
-                  onDeleteForever={onDeleteForever}
-                  onTogglePin={togglePinEntry}
-                />
-              ))
+              renderedGroups
             )}
           </div>
         </div>
@@ -383,7 +415,7 @@ export function NoteList({
             onClick={onNew}
             disabled={busy || loading}
             aria-label="New note"
-            className="mobile-compose absolute right-5 bottom-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-lg disabled:opacity-40"
+            className="mobile-compose glass-toolbar absolute right-5 bottom-5 flex h-13 w-13 items-center justify-center text-accent disabled:opacity-40"
           >
             <SquarePen size={23} strokeWidth={1.9} />
           </button>
@@ -394,11 +426,19 @@ export function NoteList({
 
   return (
     <section
-      className={`flex shrink-0 flex-col ${
-        mobile ? "mobile-note-list h-full w-full border-0" : "soft-pane pane-glass w-[360px]"
-      }`}
+      className={`collection-column flex shrink-0 flex-col ${gallery ? "is-gallery" : "w-[380px]"}`}
     >
-      <div className="soft-control mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3 shadow-sm">
+      <header className="collection-toolbar flex h-13 shrink-0 items-center border-b border-rule px-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
+          <p className="readout mt-0.5 text-ink-4">
+            {loading ? "Loading" : `${entries.length} notes`}
+          </p>
+        </div>
+        <span className="flex items-center gap-1">{toolbarActions}</span>
+      </header>
+
+      <div className="glass-search mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3">
         <Search size={13} strokeWidth={2} className="shrink-0 text-ink-4" />
         <input
           ref={searchRef}
@@ -437,15 +477,10 @@ export function NoteList({
         )}
       </div>
 
-      <div className="field-row shrink-0 px-4 pt-3 pb-2">
-        <span className="label truncate text-ink-3">{hasQuery ? "Results" : folderLabel}</span>
-        <span className="readout shrink-0 text-ink-4">{loading ? "—" : entries.length}</span>
-      </div>
-
       <div
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
-        className="flex-1 overflow-y-auto pb-2"
+        className="flex-1 overflow-y-auto pt-2 pb-2"
       >
         {loading ? (
           <Skeletons />
@@ -464,22 +499,7 @@ export function NoteList({
             )}
           </div>
         ) : (
-          entries.map((e, i) => (
-            <Row
-              mobile={mobile}
-              key={e.note.id}
-              entry={e}
-              index={i}
-              meta={meta}
-              selected={selectedId === e.note.id}
-              trashMode={trashMode}
-              onSelect={selectEntry}
-              onMoveToTrash={onMoveToTrash}
-              onRestore={onRestore}
-              onDeleteForever={onDeleteForever}
-              onTogglePin={togglePinEntry}
-            />
-          ))
+          renderedGroups
         )}
       </div>
     </section>

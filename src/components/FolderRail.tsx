@@ -237,7 +237,7 @@ export function FolderRail({
 
   if (mobile) {
     return (
-      <aside className="mobile-folder-rail flex w-full flex-col overflow-y-auto">
+      <aside className="folder-rail mobile-folder-rail flex w-full flex-col overflow-y-auto">
         <p className="label px-5 pt-1 pb-2 text-ink-4">Folders</p>
 
         <div className="overflow-hidden">
@@ -406,7 +406,7 @@ export function FolderRail({
 
   return (
     <aside
-      className={`flex shrink-0 flex-col ${
+      className={`folder-rail flex shrink-0 flex-col ${
         mobile ? "mobile-folder-rail h-full w-full border-0" : "soft-pane pane-glass w-[224px]"
       }`}
     >

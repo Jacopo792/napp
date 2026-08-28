@@ -1,6 +1,7 @@
 import {
   Bold,
   ChevronDown,
+  ChevronUp,
   Code2,
   FileUp,
   Heading2,
@@ -8,15 +9,26 @@ import {
   Italic,
   Link,
   List,
+  ListChecks,
   ListOrdered,
   Minus,
-  Pin,
+  Paperclip,
   Plus,
   Quote,
   Strikethrough,
-  Type,
+  Search,
+  Table2,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Meta, Tag } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatCount, formatStamp } from "@/lib/format";
@@ -37,6 +49,8 @@ const FORMAT_ITEMS: {
   { action: "italic", label: "Italic", shortcut: "⌘I", icon: Italic },
   { action: "strike", label: "Strikethrough", icon: Strikethrough },
   { action: "heading", label: "Heading", icon: Heading2 },
+  { action: "checklist", label: "Checklist", icon: ListChecks },
+  { action: "table", label: "Table", icon: Table2 },
   { action: "bullet-list", label: "Bulleted list", icon: List },
   { action: "ordered-list", label: "Numbered list", icon: ListOrdered },
   { action: "quote", label: "Quote", icon: Quote },
@@ -58,11 +72,15 @@ interface Props {
   /** The draft store already holds the words; this only asks for a save. */
   onEdited: () => void;
   onTagsChange: (noteId: string, tagIds: string[]) => void;
-  pinned: boolean;
-  onTogglePin: () => void;
   onNew: () => void;
   onUploadImage: (file: File) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
+  headerActions?: ReactNode;
+}
+
+export interface NoteEditorHandle {
+  openFind: (query?: string) => void;
+  focus: () => void;
 }
 
 /* The page. Title, measurements and body all sit inside one column whose width
@@ -70,50 +88,85 @@ interface Props {
    introduces — the specimen's core arrangement, and the reason the title is
    not a full-bleed input bar. */
 
-export function NoteEditor({
-  mobile = false,
-  entry,
-  meta,
-  syncRevision,
-  canEdit,
-  viewingAsPartner,
-  partnerName,
-  titleRef,
-  onEdited,
-  onTagsChange,
-  pinned,
-  onTogglePin,
-  onNew,
-  onUploadImage,
-  resolveImage,
-}: Props) {
+export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
+  {
+    mobile = false,
+    entry,
+    meta,
+    syncRevision,
+    canEdit,
+    viewingAsPartner,
+    partnerName,
+    titleRef,
+    onEdited,
+    onTagsChange,
+    onNew,
+    onUploadImage,
+    resolveImage,
+    headerActions,
+  },
+  ref,
+) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
+  const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkLabel, setLinkLabel] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState("");
   const [pdfStatus, setPdfStatus] = useState("");
   const [pdfError, setPdfError] = useState("");
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findStatus, setFindStatus] = useState({ current: 0, total: 0 });
   const pickerRef = useRef<HTMLDivElement>(null);
   const formatRef = useRef<HTMLDivElement>(null);
+  const attachmentRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const linkUrlRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<MarkdownEditorHandle>(null);
+  const findRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    openFind(query = "") {
+      setFindOpen(true);
+      if (query) {
+        setFindQuery(query);
+        setFindStatus(editorRef.current?.setSearch(query) ?? { current: 0, total: 0 });
+      }
+      window.setTimeout(() => {
+        findRef.current?.focus();
+        findRef.current?.select();
+      }, 0);
+    },
+    focus() {
+      editorRef.current?.focus();
+    },
+  }));
+
+  function closeFind() {
+    setFindOpen(false);
+    setFindQuery("");
+    setFindStatus({ current: 0, total: 0 });
+    editorRef.current?.closeSearch();
+  }
 
   useEffect(() => {
-    if (!pickerOpen && !formatOpen && !linkOpen) return;
+    if (!pickerOpen && !formatOpen && !linkOpen && !attachmentOpen) return;
     function onDown(e: MouseEvent) {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
       if (formatRef.current && !formatRef.current.contains(e.target as Node)) {
         setFormatOpen(false);
         setLinkOpen(false);
       }
+      if (attachmentRef.current && !attachmentRef.current.contains(e.target as Node)) {
+        setAttachmentOpen(false);
+      }
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [pickerOpen, formatOpen, linkOpen]);
+  }, [pickerOpen, formatOpen, linkOpen, attachmentOpen]);
 
   /* Subscribed, not computed: the body is not React state, and this readout is
      the only thing in the page that tracks it while the words are being typed. */
@@ -217,7 +270,7 @@ export function NoteEditor({
         className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
         <div className="flex flex-1 items-center justify-center px-8">
-          <div className="measure rounded-2xl border border-rule-soft bg-paper px-8 py-12 text-center font-sans">
+          <div className="measure px-8 py-12 text-center font-sans">
             <p
               className="font-display text-ink-4"
               style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontVariationSettings: '"wght" 300' }}
@@ -243,7 +296,252 @@ export function NoteEditor({
       className={`editor-shell page-in flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
-      <header className={`shrink-0 ${mobile ? "px-5 pt-4 pb-3" : "px-10 pt-10 pb-5"}`}>
+      <div className="editor-toolbar relative flex h-13 shrink-0 items-center border-b border-rule px-4">
+        <span className="label text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
+
+        {!mobile && canEdit && (
+          <div className="editor-tool-cluster glass-toolbar absolute left-1/2 flex -translate-x-1/2 items-center p-1">
+            <div className="relative" ref={formatRef}>
+              <button
+                type="button"
+                aria-label="Formatting"
+                aria-expanded={formatOpen}
+                className={`editor-tool-button ${formatOpen ? "is-active" : ""}`}
+                onClick={() => {
+                  setAttachmentOpen(false);
+                  setFormatOpen((value) => !value);
+                }}
+              >
+                <span className="font-display text-[17px]">Aa</span>
+              </button>
+              {formatOpen && (
+                <div
+                  role="menu"
+                  aria-label="Formatting"
+                  className="popover menu-popover absolute top-full left-0 z-40 mt-2 w-60 p-1.5"
+                >
+                  {FORMAT_ITEMS.map(({ action, label, shortcut, icon: Icon }) => (
+                    <button
+                      key={action}
+                      role="menuitem"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        if (action === "link") openLinkForm();
+                        else {
+                          editorRef.current?.format(action);
+                          setFormatOpen(false);
+                        }
+                      }}
+                      className="menu-row"
+                    >
+                      <Icon size={15} strokeWidth={1.8} className="text-ink-3" />
+                      <span>{label}</span>
+                      {shortcut && <span className="readout ml-auto text-ink-4">{shortcut}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {linkOpen && (
+                <div className="popover absolute top-full left-0 z-40 mt-2 w-72 p-3">
+                  <p className="label mb-2 text-ink-2">Insert link</p>
+                  <label className="mb-2 block">
+                    <span className="label mb-1 block text-ink-4">Text</span>
+                    <input
+                      value={linkLabel}
+                      onChange={(event) => setLinkLabel(event.target.value)}
+                      placeholder="Link text (optional)"
+                      className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label mb-1 block text-ink-4">URL</span>
+                    <input
+                      ref={linkUrlRef}
+                      value={linkUrl}
+                      onChange={(event) => {
+                        setLinkUrl(event.target.value);
+                        setLinkError("");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleInsertLink();
+                        } else if (event.key === "Escape") setLinkOpen(false);
+                      }}
+                      placeholder="https://example.com"
+                      aria-invalid={linkError ? true : undefined}
+                      className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
+                    />
+                  </label>
+                  {linkError && (
+                    <p role="alert" className="mt-1.5 text-[11px] text-danger">
+                      {linkError}
+                    </p>
+                  )}
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLinkOpen(false)}
+                      className="menu-small-button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleInsertLink}
+                      className="menu-small-button is-primary"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              aria-label="Insert checklist"
+              className="editor-tool-button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => editorRef.current?.format("checklist")}
+            >
+              <ListChecks size={17} />
+            </button>
+            <button
+              type="button"
+              aria-label="Insert table"
+              className="editor-tool-button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => editorRef.current?.format("table")}
+            >
+              <Table2 size={17} />
+            </button>
+
+            <div className="relative" ref={attachmentRef}>
+              <button
+                type="button"
+                aria-label="Attachments"
+                aria-expanded={attachmentOpen}
+                className={`editor-tool-button ${attachmentOpen ? "is-active" : ""}`}
+                onClick={() => {
+                  setFormatOpen(false);
+                  setAttachmentOpen((value) => !value);
+                }}
+              >
+                <Paperclip size={17} />
+              </button>
+              {attachmentOpen && (
+                <div
+                  role="menu"
+                  aria-label="Attachments"
+                  className="popover menu-popover absolute top-full right-0 z-40 mt-2 w-56 p-1.5"
+                >
+                  <button
+                    role="menuitem"
+                    className="menu-row"
+                    onClick={() => {
+                      setAttachmentOpen(false);
+                      imageRef.current?.click();
+                    }}
+                  >
+                    <ImagePlus size={16} />
+                    Choose photo
+                  </button>
+                  <button
+                    role="menuitem"
+                    className="menu-row"
+                    onClick={() => {
+                      setAttachmentOpen(false);
+                      fileRef.current?.click();
+                    }}
+                  >
+                    <FileUp size={16} />
+                    Import PDF as text
+                  </button>
+                  <p className="px-3 py-2 text-[10px] leading-relaxed text-ink-4">
+                    Images are encrypted. PDFs are converted locally into editable text.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(event) => void handlePdf(event.target.files?.[0])}
+            />
+            <input
+              ref={imageRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={(event) => void handleImage(event.target.files?.[0])}
+            />
+          </div>
+        )}
+        <span className="ml-auto flex items-center gap-1">{headerActions}</span>
+      </div>
+
+      {findOpen && (
+        <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
+          <Search size={15} className="shrink-0 text-ink-4" />
+          <input
+            ref={findRef}
+            value={findQuery}
+            onChange={(event) => {
+              const next = event.target.value;
+              setFindQuery(next);
+              setFindStatus(editorRef.current?.setSearch(next) ?? { current: 0, total: 0 });
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                setFindStatus(
+                  event.shiftKey
+                    ? (editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
+                    : (editorRef.current?.findNext() ?? { current: 0, total: 0 }),
+                );
+              } else if (event.key === "Escape") closeFind();
+            }}
+            placeholder="Find in note"
+            aria-label="Find in note"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
+          />
+          <span className="readout min-w-12 text-right text-ink-4">
+            {findStatus.total ? `${findStatus.current}/${findStatus.total}` : "0/0"}
+          </span>
+          <button
+            type="button"
+            aria-label="Previous result"
+            className="icon-button h-8 w-8 text-ink-3"
+            onClick={() =>
+              setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
+            }
+          >
+            <ChevronUp size={15} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next result"
+            className="icon-button h-8 w-8 text-ink-3"
+            onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
+          >
+            <ChevronDown size={15} />
+          </button>
+          <button
+            type="button"
+            aria-label="Close find"
+            className="icon-button h-8 w-8 text-ink-3"
+            onClick={closeFind}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <header className={`shrink-0 ${mobile ? "px-5 pt-6 pb-3" : "px-10 pt-8 pb-5"}`}>
         <div className="measure">
           <div className="font-sans text-base">
             {viewingAsPartner && (
@@ -325,168 +623,6 @@ export function NoteEditor({
                   )}
                 </div>
               )}
-
-              {/* Pin and Format read as one group of actions; wrapping them
-                  apart stranded Format alone on a line in the phone column. */}
-              {canEdit && (
-                <span className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={onTogglePin}
-                    aria-pressed={pinned}
-                    title={pinned ? "Unpin note" : "Pin note to top"}
-                    className={`label soft-control flex items-center gap-1.5 px-2.5 py-1.5 transition-colors ${
-                      pinned
-                        ? "border-accent text-accent"
-                        : "text-ink-2 hover:border-accent hover:text-accent"
-                    }`}
-                  >
-                    <Pin
-                      size={13}
-                      strokeWidth={pinned ? 2.4 : 1.8}
-                      fill={pinned ? "currentColor" : "none"}
-                    />
-                    {pinned ? "Pinned" : "Pin"}
-                  </button>
-
-                  <div className="relative" ref={formatRef}>
-                    <button
-                      onClick={() => setFormatOpen((value) => !value)}
-                      aria-expanded={formatOpen}
-                      aria-haspopup="menu"
-                      className="label soft-control flex items-center gap-1.5 px-2.5 py-1.5 text-ink-2 transition-colors hover:border-accent hover:text-accent"
-                    >
-                      <Type size={13} strokeWidth={2} />
-                      Format
-                      <ChevronDown
-                        size={12}
-                        className={`transition-transform ${formatOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {formatOpen && (
-                      <div
-                        role="menu"
-                        aria-label="Formatting"
-                        className="popover absolute top-full right-0 z-30 mt-2 w-56 p-1.5"
-                      >
-                        {FORMAT_ITEMS.map(({ action, label, shortcut, icon: Icon }) => (
-                          <button
-                            key={action}
-                            role="menuitem"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              if (action === "link") openLinkForm();
-                              else {
-                                editorRef.current?.format(action);
-                                setFormatOpen(false);
-                              }
-                            }}
-                            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                          >
-                            <Icon size={14} strokeWidth={1.8} className="text-ink-3" />
-                            <span>{label}</span>
-                            {shortcut && (
-                              <span className="readout ml-auto text-ink-4">{shortcut}</span>
-                            )}
-                          </button>
-                        ))}
-
-                        <div className="my-1 border-t border-rule-soft" />
-                        <button
-                          role="menuitem"
-                          onClick={() => imageRef.current?.click()}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                        >
-                          <ImagePlus size={14} strokeWidth={1.8} className="text-accent" />
-                          <span>Insert image</span>
-                        </button>
-                        <button
-                          role="menuitem"
-                          onClick={() => fileRef.current?.click()}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-2 transition-colors hover:bg-surface hover:text-ink"
-                        >
-                          <FileUp size={14} strokeWidth={1.8} className="text-accent" />
-                          <span>Import PDF as text</span>
-                        </button>
-                        <p className="px-2.5 pt-1 pb-1.5 text-[10px] leading-relaxed text-ink-4">
-                          Files are processed locally. JPG, PNG, WebP and text PDFs.
-                        </p>
-                      </div>
-                    )}
-
-                    {linkOpen && (
-                      <div className="popover absolute top-full right-0 z-30 mt-2 w-72 p-3">
-                        <p className="label mb-2 text-ink-2">Insert link</p>
-                        <label className="mb-2 block">
-                          <span className="label mb-1 block text-ink-4">Text</span>
-                          <input
-                            value={linkLabel}
-                            onChange={(event) => setLinkLabel(event.target.value)}
-                            placeholder="Link text (optional)"
-                            className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="label mb-1 block text-ink-4">URL</span>
-                          <input
-                            ref={linkUrlRef}
-                            value={linkUrl}
-                            onChange={(event) => {
-                              setLinkUrl(event.target.value);
-                              setLinkError("");
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                handleInsertLink();
-                              } else if (event.key === "Escape") {
-                                setLinkOpen(false);
-                              }
-                            }}
-                            placeholder="https://example.com"
-                            aria-invalid={linkError ? true : undefined}
-                            className="soft-control w-full px-3 py-2 text-xs text-ink outline-none"
-                          />
-                        </label>
-                        {linkError && (
-                          <p role="alert" className="mt-1.5 text-[11px] text-danger">
-                            {linkError}
-                          </p>
-                        )}
-                        <div className="mt-3 flex justify-end gap-2">
-                          <button
-                            onClick={() => setLinkOpen(false)}
-                            className="label rounded-lg px-3 py-2 text-ink-3 hover:bg-surface"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleInsertLink}
-                            className="label rounded-lg bg-accent px-3 py-2 text-on-accent hover:bg-accent-strong"
-                          >
-                            Insert
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      className="hidden"
-                      onChange={(event) => void handlePdf(event.target.files?.[0])}
-                    />
-                    <input
-                      ref={imageRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                      className="hidden"
-                      onChange={(event) => void handleImage(event.target.files?.[0])}
-                    />
-                  </div>
-                </span>
-              )}
             </div>
 
             {(pdfStatus || pdfError) && (
@@ -522,4 +658,4 @@ export function NoteEditor({
       </div>
     </section>
   );
-}
+});

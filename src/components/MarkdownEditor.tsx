@@ -15,6 +15,14 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage, markdownKeymap } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
+import {
+  SearchCursor,
+  SearchQuery,
+  findNext,
+  findPrevious,
+  search,
+  setSearchQuery,
+} from "@codemirror/search";
 
 /* ── Invisible markdown ──────────────────────────────────────────────────────
    Markdown renders as formatting while you type. There is no toolbar and no
@@ -536,6 +544,8 @@ export type FormatAction =
   | "strike"
   | "code"
   | "heading"
+  | "checklist"
+  | "table"
   | "bullet-list"
   | "ordered-list"
   | "quote"
@@ -548,7 +558,16 @@ export interface MarkdownEditorHandle {
   insertLink: (label: string, url: string) => void;
   insertText: (text: string) => void;
   insertImage: (src: string, alt: string) => void;
+  setSearch: (query: string) => SearchStatus;
+  findNext: () => SearchStatus;
+  findPrevious: () => SearchStatus;
+  closeSearch: () => void;
   focus: () => void;
+}
+
+export interface SearchStatus {
+  current: number;
+  total: number;
 }
 
 interface Props {
@@ -592,6 +611,20 @@ function reconcileDoc(view: EditorView, text: string): void {
     changes: { from, to, insert: text.slice(from, end) },
     annotations: [externalDocumentChange.of(true), Transaction.addToHistory.of(false)],
   });
+}
+
+function searchStatus(view: EditorView, query: string): SearchStatus {
+  if (!query) return { current: 0, total: 0 };
+  const matches = [
+    ...new SearchCursor(view.state.doc, query, 0, view.state.doc.length, (text) =>
+      text.toLocaleLowerCase(),
+    ),
+  ];
+  const selection = view.state.selection.main;
+  const current = matches.findIndex(
+    (match) => match.from === selection.from && match.to === selection.to,
+  );
+  return { current: current >= 0 ? current + 1 : 0, total: matches.length };
 }
 
 function insertImage(editor: EditorView, src: string, alt: string): void {
@@ -649,6 +682,10 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
   if (action === "divider") {
     return replaceSelection(editor, "\n\n---\n\n", 7, 7);
   }
+  if (action === "table") {
+    const insert = "| Column 1 | Column 2 |\n| --- | --- |\n| Value | Value |\n| Value | Value |";
+    return replaceSelection(editor, insert, 2, 10);
+  }
 
   const firstLine = editor.state.doc.lineAt(selection.from);
   const lastLine = editor.state.doc.lineAt(selection.to);
@@ -661,7 +698,14 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
       .map((line) => (line.startsWith("## ") ? line.slice(3) : `## ${line}`))
       .join("\n");
   } else {
-    const prefix = action === "bullet-list" ? "- " : action === "ordered-list" ? "1. " : "> ";
+    const prefix =
+      action === "bullet-list"
+        ? "- "
+        : action === "ordered-list"
+          ? "1. "
+          : action === "checklist"
+            ? "- [ ] "
+            : "> ";
     transformed = block
       .split("\n")
       .map((line) => `${prefix}${line}`)
@@ -688,6 +732,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
   const onPasteImageRef = useRef(onPasteImage);
   onPasteImageRef.current = onPasteImage;
   const editable = useRef(new Compartment());
+  const activeSearch = useRef("");
 
   useImperativeHandle(ref, () => ({
     format(action) {
@@ -725,6 +770,33 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       if (readOnly || !view.current) return;
       insertImage(view.current, src, alt);
     },
+    setSearch(query) {
+      const editor = view.current;
+      if (!editor) return { current: 0, total: 0 };
+      activeSearch.current = query;
+      editor.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: query })) });
+      if (query) findNext(editor);
+      return searchStatus(editor, query);
+    },
+    findNext() {
+      const editor = view.current;
+      if (!editor) return { current: 0, total: 0 };
+      findNext(editor);
+      return searchStatus(editor, activeSearch.current);
+    },
+    findPrevious() {
+      const editor = view.current;
+      if (!editor) return { current: 0, total: 0 };
+      findPrevious(editor);
+      return searchStatus(editor, activeSearch.current);
+    },
+    closeSearch() {
+      const editor = view.current;
+      if (!editor) return;
+      activeSearch.current = "";
+      editor.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: "" })) });
+      editor.focus();
+    },
     focus() {
       view.current?.focus();
     },
@@ -739,6 +811,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
         extensions: [
           history(),
           drawSelection(),
+          search({ top: true }),
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
           imageResolver.of(resolveImage),
