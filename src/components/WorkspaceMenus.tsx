@@ -380,6 +380,43 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
   );
 }
 
+/** The appearance sliders, on the same control as the reading axes. They were
+ *  bare `input[type=range]`, so the browser painted a blue nobody chose — two
+ *  tabs of one dialog showing the same control two different ways. */
+function AppearanceSlider({
+  label,
+  min,
+  max,
+  value,
+  readout,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  readout: string;
+  onChange: (value: number) => void;
+}) {
+  const fill = ((value - min) / (max - min)) * 100;
+  return (
+    <label className="appearance-row is-slider">
+      <span>{label}</span>
+      <input
+        type="range"
+        className="axis-range"
+        style={{ "--fill": `${fill}%` } as React.CSSProperties}
+        min={min}
+        max={max}
+        value={value}
+        aria-label={`${label}, ${readout}`}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <output>{readout}</output>
+    </label>
+  );
+}
+
 /** A row of mutually exclusive choices, the shape the platform uses for four
  *  or fewer options that fit on one line. */
 function Segmented({
@@ -592,19 +629,14 @@ export function SettingsPanel({
                     />
                   </label>
 
-                  <label className="appearance-row is-slider">
-                    <span>Contrast</span>
-                    <input
-                      type="range"
-                      min="20"
-                      max="80"
-                      value={appearance.contrast}
-                      onChange={(event) =>
-                        setAppearance({ ...appearance, contrast: Number(event.target.value) })
-                      }
-                    />
-                    <output>{appearance.contrast}</output>
-                  </label>
+                  <AppearanceSlider
+                    label="Contrast"
+                    min={20}
+                    max={80}
+                    value={appearance.contrast}
+                    readout={`${appearance.contrast}`}
+                    onChange={(contrast) => setAppearance({ ...appearance, contrast })}
+                  />
 
                   <div className="appearance-row wallpaper-row">
                     <span>
@@ -652,38 +684,24 @@ export function SettingsPanel({
                           ))}
                         </span>
                       </div>
-                      <label className="appearance-row is-slider">
-                        <span>Darken image</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="80"
-                          value={appearance.wallpaperDim}
-                          onChange={(event) =>
-                            setAppearance({
-                              ...appearance,
-                              wallpaperDim: Number(event.target.value),
-                            })
-                          }
-                        />
-                        <output>{appearance.wallpaperDim}%</output>
-                      </label>
-                      <label className="appearance-row is-slider">
-                        <span>Blur</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="20"
-                          value={appearance.wallpaperBlur}
-                          onChange={(event) =>
-                            setAppearance({
-                              ...appearance,
-                              wallpaperBlur: Number(event.target.value),
-                            })
-                          }
-                        />
-                        <output>{appearance.wallpaperBlur}px</output>
-                      </label>
+                      <AppearanceSlider
+                        label="Darken image"
+                        min={0}
+                        max={80}
+                        value={appearance.wallpaperDim}
+                        readout={`${appearance.wallpaperDim}%`}
+                        onChange={(wallpaperDim) => setAppearance({ ...appearance, wallpaperDim })}
+                      />
+                      <AppearanceSlider
+                        label="Blur"
+                        min={0}
+                        max={20}
+                        value={appearance.wallpaperBlur}
+                        readout={`${appearance.wallpaperBlur}px`}
+                        onChange={(wallpaperBlur) =>
+                          setAppearance({ ...appearance, wallpaperBlur })
+                        }
+                      />
                     </>
                   )}
                 </div>
