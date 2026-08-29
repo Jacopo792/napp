@@ -79,6 +79,8 @@ function adoptArchiveCache(archiveId: string): void {
 export interface ArchiveMember {
   userId: string;
   nickname: string;
+  /** The object id of their picture, if they have set one. */
+  avatarObject: string | null;
   isSelf: boolean;
 }
 
@@ -121,7 +123,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .select("user_id, created_at")
       .eq("archive_id", archiveId)
       .order("created_at"),
-    supabase.from("profiles").select("user_id, nickname"),
+    supabase.from("profiles").select("user_id, nickname, avatar_object"),
     supabase.from("archives").select("settings").eq("id", archiveId).single(),
   ]);
   for (const result of [
@@ -137,17 +139,25 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
 
   // A profile may not exist yet, and a missing name is never a reason to fail
   // to open the archive.
-  const nicknames = new Map<string, string>(
+  const profileRows = new Map<string, { nickname: string; avatarObject: string | null }>(
     (profilesResult.error
       ? []
-      : ((profilesResult.data ?? []) as { user_id: string; nickname: string }[])
-    ).map((row) => [row.user_id, row.nickname ?? ""]),
+      : ((profilesResult.data ?? []) as {
+          user_id: string;
+          nickname: string | null;
+          avatar_object: string | null;
+        }[])
+    ).map((row) => [
+      row.user_id,
+      { nickname: row.nickname ?? "", avatarObject: row.avatar_object ?? null },
+    ]),
   );
   const members: ArchiveMember[] = (
     (membersResult.data ?? []) as { user_id: string; created_at: string }[]
   ).map((row) => ({
     userId: row.user_id,
-    nickname: nicknames.get(row.user_id) ?? "",
+    nickname: profileRows.get(row.user_id)?.nickname ?? "",
+    avatarObject: profileRows.get(row.user_id)?.avatarObject ?? null,
     isSelf: row.user_id === session.userId,
   }));
 

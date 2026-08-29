@@ -103,6 +103,19 @@ Realtime's check in `verify:supabase` flakes about one run in three: the
 server reports SUBSCRIBED slightly before the filter is in place. A failure
 there alone, with everything above it passing, means run it again.
 
+**Deploy before you drop.** The four `ciphertext` columns had to be added back,
+empty, within the hour: GitHub Pages was still serving the build from `main`,
+that build still selected them, and every query it made failed the moment they
+were gone. The archive looked empty. Nothing was lost — the columns had been
+null for a day — but the application was down.
+
+This is the ordering rule for anything this repository ever removes from the
+schema. A static SPA has no server to deploy in step with the database, so the
+oldest client still running is whatever `main` last built, plus anybody holding
+an open tab. Merge and deploy the client that has stopped asking for a column,
+confirm it, and only then drop it. `20260829210000_drop_ciphertext_after_deploy.sql`
+is that second half, waiting.
+
 ## One-time migration tools
 
 The files in `scripts/` are local administrative tools, not part of the

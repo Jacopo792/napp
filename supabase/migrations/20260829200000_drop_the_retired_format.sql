@@ -22,6 +22,13 @@
 --     read.
 --
 -- Run it with `supabase db push`, and `pnpm verify:supabase` afterwards.
+--
+-- Applied 2026-08-29, and one thing here was wrong: the four ciphertext columns
+-- were still being selected by the build GitHub Pages was serving, so dropping
+-- them took the deployed application down until they were added back empty.
+-- They come out again in 20260829210000, which is to be applied only once a
+-- build without them is online. Everything else below was safe to drop then and
+-- is gone.
 
 -- ── The encrypted format ────────────────────────────────────────────────────
 alter table public.notes drop column if exists ciphertext;
