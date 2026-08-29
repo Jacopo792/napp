@@ -35,8 +35,10 @@ import {
   downloadImage,
   downloadObject,
   loadArchive,
+  loadPendingInvites,
   loadProfile,
   persistMetaDiff,
+  revokeArchiveInvite,
   saveNote,
   saveProfile,
   setArchiveMemberRole,
@@ -45,6 +47,7 @@ import {
   uploadObject,
   type ArchiveMember,
   type ArchiveSnapshot,
+  type PendingInvite,
   type Profile,
 } from "@/lib/supabase";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
@@ -221,6 +224,10 @@ function NotesPage() {
    *  the roster have both arrived. */
   const [viewAs, setViewAs] = useState<string>("");
   const [members, setMembers] = useState<ArchiveMember[]>([]);
+  /** Seats, and the invitations already holding one. Loaded with Settings
+   *  rather than with the archive: nothing outside that panel asks. */
+  const [seatLimit, setSeatLimit] = useState(2);
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
 
   const [entries, setEntries] = useState<NoteEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -440,6 +447,7 @@ function NotesPage() {
     setEntries(next);
 
     setMembers(snapshot.members);
+    setSeatLimit(snapshot.seatLimit);
     setMetas((current) => {
       const next = { ...current };
       for (const [owner, meta] of Object.entries(snapshot.metas)) {
@@ -1149,6 +1157,21 @@ function NotesPage() {
     }
   }
 
+  /* Pending invitations are only ever looked at from Settings, so they are
+     fetched when it opens and after anything that could change the count. */
+  const refreshInvites = useCallback(async () => {
+    if (!session) return;
+    try {
+      setInvites(await loadPendingInvites(session));
+    } catch {
+      setInvites([]);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (settingsOpen) void refreshInvites();
+  }, [settingsOpen, refreshInvites]);
+
   async function handleAvatarPick(file: File) {
     if (!session) return;
     setProfileBusy(true);
@@ -1376,6 +1399,8 @@ function NotesPage() {
       joinedAt={members.find((member) => member.isSelf)?.joinedAt}
       memberCount={members.length}
       members={members}
+      seatLimit={seatLimit}
+      invites={invites}
       canManageMembers={canWriteArchive}
       presenceEnabled={presenceEnabled}
       profileBusy={profileBusy}
@@ -1387,7 +1412,12 @@ function NotesPage() {
         const token = await createArchiveInvite(session, email, role);
         const link = new URL(import.meta.env.BASE_URL, window.location.origin);
         link.searchParams.set("invite", token);
+        await refreshInvites();
         return link.toString();
+      }}
+      onRevokeInvite={async (inviteId) => {
+        await revokeArchiveInvite(inviteId);
+        await refreshInvites();
       }}
       onMemberRoleChange={async (userId, role) => {
         await setArchiveMemberRole(session, userId, role);

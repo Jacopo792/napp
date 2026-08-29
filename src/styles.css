@@ -553,15 +553,150 @@
   opacity: 0.38;
 }
 
-.login-mode {
-  display: block;
-  margin-inline: auto;
-  border-radius: 0.5rem;
-  text-underline-offset: 0.2em;
+.login-mark {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 0.75rem;
+  background: var(--accent-wash);
+  color: var(--accent);
 }
 
-.login-mode:hover {
-  text-decoration: underline;
+.login-mark.is-quiet {
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.login-title {
+  margin-top: 1.5rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+
+.login-lede {
+  margin-top: 0.5rem;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* Which of the two things you are doing is a choice, so it is a control at the
+   top of the card rather than a link under it. The mark stays; the tabs sit
+   between it and a heading that now only ever names one of them. */
+.login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin-top: 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  padding: 3px;
+}
+
+.login-tabs button {
+  border-radius: 0.62rem;
+  padding: 8px 10px;
+  color: var(--ink-4);
+  font-size: 13px;
+  font-weight: 560;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.login-tabs button:hover {
+  color: var(--ink-2);
+}
+
+.login-tabs button.is-active {
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--glass-highlight);
+  color: var(--ink);
+  font-weight: 640;
+}
+
+.login-hint {
+  margin-left: auto;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The field keeps its own padding; the button is laid over the end of it and
+   the input is told to stop short, so the text never runs under the eye. */
+.login-secret {
+  position: relative;
+}
+
+.login-secret .login-input {
+  padding-right: 2.75rem;
+}
+
+.login-reveal {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border-radius: 0.55rem;
+  color: var(--ink-4);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.login-reveal:hover,
+.login-reveal[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.login-steps {
+  display: grid;
+  gap: 10px;
+  margin-top: 1.25rem;
+  padding-left: 1.15rem;
+  list-style: decimal;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.login-steps::marker,
+.login-steps li::marker {
+  color: var(--ink-4);
+}
+
+.login-note {
+  color: var(--ink-4);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.login-steps + .login-note {
+  margin-top: 1.25rem;
+}
+
+.login-invite-note {
+  margin-top: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.7rem;
+  background: var(--accent-wash);
+  padding: 10px 12px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .archive-choice-list {
@@ -1281,6 +1416,7 @@
 
 .settings-aside dd,
 .settings-aside-value {
+  overflow-wrap: anywhere;
   margin-top: 2px;
   overflow-wrap: anywhere;
   color: var(--ink);
@@ -1382,13 +1518,21 @@
   font-size: 8px;
 }
 
-/* ── The profile section ────────────────────────────────────────────────── */
+/* ── The profile section ──────────────────────────────────────────────────
+   The picture is the hero of this section, not the first of its rows: it is a
+   card of its own, and the rows below are a second card. Two shapes, each with
+   the same 16px inset, so their left edges agree — which is the alignment the
+   eye actually checks. Pretending the 72px portrait was a 34px row glyph is
+   what left "Picture" starting 40px to the right of "Nickname". */
 .profile-portrait {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 4px 0 18px;
-  border-bottom: 1px solid var(--rule-soft);
+  gap: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.85rem;
+  background: var(--surface);
+  padding: 14px 16px;
 }
 
 .profile-portrait-actions {
@@ -1418,20 +1562,31 @@
   color: var(--danger);
 }
 
-/* On a profile row the label is the fixed part and the control is what yields.
-   The other settings rows are the other way round, because there the label
-   carries a wrapping line of explanation and the control is a switch of known
-   size. Here the control is a text field with no natural width, and leaving it
-   a fixed share clipped the label beside it: on a phone "Nickname" arrived as
-   "Ni". */
+/* Every value in this section ends at the same edge. Letting the label take
+   its natural width put each value wherever its own label happened to stop —
+   the field at one x, the address at another, the member count at a third,
+   three ragged starts down a column of three rows. The label yields now and
+   the control is pushed right; the name itself never wraps, so the phone still
+   reads "Nickname" rather than "Ni". */
 .profile-row .settings-label {
-  flex: 0 0 auto;
-  min-width: max-content;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.profile-row .settings-label b {
+  white-space: nowrap;
+}
+
+.profile-row .settings-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-field {
   width: auto;
-  flex: 0 1 13rem;
+  flex: 0 0 13rem;
+  margin-left: auto;
   min-width: 4rem;
   border: 1px solid var(--rule);
   border-radius: 0.6rem;
@@ -1447,8 +1602,15 @@
 }
 
 .profile-static {
+  flex: 0 1 auto;
+  max-width: 13rem;
+  margin-left: auto;
+  overflow: hidden;
   color: var(--ink-3);
   font-size: 13px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-note {
@@ -2132,7 +2294,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: var(--surface);
 }
 
@@ -2214,6 +2376,74 @@
 .invite-link-row input {
   font-family: var(--font-mono);
   font-size: 11.5px;
+}
+
+/* An invitation, once made, offers the same token two ways: copied by hand, or
+   handed to the member's own mail app. Neither route passes it through
+   anything of ours — there is no server here to send mail with, and adding one
+   would put the token somewhere it currently never goes. */
+.invite-ready {
+  margin-top: 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.85rem;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.invite-ready .invite-link-row {
+  margin-top: 0;
+}
+
+.invite-ready .profile-note {
+  margin-top: 10px;
+}
+
+.invite-mail {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 0.65rem;
+  padding-inline: 14px;
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 560;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press);
+}
+
+.invite-mail:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.invite-withdraw {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 0.55rem;
+  padding: 6px 10px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  transition:
+    border-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press);
+}
+
+.invite-withdraw:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.invite-withdraw:disabled {
+  opacity: 0.45;
 }
 
 .settings-lock:hover {

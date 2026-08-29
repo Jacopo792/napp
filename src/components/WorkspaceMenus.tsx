@@ -5,6 +5,7 @@ import {
   Copy,
   Image,
   Layers,
+  Mail,
   Palette,
   ShieldCheck,
   Timer,
@@ -26,6 +27,7 @@ import {
   Settings,
   Sun,
   Trash2,
+  Undo2,
   UserRound,
   UserPlus,
   Users,
@@ -440,6 +442,33 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
  *  reuse: a leading glyph, the name of the thing with a line saying what it
  *  does, and the control itself flush right. Naming the row is what lets the
  *  control stop explaining itself. */
+/** Seven days is the invitation's whole life, so what is left of it is said in
+ *  days rather than as a date nobody can subtract at a glance. */
+function expiresIn(expiresAt: string): string {
+  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return "expires today";
+  if (days === 1) return "expires tomorrow";
+  return `expires in ${days} days`;
+}
+
+/** The message is composed and sent by the member's own mail app: the token
+ *  reaches the invited address without passing through anything of ours, and
+ *  there is no server here to send it with. */
+function inviteMailto(email: string, link: string): string {
+  const subject = "An invitation to a shared notes archive";
+  const body = [
+    "You have been invited to a private notes archive.",
+    "",
+    "Open this link, then create an account with this address (or sign in, if you already have one):",
+    link,
+    "",
+    "The link works once and expires in seven days.",
+  ].join("\n");
+  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(
+    subject,
+  )}&body=${encodeURIComponent(body)}`;
+}
+
 function RowLead({ icon, label, hint }: { icon: ReactNode; label: string; hint?: string }) {
   return (
     <>
@@ -568,6 +597,7 @@ const SETTINGS_SECTIONS = [
     group: "Account",
     items: [
       { id: "profile", name: "Profile", icon: <UserRound size={15} /> },
+      { id: "members", name: "Members", icon: <Users size={15} /> },
       { id: "security", name: "Security", icon: <ShieldCheck size={15} /> },
     ],
   },
@@ -592,6 +622,8 @@ export function SettingsPanel({
   joinedAt,
   memberCount,
   members,
+  seatLimit,
+  invites,
   canManageMembers,
   presenceEnabled,
   profileBusy,
@@ -600,6 +632,7 @@ export function SettingsPanel({
   onAvatarPick,
   onAvatarRemove,
   onCreateInvite,
+  onRevokeInvite,
   onMemberRoleChange,
   onPresenceEnabledChange,
   onAutoLockChange,
@@ -623,6 +656,10 @@ export function SettingsPanel({
     isSelf: boolean;
     role: "editor" | "viewer";
   }[];
+  /** How many members the archive holds room for. Two, by design. */
+  seatLimit: number;
+  /** Invitations nobody has claimed yet; each one is holding a seat. */
+  invites: { id: string; email: string; role: "editor" | "viewer"; expiresAt: string }[];
   canManageMembers: boolean;
   presenceEnabled: boolean;
   profileBusy: boolean;
@@ -631,6 +668,7 @@ export function SettingsPanel({
   onAvatarPick: (file: File) => void;
   onAvatarRemove: () => void;
   onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
+  onRevokeInvite: (inviteId: string) => Promise<void>;
   onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
@@ -684,13 +722,33 @@ export function SettingsPanel({
     setInviteStatus("");
     try {
       setInviteLink(await onCreateInvite(target, inviteRole));
-      setInviteStatus("Link ready. It expires in 7 days.");
+      setInviteStatus("Invitation ready. Copy the link or send it by email.");
     } catch (reason) {
       setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
     } finally {
       setInviteBusy(false);
     }
   }
+
+  async function withdrawInvite(inviteId: string) {
+    setInviteBusy(true);
+    setInviteStatus("");
+    try {
+      await onRevokeInvite(inviteId);
+      setInviteLink("");
+      setInviteStatus("Invitation withdrawn. Its link no longer works.");
+    } catch (reason) {
+      setInviteStatus(reason instanceof Error ? reason.message : "Could not withdraw it");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  /* A seat is held by a member or by an invitation waiting to be claimed. The
+     same arithmetic the database enforces, so the form is closed before the
+     write is refused rather than after. */
+  const seatsTaken = members.length + invites.length;
+  const seatsFull = seatsTaken >= seatLimit;
 
   async function changeMemberRole(userId: string, role: "editor" | "viewer") {
     setMemberBusy(userId);
@@ -807,46 +865,48 @@ export function SettingsPanel({
                   </div>
                 </div>
 
-                <div className="appearance-row profile-row">
-                  <RowLead
-                    icon={<UserRound size={17} />}
-                    label="Nickname"
-                    hint="What others in this archive call you"
-                  />
-                  <input
-                    className="profile-field"
-                    value={nickname}
-                    maxLength={40}
-                    placeholder={email.split("@")[0]}
-                    aria-label="Nickname"
-                    disabled={profileBusy}
-                    onChange={(event) => setNickname(event.target.value)}
-                    onBlur={commitNickname}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") event.currentTarget.blur();
-                      if (event.key === "Escape") setNickname(profile.nickname);
-                    }}
-                  />
-                </div>
+                <div className="appearance-controls">
+                  <div className="appearance-row profile-row">
+                    <RowLead
+                      icon={<UserRound size={17} />}
+                      label="Nickname"
+                      hint="What others in this archive call you"
+                    />
+                    <input
+                      className="profile-field"
+                      value={nickname}
+                      maxLength={40}
+                      placeholder={email.split("@")[0]}
+                      aria-label="Nickname"
+                      disabled={profileBusy}
+                      onChange={(event) => setNickname(event.target.value)}
+                      onBlur={commitNickname}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                        if (event.key === "Escape") setNickname(profile.nickname);
+                      }}
+                    />
+                  </div>
 
-                <div className="appearance-row profile-row">
-                  <RowLead
-                    icon={<AtSign size={17} />}
-                    label="Email"
-                    hint="Where this account signs in"
-                  />
-                  <span className="profile-static">{email}</span>
-                </div>
+                  <div className="appearance-row profile-row">
+                    <RowLead
+                      icon={<AtSign size={17} />}
+                      label="Email"
+                      hint="Where this account signs in"
+                    />
+                    <span className="profile-static">{email}</span>
+                  </div>
 
-                <div className="appearance-row profile-row">
-                  <RowLead
-                    icon={<Users size={17} />}
-                    label="Archive"
-                    hint="Members read everything; editors can make changes"
-                  />
-                  <span className="profile-static">
-                    {memberCount} {memberCount === 1 ? "member" : "members"}
-                  </span>
+                  <div className="appearance-row profile-row">
+                    <RowLead
+                      icon={<Users size={17} />}
+                      label="Archive"
+                      hint="Members read everything; editors can make changes"
+                    />
+                    <span className="profile-static">
+                      {memberCount} {memberCount === 1 ? "member" : "members"}
+                    </span>
+                  </div>
                 </div>
 
                 {profileError && (
@@ -1162,6 +1222,26 @@ export function SettingsPanel({
                     onChange={(event) => onPresenceEnabledChange(event.target.checked)}
                   />
                 </label>
+              </section>
+            )}
+
+            {section === "members" && (
+              <section>
+                <h3>Seats</h3>
+                <dl className="settings-facts">
+                  <div>
+                    <span className="settings-lead" aria-hidden="true">
+                      <Users size={17} />
+                    </span>
+                    <span className="settings-label">
+                      <dt>Occupied</dt>
+                      <dd>
+                        {seatsTaken} of {seatLimit}
+                        {invites.length > 0 && ` · ${invites.length} waiting to be claimed`}
+                      </dd>
+                    </span>
+                  </div>
+                </dl>
 
                 <h3>Members</h3>
                 <div className="member-role-list">
@@ -1196,8 +1276,44 @@ export function SettingsPanel({
                   </p>
                 )}
 
+                {invites.length > 0 && (
+                  <>
+                    <h3>Waiting to be claimed</h3>
+                    <div className="member-role-list">
+                      {invites.map((invite) => (
+                        <div key={invite.id}>
+                          <span>
+                            <b>{invite.email}</b>
+                            <small>
+                              Joins as {invite.role} · {expiresIn(invite.expiresAt)}
+                            </small>
+                          </span>
+                          {canManageMembers && (
+                            <button
+                              type="button"
+                              className="invite-withdraw"
+                              disabled={inviteBusy}
+                              onClick={() => void withdrawInvite(invite.id)}
+                            >
+                              <Undo2 size={14} />
+                              Withdraw
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 <h3>Invite someone</h3>
-                {canManageMembers ? (
+                {!canManageMembers ? (
+                  <p className="profile-note">Only editors can invite another member.</p>
+                ) : seatsFull ? (
+                  <p className="profile-note">
+                    Both seats are taken. Withdraw an invitation nobody claimed, and the seat it is
+                    holding comes back.
+                  </p>
+                ) : (
                   <>
                     <div className="invite-role" role="group" aria-label="Invitation role">
                       <button
@@ -1236,27 +1352,41 @@ export function SettingsPanel({
                         onClick={() => void createInvite()}
                       >
                         <UserPlus size={15} />
-                        {inviteBusy ? "Creating…" : "Create link"}
+                        {inviteBusy ? "Creating…" : "Create invitation"}
                       </button>
                     </div>
                   </>
-                ) : (
-                  <p className="profile-note">Only editors can invite another member.</p>
                 )}
+
+                {/* Both ways out of here carry the same one-time token, and
+                    neither of them hands it to a third party: the link is
+                    copied by you, and the message is composed and sent by your
+                    own mail app. */}
                 {inviteLink && (
-                  <div className="invite-link-row">
-                    <input aria-label="Invitation link" readOnly value={inviteLink} />
-                    <button
-                      type="button"
-                      aria-label="Copy invitation link"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(inviteLink).then(() => {
-                          setInviteStatus("Copied. The link expires in 7 days.");
-                        });
-                      }}
-                    >
-                      <Copy size={15} />
-                    </button>
+                  <div className="invite-ready">
+                    <div className="invite-link-row">
+                      <input aria-label="Invitation link" readOnly value={inviteLink} />
+                      <button
+                        type="button"
+                        aria-label="Copy invitation link"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(inviteLink).then(() => {
+                            setInviteStatus("Copied. The link expires in 7 days.");
+                          });
+                        }}
+                      >
+                        <Copy size={15} />
+                      </button>
+                    </div>
+                    <a className="invite-mail" href={inviteMailto(inviteEmail, inviteLink)}>
+                      <Mail size={15} />
+                      Send it by email
+                    </a>
+                    <p className="profile-note">
+                      The link is the whole invitation. It works once, only for {inviteEmail} after
+                      that address is confirmed, and only for seven days. Sending it opens your own
+                      mail app with the message already written.
+                    </p>
                   </div>
                 )}
                 {inviteStatus && (

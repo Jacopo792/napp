@@ -96,6 +96,8 @@ export interface ArchiveMember {
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   members: ArchiveMember[];
+  /** How many members this archive may hold. Two, unless the row says otherwise. */
+  seatLimit: number;
   /** One scope per member, keyed by member id. */
   metas: Record<string, Meta>;
 }
@@ -135,7 +137,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .eq("archive_id", archiveId)
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
-    supabase.from("archives").select("settings").eq("id", archiveId).single(),
+    supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).single(),
   ]);
   for (const result of [
     notesResult,
@@ -323,6 +325,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
     members,
+    seatLimit: (archiveResult.data?.seat_limit as number | null) ?? 2,
     metas,
   };
 }
@@ -673,6 +676,47 @@ export async function createArchiveInvite(
   fail(result.error);
   if (typeof result.data !== "string") throw new Error("The invitation could not be created");
   return result.data;
+}
+
+/** An invitation nobody has claimed yet. The token is not here and never was:
+ *  only its digest is stored, so a pending invitation can be withdrawn or left
+ *  to expire, but not re-read. */
+export interface PendingInvite {
+  id: string;
+  email: string;
+  role: "editor" | "viewer";
+  expiresAt: string;
+}
+
+export async function loadPendingInvites(session: AppSession): Promise<PendingInvite[]> {
+  const result = await supabase
+    .from("archive_invites")
+    .select("id, email, role, expires_at")
+    .eq("archive_id", session.archiveId)
+    .is("claimed_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at");
+  fail(result.error);
+  return (
+    (result.data ?? []) as {
+      id: string;
+      email: string;
+      role: "editor" | "viewer";
+      expires_at: string;
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    expiresAt: row.expires_at,
+  }));
+}
+
+/** Frees the seat an unclaimed invitation is holding. The stored digest goes
+ *  with it, so the link that was sent stops working immediately. */
+export async function revokeArchiveInvite(inviteId: string): Promise<void> {
+  const result = await supabase.rpc("revoke_archive_invite", { invite_id: inviteId });
+  fail(result.error);
 }
 
 export async function setArchiveMemberRole(
