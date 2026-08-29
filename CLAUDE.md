@@ -83,17 +83,25 @@ client no longer unwraps a DEK at sign-in, no longer keeps a raw archive key in
 `sessionStorage`, and no longer selects a `ciphertext` column. `crypto.ts` moved
 to `scripts/lib/`, where the one-time migration tools that still need it live.
 
-`supabase/migrations/20260829200000_drop_the_retired_format.sql` finishes the
-job in the database — the `ciphertext` columns, `vault_keys`, the `u1`/`u2`
-`owner` columns with their checks and composite keys, and the three abandoned
-tables. **It has not been applied.** Dropping columns is the point at which the
-rollback window closes, so it is left for a deliberate `supabase db push`
-followed by `pnpm verify:supabase`. The file's own comment records what was
-checked before it was written.
+`supabase/migrations/20260829200000_drop_the_retired_format.sql` finished the
+job in the database on 2026-08-29 — the `ciphertext` columns, `vault_keys`, the
+`u1`/`u2` `owner` columns with their checks and composite keys, and the three
+abandoned tables. `public` now holds seven tables and not one retired column;
+`pnpm verify:supabase` passes against the result. The file's own comment records
+what was checked before it was written, and the data it removed was dumped to a
+file outside the repository first.
 
-Nothing else needs changing first: `add:member` and `verify:supabase` were
-rewritten off the `owner` label already, and the verifier's checks are written
-so that they pass both before and after the drop.
+Two orderings in that file are load-bearing, and both were found by the drop
+being refused rather than by reading the schema. `owner` sits inside
+three-column unique keys that foreign keys in other tables point at, so the
+dependants come out before the column. And `legacy_notes_20260828` and
+`note_shares` depend on each other — policies on the first read the second, a
+foreign key and a policy on the second read the first — so neither can go
+first and they are dropped in one statement instead of with `cascade`.
+
+Realtime's check in `verify:supabase` flakes about one run in three: the
+server reports SUBSCRIBED slightly before the filter is in place. A failure
+there alone, with everything above it passing, means run it again.
 
 ## One-time migration tools
 

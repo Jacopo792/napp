@@ -66,6 +66,11 @@ alter table public.tags drop column if exists owner;
 alter table public.note_tags drop column if exists owner;
 
 -- ── Abandoned tables ────────────────────────────────────────────────────────
-drop table if exists public.note_shares;
-drop table if exists public.legacy_notes_20260828;
+-- These two depend on each other and neither can go first. `legacy_notes` has
+-- two policies whose expressions read `note_shares`; `note_shares` has a
+-- foreign key and a policy that read `legacy_notes`. Dropped in one statement,
+-- Postgres resolves the pair — and because this is not `cascade`, anything
+-- outside the pair that still depended on either would still refuse, which is
+-- the check worth keeping.
+drop table if exists public.legacy_notes_20260828, public.note_shares;
 drop table if exists public.legacy_profiles_20260829;
