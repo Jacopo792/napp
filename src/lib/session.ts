@@ -1,11 +1,21 @@
 import { base64ToBytes, bytesToBase64, importArchiveKey, unwrapArchiveKey } from "./crypto";
 import { resetArchiveCache, supabase } from "./supabase";
 
+export type OwnerLabel = "u1" | "u2";
+
 export interface AppSession {
   userId: string;
   email: string;
   archiveId: string;
-  owner: "u1" | "u2";
+  /**
+   * The organisational label carried by this membership row, or null for a
+   * member who has no personal view of their own. It is interface metadata:
+   * RLS authorizes through `archive_members` and nothing else.
+   */
+  memberOwner: OwnerLabel | null;
+  /** The view the app opens on. An unlabelled member starts on u1 and can
+      still switch freely, exactly like a labelled one. */
+  defaultView: OwnerLabel;
   /** Kept only long enough to open data written by the retired encrypted format. */
   legacyKey?: CryptoKey;
 }
@@ -16,21 +26,30 @@ interface StoredSession {
   userId: string;
   email: string;
   archiveId: string;
-  owner: "u1" | "u2";
+  memberOwner: OwnerLabel | null;
+  defaultView: OwnerLabel;
   rawDek?: string;
+  /** Written by builds that predate the unlabelled-member support. */
+  owner?: OwnerLabel;
 }
 
-async function resolveOwner(userId: string, archiveId: string): Promise<"u1" | "u2"> {
+function isOwnerLabel(value: unknown): value is OwnerLabel {
+  return value === "u1" || value === "u2";
+}
+
+async function readMembership(
+  userId: string,
+  archiveId: string,
+): Promise<{ memberOwner: OwnerLabel | null; defaultView: OwnerLabel }> {
   const { data, error } = await supabase
     .from("archive_members")
     .select("owner")
     .eq("archive_id", archiveId)
     .eq("user_id", userId)
-    .single();
-  if (error || (data?.owner !== "u1" && data?.owner !== "u2")) {
-    throw new Error("This account is not connected to a personal notes view");
-  }
-  return data.owner;
+    .maybeSingle();
+  if (error || !data) throw new Error("This account is not connected to the archive");
+  const memberOwner = isOwnerLabel(data.owner) ? data.owner : null;
+  return { memberOwner, defaultView: memberOwner ?? "u1" };
 }
 
 export async function authenticate(email: string, password: string): Promise<AppSession> {
@@ -47,10 +66,7 @@ export async function authenticate(email: string, password: string): Promise<App
       throw new Error("This account is not connected to the archive");
     }
     const membership = memberships[0];
-    const owner =
-      membership.owner === "u1" || membership.owner === "u2"
-        ? membership.owner
-        : await resolveOwner(data.user.id, membership.archive_id);
+    const memberOwner = isOwnerLabel(membership.owner) ? membership.owner : null;
 
     // Old rows and attachments may still need one last local decrypt. Failure
     // is deliberately non-fatal: account authentication is now the boundary.
@@ -79,7 +95,8 @@ export async function authenticate(email: string, password: string): Promise<App
       userId: data.user.id,
       email: data.user.email ?? email,
       archiveId: membership.archive_id,
-      owner,
+      memberOwner,
+      defaultView: memberOwner ?? "u1",
       rawDek: rawDek ? bytesToBase64(rawDek) : undefined,
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
@@ -100,8 +117,11 @@ export async function restoreSession(): Promise<AppSession | null> {
     const stored = JSON.parse(raw) as StoredSession;
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user || data.user.id !== stored.userId) throw new Error("Session expired");
-    const owner = stored.owner ?? (await resolveOwner(stored.userId, stored.archiveId));
-    const refreshed = { ...stored, owner };
+    const membership = isOwnerLabel(stored.defaultView)
+      ? { memberOwner: stored.memberOwner ?? stored.owner ?? null, defaultView: stored.defaultView }
+      : await readMembership(stored.userId, stored.archiveId);
+    const refreshed = { ...stored, ...membership };
+    delete refreshed.owner;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(refreshed));
     return {
       ...refreshed,

@@ -1,9 +1,5 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
 import {
   decryptBytes,
   decryptFolder,
@@ -13,38 +9,9 @@ import {
   importArchiveKey,
   unwrapArchiveKey,
 } from "../src/lib/crypto.ts";
+import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const apply = process.argv.includes("--apply");
-
-async function loadEnv() {
-  const values = {};
-  for (const filename of [".env", ".env.local"]) {
-    try {
-      const content = await readFile(resolve(root, filename), "utf8");
-      for (const line of content.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-        const separator = trimmed.indexOf("=");
-        values[trimmed.slice(0, separator).trim()] = trimmed
-          .slice(separator + 1)
-          .trim()
-          .replace(/^['"]|['"]$/g, "");
-      }
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  }
-  return { ...values, ...process.env };
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function fail(error) {
-  if (error) throw new Error(error.message);
-}
 
 function attachmentType(label) {
   const extension = label.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
@@ -107,18 +74,14 @@ async function listObjects(supabase, archiveId) {
 }
 
 const env = await loadEnv();
-for (const name of [
+requireEnv(env, [
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
   "USER_ONE_EMAIL",
   "USER_ONE_PASSWORD",
-]) {
-  assert(env[name], `Missing ${name}`);
-}
+]);
 
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-});
+const supabase = anonClient(env);
 
 try {
   const signedIn = await supabase.auth.signInWithPassword({
@@ -190,7 +153,7 @@ try {
   for (const result of [archiveResult, notesResult, foldersResult, tagsResult, membersResult]) {
     fail(result.error);
   }
-  assert(membersResult.data.length === 2, "Expected exactly two archive members");
+  assert(membersResult.data.length >= 2, "Expected at least two archive members");
 
   const notes = await Promise.all(
     notesResult.data.map(async (row) => ({
