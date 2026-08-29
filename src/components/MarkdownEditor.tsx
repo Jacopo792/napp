@@ -234,8 +234,8 @@ class TaskWidget extends WidgetType {
 
 interface TableCellSpec {
   text: string;
-  /** Where in the document this cell's text starts, so a click can land there. */
-  pos: number;
+  from: number;
+  to: number;
 }
 
 interface TableSpec {
@@ -288,14 +288,43 @@ class TableWidget extends WidgetType {
 
   private cell(view: EditorView, spec: TableCellSpec, tag: "th" | "td"): HTMLElement {
     const cell = document.createElement(tag);
-    cell.textContent = spec.text || "\u00a0";
-    cell.title = "Click to edit this cell";
-    cell.addEventListener("mousedown", (event) => {
-      event.preventDefault();
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = spec.text;
+    input.placeholder = tag === "th" ? "Column" : "Value";
+    input.readOnly = view.state.readOnly;
+    input.setAttribute(
+      "aria-label",
+      `${tag === "th" ? "Column heading" : "Table cell"}: ${spec.text || "empty"}`,
+    );
+    for (const eventName of [
+      "mousedown",
+      "pointerdown",
+      "click",
+      "dblclick",
+      "beforeinput",
+      "input",
+      "compositionstart",
+      "compositionupdate",
+      "compositionend",
+      "keyup",
+    ]) {
+      input.addEventListener(eventName, (event) => event.stopPropagation());
+    }
+    input.addEventListener("keydown", (event) => {
       event.stopPropagation();
-      view.dispatch({ selection: { anchor: spec.pos }, scrollIntoView: true });
-      view.focus();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      }
     });
+    input.addEventListener("blur", () => {
+      if (view.state.readOnly) return;
+      const next = input.value.replaceAll("|", "¦").replace(/\s+/g, " ").trim();
+      if (next === spec.text) return;
+      view.dispatch({ changes: { from: spec.from, to: spec.to, insert: ` ${next} ` } });
+    });
+    cell.append(input);
     return cell;
   }
 
@@ -459,7 +488,7 @@ class ImageWidget extends WidgetType {
 
 /**
  * A PDF is a document, not a paragraph. It sits in the note as a card carrying
- * its name and type; opening it decrypts the stored bytes in this tab and hands
+ * its name and type; opening it reads the stored bytes in this tab and hands
  * the result to a new one, so the file is read where files are read.
  *
  * The window is opened synchronously on the click and navigated once the bytes
@@ -507,7 +536,7 @@ class AttachmentWidget extends WidgetType {
     name.textContent = this.label;
     const hint = document.createElement("span");
     hint.className = "cm-md-file-hint";
-    hint.textContent = "Encrypted attachment · opens in a new tab";
+    hint.textContent = "Private attachment · opens in a new tab";
     text.append(name, hint);
 
     open.append(badge, text);
@@ -520,7 +549,7 @@ class AttachmentWidget extends WidgetType {
       if (!this.resolveFile) return;
 
       /* Opened empty and now, while the click is still the reason anything is
-         happening — asking for the window after the decrypt is what a popup
+         happening — asking for the window after the download is what a popup
          blocker refuses. `noopener` is deliberately absent: it makes the call
          return null, and the handle is the whole point. The opener is severed
          by hand instead, as soon as the tab has somewhere to be. */
@@ -534,7 +563,7 @@ class AttachmentWidget extends WidgetType {
             tab.opener = null;
           }
           hint.textContent = tab
-            ? "Encrypted attachment · opens in a new tab"
+            ? "Private attachment · opens in a new tab"
             : "Allow pop-ups to open this attachment";
           // The new tab has to finish reading the blob before it is released.
           window.setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
@@ -569,7 +598,7 @@ class AttachmentWidget extends WidgetType {
             anchor.click();
             anchor.remove();
             window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
-            hint.textContent = "Encrypted attachment · opens in a new tab";
+            hint.textContent = "Private attachment · opens in a new tab";
           })
           .catch((reason: unknown) => {
             hint.textContent =
@@ -667,7 +696,11 @@ function readTable(state: EditorState, table: SyntaxNode): TableSpec | null {
     const cells: TableCellSpec[] = [];
     for (let cell = row.firstChild; cell; cell = cell.nextSibling) {
       if (cell.name !== "TableCell") continue;
-      cells.push({ text: doc.sliceString(cell.from, cell.to).trim(), pos: cell.from });
+      cells.push({
+        text: doc.sliceString(cell.from, cell.to).trim(),
+        from: cell.from,
+        to: cell.to,
+      });
     }
     return cells;
   };
@@ -683,7 +716,10 @@ function readTable(state: EditorState, table: SyntaxNode): TableSpec | null {
   // Ragged rows are legal Markdown and would otherwise draw a broken grid.
   const width = header.length;
   for (const row of rows) {
-    while (row.length < width) row.push({ text: "", pos: row.at(-1)?.pos ?? table.from });
+    while (row.length < width) {
+      const fallback = row.at(-1)?.to ?? table.from;
+      row.push({ text: "", from: fallback, to: fallback });
+    }
     row.length = width;
   }
   return { header, rows };
@@ -999,15 +1035,13 @@ const richMarkdown = ViewPlugin.fromClass(
    decorations from a view plugin — a plugin is recomputed from the viewport, and
    a decoration that changes line heights cannot depend on which lines happen to
    be measured. So tables are computed from the document instead: every
-   top-level Table node becomes a grid unless the selection is inside it, in
-   which case its Markdown stands so it can be edited. */
+   top-level Table node becomes an editable grid. The Markdown serialization is
+   never shown; cells update their source on blur. */
 function buildTables(state: EditorState): DecorationSet {
   const ranges: { from: number; to: number; deco: Decoration }[] = [];
-  const selection = state.selection.main;
 
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     if (node.name !== "Table") continue;
-    if (selection.from <= node.to && selection.to >= node.from) continue;
     const spec = readTable(state, node);
     if (!spec) continue;
     ranges.push({
@@ -1084,7 +1118,6 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
           height="18"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
           strokeLinecap="round"
           aria-hidden="true"
         >
@@ -1123,6 +1156,7 @@ export type FormatAction =
 export interface MarkdownEditorHandle {
   format: (action: FormatAction) => void;
   getSelectedText: () => string;
+  replaceSelectedText: (text: string) => void;
   insertLink: (label: string, url: string) => void;
   insertText: (text: string) => void;
   insertImage: (src: string, alt: string) => void;
@@ -1220,10 +1254,11 @@ function insertBlock(editor: EditorView, text: string, selectFrom = 0, selectTo 
   const trail = after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n";
 
   const insert = `${lead}${text}${trail}`;
-  const anchor = from + lead.length + selectFrom;
+  const anchor = selectFrom < 0 ? from + insert.length : from + lead.length + selectFrom;
+  const head = selectTo < 0 ? anchor : from + lead.length + selectTo;
   editor.dispatch({
     changes: { from, to, insert },
-    selection: { anchor, head: from + lead.length + selectTo },
+    selection: { anchor, head },
     scrollIntoView: true,
   });
   editor.focus();
@@ -1300,20 +1335,6 @@ function stripColor(text: string): string {
 }
 
 /** Strips every colour marker found inside the selection. */
-function clearColor(editor: EditorView): void {
-  const { from, to } = editor.state.selection.main;
-  if (from === to) return;
-  const selected = editor.state.doc.sliceString(from, to);
-  const cleaned = stripColor(selected);
-  if (cleaned === selected) return;
-  editor.dispatch({
-    changes: { from, to, insert: cleaned },
-    selection: { anchor: from, head: from + cleaned.length },
-    scrollIntoView: true,
-  });
-  editor.focus();
-}
-
 /**
  * Colours the selection.
  *
@@ -1324,13 +1345,49 @@ function clearColor(editor: EditorView): void {
  * and the "colour" never arrived. Block markers are stepped over too, so
  * colouring a heading colours the heading rather than dismantling it.
  */
-function applyColor(editor: EditorView, color: TextColor): void {
-  const { from, to } = editor.state.selection.main;
-  if (from === to) return;
-  const opening = color === "yellow" ? "==" : `==${color}:`;
-  const selected = editor.state.doc.sliceString(from, to);
+/* ── Colouring ───────────────────────────────────────────────────────────────
+   Two things were wrong with this.
 
-  const coloured = stripColor(selected)
+   Colouring part of an already-coloured phrase nested one mark inside another:
+   picking three words out of `==yellow:a whole sentence==` wrote
+   `==yellow:a ==purple:whole==== sentence==`, which is not a colour, it is
+   broken source that the reader then has to find and unpick by hand. So the
+   range is first grown to whole marks — colour applies to the span, and a span
+   has one colour.
+
+   And colour was the only style in the app that would not come off the way it
+   went on. The text menu promises "choosing the one a paragraph already has
+   takes it off"; colour ignored that and made you find "Back to normal".
+   Applying the colour a span already has now removes it. ─────────────────── */
+
+/** Grows a range to contain whole colour marks, so nothing is ever re-marked
+ *  in the middle of an existing one. */
+function expandToColorMarks(state: EditorState, from: number, to: number): [number, number] {
+  let start = from;
+  let end = to;
+  const first = state.doc.lineAt(from).number;
+  const last = state.doc.lineAt(to).number;
+
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n);
+    COLOR_STRIP.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = COLOR_STRIP.exec(line.text)) !== null) {
+      const markStart = line.from + match.index;
+      const markEnd = markStart + match[0].length;
+      if (markEnd > start && markStart < end) {
+        start = Math.min(start, markStart);
+        end = Math.max(end, markEnd);
+      }
+    }
+  }
+  return [start, end];
+}
+
+/** Marks every written line of `text`, leaving block markers and surrounding
+ *  whitespace outside the mark where they belong. */
+function paint(text: string, opening: string): string {
+  return text
     .split("\n")
     .map((line) => {
       const mark = ANY_BLOCK_MARK.exec(line)?.[0] ?? "";
@@ -1342,14 +1399,43 @@ function applyColor(editor: EditorView, color: TextColor): void {
       return `${mark}${lead}${opening}${body}==${tail}`;
     })
     .join("\n");
+}
 
-  if (coloured === selected) return;
+function writeColor(editor: EditorView, from: number, to: number, text: string): void {
   editor.dispatch({
-    changes: { from, to, insert: coloured },
-    selection: { anchor: from, head: from + coloured.length },
+    changes: { from, to, insert: text },
+    selection: { anchor: from, head: from + text.length },
     scrollIntoView: true,
   });
   editor.focus();
+}
+
+function clearColor(editor: EditorView): void {
+  const range = editor.state.selection.main;
+  if (range.empty) return;
+  const [from, to] = expandToColorMarks(editor.state, range.from, range.to);
+  const selected = editor.state.doc.sliceString(from, to);
+  const cleaned = stripColor(selected);
+  if (cleaned === selected) return;
+  writeColor(editor, from, to, cleaned);
+}
+
+function applyColor(editor: EditorView, color: TextColor): void {
+  const range = editor.state.selection.main;
+  if (range.empty) return;
+
+  const [from, to] = expandToColorMarks(editor.state, range.from, range.to);
+  const opening = color === "yellow" ? "==" : `==${color}:`;
+  const selected = editor.state.doc.sliceString(from, to);
+  const bare = stripColor(selected);
+  const coloured = paint(bare, opening);
+
+  /* Already exactly this colour, so this is the switch being turned off. */
+  if (coloured === selected) {
+    if (bare !== selected) writeColor(editor, from, to, bare);
+    return;
+  }
+  writeColor(editor, from, to, coloured);
 }
 
 const BLOCK_PREFIX: Record<string, string> = {
@@ -1465,9 +1551,9 @@ function formatSelection(editor: EditorView, action: FormatAction): void {
     return replaceSelection(editor, insert, urlStart, urlStart + 8);
   }
   if (action === "divider") return insertBlock(editor, "---");
-  if (action === "table-2") return insertBlock(editor, table(2), 2, 10);
-  if (action === "table-3") return insertBlock(editor, table(3), 2, 10);
-  if (action === "table-4") return insertBlock(editor, table(4), 2, 10);
+  if (action === "table-2") return insertBlock(editor, table(2), -1, -1);
+  if (action === "table-3") return insertBlock(editor, table(3), -1, -1);
+  if (action === "table-4") return insertBlock(editor, table(4), -1, -1);
 
   applyBlock(editor, action);
 }
@@ -1492,6 +1578,21 @@ function endQuoteOnEmptyLine(view: EditorView): boolean {
   view.dispatch({
     changes: { from: line.from, to: line.to, insert: "" },
     selection: { anchor: line.from },
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+/** Invisible colour closers sit just to the right of the caret. Return must
+ * step over them before making a new paragraph, otherwise the opening `==`
+ * becomes visible source on the line above. */
+function exitColorOnEnter(view: EditorView): boolean {
+  const range = view.state.selection.main;
+  if (!range.empty) return false;
+  if (view.state.doc.sliceString(range.head, range.head + 2) !== "==") return false;
+  view.dispatch({
+    changes: { from: range.head + 2, insert: "\n" },
+    selection: { anchor: range.head + 3 },
     scrollIntoView: true,
   });
   return true;
@@ -1531,6 +1632,13 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
       if (!editor) return "";
       const { from, to } = editor.state.selection.main;
       return editor.state.doc.sliceString(from, to);
+    },
+    replaceSelectedText(text) {
+      if (readOnly || !view.current) return;
+      const editor = view.current;
+      const { from, to } = editor.state.selection.main;
+      if (from === to) return;
+      replaceSelection(editor, text, 0, text.length);
     },
     insertLink(label, url) {
       if (readOnly || !view.current) return;
@@ -1633,6 +1741,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
           keymap.of([
             { key: "Mod-b", run: (editor) => (formatSelection(editor, "bold"), true) },
             { key: "Mod-i", run: (editor) => (formatSelection(editor, "italic"), true) },
+            { key: "Enter", run: exitColorOnEnter },
             { key: "Enter", run: endQuoteOnEmptyLine },
             ...markdownKeymap,
             ...defaultKeymap,

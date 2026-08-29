@@ -13,6 +13,7 @@ import { editBody, readDraft } from "@/lib/draft";
 import { extractPdfText } from "@/lib/pdf";
 import { assertAttachable, attachmentLabel, attachmentReference } from "@/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
+import { translateText, type TranslationLanguage } from "@/lib/translation";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";
@@ -114,7 +115,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   }, []);
 
   /**
-   * A PDF kept as a PDF. The bytes are encrypted here and uploaded whole; the
+   * A PDF kept as a PDF. The bytes are uploaded whole; the
    * note gains one link that the editor renders as a card.
    */
   async function handleAttachPdf(file: File | undefined) {
@@ -122,13 +123,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     try {
       assertAttachable(file);
-      setStatus("Encrypting attachment…");
+      setStatus("Attaching PDF…");
       const objectId = await onUploadFile(file);
       editorRef.current?.insertAttachment(
         attachmentLabel(file.name),
         attachmentReference(objectId),
       );
-      report("PDF attached and encrypted with this note");
+      report("PDF attached");
     } catch (error) {
       setStatus("");
       setFailure(error instanceof Error ? error.message : "Could not attach the PDF");
@@ -162,7 +163,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     try {
       const src = await onUploadImage(file);
       editorRef.current?.insertImage(src, imageAltFromFilename(file.name));
-      report("Image inserted and encrypted with this note", 2600);
+      report("Image inserted", 2600);
     } catch (error) {
       setStatus("");
       setFailure(error instanceof Error ? error.message : "Could not insert image");
@@ -177,7 +178,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setStatus("Preparing pasted image…");
     try {
       const src = await onUploadImage(file);
-      report("Image pasted and encrypted with this note", 2600);
+      report("Image pasted", 2600);
       return { src, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
     } catch (error) {
       setStatus("");
@@ -215,6 +216,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   }
 
   const closeLink = useCallback(() => setLinkOpen(false), []);
+
+  async function handleTranslate(language: TranslationLanguage) {
+    const selected = editorRef.current?.getSelectedText() ?? "";
+    if (!selected.trim()) {
+      setFailure("Select the text you want to translate first");
+      return;
+    }
+    setFailure("");
+    setStatus("Detecting language…");
+    try {
+      const translated = await translateText(selected, language, (progress) => {
+        setStatus(`Downloading language pack… ${progress}%`);
+      });
+      editorRef.current?.replaceSelectedText(translated);
+      report("Translation inserted");
+    } catch (error) {
+      setStatus("");
+      setFailure(error instanceof Error ? error.message : "Could not translate the selection");
+    }
+  }
 
   const linkForm = (
     <div className="popover editor-tool-menu absolute top-full left-0 z-40 mt-2 w-72 p-3">
@@ -272,6 +293,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onAttachPdf={() => attachPdfRef.current?.click()}
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
+      onTranslate={(language) => void handleTranslate(language)}
       linkForm={linkForm}
       linkOpen={linkOpen}
       onCloseLink={closeLink}
@@ -365,7 +387,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       {findOpen && (
         <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
-          <Search size={15} className="shrink-0 text-ink-4" />
+          <Search size={16} className="shrink-0 text-ink-4" />
           <input
             ref={findRef}
             value={findQuery}
@@ -399,7 +421,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
             }
           >
-            <ChevronUp size={15} />
+            <ChevronUp size={16} />
           </button>
           <button
             type="button"
@@ -407,7 +429,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className="icon-button press h-8 w-8 text-ink-3"
             onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
           >
-            <ChevronDown size={15} />
+            <ChevronDown size={16} />
           </button>
           <button
             type="button"
@@ -415,7 +437,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className="icon-button press h-8 w-8 text-ink-3"
             onClick={closeFind}
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         </div>
       )}
@@ -460,7 +482,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           docKey={entry.note.id}
           revision={syncRevision}
           readOnly={!canEdit}
-          placeholder="Start writing. Markdown formats itself as you type."
+          placeholder="Start writing…"
           onChange={(body) => {
             if (!canEdit) return;
             editBody(entry.note.id, body);

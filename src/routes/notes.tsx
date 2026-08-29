@@ -60,6 +60,7 @@ import { ALL, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
+import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import { CollectionMenu, NoteMenu, SettingsPanel } from "@/components/WorkspaceMenus";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import type { NoteEditorHandle } from "@/components/NoteEditor";
@@ -234,6 +235,8 @@ function NotesPage() {
   const [listPreferences, setListPreferences] = useState<Record<"u1" | "u2", ListPreferencesV1>>(
     () => ({ u1: loadListPreferences("u1"), u2: loadListPreferences("u2") }),
   );
+  /** Minutes of inactivity before the archive locks itself; 0 is never. */
+  const [autoLock, setAutoLock] = useState<AutoLockMinutes>(loadAutoLock);
 
   /* Uploaded this session, so the tab that just attached a file knows its type
      without a round trip. Anything else opens as the PDF it almost always is. */
@@ -985,12 +988,21 @@ function NotesPage() {
     setMobileScreen("collection");
   }
 
+  function handleAutoLockChange(minutes: AutoLockMinutes) {
+    setAutoLock(minutes);
+    saveAutoLock(minutes);
+  }
+
   function handleLock() {
     saveNow();
     clearDrafts();
     void clearSession();
     navigate({ to: "/" });
   }
+
+  /* Last hook in the body, and deliberately above the `!session` return so the
+     order never changes between renders. */
+  useAutoLock(autoLock, handleLock);
 
   if (!session) return null;
 
@@ -1066,21 +1078,26 @@ function NotesPage() {
       : [];
 
   const collectionActions = (
-    <CollectionMenu
-      preferences={activeListPreferences}
-      galleryOnly={compact}
-      onChange={handleListPreferencesChange}
-    />
+    <CollectionMenu preferences={activeListPreferences} onChange={handleListPreferencesChange} />
   );
 
-  /* `flex-1` children need a parent with a width of its own; in the phone app
+  /* ── Whose notes ───────────────────────────────────────────────────────────
+     The control that re-points the entire window, so it is built as a real
+     switch rather than two buttons that happen to sit together: one track, one
+     travelling thumb, and the two names always both legible. The thumb is a
+     single element moved by `data-active`, which is what lets the selection
+     slide between the halves instead of blinking from one to the other.
+
+     `flex-1` children need a parent with a width of its own; in the phone app
      bar the switch is shrink-to-fit, so it is given one. */
   const archiveSwitch = (
     <div
       role="group"
       aria-label="Archive"
-      className={`archive-switch flex min-w-0 ${compact ? "w-44 shrink-0" : "flex-1"}`}
+      data-active={viewAs}
+      className={`archive-switch ${compact ? "w-44 shrink-0" : "w-full"}`}
     >
+      <span className="archive-switch-thumb" aria-hidden="true" />
       {(
         [
           ["u1", "Jacopo"],
@@ -1092,9 +1109,9 @@ function NotesPage() {
           type="button"
           onClick={() => handleViewChange(owner)}
           aria-pressed={viewAs === owner}
-          className={`min-w-0 flex-1 truncate px-3 py-1.5 text-xs ${viewAs === owner ? "is-active" : ""}`}
+          className={viewAs === owner ? "is-active" : ""}
         >
-          {label}
+          <span className="truncate">{label}</span>
         </button>
       ))}
     </div>
@@ -1124,11 +1141,12 @@ function NotesPage() {
 
   const settingsPanel = (
     <SettingsPanel
-      mobile={compact}
       open={settingsOpen}
-      preferences={activeListPreferences}
+      email={session.email}
+      reading={viewAs === "u1" ? "Jacopo's notes" : `${partnerName}'s notes`}
+      autoLock={autoLock}
+      onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
-      onPreferencesChange={handleListPreferencesChange}
       onLock={handleLock}
     />
   );
@@ -1189,7 +1207,7 @@ function NotesPage() {
                       className="toolbar-button press shrink-0"
                       onClick={() => setFoldersOpen(true)}
                     >
-                      <FolderTree size={17} />
+                      <FolderTree size={18} />
                     </button>
                     <button
                       type="button"
@@ -1197,7 +1215,7 @@ function NotesPage() {
                       className="toolbar-button press shrink-0"
                       onClick={() => setSettingsOpen(true)}
                     >
-                      <SettingsIcon size={17} />
+                      <SettingsIcon size={18} />
                     </button>
                     <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
                   </div>
@@ -1311,7 +1329,7 @@ function NotesPage() {
                 <NoteList
                   entries={visible}
                   groups={noteGroups}
-                  view={activeListPreferences.view}
+                  view="list"
                   toolbarActions={collectionActions}
                   filters={activeFilters}
                   meta={activeMeta}

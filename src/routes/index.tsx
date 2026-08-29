@@ -40,7 +40,7 @@ function Login() {
       <main className="flex flex-1 items-center justify-center px-5 pb-16">
         <div className="login-card w-full max-w-[28rem] p-8 sm:p-10">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-glass-border bg-accent-wash text-accent">
-            <ShieldCheck size={21} strokeWidth={1.8} />
+            <ShieldCheck size={20} />
           </div>
 
           <h1
@@ -95,7 +95,7 @@ function Login() {
                 "Opening…"
               ) : (
                 <>
-                  Continue <ArrowRight size={13} strokeWidth={2.5} />
+                  Continue <ArrowRight size={14} />
                 </>
               )}
             </button>
@@ -107,7 +107,7 @@ function Login() {
             </p>
           )}
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-3">
-            <ShieldCheck size={13} className="shrink-0 text-ok" />
+            <ShieldCheck size={14} className="shrink-0 text-ok" />
             Notes are decrypted locally. Supabase stores ciphertext only.
           </p>
         </div>

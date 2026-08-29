@@ -1,11 +1,14 @@
 import type { NoteEntry } from "./entries";
 
+/* The two ways the collection can be drawn. Which one you get is decided by the
+   window, not by a preference: a list of one-line rows is unreadable on a phone
+   and a grid of cards wastes a desktop column that is 300px wide and 900 tall.
+   Neither is a taste to be set, so neither is stored here any more. */
 export type ListView = "list" | "gallery";
 export type SortCriterion = "updated" | "created" | "title";
 export type SortDirection = "asc" | "desc";
 
 export interface ListPreferences {
-  view: ListView;
   sortBy: SortCriterion;
   direction: SortDirection;
   groupByDate: boolean;
@@ -26,7 +29,6 @@ export interface NoteGroup {
 }
 
 export const DEFAULT_LIST_PREFERENCES: ListPreferences = {
-  view: "list",
   sortBy: "updated",
   direction: "desc",
   groupByDate: true,
@@ -41,7 +43,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readPreferences(value: unknown): Partial<ListPreferences> {
   if (!isRecord(value)) return {};
   const next: Partial<ListPreferences> = {};
-  if (value.view === "list" || value.view === "gallery") next.view = value.view;
   if (value.sortBy === "updated" || value.sortBy === "created" || value.sortBy === "title") {
     next.sortBy = value.sortBy;
   }

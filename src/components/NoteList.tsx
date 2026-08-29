@@ -168,7 +168,7 @@ const Row = memo(function Row({
           selected ? "is-selected" : ""
         } ${pinned ? "is-pinned" : ""}`}
       >
-        <Glyph size={mobile && !gallery ? 15 : 14} strokeWidth={1.8} />
+        <Glyph size={mobile && !gallery ? 16 : 14} />
       </span>
 
       <div className="min-w-0 flex-1">
@@ -214,11 +214,7 @@ const Row = memo(function Row({
                 : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
             }`}
           >
-            <Pin
-              size={13}
-              strokeWidth={pinned ? 2.4 : 1.75}
-              fill={pinned ? "currentColor" : "none"}
-            />
+            <Pin size={14} fill={pinned ? "currentColor" : "none"} />
           </button>
         )}
         {trashMode && (
@@ -232,7 +228,7 @@ const Row = memo(function Row({
             onPointerDown={(event) => event.stopPropagation()}
             className="icon-button h-7 w-7 shrink-0 text-accent"
           >
-            <RotateCcw size={14} strokeWidth={2} />
+            <RotateCcw size={14} />
           </button>
         )}
 
@@ -270,7 +266,7 @@ const Row = memo(function Row({
           {confirmDelete ? (
             <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
           ) : (
-            <Trash2 size={13} strokeWidth={1.75} />
+            <Trash2 size={14} />
           )}
         </button>
       </div>
@@ -370,7 +366,7 @@ export function NoteList({
           aria-label={`Stop showing ${filter.label}`}
         >
           <span className="truncate">{filter.label}</span>
-          <X size={12} strokeWidth={2.5} className="shrink-0" />
+          <X size={12} className="shrink-0" />
         </button>
       ))}
     </div>
@@ -395,7 +391,7 @@ export function NoteList({
 
         <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
           <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
-            <Search size={16} strokeWidth={2} className="shrink-0 text-ink-4" />
+            <Search size={16} className="shrink-0 text-ink-4" />
             <input
               ref={searchRef}
               value={query}
@@ -417,7 +413,7 @@ export function NoteList({
                 onClick={() => onQueryChange("")}
                 className="icon-button h-8 w-8 shrink-0 text-ink-4"
               >
-                <X size={14} strokeWidth={2.5} />
+                <X size={14} />
               </button>
             )}
           </div>
@@ -460,7 +456,7 @@ export function NoteList({
             aria-label="New note"
             className="mobile-compose glass-toolbar absolute right-5 bottom-5 flex h-13 w-13 items-center justify-center text-accent disabled:opacity-40"
           >
-            <SquarePen size={23} strokeWidth={1.9} />
+            <SquarePen size={24} />
           </button>
         )}
       </section>
@@ -488,7 +484,7 @@ export function NoteList({
             title="New note · N"
             className="new-note-button press shrink-0"
           >
-            <SquarePen size={14} strokeWidth={1.9} />
+            <SquarePen size={14} />
             <span>New note</span>
           </button>
         )}
@@ -498,7 +494,7 @@ export function NoteList({
       {filterStrip}
 
       <div className="glass-search mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3">
-        <Search size={13} strokeWidth={2} className="shrink-0 text-ink-4" />
+        <Search size={14} className="shrink-0 text-ink-4" />
         <input
           ref={searchRef}
           value={query}
@@ -520,7 +516,7 @@ export function NoteList({
             onClick={() => onQueryChange("")}
             className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
           >
-            <X size={12} strokeWidth={2.5} />
+            <X size={12} />
           </button>
         )}
       </div>
