@@ -41,7 +41,7 @@ yarn.lock
 .github/hooks/
 .impeccable/
 
-# Local previews and scratch
-preview/
-vite.preview.config.ts
+# Local scratch. The UI preview harness (preview/, vite.preview.config.ts) is
+# versioned on purpose: it runs the whole interface against an in-memory
+# fixture, so anyone can work on the front end without an archive of their own.
 tmp/

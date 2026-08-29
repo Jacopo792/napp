@@ -1,0 +1,35 @@
+import { PREVIEW_U1 } from "./fixture";
+
+/* Preview-only stand-in for src/lib/session.ts. The archive is already unlocked,
+   so the notes surface can be inspected without credentials or a passphrase.
+   No archive key is needed: the preview mirrors the account-protected format. */
+
+export interface AppSession {
+  userId: string;
+  email: string;
+  archiveId: string;
+  legacyKey?: CryptoKey;
+}
+
+const ARCHIVE_ID = "00000000-0000-4000-8000-000000000001";
+const EMAIL = "preview@example.invalid";
+
+async function previewSession(email = EMAIL): Promise<AppSession> {
+  return {
+    userId: PREVIEW_U1,
+    email,
+    archiveId: ARCHIVE_ID,
+  };
+}
+
+export async function authenticate(email: string): Promise<AppSession> {
+  return previewSession(email || EMAIL);
+}
+
+export async function restoreSession(): Promise<AppSession | null> {
+  return previewSession();
+}
+
+export async function clearSession(): Promise<void> {
+  /* Nothing to clear: the preview session is recreated on every load. */
+}

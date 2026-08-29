@@ -1,29 +1,24 @@
-name: Deploy to GitHub Pages
+name: Checks
 
+# Nothing was checking a pull request. Lint, typecheck, tests and the build all
+# ran only on the way to Pages, which meant a branch could be reviewed and
+# merged before anything had compiled it.
 on:
+  pull_request:
   push:
-    branches: [main]
+    branches: [main, PP]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  checks:
     runs-on: ubuntu-latest
-    env:
-      VITE_BASE_PATH: /note-sharing-app/
-      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,14 +44,7 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # No Supabase variables: this proves the bundle compiles, and the archive
+      # it would talk to is not this workflow's business.
       - name: Build
         run: pnpm run build
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-      - uses: actions/deploy-pages@v4
-        id: deploy
