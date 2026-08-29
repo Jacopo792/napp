@@ -955,17 +955,22 @@
   }
 }
 
+/* Tokens, not literals. These three were hardcoded greys, so every light
+   palette drew a near-black card and then painted dark ink on it — the card
+   was there, the title was not. `--paper` is the step away from the page in
+   both directions, and selection moves one further toward the ink, which
+   brightens in the dark and darkens in the light. */
 .note-gallery-item {
   min-height: 10.5rem;
   border-radius: 0.95rem;
-  background: #232323;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+  background: var(--paper);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 .note-gallery-item[aria-selected="true"] {
-  border-color: #777777;
-  background: #353535;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  border-color: var(--rule);
+  background: color-mix(in srgb, var(--paper) 90%, var(--ink));
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 .note-gallery-item .note-row-actions {
@@ -1109,7 +1114,11 @@
   padding: 0 20px 20px;
 }
 
+/* A settings row is a label and its value. Given the full width of the dialog
+   they end up a hand's width apart with nothing in between, and the eye has to
+   travel the whole way to pair them. Cap the measure instead. */
 .settings-scroll > section {
+  max-width: 34rem;
   padding: 20px 0;
   border-bottom: 1px solid var(--rule-soft);
 }
@@ -1662,9 +1671,11 @@
   white-space: nowrap;
 }
 
+/* Signing out is a deliberate action, not the section's primary one. It gets a
+   button's width, not the panel's. */
 .settings-lock {
   display: flex;
-  width: 100%;
+  width: fit-content;
   align-items: center;
   justify-content: center;
   gap: var(--rail-gap);
@@ -1672,6 +1683,7 @@
   margin-top: 14px;
   border: 1px solid var(--rule);
   border-radius: 0.8rem;
+  padding-inline: 1rem;
   color: var(--ink-2);
   font-size: 13.5px;
   font-weight: 560;

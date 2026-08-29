@@ -127,6 +127,43 @@ function mix(hex: string, amount: number, toward: "black" | "white"): string {
     .join("")}`;
 }
 
+/* Semantic colour has to answer to the mode as well. These values were tuned
+   against a near-black ground; on a cream one the pale red and the pale mint
+   are the same brightness as the paper they sit on, which is how a light
+   palette ends up unreadable while every neutral looks fine. */
+const SEMANTIC = {
+  dark: {
+    "--danger": "#ffa5a8",
+    "--danger-fill": "#b3272c",
+    "--on-danger": "#fafafa",
+    "--ok": "#7fd1a8",
+    "--tint-yellow": "#e8c46a",
+    "--tint-purple": "#c69cf0",
+    "--tint-pink": "#f095b7",
+    "--tint-orange": "#efa86f",
+    "--tint-mint": "#79ddb2",
+    "--tint-blue": "#8fb6f5",
+    "--glass-highlight": "rgb(255 255 255 / 0.06)",
+    "--shadow-soft": "0 14px 40px rgb(0 0 0 / 0.22)",
+    "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.44)",
+  },
+  light: {
+    "--danger": "#b0232a",
+    "--danger-fill": "#b3272c",
+    "--on-danger": "#ffffff",
+    "--ok": "#15734b",
+    "--tint-yellow": "#8a6410",
+    "--tint-purple": "#6d3cab",
+    "--tint-pink": "#ad2f61",
+    "--tint-orange": "#9c4f12",
+    "--tint-mint": "#0f7355",
+    "--tint-blue": "#2757b0",
+    "--glass-highlight": "rgb(255 255 255 / 0.72)",
+    "--shadow-soft": "0 14px 40px rgb(0 0 0 / 0.09)",
+    "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.16)",
+  },
+} as const;
+
 export function applyAppearance(config = current): void {
   const root = document.documentElement;
   const dark = darkMode(config);
@@ -183,6 +220,9 @@ export function applyAppearance(config = current): void {
   root.style.setProperty("--wallpaper-dim", String(config.wallpaperDim / 100));
   root.style.setProperty("--wallpaper-blur", `${config.wallpaperBlur}px`);
   root.style.setProperty("--wallpaper-fit", config.wallpaperFit);
+  for (const [token, value] of Object.entries(SEMANTIC[dark ? "dark" : "light"])) {
+    root.style.setProperty(token, value);
+  }
 }
 
 function openDb(): Promise<IDBDatabase> {
