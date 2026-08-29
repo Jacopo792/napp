@@ -49,6 +49,8 @@ import {
 } from "@/lib/appearance";
 import type { Folder } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
+import { ContextMenu } from "./ContextMenu";
+import type { MenuPoint } from "@/lib/contextMenu";
 
 function useDismiss(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -70,7 +72,7 @@ function useDismiss(open: boolean, close: () => void) {
   return ref;
 }
 
-function MenuButton({
+export function MenuButton({
   children,
   active = false,
   danger = false,
@@ -204,7 +206,9 @@ export function CollectionMenu({
   );
 }
 
-export function NoteMenu({
+/* The items a note carries, wherever they are asked for: from the ⋯ in the
+   editor toolbar, and from a right-click on the page. One list, two doors. */
+function NoteMenuContent({
   pinned,
   folders,
   recent,
@@ -213,7 +217,124 @@ export function NoteMenu({
   onMove,
   onRecent,
   onDelete,
+  close,
 }: {
+  pinned: boolean;
+  folders: Folder[];
+  recent: { id: string; title: string }[];
+  onTogglePin: () => void;
+  onFind: () => void;
+  onMove: (folderId: string | null) => void;
+  onRecent: (id: string) => void;
+  onDelete: () => void;
+  close: () => void;
+}) {
+  const [section, setSection] = useState<"root" | "move" | "recent">("root");
+  return (
+    <>
+      {section !== "root" && (
+        <MenuButton onClick={() => setSection("root")}>
+          <ChevronRight size={16} className="rotate-180" />
+          Back
+        </MenuButton>
+      )}
+      {section === "root" && (
+        <>
+          <MenuButton
+            active={pinned}
+            onClick={() => {
+              onTogglePin();
+              close();
+            }}
+          >
+            <Pin size={16} />
+            {pinned ? "Unpin note" : "Pin note"}
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              onFind();
+              close();
+            }}
+          >
+            <Search size={16} />
+            Find in note
+          </MenuButton>
+          <div className="menu-separator" />
+          <MenuButton onClick={() => setSection("move")}>
+            <FolderInput size={16} />
+            Move note
+            <ChevronRight size={16} className="ml-auto" />
+          </MenuButton>
+          <MenuButton onClick={() => setSection("recent")}>
+            <Clock3 size={16} />
+            Recent notes
+            <ChevronRight size={16} className="ml-auto" />
+          </MenuButton>
+          <div className="menu-separator" />
+          <MenuButton
+            danger
+            onClick={() => {
+              onDelete();
+              close();
+            }}
+          >
+            <Trash2 size={16} />
+            Delete note
+          </MenuButton>
+        </>
+      )}
+      {section === "move" && (
+        <>
+          <p className="menu-label">Move to</p>
+          <MenuButton
+            onClick={() => {
+              onMove(null);
+              close();
+            }}
+          >
+            <FolderInput size={16} />
+            Unfiled
+          </MenuButton>
+          {folders.map((folder) => (
+            <MenuButton
+              key={folder.id}
+              onClick={() => {
+                onMove(folder.id);
+                close();
+              }}
+            >
+              <FolderInput size={16} />
+              {folder.name}
+            </MenuButton>
+          ))}
+        </>
+      )}
+      {section === "recent" && (
+        <>
+          <p className="menu-label">Recent notes</p>
+          {recent.length ? (
+            recent.map((note) => (
+              <MenuButton
+                key={note.id}
+                onClick={() => {
+                  onRecent(note.id);
+                  close();
+                }}
+              >
+                <Clock3 size={16} />
+                <span className="truncate">{note.title || "Untitled"}</span>
+              </MenuButton>
+            ))
+          ) : (
+            <p className="px-3 py-4 text-sm text-ink-4">No recent notes yet</p>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+export function NoteMenu(props: {
   pinned: boolean;
   folders: Folder[];
   recent: { id: string; title: string }[];
@@ -224,11 +345,7 @@ export function NoteMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [section, setSection] = useState<"root" | "move" | "recent">("root");
-  const close = () => {
-    setOpen(false);
-    setSection("root");
-  };
+  const close = () => setOpen(false);
   const ref = useDismiss(open, close);
   return (
     <div ref={ref} className="relative">
@@ -246,110 +363,36 @@ export function NoteMenu({
           role="menu"
           className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
         >
-          {section !== "root" && (
-            <MenuButton onClick={() => setSection("root")}>
-              <ChevronRight size={16} className="rotate-180" />
-              Back
-            </MenuButton>
-          )}
-          {section === "root" && (
-            <>
-              <MenuButton
-                active={pinned}
-                onClick={() => {
-                  onTogglePin();
-                  close();
-                }}
-              >
-                <Pin size={16} />
-                {pinned ? "Unpin note" : "Pin note"}
-              </MenuButton>
-              <MenuButton
-                onClick={() => {
-                  onFind();
-                  close();
-                }}
-              >
-                <Search size={16} />
-                Find in note
-              </MenuButton>
-              <div className="menu-separator" />
-              <MenuButton onClick={() => setSection("move")}>
-                <FolderInput size={16} />
-                Move note
-                <ChevronRight size={16} className="ml-auto" />
-              </MenuButton>
-              <MenuButton onClick={() => setSection("recent")}>
-                <Clock3 size={16} />
-                Recent notes
-                <ChevronRight size={16} className="ml-auto" />
-              </MenuButton>
-              <div className="menu-separator" />
-              <MenuButton
-                danger
-                onClick={() => {
-                  onDelete();
-                  close();
-                }}
-              >
-                <Trash2 size={16} />
-                Delete note
-              </MenuButton>
-            </>
-          )}
-          {section === "move" && (
-            <>
-              <p className="menu-label">Move to</p>
-              <MenuButton
-                onClick={() => {
-                  onMove(null);
-                  close();
-                }}
-              >
-                <FolderInput size={16} />
-                Unfiled
-              </MenuButton>
-              {folders.map((folder) => (
-                <MenuButton
-                  key={folder.id}
-                  onClick={() => {
-                    onMove(folder.id);
-                    close();
-                  }}
-                >
-                  <FolderInput size={16} />
-                  {folder.name}
-                </MenuButton>
-              ))}
-            </>
-          )}
-          {section === "recent" && (
-            <>
-              <p className="menu-label">Recent notes</p>
-              {recent.length ? (
-                recent.map((note) => (
-                  <MenuButton
-                    key={note.id}
-                    onClick={() => {
-                      onRecent(note.id);
-                      close();
-                    }}
-                  >
-                    <Clock3 size={16} />
-                    <span className="truncate">{note.title || "Untitled"}</span>
-                  </MenuButton>
-                ))
-              ) : (
-                <p className="px-3 py-4 text-sm text-ink-4">No recent notes yet</p>
-              )}
-            </>
-          )}
+          <NoteMenuContent {...props} close={close} />
         </div>
       )}
     </div>
   );
 }
 
+/** The same items, opened where the pointer is. */
+export function NoteContextMenu({
+  point,
+  onClose,
+  ...props
+}: {
+  point: MenuPoint;
+  onClose: () => void;
+  pinned: boolean;
+  folders: Folder[];
+  recent: { id: string; title: string }[];
+  onTogglePin: () => void;
+  onFind: () => void;
+  onMove: (folderId: string | null) => void;
+  onRecent: (id: string) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <ContextMenu point={point} onClose={onClose}>
+      <NoteMenuContent {...props} close={onClose} />
+    </ContextMenu>
+  );
+}
 /* ── Settings ────────────────────────────────────────────────────────────────
    What a preferences sheet in this application is actually for.
 

@@ -62,7 +62,13 @@ import { attachmentType } from "@/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
-import { CollectionMenu, NoteMenu, SettingsPanel } from "@/components/WorkspaceMenus";
+import {
+  CollectionMenu,
+  NoteContextMenu,
+  NoteMenu,
+  SettingsPanel,
+} from "@/components/WorkspaceMenus";
+import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import type { NoteEditorHandle } from "@/components/NoteEditor";
 import {
@@ -233,6 +239,8 @@ function NotesPage() {
     loadPaneWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX),
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Where a right-click landed on the note page, if one has. */
+  const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The phone has no room for a permanent sidebar, so it gets the same one
    *  as a drawer — the destinations are identical, only the staging differs. */
   const [foldersOpen, setFoldersOpen] = useState(false);
@@ -1208,6 +1216,24 @@ function NotesPage() {
     </>
   ) : null;
 
+  /* The same items the ⋯ carries, opened where the pointer is. The editor
+     hands the click over only when it did not land on the words. */
+  const editorMenu =
+    selected && editorMenuPoint ? (
+      <NoteContextMenu
+        point={editorMenuPoint}
+        onClose={() => setEditorMenuPoint(null)}
+        pinned={pinned}
+        folders={activeMeta.folders}
+        recent={recentNotes}
+        onTogglePin={() => handleTogglePin(selected.note.id)}
+        onFind={() => noteEditorRef.current?.openFind()}
+        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+        onRecent={handleOpenRecent}
+        onDelete={() => handleMoveToTrash(selected)}
+      />
+    ) : null;
+
   /* Always leave a useful writing surface. On narrower desktop windows the
      handles stop before either navigation pane can consume the editor. */
   const editorReserve = 380;
@@ -1275,6 +1301,7 @@ function NotesPage() {
                   onRestore={handleRestore}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  onMoveToFolder={handleMoveNote}
                 />
               </section>
             )}
@@ -1380,6 +1407,7 @@ function NotesPage() {
                   onRestore={handleRestore}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  onMoveToFolder={handleMoveNote}
                 />
               </div>
               <PaneResizer
@@ -1418,6 +1446,7 @@ function NotesPage() {
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
               resolveFile={resolveFile}
+              onContextMenu={(event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })}
               navigationAction={
                 !navigationOpen ? (
                   <>
@@ -1454,6 +1483,7 @@ function NotesPage() {
         </DragOverlay>
       </DndContext>
       {settingsPanel}
+      {editorMenu}
     </div>
   );
 }

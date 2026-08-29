@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
   ChevronRight,
@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { ALL, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
+import { ContextMenu } from "./ContextMenu";
+import { useContextMenu } from "@/lib/contextMenu";
+import { MenuButton } from "./WorkspaceMenus";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -277,6 +280,7 @@ function Row({
   disclosure,
   actions,
   onSelect,
+  onContextMenu,
 }: {
   scope: Scope;
   glyph: React.ReactNode;
@@ -286,6 +290,7 @@ function Row({
   disclosure?: React.ReactNode;
   actions?: React.ReactNode;
   onSelect: () => void;
+  onContextMenu?: (event: React.MouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: scope.id, disabled: !droppable });
   return (
@@ -293,6 +298,7 @@ function Row({
       ref={setNodeRef}
       className={`sidebar-row ${active ? "is-active" : ""} ${isOver ? "is-over" : ""}`}
       style={{ paddingLeft: `${depth * INDENT}px` }}
+      onContextMenu={onContextMenu}
     >
       <span className="sidebar-twisty">{disclosure}</span>
       <button type="button" className="sidebar-target press" onClick={onSelect}>
@@ -322,6 +328,13 @@ export function Sidebar({
   /** Where a new folder is being typed: null for none, "" for the top level. */
   const [adding, setAdding] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  /* The same three actions the folder's own ⋯ carries, on the right button. */
+  const folderMenu = useContextMenu<FolderType>();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const closeFolderMenu = useCallback(() => {
+    folderMenu.close();
+    setConfirmDelete(false);
+  }, [folderMenu]);
 
   useEffect(() => {
     try {
@@ -408,6 +421,10 @@ export function Sidebar({
             />
           }
           onSelect={() => onSelect(node.folder.id)}
+          onContextMenu={(event) => {
+            setConfirmDelete(false);
+            folderMenu.open(event, node.folder);
+          }}
         />
 
         {open && hasChildren && (
@@ -530,6 +547,42 @@ export function Sidebar({
           <span>Lock &amp; sign out</span>
         </button>
       </div>
+
+      {folderMenu.target && (
+        <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
+          <MenuButton
+            onClick={() => {
+              setRenaming(folderMenu.target!.item.id);
+              closeFolderMenu();
+            }}
+          >
+            <Pencil size={16} />
+            Rename folder
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              startSubfolder(folderMenu.target!.item.id);
+              closeFolderMenu();
+            }}
+          >
+            <FolderPlus size={16} />
+            New folder inside
+          </MenuButton>
+          <div className="menu-separator" />
+          <MenuButton
+            danger
+            onClick={() => {
+              if (!confirmDelete) return setConfirmDelete(true);
+              onDeleteFolder(folderMenu.target!.item.id);
+              closeFolderMenu();
+            }}
+          >
+            <Trash2 size={16} />
+            {confirmDelete ? "Delete — click to confirm" : "Delete folder"}
+          </MenuButton>
+          <p className="menu-note">Deleting a folder never deletes its notes; they go unfiled.</p>
+        </ContextMenu>
+      )}
     </nav>
   );
 }

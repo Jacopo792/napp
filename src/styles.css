@@ -819,6 +819,13 @@
   overflow: hidden;
 }
 
+/* Portalled to the body, so it ranks against the page rather than against the
+   pane it was opened over. Above the toolbars, which sit at 30. */
+.context-menu {
+  position: fixed;
+  z-index: 80;
+}
+
 .menu-row {
   display: flex;
   width: 100%;

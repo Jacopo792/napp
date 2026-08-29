@@ -91,6 +91,18 @@ Markdown is edited in one continuous reading surface. Syntax is formatted in pla
 - Icon actions are quiet until hover or keyboard focus. Hover shifts them toward the accent wash; destructive actions shift to `--danger`.
 - Note deletion is deliberately two-step in place: the first click changes the row action to a visible **Delete?** confirmation, and the second click performs the permanent deletion. The confirmation expires after three seconds. Do not replace this with a one-click destructive icon.
 
+## The right button
+
+Right-click acts on the thing under the pointer: a note row, a folder, the note
+page. It opens the same items that thing's own ⋯ already carries — one list
+behind two doors, never a second set of actions that exists only here.
+
+The one place it is not ours is the text itself. Inside the editor, the title
+field and any other input, the browser's own menu is left alone: it carries
+spelling suggestions, Look Up, and a paste that needs no permission, and a web
+page cannot put those back. A destructive item asks twice here exactly as it
+does on a row.
+
 ## Honest persistence
 
 Saving is a visible network state, not an implied local success. The editor

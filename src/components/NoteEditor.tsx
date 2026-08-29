@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import type { NoteEntry } from "@/lib/entries";
@@ -36,6 +37,8 @@ interface Props {
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
   headerActions?: ReactNode;
+  /** Right-click on the page, but never on the words themselves. */
+  onContextMenu?: (event: MouseEvent) => void;
 }
 
 /* The toolbar's three groups — the mode label, the format cluster, the save
@@ -72,6 +75,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     resolveFile,
     navigationAction,
     headerActions,
+    onContextMenu,
   },
   ref,
 ) {
@@ -316,6 +320,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     />
   ) : null;
 
+  /* The page's own menu, and only where the page has one to give. Inside the
+     words the browser's menu is worth more than anything we could put there:
+     spelling suggestions, Look Up, and a paste that needs no permission. So a
+     right-click on the text, the title or any other field is left alone. */
+  function handlePageContextMenu(event: MouseEvent) {
+    if (!onContextMenu) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest(".cm-editor, input, textarea, [contenteditable='true']")) return;
+    event.preventDefault();
+    /* The menu that is about to mount listens on the document for the next
+       right-click, so this one must not be allowed to reach it. */
+    event.stopPropagation();
+    onContextMenu(event);
+  }
+
   /* Inline while there is room for it; on its own row otherwise. */
   const inlineToolbar =
     !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
@@ -384,6 +403,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     <section
       key={entry.note.id}
       ref={shellRef}
+      onContextMenu={handlePageContextMenu}
       className={`editor-shell page-in flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
