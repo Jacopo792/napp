@@ -626,3 +626,15 @@ export async function deleteAvatar(session: AppSession, objectId: string): Promi
     .remove([`${session.userId}/${objectId}`]);
   fail(result.error);
 }
+
+/** Returns the raw invitation token once. Postgres stores only its digest, so
+ * the caller is responsible for turning it into the link the member shares. */
+export async function createArchiveInvite(session: AppSession, email: string): Promise<string> {
+  const result = await supabase.rpc("create_archive_invite", {
+    archive_id: session.archiveId,
+    email,
+  });
+  fail(result.error);
+  if (typeof result.data !== "string") throw new Error("The invitation could not be created");
+  return result.data;
+}

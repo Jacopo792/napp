@@ -193,3 +193,8 @@ export async function deleteAvatar(_session: AppSession, objectId: string): Prom
   await sleep(80);
   avatars.delete(objectId);
 }
+
+export async function createArchiveInvite(): Promise<string> {
+  await sleep(180);
+  return "a".repeat(64);
+}

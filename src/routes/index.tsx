@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, NotebookPen } from "lucide-react";
-import { authenticate, registerAccount } from "@/lib/session";
+import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
 
 export const Route = createFileRoute("/")({ component: Login });
 
@@ -11,6 +11,10 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [archiveChoice, setArchiveChoice] = useState<{
+    account: { userId: string; email: string };
+    archives: ArchiveOption[];
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,7 +33,14 @@ function Login() {
           return;
         }
       } else {
-        await authenticate(email.trim(), password);
+        const inviteToken = new URL(window.location.href).searchParams.get("invite") ?? undefined;
+        const result = await authenticate(email.trim(), password, inviteToken);
+        if (!result.session) {
+          setArchiveChoice({ account: result.account, archives: result.archives });
+          setPassword("");
+          setLoading(false);
+          return;
+        }
       }
       setPassword("");
       navigate({ to: "/notes" });
@@ -37,6 +48,66 @@ function Login() {
       setError(reason instanceof Error ? reason.message : "Sign in failed");
       setLoading(false);
     }
+  }
+
+  async function handleArchiveChoice(archiveId: string) {
+    if (!archiveChoice) return;
+    setLoading(true);
+    setError("");
+    try {
+      await chooseArchive(archiveChoice.account, archiveId);
+      navigate({ to: "/notes" });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not open that archive");
+      setLoading(false);
+    }
+  }
+
+  if (archiveChoice) {
+    return (
+      <div className="login-shell flex min-h-screen flex-col">
+        <LoginHeader />
+        <main className="flex flex-1 items-center justify-center px-5 pb-16">
+          <div className="login-card w-full max-w-[28rem] p-8 sm:p-10">
+            <LoginMark />
+            <h1
+              className="font-display mt-6 text-[2rem] leading-tight text-ink"
+              style={{ letterSpacing: "-0.035em", fontWeight: 700 }}
+            >
+              Choose an archive
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-ink-3">
+              This account belongs to more than one archive.
+            </p>
+            <div className="archive-choice-list mt-6">
+              {archiveChoice.archives.map((archive) => (
+                <button
+                  key={archive.archiveId}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void handleArchiveChoice(archive.archiveId)}
+                >
+                  <span>{archive.name}</span>
+                  <small>
+                    Joined{" "}
+                    {new Date(archive.joinedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </small>
+                  <ArrowRight size={14} />
+                </button>
+              ))}
+            </div>
+            {error && (
+              <p role="alert" className="readout mt-3 text-danger">
+                {error}
+              </p>
+            )}
+          </div>
+        </main>
+      </div>
+    );
   }
 
   if (confirmation) {

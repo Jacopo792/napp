@@ -564,6 +564,45 @@
   text-decoration: underline;
 }
 
+.archive-choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.archive-choice-list button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.archive-choice-list button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.archive-choice-list button span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.archive-choice-list button small {
+  grid-column: 1;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+
+.archive-choice-list button svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 /* A label on the left, its value hard against the right edge — the specimen's
    one repeating row, used for every measured pair in the interface. */
 @utility field-row {
@@ -1998,6 +2037,67 @@
     border-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
     transform var(--dur-press) var(--ease-press);
+}
+
+.invite-form {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.invite-form label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.invite-form input,
+.invite-link-row input {
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  padding: 9px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.invite-form > button,
+.invite-link-row button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  padding-inline: 12px;
+  color: var(--ink-2);
+}
+
+.invite-form > button:hover:not(:disabled),
+.invite-link-row button:hover {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.invite-form > button:disabled {
+  opacity: 0.45;
+}
+
+.invite-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.invite-link-row input {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
 }
 
 .settings-lock:hover {

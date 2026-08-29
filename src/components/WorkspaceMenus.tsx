@@ -2,6 +2,7 @@ import {
   AtSign,
   BookOpen,
   Contrast,
+  Copy,
   Image,
   Layers,
   Palette,
@@ -26,6 +27,7 @@ import {
   Sun,
   Trash2,
   UserRound,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -584,6 +586,7 @@ export function SettingsPanel({
   onNicknameSave,
   onAvatarPick,
   onAvatarRemove,
+  onCreateInvite,
   onAutoLockChange,
   onClose,
   onLock,
@@ -604,6 +607,7 @@ export function SettingsPanel({
   onNicknameSave: (nickname: string) => void;
   onAvatarPick: (file: File) => void;
   onAvatarRemove: () => void;
+  onCreateInvite: (email: string) => Promise<string>;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -614,6 +618,10 @@ export function SettingsPanel({
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>("profile");
   const [nickname, setNickname] = useState(profile.nickname);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [inviteStatus, setInviteStatus] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
 
@@ -621,6 +629,9 @@ export function SettingsPanel({
     if (!open) {
       setTuning(false);
       setSection("profile");
+      setInviteEmail("");
+      setInviteLink("");
+      setInviteStatus("");
     }
   }, [open]);
 
@@ -634,6 +645,21 @@ export function SettingsPanel({
     const trimmed = nickname.trim().slice(0, 40);
     if (trimmed === profile.nickname) return;
     onNicknameSave(trimmed);
+  }
+
+  async function createInvite() {
+    const target = inviteEmail.trim();
+    if (!target) return;
+    setInviteBusy(true);
+    setInviteStatus("");
+    try {
+      setInviteLink(await onCreateInvite(target));
+      setInviteStatus("Link ready. It expires in 7 days.");
+    } catch (reason) {
+      setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
+    } finally {
+      setInviteBusy(false);
+    }
   }
 
   const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
@@ -1079,6 +1105,53 @@ export function SettingsPanel({
                   }))}
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
+
+                <h3>Invite someone</h3>
+                <div className="invite-form">
+                  <label>
+                    <span>Email address</span>
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      placeholder="person@example.com"
+                      disabled={inviteBusy}
+                      onChange={(event) => {
+                        setInviteEmail(event.target.value);
+                        setInviteLink("");
+                        setInviteStatus("");
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={inviteBusy || !inviteEmail.trim()}
+                    onClick={() => void createInvite()}
+                  >
+                    <UserPlus size={15} />
+                    {inviteBusy ? "Creating…" : "Create link"}
+                  </button>
+                </div>
+                {inviteLink && (
+                  <div className="invite-link-row">
+                    <input aria-label="Invitation link" readOnly value={inviteLink} />
+                    <button
+                      type="button"
+                      aria-label="Copy invitation link"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(inviteLink).then(() => {
+                          setInviteStatus("Copied. The link expires in 7 days.");
+                        });
+                      }}
+                    >
+                      <Copy size={15} />
+                    </button>
+                  </div>
+                )}
+                {inviteStatus && (
+                  <p className="profile-note" role="status">
+                    {inviteStatus}
+                  </p>
+                )}
                 <p className="profile-note">
                   Membership is the whole of the boundary: everyone in this archive reads and writes
                   every note in it. Somebody who should not read these needs an archive of their

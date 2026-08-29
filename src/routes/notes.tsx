@@ -29,6 +29,7 @@ import {
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
 import {
   createNote,
+  createArchiveInvite,
   deleteAvatar,
   deleteNote,
   downloadAvatar,
@@ -1300,6 +1301,12 @@ function NotesPage() {
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
       onAvatarPick={(file) => void handleAvatarPick(file)}
       onAvatarRemove={() => void handleAvatarRemove()}
+      onCreateInvite={async (email) => {
+        const token = await createArchiveInvite(session, email);
+        const link = new URL(import.meta.env.BASE_URL, window.location.origin);
+        link.searchParams.set("invite", token);
+        return link.toString();
+      }}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}

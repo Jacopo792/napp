@@ -22,6 +22,18 @@ export interface RegistrationResult {
   confirmationRequired: boolean;
 }
 
+export interface ArchiveOption {
+  archiveId: string;
+  name: string;
+  joinedAt: string;
+}
+
+export interface AuthenticationResult {
+  session: AppSession | null;
+  account: { userId: string; email: string };
+  archives: ArchiveOption[];
+}
+
 /** A member with no profile gets one on first sign-in, named after the local
  *  part of their address. It is a starting point, not a claim: the nickname is
  *  theirs to change, and nobody else may write it. */
@@ -43,45 +55,98 @@ async function ensureProfile(userId: string, email: string): Promise<void> {
   await supabase.from("profiles").insert({ user_id: userId, nickname: defaultNickname(email) });
 }
 
-export async function authenticate(email: string, password: string): Promise<AppSession> {
+function storeSession(userId: string, email: string, archiveId: string): AppSession {
+  const stored: StoredSession = { userId, email, archiveId };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+  resetArchiveCache();
+  return stored;
+}
+
+async function loadArchiveOptions(userId: string): Promise<ArchiveOption[]> {
+  const memberships = await supabase
+    .from("archive_members")
+    .select("archive_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (memberships.error) throw new Error(memberships.error.message);
+
+  const rows = (memberships.data ?? []) as { archive_id: string; created_at: string }[];
+  const archiveIds = rows.map((row) => row.archive_id);
+  if (archiveIds.length === 0) return [];
+
+  const archives = await supabase.from("archives").select("id, name").in("id", archiveIds);
+  if (archives.error) throw new Error(archives.error.message);
+  const names = new Map(
+    ((archives.data ?? []) as { id: string; name: string }[]).map((archive) => [
+      archive.id,
+      archive.name,
+    ]),
+  );
+  return rows.map((row) => ({
+    archiveId: row.archive_id,
+    name: names.get(row.archive_id) ?? "Notes",
+    joinedAt: row.created_at,
+  }));
+}
+
+async function openAccount(
+  userId: string,
+  email: string,
+  inviteToken?: string,
+): Promise<AuthenticationResult> {
+  const bootstrap = await supabase.rpc("ensure_personal_archive");
+  if (bootstrap.error || !bootstrap.data) {
+    throw new Error(bootstrap.error?.message ?? "Could not create an archive for this account");
+  }
+
+  if (inviteToken) {
+    const claim = await supabase.rpc("claim_archive_invite", { token: inviteToken });
+    if (claim.error) throw new Error(claim.error.message);
+  }
+
+  await ensureProfile(userId, email);
+  const archives = await loadArchiveOptions(userId);
+  if (archives.length === 0) throw new Error("Could not open this account");
+
+  return {
+    session: archives.length === 1 ? storeSession(userId, email, archives[0].archiveId) : null,
+    account: { userId, email },
+    archives,
+  };
+}
+
+export async function authenticate(
+  email: string,
+  password: string,
+  inviteToken?: string,
+): Promise<AuthenticationResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
-    const membershipResult = await supabase
-      .from("archive_members")
-      .select("archive_id")
-      .eq("user_id", data.user.id)
-      .limit(2);
-    let memberships = membershipResult.data;
-    const membershipError = membershipResult.error;
-    if (membershipError) throw new Error(membershipError.message);
-
-    if (!memberships || memberships.length === 0) {
-      const bootstrap = await supabase.rpc("ensure_personal_archive");
-      if (bootstrap.error || !bootstrap.data) {
-        throw new Error(bootstrap.error?.message ?? "Could not create an archive for this account");
-      }
-      memberships = [{ archive_id: bootstrap.data as string }];
-    }
-
-    if (memberships.length !== 1) {
-      throw new Error("This account is not connected to the archive");
-    }
-    const archiveId = memberships[0].archive_id;
-    const address = data.user.email ?? email;
-
-    await ensureProfile(data.user.id, address);
-
-    const stored: StoredSession = { userId: data.user.id, email: address, archiveId };
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
-    return stored;
+    return await openAccount(data.user.id, data.user.email ?? email, inviteToken);
   } catch (reason) {
     sessionStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
     await supabase.auth.signOut({ scope: "local" });
-    if (reason instanceof Error && reason.message.includes("not connected")) throw reason;
+    if (reason instanceof Error && reason.message.toLowerCase().includes("invitation"))
+      throw reason;
     throw new Error("Could not open this account");
   }
+}
+
+export async function chooseArchive(
+  account: { userId: string; email: string },
+  archiveId: string,
+): Promise<AppSession> {
+  const current = await supabase.auth.getUser();
+  if (current.error || current.data.user?.id !== account.userId) {
+    throw new Error("Session expired");
+  }
+  const archives = await loadArchiveOptions(account.userId);
+  if (!archives.some((archive) => archive.archiveId === archiveId)) {
+    throw new Error("That archive is no longer available");
+  }
+  return storeSession(account.userId, account.email, archiveId);
 }
 
 /** Registration deliberately gives the same completion message for a new or
@@ -91,7 +156,10 @@ export async function registerAccount(
   email: string,
   password: string,
 ): Promise<RegistrationResult> {
-  const emailRedirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+  const redirect = new URL(import.meta.env.BASE_URL, window.location.origin);
+  const inviteToken = new URL(window.location.href).searchParams.get("invite");
+  if (inviteToken) redirect.searchParams.set("invite", inviteToken);
+  const emailRedirectTo = redirect.toString();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -100,8 +168,8 @@ export async function registerAccount(
   if (error) throw new Error(error.message);
 
   if (data.session && data.user) {
-    const session = await authenticate(email, password);
-    return { session, confirmationRequired: false };
+    const result = await openAccount(data.user.id, data.user.email ?? email);
+    return { session: result.session, confirmationRequired: false };
   }
 
   sessionStorage.removeItem(SESSION_KEY);
