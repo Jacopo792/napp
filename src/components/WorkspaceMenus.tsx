@@ -2,6 +2,7 @@ import {
   AtSign,
   BookOpen,
   Contrast,
+  Copy,
   Image,
   Layers,
   Palette,
@@ -26,6 +27,7 @@ import {
   Sun,
   Trash2,
   UserRound,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -538,15 +540,25 @@ export function Avatar({
   name,
   email,
   large = false,
+  compact = false,
+  online = false,
 }: {
   url: string | null;
   name: string;
   email: string;
   large?: boolean;
+  compact?: boolean;
+  online?: boolean;
 }) {
   return (
-    <span className={`avatar ${large ? "is-large" : ""}`} aria-hidden="true">
+    <span
+      className={`avatar ${large ? "is-large" : ""} ${compact ? "is-compact" : ""} ${online ? "is-online" : ""}`}
+      aria-hidden={online ? undefined : true}
+      aria-label={online ? `${name || "Member"} is online` : undefined}
+      title={online ? "Online now" : undefined}
+    >
       {url ? <img src={url} alt="" /> : initialsOf(name, email)}
+      {online && <i className="avatar-presence" aria-hidden="true" />}
     </span>
   );
 }
@@ -579,11 +591,17 @@ export function SettingsPanel({
   avatarUrl,
   joinedAt,
   memberCount,
+  members,
+  canManageMembers,
+  presenceEnabled,
   profileBusy,
   profileError,
   onNicknameSave,
   onAvatarPick,
   onAvatarRemove,
+  onCreateInvite,
+  onMemberRoleChange,
+  onPresenceEnabledChange,
   onAutoLockChange,
   onClose,
   onLock,
@@ -599,11 +617,22 @@ export function SettingsPanel({
   avatarUrl: string | null;
   joinedAt?: string;
   memberCount: number;
+  members: {
+    userId: string;
+    nickname: string;
+    isSelf: boolean;
+    role: "editor" | "viewer";
+  }[];
+  canManageMembers: boolean;
+  presenceEnabled: boolean;
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
   onAvatarPick: (file: File) => void;
   onAvatarRemove: () => void;
+  onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
+  onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
+  onPresenceEnabledChange: (enabled: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -614,6 +643,13 @@ export function SettingsPanel({
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>("profile");
   const [nickname, setNickname] = useState(profile.nickname);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
+  const [inviteLink, setInviteLink] = useState("");
+  const [inviteStatus, setInviteStatus] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [memberBusy, setMemberBusy] = useState("");
+  const [memberStatus, setMemberStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
 
@@ -621,6 +657,11 @@ export function SettingsPanel({
     if (!open) {
       setTuning(false);
       setSection("profile");
+      setInviteEmail("");
+      setInviteLink("");
+      setInviteStatus("");
+      setInviteRole("editor");
+      setMemberStatus("");
     }
   }, [open]);
 
@@ -634,6 +675,34 @@ export function SettingsPanel({
     const trimmed = nickname.trim().slice(0, 40);
     if (trimmed === profile.nickname) return;
     onNicknameSave(trimmed);
+  }
+
+  async function createInvite() {
+    const target = inviteEmail.trim();
+    if (!target) return;
+    setInviteBusy(true);
+    setInviteStatus("");
+    try {
+      setInviteLink(await onCreateInvite(target, inviteRole));
+      setInviteStatus("Link ready. It expires in 7 days.");
+    } catch (reason) {
+      setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function changeMemberRole(userId: string, role: "editor" | "viewer") {
+    setMemberBusy(userId);
+    setMemberStatus("");
+    try {
+      await onMemberRoleChange(userId, role);
+      setMemberStatus("Role updated.");
+    } catch (reason) {
+      setMemberStatus(reason instanceof Error ? reason.message : "Role change failed");
+    } finally {
+      setMemberBusy("");
+    }
   }
 
   const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
@@ -773,7 +842,7 @@ export function SettingsPanel({
                   <RowLead
                     icon={<Users size={17} />}
                     label="Archive"
-                    hint="Everyone here reads and writes everything"
+                    hint="Members read everything; editors can make changes"
                   />
                   <span className="profile-static">
                     {memberCount} {memberCount === 1 ? "member" : "members"}
@@ -1079,10 +1148,126 @@ export function SettingsPanel({
                   }))}
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
+
+                <label className="appearance-row">
+                  <RowLead
+                    icon={<Users size={17} />}
+                    label="Live presence"
+                    hint="Share that you are here to see who else is here"
+                  />
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={presenceEnabled}
+                    onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                  />
+                </label>
+
+                <h3>Members</h3>
+                <div className="member-role-list">
+                  {members.map((member) => (
+                    <div key={member.userId}>
+                      <span>
+                        <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
+                        <small>
+                          {member.role === "editor" ? "Can read and write" : "Can read"}
+                        </small>
+                      </span>
+                      <select
+                        aria-label={`Role for ${member.isSelf ? "you" : member.nickname || "member"}`}
+                        value={member.role}
+                        disabled={!canManageMembers || Boolean(memberBusy)}
+                        onChange={(event) =>
+                          void changeMemberRole(
+                            member.userId,
+                            event.target.value as "editor" | "viewer",
+                          )
+                        }
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                {memberStatus && (
+                  <p className="profile-note" role="status">
+                    {memberStatus}
+                  </p>
+                )}
+
+                <h3>Invite someone</h3>
+                {canManageMembers ? (
+                  <>
+                    <div className="invite-role" role="group" aria-label="Invitation role">
+                      <button
+                        type="button"
+                        aria-pressed={inviteRole === "editor"}
+                        onClick={() => setInviteRole("editor")}
+                      >
+                        Editor
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={inviteRole === "viewer"}
+                        onClick={() => setInviteRole("viewer")}
+                      >
+                        Viewer
+                      </button>
+                    </div>
+                    <div className="invite-form">
+                      <label>
+                        <span>Email address</span>
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          placeholder="person@example.com"
+                          disabled={inviteBusy}
+                          onChange={(event) => {
+                            setInviteEmail(event.target.value);
+                            setInviteLink("");
+                            setInviteStatus("");
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={inviteBusy || !inviteEmail.trim()}
+                        onClick={() => void createInvite()}
+                      >
+                        <UserPlus size={15} />
+                        {inviteBusy ? "Creating…" : "Create link"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="profile-note">Only editors can invite another member.</p>
+                )}
+                {inviteLink && (
+                  <div className="invite-link-row">
+                    <input aria-label="Invitation link" readOnly value={inviteLink} />
+                    <button
+                      type="button"
+                      aria-label="Copy invitation link"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(inviteLink).then(() => {
+                          setInviteStatus("Copied. The link expires in 7 days.");
+                        });
+                      }}
+                    >
+                      <Copy size={15} />
+                    </button>
+                  </div>
+                )}
+                {inviteStatus && (
+                  <p className="profile-note" role="status">
+                    {inviteStatus}
+                  </p>
+                )}
                 <p className="profile-note">
-                  Membership is the whole of the boundary: everyone in this archive reads and writes
-                  every note in it. Somebody who should not read these needs an archive of their
-                  own.
+                  Membership permits reading the whole archive. Editors can change notes, files and
+                  roles; viewers cannot. Somebody who should not read these needs an archive of
+                  their own.
                 </p>
               </section>
             )}

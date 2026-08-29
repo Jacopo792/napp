@@ -29,9 +29,9 @@ import {
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
 import {
   createNote,
+  createArchiveInvite,
   deleteAvatar,
   deleteNote,
-  downloadAvatar,
   downloadImage,
   downloadObject,
   loadArchive,
@@ -39,6 +39,7 @@ import {
   persistMetaDiff,
   saveNote,
   saveProfile,
+  setArchiveMemberRole,
   uploadAvatar,
   uploadImage,
   uploadObject,
@@ -46,7 +47,14 @@ import {
   type ArchiveSnapshot,
   type Profile,
 } from "@/lib/supabase";
+import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import {
+  loadPresencePreference,
+  savePresencePreference,
+  subscribeToPresence,
+  unsubscribeFromPresence,
+} from "@/lib/presence";
 import { prepareAvatar, prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
@@ -62,21 +70,22 @@ import {
   replaceDraft,
   requeue,
   takePending,
-} from "@/lib/draft";
+} from "@/features/editor/lib/draft";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
-import { attachmentType } from "@/lib/attachments";
+import { attachmentType } from "@/features/editor/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import {
   CollectionMenu,
+  Avatar,
   NoteContextMenu,
   NoteMenu,
   SettingsPanel,
 } from "@/components/WorkspaceMenus";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
-import type { NoteEditorHandle } from "@/components/NoteEditor";
+import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
 import {
   groupEntries,
   createListPreferences,
@@ -89,7 +98,7 @@ import {
 } from "@/lib/listPreferences";
 
 const NoteEditor = lazy(() =>
-  import("@/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
+  import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
 );
 
 export const Route = createFileRoute("/notes")({
@@ -249,9 +258,12 @@ function NotesPage() {
      being edited is read on its own so a save shows immediately rather than
      waiting for the next archive snapshot. */
   const [profile, setProfile] = useState<Profile>({ nickname: "", avatarObject: null });
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const [presenceEnabled, setPresenceEnabled] = useState(false);
+  const [presenceReady, setPresenceReady] = useState(false);
+  const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The phone has no room for a permanent sidebar, so it gets the same one
@@ -360,25 +372,29 @@ function NotesPage() {
     };
   }, [session]);
 
-  /* The picture, as a local object URL. Revoked when it changes, so a session
-     that swaps its avatar a few times does not leak the old ones. */
+  /* One roster load carries every member's avatar object. The byte URLs live in
+     a module cache, so the sidebar, switch and Settings reuse one download and
+     an ordinary component unmount never revokes an image still in use. */
   useEffect(() => {
-    if (!session || !profile.avatarObject) {
-      setAvatarUrl(null);
-      return;
-    }
-    let url: string | null = null;
+    const leases: Array<ReturnType<typeof acquireAvatarUrl>> = [];
     let live = true;
-    void downloadAvatar(session.userId, profile.avatarObject).then((blob) => {
-      if (!live || !blob) return;
-      url = URL.createObjectURL(blob);
-      setAvatarUrl(url);
-    });
+    setAvatarUrls((current) =>
+      Object.fromEntries(members.map((member) => [member.userId, current[member.userId] ?? null])),
+    );
+    for (const member of members) {
+      if (!member.avatarObject) continue;
+      const lease = acquireAvatarUrl(member.userId, member.avatarObject);
+      leases.push(lease);
+      void lease.url.then((url) => {
+        if (!live) return;
+        setAvatarUrls((current) => ({ ...current, [member.userId]: url }));
+      });
+    }
     return () => {
       live = false;
-      if (url) URL.revokeObjectURL(url);
+      for (const lease of leases) lease.release();
     };
-  }, [session, profile.avatarObject]);
+  }, [members]);
 
   const setActiveMeta = useCallback(
     (m: Meta) => setMetas((current) => ({ ...current, [viewAs]: m })),
@@ -508,6 +524,22 @@ function NotesPage() {
     return () => void unsubscribeFromArchive(channel);
   }, [session, refreshRemote]);
 
+  useEffect(() => {
+    if (!session) return;
+    setPresenceEnabled(loadPresencePreference(session));
+    setPresenceReady(true);
+    return () => setPresenceReady(false);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !presenceReady || !presenceEnabled) {
+      setOnlineMemberIds(new Set());
+      return;
+    }
+    const channel = subscribeToPresence(session, setOnlineMemberIds);
+    return () => void unsubscribeFromPresence(channel);
+  }, [session, presenceReady, presenceEnabled]);
+
   /** The owner's whole catalogue, unfiltered — what the rail and the scope
    *  strip count against. Memoised so their counts are not recomputed for an
    *  array that holds exactly the same notes as the render before. */
@@ -556,7 +588,9 @@ function NotesPage() {
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
-  const canEdit = selected ? selectedFolderId !== TRASH : false;
+  const selfMember = members.find((member) => member.isSelf);
+  const canWriteArchive = selfMember?.role === "editor";
+  const canEdit = selected ? selectedFolderId !== TRASH && canWriteArchive : false;
 
   const folderLabel =
     selectedFolderId === ALL
@@ -684,14 +718,18 @@ function NotesPage() {
     };
   }, [saveNow]);
 
-  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
-    const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before uploading an image");
-    const blob = await prepareImageForNote(file);
-    const imageId = crypto.randomUUID();
-    await uploadImage(current, imageId, blob);
-    return `napp-image:${imageId}`;
-  }, []);
+  const handleUploadImage = useCallback(
+    async (file: File): Promise<string> => {
+      if (!canWriteArchive) throw new Error("This archive is view only");
+      const current = sessionRef.current;
+      if (!current) throw new Error("Sign in again before uploading an image");
+      const blob = await prepareImageForNote(file);
+      const imageId = crypto.randomUUID();
+      await uploadImage(current, imageId, blob);
+      return `napp-image:${imageId}`;
+    },
+    [canWriteArchive],
+  );
 
   const resolveImage = useCallback(async (imageId: string): Promise<Blob> => {
     const current = sessionRef.current;
@@ -700,14 +738,18 @@ function NotesPage() {
   }, []);
 
   /* Attachments and images share one private, account-protected bucket. */
-  const handleUploadFile = useCallback(async (file: File): Promise<string> => {
-    const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before attaching a file");
-    const objectId = crypto.randomUUID();
-    await uploadObject(current, objectId, file);
-    fileTypes.current.set(objectId, file.type || attachmentType(file.name));
-    return objectId;
-  }, []);
+  const handleUploadFile = useCallback(
+    async (file: File): Promise<string> => {
+      if (!canWriteArchive) throw new Error("This archive is view only");
+      const current = sessionRef.current;
+      if (!current) throw new Error("Sign in again before attaching a file");
+      const objectId = crypto.randomUUID();
+      await uploadObject(current, objectId, file);
+      fileTypes.current.set(objectId, file.type || attachmentType(file.name));
+      return objectId;
+    },
+    [canWriteArchive],
+  );
 
   const resolveFile = useCallback(async (objectId: string): Promise<Blob> => {
     const current = sessionRef.current;
@@ -720,6 +762,7 @@ function NotesPage() {
 
   const handleMetaChange = useCallback(
     (m: Meta) => {
+      if (!canWriteArchive) return;
       const pending = pendingMetaRef.current.get(viewAs);
       pendingMetaRef.current.set(viewAs, {
         before: pending?.before ?? activeMeta,
@@ -728,7 +771,7 @@ function NotesPage() {
       setActiveMeta(m);
       schedule();
     },
-    [viewAs, activeMeta, setActiveMeta, schedule],
+    [viewAs, activeMeta, setActiveMeta, schedule, canWriteArchive],
   );
 
   const handleTogglePin = useCallback(
@@ -746,6 +789,7 @@ function NotesPage() {
 
   // ── Create / delete ─────────────────────────────────────────────────────
   const handleNew = useCallback(async () => {
+    if (!canWriteArchive) return;
     const s = sessionRef.current;
     if (!s) return;
     const folderId =
@@ -788,7 +832,7 @@ function NotesPage() {
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewAs, selectedFolderId, activeMeta]);
+  }, [viewAs, selectedFolderId, activeMeta, canWriteArchive]);
 
   const handleMoveToTrash = useCallback(
     (entry: NoteEntry) => {
@@ -835,6 +879,7 @@ function NotesPage() {
 
   const handleDeleteForever = useCallback(
     async (entry: NoteEntry) => {
+      if (!canWriteArchive) return;
       const s = sessionRef.current;
       if (!s) return;
       setSaving(true);
@@ -862,7 +907,7 @@ function NotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta],
+    [selectedId, activeMeta, canWriteArchive],
   );
 
   // ── Keyboard ────────────────────────────────────────────────────────────
@@ -1101,6 +1146,7 @@ function NotesPage() {
       /* The old picture is removed only once the new one is the stored one, so
          a failed write never leaves the profile pointing at nothing. */
       if (replaced) await deleteAvatar(session, replaced).catch(() => {});
+      if (replaced) invalidateAvatarUrl(replaced);
     } catch (reason) {
       setProfileError(reason instanceof Error ? reason.message : "Could not use that picture");
     } finally {
@@ -1113,11 +1159,18 @@ function NotesPage() {
     const removed = profile.avatarObject;
     await persistProfile({ ...profile, avatarObject: null });
     if (removed) await deleteAvatar(session, removed).catch(() => {});
+    if (removed) invalidateAvatarUrl(removed);
   }
 
   function handleAutoLockChange(minutes: AutoLockMinutes) {
     setAutoLock(minutes);
     saveAutoLock(minutes);
+  }
+
+  function handlePresenceChange(enabled: boolean) {
+    if (!session) return;
+    savePresencePreference(session, enabled);
+    setPresenceEnabled(enabled);
   }
 
   function handleLock() {
@@ -1245,6 +1298,13 @@ function NotesPage() {
           aria-pressed={viewAs === member.userId}
           className={viewAs === member.userId ? "is-active" : ""}
         >
+          <Avatar
+            url={avatarUrls[member.userId] ?? null}
+            name={member.nickname}
+            email=""
+            compact
+            online={presenceEnabled && onlineMemberIds.has(member.userId)}
+          />
           <span className="truncate">
             {member.isSelf ? "My notes" : member.nickname || "Member"}
           </span>
@@ -1258,6 +1318,7 @@ function NotesPage() {
       scopes={scopes}
       folders={activeMeta.folders}
       selectedId={selectedFolderId}
+      canWrite={canWriteArchive}
       onSelect={(id) => {
         handleSelectFolder(id);
         setFoldersOpen(false);
@@ -1271,6 +1332,10 @@ function NotesPage() {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
+      selfAvatarUrl={avatarUrls[session.userId] ?? null}
+      selfName={selfMember?.nickname || profile.nickname}
+      selfEmail={session.email}
+      selfOnline={presenceEnabled && onlineMemberIds.has(session.userId)}
       archiveSwitch={archiveSwitch}
     />
   );
@@ -1292,14 +1357,28 @@ function NotesPage() {
       reading={readingLabel}
       autoLock={autoLock}
       profile={profile}
-      avatarUrl={avatarUrl}
+      avatarUrl={avatarUrls[session.userId] ?? null}
       joinedAt={members.find((member) => member.isSelf)?.joinedAt}
       memberCount={members.length}
+      members={members}
+      canManageMembers={canWriteArchive}
+      presenceEnabled={presenceEnabled}
       profileBusy={profileBusy}
       profileError={profileError}
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
       onAvatarPick={(file) => void handleAvatarPick(file)}
       onAvatarRemove={() => void handleAvatarRemove()}
+      onCreateInvite={async (email, role) => {
+        const token = await createArchiveInvite(session, email, role);
+        const link = new URL(import.meta.env.BASE_URL, window.location.origin);
+        link.searchParams.set("invite", token);
+        return link.toString();
+      }}
+      onMemberRoleChange={async (userId, role) => {
+        await setArchiveMemberRole(session, userId, role);
+        await refreshRemote();
+      }}
+      onPresenceEnabledChange={handlePresenceChange}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}
@@ -1309,7 +1388,7 @@ function NotesPage() {
   const noteActions = selected ? (
     <>
       <span className="mr-2 flex w-[7.5rem] shrink-0 items-center overflow-hidden">
-        {saveReadout}
+        {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
       </span>
       <button
         type="button"
@@ -1319,23 +1398,25 @@ function NotesPage() {
       >
         <Search size={16} />
       </button>
-      <NoteMenu
-        pinned={pinned}
-        folders={activeMeta.folders}
-        recent={recentNotes}
-        onTogglePin={() => handleTogglePin(selected.note.id)}
-        onFind={() => noteEditorRef.current?.openFind()}
-        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
-        onRecent={handleOpenRecent}
-        onDelete={() => handleMoveToTrash(selected)}
-      />
+      {canWriteArchive && (
+        <NoteMenu
+          pinned={pinned}
+          folders={activeMeta.folders}
+          recent={recentNotes}
+          onTogglePin={() => handleTogglePin(selected.note.id)}
+          onFind={() => noteEditorRef.current?.openFind()}
+          onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+          onRecent={handleOpenRecent}
+          onDelete={() => handleMoveToTrash(selected)}
+        />
+      )}
     </>
   ) : null;
 
   /* The same items the ⋯ carries, opened where the pointer is. The editor
      hands the click over only when it did not land on the words. */
   const editorMenu =
-    selected && editorMenuPoint ? (
+    selected && editorMenuPoint && canWriteArchive ? (
       <NoteContextMenu
         point={editorMenuPoint}
         onClose={() => setEditorMenuPoint(null)}
@@ -1407,6 +1488,7 @@ function NotesPage() {
                   query={query}
                   loading={loading}
                   busy={saving}
+                  canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
                   searchRef={searchRef}
@@ -1513,6 +1595,7 @@ function NotesPage() {
                   query={query}
                   loading={loading}
                   busy={saving}
+                  canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
                   searchRef={searchRef}
@@ -1562,7 +1645,11 @@ function NotesPage() {
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
               resolveFile={resolveFile}
-              onContextMenu={(event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })}
+              onContextMenu={
+                canWriteArchive
+                  ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
+                  : undefined
+              }
               navigationAction={
                 !navigationOpen ? (
                   <>

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { countChars, countWords } from "./format";
+import { countChars, countWords } from "@/lib/format";
 
 /* ── The draft store ─────────────────────────────────────────────────────────
    The text being typed does not live in React state, and this is the whole

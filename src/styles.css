@@ -553,6 +553,56 @@
   opacity: 0.38;
 }
 
+.login-mode {
+  display: block;
+  margin-inline: auto;
+  border-radius: 0.5rem;
+  text-underline-offset: 0.2em;
+}
+
+.login-mode:hover {
+  text-decoration: underline;
+}
+
+.archive-choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.archive-choice-list button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.archive-choice-list button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.archive-choice-list button span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.archive-choice-list button small {
+  grid-column: 1;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+
+.archive-choice-list button svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 /* A label on the left, its value hard against the right edge — the specimen's
    one repeating row, used for every measured pair in the interface. */
 @utility field-row {
@@ -1252,6 +1302,7 @@
 
 /* ── A face, or the letters standing in for one ─────────────────────────── */
 .avatar {
+  position: relative;
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -1273,12 +1324,62 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: inherit;
+}
+
+.avatar.is-online {
+  overflow: visible;
+}
+
+.avatar-presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--ok);
 }
 
 .avatar.is-large {
   width: 72px;
   height: 72px;
   font-size: 24px;
+}
+
+.avatar.is-compact {
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
+}
+
+.sidebar-profile-button {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 9.5rem;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--radius-pill);
+  padding: 3px 8px 3px 3px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 560;
+}
+
+.sidebar-profile-button:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.archive-switch button {
+  gap: 5px;
+}
+
+.archive-switch .avatar.is-compact {
+  width: 20px;
+  height: 20px;
+  font-size: 8px;
 }
 
 /* ── The profile section ────────────────────────────────────────────────── */
@@ -1987,6 +2088,132 @@
     border-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
     transform var(--dur-press) var(--ease-press);
+}
+
+.invite-form {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.invite-role {
+  display: inline-flex;
+  margin-bottom: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  padding: 2px;
+  background: var(--surface);
+}
+
+.invite-role button {
+  border-radius: 0.5rem;
+  padding: 6px 12px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.invite-role button[aria-pressed="true"] {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.member-role-list {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.85rem;
+  background: var(--rule-soft);
+  overflow: hidden;
+}
+
+.member-role-list > div {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--surface);
+}
+
+.member-role-list span {
+  display: grid;
+  gap: 2px;
+}
+
+.member-role-list b {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.member-role-list small {
+  color: var(--ink-4);
+  font-size: 12px;
+}
+
+.member-role-list select {
+  border: 1px solid var(--rule);
+  border-radius: 0.55rem;
+  padding: 6px 28px 6px 9px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.invite-form label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.invite-form input,
+.invite-link-row input {
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  padding: 9px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.invite-form > button,
+.invite-link-row button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--rule);
+  border-radius: 0.65rem;
+  padding-inline: 12px;
+  color: var(--ink-2);
+}
+
+.invite-form > button:hover:not(:disabled),
+.invite-link-row button:hover {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.invite-form > button:disabled {
+  opacity: 0.45;
+}
+
+.invite-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.invite-link-row input {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
 }
 
 .settings-lock:hover {

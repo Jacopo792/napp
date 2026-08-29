@@ -10,26 +10,37 @@ web
 
 Everyone holding a row in `archive_members`: Jacopo and Lisa today, plus any
 further account invited into the same archive. Each has a separate Supabase
-email/password account and full read/write access to the one shared archive. The
-account is the only access boundary; there is no separate archive key or
-passphrase. Every member can use the `viewAs` switch.
+email/password account and confirmed address; membership carries a role,
+`editor` or `viewer`. Every member can read every note and list in the archive
+and use the `viewAs` switch; only editors can write notes, folders, tags,
+archive settings and `note-images` objects, create invitations, or change
+another member's role. The account is the only access boundary; there is no
+separate archive key or passphrase. The last editor cannot be demoted.
 
 `owner_id` names the member a note, folder or tag belongs to. It is an
 organisational label and never an authorization boundary: RLS checks membership
-in the shared archive and nothing else, so every member reads and writes every
-scope. The scope switch is built from the roster, showing **My notes** for the
-signed-in account and each other member by nickname, and each account opens on
-its own scope. A row whose member is unknown — written before the column, or
-left by a deleted account — is filed under the first scope rather than
-disappearing.
+(and `editor` for writes) and nothing else. The scope switch is built from the
+roster, showing **My notes** for the signed-in account and each other member by
+nickname, and each account opens on its own scope. A row whose member is unknown
+— written before the column, or left by a deleted account — is filed under the
+first scope rather than disappearing.
 
 The retired `u1` / `u2` labels are the shape this replaced: two scopes were a
 fixture of an archive with exactly two people in it.
 
 Creating a Supabase Auth account does not join the archive. Until the
 `archive_members` row exists the app answers "This account is not connected to
-the archive" and the database returns nothing. `pnpm add:member` writes that row
-through an existing member's own session; no service-role key is involved.
+the archive" and the database returns nothing. A new account creates its own
+personal archive atomically behind `ensure_personal_archive()` the first time it
+signs in, held by an advisory lock so two tabs do not race; an account that
+belongs to several archives picks which one to open on sign-in. Joining an
+existing archive requires an invitation link: a 64-hex-character one-time token
+whose SHA-256 digest is stored for seven days. Claiming checks that the
+caller's `auth.users.email_confirmed_at` is set and lower-cased equals the
+invited address, then adds the membership — the browser never resolves an
+address to a user id. `pnpm add:member` remains as a local administrative path
+that writes the row through an existing member's own session, with no
+service-role key involved.
 
 ## Product Purpose
 
@@ -67,11 +78,18 @@ while search and content processing remain local.
 ## Capabilities and Constraints
 
 Confirmed functionality: create / edit / delete notes, fast debounced autosave,
-pinning, folders, colored tags, full-text search, drag a note onto a folder, and the
-`viewAs` scope switch every member can use. Appearance supports system, light and dark
-modes, curated palettes, custom colours and an optional device-local background image.
-Opening a note is read-only state selection: it must never update `updatedAt` or trigger
-a database write.
+pinning, folders, colored tags, full-text search, drag a note onto a folder, the
+`viewAs` scope switch every member can use, invitations with a one-time link and
+role, a personal-archive bootstrap and multi-archive chooser, per-member nicknames
+and private avatars cached as object URLs, and opt-in live presence that is
+visible only while broadcasting on a private Realtime channel (`private: true`,
+`realtime.messages` extension `presence` restricted to members of
+`presence:<archiveId>`). A viewer reads everything but writes nothing in the
+archive — including Storage and the invitation / role RPCs — while a personal
+avatar remains writable only by its owner. Appearance supports system, light and
+dark modes, curated palettes, custom colours and an optional device-local
+background image. Opening a note is read-only state selection: it must never
+update `updatedAt` or trigger a database write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
 Bear model — markdown syntax renders as formatting while you type in one pane, with no
@@ -93,12 +111,22 @@ and URL fields instead of leaving an editable Markdown placeholder in the note.
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
-- Supabase Auth accounts are created out of band and public signup is disabled. A
-  new account reaches the archive only when an existing member adds its
-  `archive_members` row.
-- RLS authorizes every database row through `archive_members`; `owner` is never a
-  security boundary. Storage policies derive the archive id from the object path and
-  apply the same membership check.
+- Supabase Auth public signup is enabled with email confirmations required; a new
+  account reaches the archive either by bootstrapping its own personal archive
+  atomically or by claiming a seven-day invitation link that checks the confirmed
+  address. Invitations store only a SHA-256 digest, never the raw token or a
+  resolvable directory of addresses.
+- RLS authorizes every archive row through `archive_members`; `owner` is never a
+  security boundary. Members may select; only editors may insert, update or
+  delete `archives`, `notes`, `folders`, `tags`, `note_tags` and `note-images`
+  objects via `private.can_write_archive(archive_id)` — direct writes to
+  `archive_members` are revoked entirely and go through `create_archive_invite`
+  / `claim_archive_invite` / `set_archive_member_role`. Storage policies derive
+  the archive id from the object path and apply the same membership check; the
+  `presence` extension on `realtime.messages` is restricted to
+  `presence:<archiveId>` members via `private.presence_archive_id()`, with the
+  client joining `config.private = true`. Postgres Changes subscriptions remain
+  public channels and are filtered by table RLS.
 - Concurrent edits remain last-write-wins at note granularity. The `version` column
   provides optimistic concurrency; the interface must never imply a merge happened.
 - Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
@@ -106,7 +134,10 @@ Technical constraints that outlive any design:
   organisational only.
 - Every member has a `public.profiles` row: a nickname and an optional avatar. You
   may read the profile of anyone you share an archive with, and write only your
-  own. A new account gets a nickname from its address on first sign-in.
+  own. A new account gets a nickname from its address on first sign-in. Avatars
+  live in the private `avatars` bucket under `<userId>/<objectId>`; only that
+  account may write there, while sharing an archive is what lets a peer read the
+  picture.
 
 ## Brand Commitments
 

@@ -18,6 +18,10 @@ export function subscribeToArchive(archiveId: string, onChange: () => void): Rea
       onChange,
     );
   }
+  /* Profiles have no archive_id: their SELECT policy already narrows delivery
+     to people who share an archive. A change is only a wake-up signal, and the
+     coherent reload fetches the roster and all of its profiles together. */
+  channel.on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, onChange);
   return channel.subscribe();
 }
 

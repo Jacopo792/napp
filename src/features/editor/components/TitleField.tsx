@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { editTitle, useDraftTitle } from "@/lib/draft";
+import { editTitle, useDraftTitle } from "@/features/editor/lib/draft";
 
 interface Props {
   mobile: boolean;

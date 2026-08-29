@@ -18,6 +18,7 @@ export default defineConfig({
       { find: /^@\/lib\/supabase$/, replacement: here("./preview/supabase.mock.ts") },
       { find: /^@\/lib\/session$/, replacement: here("./preview/session.mock.ts") },
       { find: /^@\/lib\/sync$/, replacement: here("./preview/sync.mock.ts") },
+      { find: /^@\/lib\/presence$/, replacement: here("./preview/presence.mock.ts") },
     ],
   },
   plugins: [

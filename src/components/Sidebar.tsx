@@ -10,7 +10,6 @@ import {
   NotebookText,
   PanelLeftClose,
   Pencil,
-  Settings as SettingsIcon,
   Trash2,
   X,
 } from "lucide-react";
@@ -18,7 +17,7 @@ import { ALL, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
-import { MenuButton } from "./WorkspaceMenus";
+import { Avatar, MenuButton } from "./WorkspaceMenus";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -46,6 +45,7 @@ interface Props {
   scopes: Scope[];
   folders: FolderType[];
   selectedId: string;
+  canWrite: boolean;
   onSelect: (id: string) => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
@@ -53,6 +53,10 @@ interface Props {
   onClose: () => void;
   onSettings: () => void;
   onLock: () => void;
+  selfAvatarUrl: string | null;
+  selfName: string;
+  selfEmail: string;
+  selfOnline: boolean;
   /** The archive switch, which belongs above the destinations it re-points. */
   archiveSwitch: React.ReactNode;
 }
@@ -315,6 +319,7 @@ export function Sidebar({
   scopes,
   folders,
   selectedId,
+  canWrite,
   onSelect,
   onCreateFolder,
   onRenameFolder,
@@ -322,6 +327,10 @@ export function Sidebar({
   onClose,
   onSettings,
   onLock,
+  selfAvatarUrl,
+  selfName,
+  selfEmail,
+  selfOnline,
   archiveSwitch,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -397,6 +406,7 @@ export function Sidebar({
           glyph={active || (open && hasChildren) ? <FolderOpen size={16} /> : <Folder size={16} />}
           depth={depth}
           active={active}
+          droppable={canWrite}
           disclosure={
             hasChildren ? (
               <button
@@ -414,17 +424,23 @@ export function Sidebar({
             ) : null
           }
           actions={
-            <FolderMenu
-              onRename={() => setRenaming(node.folder.id)}
-              onNewSubfolder={() => startSubfolder(node.folder.id)}
-              onDelete={() => onDeleteFolder(node.folder.id)}
-            />
+            canWrite ? (
+              <FolderMenu
+                onRename={() => setRenaming(node.folder.id)}
+                onNewSubfolder={() => startSubfolder(node.folder.id)}
+                onDelete={() => onDeleteFolder(node.folder.id)}
+              />
+            ) : undefined
           }
           onSelect={() => onSelect(node.folder.id)}
-          onContextMenu={(event) => {
-            setConfirmDelete(false);
-            folderMenu.open(event, node.folder);
-          }}
+          onContextMenu={
+            canWrite
+              ? (event) => {
+                  setConfirmDelete(false);
+                  folderMenu.open(event, node.folder);
+                }
+              : undefined
+          }
         />
 
         {open && hasChildren && (
@@ -438,7 +454,7 @@ export function Sidebar({
           </div>
         )}
 
-        {adding === node.folder.id && (
+        {canWrite && adding === node.folder.id && (
           <NameField
             value=""
             depth={depth + 1}
@@ -460,13 +476,31 @@ export function Sidebar({
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
         <button
           type="button"
-          aria-label="New folder"
-          title="New folder"
-          className="toolbar-button press shrink-0"
-          onClick={() => setAdding("")}
+          aria-label="Open profile and settings"
+          title="Profile and settings"
+          className="sidebar-profile-button press"
+          onClick={onSettings}
         >
-          <FolderPlus size={16} />
+          <Avatar
+            url={selfAvatarUrl}
+            name={selfName}
+            email={selfEmail}
+            compact
+            online={selfOnline}
+          />
+          <span className="truncate">{selfName || selfEmail.split("@")[0]}</span>
         </button>
+        {canWrite && (
+          <button
+            type="button"
+            aria-label="New folder"
+            title="New folder"
+            className="toolbar-button press shrink-0"
+            onClick={() => setAdding("")}
+          >
+            <FolderPlus size={16} />
+          </button>
+        )}
         <span className="ml-auto" />
         <button
           type="button"
@@ -498,13 +532,19 @@ export function Sidebar({
 
         {tree.length === 0 && adding === null && (
           <p className="sidebar-empty">
-            No folders yet. Use <FolderPlus size={12} /> above to make one.
+            {canWrite ? (
+              <>
+                No folders yet. Use <FolderPlus size={12} /> above to make one.
+              </>
+            ) : (
+              "No folders yet."
+            )}
           </p>
         )}
 
         {tree.map((node) => renderNode(node, 0))}
 
-        {adding === "" && (
+        {canWrite && adding === "" && (
           <NameField
             value=""
             depth={0}
@@ -537,18 +577,13 @@ export function Sidebar({
       )}
 
       <div className="sidebar-footer">
-        <button type="button" className="sidebar-footer-button press" onClick={onSettings}>
-          <SettingsIcon size={16} />
-          <span>Settings</span>
-          <ChevronRight size={14} className="ml-auto opacity-40" />
-        </button>
         <button type="button" className="sidebar-footer-button press" onClick={onLock}>
           <Lock size={16} />
           <span>Lock &amp; sign out</span>
         </button>
       </div>
 
-      {folderMenu.target && (
+      {canWrite && folderMenu.target && (
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
           <MenuButton
             onClick={() => {

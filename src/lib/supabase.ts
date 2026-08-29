@@ -83,6 +83,7 @@ export interface ArchiveMember {
   avatarObject: string | null;
   /** When they joined the archive, which is the only date a member has. */
   joinedAt: string;
+  role: "editor" | "viewer";
   isSelf: boolean;
 }
 
@@ -122,7 +123,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
     supabase
       .from("archive_members")
-      .select("user_id, created_at")
+      .select("user_id, created_at, role")
       .eq("archive_id", archiveId)
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
@@ -155,12 +156,17 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     ]),
   );
   const members: ArchiveMember[] = (
-    (membersResult.data ?? []) as { user_id: string; created_at: string }[]
+    (membersResult.data ?? []) as {
+      user_id: string;
+      created_at: string;
+      role: "editor" | "viewer";
+    }[]
   ).map((row) => ({
     userId: row.user_id,
     nickname: profileRows.get(row.user_id)?.nickname ?? "",
     avatarObject: profileRows.get(row.user_id)?.avatarObject ?? null,
     joinedAt: row.created_at,
+    role: row.role,
     isSelf: row.user_id === session.userId,
   }));
 
@@ -624,5 +630,35 @@ export async function deleteAvatar(session: AppSession, objectId: string): Promi
   const result = await supabase.storage
     .from(AVATAR_BUCKET)
     .remove([`${session.userId}/${objectId}`]);
+  fail(result.error);
+}
+
+/** Returns the raw invitation token once. Postgres stores only its digest, so
+ * the caller is responsible for turning it into the link the member shares. */
+export async function createArchiveInvite(
+  session: AppSession,
+  email: string,
+  role: "editor" | "viewer",
+): Promise<string> {
+  const result = await supabase.rpc("create_archive_invite", {
+    archive_id: session.archiveId,
+    email,
+    role,
+  });
+  fail(result.error);
+  if (typeof result.data !== "string") throw new Error("The invitation could not be created");
+  return result.data;
+}
+
+export async function setArchiveMemberRole(
+  session: AppSession,
+  userId: string,
+  role: "editor" | "viewer",
+): Promise<void> {
+  const result = await supabase.rpc("set_archive_member_role", {
+    archive_id: session.archiveId,
+    user_id: userId,
+    role,
+  });
   fail(result.error);
 }

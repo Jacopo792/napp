@@ -15,6 +15,7 @@ export interface ArchiveMember {
   nickname: string;
   avatarObject: string | null;
   joinedAt: string;
+  role: "editor" | "viewer";
   isSelf: boolean;
 }
 
@@ -29,27 +30,45 @@ export interface ArchiveSnapshot {
   metas: Record<string, Meta>;
 }
 
+const PREVIEW_AVATAR_U1 = "10000000-0000-4000-8000-000000000001";
+const PREVIEW_AVATAR_U2 = "10000000-0000-4000-8000-000000000002";
+
+function previewPortrait(background: string, foreground: string, initials: string): Blob {
+  return new Blob(
+    [
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="${background}"/><text x="48" y="57" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="32" font-weight="650" fill="${foreground}">${initials}</text></svg>`,
+    ],
+    { type: "image/svg+xml" },
+  );
+}
+
+const avatars = new Map<string, Blob>([
+  [PREVIEW_AVATAR_U1, previewPortrait("#d9edf5", "#087aa5", "PR")],
+  [PREVIEW_AVATAR_U2, previewPortrait("#e8e4dd", "#4e4a44", "PA")],
+]);
+
 const MEMBERS: ArchiveMember[] = [
   {
     userId: PREVIEW_U1,
     nickname: "Preview",
-    avatarObject: null,
+    avatarObject: PREVIEW_AVATAR_U1,
     joinedAt: "2026-05-18T09:00:00.000Z",
+    role: "editor",
     isSelf: true,
   },
   {
     userId: PREVIEW_U2,
     nickname: "Partner",
-    avatarObject: null,
+    avatarObject: PREVIEW_AVATAR_U2,
     joinedAt: "2026-06-02T09:00:00.000Z",
+    role: "editor",
     isSelf: false,
   },
 ];
 
 /* The profile the preview edits, kept in memory like everything else here so
    the page can be worked on without an account. */
-const avatars = new Map<string, Blob>();
-let profile: Profile = { nickname: "Preview", avatarObject: null };
+let profile: Profile = { nickname: "Preview", avatarObject: PREVIEW_AVATAR_U1 };
 
 /** sync.mock.ts replaces the realtime layer, so this only has to exist. */
 export const supabase = {
@@ -192,4 +211,19 @@ export async function downloadAvatar(
 export async function deleteAvatar(_session: AppSession, objectId: string): Promise<void> {
   await sleep(80);
   avatars.delete(objectId);
+}
+
+export async function createArchiveInvite(): Promise<string> {
+  await sleep(180);
+  return "a".repeat(64);
+}
+
+export async function setArchiveMemberRole(
+  _session: AppSession,
+  userId: string,
+  role: "editor" | "viewer",
+): Promise<void> {
+  await sleep(160);
+  const member = MEMBERS.find((item) => item.userId === userId);
+  if (member) member.role = role;
 }
