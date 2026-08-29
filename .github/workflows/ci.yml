@@ -44,7 +44,14 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # No Supabase variables: this proves the bundle compiles, and the archive
-      # it would talk to is not this workflow's business.
+      # Placeholders, not the real project. vite.config.ts refuses to build
+      # without these two, by design — a bundle that silently shipped with no
+      # backend would be worse than a failed build. What this step proves is
+      # that the code compiles, and it has to do that for a pull request from a
+      # fork, which cannot read repository variables. The real values are set
+      # in deploy.yml, and neither of them is secret in the first place.
       - name: Build
+        env:
+          VITE_SUPABASE_URL: https://checks.example.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
         run: pnpm run build
