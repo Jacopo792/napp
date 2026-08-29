@@ -104,7 +104,7 @@ Markdown is edited in one continuous reading surface. Syntax is formatted in pla
 
 ## Navigation and interaction states
 
-- The sidebar makes scope separation explicit. The switch is a segmented control built from the archive's roster, one segment per member, with the active one filled; scopes are never presented as blended. It is an organisational separation and the interface must not imply it is a security one — every member can read and write every scope, and `PRODUCT.md` is where that is stated.
+- The sidebar makes scope separation explicit. The switch is a segmented control built from the archive's roster — "My notes" plus each other member by nickname, one segment per member, with the active one filled; members are shown with avatars and an online indicator while you share presence. Scopes are never presented as blended. The separation is organisational and the permission behind it is recorded in `PRODUCT.md`: every member can read every scope; only editors write.
 - Folder selection uses the accent wash, full ink and stable count alignment. Notes can be dragged onto valid folder rows, which show an inset ring while targeted.
 - Catalogue rows stay dense. Pinned notes appear first, then every group is ordered by the latest real edit; opening a note never changes its position. Each row leads with a glyph saying what it will open — a checklist, a note carrying a picture, a note carrying a file — then a multiline title, a timestamp, a clipped preview and a pin action. It does not show its own position in the sort: that is a number about the list, not about the note. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.
 - Icon actions are quiet until hover or keyboard focus. Hover shifts them toward the accent wash; destructive actions shift to `--danger`.
@@ -121,6 +121,14 @@ field and any other input, the browser's own menu is left alone: it carries
 spelling suggestions, Look Up, and a paste that needs no permission, and a web
 page cannot put those back. A destructive item asks twice here exactly as it
 does on a row.
+
+## Accounts, invitations, roles, avatars and presence
+
+- Signing up is public but confirming is required: the login page toggles between sign-in and sign-up, sign-up shows a neutral "check your email" state without enumerating whether the address could be created, and the first personal archive is created atomically behind `ensure_personal_archive()` with an advisory lock. An account that belongs to several archives picks which one to open; "not connected" only means this account has no membership row for this archive yet.
+- An invitation is a one-time link whose raw 64-hex token is shown once for the inviter to copy. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. Redemption runs behind a private security-definer function and succeeds only when the caller's `auth.users.email_confirmed_at` is set and lower-cased equals the invited address. The client never resolves an address to a user id and never lists existing addresses as a directory.
+- Roles are binary and visible: every member can read every note and list; only editors can write notes, folders, tags, archive settings and `note-images` objects, or create invites and change roles. A viewer sees the same notes and scopes but the editor is read-only and the write menus and actions are inert. Changing another member's role is done through `set_archive_member_role()`, and the last editor cannot be demoted. Storage mirrors the table boundary.
+- A member is a person. Settings shows who belongs to the archive, by nickname and join date, and every member's avatar appears in the scope switch and in the sidebar while you are present. The rule stays the same: you may read a peer's `profiles` row and avatar when you share an archive; only the account itself may write its own `profiles` row and upload or delete under `avatars/<your user id>/…`. The avatar URL cache (`src/lib/avatarCache.ts`) keeps one object URL per avatar and Realtime keeps the roster live.
+- Presence is off by default and mutual: joining `presence:<archiveId>` with `{ private: true }` happens only while broadcasting `{ userId, onlineAt }`, so there is no listen-only mode in the client and the server enforces the same boundary on `realtime.messages` (`extension = 'presence'`, verified through `private.presence_archive_id()` against `archive_members`). The Settings toggle is per-archive and persisted in `localStorage`. When enabled, online members are indicated on the scope switch and in the member list.
 
 ## Honest persistence
 

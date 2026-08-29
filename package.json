@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview:dist": "vite preview",
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts src/features/editor/lib/*.test.ts",
     "format": "prettier --write .",
     "provision:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs --provision-only",
     "migrate:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs",

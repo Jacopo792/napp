@@ -8,10 +8,16 @@
   `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - Notes, folder names, tag names and files are stored as ordinary columns and
   Storage objects. Supabase Auth plus `archive_members` RLS is the whole access
-  boundary; `owner_id` names which member's scope a row sits in and is never
-  consulted by a policy. Nothing under `src/` mentions the retired `owner`
-  (`u1`/`u2`) column, the `ciphertext` columns or `vault_keys`; the migration
-  that drops them is written and waiting to be run — see below.
+  boundary — members can read; only `editor` rows may write, enforced by
+  `private.can_write_archive()` and by revoking direct writes to
+  `archive_members` entirely. `owner_id` names which member's scope a row sits
+  in and is never consulted by a policy. Invitations store only a SHA-256 digest
+  for seven days and are redeemed only by a confirmed address; presence is
+  `private: true` on `presence:<archiveId>` with `realtime.messages` policies
+  for `extension = 'presence'` via `private.presence_archive_id()`. Nothing
+  under `src/` mentions the retired `owner` (`u1`/`u2`) column, the `ciphertext`
+  columns or `vault_keys`; the migration that drops them is written and waiting
+  to be run — see below.
 
 ## Local development
 
@@ -49,22 +55,42 @@ clients still see nothing.
 
 Someone who should use the app without reading an existing archive needs their
 own archive, not a membership: `supabase/admin/new-archive-for-person.sql` creates
-one in the Supabase SQL editor. Membership is full read and write over every note
-in the archive, so it is only for people who are meant to share the notes.
+one in the Supabase SQL editor, while the application itself does it
+atomically — `private.bootstrap_personal_archive()` behind `ensure_personal_archive()`
+with an advisory lock — the first time a freshly confirmed account signs in.
+An account that belongs to several archives picks which one to open; the
+"not connected" message only means this account has no row for this archive
+yet. Membership lets every member read; only editors write — `archives`,
+`notes`, `folders`, `tags`, `note_tags` and `note-images` all use
+`private.can_write_archive()` for inserts/updates/deletes, and the role itself
+is changed only through `set_archive_member_role()` with a guard that the last
+editor cannot be demoted.
 
-Connect another Supabase Auth account to an existing archive with
-`pnpm add:member`. It signs in as an existing member and writes the missing
-`public.archive_members` row, which is what the "This account is not connected to
-the archive" message means. New members join with `owner = null`: the
-`archive_members_archive_owner_idx` unique index keeps one `u1` and one `u2` per
-archive, and an unlabelled member opens on the u1 view while keeping the
-Jacopo / Lisa switch.
+Inviting is how an archive grows without ever exposing an address directory:
+`create_archive_invite(archive_id, email, role)` returns a 64-hex-character raw
+token once, stores only its SHA-256 digest in `archive_invites` for seven days,
+and `claim_archive_invite(token)` checks the caller's confirmed Auth email
+before adding the membership. The browser never resolves an address to a user
+id; re-inviting an unclaimed address rewrites the same row. Connect another
+Supabase Auth account locally with `pnpm add:member` — it signs in as an
+existing member and writes the missing row with no service-role key.
 
 A member is a person: `public.profiles` carries a nickname and an avatar object
 per account, and avatars live in their own private bucket under the owner's user
 id. The rule does not change — `private.shares_archive()` lets you read the
 profile of someone you share an archive with, and only the account itself may
-write its own row.
+write its own row. `src/lib/avatarCache.ts` keeps one object URL per avatar and
+Realtime keeps the roster live; every avatar is shown in the switch and in the
+sidebar.
+
+Presence is mutual: the client is off by default and only joins
+`presence:<archiveId>` with `config.private = true` while broadcasting its own
+`{ userId, onlineAt }`. `20260829250000_private_archive_presence.sql`
+restricts `realtime.messages` for `extension = 'presence'` to members of the
+archive derived from `realtime.topic()` via `private.presence_archive_id()` —
+`SELECT` to receive and `INSERT` to publish. Postgres Changes subscriptions stay
+public channels and are filtered by table RLS as before; `private_only` is not
+turned on globally so they are not disturbed.
 
 Two things to know before writing another migration. `supabase db query --linked`
 splits a file into statements and mis-pairs `$$` blocks when a file holds more

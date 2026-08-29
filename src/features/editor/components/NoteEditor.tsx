@@ -10,11 +10,15 @@ import {
 } from "react";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
-import { editBody, readDraft } from "@/lib/draft";
-import { extractPdfText } from "@/lib/pdf";
-import { assertAttachable, attachmentLabel, attachmentReference } from "@/lib/attachments";
+import { editBody, readDraft } from "@/features/editor/lib/draft";
+import { extractPdfText } from "@/features/editor/lib/pdf";
+import {
+  assertAttachable,
+  attachmentLabel,
+  attachmentReference,
+} from "@/features/editor/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
-import { translateText, type TranslationLanguage } from "@/lib/translation";
+import { translateText, type TranslationLanguage } from "@/features/editor/lib/translation";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";

@@ -30,7 +30,7 @@ import {
   search,
   setSearchQuery,
 } from "@codemirror/search";
-import { attachmentExtension, attachmentObjectId } from "@/lib/attachments";
+import { attachmentExtension, attachmentObjectId } from "@/features/editor/lib/attachments";
 
 /* The tree's own node type, taken from the tree rather than from a direct
    dependency on @lezer/common that this package does not otherwise need. */

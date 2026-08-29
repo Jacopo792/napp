@@ -31,7 +31,7 @@ export function subscribeToPresence(
   onChange: (onlineUserIds: Set<string>) => void,
 ): RealtimeChannel {
   const channel = supabase.channel(`presence:${session.archiveId}`, {
-    config: { presence: { key: session.userId } },
+    config: { presence: { key: session.userId }, private: true },
   });
 
   channel.on("presence", { event: "sync" }, () => {

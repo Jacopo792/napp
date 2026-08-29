@@ -70,9 +70,9 @@ import {
   replaceDraft,
   requeue,
   takePending,
-} from "@/lib/draft";
+} from "@/features/editor/lib/draft";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
-import { attachmentType } from "@/lib/attachments";
+import { attachmentType } from "@/features/editor/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
@@ -85,7 +85,7 @@ import {
 } from "@/components/WorkspaceMenus";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
-import type { NoteEditorHandle } from "@/components/NoteEditor";
+import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
 import {
   groupEntries,
   createListPreferences,
@@ -98,7 +98,7 @@ import {
 } from "@/lib/listPreferences";
 
 const NoteEditor = lazy(() =>
-  import("@/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
+  import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
 );
 
 export const Route = createFileRoute("/notes")({
