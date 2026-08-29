@@ -7,7 +7,3 @@
 export const ALL = "__all";
 export const UNFILED = "__unfiled";
 export const TRASH = "__trash";
-
-export function isVirtualScope(id: string): boolean {
-  return id === ALL || id === UNFILED || id === TRASH;
-}

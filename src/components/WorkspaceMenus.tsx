@@ -112,28 +112,6 @@ export function MenuButton({
  * them. Standing where an application's account controls stand, they are one
  * click each and the menu is gone.
  */
-export function WorkspaceFooter({
-  compact = false,
-  onSettings,
-  onLock,
-}: {
-  compact?: boolean;
-  onSettings: () => void;
-  onLock: () => void;
-}) {
-  return (
-    <div className={`workspace-footer ${compact ? "is-compact" : ""}`}>
-      <button type="button" className="workspace-footer-button press" onClick={onSettings}>
-        <Settings size={16} />
-        <span>Settings</span>
-      </button>
-      <button type="button" className="workspace-footer-button press" onClick={onLock}>
-        <Lock size={16} />
-        <span>Lock &amp; sign out</span>
-      </button>
-    </div>
-  );
-}
 
 /**
  * How the list is ordered, and how it is drawn.

@@ -26,12 +26,3 @@ export function countWords(s: string): number {
   const t = s.trim();
   return t ? t.split(/\s+/).length : 0;
 }
-
-export function countChars(s: string): number {
-  return s.length;
-}
-
-/** Counts are printed with a thin space grouping so four figures stay scannable. */
-export function formatCount(n: number): string {
-  return n.toLocaleString(undefined);
-}
