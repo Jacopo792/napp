@@ -6,12 +6,15 @@ import {
   ChevronRight,
   Clock3,
   FolderInput,
+  ImagePlus,
   Lock,
+  Monitor,
   MoreHorizontal,
+  Moon,
   Pin,
   Search,
   Settings,
-  ShieldCheck,
+  Sun,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,6 +29,15 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
+import {
+  APPEARANCE_PRESETS,
+  DEFAULT_APPEARANCE,
+  setAppearance,
+  setTheme,
+  setWallpaper,
+  useAppearance,
+  type ThemeMode,
+} from "@/lib/appearance";
 import type { Folder } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
 
@@ -423,11 +435,23 @@ export function SettingsPanel({
 }) {
   const axes = useAxes();
   const preset = matchingPreset(axes);
+  const appearance = useAppearance();
   const [tuning, setTuning] = useState(false);
+  const [section, setSection] = useState<"appearance" | "reading" | "account">("appearance");
+  const wallpaperRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) setTuning(false);
+    if (!open) {
+      setTuning(false);
+      setSection("appearance");
+    }
   }, [open]);
+
+  const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
+    { id: "system", name: "System", icon: <Monitor size={18} /> },
+    { id: "light", name: "Light", icon: <Sun size={18} /> },
+    { id: "dark", name: "Dark", icon: <Moon size={18} /> },
+  ];
 
   if (!open) return null;
   return (
@@ -459,101 +483,306 @@ export function SettingsPanel({
           </button>
         </header>
 
-        <div className="settings-scroll">
-          <section>
-            <h3>Reading</h3>
+        <div className="settings-body">
+          <nav className="settings-nav" aria-label="Settings sections">
+            {(["appearance", "reading", "account"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={section === item ? "is-active" : ""}
+                onClick={() => setSection(item)}
+              >
+                {item[0].toUpperCase() + item.slice(1)}
+              </button>
+            ))}
+          </nav>
 
-            {/* The specimen is the control. It is set from the same four custom
-                properties the note itself reads, so what moves here is exactly
-                what will have moved when the panel closes. */}
-            <div className="settings-specimen" aria-hidden="true">
-              <p>
-                The note is the calmest place in the app. Set the type the way you actually read —
-                larger for a long evening, narrower to keep one thought in view — and every note
-                follows.
-              </p>
-            </div>
+          <div className="settings-scroll">
+            {section === "appearance" && (
+              <section>
+                <h3>Theme</h3>
+                <div className="theme-picker" role="radiogroup" aria-label="Theme">
+                  {themeChoices.map((choice) => (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={appearance.theme === choice.id}
+                      className={appearance.theme === choice.id ? "is-active" : ""}
+                      onClick={() => setTheme(choice.id)}
+                    >
+                      <span className={`theme-preview is-${choice.id}`}>
+                        {choice.icon}
+                        <i />
+                        <b />
+                      </span>
+                      {choice.name}
+                    </button>
+                  ))}
+                </div>
 
-            <Segmented
-              label="Reading preset"
-              value={preset?.id ?? null}
-              options={PRESETS.map((item) => ({ id: item.id, name: item.name, hint: item.role }))}
-              onChange={(id) => {
-                const chosen = PRESETS.find((item) => item.id === id);
-                if (chosen) setAxes(chosen.axes);
-              }}
-            />
+                <h3>Palette</h3>
+                <div className="palette-presets" role="group" aria-label="Colour palettes">
+                  {APPEARANCE_PRESETS.map((palette) => {
+                    const active =
+                      appearance.accent === palette.accent &&
+                      appearance.background === palette.background &&
+                      appearance.foreground === palette.foreground;
+                    return (
+                      <button
+                        key={palette.id}
+                        type="button"
+                        aria-pressed={active}
+                        className={active ? "is-active" : ""}
+                        onClick={() =>
+                          setAppearance({
+                            ...appearance,
+                            theme: palette.theme,
+                            accent: palette.accent,
+                            background: palette.background,
+                            foreground: palette.foreground,
+                          })
+                        }
+                      >
+                        <span
+                          className="palette-chip"
+                          style={
+                            {
+                              "--palette-bg": palette.background,
+                              "--palette-fg": palette.foreground,
+                              "--palette-accent": palette.accent,
+                            } as React.CSSProperties
+                          }
+                        />
+                        {palette.name}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            <button
-              type="button"
-              className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
-              aria-expanded={tuning}
-              onClick={() => setTuning((current) => !current)}
-            >
-              <ChevronRight size={14} />
-              <span>Fine-tune</span>
-              <small>{preset ? preset.name : "Custom"}</small>
-            </button>
+                <div className="appearance-controls">
+                  {(
+                    [
+                      ["Accent", "accent"],
+                      ["Background", "background"],
+                      ["Foreground", "foreground"],
+                    ] as const
+                  ).map(([label, key]) => (
+                    <label key={key} className="appearance-row">
+                      <span>{label}</span>
+                      <span className="color-control">
+                        <input
+                          type="color"
+                          value={appearance[key]}
+                          onChange={(event) =>
+                            setAppearance({ ...appearance, [key]: event.target.value })
+                          }
+                        />
+                        <code>{appearance[key].toUpperCase()}</code>
+                      </span>
+                    </label>
+                  ))}
 
-            {tuning && (
-              <div className="settings-sliders">
-                {AXIS_SPECS.map((spec) => (
-                  <AxisSlider key={spec.key} spec={spec} axes={axes} />
-                ))}
-              </div>
+                  <label className="appearance-row">
+                    <span>Translucent sidebar</span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={appearance.translucentSidebar}
+                      onChange={(event) =>
+                        setAppearance({ ...appearance, translucentSidebar: event.target.checked })
+                      }
+                    />
+                  </label>
+
+                  <label className="appearance-row is-slider">
+                    <span>Contrast</span>
+                    <input
+                      type="range"
+                      min="20"
+                      max="80"
+                      value={appearance.contrast}
+                      onChange={(event) =>
+                        setAppearance({ ...appearance, contrast: Number(event.target.value) })
+                      }
+                    />
+                    <output>{appearance.contrast}</output>
+                  </label>
+
+                  <div className="appearance-row wallpaper-row">
+                    <span>
+                      Background image
+                      <small>Stored only on this device</small>
+                    </span>
+                    <input
+                      ref={wallpaperRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void setWallpaper(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <span className="wallpaper-actions">
+                      {appearance.wallpaper && (
+                        <button type="button" onClick={() => void setWallpaper(null)}>
+                          Remove
+                        </button>
+                      )}
+                      <button type="button" onClick={() => wallpaperRef.current?.click()}>
+                        <ImagePlus size={15} /> Choose
+                      </button>
+                    </span>
+                  </div>
+
+                  {appearance.wallpaper && (
+                    <>
+                      <div className="appearance-row wallpaper-fit-row">
+                        <span>Image fit</span>
+                        <span className="compact-segment" role="group" aria-label="Image fit">
+                          {(["cover", "contain"] as const).map((fit) => (
+                            <button
+                              key={fit}
+                              type="button"
+                              aria-pressed={appearance.wallpaperFit === fit}
+                              className={appearance.wallpaperFit === fit ? "is-active" : ""}
+                              onClick={() => setAppearance({ ...appearance, wallpaperFit: fit })}
+                            >
+                              {fit === "cover" ? "Fill" : "Fit"}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
+                      <label className="appearance-row is-slider">
+                        <span>Darken image</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="80"
+                          value={appearance.wallpaperDim}
+                          onChange={(event) =>
+                            setAppearance({
+                              ...appearance,
+                              wallpaperDim: Number(event.target.value),
+                            })
+                          }
+                        />
+                        <output>{appearance.wallpaperDim}%</output>
+                      </label>
+                      <label className="appearance-row is-slider">
+                        <span>Blur</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="20"
+                          value={appearance.wallpaperBlur}
+                          onChange={(event) =>
+                            setAppearance({
+                              ...appearance,
+                              wallpaperBlur: Number(event.target.value),
+                            })
+                          }
+                        />
+                        <output>{appearance.wallpaperBlur}px</output>
+                      </label>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="settings-reset"
+                  onClick={() =>
+                    void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
+                  }
+                >
+                  Reset appearance
+                </button>
+              </section>
             )}
-          </section>
 
-          <section>
-            <h3>Security</h3>
-            <div className="settings-row">
-              <span>
-                <b>Lock when idle</b>
-                <small>
-                  The key is dropped from this browser and reading again means signing in. Nothing
-                  is deleted.
-                </small>
-              </span>
-            </div>
-            <Segmented
-              label="Lock when idle"
-              value={String(autoLock)}
-              options={AUTO_LOCK_CHOICES.map((minutes) => ({
-                id: String(minutes),
-                name: AUTO_LOCK_LABELS[minutes],
-              }))}
-              onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
-            />
-          </section>
+            {section === "reading" && (
+              <section>
+                <h3>Reading</h3>
+                <div className="settings-specimen" aria-hidden="true">
+                  <p>
+                    Set the page for the way you read. Every note follows these choices instantly.
+                  </p>
+                </div>
+                <Segmented
+                  label="Reading preset"
+                  value={preset?.id ?? null}
+                  options={PRESETS.map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    hint: item.role,
+                  }))}
+                  onChange={(id) => {
+                    const chosen = PRESETS.find((item) => item.id === id);
+                    if (chosen) setAxes(chosen.axes);
+                  }}
+                />
+                <button
+                  type="button"
+                  className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
+                  aria-expanded={tuning}
+                  onClick={() => setTuning((current) => !current)}
+                >
+                  <ChevronRight size={14} />
+                  <span>Fine-tune</span>
+                  <small>{preset ? preset.name : "Custom"}</small>
+                </button>
+                {tuning && (
+                  <div className="settings-sliders">
+                    {AXIS_SPECS.map((spec) => (
+                      <AxisSlider key={spec.key} spec={spec} axes={axes} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
-          <section>
-            <h3>This archive</h3>
-            <dl className="settings-facts">
-              <div>
-                <dt>Signed in</dt>
-                <dd>{email}</dd>
-              </div>
-              <div>
-                <dt>Reading</dt>
-                <dd>{reading}</dd>
-              </div>
-              <div>
-                <dt>Encryption</dt>
-                <dd>
-                  <ShieldCheck size={14} className="text-ok" />
-                  In this browser
-                </dd>
-              </div>
-            </dl>
-            <p className="settings-note">
-              Notes, folder names and attachments are encrypted here before they are sent. Supabase
-              stores ciphertext and never holds a key.
-            </p>
-            <button type="button" className="settings-lock press" onClick={onLock}>
-              <Lock size={16} />
-              Lock &amp; sign out
-            </button>
-          </section>
+            {section === "account" && (
+              <section>
+                <h3>Account</h3>
+                <dl className="settings-facts">
+                  <div>
+                    <dt>Signed in</dt>
+                    <dd>{email}</dd>
+                  </div>
+                  <div>
+                    <dt>Reading</dt>
+                    <dd>{reading}</dd>
+                  </div>
+                  <div>
+                    <dt>Storage</dt>
+                    <dd>Protected by your account</dd>
+                  </div>
+                </dl>
+                <div className="settings-row account-lock-row">
+                  <span>
+                    <b>Sign out when idle</b>
+                    <small>Require the account password again after a period of inactivity.</small>
+                  </span>
+                </div>
+                <Segmented
+                  label="Sign out when idle"
+                  value={String(autoLock)}
+                  options={AUTO_LOCK_CHOICES.map((minutes) => ({
+                    id: String(minutes),
+                    name: AUTO_LOCK_LABELS[minutes],
+                  }))}
+                  onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
+                />
+                <button type="button" className="settings-lock press" onClick={onLock}>
+                  <Lock size={16} />
+                  Sign out
+                </button>
+              </section>
+            )}
+          </div>
         </div>
       </section>
     </div>

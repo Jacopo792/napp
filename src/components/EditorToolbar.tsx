@@ -17,6 +17,7 @@ import {
   List,
   ListChecks,
   ListOrdered,
+  Languages,
   Minus,
   Palette,
   Paperclip,
@@ -41,7 +42,7 @@ import { TEXT_COLORS, type FormatAction, type TextColor } from "./MarkdownEditor
    The same component serves the phone: parity is not a port, it is this file
    being rendered twice. ──────────────────────────────────────────────────── */
 
-type Tool = "text" | "color" | "lists" | "table" | "attach";
+type Tool = "text" | "color" | "lists" | "table" | "translate" | "attach";
 
 interface Props {
   mobile?: boolean;
@@ -50,6 +51,7 @@ interface Props {
   onAttachPdf: () => void;
   onImportPdfText: () => void;
   onChoosePhoto: () => void;
+  onTranslate: (language: "it" | "fr" | "en") => void;
   /** The insert-link form, anchored under the text tab that opened it. */
   linkForm?: ReactNode;
   linkOpen?: boolean;
@@ -98,6 +100,7 @@ export function EditorToolbar({
   onAttachPdf,
   onImportPdfText,
   onChoosePhoto,
+  onTranslate,
   linkForm,
   linkOpen = false,
   onCloseLink,
@@ -340,8 +343,38 @@ export function EditorToolbar({
             <Row icon={<Columns3 size={16} />} label="3 columns" onClick={() => run("table-3")} />
             <Row icon={<Columns4 size={16} />} label="4 columns" onClick={() => run("table-4")} />
             <p className="menu-note">
-              Tables are drawn as tables. Click any cell to edit it — the row source appears only
-              while the caret is inside it.
+              Tables stay visual while you edit. Click a cell, type, then press Return.
+            </p>
+          </>,
+        )}
+      </div>
+
+      {/* ── Translation ── */}
+      <div className="relative">
+        {tab("translate", "Translate selection", <Languages size={18} />)}
+        {menu(
+          "translate",
+          "Translate selection",
+          "right",
+          <>
+            <p className="menu-label">Translate selected text to</p>
+            <Row
+              icon={<span>IT</span>}
+              label="Italiano"
+              onClick={() => (setOpen(null), onTranslate("it"))}
+            />
+            <Row
+              icon={<span>FR</span>}
+              label="Français"
+              onClick={() => (setOpen(null), onTranslate("fr"))}
+            />
+            <Row
+              icon={<span>EN</span>}
+              label="English"
+              onClick={() => (setOpen(null), onTranslate("en"))}
+            />
+            <p className="menu-note">
+              Translation runs on this device in supported desktop browsers.
             </p>
           </>,
         )}
