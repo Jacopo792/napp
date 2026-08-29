@@ -120,9 +120,15 @@ The rule now:
   same JSON is the same block — and the changed window on each side is found by
   trimming the common prefix and suffix rather than by an LCS, which is exact
   for edits that sit in one place.
-- Overlapping windows return `null`. Then the remote version stays in the note
-  and the local one becomes a note of its own, `"<title> — your version"`.
-  Nothing is discarded either way, and the readout says which happened.
+- Overlapping windows are resolved when what **both sides replaced was blank** —
+  an empty paragraph or heading. A new note is exactly one empty paragraph, so
+  two people opening one to talk both type into the same block; that is two
+  people writing, not a conflict, and both texts are kept in order. Anything
+  holding content — words, an image, a table — is real, and two sides rewriting
+  the same real block returns `null`.
+- On `null` the remote version stays in the note and the local one becomes a
+  note of its own, `"<title> — your version"`. Nothing is discarded either way,
+  and the readout says which happened.
 - The merge needs three documents, so `draft.ts` keeps the `base` each draft
   departed from. **The base must always be a document the archive actually
   holds** — set it to what is on screen and the next merge reads the other

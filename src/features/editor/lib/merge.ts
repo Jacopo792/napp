@@ -47,6 +47,19 @@ function changedRegion(base: string[], side: string[]): Region {
   return { start, baseEnd: base.length - tail, sideEnd: side.length - tail };
 }
 
+/* A paragraph or heading with nothing in it is not content, it is where the
+   caret is parked — and a fresh note is exactly one of them. Two people typing
+   into the same blank spot are not in conflict: they are both writing, and the
+   answer is both texts, not a copy. Anything that holds something — an image, a
+   table, a paragraph with words — is real, and two people rewriting the same
+   real block is a conflict this cannot resolve. */
+function isBlank(node: JSONContent): boolean {
+  if (node.type !== "paragraph" && node.type !== "heading") return false;
+  const children = node.content;
+  if (!children || children.length === 0) return true;
+  return children.every((child) => child.type === "text" && !(child.text ?? "").trim());
+}
+
 function same(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -80,7 +93,24 @@ export function mergeBlocks(
   // two people appending at the end both have an empty base window there.
   const overlaps =
     localRegion.start < remoteRegion.baseEnd && remoteRegion.start < localRegion.baseEnd;
-  if (overlaps) return null;
+
+  if (overlaps) {
+    /* The one overlap worth resolving: what both sides replaced was blank. Take
+       the union of the two windows — everything before it is common to all
+       three — and put what each side wrote there, one after the other. Beyond
+       a side's own window it agrees with the base again, which is what shifts
+       its end index by the length that side changed. */
+    const start = Math.min(localRegion.start, remoteRegion.start);
+    const baseEnd = Math.max(localRegion.baseEnd, remoteRegion.baseEnd);
+    if (!base.slice(start, baseEnd).every(isBlank)) return null;
+
+    return [
+      ...base.slice(0, start),
+      ...local.slice(start, baseEnd + (localRegion.sideEnd - localRegion.baseEnd)),
+      ...remote.slice(start, baseEnd + (remoteRegion.sideEnd - remoteRegion.baseEnd)),
+      ...base.slice(baseEnd),
+    ];
+  }
 
   const localFirst =
     localRegion.start < remoteRegion.start ||

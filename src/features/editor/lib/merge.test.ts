@@ -39,6 +39,35 @@ test("the same change on both sides is not a conflict", () => {
   assert.deepEqual(texts(mergeBlocks(base, both, both)), ["one", "same"]);
 });
 
+test("a fresh note: both typing into the one empty paragraph keeps both", () => {
+  const base = [{ type: "paragraph" }];
+  const local = [p("JACOPO: ci sei?")];
+  const remote = [p("LISA: sono qui")];
+  assert.deepEqual(texts(mergeBlocks(base, local, remote)), ["JACOPO: ci sei?", "LISA: sono qui"]);
+});
+
+test("a blank spot filled with several blocks on one side keeps all of them", () => {
+  const base = [p("intro"), { type: "paragraph" }];
+  const local = [p("intro"), p("mine one"), p("mine two")];
+  const remote = [p("intro"), p("theirs")];
+  assert.deepEqual(texts(mergeBlocks(base, local, remote)), [
+    "intro",
+    "mine one",
+    "mine two",
+    "theirs",
+  ]);
+});
+
+test("a paragraph of only whitespace counts as blank", () => {
+  const base = [p("   ")];
+  assert.deepEqual(texts(mergeBlocks(base, [p("mine")], [p("theirs")])), ["mine", "theirs"]);
+});
+
+test("an image is never blank, so replacing the same one still conflicts", () => {
+  const base = [image("old")];
+  assert.equal(mergeBlocks(base, [image("mine")], [image("theirs")]), null);
+});
+
 test("both editing the same block is a conflict the caller has to resolve", () => {
   const base = [p("one"), p("two")];
   const local = [p("one"), p("two — Jacopo")];
