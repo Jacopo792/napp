@@ -371,7 +371,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
         {(navigationAction || headerActions) && (
-          <header className="editor-toolbar flex h-13 shrink-0 items-center border-b border-rule px-4">
+          <header className="editor-toolbar has-rule flex h-13 shrink-0 items-center px-4">
             {navigationAction && (
               <span className="flex items-center gap-1">{navigationAction}</span>
             )}

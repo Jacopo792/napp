@@ -190,7 +190,11 @@ const Row = memo(function Row({
 
       <div className="min-w-0 flex-1">
         <p
-          className={`${gallery ? "text-[15px]" : mobile ? "text-[16px]" : "text-[13.5px]"} leading-[1.35] ${
+          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+             so every row below the first started on a fraction of a pixel and
+             its 1px rule was painted across two device rows at half strength —
+             the blur down the list that looked like bad icon rendering. */
+          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           style={{
@@ -613,7 +617,7 @@ export function NoteList({
       className={`collection-column flex h-full w-full shrink-0 flex-col ${gallery ? "is-gallery" : ""}`}
     >
       {topBar}
-      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 border-b border-rule px-4">
+      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">

@@ -238,25 +238,29 @@
     caret-color: var(--accent);
   }
 
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  /* ── Scrollbars ────────────────────────────────────────────────────────────
+     Overlay, and quiet until the pointer is in the region they belong to.
+
+     They were being drawn as classic scrollbars, which is what giving
+     `::-webkit-scrollbar` a width does: an overlay scrollbar that costs
+     nothing becomes a channel that occupies layout. The notes list and the
+     editor were each surrendering ten real pixels to a permanent grey track
+     with a four-pixel thumb inside it — measured, not guessed, and the reason
+     the list's right edge never lined up with the header above it.
+
+     The standard properties keep the overlay. The sidebar had already moved to
+     them and was reserving nothing, so this is the sidebar's treatment applied
+     everywhere rather than a new idea, and it covers scrolling regions nobody
+     has to remember to add to a list. The thumb is still there the moment you
+     are in the region — the affordance is not removed, only the furniture. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: transparent;
-    border: 3px solid transparent;
-    background-clip: content-box;
-  }
-  *:hover::-webkit-scrollbar-thumb {
-    background: var(--ink-4);
-    background-clip: content-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--ink-3);
-    background-clip: content-box;
+
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--ink-4) transparent;
   }
 }
 
@@ -680,6 +684,15 @@
   background: var(--paper);
 }
 
+/* The rule under a toolbar is painted, not laid out. As a border it ate one of
+   the 52 pixels, leaving an odd content box, and every 32px control centred in
+   it landed on a half pixel — which is what softens a hairline and a rounded
+   hover pill alike. An inset shadow draws the same line and costs no height. */
+.collection-toolbar,
+.editor-toolbar.has-rule {
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
 .editor-toolbar {
   background: var(--page);
 }
@@ -760,7 +773,14 @@
   top: 3px;
   bottom: 3px;
   left: 3px;
+  /* Whole pixels, or the ring below is drawn across two of them. A roster of
+     three in a column the width of this one gives slots of 67.98, 68.33, 74.98
+     — measured while dragging the pane — and the thumb carries a 1px inset
+     ring at both edges. Rounding down costs at most one pixel per step of
+     alignment with the label behind it, against a ring that is crisp at every
+     width. The unrounded value stays as the fallback. */
   width: calc((100% - 6px) / var(--switch-count, 2));
+  width: round(down, calc((100% - 6px) / var(--switch-count, 2)), 1px);
   border-radius: 0.62rem;
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
@@ -894,11 +914,16 @@
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 1.2rem 1rem 0.55rem;
+  /* Whole pixels, like the rows underneath. 1.2rem and 0.55rem are 19.2 and
+     8.8, and the baseline row they wrap measured 22.06 — so each heading threw
+     every row below it a further fraction of a pixel off the device grid, and
+     each of those rows draws a 1px rule. */
+  padding: 19px 16px 9px;
+  line-height: 22px;
 }
 
 .note-group-heading.is-first {
-  padding-top: 0.45rem;
+  padding-top: 7px;
 }
 
 .note-group-heading h3 {
@@ -923,7 +948,9 @@
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 12px;
-  line-height: 1.35;
+  /* Whole pixels: 12 × 1.35 is 16.2, and the fraction accumulates down the
+     column until every row's hairline is drawn between two device rows. */
+  line-height: 16px;
 }
 
 .note-row-summary > span:first-child {
@@ -2726,11 +2753,10 @@
    the right of the scrolling area, which pulled every row's right edge 10px
    short of the switch above it and the footer below it — a permanent seam down
    a column whose whole job is to look like one column. macOS overlays its
-   scrollbar anyway, so the reserve bought nothing and cost the alignment. */
-.sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
+   scrollbar anyway, so the reserve bought nothing and cost the alignment.
+
+   The thin overlay treatment this column used to declare for itself is now the
+   base rule for every scrolling region, so there is nothing left to say here. */
 
 .sidebar-heading {
   display: flex;
