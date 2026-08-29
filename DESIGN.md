@@ -93,14 +93,25 @@ Markdown is edited in one continuous reading surface. Syntax is formatted in pla
 
 ## Honest persistence
 
-Saving is a visible network state, not an implied local success. The bottom bar must distinguish:
+Saving is a visible network state, not an implied local success. The editor
+toolbar must distinguish:
 
 - **Unsaved** while changes are waiting for the debounce;
-- **Writing** with a small spinner while a commit is in flight;
-- **Committed** with the last successful timestamp after persistence;
-- **Write failed** in danger color, with the actual error available and the state actionable for retry.
+- **Saving** with a small spinner while a commit is in flight;
+- **Saved** with the last successful timestamp after persistence;
+- **Updated elsewhere** when another member's write arrives over Realtime;
+- **Save failed** in danger color, with the actual error available and the state actionable for retry.
 
-Do not use optimistic “Saved” language before the Postgres write completes, and do not imply conflict merging.
+Say “Saved” only once the Postgres write has completed — never ahead of it, and
+never as a local-only reassurance. Before it completes the state is **Unsaved**
+or **Saving**. The wording stays in the user's vocabulary: no “committed”, no
+“write”, no other borrowing from version control or from the database. Do not
+imply conflict merging.
+
+The readout occupies a slot of one fixed width, sized to the longest state, and
+the states differ enough in length that any other arrangement makes the label
+slide horizontally on every debounce. Anything unbounded — a server error string
+above all — belongs in the tooltip, not in the row.
 
 ## Accessibility and motion
 

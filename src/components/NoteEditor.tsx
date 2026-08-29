@@ -38,6 +38,13 @@ interface Props {
   headerActions?: ReactNode;
 }
 
+/* The toolbar's three groups — the mode label, the format cluster, the save
+   readout and its actions — need about this much room side by side. Under it
+   the cluster takes a row of its own, the way the phone already gives it one.
+   Measured, not guessed: the cluster is 210px and the actions 184px, and a
+   desktop window of 1024px leaves the editor 334px to hold both. */
+const TOOLBAR_ROOM = 500;
+
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
   focus: () => void;
@@ -83,6 +90,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const linkUrlRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const findRef = useRef<HTMLInputElement>(null);
+  const [shellWidth, setShellWidth] = useState<number | null>(null);
+
+  const shellRef = useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    setShellWidth(node.getBoundingClientRect().width);
+    const observer = new ResizeObserver(([box]) => setShellWidth(box.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useImperativeHandle(ref, () => ({
     openFind(query = "") {
@@ -300,6 +316,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     />
   ) : null;
 
+  /* Inline while there is room for it; on its own row otherwise. */
+  const inlineToolbar =
+    !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
+
   const fileInputs = (
     <>
       <input
@@ -363,21 +383,39 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   return (
     <section
       key={entry.note.id}
+      ref={shellRef}
       className={`editor-shell page-in flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
-      <div className="editor-toolbar relative flex h-13 shrink-0 items-center gap-2 px-4">
-        {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
-        {!mobile && <span className="label text-ink-4">{canEdit ? "Editing" : "Read only"}</span>}
+      <div
+        className={`editor-toolbar relative h-13 shrink-0 px-4 ${
+          inlineToolbar
+            ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+            : "flex items-center gap-2"
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
+          {!mobile && (
+            <span className="label truncate text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
+          )}
+        </span>
 
-        {/* Desktop keeps the cluster optically centred over the measure; the
-            phone gives it a row of its own, below. */}
-        {!mobile && toolbar && <div className="absolute left-1/2 -translate-x-1/2">{toolbar}</div>}
+        {/* A wide enough editor keeps the cluster optically centred over the
+            measure. A middle grid column centres it exactly as `position:
+            absolute` used to, and unlike absolute it occupies room: centred
+            over a 632px editor the cluster ran fifteen pixels underneath the
+            save readout, and no width of readout could have avoided it. */}
+        {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
 
-        <span className="ml-auto flex min-w-0 items-center gap-1">{headerActions}</span>
+        <span
+          className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
+        >
+          {headerActions}
+        </span>
       </div>
 
-      {mobile && toolbar && (
+      {!inlineToolbar && toolbar && (
         <div className="editor-format-bar flex shrink-0 items-center justify-center px-3 py-2">
           {toolbar}
         </div>

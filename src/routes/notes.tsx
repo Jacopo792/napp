@@ -1030,30 +1030,34 @@ function NotesPage() {
 
   const dragEntry = dragId ? entries.find((e) => e.note.id === dragId) : null;
 
+  /* The states have very different lengths, so the readout is given one slot of
+     a fixed width below and every state is measured against the widest of them.
+     Left to size itself it slid back and forth by 55px on each debounce, which
+     is the one thing in the toolbar that moves while you are looking at it. The
+     write error is carried in the tooltip for the same reason. */
   const saveReadout = error ? (
     <button
       onClick={saveNow}
-      title="Retry the write now"
+      title={`${error}\nClick to retry the write now`}
       className="flex items-center gap-2 text-left"
     >
-      <span className="label text-danger">Write failed</span>
-      <span className="readout max-w-[20rem] truncate text-ink-3 underline-offset-2 hover:underline">
-        {error}
-      </span>
+      <span className="label text-danger underline-offset-2 hover:underline">Save failed</span>
     </button>
   ) : saving ? (
     <span className="flex items-center gap-2">
       <span className="animate-spin inline-block h-2.5 w-2.5 rounded-full border border-accent border-t-transparent" />
-      <span className="label text-accent">Writing</span>
+      <span className="label text-accent">Saving</span>
     </span>
   ) : dirty ? (
     <span className="label text-ink-2">Unsaved</span>
   ) : syncFlash ? (
-    <span className="label text-accent">Synced from elsewhere</span>
+    <span className="label text-accent">Updated elsewhere</span>
   ) : (
     <span className="flex items-center gap-2">
-      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Committed</span>
-      {lastSavedAt && <span className="readout text-ink-4">{formatStamp(lastSavedAt)}</span>}
+      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Saved</span>
+      {lastSavedAt && (
+        <span className="readout tabular-nums text-ink-4">{formatStamp(lastSavedAt)}</span>
+      )}
     </span>
   );
 
@@ -1180,7 +1184,9 @@ function NotesPage() {
 
   const noteActions = selected ? (
     <>
-      <span className="mr-2 min-w-0 truncate">{saveReadout}</span>
+      <span className="mr-2 flex w-[7.5rem] shrink-0 items-center overflow-hidden">
+        {saveReadout}
+      </span>
       <button
         type="button"
         aria-label="Find in note"
