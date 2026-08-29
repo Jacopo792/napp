@@ -738,7 +738,7 @@ export function SettingsPanel({
                   </div>
                 </div>
 
-                <div className="appearance-row">
+                <div className="appearance-row profile-row">
                   <RowLead
                     icon={<UserRound size={17} />}
                     label="Nickname"
@@ -760,7 +760,7 @@ export function SettingsPanel({
                   />
                 </div>
 
-                <div className="appearance-row">
+                <div className="appearance-row profile-row">
                   <RowLead
                     icon={<AtSign size={17} />}
                     label="Email"
@@ -769,7 +769,7 @@ export function SettingsPanel({
                   <span className="profile-static">{email}</span>
                 </div>
 
-                <div className="appearance-row">
+                <div className="appearance-row profile-row">
                   <RowLead
                     icon={<Users size={17} />}
                     label="Archive"

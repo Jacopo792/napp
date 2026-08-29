@@ -593,6 +593,12 @@
   .skeleton {
     animation: none;
   }
+
+  /* A menu that scales into place is motion nobody asked for, and it appears
+     under a pointer already moving toward it. It is simply there instead. */
+  .menu-popover {
+    animation: none;
+  }
 }
 
 /* ── Midnight Instrument shell ─────────────────────────────────────────── */
@@ -840,10 +846,15 @@
 }
 
 /* Portalled to the body, so it ranks against the page rather than against the
-   pane it was opened over. Above the toolbars, which sit at 30. */
+   pane it was opened over. Above the toolbars, which sit at 30.
+
+   It grows from its top-left corner, not the top-right the anchored menus use:
+   this one opens *at* the pointer, so that corner is the one the reader's eye
+   and cursor are already on. */
 .context-menu {
   position: fixed;
   z-index: 80;
+  transform-origin: top left;
 }
 
 .menu-row {
@@ -1306,8 +1317,21 @@
   color: var(--danger);
 }
 
+/* On a profile row the label is the fixed part and the control is what yields.
+   The other settings rows are the other way round, because there the label
+   carries a wrapping line of explanation and the control is a switch of known
+   size. Here the control is a text field with no natural width, and leaving it
+   a fixed share clipped the label beside it: on a phone "Nickname" arrived as
+   "Ni". */
+.profile-row .settings-label {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
 .profile-field {
-  width: min(13rem, 100%);
+  width: auto;
+  flex: 0 1 13rem;
+  min-width: 4rem;
   border: 1px solid var(--rule);
   border-radius: 0.6rem;
   padding: 7px 10px;
@@ -1663,6 +1687,14 @@
      second line, because there the value is the content, not a gloss. */
   .appearance-row .settings-label small {
     display: none;
+  }
+
+  .profile-field {
+    flex: 0 1 10rem;
+  }
+
+  .profile-static {
+    text-align: right;
   }
 
   /* The panel holds one height now, so the body has to say which of its two
