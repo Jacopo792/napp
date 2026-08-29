@@ -14,12 +14,17 @@ email/password account and full read/write access to the one shared archive. The
 account is the only access boundary; there is no separate archive key or
 passphrase. Every member can use the `viewAs` switch.
 
-`owner: "u1" | "u2"` remains a live organisational label. It powers **Jacopo /
-Lisa**, and folders and tags carry the same owner label, but it is never an
-authorization boundary: RLS checks membership in the shared archive and nothing
-else. A unique index allows one member per label per archive, so Jacopo's account
-opens on `u1`, Lisa's on `u2`, and an additional member joins unlabelled and
-opens on `u1`. Everyone can still switch views manually.
+`owner_id` names the member a note, folder or tag belongs to. It is an
+organisational label and never an authorization boundary: RLS checks membership
+in the shared archive and nothing else, so every member reads and writes every
+scope. The scope switch is built from the roster, showing **My notes** for the
+signed-in account and each other member by nickname, and each account opens on
+its own scope. A row whose member is unknown — written before the column, or
+left by a deleted account — is filed under the first scope rather than
+disappearing.
+
+The retired `u1` / `u2` labels are the shape this replaced: two scopes were a
+fixture of an archive with exactly two people in it.
 
 Creating a Supabase Auth account does not join the archive. Until the
 `archive_members` row exists the app answers "This account is not connected to
@@ -97,8 +102,11 @@ Technical constraints that outlive any design:
 - Concurrent edits remain last-write-wins at note granularity. The `version` column
   provides optimistic concurrency; the interface must never imply a merge happened.
 - Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
-  and tag names are ordinary account-protected columns, and `owner` remains
+  and tag names are ordinary account-protected columns, and `owner_id` remains
   organisational only.
+- Every member has a `public.profiles` row: a nickname and an optional avatar. You
+  may read the profile of anyone you share an archive with, and write only your
+  own. A new account gets a nickname from its address on first sign-in.
 
 ## Brand Commitments
 
@@ -122,8 +130,9 @@ success states retain their semantic meaning in every palette.
 
 1. **The words outrank the app.** Every surface that is not the note itself recedes:
    chrome is quiet, the writing area is the brightest and calmest thing on screen.
-2. **Two labelled scopes, never blended.** u1 and u2 remain distinct organisational
-   views inside one shared archive, available to every authenticated member.
+2. **One scope per member, never blended.** Each member's notes stay a distinct
+   organisational view inside one shared archive, and every view is available to
+   every authenticated member.
 3. **Honest about the network.** Saving is a database write and can fail. Show real
    save state; never fake instant persistence.
 4. **Built for long notes and long titles.** Density decisions are validated against

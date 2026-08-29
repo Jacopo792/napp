@@ -127,10 +127,16 @@ try {
   const [notes, folders, tags, archive] = await Promise.all([
     first.supabase
       .from("notes")
-      .select("id, owner, title, body, ciphertext")
+      .select("id, owner_id, title, body, ciphertext")
       .eq("archive_id", archiveId),
-    first.supabase.from("folders").select("id, name, ciphertext").eq("archive_id", archiveId),
-    first.supabase.from("tags").select("id, name, ciphertext").eq("archive_id", archiveId),
+    first.supabase
+      .from("folders")
+      .select("id, owner_id, name, ciphertext")
+      .eq("archive_id", archiveId),
+    first.supabase
+      .from("tags")
+      .select("id, owner_id, name, ciphertext")
+      .eq("archive_id", archiveId),
     first.supabase
       .from("archives")
       .select("settings, settings_ciphertext")
@@ -156,6 +162,23 @@ try {
     archive.data.settings !== null && typeof archive.data.settings === "object",
     "Archive settings are not a plain JSON object",
   );
+  // Every row belongs to somebody on the roster. A note whose member is not a
+  // member is a note that would drop out of every scope on screen.
+  const roll = new Set(roster.data.map((row) => row.user_id));
+  for (const [table, rows] of [
+    ["notes", notes.data],
+    ["folders", folders.data],
+    ["tags", tags.data],
+  ]) {
+    for (const row of rows) {
+      assert(row.owner_id, `${table} row ${row.id} has no member`);
+      assert(roll.has(row.owner_id), `${table} row ${row.id} belongs to a non-member`);
+    }
+  }
+  report.scopes = Object.fromEntries(
+    [...roll].map((userId) => [userId, notes.data.filter((row) => row.owner_id === userId).length]),
+  );
+
   report.plaintext = {
     notes: notes.data.length,
     folders: folders.data.length,
@@ -207,7 +230,7 @@ try {
   const inserted = await first.supabase.from("notes").insert({
     id: testId,
     archive_id: archiveId,
-    owner: "u1",
+    owner_id: first.userId,
     title: "Supabase verification",
     body: "Created by the automated cross-account verification.",
     created_at: now,
@@ -335,7 +358,7 @@ try {
     const write = await outsider.supabase.from("notes").insert({
       id: crypto.randomUUID(),
       archive_id: archiveId,
-      owner: "u1",
+      owner_id: first.userId,
       title: "should not exist",
       body: "",
       created_at: new Date().toISOString(),
