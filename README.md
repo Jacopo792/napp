@@ -23,9 +23,12 @@ separate composition for the phone.
   whole archive.
 - **A scope switch** built from the roster: your notes, and the other member's,
   by nickname. Each account opens on its own scope.
-- **Realtime sync**, last-write-wins on a conflict. Save state is always visible:
-  Unsaved, Saving, Saved with the time, Updated elsewhere, Save failed with the
-  error and a retry.
+- **Realtime sync with a block-level merge.** Two people writing in one note both
+  keep their text: a write that collides is merged by top-level block, not
+  overwritten. When both edited the same block, the remote version stays and
+  yours is kept as a note of its own. Save state is always visible: Unsaved,
+  Saving, Saved with the time, Updated elsewhere, Merged, Kept a copy, Save
+  failed with the error and a retry.
 - **Two seats, enforced by the database.** `archives.seat_limit` defaults to 2, a
   trigger on `archive_members` refuses the row past it, and issuing an invitation
   counts the seats unclaimed invitations already hold. The column takes 1–8, so a

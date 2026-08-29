@@ -7,6 +7,23 @@ changes. The commit history remains the detailed engineering record.
 
 ### Fixed
 
+- **Text lost when two people wrote in the same note.** `saveNote` wrote
+  conditionally on the `version` column and then defeated it: a conditional
+  update that matched nothing — the signal that somebody else had written — made
+  it re-read the current version and rewrite the same payload on top, up to four
+  times. Two people in one note overwrote each other silently, with no error
+  anywhere, and an image upload took the whole document with it like any other
+  write. A miss is a conflict now, and colliding writes are merged by top-level
+  block so both people keep their text; when both edited the same block the
+  remote version stays in the note and the local one is kept as
+  `"<title> — your version"`. The readout says `Merged` or `Kept a copy`. This
+  reverses the last-write-wins decision of 2026-08-27, which had accepted a rare
+  loss and turned out not to be rare.
+- **Links could not be clicked.** `openOnClick` was false, so clicking a link put
+  a caret inside its text instead of opening it. A plain click opens the target
+  in a new tab, with `rel="noopener noreferrer nofollow"`; editing a link goes
+  through the toolbar's own fields.
+
 - **Account creation.** Signing up failed with "Database error saving new user".
   The Supabase starter scaffold's `on_auth_user_created` trigger had survived the
   rename of `public.profiles` and still inserted into columns that had not

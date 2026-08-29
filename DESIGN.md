@@ -115,7 +115,7 @@ Title, metadata, and body share one left-aligned reading column capped at the ac
 
 They live in Settings, each on a native range input beside a specimen that is set with the value the slider currently holds — which is the whole difference between a control you understand and four numbers. Keep native keyboard stepping and screen-reader semantics; the travelled track and the thumb take the accent.
 
-Tiptap edits a structured document in one continuous reading surface. There are no source markers: headings, links, lists, code, dividers, colours, tables and checklists are first-class nodes or marks. Private images and attachments are atomic reading objects whose storage ids are never exposed; each carries its own open, download or remove actions. The format cluster stands in the editor's own header, optically centred over the measure it acts on, and drops to a row of its own when the pane is too narrow to hold three groups side by side. It offers bold/italic/strike/heading/list/quote/link/code/divider, colour, tables, local image insertion, attachment, translation and “Import PDF as text.” A table menu inserts a grid or deletes the selected cell's row, column or complete table. There is no split preview: the reading surface is the editing surface. Legacy Markdown exists only at the migration boundary.
+Tiptap edits a structured document in one continuous reading surface. There are no source markers: headings, links, lists, code, dividers, colours, tables and checklists are first-class nodes or marks. Private images and attachments are atomic reading objects whose storage ids are never exposed; each carries its own open, download or remove actions. The format cluster stands in the editor's own header, optically centred over the measure it acts on, and drops to a row of its own when the pane is too narrow to hold three groups side by side. It offers bold/italic/strike/heading/list/quote/link/code/divider, colour, tables, local image insertion, attachment, translation and “Import PDF as text.” A link in the document is a link: a plain click opens it in a new tab, and it is edited through the toolbar's fields rather than by putting a caret inside it. A table menu inserts a grid or deletes the selected cell's row, column or complete table. There is no split preview: the reading surface is the editing surface. Legacy Markdown exists only at the migration boundary.
 
 ## Navigation and interaction states
 
@@ -155,13 +155,21 @@ toolbar must distinguish:
 - **Saving** with a small spinner while a commit is in flight;
 - **Saved** with the last successful timestamp after persistence;
 - **Updated elsewhere** when another member's write arrives over Realtime;
+- **Merged** when your write collided with somebody else's and both survived;
+- **Kept a copy** when both of you edited the same block, so the two versions could not become one and yours was kept as a note of its own;
 - **Save failed** in danger color, with the actual error available and the state actionable for retry.
 
 Say “Saved” only once the Postgres write has completed — never ahead of it, and
 never as a local-only reassurance. Before it completes the state is **Unsaved**
 or **Saving**. The wording stays in the user's vocabulary: no “committed”, no
-“write”, no other borrowing from version control or from the database. Do not
-imply conflict merging.
+“write”, no other borrowing from version control or from the database.
+
+Say **Merged** only when a merge actually happened, and **Kept a copy** when it
+could not. Never claim one for the other, and never let a version disappear
+without saying so: the whole reason these two states exist is that silence used
+to mean somebody's paragraph had been thrown away. Both are one word in the
+readout with the sentence in the tooltip, because the slot holds a state and not
+a paragraph. No conflict marker is ever written into the text of either version.
 
 The readout occupies a slot of one fixed width, sized to the longest state, and
 the states differ enough in length that any other arrangement makes the label

@@ -100,6 +100,40 @@ every new account, through `private.bootstrap_personal_archive()` behind
 archives. An account belonging to several archives picks one at sign-in; "not
 connected" only means this account has no row for _this_ archive yet.
 
+## Two people in one note
+
+The document is the unit of the write, so a note saved by two people at once is
+the one place text can be lost. It was being lost. `saveNote` wrote
+conditionally on `version` and then, when the condition matched nothing —
+exactly the signal that somebody else had written — re-read the current version
+and rewrote the same payload on top of it, four times over. Silent, total, no
+error anywhere.
+
+The rule now:
+
+- A conditional update that matches nothing is a **conflict**, never a reason to
+  write anyway. `NoteConflict` carries the row that is actually there, so the
+  merge costs no extra round trip.
+- `mergeDocuments()` in `src/features/editor/lib/merge.ts` is a three-way merge
+  over the document's **top-level blocks**. It does not merge prose, and it
+  never writes a marker into the text. Blocks are compared by identity — the
+  same JSON is the same block — and the changed window on each side is found by
+  trimming the common prefix and suffix rather than by an LCS, which is exact
+  for edits that sit in one place.
+- Overlapping windows return `null`. Then the remote version stays in the note
+  and the local one becomes a note of its own, `"<title> — your version"`.
+  Nothing is discarded either way, and the readout says which happened.
+- The merge needs three documents, so `draft.ts` keeps the `base` each draft
+  departed from. **The base must always be a document the archive actually
+  holds** — set it to what is on screen and the next merge reads the other
+  person's blocks as a deletion. `reconcileDraft()` is the one that sets both
+  together, for keystrokes made while a merged write was in flight.
+
+`applySnapshot` still withholds remote content from a note you are typing in,
+and that is fine now: the merge on the next save (250 ms after you pause) is
+what delivers it. Do not make it apply remote content to a dirty draft — that
+is the overwrite this whole section exists to prevent.
+
 ## Members and profiles
 
 `public.profiles` carries a nickname and an avatar object per account.

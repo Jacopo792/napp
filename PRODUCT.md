@@ -111,7 +111,8 @@ private-image node with an opaque object id. An embedded image remains a reading
 it opens full size, can be removed whole, and its storage reference is never exposed in
 the editor. Choosing a file and pasting from the clipboard use the same upload path.
 Legacy Markdown image URLs render in place after conversion, and links plus bare HTTP(S)
-URLs become clickable. Link insertion uses explicit text and URL fields.
+URLs become clickable — a plain click opens the target in a new tab, and editing a link
+goes through the toolbar's explicit text and URL fields rather than through the caret.
 
 Technical constraints that outlive any design:
 
@@ -140,8 +141,18 @@ Technical constraints that outlive any design:
   `presence:<archiveId>` members via `private.presence_archive_id()`, with the
   client joining `config.private = true`. Postgres Changes subscriptions remain
   public channels and are filtered by table RLS.
-- Concurrent edits remain last-write-wins at note granularity. The `version` column
-  provides optimistic concurrency; the interface must never imply a merge happened.
+- Concurrent edits are merged at block granularity (changed 2026-08-30, after
+  last-write-wins lost a whole burst of typing in practice). The `version`
+  column is the optimistic concurrency check and is now honoured: a conditional
+  update that matches nothing is a conflict, never a reason to write anyway.
+  On a conflict the client merges the top-level blocks each side added or
+  removed relative to the version it started from, so two people adding
+  paragraphs to one note both keep their text. When both edited the _same_
+  block there is nothing to decide: the remote version stays in the note and
+  the local one is kept as a note of its own. No conflict marker ever reaches
+  the text, and the readout says which of the two happened — `Merged` or
+  `Kept a copy`. The interface must never claim a merge that did not happen,
+  and must never discard a version silently.
 - Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
   and tag names are ordinary account-protected columns, and `owner_id` remains
   organisational only.
