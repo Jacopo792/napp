@@ -14,7 +14,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 }
 
 /**
- * Downscales local images before their bytes are encrypted and uploaded.
+ * Downscales local images before their bytes are uploaded.
  */
 export async function prepareImageForNote(file: File): Promise<Blob> {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, NotebookPen } from "lucide-react";
 import { authenticate } from "@/lib/session";
 
 export const Route = createFileRoute("/")({ component: Login });
@@ -40,7 +40,7 @@ function Login() {
       <main className="flex flex-1 items-center justify-center px-5 pb-16">
         <div className="login-card w-full max-w-[28rem] p-8 sm:p-10">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-glass-border bg-accent-wash text-accent">
-            <ShieldCheck size={20} />
+            <NotebookPen size={20} />
           </div>
 
           <h1
@@ -53,7 +53,7 @@ function Login() {
             Sign in to your notes
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-3">
-            One private workspace. Your email and password handle both access and decryption.
+            One shared workspace, protected by your account.
           </p>
 
           <form
@@ -106,9 +106,8 @@ function Login() {
               {error}
             </p>
           )}
-          <p className="mt-5 flex items-center gap-2 text-xs text-ink-3">
-            <ShieldCheck size={14} className="shrink-0 text-ok" />
-            Notes are decrypted locally. Supabase stores ciphertext only.
+          <p className="mt-5 text-xs text-ink-3">
+            Your account controls access to notes and files.
           </p>
         </div>
       </main>

@@ -9,9 +9,8 @@ web
 ## Users
 
 Two people, and only two, with separate Supabase email/password accounts and full
-read/write access to one shared encrypted archive. Each account password also unwraps
-that member's copy of the shared archive DEK, so sign-in is one step with no separate
-archive passphrase screen. Both can use the `viewAs` switch.
+read/write access to one shared archive. The account is the only access boundary;
+there is no separate archive key or passphrase. Both can use the `viewAs` switch.
 
 `owner: "u1" | "u2"` remains a live organisational label. It powers **Jacopo /
 Lisa**, and folders and tags carry the same owner label, but it is never an
@@ -21,18 +20,18 @@ switch views manually.
 
 ## Product Purpose
 
-A private place to keep and write notes that no server operator can read. Supabase
-stores AES-256-GCM ciphertext, structural metadata and encrypted image objects; the SPA
-holds the archive key and performs all encryption and decryption in the browser.
+A private, account-protected place to keep and write notes. Supabase Auth controls
+identity, archive-membership RLS controls database access, and private Storage uses the
+same membership rule for images and attachments.
 
 Success is that writing in it feels better than the alternatives Jacopo already has
 open, so the notes actually land here instead of in Apple Notes.
 
 ## Positioning
 
-End-to-end encrypted notes with a deliberately small backend surface: Supabase Auth,
-Postgres, Realtime and private Storage act as an encrypted persistence layer while
-search and content processing remain local.
+Account-protected shared notes with a deliberately small backend surface: Supabase
+Auth, Postgres, Realtime and private Storage provide identity, persistence and sync,
+while search and content processing remain local.
 
 ## Operating Context
 
@@ -56,9 +55,10 @@ search and content processing remain local.
 
 Confirmed functionality: create / edit / delete notes, fast debounced autosave,
 pinning, folders, colored tags, full-text search, drag a note onto a folder,
-and u1's `viewAs` archive switch. **The interface is dark only**: near-white ink on
-opaque graphite surfaces, with no theme control or decorative colour palette. Opening a note is read-only
-state selection: it must never update `updatedAt` or trigger a database write.
+and u1's `viewAs` archive switch. Appearance supports system, light and dark modes,
+curated palettes, custom colours and an optional device-local background image. Opening
+a note is read-only state selection: it must never update `updatedAt` or trigger a
+database write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
 Bear model — markdown syntax renders as formatting while you type in one pane, with no
@@ -69,8 +69,8 @@ PDFs with selectable text may be imported locally into the current note. The bro
 extracts the text without uploading the document; OCR and AI document analysis are not
 part of this capability.
 
-JPG, PNG, and WebP images may be inserted locally. They are resized, encrypted with the
-archive DEK and uploaded to a private Storage bucket; the note stores only a
+JPG, PNG, and WebP images may be inserted locally. They are resized and uploaded to a
+private, archive-membership-protected Storage bucket; the note stores only a
 `napp-image:<uuid>` reference. An embedded image remains a reading object: it opens full
 size, can be removed whole, and its storage reference is never exposed in the editor.
 Markdown image URLs render in place, and Markdown links plus bare HTTP(S) URLs become
@@ -81,25 +81,23 @@ Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
 - Supabase Auth uses two pre-created email/password accounts; public signup is disabled.
-- One random 256-bit archive DEK is wrapped independently for each account with a
-  PBKDF2-SHA256-derived KEK from that account's password (at least 600,000 iterations).
-  The raw DEK is session-only.
+- RLS authorizes every database row through `archive_members`; `owner` is never a
+  security boundary. Storage policies derive the archive id from the object path and
+  apply the same membership check.
 - Concurrent edits remain last-write-wins at note granularity. The `version` column
   provides optimistic concurrency; the interface must never imply a merge happened.
 - Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
-  and tag names remain encrypted, and `owner` remains organisational only.
+  and tag names are ordinary account-protected columns, and `owner` remains
+  organisational only.
 
 ## Brand Commitments
 
 The interface uses the operating system's native sans-serif and monospace faces for the
-sharpest platform rendering. Opaque graphite planes, neutral borders, restrained radii and
-`--ease-premium` remain the visual foundation.
+sharpest platform rendering. Graphite remains the default; neutral borders, restrained
+radii and `--ease-premium` remain the visual foundation across custom themes.
 
-Standing exception: coloured product accents are rejected. Selection and focus use white,
-gray or transparency; only tags, destructive states and success states retain semantic colour.
-
-Standing constraint (2026-08-28): decorative gradient washes — soft radial or mesh
-colour fields behind the interface — are rejected outright, in any palette.
+Custom accent and background colours are user-controlled. Tags, destructive states and
+success states retain their semantic meaning in every palette.
 
 ## Evidence on Hand
 

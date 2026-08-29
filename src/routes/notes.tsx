@@ -30,13 +30,13 @@ import { restoreSession, clearSession, type AppSession } from "@/lib/session";
 import {
   createNote,
   deleteNote,
-  downloadEncryptedImage,
-  downloadEncryptedObject,
+  downloadImage,
+  downloadObject,
   loadArchive,
   persistMetaDiff,
   saveNote,
-  uploadEncryptedImage,
-  uploadEncryptedObject,
+  uploadImage,
+  uploadObject,
   type ArchiveSnapshot,
 } from "@/lib/supabase";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
@@ -607,23 +607,22 @@ function NotesPage() {
     if (!current) throw new Error("Sign in again before uploading an image");
     const blob = await prepareImageForNote(file);
     const imageId = crypto.randomUUID();
-    await uploadEncryptedImage(current, imageId, blob);
+    await uploadImage(current, imageId, blob);
     return `napp-image:${imageId}`;
   }, []);
 
   const resolveImage = useCallback(async (imageId: string): Promise<Blob> => {
     const current = sessionRef.current;
     if (!current) throw new Error("Sign in again to view this image");
-    return downloadEncryptedImage(current, imageId);
+    return downloadImage(current, imageId);
   }, []);
 
-  /* An attachment goes up as encrypted bytes exactly like an image does; only
-     the note's reference and the type handed back on the way down differ. */
+  /* Attachments and images share one private, account-protected bucket. */
   const handleUploadFile = useCallback(async (file: File): Promise<string> => {
     const current = sessionRef.current;
     if (!current) throw new Error("Sign in again before attaching a file");
     const objectId = crypto.randomUUID();
-    await uploadEncryptedObject(current, objectId, file);
+    await uploadObject(current, objectId, file);
     fileTypes.current.set(objectId, file.type || attachmentType(file.name));
     return objectId;
   }, []);
@@ -631,11 +630,7 @@ function NotesPage() {
   const resolveFile = useCallback(async (objectId: string): Promise<Blob> => {
     const current = sessionRef.current;
     if (!current) throw new Error("Sign in again to open this attachment");
-    return downloadEncryptedObject(
-      current,
-      objectId,
-      fileTypes.current.get(objectId) ?? "application/pdf",
-    );
+    return downloadObject(current, objectId, fileTypes.current.get(objectId) ?? "application/pdf");
   }, []);
 
   /* The editor has already written the words into the draft store; the page

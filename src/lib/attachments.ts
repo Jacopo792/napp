@@ -1,17 +1,17 @@
 /* ── Attachments ─────────────────────────────────────────────────────────────
    A PDF dropped into a note is not prose, and turning it into prose was the old
    behaviour's mistake: the document stopped being a document. An attachment is
-   now stored whole — encrypted in the browser, uploaded as opaque bytes, and
+   now stored whole in the private archive bucket and
    referenced from the note by a single Markdown link whose target is a storage
    id rather than a URL:
 
      [Contract 2026.pdf](napp-file:8f14e45f-…)
 
-   The editor renders that link as a card. Opening it decrypts the bytes here
-   and hands the browser a blob in a new tab; nothing about the file ever
-   reaches the server in a readable form. ─────────────────────────────────── */
+   The editor renders that link as a card. Opening it downloads the bytes here
+   and hands the browser a blob in a new tab. The private bucket is protected by
+   the same archive-membership policy as the notes. ────────────────────────── */
 
-/** The bucket refuses anything larger, and ciphertext adds 28 bytes. */
+/** Keep large attachments out of the note-writing path. */
 export const MAX_ATTACHMENT_BYTES = 24 * 1024 * 1024;
 
 const REFERENCE =
@@ -33,7 +33,7 @@ const TYPES: Record<string, string> = {
   csv: "text/csv",
 };
 
-/** What to tell the browser the decrypted bytes are, inferred from the label. */
+/** What to tell the browser the downloaded bytes are, inferred from the label. */
 export function attachmentType(label: string): string {
   const extension = label.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
   return TYPES[extension] ?? "application/octet-stream";

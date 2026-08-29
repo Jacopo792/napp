@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
    on a kitchen table is an unlocked archive — and it is a *shared* archive, so
    it is not only your own notes sitting there.
 
-   Locking is exactly what the sign-out button already does: the key is dropped,
+   Locking is exactly what the sign-out button already does: the session is dropped,
    the drafts are flushed first so nothing is lost, and reading again means
    signing in again. Nothing is deleted and nothing is sent anywhere.
 

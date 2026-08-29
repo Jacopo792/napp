@@ -13,9 +13,7 @@ export interface Folder {
   /**
    * The folder this one sits inside, or null at the top level.
    *
-   * It travels inside the folder's own ciphertext rather than in a column, so
-   * the shape of the archive is as private as the names in it — the server
-   * learns that folders exist and nothing about how they are arranged.
+   * Stored directly so both archive members see the same hierarchy.
    */
   parentId?: string | null;
 }
@@ -47,7 +45,7 @@ export interface NoteMeta {
   tagIds: string[];
   /** Optional for backward compatibility with metadata written before pinning existed. */
   pinned?: boolean;
-  /** Soft-deleted notes remain encrypted in Postgres until removed from Trash. */
+  /** Soft-deleted notes remain recoverable in Postgres until removed from Trash. */
   trashedAt?: string;
 }
 
