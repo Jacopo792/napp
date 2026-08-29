@@ -56,6 +56,13 @@ interface Props {
 
 const EXPANDED_KEY = "napp:folders-open";
 
+/* Whole pixels, both of them. 0.85rem is 13.6px, so every level of nesting used
+   to push its glyph another 0.6px off the device grid — the icons at depth two
+   were blurrier than the icons at depth one, for no reason anybody could name.
+   RAIL matches --rail-offset in the stylesheet. */
+const INDENT = 14;
+const RAIL = 18;
+
 function loadExpanded(): Set<string> {
   try {
     const raw = localStorage.getItem(EXPANDED_KEY);
@@ -173,7 +180,7 @@ function FolderMenu({
               onRename();
             }}
           >
-            <Pencil size={15} className="text-ink-3" />
+            <Pencil size={16} className="text-ink-3" />
             Rename folder
           </button>
           <button
@@ -185,7 +192,7 @@ function FolderMenu({
               onNewSubfolder();
             }}
           >
-            <FolderPlus size={15} className="text-ink-3" />
+            <FolderPlus size={16} className="text-ink-3" />
             New folder inside
           </button>
           <div className="menu-separator" />
@@ -202,7 +209,7 @@ function FolderMenu({
               onDelete();
             }}
           >
-            <Trash2 size={15} />
+            <Trash2 size={16} />
             {confirm ? "Delete — click to confirm" : "Delete folder"}
           </button>
           <p className="menu-note">Deleting a folder never deletes its notes; they go unfiled.</p>
@@ -228,9 +235,11 @@ function NameField({
 }) {
   const [draft, setDraft] = useState(value);
   return (
-    <div className="sidebar-row is-editing" style={{ paddingLeft: `${0.7 + depth * 0.85}rem` }}>
+    /* An editing row has no disclosure column, so it pays the rail out of its
+       own padding to keep its glyph on the same line as every other one. */
+    <div className="sidebar-row is-editing" style={{ paddingLeft: `${RAIL + depth * INDENT}px` }}>
       <span className="sidebar-glyph">
-        <Folder size={16} strokeWidth={1.8} />
+        <Folder size={16} />
       </span>
       <input
         autoFocus
@@ -283,7 +292,7 @@ function Row({
     <div
       ref={setNodeRef}
       className={`sidebar-row ${active ? "is-active" : ""} ${isOver ? "is-over" : ""}`}
-      style={{ paddingLeft: `${depth * 0.85}rem` }}
+      style={{ paddingLeft: `${depth * INDENT}px` }}
     >
       <span className="sidebar-twisty">{disclosure}</span>
       <button type="button" className="sidebar-target press" onClick={onSelect}>
@@ -372,13 +381,7 @@ export function Sidebar({
                branch never makes its notes look like they went away. */
             count: open || !hasChildren ? node.scope.count : node.total,
           }}
-          glyph={
-            active || (open && hasChildren) ? (
-              <FolderOpen size={16} strokeWidth={1.8} />
-            ) : (
-              <Folder size={16} strokeWidth={1.8} />
-            )
-          }
+          glyph={active || (open && hasChildren) ? <FolderOpen size={16} /> : <Folder size={16} />}
           depth={depth}
           active={active}
           disclosure={
@@ -393,7 +396,7 @@ export function Sidebar({
                   toggle(node.folder.id);
                 }}
               >
-                <ChevronRight size={13} strokeWidth={2.4} />
+                <ChevronRight size={14} />
               </button>
             ) : null
           }
@@ -409,7 +412,12 @@ export function Sidebar({
 
         {open && hasChildren && (
           <div className="sidebar-branch">
-            {node.children.map((child) => renderNode(child, depth + 1))}
+            {/* The inner element is what the grid row measures. Without it the
+                0fr→1fr open animates only the first child, because every child
+                after the first lands in an implicit `auto` row. */}
+            <div className="sidebar-branch-inner">
+              {node.children.map((child) => renderNode(child, depth + 1))}
+            </div>
           </div>
         )}
 
@@ -432,7 +440,7 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
-      <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-3">
+      <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
         <button
           type="button"
           aria-label="New folder"
@@ -454,13 +462,13 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="px-3 pb-2">{archiveSwitch}</div>
+      <div className="px-2 pb-2">{archiveSwitch}</div>
 
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {all && (
           <Row
             scope={all}
-            glyph={<NotebookText size={16} strokeWidth={1.8} />}
+            glyph={<NotebookText size={16} />}
             active={selectedId === ALL}
             onSelect={() => onSelect(ALL)}
           />
@@ -473,7 +481,7 @@ export function Sidebar({
 
         {tree.length === 0 && adding === null && (
           <p className="sidebar-empty">
-            No folders yet. Use <FolderPlus size={12} strokeWidth={2} /> above to make one.
+            No folders yet. Use <FolderPlus size={12} /> above to make one.
           </p>
         )}
 
@@ -503,7 +511,7 @@ export function Sidebar({
         <div className="sidebar-tail">
           <Row
             scope={trash}
-            glyph={<Trash2 size={16} strokeWidth={1.8} />}
+            glyph={<Trash2 size={16} />}
             active={selectedId === TRASH}
             droppable={false}
             onSelect={() => onSelect(TRASH)}
@@ -513,12 +521,12 @@ export function Sidebar({
 
       <div className="sidebar-footer">
         <button type="button" className="sidebar-footer-button press" onClick={onSettings}>
-          <SettingsIcon size={16} strokeWidth={1.9} />
+          <SettingsIcon size={16} />
           <span>Settings</span>
           <ChevronRight size={14} className="ml-auto opacity-40" />
         </button>
         <button type="button" className="sidebar-footer-button press" onClick={onLock}>
-          <Lock size={16} strokeWidth={1.9} />
+          <Lock size={16} />
           <span>Lock &amp; sign out</span>
         </button>
       </div>

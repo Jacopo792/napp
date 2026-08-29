@@ -6,13 +6,12 @@ import {
   ChevronRight,
   Clock3,
   FolderInput,
-  GalleryHorizontalEnd,
-  List,
   Lock,
   MoreHorizontal,
   Pin,
   Search,
   Settings,
+  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,6 +25,7 @@ import {
   useAxes,
   type Axes,
 } from "@/lib/axes";
+import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
 import type { Folder } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
 
@@ -93,11 +93,11 @@ export function WorkspaceFooter({
   return (
     <div className={`workspace-footer ${compact ? "is-compact" : ""}`}>
       <button type="button" className="workspace-footer-button press" onClick={onSettings}>
-        <Settings size={16} strokeWidth={1.9} />
+        <Settings size={16} />
         <span>Settings</span>
       </button>
       <button type="button" className="workspace-footer-button press" onClick={onLock}>
-        <Lock size={16} strokeWidth={1.9} />
+        <Lock size={16} />
         <span>Lock &amp; sign out</span>
       </button>
     </div>
@@ -113,11 +113,9 @@ export function WorkspaceFooter({
  */
 export function CollectionMenu({
   preferences,
-  galleryOnly = false,
   onChange,
 }: {
   preferences: ListPreferences;
-  galleryOnly?: boolean;
   onChange: (next: ListPreferences) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -134,7 +132,7 @@ export function CollectionMenu({
         className="toolbar-button press"
         onClick={() => setOpen((current) => !current)}
       >
-        <MoreHorizontal size={17} />
+        <MoreHorizontal size={18} />
       </button>
       {open && (
         <div
@@ -179,24 +177,6 @@ export function CollectionMenu({
             <CalendarDays size={16} />
             Group by date
           </MenuButton>
-          {!galleryOnly && (
-            <>
-              <MenuButton
-                active={preferences.view === "list"}
-                onClick={() => onChange({ ...preferences, view: "list" })}
-              >
-                <List size={16} />
-                List view
-              </MenuButton>
-              <MenuButton
-                active={preferences.view === "gallery"}
-                onClick={() => onChange({ ...preferences, view: "gallery" })}
-              >
-                <GalleryHorizontalEnd size={16} />
-                Gallery view
-              </MenuButton>
-            </>
-          )}
         </div>
       )}
     </div>
@@ -276,12 +256,12 @@ export function NoteMenu({
               <MenuButton onClick={() => setSection("move")}>
                 <FolderInput size={16} />
                 Move note
-                <ChevronRight size={15} className="ml-auto" />
+                <ChevronRight size={16} className="ml-auto" />
               </MenuButton>
               <MenuButton onClick={() => setSection("recent")}>
                 <Clock3 size={16} />
                 Recent notes
-                <ChevronRight size={15} className="ml-auto" />
+                <ChevronRight size={16} className="ml-auto" />
               </MenuButton>
               <div className="menu-separator" />
               <MenuButton
@@ -349,8 +329,26 @@ export function NoteMenu({
   );
 }
 
+/* ── Settings ────────────────────────────────────────────────────────────────
+   What a preferences sheet in this application is actually for.
+
+   It used to hold three things, and not one of them earned the modal. The
+   reading axes were four unlabelled tracks whose effect was hidden behind the
+   very panel you were dragging them in. List-versus-gallery was a choice the
+   window size already makes correctly on its own. Group-by-date and the lock
+   were both duplicates — of the ⋯ menu on the list header, and of the button
+   sitting one row above Settings in the same column.
+
+   So: the axes stay, but with a specimen that changes under the slider, which
+   is the whole difference between a control you understand and four numbers.
+   The duplicates are gone. In their place is the one preference this app has
+   that protects something — when a shared, encrypted archive locks itself —
+   and the plain statement of whose notes you are reading and where the
+   ciphertext goes, which had nowhere to live at all. ────────────────────── */
+
 function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: Axes }) {
   const value = axes[spec.key];
+  const fill = ((value - spec.min) / (spec.max - spec.min)) * 100;
   return (
     <label className="settings-field">
       <span>{spec.label}</span>
@@ -360,41 +358,77 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
       </output>
       <input
         type="range"
+        className="axis-range"
+        style={{ "--fill": `${fill}%` } as React.CSSProperties}
         min={spec.min}
         max={spec.max}
         step={spec.step}
         value={value}
+        aria-label={`${spec.label}, ${value}${spec.unit}`}
         onChange={(event) => setAxis(spec.key, Number(event.target.value))}
       />
     </label>
   );
 }
 
-/**
- * Settings: what is stored on this device, and nothing else.
- *
- * Trash and the folder list have moved into the sidebar, where they are one
- * click from the notes they act on rather than behind a modal. What is left
- * here is the only thing that genuinely belongs in a preferences sheet — how
- * the notes read on this machine — plus the way out.
- */
+/** A row of mutually exclusive choices, the shape the platform uses for four
+ *  or fewer options that fit on one line. */
+function Segmented({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { id: string; name: string; hint?: string }[];
+  value: string | null;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="settings-segment" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          aria-pressed={value === option.id}
+          className={`press ${value === option.id ? "is-active" : ""}`}
+          onClick={() => onChange(option.id)}
+        >
+          <span>{option.name}</span>
+          {option.hint && <small>{option.hint}</small>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SettingsPanel({
   open,
-  mobile = false,
-  preferences,
+  email,
+  reading,
+  autoLock,
+  onAutoLockChange,
   onClose,
-  onPreferencesChange,
   onLock,
 }: {
   open: boolean;
-  mobile?: boolean;
-  preferences: ListPreferences;
+  /** The account signed in, which is not the same thing as the notes on screen. */
+  email: string;
+  /** Whose notes the window is currently pointed at. */
+  reading: string;
+  autoLock: AutoLockMinutes;
+  onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
-  onPreferencesChange: (next: ListPreferences) => void;
   onLock: () => void;
 }) {
   const axes = useAxes();
   const preset = matchingPreset(axes);
+  const [tuning, setTuning] = useState(false);
+
+  useEffect(() => {
+    if (!open) setTuning(false);
+  }, [open]);
+
   if (!open) return null;
   return (
     <div className="settings-layer" role="presentation">
@@ -410,12 +444,10 @@ export function SettingsPanel({
         aria-labelledby="settings-title"
         className="settings-panel glass-sheet"
       >
-        <header className="flex items-center border-b border-rule px-5 py-4">
+        <header className="settings-header">
           <div>
-            <h2 id="settings-title" className="font-display text-xl font-semibold">
-              Settings
-            </h2>
-            <p className="mt-0.5 text-sm text-ink-4">How notes read on this device</p>
+            <h2 id="settings-title">Settings</h2>
+            <p>Kept in this browser, on this device</p>
           </div>
           <button
             type="button"
@@ -426,79 +458,99 @@ export function SettingsPanel({
             <X size={18} />
           </button>
         </header>
+
         <div className="settings-scroll">
           <section>
-            <h3>Reading appearance</h3>
-            <p className="settings-note">
-              Type size, measure and weight for the notes on this device only.
-            </p>
-            <div className="settings-presets">
-              {PRESETS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={preset?.id === item.id}
-                  className={`press ${preset?.id === item.id ? "is-active" : ""}`}
-                  onClick={() => setAxes(item.axes)}
-                >
-                  <span>{item.name}</span>
-                  <small>{item.role}</small>
-                </button>
-              ))}
-            </div>
-            <div className="settings-sliders">
-              {AXIS_SPECS.map((spec) => (
-                <AxisSlider key={spec.key} spec={spec} axes={axes} />
-              ))}
-            </div>
-          </section>
+            <h3>Reading</h3>
 
-          <section>
-            <h3>The notes list</h3>
-            {mobile ? (
-              <p className="settings-mobile-gallery">
-                <GalleryHorizontalEnd size={17} />
-                Gallery is the fixed phone layout.
+            {/* The specimen is the control. It is set from the same four custom
+                properties the note itself reads, so what moves here is exactly
+                what will have moved when the panel closes. */}
+            <div className="settings-specimen" aria-hidden="true">
+              <p>
+                The note is the calmest place in the app. Set the type the way you actually read —
+                larger for a long evening, narrower to keep one thought in view — and every note
+                follows.
               </p>
-            ) : (
-              <div className="settings-choice">
-                <button
-                  type="button"
-                  className={`press ${preferences.view === "list" ? "is-active" : ""}`}
-                  onClick={() => onPreferencesChange({ ...preferences, view: "list" })}
-                >
-                  <List size={17} />
-                  List
-                </button>
-                <button
-                  type="button"
-                  className={`press ${preferences.view === "gallery" ? "is-active" : ""}`}
-                  onClick={() => onPreferencesChange({ ...preferences, view: "gallery" })}
-                >
-                  <GalleryHorizontalEnd size={17} />
-                  Gallery
-                </button>
+            </div>
+
+            <Segmented
+              label="Reading preset"
+              value={preset?.id ?? null}
+              options={PRESETS.map((item) => ({ id: item.id, name: item.name, hint: item.role }))}
+              onChange={(id) => {
+                const chosen = PRESETS.find((item) => item.id === id);
+                if (chosen) setAxes(chosen.axes);
+              }}
+            />
+
+            <button
+              type="button"
+              className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
+              aria-expanded={tuning}
+              onClick={() => setTuning((current) => !current)}
+            >
+              <ChevronRight size={14} />
+              <span>Fine-tune</span>
+              <small>{preset ? preset.name : "Custom"}</small>
+            </button>
+
+            {tuning && (
+              <div className="settings-sliders">
+                {AXIS_SPECS.map((spec) => (
+                  <AxisSlider key={spec.key} spec={spec} axes={axes} />
+                ))}
               </div>
             )}
-            <label className="settings-toggle">
-              <span>
-                <b>Group by date</b>
-                <small>Keep pinned notes separate, then use calendar buckets.</small>
-              </span>
-              <input
-                type="checkbox"
-                checked={preferences.groupByDate}
-                onChange={(event) =>
-                  onPreferencesChange({ ...preferences, groupByDate: event.target.checked })
-                }
-              />
-            </label>
           </section>
 
           <section>
-            <h3>This session</h3>
+            <h3>Security</h3>
+            <div className="settings-row">
+              <span>
+                <b>Lock when idle</b>
+                <small>
+                  The key is dropped from this browser and reading again means signing in. Nothing
+                  is deleted.
+                </small>
+              </span>
+            </div>
+            <Segmented
+              label="Lock when idle"
+              value={String(autoLock)}
+              options={AUTO_LOCK_CHOICES.map((minutes) => ({
+                id: String(minutes),
+                name: AUTO_LOCK_LABELS[minutes],
+              }))}
+              onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
+            />
+          </section>
+
+          <section>
+            <h3>This archive</h3>
+            <dl className="settings-facts">
+              <div>
+                <dt>Signed in</dt>
+                <dd>{email}</dd>
+              </div>
+              <div>
+                <dt>Reading</dt>
+                <dd>{reading}</dd>
+              </div>
+              <div>
+                <dt>Encryption</dt>
+                <dd>
+                  <ShieldCheck size={14} className="text-ok" />
+                  In this browser
+                </dd>
+              </div>
+            </dl>
+            <p className="settings-note">
+              Notes, folder names and attachments are encrypted here before they are sent. Supabase
+              stores ciphertext and never holds a key.
+            </p>
             <button type="button" className="settings-lock press" onClick={onLock}>
-              <Lock size={17} />
+              <Lock size={16} />
               Lock &amp; sign out
             </button>
           </section>

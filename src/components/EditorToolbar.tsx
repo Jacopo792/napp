@@ -194,7 +194,7 @@ export function EditorToolbar({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("bold")}
               >
-                <Bold size={16} strokeWidth={2.2} />
+                <Bold size={16} />
               </button>
               <button
                 type="button"
@@ -203,7 +203,7 @@ export function EditorToolbar({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("italic")}
               >
-                <Italic size={16} strokeWidth={2.2} />
+                <Italic size={16} />
               </button>
               <button
                 type="button"
@@ -212,7 +212,7 @@ export function EditorToolbar({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("strike")}
               >
-                <Strikethrough size={16} strokeWidth={2.2} />
+                <Strikethrough size={16} />
               </button>
               <button
                 type="button"
@@ -221,32 +221,32 @@ export function EditorToolbar({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("code")}
               >
-                <Code2 size={16} strokeWidth={2.2} />
+                <Code2 size={16} />
               </button>
             </div>
 
             <div className="menu-separator" />
             <p className="menu-label">Paragraph style</p>
-            <Row icon={<Pilcrow size={15} />} label="Body" onClick={() => run("body")} />
-            <Row icon={<Heading1 size={15} />} label="Title" onClick={() => run("heading-1")} />
-            <Row icon={<Heading2 size={15} />} label="Heading" onClick={() => run("heading-2")} />
+            <Row icon={<Pilcrow size={16} />} label="Body" onClick={() => run("body")} />
+            <Row icon={<Heading1 size={16} />} label="Title" onClick={() => run("heading-1")} />
+            <Row icon={<Heading2 size={16} />} label="Heading" onClick={() => run("heading-2")} />
             <Row
-              icon={<Heading3 size={15} />}
+              icon={<Heading3 size={16} />}
               label="Subheading"
               onClick={() => run("heading-3")}
             />
-            <Row icon={<Quote size={15} />} label="Quote" onClick={() => run("quote")} />
+            <Row icon={<Quote size={16} />} label="Quote" onClick={() => run("quote")} />
 
             <div className="menu-separator" />
             <Row
-              icon={<Link size={15} />}
+              icon={<Link size={16} />}
               label="Link"
               onClick={() => {
                 setOpen(null);
                 onLink();
               }}
             />
-            <Row icon={<Minus size={15} />} label="Divider" onClick={() => run("divider")} />
+            <Row icon={<Minus size={16} />} label="Divider" onClick={() => run("divider")} />
             <p className="menu-note">
               Every style is a switch: choosing the one a paragraph already has takes it off.
             </p>
@@ -257,7 +257,7 @@ export function EditorToolbar({
 
       {/* ── Colour ── */}
       <div className="relative">
-        {tab("color", "Text colour", <Palette size={17} />)}
+        {tab("color", "Text colour", <Palette size={18} />)}
         {menu(
           "color",
           "Text colour",
@@ -287,7 +287,7 @@ export function EditorToolbar({
               onClick={() => run("color-clear")}
             >
               <span className="text-ink-3">
-                <Eraser size={15} />
+                <Eraser size={16} />
               </span>
               <span>Back to normal</span>
             </button>
@@ -298,24 +298,24 @@ export function EditorToolbar({
 
       {/* ── Lists ── */}
       <div className="relative">
-        {tab("lists", "Lists", <ListChecks size={17} />)}
+        {tab("lists", "Lists", <ListChecks size={18} />)}
         {menu(
           "lists",
           "Lists",
           "left",
           <>
             <Row
-              icon={<ListChecks size={15} />}
+              icon={<ListChecks size={16} />}
               label="Checklist"
               onClick={() => run("checklist")}
             />
             <Row
-              icon={<List size={15} />}
+              icon={<List size={16} />}
               label="Bulleted list"
               onClick={() => run("bullet-list")}
             />
             <Row
-              icon={<ListOrdered size={15} />}
+              icon={<ListOrdered size={16} />}
               label="Numbered list"
               onClick={() => run("ordered-list")}
             />
@@ -329,16 +329,16 @@ export function EditorToolbar({
 
       {/* ── Tables ── */}
       <div className="relative">
-        {tab("table", "Tables", <Table2 size={17} />)}
+        {tab("table", "Tables", <Table2 size={18} />)}
         {menu(
           "table",
           "Tables",
           "left",
           <>
             <p className="menu-label">Insert table</p>
-            <Row icon={<Columns2 size={15} />} label="2 columns" onClick={() => run("table-2")} />
-            <Row icon={<Columns3 size={15} />} label="3 columns" onClick={() => run("table-3")} />
-            <Row icon={<Columns4 size={15} />} label="4 columns" onClick={() => run("table-4")} />
+            <Row icon={<Columns2 size={16} />} label="2 columns" onClick={() => run("table-2")} />
+            <Row icon={<Columns3 size={16} />} label="3 columns" onClick={() => run("table-3")} />
+            <Row icon={<Columns4 size={16} />} label="4 columns" onClick={() => run("table-4")} />
             <p className="menu-note">
               Tables are drawn as tables. Click any cell to edit it — the row source appears only
               while the caret is inside it.
@@ -349,14 +349,28 @@ export function EditorToolbar({
 
       {/* ── Attachments ── */}
       <div className="relative">
-        {tab("attach", "Attachments", <Paperclip size={17} />)}
+        {tab("attach", "Attachments", <Paperclip size={18} />)}
         {menu(
           "attach",
           "Attachments",
           "right",
           <>
+            {/* Importing is the one people reach for, so it is the first thing
+                under the clip rather than the afterthought below a rule. The
+                paragraph that used to explain the difference is gone: the two
+                labels already say it, and a menu that has to footnote itself is
+                a menu with the wrong labels. */}
             <Row
-              icon={<FileText size={15} />}
+              icon={<FileUp size={16} />}
+              label="Import PDF as text"
+              onClick={() => {
+                setOpen(null);
+                onImportPdfText();
+              }}
+            />
+            <div className="menu-separator" />
+            <Row
+              icon={<FileText size={16} />}
               label="Attach PDF"
               onClick={() => {
                 setOpen(null);
@@ -364,26 +378,13 @@ export function EditorToolbar({
               }}
             />
             <Row
-              icon={<ImagePlus size={15} />}
+              icon={<ImagePlus size={16} />}
               label="Attach photo"
               onClick={() => {
                 setOpen(null);
                 onChoosePhoto();
               }}
             />
-            <div className="menu-separator" />
-            <Row
-              icon={<FileUp size={15} />}
-              label="Import PDF as text"
-              onClick={() => {
-                setOpen(null);
-                onImportPdfText();
-              }}
-            />
-            <p className="menu-note">
-              Attachments stay whole and encrypted, and open in a new tab. Importing instead
-              converts the pages into editable text.
-            </p>
           </>,
         )}
       </div>

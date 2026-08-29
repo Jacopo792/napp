@@ -1084,7 +1084,6 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
           height="18"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
           strokeLinecap="round"
           aria-hidden="true"
         >
@@ -1300,20 +1299,6 @@ function stripColor(text: string): string {
 }
 
 /** Strips every colour marker found inside the selection. */
-function clearColor(editor: EditorView): void {
-  const { from, to } = editor.state.selection.main;
-  if (from === to) return;
-  const selected = editor.state.doc.sliceString(from, to);
-  const cleaned = stripColor(selected);
-  if (cleaned === selected) return;
-  editor.dispatch({
-    changes: { from, to, insert: cleaned },
-    selection: { anchor: from, head: from + cleaned.length },
-    scrollIntoView: true,
-  });
-  editor.focus();
-}
-
 /**
  * Colours the selection.
  *
@@ -1324,13 +1309,49 @@ function clearColor(editor: EditorView): void {
  * and the "colour" never arrived. Block markers are stepped over too, so
  * colouring a heading colours the heading rather than dismantling it.
  */
-function applyColor(editor: EditorView, color: TextColor): void {
-  const { from, to } = editor.state.selection.main;
-  if (from === to) return;
-  const opening = color === "yellow" ? "==" : `==${color}:`;
-  const selected = editor.state.doc.sliceString(from, to);
+/* ── Colouring ───────────────────────────────────────────────────────────────
+   Two things were wrong with this.
 
-  const coloured = stripColor(selected)
+   Colouring part of an already-coloured phrase nested one mark inside another:
+   picking three words out of `==yellow:a whole sentence==` wrote
+   `==yellow:a ==purple:whole==== sentence==`, which is not a colour, it is
+   broken source that the reader then has to find and unpick by hand. So the
+   range is first grown to whole marks — colour applies to the span, and a span
+   has one colour.
+
+   And colour was the only style in the app that would not come off the way it
+   went on. The text menu promises "choosing the one a paragraph already has
+   takes it off"; colour ignored that and made you find "Back to normal".
+   Applying the colour a span already has now removes it. ─────────────────── */
+
+/** Grows a range to contain whole colour marks, so nothing is ever re-marked
+ *  in the middle of an existing one. */
+function expandToColorMarks(state: EditorState, from: number, to: number): [number, number] {
+  let start = from;
+  let end = to;
+  const first = state.doc.lineAt(from).number;
+  const last = state.doc.lineAt(to).number;
+
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n);
+    COLOR_STRIP.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = COLOR_STRIP.exec(line.text)) !== null) {
+      const markStart = line.from + match.index;
+      const markEnd = markStart + match[0].length;
+      if (markEnd > start && markStart < end) {
+        start = Math.min(start, markStart);
+        end = Math.max(end, markEnd);
+      }
+    }
+  }
+  return [start, end];
+}
+
+/** Marks every written line of `text`, leaving block markers and surrounding
+ *  whitespace outside the mark where they belong. */
+function paint(text: string, opening: string): string {
+  return text
     .split("\n")
     .map((line) => {
       const mark = ANY_BLOCK_MARK.exec(line)?.[0] ?? "";
@@ -1342,14 +1363,43 @@ function applyColor(editor: EditorView, color: TextColor): void {
       return `${mark}${lead}${opening}${body}==${tail}`;
     })
     .join("\n");
+}
 
-  if (coloured === selected) return;
+function writeColor(editor: EditorView, from: number, to: number, text: string): void {
   editor.dispatch({
-    changes: { from, to, insert: coloured },
-    selection: { anchor: from, head: from + coloured.length },
+    changes: { from, to, insert: text },
+    selection: { anchor: from, head: from + text.length },
     scrollIntoView: true,
   });
   editor.focus();
+}
+
+function clearColor(editor: EditorView): void {
+  const range = editor.state.selection.main;
+  if (range.empty) return;
+  const [from, to] = expandToColorMarks(editor.state, range.from, range.to);
+  const selected = editor.state.doc.sliceString(from, to);
+  const cleaned = stripColor(selected);
+  if (cleaned === selected) return;
+  writeColor(editor, from, to, cleaned);
+}
+
+function applyColor(editor: EditorView, color: TextColor): void {
+  const range = editor.state.selection.main;
+  if (range.empty) return;
+
+  const [from, to] = expandToColorMarks(editor.state, range.from, range.to);
+  const opening = color === "yellow" ? "==" : `==${color}:`;
+  const selected = editor.state.doc.sliceString(from, to);
+  const bare = stripColor(selected);
+  const coloured = paint(bare, opening);
+
+  /* Already exactly this colour, so this is the switch being turned off. */
+  if (coloured === selected) {
+    if (bare !== selected) writeColor(editor, from, to, bare);
+    return;
+  }
+  writeColor(editor, from, to, coloured);
 }
 
 const BLOCK_PREFIX: Record<string, string> = {

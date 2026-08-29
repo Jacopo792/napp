@@ -365,7 +365,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       {findOpen && (
         <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
-          <Search size={15} className="shrink-0 text-ink-4" />
+          <Search size={16} className="shrink-0 text-ink-4" />
           <input
             ref={findRef}
             value={findQuery}
@@ -399,7 +399,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
             }
           >
-            <ChevronUp size={15} />
+            <ChevronUp size={16} />
           </button>
           <button
             type="button"
@@ -407,7 +407,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className="icon-button press h-8 w-8 text-ink-3"
             onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
           >
-            <ChevronDown size={15} />
+            <ChevronDown size={16} />
           </button>
           <button
             type="button"
@@ -415,7 +415,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className="icon-button press h-8 w-8 text-ink-3"
             onClick={closeFind}
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         </div>
       )}

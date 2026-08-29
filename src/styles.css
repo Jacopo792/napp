@@ -76,6 +76,21 @@
   --dur-fast: 160ms;
   --dur-base: 240ms;
   --dur-slow: 360ms;
+
+  /* ── The sidebar rail ──────────────────────────────────────────────────────
+     Every glyph in the left column — scopes, folders, the wastebasket, Settings
+     and the lock — stands on one vertical line, and every section label starts
+     on that same line. The numbers are whole pixels on purpose: an icon whose
+     box lands on x.4 is an icon drawn across two device columns, which is the
+     whole of why line glyphs look sanded down on a 1× display.
+
+     rail = twisty (16) + inset (2) = 18px from the row's own left edge. */
+  --rail-twisty: 16px;
+  --rail-inset: 2px;
+  --rail-offset: 18px;
+  --rail-gap: 8px;
+  --row-pad-y: 7px;
+  --row-line: 20px;
 }
 
 @theme inline {
@@ -110,6 +125,36 @@
 @layer base {
   * {
     box-sizing: border-box;
+  }
+
+  /* ── Line glyphs ──────────────────────────────────────────────────────────
+     Why the icons looked sanded down.
+
+     lucide draws every glyph on a 24-unit grid with a 2-unit stroke, and the
+     SVG is then scaled to the size it is asked for. A 16px icon therefore
+     renders its stroke at 16/24 × 1.8 = 1.2 device pixels: never a column of
+     pixels, always a smear across two of them. On a 2× display the second
+     pixel hides it; on a 1× display it is the whole appearance of the icon.
+
+     `non-scaling-stroke` lifts the stroke out of the glyph's own coordinate
+     space and into the screen's, so the width below is read as CSS pixels
+     rather than 24ths. One pixel for interface glyphs, two for the few drawn
+     at 20px and up, and both land on whole device columns at 1× and 2× alike.
+
+     The `strokeWidth` props still on the call sites are inert: a CSS rule
+     outranks an SVG presentation attribute. Sizes are even numbers for the
+     matching reason — an odd box centres its contents on a half pixel. */
+  svg.lucide {
+    stroke-width: 1;
+  }
+
+  svg.lucide > * {
+    vector-effect: non-scaling-stroke;
+  }
+
+  svg.lucide[width="20"],
+  svg.lucide[width="24"] {
+    stroke-width: 2;
   }
 
   html,
@@ -612,23 +657,67 @@
   color: var(--ink);
 }
 
+/* ── The archive switch ──────────────────────────────────────────────────────
+   Two names, one track, and a thumb that travels between them. It was two
+   buttons with a background that blinked from one to the other, at 12px in the
+   dimmest ink in the palette — the control that re-points every pane in the
+   window, dressed as a minor toggle.
+
+   The thumb is one absolutely-positioned element rather than a background on
+   the active button, because a background cannot move: this is the difference
+   between a switch that throws and two buttons that light up. */
 .archive-switch {
-  gap: 0.15rem;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  isolation: isolate;
   border: 1px solid var(--rule);
-  border-radius: 0.75rem;
+  border-radius: 0.8rem;
   background: var(--surface);
+  padding: 3px;
+}
+
+.archive-switch-thumb {
+  position: absolute;
+  z-index: -1;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 0.62rem;
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.archive-switch[data-active="u2"] .archive-switch-thumb {
+  transform: translateX(100%);
 }
 
 .archive-switch button {
-  border-radius: 0.55rem;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 0.62rem;
   color: var(--ink-4);
-  transition: 180ms var(--ease);
+  font-size: 13px;
+  font-weight: 520;
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.archive-switch button:hover {
+  color: var(--ink-2);
 }
 
 .archive-switch button.is-active {
-  background: var(--accent-wash);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  color: var(--accent-strong);
+  font-weight: 620;
 }
 
 .glass-toolbar,
@@ -849,7 +938,13 @@
   color: var(--accent-strong);
 }
 
-/* Settings are part of the app shell, not a footer bolted beneath it. */
+/* ══ Settings ═════════════════════════════════════════════════════════════════
+   A preferences sheet reads top to bottom as a stack of sections, each one a
+   micro-label and the controls it governs — the shape every desktop platform
+   settled on, and the one the sidebar already uses for FOLDERS. Every control
+   is either a segmented row of named choices or a labelled track; there are no
+   bare numbers, and nothing here is a duplicate of a control that also exists
+   somewhere else in the window. ═══════════════════════════════════════════ */
 .settings-layer {
   position: fixed;
   inset: 0;
@@ -870,157 +965,321 @@
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(34rem, 100%);
+  width: min(38rem, 100%);
   max-height: min(46rem, calc(100dvh - 2.5rem));
   flex-direction: column;
   overflow: hidden;
 }
 
+.settings-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 20px 16px;
+}
+
+.settings-header h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.settings-header p {
+  margin-top: 2px;
+  color: var(--ink-4);
+  font-size: 13px;
+}
+
 .settings-scroll {
   overflow-y: auto;
-  padding: 0 1.25rem 1.25rem;
+  padding: 0 20px 20px;
 }
 
 .settings-scroll > section {
-  padding: 1.4rem 0;
-  border-bottom: 1px solid var(--rule);
+  padding: 20px 0;
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .settings-scroll > section:last-child {
   border-bottom: 0;
+  padding-bottom: 4px;
 }
 
+/* Section labels speak in the sidebar's voice, so the two columns of the app
+   read as one interface rather than two. */
 .settings-scroll h3 {
-  margin-bottom: 0.8rem;
-  color: var(--ink-2);
-  font-size: 0.82rem;
-  font-weight: 650;
+  margin-bottom: 12px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
-.settings-presets,
-.settings-choice {
+/* ── The specimen ────────────────────────────────────────────────────────────
+   The reading axes used to be four unlabelled tracks with their effect hidden
+   behind the panel you were dragging them in. This paragraph is set from the
+   same four custom properties the note reads, so the control shows its own
+   result — including the measure, which narrows this column visibly rather
+   than being a number in `ch` that means nothing until you close the sheet. */
+.settings-specimen {
+  margin-bottom: 14px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.85rem;
+  background: var(--page);
+  padding: 16px 18px;
+  overflow: hidden;
+}
+
+.settings-specimen p {
+  max-width: var(--read-measure);
+  color: var(--ink);
+  font-family: var(--font-reading);
+  font-size: var(--read-size);
+  font-weight: var(--read-weight);
+  line-height: var(--read-leading);
+  transition:
+    max-width var(--dur-base) var(--ease),
+    font-size var(--dur-fast) var(--ease);
+}
+
+/* ── Segmented choices ───────────────────────────────────────────────────── */
+.settings-segment {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.settings-presets button,
-.settings-choice button {
-  display: flex;
-  min-height: 3.4rem;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.15rem;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
   border: 1px solid var(--rule);
-  border-radius: 0.75rem;
-  color: var(--ink-3);
-  font-size: 0.78rem;
+  border-radius: 0.8rem;
+  background: var(--surface);
+  padding: 3px;
 }
 
-.settings-presets button.is-active,
-.settings-choice button.is-active {
-  border-color: var(--accent);
+.settings-segment button {
+  display: flex;
+  min-height: 40px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 0.6rem;
+  padding: 4px 6px;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 520;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    box-shadow var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.settings-segment button:hover {
+  color: var(--ink);
+}
+
+.settings-segment button.is-active {
   background: var(--accent-wash);
   color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
 }
 
-.settings-presets small {
+.settings-segment small {
   color: var(--ink-4);
-  font-size: 0.62rem;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.settings-segment button.is-active small {
+  color: var(--ink-3);
+}
+
+/* On a phone the four names alone fill the track; the roles underneath wrap to
+   two lines each and turn a segmented control into a paragraph. */
+@media (max-width: 460px) {
+  .settings-segment small {
+    display: none;
+  }
+
+  .settings-segment button {
+    min-height: 34px;
+  }
+}
+
+/* ── Fine-tune ───────────────────────────────────────────────────────────── */
+.settings-disclosure {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--rail-gap);
+  margin-top: 10px;
+  border-radius: 0.6rem;
+  padding: 7px 10px 7px 6px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 520;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.settings-disclosure:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.settings-disclosure svg {
+  color: var(--ink-4);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.settings-disclosure.is-open svg {
+  transform: rotate(90deg);
+}
+
+.settings-disclosure small {
+  margin-left: auto;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .settings-sliders {
   display: grid;
-  gap: 0.9rem;
-  margin-top: 1rem;
+  gap: 14px;
+  padding: 12px 6px 4px;
+  animation: settings-expand var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes settings-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .settings-field {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.4rem 1rem;
+  align-items: baseline;
+  gap: 4px 1rem;
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 
 .settings-field output {
   color: var(--ink-2);
   font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .settings-field input {
   grid-column: 1 / -1;
-  width: 100%;
-  accent-color: var(--accent);
 }
 
-.settings-choice {
-  grid-template-columns: 1fr 1fr;
-}
-
-.settings-choice button {
-  min-height: 2.7rem;
-  flex-direction: row;
-  align-items: center;
-}
-
-.settings-toggle {
+/* ── Labelled rows ───────────────────────────────────────────────────────── */
+.settings-row {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-bottom: 12px;
 }
 
-.settings-toggle span {
+.settings-row span {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 3px;
 }
 
-.settings-toggle b {
+.settings-row b {
   color: var(--ink-2);
-  font-size: 0.82rem;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
-.settings-toggle small {
+.settings-row small,
+.settings-note {
   color: var(--ink-4);
-  font-size: 0.72rem;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
-.settings-toggle input {
-  accent-color: var(--accent);
+.settings-note {
+  margin-top: 12px;
 }
 
-.settings-mobile-gallery {
+/* ── The facts ───────────────────────────────────────────────────────────────
+   Who is signed in, whose notes are on screen, and where the ciphertext goes.
+   None of it is a control; all of it is the thing you open Settings to check,
+   and it had nowhere else in the interface to live. */
+.settings-facts {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.85rem;
+  background: var(--rule-soft);
+  overflow: hidden;
+}
+
+.settings-facts > div {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  min-height: 2.8rem;
-  border: 1px solid var(--rule);
-  border-radius: 0.8rem;
-  background: var(--accent-wash);
-  padding: 0.7rem 0.85rem;
-  color: var(--ink-2);
-  font-size: 0.8rem;
+  gap: 1rem;
+  background: var(--surface);
+  padding: 10px 14px;
 }
 
-/* One line under a heading saying what the section is for. */
-.settings-note {
-  margin-bottom: 0.75rem;
+.settings-facts dt {
+  flex-shrink: 0;
   color: var(--ink-4);
-  font-size: 0.78rem;
-  line-height: 1.55;
+  font-size: 12.5px;
+}
+
+.settings-facts dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-lock {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: center;
+  gap: var(--rail-gap);
+  min-height: 40px;
+  margin-top: 14px;
+  border: 1px solid var(--rule);
+  border-radius: 0.8rem;
   color: var(--ink-2);
-  font-size: 0.84rem;
+  font-size: 13.5px;
+  font-weight: 560;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.settings-lock:hover {
+  border-color: var(--rule);
+  background: var(--accent-wash);
+  color: var(--ink);
 }
 
 /* Phone navigation is a real stack: folders, collection, then note. */
@@ -1721,19 +1980,31 @@
     border-color var(--dur-fast) var(--ease-press);
 }
 
+/* 0.955 is right for a 32px button and wrong for a 230px row: the same ratio
+   moves four pixels on one and ten on the other, and the wide one reads as the
+   list flinching rather than the row answering. Wide targets get a ratio scaled
+   to their size. */
 .press:active:not(:disabled) {
   transform: scale(0.955);
+}
+
+.sidebar-target.press:active,
+.sidebar-footer-button:active,
+.new-note-button.press:active:not(:disabled) {
+  transform: scale(0.99);
 }
 
 .press:disabled {
   transform: none;
 }
 
-/* Menus grow from the corner they hang off, which is what makes them read as
-   unfolding out of their button rather than materialising beside it. */
+/* A menu appears under a pointer that is already on its way to an item, so it
+   has to be *there* rather than settling into place. The spring's overshoot at
+   240ms was the wobble: the menu arrived, went past itself, and came back while
+   you were reading it. Shorter, smaller, and no overshoot. */
 .menu-popover {
   transform-origin: top right;
-  animation: menu-reveal var(--dur-base) var(--ease-spring) both;
+  animation: menu-reveal var(--dur-fast) var(--ease-out) both;
 }
 
 .menu-popover.left-0 {
@@ -1743,7 +2014,7 @@
 @keyframes menu-reveal {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.94);
+    transform: translateY(-4px) scale(0.975);
   }
 }
 
@@ -1768,7 +2039,7 @@
 }
 
 .settings-panel {
-  animation: settings-reveal var(--dur-slow) var(--ease) both;
+  animation: settings-reveal var(--dur-base) var(--ease-out) both;
 }
 
 @keyframes fade-in {
@@ -1780,16 +2051,20 @@
 @keyframes settings-reveal {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.97);
+    transform: translateY(12px) scale(0.99);
   }
 }
 
 /* A note opening is the one entrance the reader is waiting on, so it is the
    slowest thing in the app — and still under half a second. */
+/* No scale on anything made of words. A scaled entrance re-rasterises every
+   glyph on every frame, so the note you are opening spends a third of a second
+   soft before it snaps sharp — which reads as a blurry app, not a smooth one.
+   Opacity and a few pixels of travel say the same thing and stay crisp. */
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.995);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1855,8 +2130,12 @@
     transform var(--dur-press) var(--ease-press);
 }
 
-.archive-switch button:active {
-  transform: scale(0.97);
+.archive-switch:active {
+  transform: scale(0.985);
+}
+
+.archive-switch {
+  transition: transform var(--dur-press) var(--ease-press);
 }
 
 .editor-tool-button {
@@ -1878,17 +2157,27 @@
   .note-gallery-item:active,
   .mobile-compose:active,
   .note-row-actions button:active,
-  .archive-switch button:active,
+  .archive-switch:active,
   .editor-tool-button:active {
     transform: none;
   }
 
+  .archive-switch-thumb {
+    transition: none;
+  }
+
+  .sidebar-branch,
   .menu-popover,
   .settings-scrim,
   .settings-panel,
+  .settings-sliders,
   .page-in,
   .mobile-screen {
     animation: none;
+  }
+
+  .settings-specimen p {
+    transition: none;
   }
 }
 
@@ -1926,7 +2215,14 @@
   will-change: auto;
 }
 
-.cm-scroller,
+/* The editor scrolls itself on every keystroke that reaches the last line.
+   Animating that scroll means the caret is chasing a moving page, which is the
+   single least smooth thing the app did. The lists keep it: those scrolls are
+   navigation, and navigation is worth watching travel. */
+.cm-scroller {
+  scroll-behavior: auto;
+}
+
 .sidebar-scroll,
 .collection-column [role="listbox"] {
   scroll-behavior: smooth;
@@ -1957,8 +2253,14 @@
   background: var(--paper);
 }
 
+/* No reserved gutter. `scrollbar-gutter: stable` was holding 10px open down
+   the right of the scrolling area, which pulled every row's right edge 10px
+   short of the switch above it and the footer below it — a permanent seam down
+   a column whose whole job is to look like one column. macOS overlays its
+   scrollbar anyway, so the reserve bought nothing and cost the alignment. */
 .sidebar-scroll {
-  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 
 .sidebar-heading {
@@ -1966,8 +2268,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding: 0 0.6rem 0.3rem 1.55rem;
+  margin-top: 12px;
+  padding: 0 10px 4px var(--rail-offset);
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: 10px;
@@ -1981,7 +2283,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.3rem 0.7rem 0.5rem 1.55rem;
+  padding: 4px 10px 8px var(--rail-offset);
   color: var(--ink-4);
   font-size: 11.5px;
   line-height: 1.55;
@@ -1994,7 +2296,7 @@
 
 .sidebar-tail {
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem 0.35rem;
+  padding: 4px 8px 6px;
 }
 
 .sidebar-row {
@@ -2034,7 +2336,7 @@
 .sidebar-twisty {
   display: inline-flex;
   flex-shrink: 0;
-  width: 1rem;
+  width: var(--rail-twisty);
   justify-content: center;
 }
 
@@ -2061,14 +2363,33 @@
 
 /* A branch is drawn as a branch: one hairline running under the parent's
    glyph, so depth is legible without counting indents. */
+/* Opening a folder used to be a cut: the children were there on the next
+   frame, and a tree three deep re-laid the whole column under the cursor with
+   no indication of what had moved. `grid-template-rows: 0fr → 1fr` animates to
+   the children's real height without anyone having to measure it. */
 .sidebar-branch {
+  display: grid;
+  grid-template-rows: 1fr;
   position: relative;
-  margin-left: 1.05rem;
+  margin-left: 16px;
   border-left: 1px solid var(--rule-soft);
+  animation: branch-open var(--dur-base) var(--ease-out) both;
+}
+
+.sidebar-branch-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@keyframes branch-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
 }
 
 .sidebar-branch .sidebar-row {
-  margin-left: -1.05rem;
+  margin-left: -16px;
 }
 
 .sidebar-target {
@@ -2076,11 +2397,12 @@
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.42rem 0.6rem 0.42rem 0.15rem;
+  gap: var(--rail-gap);
+  padding: var(--row-pad-y) 10px var(--row-pad-y) var(--rail-inset);
   color: var(--ink-2);
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 480;
+  line-height: var(--row-line);
   text-align: left;
   transition: color var(--dur-fast) var(--ease);
 }
@@ -2096,11 +2418,13 @@
 
 .sidebar-glyph {
   display: inline-flex;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   color: var(--ink-3);
-  transition:
-    color var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease-spring);
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .sidebar-row:hover .sidebar-glyph,
@@ -2108,9 +2432,9 @@
   color: var(--accent);
 }
 
-.sidebar-row.is-active .sidebar-glyph {
-  transform: scale(1.06);
-}
+/* Colour alone carries the active glyph. It used to scale to 1.06, which put a
+   16px icon on a 16.96px box — permanently blurred, on the one row you look at
+   most. State never justifies a fractional icon. */
 
 .sidebar-name {
   min-width: 0;
@@ -2201,8 +2525,8 @@
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
+  gap: 2px;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--rule-soft);
   background: var(--paper);
 }
@@ -2211,12 +2535,15 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 0.55rem;
+  gap: var(--rail-gap);
   border-radius: 0.6rem;
-  padding: 0.45rem 0.6rem;
+  /* Left padding is the rail, so Settings and the lock stand under the folder
+     glyphs rather than 9px to their left. */
+  padding: var(--row-pad-y) 10px var(--row-pad-y) var(--rail-offset);
   color: var(--ink-2);
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 480;
+  line-height: var(--row-line);
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -2229,6 +2556,8 @@
 
 .sidebar-footer-button svg {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   color: var(--ink-3);
   transition: color var(--dur-fast) var(--ease);
 }
@@ -2323,14 +2652,16 @@
 .new-note-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  height: 2rem;
+  /* Whole pixels: 0.4rem and 0.7rem are 6.4 and 11.2, and each one moved the
+     glyph a fraction off the device grid. */
+  gap: 6px;
+  height: 32px;
   border-radius: var(--radius-sm);
   background: var(--accent);
-  padding: 0 0.7rem;
+  padding: 0 12px;
   color: var(--on-accent);
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 620;
 }
 
