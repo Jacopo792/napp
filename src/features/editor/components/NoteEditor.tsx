@@ -12,16 +12,12 @@ import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
-import {
-  assertAttachable,
-  attachmentLabel,
-  attachmentReference,
-} from "@/features/editor/lib/attachments";
+import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
 import { translateText, type TranslationLanguage } from "@/features/editor/lib/translation";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
-import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";
+import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 
 interface Props {
   mobile?: boolean;
@@ -96,7 +92,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const importPdfRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const linkUrlRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<MarkdownEditorHandle>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const findRef = useRef<HTMLInputElement>(null);
   const [shellWidth, setShellWidth] = useState<number | null>(null);
 
@@ -140,7 +136,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   /**
    * A PDF kept as a PDF. The bytes are uploaded whole; the
-   * note gains one link that the editor renders as a card.
+   * note gains one structured attachment node that the editor renders as a card.
    */
   async function handleAttachPdf(file: File | undefined) {
     if (!file || !entry || !canEdit) return;
@@ -149,10 +145,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       assertAttachable(file);
       setStatus("Attaching PDF…");
       const objectId = await onUploadFile(file);
-      editorRef.current?.insertAttachment(
-        attachmentLabel(file.name),
-        attachmentReference(objectId),
-      );
+      editorRef.current?.insertAttachment(attachmentLabel(file.name), objectId);
       report("PDF attached");
     } catch (error) {
       setStatus("");
@@ -196,14 +189,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     }
   }
 
-  async function handlePastedImage(file: File): Promise<{ src: string; alt: string } | null> {
+  async function handlePastedImage(file: File): Promise<{ objectId: string; alt: string } | null> {
     if (!entry || !canEdit) return null;
     setFailure("");
     setStatus("Preparing pasted image…");
     try {
-      const src = await onUploadImage(file);
+      const objectId = await onUploadImage(file);
       report("Image pasted", 2600);
-      return { src, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
+      return { objectId, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
     } catch (error) {
       setStatus("");
       setFailure(error instanceof Error ? error.message : "Could not paste image");
@@ -331,7 +324,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   function handlePageContextMenu(event: MouseEvent) {
     if (!onContextMenu) return;
     const target = event.target as HTMLElement | null;
-    if (target?.closest(".cm-editor, input, textarea, [contenteditable='true']")) return;
+    if (target?.closest(".rich-text-content, input, textarea, [contenteditable='true']")) return;
     event.preventDefault();
     /* The menu that is about to mount listens on the document for the next
        right-click, so this one must not be allowed to reach it. */
@@ -537,17 +530,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       {/* The text itself. */}
       <div className={`min-h-0 flex-1 ${mobile ? "px-5" : "px-10"}`}>
-        <MarkdownEditor
+        <RichTextEditor
           key={entry.note.id}
           ref={editorRef}
-          value={readDraft(entry.note.id)?.body ?? entry.note.body}
-          docKey={entry.note.id}
+          value={readDraft(entry.note.id)?.content ?? entry.note.content}
           revision={syncRevision}
           readOnly={!canEdit}
           placeholder="Start writing…"
-          onChange={(body) => {
+          onChange={(content, body) => {
             if (!canEdit) return;
-            editBody(entry.note.id, body);
+            editBody(entry.note.id, body, content);
             onEdited();
           }}
           onPasteImage={handlePastedImage}

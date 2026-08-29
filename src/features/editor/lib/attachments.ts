@@ -1,13 +1,11 @@
 /* ── Attachments ─────────────────────────────────────────────────────────────
    A PDF dropped into a note is not prose, and turning it into prose was the old
    behaviour's mistake: the document stopped being a document. An attachment is
-   now stored whole in the private archive bucket and
-   referenced from the note by a single Markdown link whose target is a storage
-   id rather than a URL:
+   now stored whole in the private archive bucket and referenced from the note
+   by a structured private-file node whose only payload is the storage id and
+   display label. Legacy Markdown links are converted at the import boundary.
 
-     [Contract 2026.pdf](napp-file:8f14e45f-…)
-
-   The editor renders that link as a card. Opening it downloads the bytes here
+   The editor renders the node as a card. Opening it downloads the bytes here
    and hands the browser a blob in a new tab. The private bucket is protected by
    the same archive-membership policy as the notes. ────────────────────────── */
 
@@ -43,7 +41,7 @@ export function attachmentExtension(label: string): string {
   return (label.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "file").toUpperCase();
 }
 
-/** Square brackets would end the link label early, so they never survive. */
+/** Keep the visible label clean and compatible with legacy Markdown imports. */
 export function attachmentLabel(filename: string): string {
   return filename.replace(/[[\]]/g, "").trim() || "Attachment";
 }

@@ -91,22 +91,23 @@ dark modes, curated palettes, custom colours and an optional device-local
 background image. Opening a note is read-only state selection: it must never
 update `updatedAt` or trigger a database write.
 
-**Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
-Bear model — markdown syntax renders as formatting while you type in one pane, with no
-separate preview tab. A compact, dismissible formatting menu is now wanted for common
-Markdown actions; the always-visible Edit/Live/Preview toolbar remains unwanted.
+**Editor direction (updated 2026-08-30):** use a structured Tiptap rich-text document
+in one reading-and-writing surface, with no Markdown delimiters and no separate preview
+tab. A compact, dismissible formatting menu covers common actions; the always-visible
+Edit/Live/Preview toolbar remains unwanted. Legacy Markdown is parsed only at the
+migration boundary and retained unchanged in `legacy_body`.
 
 PDFs with selectable text may be imported locally into the current note. The browser
 extracts the text without uploading the document; OCR and AI document analysis are not
 part of this capability.
 
 JPG, PNG, and WebP images may be inserted locally. They are resized and uploaded to a
-private, archive-membership-protected Storage bucket; the note stores only a
-`napp-image:<uuid>` reference. An embedded image remains a reading object: it opens full
-size, can be removed whole, and its storage reference is never exposed in the editor.
-Markdown image URLs render in place, and Markdown links plus bare HTTP(S) URLs become
-clickable when their source line is not being edited. Link insertion uses explicit text
-and URL fields instead of leaving an editable Markdown placeholder in the note.
+private, archive-membership-protected Storage bucket; the note stores only a structured
+private-image node with an opaque object id. An embedded image remains a reading object:
+it opens full size, can be removed whole, and its storage reference is never exposed in
+the editor. Choosing a file and pasting from the clipboard use the same upload path.
+Legacy Markdown image URLs render in place after conversion, and links plus bare HTTP(S)
+URLs become clickable. Link insertion uses explicit text and URL fields.
 
 Technical constraints that outlive any design:
 

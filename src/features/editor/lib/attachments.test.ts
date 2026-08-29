@@ -8,6 +8,6 @@ test("attachment references round-trip without exposing a public URL", () => {
   assert.equal(attachmentObjectId("https://example.com/document.pdf"), null);
 });
 
-test("attachment labels cannot break their Markdown card", () => {
+test("attachment labels remain safe for their structured card", () => {
   assert.equal(attachmentLabel("[Studio] finale.pdf"), "Studio finale.pdf");
 });

@@ -2,6 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
+import {
+  noteDocument,
+  richTextToPlainText,
+  RICH_TEXT_VERSION,
+} from "@/features/editor/lib/content";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -25,6 +30,7 @@ interface NoteRow {
   pinned: boolean;
   folder_id: string | null;
   version: number;
+  content_version: number;
 }
 
 interface FolderRow {
@@ -112,7 +118,9 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   ] = await Promise.all([
     supabase
       .from("notes")
-      .select("id, owner_id, created_at, updated_at, trashed_at, pinned, folder_id, version")
+      .select(
+        "id, owner_id, created_at, updated_at, trashed_at, pinned, folder_id, version, content_version",
+      )
       .eq("archive_id", archiveId),
     supabase
       .from("folders")
@@ -187,11 +195,14 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     .filter((row) => noteCache.get(row.id)?.version !== row.version)
     .map((row) => row.id);
 
-  const payloads = new Map<string, { title: string | null; body: string | null }>();
+  const payloads = new Map<
+    string,
+    { title: string | null; body: string | null; content: unknown; legacy_body: string | null }
+  >();
   if (staleIds.length > 0) {
     const changed = await supabase
       .from("notes")
-      .select("id, title, body")
+      .select("id, title, body, content, legacy_body")
       .eq("archive_id", archiveId)
       .in("id", staleIds);
     fail(changed.error);
@@ -199,6 +210,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       id: string;
       title: string | null;
       body: string | null;
+      content: unknown;
+      legacy_body: string | null;
     }[]) {
       payloads.set(row.id, row);
     }
@@ -217,10 +230,16 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         if (!cached) throw new Error("A note changed while the archive was loading");
         return { note: cached.note, version: cached.version } satisfies NoteEntry;
       }
-      const { title, body } = payload;
+      const { title, body, content, legacy_body: legacyBody } = payload;
+      const storedBody = body ?? "";
+      const document = noteDocument(content, row.content_version, legacyBody ?? storedBody);
       const note: Note = {
         title: title ?? "",
-        body: body ?? "",
+        body:
+          row.content_version === RICH_TEXT_VERSION ? storedBody : richTextToPlainText(document),
+        content: document,
+        contentVersion: row.content_version,
+        legacyBody: legacyBody ?? (row.content_version === 0 ? storedBody : null),
         id: row.id,
         ownerId: scopeOf(row.owner_id),
         createdAt: row.created_at,
@@ -321,6 +340,9 @@ export async function createNote(
       owner_id: note.ownerId ?? session.userId,
       title: note.title,
       body: note.body,
+      content: note.content,
+      content_version: note.contentVersion,
+      legacy_body: note.legacyBody,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
@@ -346,6 +368,9 @@ export async function saveNote(
       .update({
         title: note.title,
         body: note.body,
+        content: note.content,
+        content_version: note.contentVersion,
+        legacy_body: note.legacyBody,
         updated_at: note.updatedAt,
         version: version + 1,
       })

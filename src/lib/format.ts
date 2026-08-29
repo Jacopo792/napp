@@ -1,17 +1,6 @@
-/** Markdown stripped down to something readable in a list preview. */
+/** Collapse a note's searchable plain text into one readable preview line. */
 export function previewOf(body: string): string {
-  return body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
-    .replace(/^\s{0,3}>\s?/gm, "")
-    .replace(/^\s*[-*+]\s+\[[ xX]\]\s+/gm, "")
-    .replace(/^\s*[-*+]\s+/gm, "")
-    .replace(/==(?:(?:yellow|purple|pink|orange|mint|blue):)?([^\n]*?)==/g, "$1")
-    .replace(/[*_`~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return body.replace(/\s+/g, " ").trim();
 }
 
 /** Relative where relative is useful, absolute the moment it stops being. */
@@ -34,13 +23,12 @@ export function formatStamp(iso: string): string {
 }
 
 export function countWords(s: string): number {
-  const t = s.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").trim();
+  const t = s.trim();
   return t ? t.split(/\s+/).length : 0;
 }
 
-/** Embedded image payloads are storage, not readable note characters. */
 export function countChars(s: string): number {
-  return s.replace(/!\[[^\]]*\]\([^)]*\)/g, "").length;
+  return s.length;
 }
 
 /** Counts are printed with a thin space grouping so four figures stay scannable. */

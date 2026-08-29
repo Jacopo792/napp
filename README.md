@@ -17,8 +17,9 @@ a separate composition for the phone.
 
 ## What is in it
 
-- Markdown notes with a CodeMirror editor: headings, lists, checklists, tables,
-  highlights, links, images, PDF attachments and PDF text import.
+- Rich-text notes with a Tiptap editor: headings, lists, checklists, tables,
+  colours, links, images, PDF attachments and PDF text import. Existing Markdown
+  notes are converted losslessly when first opened and retained as a legacy backup.
 - Folders that nest, a trash that restores, pinning, and search over the whole
   archive.
 - A scope switch built from the archive's roster: your notes, and each other
@@ -94,14 +95,15 @@ All four run on every pull request.
 The browser holds the whole application. `src/routes/notes.tsx` owns the
 workspace state and the save pipeline; `src/components/` holds the sidebar, note
 list and menus; `src/features/editor/` holds the editor domain — `components/`
-for `EditorToolbar`, `MarkdownEditor`, `NoteEditor` and `TitleField`, and `lib/`
+for `EditorToolbar`, `RichTextEditor`, `NoteEditor` and `TitleField`, and `lib/`
 for `draft`, `attachments`, `pdf` and `translation`; `src/lib/` holds the rest
 with no markup in it: the Supabase client, session and archive bootstrap,
 invite and role helpers, sync and private presence, avatar cache, appearance and
 reading axes.
 
-Persistence is deliberately plain. Notes, folder names and tag names are
-ordinary Postgres columns; files are ordinary Storage objects. Every archive row
+Persistence is deliberately plain. Note documents are versioned JSONB with a
+plain-text body for search and previews; folder names and tag names are ordinary
+Postgres columns, and files are ordinary Storage objects. Every archive row
 is readable by any member of its archive; only editors may change notes,
 folders, tags, archive settings and `note-images` objects — the role is enforced
 by `private.can_write_archive(archive_id)` and by direct writes to
@@ -147,13 +149,13 @@ reading your notes needs their own archive, not a membership.
 
 ## Documentation
 
-| File | What it settles |
-| --- | --- |
-| `PRODUCT.md` | Who it is for, what it is for, and the operating context |
-| `DESIGN.md` | The interface rules, and the reasoning behind them |
-| `CLAUDE.md` | Repository layout, deployment, and the migration hazards |
-| `SECURITY.md` | How to report a vulnerability privately and the security model |
-| `CHANGELOG.md` | User-visible and security-relevant changes by release date |
+| File           | What it settles                                                |
+| -------------- | -------------------------------------------------------------- |
+| `PRODUCT.md`   | Who it is for, what it is for, and the operating context       |
+| `DESIGN.md`    | The interface rules, and the reasoning behind them             |
+| `CLAUDE.md`    | Repository layout, deployment, and the migration hazards       |
+| `SECURITY.md`  | How to report a vulnerability privately and the security model |
+| `CHANGELOG.md` | User-visible and security-relevant changes by release date     |
 
 ## Deployment
 
@@ -172,7 +174,7 @@ the same licence, and you have to make its source available to whoever you gave
 it to.
 
 One thing worth knowing rather than discovering: the GPL is triggered by
-*distribution*. Running a modified copy of this application on your own server
+_distribution_. Running a modified copy of this application on your own server
 and letting other people use it in their browser is not distribution, so it does
 not oblige you to publish those changes. The licence that closes that gap is the
 AGPL, and this project is not under it.

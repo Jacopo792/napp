@@ -26,6 +26,7 @@ import {
 import type { Meta } from "@/lib/types";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
+import { documentGlyph } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
@@ -82,14 +83,6 @@ const GLYPHS = {
   table: { icon: Table2, label: "Has a table" },
   text: { icon: FileText, label: "Note" },
 } as const;
-
-function glyphFor(body: string): (typeof GLYPHS)[keyof typeof GLYPHS] {
-  if (body.includes("napp-file:")) return GLYPHS.attachment;
-  if (body.includes("](napp-image:") || body.includes("![")) return GLYPHS.image;
-  if (/^\s*[-*+]\s\[[ xX]\]\s/m.test(body)) return GLYPHS.checklist;
-  if (/^\s*\|.*\|\s*$/m.test(body)) return GLYPHS.table;
-  return GLYPHS.text;
-}
 
 /* The catalogue. Titles here are never truncated to one line: the real corpus
    names notes things like "MAPPA 5: SK GROUP (il chaebol che ha catturato i
@@ -148,7 +141,7 @@ const Row = memo(function Row({
 
   const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
-  const glyph = glyphFor(entry.note.body);
+  const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
 
   return (

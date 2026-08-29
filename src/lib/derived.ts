@@ -2,7 +2,7 @@ import { countWords, previewOf } from "./format";
 import type { Note, Folder, Meta, NoteMeta, Tag } from "./types";
 
 /* ── Derived reading, computed once ──────────────────────────────────────────
-   Stripping Markdown for a preview and counting words are both full passes over
+   Building a preview and counting words are both full passes over
    a note body, and the catalogue wants them for every visible row. Doing that
    during render means every row pays the cost again on every render of the
    page — which, on a corpus of long study notes, is the most expensive thing
@@ -13,7 +13,7 @@ import type { Note, Folder, Meta, NoteMeta, Tag } from "./types";
    dependency array to keep honest, and nothing to invalidate by hand. ─────── */
 
 export interface Derived {
-  /** Markdown reduced to a line of readable prose. */
+  /** Plain text reduced to one readable line. */
   preview: string;
   words: number;
   /** Title and body folded to lower case once, so search is a substring test

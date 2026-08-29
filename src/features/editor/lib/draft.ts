@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { JSONContent } from "@tiptap/core";
 import { countChars, countWords } from "@/lib/format";
 
 /* ── The draft store ─────────────────────────────────────────────────────────
@@ -7,7 +8,7 @@ import { countChars, countWords } from "@/lib/format";
 
    A note body reaching `useState` means every keystroke re-renders the page
    that owns it, and with it the catalogue, the rail and the axis bar — none of
-   which have anything to say about the character just typed. CodeMirror already
+   which have anything to say about the character just typed. Tiptap already
    owns the document; React only ever needed the text at three moments: to save
    it, to count it, and to hand it to a freshly mounted editor. So the drafts sit
    in a module-level Map, and the two things that genuinely track them subscribe
@@ -25,6 +26,7 @@ import { countChars, countWords } from "@/lib/format";
 export interface Draft {
   title: string;
   body: string;
+  content: JSONContent;
 }
 
 interface Slot {
@@ -89,15 +91,15 @@ export function ensureDraft(id: string, stored: Draft): void {
 export function editTitle(id: string, title: string): void {
   const slot = slots.get(id);
   if (!slot || slot.draft.title === title) return;
-  slot.draft = { title, body: slot.draft.body };
+  slot.draft = { title, body: slot.draft.body, content: slot.draft.content };
   slot.dirty = true;
   notify(titleListeners, id);
 }
 
-export function editBody(id: string, body: string): void {
+export function editBody(id: string, body: string, content: JSONContent): void {
   const slot = slots.get(id);
-  if (!slot || slot.draft.body === body) return;
-  slot.draft = { title: slot.draft.title, body };
+  if (!slot) return;
+  slot.draft = { title: slot.draft.title, body, content };
   slot.dirty = true;
   scheduleMetrics(id);
 }

@@ -23,10 +23,13 @@ import {
   Paperclip,
   Pilcrow,
   Quote,
+  Rows3,
   Strikethrough,
   Table2,
+  Trash2,
 } from "lucide-react";
-import { TEXT_COLORS, type FormatAction, type TextColor } from "./MarkdownEditor";
+import { TEXT_COLORS, type TextColor } from "@/features/editor/lib/content";
+import type { FormatAction } from "./RichTextEditor";
 
 /* ── The writing toolbar ─────────────────────────────────────────────────────
    Five tabs, and each one owns exactly the menu its icon promises: letters open
@@ -342,9 +345,24 @@ export function EditorToolbar({
             <Row icon={<Columns2 size={16} />} label="2 columns" onClick={() => run("table-2")} />
             <Row icon={<Columns3 size={16} />} label="3 columns" onClick={() => run("table-3")} />
             <Row icon={<Columns4 size={16} />} label="4 columns" onClick={() => run("table-4")} />
-            <p className="menu-note">
-              Tables stay visual while you edit. Click a cell, type, then press Return.
-            </p>
+            <div className="menu-separator" />
+            <p className="menu-label">Selected table</p>
+            <Row
+              icon={<Trash2 size={16} />}
+              label="Delete column"
+              onClick={() => run("table-delete-column")}
+            />
+            <Row
+              icon={<Trash2 size={16} />}
+              label="Delete row"
+              onClick={() => run("table-delete-row")}
+            />
+            <Row
+              icon={<Trash2 size={16} />}
+              label="Delete table"
+              onClick={() => run("table-delete")}
+            />
+            <p className="menu-note">Click inside a cell before changing its row or column.</p>
           </>,
         )}
       </div>

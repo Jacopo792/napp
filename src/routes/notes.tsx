@@ -71,6 +71,7 @@ import {
   requeue,
   takePending,
 } from "@/features/editor/lib/draft";
+import { EMPTY_RICH_TEXT, RICH_TEXT_VERSION } from "@/features/editor/lib/content";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -470,6 +471,7 @@ function NotesPage() {
     replaceDraft(open, {
       title: titleBusy && current ? current.title : fresh.note.title,
       body: fresh.note.body,
+      content: fresh.note.content,
     });
     setSyncRevision((n) => n + 1);
   }, []);
@@ -605,7 +607,11 @@ function NotesPage() {
   // alone, so this is safe to run whenever the selection or the entry changes.
   useEffect(() => {
     if (!selected) return;
-    ensureDraft(selected.note.id, { title: selected.note.title, body: selected.note.body });
+    ensureDraft(selected.note.id, {
+      title: selected.note.title,
+      body: selected.note.body,
+      content: selected.note.content,
+    });
   }, [selected]);
 
   // ── Save pipeline ───────────────────────────────────────────────────────
@@ -631,6 +637,8 @@ function NotesPage() {
             ...entry.note,
             title: d.title,
             body: d.body,
+            content: d.content,
+            contentVersion: RICH_TEXT_VERSION,
             updatedAt: new Date().toISOString(),
           };
           try {
@@ -726,7 +734,7 @@ function NotesPage() {
       const blob = await prepareImageForNote(file);
       const imageId = crypto.randomUUID();
       await uploadImage(current, imageId, blob);
-      return `napp-image:${imageId}`;
+      return imageId;
     },
     [canWriteArchive],
   );
@@ -801,6 +809,9 @@ function NotesPage() {
       id: crypto.randomUUID(),
       title: "",
       body: "",
+      content: structuredClone(EMPTY_RICH_TEXT),
+      contentVersion: RICH_TEXT_VERSION,
+      legacyBody: null,
       ownerId: viewAs,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -824,7 +835,11 @@ function NotesPage() {
         [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), note.id),
       }));
       if (compact) setMobileScreen("note");
-      ensureDraft(note.id, { title: "", body: "" });
+      ensureDraft(note.id, {
+        title: "",
+        body: "",
+        content: structuredClone(EMPTY_RICH_TEXT),
+      });
       window.setTimeout(() => titleRef.current?.focus(), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create note");

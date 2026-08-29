@@ -319,7 +319,7 @@
     overscroll-behavior: contain;
   }
 
-  .mobile-editor .cm-scroller {
+  .mobile-editor .rich-text-editor {
     scrollbar-gutter: auto;
     padding-bottom: max(40vh, calc(env(safe-area-inset-bottom) + 6rem));
   }
@@ -759,8 +759,8 @@
    the lower half of every menu could not be clicked at all: the text
    underneath was taking the click.
 
-   The cause is stacking order, not opacity. CodeMirror gives `.cm-editor` its
-   own `position: relative`, and each row of the notes list is positioned too;
+   The cause is stacking order, not opacity. The editor surface and each row of
+   the notes list are positioned;
    a positioned element that comes later in the document paints over an earlier
    positioned one whenever both are at `z-index: auto`, however large the
    z-index inside the earlier one is. The menu's own `z-40` never got a chance,
@@ -2318,295 +2318,6 @@
   }
 }
 
-/* ── The reading page ────────────────────────────────────────────────────────
-   The editor is not a widget with a theme applied — it is a page of set text.
-   Sizes, measure and weight all come from the reading axes, so the axis bar
-   drives actual size, measure, weight and leading values. ───────────────── */
-.cm-editor {
-  height: 100%;
-  background: transparent;
-  color: var(--ink);
-}
-
-.cm-editor.cm-focused {
-  outline: none;
-}
-
-.cm-scroller {
-  /* CodeMirror ships display:flex and a monospace stack on its own nodes; both
-     are overridden here so the note is set in the reading face and the measure
-     can be centred by plain auto margins. */
-  display: block;
-  font-size: var(--read-size);
-  line-height: var(--read-leading);
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding: 0 0 45vh;
-}
-
-.cm-editor .cm-content {
-  font-family: var(--font-reading);
-  font-weight: var(--read-weight);
-  width: 100%;
-  max-width: var(--read-measure);
-  margin-inline: auto;
-  padding: 0;
-  caret-color: var(--accent);
-}
-
-.cm-line {
-  padding: 0;
-}
-
-.cm-cursor,
-.cm-dropCursor {
-  border-left: 2.5px solid var(--accent) !important;
-  opacity: 1 !important;
-  box-shadow: 0 0 0 1px var(--page);
-}
-
-/* CodeMirror animation can dim the cursor to 0 — keep it legible. */
-@keyframes cm-blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-.cm-cursor {
-  animation: cm-blink 1.1s step-end infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .cm-cursor {
-    animation: none;
-  }
-}
-
-.cm-selectionBackground,
-.cm-editor .cm-selectionBackground,
-.cm-editor.cm-focused .cm-selectionBackground {
-  background: var(--accent-wash) !important;
-}
-
-.cm-placeholder {
-  color: var(--ink-4);
-  font-style: normal;
-}
-
-/* Rendered markdown. Headings take the display stack a size and a weight up;
-   the markers themselves are dimmed rather than deleted, so the source is
-   always recoverable by eye and the cursor never lands on hidden characters. */
-.cm-md-mark {
-  color: var(--ink-4);
-  font-weight: 400;
-}
-
-.cm-md-h1,
-.cm-md-h2,
-.cm-md-h3,
-.cm-md-h4 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.22;
-  /* Space above a heading is what makes it read as the start of something.
-     Padding rather than margin: a CodeMirror line is a block whose height the
-     editor measures, and collapsing margins would make it measure wrong. */
-  padding-top: 0.5em;
-}
-.cm-md-h1 {
-  font-size: 1.8em;
-  font-weight: 700;
-  padding-top: 0.35em;
-}
-.cm-md-h2 {
-  font-size: 1.4em;
-  font-weight: 680;
-}
-/* Subheading has to be visibly a step down from Heading and a step up from
-   body, or choosing it looks like it did nothing. Size alone was not enough of
-   a step, so it takes the accent's lighter ink as well. */
-.cm-md-h3 {
-  font-size: 1.15em;
-  font-weight: 660;
-  color: var(--ink);
-  letter-spacing: 0.005em;
-}
-.cm-md-h4 {
-  font-size: 1em;
-  font-weight: 650;
-  color: var(--ink-2);
-}
-
-.cm-md-strong {
-  font-weight: 700;
-}
-.cm-md-em {
-  font-style: italic;
-}
-.cm-md-strike {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  color: var(--ink-3);
-}
-
-.cm-md-code {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  background: var(--surface);
-  border: 1px solid var(--rule-soft);
-  border-radius: 0.3em;
-  padding: 0.05em 0.3em;
-}
-
-.cm-md-fence {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  color: var(--ink-2);
-}
-
-.cm-md-quote {
-  color: var(--ink-2);
-  font-style: italic;
-}
-
-.cm-md-link {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-thickness: 1.5px;
-}
-
-.cm-md-link-widget {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-thickness: 1.5px;
-  cursor: pointer;
-}
-
-.cm-md-link-widget:hover {
-  color: var(--accent-strong);
-}
-
-.cm-md-image-widget {
-  position: relative;
-  display: block;
-  width: min(100%, 46rem);
-  margin-block: 1rem 1.35rem;
-}
-
-.cm-md-image-open {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 1px solid var(--rule-soft);
-  border-radius: 0.75rem;
-  background: var(--surface);
-  overflow: hidden;
-  cursor: zoom-in;
-  transition:
-    border-color 160ms var(--ease),
-    box-shadow 160ms var(--ease);
-}
-
-.cm-md-image-open:hover,
-.cm-md-image-open:focus-visible {
-  border-color: var(--rule);
-  box-shadow: var(--shadow-soft);
-}
-
-.cm-md-image-open img {
-  display: block;
-  width: 100%;
-  max-height: 34rem;
-  object-fit: contain;
-}
-
-/* Actions ride the corner of the picture, quiet until it is hovered. */
-.cm-md-image-actions {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.2rem;
-  border-radius: 0.6rem;
-  background: oklch(0.185 0 0 / 0.75);
-  backdrop-filter: blur(10px);
-  opacity: 0;
-  transform: translateY(-2px);
-  transition:
-    opacity 160ms var(--ease),
-    transform 160ms var(--ease);
-}
-
-.cm-md-image-widget:hover .cm-md-image-actions,
-.cm-md-image-actions:focus-within {
-  opacity: 1;
-  transform: none;
-}
-
-.cm-md-image-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.85rem;
-  height: 1.85rem;
-  border: 0;
-  border-radius: 0.45rem;
-  background: transparent;
-  color: #ffffff;
-  cursor: pointer;
-  transition:
-    background-color 140ms var(--ease),
-    color 140ms var(--ease);
-}
-
-.cm-md-image-action:hover {
-  background: oklch(1 0 0 / 0.11);
-  color: #ffffff;
-}
-
-.cm-md-image-action.is-danger:hover {
-  color: var(--danger);
-}
-
-/* Touch has no hover: the actions are simply always there. */
-@media (hover: none) {
-  .cm-md-image-actions {
-    opacity: 1;
-    transform: none;
-  }
-
-  .cm-md-image-action {
-    width: 2.35rem;
-    height: 2.35rem;
-  }
-}
-
-.cm-md-image-caption {
-  display: block;
-  margin-top: 0.5rem;
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  line-height: 1.4;
-  color: var(--ink-4);
-}
-
-.cm-md-image-error {
-  display: block;
-  padding: 1.1rem;
-  border: 1px solid var(--rule-soft);
-  border-radius: 0.75rem;
-  color: var(--danger);
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
-}
-
 /* ── Full-size image ────────────────────────────────────────────────────────
    The note is still there behind the scrim; the picture is simply lifted off
    it for a moment. One entrance, eased out from an already-placed frame. ─── */
@@ -2690,166 +2401,6 @@
   .lightbox-figure {
     animation: none;
   }
-}
-
-/* ── Lists ───────────────────────────────────────────────────────────────────
-   A list item hangs: the marker sits in the left margin and every wrapped line
-   of the item lines up under the first word, not under the bullet. The marker
-   itself is drawn — a real dot, a real checkbox — because `- ` and `- [ ] ` are
-   a file format, not something anyone wants to read. */
-.cm-md-item {
-  padding-left: 1.5em;
-  text-indent: -1.5em;
-}
-
-.cm-md-item.is-task {
-  padding-left: 1.75em;
-  text-indent: -1.75em;
-}
-
-.cm-md-bullet {
-  display: inline-block;
-  width: 1.5em;
-  text-indent: 0;
-  color: var(--ink-3);
-  font-size: 1.05em;
-  line-height: inherit;
-}
-
-/* The number is content, so it is set rather than replaced — just quieter than
-   the words it counts. */
-.cm-md-number {
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.cm-md-task {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.05em;
-  height: 1.05em;
-  margin-right: 0.7em;
-  vertical-align: -0.14em;
-  text-indent: 0;
-  border-radius: 0.35em;
-  border: 1.5px solid var(--rule);
-  background: var(--surface);
-  color: var(--on-accent);
-  cursor: pointer;
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    transform var(--dur-press) var(--ease-spring);
-}
-
-.cm-md-task:hover {
-  border-color: var(--ink-3);
-}
-
-.cm-md-task:active {
-  transform: scale(0.88);
-}
-
-.cm-md-task.is-done {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-/* A finished item reads as finished. */
-.cm-md-done {
-  color: var(--ink-4);
-  text-decoration: line-through;
-  text-decoration-color: var(--ink-4);
-  text-decoration-thickness: 1px;
-}
-
-/* ── Quotes ──────────────────────────────────────────────────────────────── */
-.cm-md-quote-line {
-  padding-left: 1.15em;
-  box-shadow: inset 2px 0 0 var(--ink-4);
-  color: var(--ink-2);
-  font-style: italic;
-}
-
-/* ── Tables ──────────────────────────────────────────────────────────────────
-   Pipes and dashes never line up into columns, however they are styled, so the
-   block is drawn as a grid instead. Clicking a cell hands the caret back to
-   that cell's source, which is the only moment the pipes are worth seeing. */
-.cm-md-table {
-  margin-block: 0.9rem 1.2rem;
-  overflow-x: auto;
-  border: 1px solid var(--rule-soft);
-  border-radius: 0.7rem;
-  background: var(--surface);
-}
-
-.cm-md-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92em;
-  line-height: 1.5;
-}
-
-.cm-md-table th,
-.cm-md-table td {
-  padding: 0.5em 0.75em;
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--rule-soft);
-  border-right: 1px solid var(--rule-soft);
-  cursor: text;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.cm-md-table input {
-  width: 100%;
-  min-width: 5rem;
-  border: 0;
-  border-radius: 0.3rem;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  outline: 0;
-}
-
-.cm-md-table input:focus {
-  outline: 0;
-  background: var(--accent-wash);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.cm-md-table th:last-child,
-.cm-md-table td:last-child {
-  border-right: 0;
-}
-
-.cm-md-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.cm-md-table th {
-  font-weight: 640;
-  color: var(--ink);
-  background: var(--paper);
-}
-
-.cm-md-table td {
-  color: var(--ink-2);
-}
-
-.cm-md-table th:hover,
-.cm-md-table td:hover {
-  background: var(--accent-wash);
-}
-
-/* A horizontal rule in the source draws a real rule across the measure. */
-.cm-md-hr {
-  color: transparent;
-  display: inline-block;
-  width: 100%;
-  border-bottom: 1px solid var(--rule);
-  vertical-align: middle;
 }
 
 /* ── Axis sliders ───────────────────────────────────────────────────────────
@@ -3156,16 +2707,6 @@
   animation: list-in var(--dur-base) var(--ease-out) both;
 }
 
-@keyframes glyph-pop {
-  50% {
-    transform: scale(1.22);
-  }
-}
-
-.cm-md-task.is-done {
-  animation: glyph-pop var(--dur-base) var(--ease-spring);
-}
-
 .collection-column [role="option"],
 .sidebar-row,
 .note-row-glyph {
@@ -3176,7 +2717,7 @@
    Animating that scroll means the caret is chasing a moving page, which is the
    single least smooth thing the app did. The lists keep it: those scrolls are
    navigation, and navigation is worth watching travel. */
-.cm-scroller {
+.rich-text-editor {
   scroll-behavior: auto;
 }
 
@@ -3186,12 +2727,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .list-in,
-  .cm-md-task.is-done {
+  .list-in {
     animation: none;
   }
 
-  .cm-scroller,
+  .rich-text-editor,
   .sidebar-scroll,
   .collection-column [role="listbox"] {
     scroll-behavior: auto;
@@ -3783,36 +3323,269 @@
   line-height: 1.5;
 }
 
-/* ══ Coloured text ═══════════════════════════════════════════════════════════
-   Colour belongs to the letters. A wash behind them was the old behaviour and
-   it fought the dark page in both directions: too faint to see, and heavy
-   enough to repaint the type when it was visible. */
-.cm-md-tint {
-  color: var(--tint-yellow);
+/* ══ Structured rich text (Tiptap) ═══════════════════════════════════════════
+   The document now contains real paragraphs, marks and nodes. These rules keep
+   the reading page visually unchanged without exposing storage syntax. */
+.rich-text-editor {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-bottom: 45vh;
+  color: var(--ink);
+  font-family: var(--font-reading);
+  font-size: var(--read-size);
+  font-weight: var(--read-weight);
+  line-height: var(--read-leading);
 }
 
-.cm-md-tint-yellow {
-  color: var(--tint-yellow);
+.rich-text-content {
+  width: 100%;
+  min-height: 10rem;
+  max-width: var(--read-measure);
+  margin-inline: auto;
+  padding: 0;
+  outline: none;
+  caret-color: var(--accent);
+  overflow-wrap: anywhere;
 }
-.cm-md-tint-purple {
-  color: var(--tint-purple);
+
+.rich-text-content > *:first-child {
+  margin-top: 0;
 }
-.cm-md-tint-pink {
-  color: var(--tint-pink);
+
+.rich-text-content p {
+  min-height: 1.35em;
+  margin: 0.28em 0;
 }
-.cm-md-tint-orange {
-  color: var(--tint-orange);
+
+.rich-text-content p.is-editor-empty:first-child::before {
+  height: 0;
+  float: left;
+  color: var(--ink-4);
+  content: attr(data-placeholder);
+  pointer-events: none;
 }
-.cm-md-tint-mint {
-  color: var(--tint-mint);
+
+.rich-text-content h1,
+.rich-text-content h2,
+.rich-text-content h3 {
+  margin: 0.85em 0 0.28em;
+  font-family: var(--font-display);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
 }
-.cm-md-tint-blue {
-  color: var(--tint-blue);
+
+.rich-text-content h1 {
+  font-size: 1.8em;
+  font-weight: 700;
+}
+.rich-text-content h2 {
+  font-size: 1.4em;
+}
+.rich-text-content h3 {
+  font-size: 1.15em;
+  letter-spacing: 0.005em;
+}
+
+.rich-text-content strong {
+  font-weight: 700;
+}
+.rich-text-content em {
+  font-style: italic;
+}
+.rich-text-content s {
+  color: var(--ink-3);
+  text-decoration-thickness: 1px;
+}
+.rich-text-content code {
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.3em;
+  background: var(--surface);
+  padding: 0.05em 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+.rich-text-content pre {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.8rem 1rem;
+}
+.rich-text-content pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.rich-text-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+.rich-text-content blockquote {
+  margin: 0.7em 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 0.9em;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0.45em 0;
+  padding-left: 1.55em;
+}
+.rich-text-content ul {
+  list-style: disc;
+}
+.rich-text-content ol {
+  list-style: decimal;
+}
+.rich-text-content li::marker {
+  color: var(--accent);
+}
+
+.rich-text-content ul[data-type="taskList"] {
+  padding-left: 0;
+  list-style: none;
+}
+.rich-text-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+}
+.rich-text-content ul[data-type="taskList"] li > label {
+  padding-top: 0.22em;
+}
+.rich-text-content ul[data-type="taskList"] li > div {
+  min-width: 0;
+  flex: 1;
+}
+.rich-text-content ul[data-type="taskList"] input {
+  accent-color: var(--accent);
+}
+
+.rich-text-content .tableWrapper {
+  overflow-x: auto;
+  margin: 0.9em 0;
+}
+.rich-text-content table {
+  width: 100%;
+  min-width: 24rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.rich-text-content th,
+.rich-text-content td {
+  position: relative;
+  min-width: 5rem;
+  border: 1px solid var(--rule);
+  padding: 0.45rem 0.55rem;
+  vertical-align: top;
+}
+.rich-text-content th {
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-weight: 650;
+}
+.rich-text-content .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-wash);
+  content: "";
+  pointer-events: none;
+}
+
+.rich-text-content hr {
+  margin: 1.25em 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.rich-text-content > img {
+  display: block;
+  width: min(100%, 46rem);
+  max-height: 34rem;
+  margin: 1rem 0 1.35rem;
+  border-radius: 0.75rem;
+  object-fit: contain;
+}
+
+.rich-media-image {
+  position: relative;
+  display: block;
+  width: min(100%, 46rem);
+  margin: 1rem 0 1.35rem;
+}
+.rich-media-image-open {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+.rich-media-image-open img {
+  display: block;
+  width: 100%;
+  max-height: 34rem;
+  object-fit: contain;
+}
+.rich-media-remove {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--danger);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-press);
+}
+.rich-media-image:hover .rich-media-remove,
+.rich-media-remove:focus-visible {
+  opacity: 1;
+}
+.rich-media-caption {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+}
+.rich-media-loading {
+  border: 1px dashed var(--rule);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+}
+
+.rich-text-content .ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.rich-text-content .find-and-replace-result {
+  border-radius: 0.15em;
+  background: color-mix(in srgb, var(--tint-yellow) 32%, transparent);
+}
+.rich-text-content .find-and-replace-result-current {
+  background: color-mix(in srgb, var(--tint-yellow) 62%, transparent);
 }
 
 /* ══ Attachments ══════════════════════════════════════════════════════════════
    A stored document, shown as a document. */
-.cm-md-file-widget {
+.rich-media-file {
   position: relative;
   display: flex;
   align-items: center;
@@ -3828,15 +3601,15 @@
     transform var(--dur-press) var(--ease-press);
 }
 
-.cm-md-file-widget:hover {
+.rich-media-file:hover {
   border-color: var(--ink-4);
 }
 
-.cm-md-file-widget.is-error {
+.rich-media-file.is-error {
   border-color: var(--danger);
 }
 
-.cm-md-file-open {
+.rich-media-file-open {
   display: flex;
   align-items: center;
   gap: 0.65rem;
@@ -3845,11 +3618,11 @@
   text-align: left;
 }
 
-.cm-md-file-open:active {
+.rich-media-file-open:active {
   transform: scale(0.99);
 }
 
-.cm-md-file-badge {
+.rich-media-file-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3865,14 +3638,14 @@
   letter-spacing: 0.04em;
 }
 
-.cm-md-file-text {
+.rich-media-file-text {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 0.1rem;
 }
 
-.cm-md-file-name {
+.rich-media-file-name {
   overflow: hidden;
   color: var(--ink);
   font-family: var(--font-sans);
@@ -3882,19 +3655,34 @@
   white-space: nowrap;
 }
 
-.cm-md-file-hint {
+.rich-media-file-hint {
   color: var(--ink-4);
   font-family: var(--font-mono);
   font-size: 10px;
 }
 
-.cm-md-file-actions {
+.rich-media-file-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 0.15rem;
 }
 
-.cm-md-file-actions .cm-md-image-action {
-  position: static;
+.rich-media-file-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.45rem;
+  color: var(--ink-3);
+}
+
+.rich-media-file-action:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.rich-media-file-action.is-danger:hover {
+  color: var(--danger);
 }

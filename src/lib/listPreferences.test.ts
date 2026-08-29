@@ -12,7 +12,17 @@ import {
 function entry(id: string, updatedAt: string, createdAt = updatedAt, title = id): NoteEntry {
   return {
     version: 1,
-    note: { id, ownerId: "member-1", title, body: "", createdAt, updatedAt },
+    note: {
+      id,
+      ownerId: "member-1",
+      title,
+      body: "",
+      content: { type: "doc", content: [{ type: "paragraph" }] },
+      contentVersion: 1,
+      legacyBody: null,
+      createdAt,
+      updatedAt,
+    },
   };
 }
 

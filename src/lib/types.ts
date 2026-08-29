@@ -1,7 +1,15 @@
+import type { JSONContent } from "@tiptap/core";
+
 export interface Note {
   id: string;
   title: string;
   body: string;
+  /** Canonical structured document. Existing source rows are converted while loading. */
+  content: JSONContent;
+  /** Zero is the legacy source format; one is the Tiptap JSON schema introduced in 2026. */
+  contentVersion: number;
+  /** Original source retained after conversion so migration is reversible. */
+  legacyBody: string | null;
   /**
    * The member whose scope this note sits in. It is an organisational label,
    * not a permission: every member of the archive reads and writes every

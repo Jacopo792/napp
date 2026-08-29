@@ -3,6 +3,10 @@
    note — it is authored material with the same dimensions, which is the point:
    density decisions must be judged against 55-character titles, not "Note 1". */
 import type { Note, Meta } from "@/lib/types";
+import {
+  legacyMarkdownToRichText,
+  richTextToPlainText,
+} from "@/features/editor/lib/content";
 
 /* Two stand-in member ids, so the preview exercises the same scope
    switching the real archive does. */
@@ -212,11 +216,17 @@ export const FIXTURE_META: Meta = {
   })),
 };
 
-export const FIXTURE_NOTES: Note[] = SEEDS.map((s, i) => ({
-  id: `n${i}`,
-  title: s.title,
-  body: s.body,
-  ownerId: PREVIEW_U1,
-  createdAt: iso(s.days + 30),
-  updatedAt: iso(s.days),
-}));
+export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
+  const content = legacyMarkdownToRichText(seed.body);
+  return {
+    id: `n${index}`,
+    title: seed.title,
+    body: richTextToPlainText(content),
+    content,
+    contentVersion: 0,
+    legacyBody: seed.body,
+    ownerId: PREVIEW_U1,
+    createdAt: iso(seed.days + 30),
+    updatedAt: iso(seed.days),
+  };
+});

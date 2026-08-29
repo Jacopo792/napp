@@ -5,11 +5,16 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
-- Organized the editor domain under `src/features/editor/` (`components/` for
-  `EditorToolbar`, `MarkdownEditor`, `NoteEditor`, `TitleField`; `lib/` for
-  `attachments`, `draft`, `pdf`, `translation`) with `git mv` and updated
-  imports. `NoteList`, `Sidebar`, `WorkspaceMenus` and `notes.tsx` remain where
-  they are for now.
+- Replaced the source-text editor with a structured Tiptap document, including
+  formatting, colours, checklists, editable tables, private media nodes and a
+  reversible import path for existing notes.
+- Added clipboard image insertion and concise table controls for deleting the
+  selected row, column or table.
+- Opening or focusing a note no longer emits an editor update or changes its
+  modification time; only document-changing transactions enter the save queue.
+- Organized the editor domain under `src/features/editor/`: four focused UI
+  components and five small domain modules. `NoteList`, `Sidebar`,
+  `WorkspaceMenus` and `notes.tsx` remain in their existing domains.
 - Renamed the `preview` npm script to `preview:dist`; `preview:ui` remains the
   credential-free fixture on `localhost:5199`.
 - Secured the Realtime Presence channel: `presence:<archiveId>` is now joined
