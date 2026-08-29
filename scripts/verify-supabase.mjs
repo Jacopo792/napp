@@ -10,8 +10,9 @@
  * archive, and nobody else reads anything at all.
  *
  * USER_ONE and USER_TWO are required. USER_THREE (an additional member, which
- * may carry no `owner` label) and USER_OUTSIDER (an authenticated account with
- * no membership) are verified when their credentials are present.
+ * may carry no `owner` label) and USER_OUTSIDER (an authenticated account that
+ * is not a member of this archive — it may well be a member of another one) are
+ * verified when their credentials are present.
  */
 
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
@@ -269,10 +270,16 @@ try {
   report.anonymous = { rows: 0, insertRejected: true, storageRejected: true };
 
   if (outsider) {
+    // Scoped to this archive on purpose: an outsider may legitimately own rows
+    // in an archive of their own, and must still see nothing of this one.
     for (const table of closedTables) {
-      const read = await outsider.supabase.from(table).select("*").limit(5);
+      const read = await outsider.supabase
+        .from(table)
+        .select("*")
+        .eq(table === "archives" ? "id" : "archive_id", archiveId)
+        .limit(5);
       fail(read.error);
-      assert(read.data.length === 0, `A member-less account read ${table}`);
+      assert(read.data.length === 0, `An account outside the archive read ${table}`);
     }
     const write = await outsider.supabase.from("notes").insert({
       id: crypto.randomUUID(),
@@ -283,9 +290,12 @@ try {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
-    assert(write.error, "A member-less account inserted a note");
+    assert(write.error, "An account outside the archive inserted a note");
     const files = await outsider.supabase.storage.from("note-images").list(archiveId);
-    assert(files.error || files.data.length === 0, "A member-less account listed archive files");
+    assert(
+      files.error || files.data.length === 0,
+      "An account outside the archive listed its files",
+    );
     report.authenticatedNonMember = { rows: 0, insertRejected: true, storageRejected: true };
   } else {
     report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
