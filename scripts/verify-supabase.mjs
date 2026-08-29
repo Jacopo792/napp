@@ -1,230 +1,310 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
-import { decryptNote, encryptNote, importArchiveKey, unwrapArchiveKey } from "../src/lib/crypto.ts";
+/**
+ * End-to-end check of the account-only archive.
+ *
+ * Nothing here decrypts anything: notes, folders and tags are ordinary columns
+ * now, and the only thing standing between them and the internet is Supabase
+ * Auth plus the `archive_members` row-level policies. The script therefore
+ * verifies exactly that boundary — every member reads and writes the same
+ * archive, and nobody else reads anything at all.
+ *
+ * USER_ONE and USER_TWO are required. USER_THREE (an additional member, which
+ * may carry no `owner` label) and USER_OUTSIDER (an authenticated account with
+ * no membership) are verified when their credentials are present.
+ */
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
 
-async function loadEnv() {
-  const values = {};
-  for (const filename of [".env", ".env.local"]) {
-    try {
-      const content = await readFile(resolve(root, filename), "utf8");
-      for (const line of content.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-        const separator = trimmed.indexOf("=");
-        values[trimmed.slice(0, separator).trim()] = trimmed
-          .slice(separator + 1)
-          .trim()
-          .replace(/^['"]|['"]$/g, "");
-      }
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  }
-  return { ...values, ...process.env };
+const REALTIME_SETTLE_MS = 1_000;
+const REALTIME_TIMEOUT_MS = 25_000;
+
+function delay(ms) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function client(url, key) {
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-}
-
-async function loginAndUnlock(supabase, email, password) {
+async function signIn(env, email, password) {
+  const supabase = anonClient(env);
   const signedIn = await supabase.auth.signInWithPassword({ email, password });
-  if (signedIn.error || !signedIn.data.user) throw signedIn.error ?? new Error("Login failed");
-  const vault = await supabase
-    .from("vault_keys")
-    .select("archive_id, wrapped_dek, kdf_salt, kdf_iterations")
-    .eq("user_id", signedIn.data.user.id)
-    .single();
-  if (vault.error) throw vault.error;
-  const membership = await supabase
-    .from("archive_members")
-    .select("owner")
-    .eq("archive_id", vault.data.archive_id)
-    .eq("user_id", signedIn.data.user.id)
-    .single();
-  if (membership.error) throw membership.error;
-  const rawDek = await unwrapArchiveKey(
-    {
-      wrappedDek: vault.data.wrapped_dek,
-      kdfSalt: vault.data.kdf_salt,
-      kdfIterations: vault.data.kdf_iterations,
-    },
-    password,
-  );
+  fail(signedIn.error);
+  assert(signedIn.data.user, `Login failed for ${email}`);
   return {
-    archiveId: vault.data.archive_id,
-    key: await importArchiveKey(rawDek),
-    rawDek,
-    owner: membership.data.owner,
+    supabase,
+    userId: signedIn.data.user.id,
+    email,
+    token: signedIn.data.session.access_token,
   };
 }
 
+async function openMember(env, email, password) {
+  const account = await signIn(env, email, password);
+  const memberships = await account.supabase
+    .from("archive_members")
+    .select("archive_id, owner")
+    .eq("user_id", account.userId);
+  fail(memberships.error);
+  assert(memberships.data.length === 1, `${email} does not have exactly one membership`);
+  return {
+    ...account,
+    archiveId: memberships.data[0].archive_id,
+    owner: memberships.data[0].owner,
+  };
+}
+
+/** Realtime reports SUBSCRIBED slightly before the server has the filter in
+    place, which is what made this check flake. Settle, then insert. */
 function waitForSubscription(channel) {
   return new Promise((resolveSubscription, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Realtime subscription timed out")), 12_000);
-    channel.subscribe((status) => {
+    const timeout = setTimeout(() => reject(new Error("Realtime subscription timed out")), 20_000);
+    channel.subscribe((status, error) => {
       if (status === "SUBSCRIBED") {
         clearTimeout(timeout);
         resolveSubscription();
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         clearTimeout(timeout);
-        reject(new Error(`Realtime subscription failed: ${status}`));
+        reject(
+          new Error(`Realtime subscription failed: ${status}${error ? ` (${error.message})` : ""}`),
+        );
       }
     });
   });
 }
 
 const env = await loadEnv();
-for (const name of [
+requireEnv(env, [
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
   "USER_ONE_EMAIL",
   "USER_ONE_PASSWORD",
   "USER_TWO_EMAIL",
   "USER_TWO_PASSWORD",
-]) {
-  assert(env[name], `Missing ${name}`);
-}
+]);
 
-const firstClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
-const secondClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
-const anonymousClient = client(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const first = await openMember(env, env.USER_ONE_EMAIL, env.USER_ONE_PASSWORD);
+const second = await openMember(env, env.USER_TWO_EMAIL, env.USER_TWO_PASSWORD);
+const third = env.USER_THREE_EMAIL
+  ? await openMember(env, env.USER_THREE_EMAIL, env.USER_THREE_PASSWORD)
+  : null;
+const members = [first, second, ...(third ? [third] : [])];
+const anonymous = anonClient(env);
+const outsider = env.USER_OUTSIDER_EMAIL
+  ? await signIn(env, env.USER_OUTSIDER_EMAIL, env.USER_OUTSIDER_PASSWORD)
+  : null;
 
-const first = await loginAndUnlock(firstClient, env.USER_ONE_EMAIL, env.USER_ONE_PASSWORD);
-const second = await loginAndUnlock(secondClient, env.USER_TWO_EMAIL, env.USER_TWO_PASSWORD);
-assert(first.owner === "u1", "Jacopo account did not resolve to u1");
-assert(second.owner === "u2", "Lisa account did not resolve to u2");
-assert(first.archiveId === second.archiveId, "Accounts point to different archives");
-assert(
-  Buffer.from(first.rawDek).equals(Buffer.from(second.rawDek)),
-  "Accounts did not unwrap the same DEK",
-);
-
-const membership = await firstClient
-  .from("archive_members")
-  .select("user_id")
-  .eq("archive_id", first.archiveId);
-if (membership.error) throw membership.error;
-assert(membership.data.length === 2, "The archive does not have exactly two members");
-
+const archiveId = first.archiveId;
+const report = {};
+const channel = second.supabase.channel(`verify:${crypto.randomUUID()}`);
 const testId = crypto.randomUUID();
-const now = new Date().toISOString();
-const original = {
-  id: testId,
-  title: "Supabase verification",
-  body: "Created by the automated cross-account verification.",
-  owner: "u1",
-  createdAt: now,
-  updatedAt: now,
-};
-
-let realtimeReceived = false;
-const channel = secondClient.channel(`verify:${testId}`);
-const realtimePromise = new Promise((resolveEvent) => {
-  const timeout = setTimeout(() => resolveEvent(false), 10_000);
-  channel.on(
-    "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "public",
-      table: "notes",
-      filter: `archive_id=eq.${first.archiveId}`,
-    },
-    () => {
-      clearTimeout(timeout);
-      realtimeReceived = true;
-      resolveEvent(true);
-    },
-  );
-});
-await waitForSubscription(channel);
 
 try {
-  const inserted = await firstClient.from("notes").insert({
-    id: testId,
-    archive_id: first.archiveId,
-    owner: "u1",
-    ciphertext: await encryptNote(original, first.key),
-    created_at: original.createdAt,
-    updated_at: original.updatedAt,
-  });
-  if (inserted.error) throw inserted.error;
+  // ── One archive, several members, `owner` as a label only ────────────────
+  for (const member of members) {
+    assert(member.archiveId === archiveId, `${member.email} points at a different archive`);
+    assert(
+      member.owner === null || member.owner === "u1" || member.owner === "u2",
+      `${member.email} carries an unknown owner label`,
+    );
+  }
+  const roster = await first.supabase
+    .from("archive_members")
+    .select("user_id, owner")
+    .eq("archive_id", archiveId);
+  fail(roster.error);
+  assert(roster.data.length >= members.length, "The roster is smaller than the verified accounts");
+  const labels = roster.data.map((row) => row.owner).filter((owner) => owner !== null);
+  assert(new Set(labels).size === labels.length, "Two members share one owner label");
+  for (const member of members) {
+    assert(
+      roster.data.some((row) => row.user_id === member.userId),
+      `${member.email} is missing from the roster every member can read`,
+    );
+  }
+  report.members = roster.data.length;
+  report.verifiedAccounts = members.map((member) => ({ email: member.email, owner: member.owner }));
 
-  await realtimePromise;
-  assert(realtimeReceived, "Lisa did not receive the Realtime insert event");
-
-  const readBySecond = await secondClient
-    .from("notes")
-    .select("ciphertext, version")
-    .eq("id", testId)
-    .single();
-  if (readBySecond.error) throw readBySecond.error;
-  const decryptedBySecond = await decryptNote(readBySecond.data.ciphertext, second.key);
-  assert(decryptedBySecond.title === original.title, "Lisa could not decrypt Jacopo's note");
-
-  const updatedNote = {
-    ...decryptedBySecond,
-    body: "Updated through Lisa's account.",
-    updatedAt: new Date().toISOString(),
+  // ── Stored data is plaintext, not ciphertext ─────────────────────────────
+  const [notes, folders, tags, archive] = await Promise.all([
+    first.supabase
+      .from("notes")
+      .select("id, owner, title, body, ciphertext")
+      .eq("archive_id", archiveId),
+    first.supabase.from("folders").select("id, name, ciphertext").eq("archive_id", archiveId),
+    first.supabase.from("tags").select("id, name, ciphertext").eq("archive_id", archiveId),
+    first.supabase
+      .from("archives")
+      .select("settings, settings_ciphertext")
+      .eq("id", archiveId)
+      .single(),
+  ]);
+  for (const result of [notes, folders, tags, archive]) fail(result.error);
+  for (const row of notes.data) {
+    assert(row.ciphertext === null, `Note ${row.id} still stores ciphertext`);
+    assert(typeof row.title === "string", `Note ${row.id} has no plaintext title`);
+    assert(typeof row.body === "string", `Note ${row.id} has no plaintext body`);
+  }
+  for (const row of folders.data) {
+    assert(row.ciphertext === null, `Folder ${row.id} still stores ciphertext`);
+    assert(typeof row.name === "string" && row.name.length > 0, `Folder ${row.id} has no name`);
+  }
+  for (const row of tags.data) {
+    assert(row.ciphertext === null, `Tag ${row.id} still stores ciphertext`);
+    assert(typeof row.name === "string" && row.name.length > 0, `Tag ${row.id} has no name`);
+  }
+  assert(archive.data.settings_ciphertext === null, "Archive settings still store ciphertext");
+  assert(
+    archive.data.settings !== null && typeof archive.data.settings === "object",
+    "Archive settings are not a plain JSON object",
+  );
+  report.plaintext = {
+    notes: notes.data.length,
+    folders: folders.data.length,
+    tags: tags.data.length,
+    ciphertextRows: 0,
   };
-  const updated = await secondClient
-    .from("notes")
-    .update({
-      ciphertext: await encryptNote(updatedNote, second.key),
-      updated_at: updatedNote.updatedAt,
-      version: readBySecond.data.version + 1,
-    })
-    .eq("id", testId)
-    .eq("version", readBySecond.data.version);
-  if (updated.error) throw updated.error;
 
-  const readBack = await firstClient.from("notes").select("ciphertext").eq("id", testId).single();
-  if (readBack.error) throw readBack.error;
-  const decryptedByFirst = await decryptNote(readBack.data.ciphertext, first.key);
-  assert(decryptedByFirst.body === updatedNote.body, "Jacopo could not read Lisa's update");
+  // ── Files keep their real type behind the same membership rule ───────────
+  const objects = await first.supabase.storage.from("note-images").list(archiveId, { limit: 1000 });
+  fail(objects.error);
+  for (const object of objects.data) {
+    assert(
+      object.metadata?.mimetype && object.metadata.mimetype !== "application/octet-stream",
+      `Object ${object.name} is still stored as opaque bytes`,
+    );
+  }
+  if (objects.data.length > 0) {
+    const download = await first.supabase.storage
+      .from("note-images")
+      .download(`${archiveId}/${objects.data[0].name}`);
+    fail(download.error);
+    assert((await download.data.arrayBuffer()).byteLength > 0, "A stored file downloaded empty");
+  }
+  report.objects = {
+    count: objects.data.length,
+    types: [...new Set(objects.data.map((object) => object.metadata?.mimetype))],
+  };
 
-  const anonymous = await anonymousClient.from("notes").select("id");
-  if (anonymous.error) throw anonymous.error;
-  assert(anonymous.data.length === 0, "Anonymous client could read notes");
+  // ── Realtime reaches the other members ───────────────────────────────────
+  let realtimeReceived = false;
+  const realtimeEvent = new Promise((resolveEvent) => {
+    const timeout = setTimeout(() => resolveEvent(false), REALTIME_TIMEOUT_MS);
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "notes", filter: `archive_id=eq.${archiveId}` },
+      (payload) => {
+        if (payload.new?.id !== testId) return;
+        clearTimeout(timeout);
+        realtimeReceived = true;
+        resolveEvent(true);
+      },
+    );
+  });
+  await second.supabase.realtime.setAuth(second.token);
+  await waitForSubscription(channel);
+  await delay(REALTIME_SETTLE_MS);
+
+  const now = new Date().toISOString();
+  const inserted = await first.supabase.from("notes").insert({
+    id: testId,
+    archive_id: archiveId,
+    owner: "u1",
+    title: "Supabase verification",
+    body: "Created by the automated cross-account verification.",
+    created_at: now,
+    updated_at: now,
+  });
+  fail(inserted.error);
+
+  await realtimeEvent;
+  assert(realtimeReceived, `${second.email} did not receive the Realtime insert event`);
+  report.realtime = true;
+
+  // ── Every member reads and writes the same row ───────────────────────────
+  const writers = members.slice(1);
+  const trail = [];
+  for (const writer of writers) {
+    const read = await writer.supabase
+      .from("notes")
+      .select("title, body, version")
+      .eq("id", testId)
+      .single();
+    fail(read.error);
+    assert(read.data.title === "Supabase verification", `${writer.email} read the wrong note`);
+    const body = `Updated through ${writer.email}.`;
+    const updated = await writer.supabase
+      .from("notes")
+      .update({ body, updated_at: new Date().toISOString(), version: read.data.version + 1 })
+      .eq("id", testId)
+      .eq("version", read.data.version);
+    fail(updated.error);
+    trail.push({ email: writer.email, read: true, wrote: true });
+
+    const readBack = await first.supabase.from("notes").select("body").eq("id", testId).single();
+    fail(readBack.error);
+    assert(readBack.data.body === body, `${first.email} could not read ${writer.email}'s update`);
+  }
+  report.crossAccount = trail;
+
+  // ── Nobody outside the roster sees anything ──────────────────────────────
+  const closedTables = ["archives", "archive_members", "notes", "folders", "tags", "note_tags"];
+  for (const table of closedTables) {
+    const anonymousRead = await anonymous.from(table).select("*").limit(5);
+    fail(anonymousRead.error);
+    assert(anonymousRead.data.length === 0, `An anonymous client read ${table}`);
+  }
+  const anonymousWrite = await anonymous.from("notes").insert({
+    id: crypto.randomUUID(),
+    archive_id: archiveId,
+    owner: "u1",
+    title: "should not exist",
+    body: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  assert(anonymousWrite.error, "An anonymous client inserted a note");
+  const anonymousObjects = await anonymous.storage.from("note-images").list(archiveId);
+  assert(
+    anonymousObjects.error || anonymousObjects.data.length === 0,
+    "An anonymous client listed archive files",
+  );
+  report.anonymous = { rows: 0, insertRejected: true, storageRejected: true };
+
+  if (outsider) {
+    for (const table of closedTables) {
+      const read = await outsider.supabase.from(table).select("*").limit(5);
+      fail(read.error);
+      assert(read.data.length === 0, `A member-less account read ${table}`);
+    }
+    const write = await outsider.supabase.from("notes").insert({
+      id: crypto.randomUUID(),
+      archive_id: archiveId,
+      owner: "u1",
+      title: "should not exist",
+      body: "",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    assert(write.error, "A member-less account inserted a note");
+    const files = await outsider.supabase.storage.from("note-images").list(archiveId);
+    assert(files.error || files.data.length === 0, "A member-less account listed archive files");
+    report.authenticatedNonMember = { rows: 0, insertRejected: true, storageRejected: true };
+  } else {
+    report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
+  }
 } finally {
-  await firstClient.from("notes").delete().eq("id", testId);
-  await secondClient.removeChannel(channel);
-  await firstClient.auth.signOut({ scope: "local" });
-  await secondClient.auth.signOut({ scope: "local" });
-  firstClient.realtime.disconnect();
-  secondClient.realtime.disconnect();
-  anonymousClient.realtime.disconnect();
+  const removed = await first.supabase.from("notes").delete().eq("id", testId);
+  const leftover = await first.supabase.from("notes").select("id").eq("id", testId);
+  report.testNoteRemoved = !removed.error && leftover.data?.length === 0;
+  await second.supabase.removeChannel(channel);
+  for (const member of members) {
+    await member.supabase.auth.signOut({ scope: "local" });
+    member.supabase.realtime.disconnect();
+  }
+  if (outsider) {
+    await outsider.supabase.auth.signOut({ scope: "local" });
+    outsider.supabase.realtime.disconnect();
+  }
+  anonymous.realtime.disconnect();
 }
 
-console.log(
-  JSON.stringify(
-    {
-      jacopoLogin: true,
-      lisaLogin: true,
-      sameArchive: true,
-      sameDek: true,
-      jacopoOwner: first.owner,
-      lisaOwner: second.owner,
-      members: 2,
-      realtime: realtimeReceived,
-      lisaReadJacopoNote: true,
-      jacopoReadLisaUpdate: true,
-      anonymousRows: 0,
-      testNoteRemoved: true,
-    },
-    null,
-    2,
-  ),
-);
+assert(report.testNoteRemoved, "The verification note could not be removed");
+console.log(JSON.stringify(report, null, 2));

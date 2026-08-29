@@ -315,7 +315,7 @@ function NotesPage() {
         return;
       }
       setSession(s);
-      setViewAs(s.owner);
+      setViewAs(s.defaultView);
     });
   }, [navigate]);
 

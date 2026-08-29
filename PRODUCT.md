@@ -8,15 +8,23 @@ web
 
 ## Users
 
-Two people, and only two, with separate Supabase email/password accounts and full
-read/write access to one shared archive. The account is the only access boundary;
-there is no separate archive key or passphrase. Both can use the `viewAs` switch.
+Everyone holding a row in `archive_members`: Jacopo and Lisa today, plus any
+further account invited into the same archive. Each has a separate Supabase
+email/password account and full read/write access to the one shared archive. The
+account is the only access boundary; there is no separate archive key or
+passphrase. Every member can use the `viewAs` switch.
 
 `owner: "u1" | "u2"` remains a live organisational label. It powers **Jacopo /
 Lisa**, and folders and tags carry the same owner label, but it is never an
-authorization boundary. RLS checks only membership in the shared archive.
-Jacopo's account opens on `u1`; Lisa's account opens on `u2`. Either person can still
-switch views manually.
+authorization boundary: RLS checks membership in the shared archive and nothing
+else. A unique index allows one member per label per archive, so Jacopo's account
+opens on `u1`, Lisa's on `u2`, and an additional member joins unlabelled and
+opens on `u1`. Everyone can still switch views manually.
+
+Creating a Supabase Auth account does not join the archive. Until the
+`archive_members` row exists the app answers "This account is not connected to
+the archive" and the database returns nothing. `pnpm add:member` writes that row
+through an existing member's own session; no service-role key is involved.
 
 ## Product Purpose
 
@@ -54,11 +62,11 @@ while search and content processing remain local.
 ## Capabilities and Constraints
 
 Confirmed functionality: create / edit / delete notes, fast debounced autosave,
-pinning, folders, colored tags, full-text search, drag a note onto a folder,
-and u1's `viewAs` archive switch. Appearance supports system, light and dark modes,
-curated palettes, custom colours and an optional device-local background image. Opening
-a note is read-only state selection: it must never update `updatedAt` or trigger a
-database write.
+pinning, folders, colored tags, full-text search, drag a note onto a folder, and the
+`viewAs` scope switch every member can use. Appearance supports system, light and dark
+modes, curated palettes, custom colours and an optional device-local background image.
+Opening a note is read-only state selection: it must never update `updatedAt` or trigger
+a database write.
 
 **Editor direction (updated 2026-08-27):** keep the _invisible markdown_ editor in the
 Bear model — markdown syntax renders as formatting while you type in one pane, with no
@@ -80,7 +88,9 @@ and URL fields instead of leaving an editable Markdown placeholder in the note.
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
-- Supabase Auth uses two pre-created email/password accounts; public signup is disabled.
+- Supabase Auth accounts are created out of band and public signup is disabled. A
+  new account reaches the archive only when an existing member adds its
+  `archive_members` row.
 - RLS authorizes every database row through `archive_members`; `owner` is never a
   security boundary. Storage policies derive the archive id from the object path and
   apply the same membership check.
@@ -105,14 +115,15 @@ success states retain their semantic meaning in every palette.
   previews, and reading measure honestly. Do not invent placeholder note content that
   is shorter or tidier than the real thing.
 - No logo, no wordmark, no brand imagery exists for this app. Do not fabricate one.
-- No users beyond the two. No testimonials, metrics, or adoption claims exist.
+- No users beyond the archive's own members. No testimonials, metrics, or adoption
+  claims exist.
 
 ## Product Principles
 
 1. **The words outrank the app.** Every surface that is not the note itself recedes:
    chrome is quiet, the writing area is the brightest and calmest thing on screen.
 2. **Two labelled scopes, never blended.** u1 and u2 remain distinct organisational
-   views inside one shared archive, available to both authenticated members.
+   views inside one shared archive, available to every authenticated member.
 3. **Honest about the network.** Saving is a database write and can fail. Show real
    save state; never fake instant persistence.
 4. **Built for long notes and long titles.** Density decisions are validated against
