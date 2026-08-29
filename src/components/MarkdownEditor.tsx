@@ -554,7 +554,7 @@ class AttachmentWidget extends WidgetType {
          return null, and the handle is the whole point. The opener is severed
          by hand instead, as soon as the tab has somewhere to be. */
       const tab = window.open("", "_blank");
-      hint.textContent = "Decrypting…";
+      hint.textContent = "Opening…";
       void this.resolveFile(this.objectId)
         .then((blob) => {
           const objectUrl = URL.createObjectURL(blob);

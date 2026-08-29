@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "provision:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs --provision-only",
     "migrate:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs",
+    "migrate:account-only": "node --experimental-strip-types scripts/migrate-to-account-only.mjs",
     "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs"
   },
   "dependencies": {

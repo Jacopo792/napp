@@ -6,7 +6,8 @@ export interface AppSession {
   email: string;
   archiveId: string;
   owner: "u1" | "u2";
-  key: CryptoKey;
+  /** Kept only long enough to open data written by the retired encrypted format. */
+  legacyKey?: CryptoKey;
 }
 
 const SESSION_KEY = "napp:archive-session";
@@ -16,7 +17,7 @@ interface StoredSession {
   email: string;
   archiveId: string;
   owner: "u1" | "u2";
-  rawDek: string;
+  rawDek?: string;
 }
 
 async function resolveOwner(userId: string, archiveId: string): Promise<"u1" | "u2"> {
@@ -36,41 +37,59 @@ export async function authenticate(email: string, password: string): Promise<App
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
-    const { data: rows, error: keyError } = await supabase
-      .from("vault_keys")
-      .select("archive_id, wrapped_dek, kdf_salt, kdf_iterations")
+    const { data: memberships, error: membershipError } = await supabase
+      .from("archive_members")
+      .select("archive_id, owner")
       .eq("user_id", data.user.id)
       .limit(2);
-    if (keyError) throw new Error(keyError.message);
-    if (!rows || rows.length !== 1) {
+    if (membershipError) throw new Error(membershipError.message);
+    if (!memberships || memberships.length !== 1) {
       throw new Error("This account is not connected to the archive");
     }
+    const membership = memberships[0];
+    const owner =
+      membership.owner === "u1" || membership.owner === "u2"
+        ? membership.owner
+        : await resolveOwner(data.user.id, membership.archive_id);
 
-    const row = rows[0];
-    const owner = await resolveOwner(data.user.id, row.archive_id);
-    const rawDek = await unwrapArchiveKey(
-      {
-        wrappedDek: row.wrapped_dek,
-        kdfSalt: row.kdf_salt,
-        kdfIterations: row.kdf_iterations,
-      },
-      password,
-    );
+    // Old rows and attachments may still need one last local decrypt. Failure
+    // is deliberately non-fatal: account authentication is now the boundary.
+    let rawDek: Uint8Array | undefined;
+    const legacy = await supabase
+      .from("vault_keys")
+      .select("wrapped_dek, kdf_salt, kdf_iterations")
+      .eq("user_id", data.user.id)
+      .eq("archive_id", membership.archive_id)
+      .maybeSingle();
+    if (legacy.data) {
+      try {
+        rawDek = await unwrapArchiveKey(
+          {
+            wrappedDek: legacy.data.wrapped_dek,
+            kdfSalt: legacy.data.kdf_salt,
+            kdfIterations: legacy.data.kdf_iterations,
+          },
+          password,
+        );
+      } catch {
+        rawDek = undefined;
+      }
+    }
     const stored: StoredSession = {
       userId: data.user.id,
       email: data.user.email ?? email,
-      archiveId: row.archive_id,
+      archiveId: membership.archive_id,
       owner,
-      rawDek: bytesToBase64(rawDek),
+      rawDek: rawDek ? bytesToBase64(rawDek) : undefined,
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
-    return { ...stored, key: await importArchiveKey(rawDek) };
+    return { ...stored, legacyKey: rawDek ? await importArchiveKey(rawDek) : undefined };
   } catch (reason) {
     sessionStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
     await supabase.auth.signOut({ scope: "local" });
     if (reason instanceof Error && reason.message.includes("not connected")) throw reason;
-    throw new Error("Email or password could not unlock this archive");
+    throw new Error("Could not open this account");
   }
 }
 
@@ -84,7 +103,10 @@ export async function restoreSession(): Promise<AppSession | null> {
     const owner = stored.owner ?? (await resolveOwner(stored.userId, stored.archiveId));
     const refreshed = { ...stored, owner };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(refreshed));
-    return { ...refreshed, key: await importArchiveKey(base64ToBytes(stored.rawDek)) };
+    return {
+      ...refreshed,
+      legacyKey: stored.rawDek ? await importArchiveKey(base64ToBytes(stored.rawDek)) : undefined,
+    };
   } catch {
     sessionStorage.removeItem(SESSION_KEY);
     return null;

@@ -1,16 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import {
-  decryptBytes,
-  decryptFolder,
-  decryptJson,
-  decryptNote,
-  decryptTag,
-  encryptBytes,
-  encryptFolder,
-  encryptJson,
-  encryptNote,
-  encryptTag,
-} from "./crypto";
+import { decryptBytes, decryptFolder, decryptJson, decryptNote, decryptTag } from "./crypto";
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
@@ -44,13 +33,16 @@ interface NoteRow {
 interface FolderRow {
   id: string;
   owner: Owner;
-  ciphertext: string;
+  name: string | null;
+  parent_id: string | null;
+  ciphertext: string | null;
 }
 
 interface TagRow {
   id: string;
   owner: Owner;
-  ciphertext: string;
+  name: string | null;
+  ciphertext: string | null;
   color: Tag["color"];
 }
 
@@ -59,15 +51,9 @@ interface NoteTagRow {
   tag_id: string;
 }
 
-/* ── The decrypted-note cache ────────────────────────────────────────────────
-   Realtime is only a wake-up signal, so every event used to re-download and
-   re-decrypt the entire archive. With two people writing at once that means one
-   person's keystrokes pay for a full decrypt of the other's corpus, several
-   times a minute.
-
-   `version` already exists for optimistic concurrency, and it changes on every
-   write — so it is exactly the cache key this needs. A cheap metadata query
-   says which rows moved; only those have their ciphertext fetched and decrypted.
+/* ── The note cache ──────────────────────────────────────────────────────────
+   Realtime is only a wake-up signal, so every event must not rebuild the
+   entire archive. `version` is the cache key and changes on every write.
 
    Reusing the cached Note object also preserves its identity across snapshots,
    which is what lets the WeakMap in lib/derived.ts keep the preview and search
@@ -80,49 +66,16 @@ interface CachedNote {
 
 let cacheArchiveId: string | null = null;
 const noteCache = new Map<string, CachedNote>();
-/** Folder and tag names are keyed by their own ciphertext: it changes if and
- *  only if the name did. */
-const nameCache = new Map<string, string>();
 
 export function resetArchiveCache(): void {
   cacheArchiveId = null;
   noteCache.clear();
-  nameCache.clear();
 }
 
 function adoptArchiveCache(archiveId: string): void {
   if (cacheArchiveId === archiveId) return;
   resetArchiveCache();
   cacheArchiveId = archiveId;
-}
-
-async function decryptName(
-  ciphertext: string,
-  decrypt: (value: string, key: CryptoKey) => Promise<{ name: string }>,
-  key: CryptoKey,
-): Promise<string> {
-  const hit = nameCache.get(ciphertext);
-  if (hit !== undefined) return hit;
-  const { name } = await decrypt(ciphertext, key);
-  nameCache.set(ciphertext, name);
-  return name;
-}
-
-/* A folder carries its place in the tree as well as its name, and both are
-   inside the ciphertext. Cached on the ciphertext like the names are, so a
-   reload that changed nothing does no extra AES work. */
-const folderCache = new Map<string, { name: string; parentId: string | null }>();
-
-async function decryptFolderRow(
-  ciphertext: string,
-  key: CryptoKey,
-): Promise<{ name: string; parentId: string | null }> {
-  const hit = folderCache.get(ciphertext);
-  if (hit) return hit;
-  const { name, parentId } = await decryptFolder(ciphertext, key);
-  const value = { name, parentId: parentId ?? null };
-  folderCache.set(ciphertext, value);
-  return value;
 }
 
 export interface ArchiveSnapshot {
@@ -145,12 +98,19 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         .eq("archive_id", archiveId),
       supabase
         .from("folders")
-        .select("id, owner, ciphertext, position")
+        .select("id, owner, name, parent_id, ciphertext, position")
         .eq("archive_id", archiveId)
         .order("position"),
-      supabase.from("tags").select("id, owner, ciphertext, color").eq("archive_id", archiveId),
+      supabase
+        .from("tags")
+        .select("id, owner, name, ciphertext, color")
+        .eq("archive_id", archiveId),
       supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
-      supabase.from("archives").select("settings_ciphertext").eq("id", archiveId).single(),
+      supabase
+        .from("archives")
+        .select("settings, settings_ciphertext")
+        .eq("id", archiveId)
+        .single(),
     ],
   );
   for (const result of [notesResult, foldersResult, tagsResult, noteTagsResult, archiveResult]) {
@@ -162,40 +122,68 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const tagRows = (tagsResult.data ?? []) as TagRow[];
   const noteTagRows = (noteTagsResult.data ?? []) as NoteTagRow[];
 
-  // Only the rows whose version moved need their ciphertext at all.
+  // Only rows whose version moved need their payload at all.
   const staleIds = noteRows
     .filter((row) => noteCache.get(row.id)?.version !== row.version)
     .map((row) => row.id);
 
-  const ciphertexts = new Map<string, string>();
+  const payloads = new Map<
+    string,
+    { title: string | null; body: string | null; ciphertext: string | null }
+  >();
   if (staleIds.length > 0) {
     const changed = await supabase
       .from("notes")
-      .select("id, ciphertext")
+      .select("id, title, body, ciphertext")
       .eq("archive_id", archiveId)
       .in("id", staleIds);
     fail(changed.error);
-    for (const row of (changed.data ?? []) as { id: string; ciphertext: string }[]) {
-      ciphertexts.set(row.id, row.ciphertext);
+    for (const row of (changed.data ?? []) as {
+      id: string;
+      title: string | null;
+      body: string | null;
+      ciphertext: string | null;
+    }[]) {
+      payloads.set(row.id, row);
     }
   }
 
+  const legacyWrites: PromiseLike<{ error: { message: string } | null }>[] = [];
   const entries = await Promise.all(
     noteRows.map(async (row) => {
       const cached = noteCache.get(row.id);
       if (cached?.version === row.version) {
         return { note: cached.note, version: row.version } satisfies NoteEntry;
       }
-      const ciphertext = ciphertexts.get(row.id);
+      const payload = payloads.get(row.id);
       // A row that appeared between the two queries: keep whatever is cached
       // rather than inventing a note, and let the next wake-up collect it.
-      if (ciphertext === undefined) {
+      if (payload === undefined) {
         if (!cached) throw new Error("A note changed while the archive was loading");
         return { note: cached.note, version: cached.version } satisfies NoteEntry;
       }
-      const decrypted = await decryptNote(ciphertext, session.key);
+      let title = payload.title;
+      let body = payload.body;
+      if ((title === null || body === null) && payload.ciphertext) {
+        if (!session.legacyKey) {
+          throw new Error(
+            "This note still uses the old encrypted format. Sign out and sign in once more to migrate it.",
+          );
+        }
+        const legacy = await decryptNote(payload.ciphertext, session.legacyKey);
+        title = legacy.title;
+        body = legacy.body;
+        legacyWrites.push(
+          supabase
+            .from("notes")
+            .update({ title, body, ciphertext: null })
+            .eq("archive_id", archiveId)
+            .eq("id", row.id),
+        );
+      }
       const note: Note = {
-        ...decrypted,
+        title: title ?? "",
+        body: body ?? "",
         id: row.id,
         owner: row.owner,
         createdAt: row.created_at,
@@ -211,25 +199,53 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   for (const id of [...noteCache.keys()]) if (!present.has(id)) noteCache.delete(id);
 
   const foldersByOwner: Record<Owner, Folder[]> = { u1: [], u2: [] };
-  const decryptedFolders = await Promise.all(
+  const plainFolders = await Promise.all(
     folderRows.map(async (row) => {
-      const { name, parentId } = await decryptFolderRow(row.ciphertext, session.key);
-      return { owner: row.owner, folder: { id: row.id, name, parentId } satisfies Folder };
-    }),
-  );
-  for (const item of decryptedFolders) foldersByOwner[item.owner].push(item.folder);
-
-  const tagsByOwner: Record<Owner, Tag[]> = { u1: [], u2: [] };
-  const decryptedTags = await Promise.all(
-    tagRows.map(async (row) => {
-      const name = await decryptName(row.ciphertext, decryptTag, session.key);
+      let name = row.name;
+      let parentId = row.parent_id;
+      if (name === null && row.ciphertext) {
+        if (!session.legacyKey) throw new Error("A folder still uses the old encrypted format");
+        const legacy = await decryptFolder(row.ciphertext, session.legacyKey);
+        name = legacy.name;
+        parentId = legacy.parentId ?? null;
+        legacyWrites.push(
+          supabase
+            .from("folders")
+            .update({ name, parent_id: parentId, ciphertext: null })
+            .eq("archive_id", archiveId)
+            .eq("id", row.id),
+        );
+      }
       return {
         owner: row.owner,
-        tag: { id: row.id, name, color: row.color } satisfies Tag,
+        folder: { id: row.id, name: name ?? "", parentId } satisfies Folder,
       };
     }),
   );
-  for (const item of decryptedTags) tagsByOwner[item.owner].push(item.tag);
+  for (const item of plainFolders) foldersByOwner[item.owner].push(item.folder);
+
+  const tagsByOwner: Record<Owner, Tag[]> = { u1: [], u2: [] };
+  const plainTags = await Promise.all(
+    tagRows.map(async (row) => {
+      let name = row.name;
+      if (name === null && row.ciphertext) {
+        if (!session.legacyKey) throw new Error("A tag still uses the old encrypted format");
+        name = (await decryptTag(row.ciphertext, session.legacyKey)).name;
+        legacyWrites.push(
+          supabase
+            .from("tags")
+            .update({ name, ciphertext: null })
+            .eq("archive_id", archiveId)
+            .eq("id", row.id),
+        );
+      }
+      return {
+        owner: row.owner,
+        tag: { id: row.id, name: name ?? "", color: row.color } satisfies Tag,
+      };
+    }),
+  );
+  for (const item of plainTags) tagsByOwner[item.owner].push(item.tag);
 
   const tagsByNote = new Map<string, string[]>();
   for (const relation of noteTagRows) {
@@ -249,13 +265,24 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   }
 
   let partnerName: string | undefined;
-  const settingsCiphertext = archiveResult.data?.settings_ciphertext;
-  if (settingsCiphertext) {
+  const settings = archiveResult.data?.settings as { partnerName?: string } | null;
+  partnerName = settings?.partnerName;
+  const settingsCiphertext = archiveResult.data?.settings_ciphertext as string | null;
+  if (!partnerName && settingsCiphertext) {
+    if (!session.legacyKey) throw new Error("Archive settings still use the old encrypted format");
     ({ partnerName } = await decryptJson<{ partnerName?: string }>(
-      session.key,
+      session.legacyKey,
       settingsCiphertext,
     ));
+    legacyWrites.push(
+      supabase
+        .from("archives")
+        .update({ settings: { partnerName }, settings_ciphertext: null })
+        .eq("id", archiveId),
+    );
   }
+
+  if (legacyWrites.length) await all(legacyWrites);
 
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
@@ -282,14 +309,15 @@ export async function createNote(
   note: Note,
   metadata: NoteMeta,
 ): Promise<NoteEntry> {
-  const ciphertext = await encryptNote(note, session.key);
   const { data, error } = await supabase
     .from("notes")
     .insert({
       id: note.id,
       archive_id: session.archiveId,
       owner: note.owner,
-      ciphertext,
+      title: note.title,
+      body: note.body,
+      ciphertext: null,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
@@ -308,12 +336,17 @@ export async function saveNote(
   note: Note,
   expectedVersion: number,
 ): Promise<number> {
-  const ciphertext = await encryptNote(note, session.key);
   let version = expectedVersion;
   for (let attempt = 0; attempt < 4; attempt++) {
     const result = await supabase
       .from("notes")
-      .update({ ciphertext, updated_at: note.updatedAt, version: version + 1 })
+      .update({
+        title: note.title,
+        body: note.body,
+        ciphertext: null,
+        updated_at: note.updatedAt,
+        version: version + 1,
+      })
       .eq("archive_id", session.archiveId)
       .eq("id", note.id)
       .eq("version", version)
@@ -395,26 +428,29 @@ export async function persistMetaDiff(
   });
 
   const [folderRows, tagRows, settings] = await Promise.all([
-    Promise.all(
-      changedFolders.map(async ({ folder, position }) => ({
+    Promise.resolve(
+      changedFolders.map(({ folder, position }) => ({
         id: folder.id,
         archive_id: archiveId,
         owner,
-        ciphertext: await encryptFolder(folder, session.key),
+        name: folder.name,
+        parent_id: folder.parentId ?? null,
+        ciphertext: null,
         position,
       })),
     ),
-    Promise.all(
-      changedTags.map(async (tag) => ({
+    Promise.resolve(
+      changedTags.map((tag) => ({
         id: tag.id,
         archive_id: archiveId,
         owner,
-        ciphertext: await encryptTag(tag, session.key),
+        name: tag.name,
+        ciphertext: null,
         color: tag.color,
       })),
     ),
     owner === "u1" && before.partnerName !== after.partnerName
-      ? encryptJson(session.key, { partnerName: after.partnerName })
+      ? Promise.resolve({ partnerName: after.partnerName })
       : Promise.resolve(null),
   ]);
 
@@ -422,7 +458,12 @@ export async function persistMetaDiff(
     ...(folderRows.length ? [supabase.from("folders").upsert(folderRows)] : []),
     ...(tagRows.length ? [supabase.from("tags").upsert(tagRows)] : []),
     ...(settings
-      ? [supabase.from("archives").update({ settings_ciphertext: settings }).eq("id", archiveId)]
+      ? [
+          supabase
+            .from("archives")
+            .update({ settings, settings_ciphertext: null })
+            .eq("id", archiveId),
+        ]
       : []),
   ]);
 
@@ -493,29 +534,25 @@ export async function persistMetaDiff(
   ]);
 }
 
-/* One private bucket holds every encrypted blob a note can carry. Objects are
-   always uploaded as `application/octet-stream` — the bucket's only allowed
-   type, and the truth about the bytes, which are ciphertext until the browser
-   that holds the archive key decrypts them. What the plaintext actually is
-   (a WebP image, a PDF) is known only to the note that references it. */
+/* One private bucket holds every blob a note can carry. Access is enforced by
+   archive membership in Storage RLS; bytes keep their real media type. */
 const OBJECT_BUCKET = "note-images";
 
-export async function uploadEncryptedObject(
+export async function uploadObject(
   session: AppSession,
   objectId: string,
   blob: Blob,
 ): Promise<void> {
-  const encrypted = await encryptBytes(session.key, new Uint8Array(await blob.arrayBuffer()));
   const result = await supabase.storage
     .from(OBJECT_BUCKET)
-    .upload(`${session.archiveId}/${objectId}`, encrypted, {
-      contentType: "application/octet-stream",
+    .upload(`${session.archiveId}/${objectId}`, blob, {
+      contentType: blob.type || "application/octet-stream",
       upsert: false,
     });
   fail(result.error);
 }
 
-export async function downloadEncryptedObject(
+export async function downloadObject(
   session: AppSession,
   objectId: string,
   type: string,
@@ -524,15 +561,25 @@ export async function downloadEncryptedObject(
     .from(OBJECT_BUCKET)
     .download(`${session.archiveId}/${objectId}`);
   fail(result.error);
+  const stored = result.data!;
+  if (stored.type && stored.type !== "application/octet-stream") return stored;
+  if (!session.legacyKey) return new Blob([await stored.arrayBuffer()], { type });
+
+  // An old encrypted object migrates in place the first time it is opened.
   const plaintext = await decryptBytes(
-    session.key,
-    new Uint8Array(await result.data!.arrayBuffer()),
+    session.legacyKey,
+    new Uint8Array(await stored.arrayBuffer()),
   );
-  return new Blob([plaintext.slice().buffer as ArrayBuffer], { type });
+  const migrated = new Blob([plaintext.slice().buffer as ArrayBuffer], { type });
+  const rewrite = await supabase.storage
+    .from(OBJECT_BUCKET)
+    .upload(`${session.archiveId}/${objectId}`, migrated, { contentType: type, upsert: true });
+  fail(rewrite.error);
+  return migrated;
 }
 
-export const uploadEncryptedImage = uploadEncryptedObject;
+export const uploadImage = uploadObject;
 
-export function downloadEncryptedImage(session: AppSession, imageId: string): Promise<Blob> {
-  return downloadEncryptedObject(session, imageId, "image/webp");
+export function downloadImage(session: AppSession, imageId: string): Promise<Blob> {
+  return downloadObject(session, imageId, "image/webp");
 }

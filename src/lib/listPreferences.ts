@@ -105,7 +105,7 @@ export function saveListPreferences(preferences: ListPreferencesV1): void {
   try {
     localStorage.setItem(`${STORAGE_PREFIX}:${preferences.owner}`, JSON.stringify(preferences));
   } catch {
-    // Preferences are optional; the encrypted archive remains fully usable.
+    // Preferences are optional; the archive remains fully usable.
   }
 }
 

@@ -353,10 +353,7 @@ export function NoteMenu({
 
    So: the axes stay, but with a specimen that changes under the slider, which
    is the whole difference between a control you understand and four numbers.
-   The duplicates are gone. In their place is the one preference this app has
-   that protects something — when a shared, encrypted archive locks itself —
-   and the plain statement of whose notes you are reading and where the
-   ciphertext goes, which had nowhere to live at all. ────────────────────── */
+   Appearance, reading and account state each get their own clear section. */
 
 function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: Axes }) {
   const value = axes[spec.key];
