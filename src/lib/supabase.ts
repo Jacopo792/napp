@@ -16,12 +16,10 @@ export const supabase = createClient(url, publishableKey, {
   },
 });
 
-type Owner = "u1" | "u2";
-
 /** What the cheap first pass selects: everything except the payload. */
 interface NoteRow {
   id: string;
-  owner: Owner;
+  owner_id: string | null;
   created_at: string;
   updated_at: string;
   trashed_at: string | null;
@@ -32,7 +30,7 @@ interface NoteRow {
 
 interface FolderRow {
   id: string;
-  owner: Owner;
+  owner_id: string | null;
   name: string | null;
   parent_id: string | null;
   ciphertext: string | null;
@@ -40,7 +38,7 @@ interface FolderRow {
 
 interface TagRow {
   id: string;
-  owner: Owner;
+  owner_id: string | null;
   name: string | null;
   ciphertext: string | null;
   color: Tag["color"];
@@ -78,9 +76,20 @@ function adoptArchiveCache(archiveId: string): void {
   cacheArchiveId = archiveId;
 }
 
+/** Who is in this archive, in the order they joined. `nickname` is empty until
+ *  the member sets one; the interface, not this module, decides what to call
+ *  them then. */
+export interface ArchiveMember {
+  userId: string;
+  nickname: string;
+  isSelf: boolean;
+}
+
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
-  metas: Record<Owner, Meta>;
+  members: ArchiveMember[];
+  /** One scope per member, keyed by member id. */
+  metas: Record<string, Meta>;
 }
 
 function fail(error: { message: string } | null): void {
@@ -90,32 +99,70 @@ function fail(error: { message: string } | null): void {
 export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot> {
   const archiveId = session.archiveId;
   adoptArchiveCache(archiveId);
-  const [notesResult, foldersResult, tagsResult, noteTagsResult, archiveResult] = await Promise.all(
-    [
-      supabase
-        .from("notes")
-        .select("id, owner, created_at, updated_at, trashed_at, pinned, folder_id, version")
-        .eq("archive_id", archiveId),
-      supabase
-        .from("folders")
-        .select("id, owner, name, parent_id, ciphertext, position")
-        .eq("archive_id", archiveId)
-        .order("position"),
-      supabase
-        .from("tags")
-        .select("id, owner, name, ciphertext, color")
-        .eq("archive_id", archiveId),
-      supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
-      supabase
-        .from("archives")
-        .select("settings, settings_ciphertext")
-        .eq("id", archiveId)
-        .single(),
-    ],
-  );
-  for (const result of [notesResult, foldersResult, tagsResult, noteTagsResult, archiveResult]) {
+  const [
+    notesResult,
+    foldersResult,
+    tagsResult,
+    noteTagsResult,
+    membersResult,
+    profilesResult,
+    archiveResult,
+  ] = await Promise.all([
+    supabase
+      .from("notes")
+      .select("id, owner_id, created_at, updated_at, trashed_at, pinned, folder_id, version")
+      .eq("archive_id", archiveId),
+    supabase
+      .from("folders")
+      .select("id, owner_id, name, parent_id, ciphertext, position")
+      .eq("archive_id", archiveId)
+      .order("position"),
+    supabase
+      .from("tags")
+      .select("id, owner_id, name, ciphertext, color")
+      .eq("archive_id", archiveId),
+    supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
+    supabase
+      .from("archive_members")
+      .select("user_id, created_at")
+      .eq("archive_id", archiveId)
+      .order("created_at"),
+    supabase.from("profiles").select("user_id, nickname"),
+    supabase.from("archives").select("settings, settings_ciphertext").eq("id", archiveId).single(),
+  ]);
+  for (const result of [
+    notesResult,
+    foldersResult,
+    tagsResult,
+    noteTagsResult,
+    membersResult,
+    archiveResult,
+  ]) {
     fail(result.error);
   }
+
+  // A profile may not exist yet, and a missing name is never a reason to fail
+  // to open the archive.
+  const nicknames = new Map<string, string>(
+    (profilesResult.error
+      ? []
+      : ((profilesResult.data ?? []) as { user_id: string; nickname: string }[])
+    ).map((row) => [row.user_id, row.nickname ?? ""]),
+  );
+  const members: ArchiveMember[] = (
+    (membersResult.data ?? []) as { user_id: string; created_at: string }[]
+  ).map((row) => ({
+    userId: row.user_id,
+    nickname: nicknames.get(row.user_id) ?? "",
+    isSelf: row.user_id === session.userId,
+  }));
+
+  /* A row whose member is unknown — written before the member column, or left
+     behind by a deleted account — is filed under the first scope. Nothing is
+     allowed to become invisible because its owner went away. */
+  const fallbackOwner = members[0]?.userId ?? session.userId;
+  const scopeOf = (ownerId: string | null): string =>
+    ownerId && members.some((member) => member.userId === ownerId) ? ownerId : fallbackOwner;
 
   const noteRows = (notesResult.data ?? []) as NoteRow[];
   const folderRows = (foldersResult.data ?? []) as FolderRow[];
@@ -185,7 +232,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         title: title ?? "",
         body: body ?? "",
         id: row.id,
-        owner: row.owner,
+        ownerId: scopeOf(row.owner_id),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
@@ -198,7 +245,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const present = new Set(noteRows.map((row) => row.id));
   for (const id of [...noteCache.keys()]) if (!present.has(id)) noteCache.delete(id);
 
-  const foldersByOwner: Record<Owner, Folder[]> = { u1: [], u2: [] };
+  const foldersByOwner: Record<string, Folder[]> = {};
   const plainFolders = await Promise.all(
     folderRows.map(async (row) => {
       let name = row.name;
@@ -217,14 +264,14 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         );
       }
       return {
-        owner: row.owner,
+        ownerId: scopeOf(row.owner_id),
         folder: { id: row.id, name: name ?? "", parentId } satisfies Folder,
       };
     }),
   );
-  for (const item of plainFolders) foldersByOwner[item.owner].push(item.folder);
+  for (const item of plainFolders) (foldersByOwner[item.ownerId] ??= []).push(item.folder);
 
-  const tagsByOwner: Record<Owner, Tag[]> = { u1: [], u2: [] };
+  const tagsByOwner: Record<string, Tag[]> = {};
   const plainTags = await Promise.all(
     tagRows.map(async (row) => {
       let name = row.name;
@@ -240,12 +287,12 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         );
       }
       return {
-        owner: row.owner,
+        ownerId: scopeOf(row.owner_id),
         tag: { id: row.id, name: name ?? "", color: row.color } satisfies Tag,
       };
     }),
   );
-  for (const item of plainTags) tagsByOwner[item.owner].push(item.tag);
+  for (const item of plainTags) (tagsByOwner[item.ownerId] ??= []).push(item.tag);
 
   const tagsByNote = new Map<string, string[]>();
   for (const relation of noteTagRows) {
@@ -253,9 +300,9 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     current.push(relation.tag_id);
     tagsByNote.set(relation.note_id, current);
   }
-  const notesByOwner: Record<Owner, NoteMeta[]> = { u1: [], u2: [] };
+  const notesByOwner: Record<string, NoteMeta[]> = {};
   for (const row of noteRows) {
-    notesByOwner[row.owner].push({
+    (notesByOwner[scopeOf(row.owner_id)] ??= []).push({
       id: row.id,
       folderId: row.folder_id,
       tagIds: tagsByNote.get(row.id) ?? [],
@@ -284,23 +331,29 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
 
   if (legacyWrites.length) await all(legacyWrites);
 
+  /* One scope per member, and a scope for any member id the rows mention that
+     the roster does not — so a note can never fall out of every list. */
+  const metas: Record<string, Meta> = {};
+  const scopes = new Set([
+    ...members.map((member) => member.userId),
+    ...Object.keys(foldersByOwner),
+    ...Object.keys(tagsByOwner),
+    ...Object.keys(notesByOwner),
+  ]);
+  for (const scope of scopes) {
+    metas[scope] = {
+      v: 1,
+      partnerName: scope === fallbackOwner ? partnerName : undefined,
+      folders: foldersByOwner[scope] ?? [],
+      tags: tagsByOwner[scope] ?? [],
+      notes: notesByOwner[scope] ?? [],
+    };
+  }
+
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
-    metas: {
-      u1: {
-        v: 1,
-        partnerName,
-        folders: foldersByOwner.u1,
-        tags: tagsByOwner.u1,
-        notes: notesByOwner.u1,
-      },
-      u2: {
-        v: 1,
-        folders: foldersByOwner.u2,
-        tags: tagsByOwner.u2,
-        notes: notesByOwner.u2,
-      },
-    },
+    members,
+    metas,
   };
 }
 
@@ -314,7 +367,7 @@ export async function createNote(
     .insert({
       id: note.id,
       archive_id: session.archiveId,
-      owner: note.owner,
+      owner_id: note.ownerId ?? session.userId,
       title: note.title,
       body: note.body,
       ciphertext: null,
@@ -401,7 +454,7 @@ async function all(work: PromiseLike<{ error: { message: string } | null }>[]): 
      4. emptied folders and tags are deleted. */
 export async function persistMetaDiff(
   session: AppSession,
-  owner: Owner,
+  ownerId: string,
   before: Meta,
   after: Meta,
 ): Promise<void> {
@@ -432,7 +485,7 @@ export async function persistMetaDiff(
       changedFolders.map(({ folder, position }) => ({
         id: folder.id,
         archive_id: archiveId,
-        owner,
+        owner_id: ownerId,
         name: folder.name,
         parent_id: folder.parentId ?? null,
         ciphertext: null,
@@ -443,13 +496,13 @@ export async function persistMetaDiff(
       changedTags.map((tag) => ({
         id: tag.id,
         archive_id: archiveId,
-        owner,
+        owner_id: ownerId,
         name: tag.name,
         ciphertext: null,
         color: tag.color,
       })),
     ),
-    owner === "u1" && before.partnerName !== after.partnerName
+    ownerId === session.userId && before.partnerName !== after.partnerName
       ? Promise.resolve({ partnerName: after.partnerName })
       : Promise.resolve(null),
   ]);
@@ -516,7 +569,7 @@ export async function persistMetaDiff(
       note_id: metadata.id,
       tag_id: tagId,
       archive_id: archiveId,
-      owner,
+      owner_id: ownerId,
     })),
   );
   if (links.length > 0) await all([supabase.from("note_tags").insert(links)]);

@@ -37,6 +37,7 @@ import {
   saveNote,
   uploadImage,
   uploadObject,
+  type ArchiveMember,
   type ArchiveSnapshot,
 } from "@/lib/supabase";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
@@ -66,6 +67,7 @@ import { Sidebar, type Scope } from "@/components/Sidebar";
 import type { NoteEditorHandle } from "@/components/NoteEditor";
 import {
   groupEntries,
+  createListPreferences,
   loadListPreferences,
   preferencesForFolder,
   rememberRecent,
@@ -193,15 +195,18 @@ function NotesPage() {
   const compact = useIsCompact();
 
   const [session, setSession] = useState<AppSession | null>(null);
-  const [viewAs, setViewAs] = useState<"u1" | "u2">("u1");
+  /** The scope on screen, which is a member id. Empty until the session and
+   *  the roster have both arrived. */
+  const [viewAs, setViewAs] = useState<string>("");
+  const [members, setMembers] = useState<ArchiveMember[]>([]);
 
   const [entries, setEntries] = useState<NoteEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ALL);
   const [query, setQuery] = useState("");
 
-  const [myMeta, setMyMeta] = useState<Meta>({ ...EMPTY_META });
-  const [partnerMeta, setPartnerMeta] = useState<Meta>({ ...EMPTY_META });
+  /** One scope of folders, tags and note placement per member. */
+  const [metas, setMetas] = useState<Record<string, Meta>>({});
 
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -232,9 +237,7 @@ function NotesPage() {
    *  as a drawer — the destinations are identical, only the staging differs. */
   const [foldersOpen, setFoldersOpen] = useState(false);
   const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
-  const [listPreferences, setListPreferences] = useState<Record<"u1" | "u2", ListPreferencesV1>>(
-    () => ({ u1: loadListPreferences("u1"), u2: loadListPreferences("u2") }),
-  );
+  const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
   const [autoLock, setAutoLock] = useState<AutoLockMinutes>(loadAutoLock);
 
@@ -249,16 +252,14 @@ function NotesPage() {
   //    synchronously without waiting for a React commit. ───────────────────
   const entriesRef = useRef<NoteEntry[]>([]);
   entriesRef.current = entries;
-  const myMetaRef = useRef(myMeta);
-  myMetaRef.current = myMeta;
-  const partnerMetaRef = useRef(partnerMeta);
-  partnerMetaRef.current = partnerMeta;
+  const metasRef = useRef(metas);
+  metasRef.current = metas;
   const sessionRef = useRef<AppSession | null>(null);
   sessionRef.current = session;
 
   /** Note edits waiting to be written live in the draft store (lib/draft.ts),
    *  keyed by note so switching notes or archive labels never strands one. */
-  const pendingMetaRef = useRef<Map<"u1" | "u2", { before: Meta; after: Meta }>>(new Map());
+  const pendingMetaRef = useRef<Map<string, { before: Meta; after: Meta }>>(new Map());
   const inFlightRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
   /** Retry after a failed write, backing off and giving up on unmount. */
@@ -272,9 +273,15 @@ function NotesPage() {
   const syncingRef = useRef(false);
   const realtimePendingRef = useRef(false);
 
-  const activeMeta = viewAs === "u1" ? myMeta : partnerMeta;
-  const partnerName = "Lisa";
-  const storedPreferences = listPreferences[viewAs];
+  const activeMeta = metas[viewAs] ?? EMPTY_META;
+  /* What to call the other person, for the copy that still says "partner". The
+     archive setting was a single stored string; a nickname belongs to whoever
+     owns it. */
+  const partnerName =
+    members.find((member) => !member.isSelf && member.nickname)?.nickname ??
+    activeMeta.partnerName ??
+    "Partner";
+  const storedPreferences = listPreferences[viewAs] ?? createListPreferences(viewAs);
   const activeListPreferences = preferencesForFolder(storedPreferences, selectedFolderId);
 
   useEffect(() => {
@@ -295,15 +302,28 @@ function NotesPage() {
   }, [sidebarWidth, listWidth]);
 
   useEffect(() => {
-    saveListPreferences(listPreferences.u1);
-    saveListPreferences(listPreferences.u2);
+    for (const preferences of Object.values(listPreferences)) saveListPreferences(preferences);
   }, [listPreferences]);
 
+  /* Preferences are per member and stored locally, so they are read as the
+     roster arrives rather than at mount, when nobody is known yet. */
+  useEffect(() => {
+    if (members.length === 0) return;
+    setListPreferences((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const member of members) {
+        if (!next[member.userId]) {
+          next[member.userId] = loadListPreferences(member.userId);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [members]);
+
   const setActiveMeta = useCallback(
-    (m: Meta) => {
-      if (viewAs === "u1") setMyMeta(m);
-      else setPartnerMeta(m);
-    },
+    (m: Meta) => setMetas((current) => ({ ...current, [viewAs]: m })),
     [viewAs],
   );
 
@@ -315,7 +335,7 @@ function NotesPage() {
         return;
       }
       setSession(s);
-      setViewAs(s.defaultView);
+      setViewAs(s.userId);
     });
   }, [navigate]);
 
@@ -344,15 +364,19 @@ function NotesPage() {
     entriesRef.current = next;
     setEntries(next);
 
-    for (const owner of ["u1", "u2"] as const) {
-      if (pendingMetaRef.current.has(owner)) continue;
-      if (owner === "u1") setMyMeta(snapshot.metas.u1);
-      else setPartnerMeta(snapshot.metas.u2);
-    }
+    setMembers(snapshot.members);
+    setMetas((current) => {
+      const next = { ...current };
+      for (const [owner, meta] of Object.entries(snapshot.metas)) {
+        if (pendingMetaRef.current.has(owner)) continue;
+        next[owner] = meta;
+      }
+      return next;
+    });
 
-    const metadataChanged =
-      metaShape(myMetaRef.current) !== metaShape(snapshot.metas.u1) ||
-      metaShape(partnerMetaRef.current) !== metaShape(snapshot.metas.u2);
+    const metadataChanged = Object.entries(snapshot.metas).some(
+      ([owner, meta]) => metaShape(metasRef.current[owner] ?? EMPTY_META) !== metaShape(meta),
+    );
     if (remote && (entrySetChanged || changedIds.size > 0 || metadataChanged)) {
       setSyncFlash(true);
       window.setTimeout(() => setSyncFlash(false), 2000);
@@ -430,7 +454,7 @@ function NotesPage() {
    *  strip count against. Memoised so their counts are not recomputed for an
    *  array that holds exactly the same notes as the render before. */
   const ownedEntries = useMemo(
-    () => entries.filter((entry) => entry.note.owner === viewAs),
+    () => entries.filter((entry) => entry.note.ownerId === viewAs),
     [entries, viewAs],
   );
 
@@ -675,7 +699,7 @@ function NotesPage() {
       id: crypto.randomUUID(),
       title: "",
       body: "",
-      owner: viewAs,
+      ownerId: viewAs,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -695,7 +719,7 @@ function NotesPage() {
       setSelectedId(note.id);
       setListPreferences((current) => ({
         ...current,
-        [viewAs]: rememberRecent(current[viewAs], note.id),
+        [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), note.id),
       }));
       if (compact) setMobileScreen("note");
       ensureDraft(note.id, { title: "", body: "" });
@@ -793,7 +817,7 @@ function NotesPage() {
       setSelectedId(id);
       setListPreferences((current) => ({
         ...current,
-        [viewAs]: rememberRecent(current[viewAs], id),
+        [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), id),
       }));
     },
     [orderedVisible, selectedId, viewAs],
@@ -938,13 +962,16 @@ function NotesPage() {
     setListPreferences((current) => ({
       ...current,
       [viewAs]: {
-        ...current[viewAs],
-        folders: { ...current[viewAs].folders, [selectedFolderId]: next },
+        ...(current[viewAs] ?? createListPreferences(viewAs)),
+        folders: {
+          ...(current[viewAs] ?? createListPreferences(viewAs)).folders,
+          [selectedFolderId]: next,
+        },
       },
     }));
   }
 
-  function handleViewChange(v: "u1" | "u2") {
+  function handleViewChange(v: string) {
     saveNow();
     setViewAs(v);
     setSelectedId(null);
@@ -964,7 +991,7 @@ function NotesPage() {
       setSelectedId(id);
       setListPreferences((current) => ({
         ...current,
-        [viewAs]: rememberRecent(current[viewAs], id),
+        [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), id),
       }));
       if (compact) setMobileScreen("note");
     },
@@ -1088,25 +1115,30 @@ function NotesPage() {
   const archiveSwitch = (
     <div
       role="group"
-      aria-label="Archive"
-      data-active={viewAs}
+      aria-label="Scope"
+      style={
+        {
+          "--switch-count": Math.max(members.length, 1),
+          "--switch-index": Math.max(
+            members.findIndex((member) => member.userId === viewAs),
+            0,
+          ),
+        } as React.CSSProperties
+      }
       className={`archive-switch ${compact ? "w-44 shrink-0" : "w-full"}`}
     >
       <span className="archive-switch-thumb" aria-hidden="true" />
-      {(
-        [
-          ["u1", "Jacopo"],
-          ["u2", "Lisa"],
-        ] as const
-      ).map(([owner, label]) => (
+      {members.map((member) => (
         <button
-          key={owner}
+          key={member.userId}
           type="button"
-          onClick={() => handleViewChange(owner)}
-          aria-pressed={viewAs === owner}
-          className={viewAs === owner ? "is-active" : ""}
+          onClick={() => handleViewChange(member.userId)}
+          aria-pressed={viewAs === member.userId}
+          className={viewAs === member.userId ? "is-active" : ""}
         >
-          <span className="truncate">{label}</span>
+          <span className="truncate">
+            {member.isSelf ? "My notes" : member.nickname || "Member"}
+          </span>
         </button>
       ))}
     </div>

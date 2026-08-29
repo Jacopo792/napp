@@ -751,21 +751,21 @@
   padding: 3px;
 }
 
+/* The thumb used to be half the track, moved once. A roster is any length, so
+   both the width and the travel come from the count and the position the
+   switch is told about. */
 .archive-switch-thumb {
   position: absolute;
   z-index: -1;
   top: 3px;
   bottom: 3px;
   left: 3px;
-  width: calc(50% - 3px);
+  width: calc((100% - 6px) / var(--switch-count, 2));
   border-radius: 0.62rem;
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  transform: translateX(calc(100% * var(--switch-index, 0)));
   transition: transform var(--dur-base) var(--ease);
-}
-
-.archive-switch[data-active="u2"] .archive-switch-thumb {
-  transform: translateX(100%);
 }
 
 .archive-switch button {

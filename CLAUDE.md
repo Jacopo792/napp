@@ -8,8 +8,9 @@
   `VITE_SUPABASE_PUBLISHABLE_KEY`.
 - Notes, folder names, tag names and files are stored as ordinary columns and
   Storage objects. Supabase Auth plus `archive_members` RLS is the whole access
-  boundary; `owner` is only the `u1`/`u2` organisational label, and a member with
-  no label is valid.
+  boundary; `owner_id` names which member's scope a row sits in and is never
+  consulted by a policy. The retired `owner` (`u1`/`u2`) column is still present,
+  nullable and unwritten, until it is deliberately dropped.
 
 ## Local development
 

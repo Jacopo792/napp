@@ -2,7 +2,14 @@ export interface Note {
   id: string;
   title: string;
   body: string;
-  owner: "u1" | "u2";
+  /**
+   * The member whose scope this note sits in. It is an organisational label,
+   * not a permission: every member of the archive reads and writes every
+   * scope. Null means the row predates the member column or its account is
+   * gone, and the interface files it under the first scope rather than
+   * hiding it.
+   */
+  ownerId: string | null;
   createdAt: string;
   updatedAt: string;
 }

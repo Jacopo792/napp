@@ -16,7 +16,8 @@ export interface ListPreferences {
 
 export interface ListPreferencesV1 {
   v: 1;
-  owner: "u1" | "u2";
+  /** The member whose scope these preferences belong to. */
+  owner: string;
   defaults: ListPreferences;
   folders: Record<string, Partial<ListPreferences>>;
   recentNoteIds: string[];
@@ -51,7 +52,7 @@ function readPreferences(value: unknown): Partial<ListPreferences> {
   return next;
 }
 
-export function createListPreferences(owner: "u1" | "u2"): ListPreferencesV1 {
+export function createListPreferences(owner: string): ListPreferencesV1 {
   return {
     v: 1,
     owner,
@@ -61,7 +62,7 @@ export function createListPreferences(owner: "u1" | "u2"): ListPreferencesV1 {
   };
 }
 
-export function parseListPreferences(raw: string | null, owner: "u1" | "u2"): ListPreferencesV1 {
+export function parseListPreferences(raw: string | null, owner: string): ListPreferencesV1 {
   if (!raw) return createListPreferences(owner);
   try {
     const value: unknown = JSON.parse(raw);
@@ -93,7 +94,7 @@ export function parseListPreferences(raw: string | null, owner: "u1" | "u2"): Li
   }
 }
 
-export function loadListPreferences(owner: "u1" | "u2"): ListPreferencesV1 {
+export function loadListPreferences(owner: string): ListPreferencesV1 {
   try {
     return parseListPreferences(localStorage.getItem(`${STORAGE_PREFIX}:${owner}`), owner);
   } catch {
