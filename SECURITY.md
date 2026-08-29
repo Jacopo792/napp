@@ -30,6 +30,21 @@ database access through `archive_members`, and private Storage applies the same
 archive-membership boundary. `owner_id` is organizational metadata, not an
 authorization boundary.
 
+Membership is capped in the database, not in the interface. A `before insert`
+trigger on `archive_members` refuses a row once the archive holds
+`archives.seat_limit` members, so every path in — the personal-archive
+bootstrap and invitation redemption alike — is covered by one check. Issuing an
+invitation additionally counts unclaimed, unexpired invitations, so a link that
+could never be redeemed is never created; `revoke_archive_invite()` deletes an
+unclaimed row, which destroys the stored digest and invalidates the link
+immediately.
+
+Invitation tokens exist in plaintext only in the browser that created them.
+They are shown once, stored as a SHA-256 digest, and delivered by the member
+either through the clipboard or through their own mail client — the application
+has no mail path, and adding one would put the token on a server it currently
+never reaches.
+
 The browser receives only the Supabase project URL and publishable key. Service
 role keys, account passwords, session tokens, and migration credentials must
 never be committed, placed in Vite variables, or included in a build.

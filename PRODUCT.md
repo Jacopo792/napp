@@ -8,10 +8,11 @@ web
 
 ## Users
 
-Everyone holding a row in `archive_members`: Jacopo and Lisa today, plus any
-further account invited into the same archive. Each has a separate Supabase
-email/password account and confirmed address; membership carries a role,
-`editor` or `viewer`. Every member can read every note and list in the archive
+Everyone holding a row in `archive_members`. The archive is built for two —
+`archives.seat_limit` defaults to `2` and the database refuses the row past it —
+and the column accepts `1`–`8`, so a larger group is a value change rather than
+a rewrite. Each member has a separate Supabase email/password account and a
+confirmed address; membership carries a role, `editor` or `viewer`. Every member can read every note and list in the archive
 and use the `viewAs` switch; only editors can write notes, folders, tags,
 archive settings and `note-images` objects, create invitations, or change
 another member's role. The account is the only access boundary; there is no
@@ -25,8 +26,11 @@ nickname, and each account opens on its own scope. A row whose member is unknown
 — written before the column, or left by a deleted account — is filed under the
 first scope rather than disappearing.
 
-The retired `u1` / `u2` labels are the shape this replaced: two scopes were a
-fixture of an archive with exactly two people in it.
+The retired `u1` / `u2` labels are the shape this replaced. The seat limit is not
+a return to them: `u1` and `u2` were two fixed slots baked into every row and
+policy, while `seat_limit` is one number counting members of a roster that is
+otherwise general. Two people is the current policy; two slots was the old
+architecture.
 
 Creating a Supabase Auth account does not join the archive. Until the
 `archive_members` row exists the app answers "This account is not connected to
@@ -116,7 +120,15 @@ Technical constraints that outlive any design:
   account reaches the archive either by bootstrapping its own personal archive
   atomically or by claiming a seven-day invitation link that checks the confirmed
   address. Invitations store only a SHA-256 digest, never the raw token or a
-  resolvable directory of addresses.
+  resolvable directory of addresses. Sign-in and account creation are separate
+  modes on the login page, each with its own copy and a show/hide password
+  control; the confirmation state says what the emailed link does and where the
+  archive comes from.
+- The seat limit lives in the database, not in the interface:
+  `private.enforce_archive_seats()` is a `before insert` trigger on
+  `archive_members`, and `private.issue_archive_invite()` counts members plus
+  live unclaimed invitations before issuing. Settings closes the form on the same
+  arithmetic as a courtesy, not as the boundary.
 - RLS authorizes every archive row through `archive_members`; `owner` is never a
   security boundary. Members may select; only editors may insert, update or
   delete `archives`, `notes`, `folders`, `tags`, `note_tags` and `note-images`
@@ -138,7 +150,8 @@ Technical constraints that outlive any design:
   own. A new account gets a nickname from its address on first sign-in. Avatars
   live in the private `avatars` bucket under `<userId>/<objectId>`; only that
   account may write there, while sharing an archive is what lets a peer read the
-  picture.
+  picture. The square is chosen before upload — a round window the picture is
+  dragged and zoomed behind — not cut from the middle of the file.
 
 ## Brand Commitments
 

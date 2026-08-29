@@ -35,6 +35,7 @@ the same hairlines. A theme repaints the interface; it never rearranges it.
 - The editor is visually dominant. Its page surface is the quietest layer and its content is centred on the active reading measure, so collapsing the navigation moves title and text together instead of stranding them against the left edge. The measure counts characters of the reading face, and the frontispiece resolves `ch` against that same face so title and body share one column edge. The sidebar and catalogue share a slightly more recessive paper surface; the app background sits on the furthest surface. Both navigation panes can be collapsed together for a full-page writing focus.
 - The sidebar is the column of destinations, top to bottom: the scope switch, the scopes and folder tree, the wastebasket at the foot, then Settings and the lock. The switch is built from the archive's roster — your notes, and each other member by nickname — and each account opens on its own scope. Both navigation panes can be hidden together for focused writing. The reading axes live in Settings, next to a specimen that changes under the slider; they are not a bar across the bottom of the note.
 - Controls are rounded throughout: pills for identity, rounded rectangles for inputs and actions, and circular slider thumbs. Use borders and surface shifts before adding shadow or saturated colour.
+- Settings has one row shape and every row uses it: a 34 px lead glyph, the name with a line of explanation, the control flush right. The profile picture is a row like the rest, so all four labels start at one x and all four values end at another. A card of rows and a paragraph of prose are different levels and may start at different insets; two cards of rows may not.
 
 ## Surface and colour system
 
@@ -43,6 +44,20 @@ that floats over the note — toolbars, the search field, popovers, sheets — i
 allowed translucency and a backdrop blur, and falls back to an opaque `--glass`
 plane where the browser has neither. The panes themselves never do: a pane is a
 plane, and you must not be able to read the note through the list.
+
+Three rules follow from having a wallpaper behind all of it:
+
+- **Shadow is contact, not atmosphere.** `--shadow-soft` is a hairline directly
+  under the edge plus a wider pass pulled back by a negative spread. A 40 px
+  blur spread evenly around a rounded card reads as soot ringing it, not lift.
+- **A band inside a translucent pane takes neither the tint nor the blur again.**
+  Two coats of `--paper` is what made every toolbar a darker strip across the top
+  of its own column, and a second `backdrop-filter` is a full compositing pass
+  per frame for output the eye cannot tell from one.
+- **Recesses tint, they do not plate.** The scope switch used to paint opaque
+  `--surface`, darker than the column holding it, which over a picture is a black
+  rectangle with a hard edge. It is a partial mix now, so the recess comes from
+  the ink and the atmosphere still passes through.
 
 Every colour in the interface is a token. Nothing hard-codes a hex value, because
 every one of them is repainted by the reader's theme.
@@ -124,10 +139,11 @@ does on a row.
 
 ## Accounts, invitations, roles, avatars and presence
 
-- Signing up is public but confirming is required: the login page toggles between sign-in and sign-up, sign-up shows a neutral "check your email" state without enumerating whether the address could be created, and the first personal archive is created atomically behind `ensure_personal_archive()` with an advisory lock. An account that belongs to several archives picks which one to open; "not connected" only means this account has no membership row for this archive yet.
-- An invitation is a one-time link whose raw 64-hex token is shown once for the inviter to copy. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. Redemption runs behind a private security-definer function and succeeds only when the caller's `auth.users.email_confirmed_at` is set and lower-cased equals the invited address. The client never resolves an address to a user id and never lists existing addresses as a directory.
+- Signing in and creating an account are two things, not two moods of one thing. The login card carries a pair of tabs at the top, and the heading, the sub-line, the submit label and the footnote all belong to the tab showing; both fields can reveal what was typed. Confirmation is required, and the confirmation state is a numbered account of what happens next — the link proves the address, signing in comes after it, and the archive is made then — rather than a single neutral sentence. It still does not enumerate whether the address could be created. The first personal archive is created atomically behind `ensure_personal_archive()` with an advisory lock. An account that belongs to several archives picks which one to open; "not connected" only means this account has no membership row for this archive yet.
+- Members and invitations are their own Settings section, not a tail on Security. It opens on the seat count, then the roster, then any invitation waiting to be claimed with the seat it holds and a way to withdraw it, then the form. When the seats are full the form is replaced by a row in the same card shape saying so, because a disabled form is a worse explanation than a sentence.
+- An invitation is a one-time link whose raw 64-hex token is shown once. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. Redemption runs behind a private security-definer function and succeeds only when the caller's `auth.users.email_confirmed_at` is set and lower-cased equals the invited address. The client never resolves an address to a user id and never lists existing addresses as a directory. The finished link is offered two ways in the same place — copied, or handed to a `mailto:` the member's own mail app composes — because there is no server here to send mail with, and adding one would put the token somewhere it currently never goes.
 - Roles are binary and visible: every member can read every note and list; only editors can write notes, folders, tags, archive settings and `note-images` objects, or create invites and change roles. A viewer sees the same notes and scopes but the editor is read-only and the write menus and actions are inert. Changing another member's role is done through `set_archive_member_role()`, and the last editor cannot be demoted. Storage mirrors the table boundary.
-- A member is a person. Settings shows who belongs to the archive, by nickname and join date, and every member's avatar appears in the scope switch and in the sidebar while you are present. The rule stays the same: you may read a peer's `profiles` row and avatar when you share an archive; only the account itself may write its own `profiles` row and upload or delete under `avatars/<your user id>/…`. The avatar URL cache (`src/lib/avatarCache.ts`) keeps one object URL per avatar and Realtime keeps the roster live.
+- A member is a person. Settings shows who belongs to the archive, by nickname and join date, and every member's avatar appears in the scope switch and in the sidebar while you are present. A picture is _placed_, not cropped for you: a round window over the image, dragged and zoomed, and what the window shows is exactly the square that is uploaded. A centre crop is right for a portrait and wrong for everything else. The rule stays the same: you may read a peer's `profiles` row and avatar when you share an archive; only the account itself may write its own `profiles` row and upload or delete under `avatars/<your user id>/…`. The avatar URL cache (`src/lib/avatarCache.ts`) keeps one object URL per avatar and Realtime keeps the roster live.
 - Presence is off by default and mutual: joining `presence:<archiveId>` with `{ private: true }` happens only while broadcasting `{ userId, onlineAt }`, so there is no listen-only mode in the client and the server enforces the same boundary on `realtime.messages` (`extension = 'presence'`, verified through `private.presence_archive_id()` against `archive_members`). The Settings toggle is per-archive and persisted in `localStorage`. When enabled, online members are indicated on the scope switch and in the member list.
 
 ## Honest persistence
@@ -158,3 +174,4 @@ above all — belongs in the tooltip, not in the row.
 - Maintain AA text contrast, semantic labels for icon controls, pressed/expanded states, native range semantics, and alerts for unlock errors.
 - Motion is restrained. Opening a note uses the single authored entrance: a 420 ms fade with a 4 px upward settle. Ordinary state changes use short color transitions. The full-size image view fades its scrim in over 220 ms while the picture settles up from 4 px; the phone's maintenance sheet rises from the bottom edge over 320 ms.
 - Respect `prefers-reduced-motion`: remove page entrance and skeleton pulsing. Never make motion necessary to understand save, selection, or deletion state.
+- Animate `transform` and `opacity`, and nothing else that runs per frame. A scaled entrance on text re-rasterises every glyph, and `filter: blur(0)` still promotes a layer and still costs a pass — the wallpaper declares `filter: none` when there is no blur rather than a blur of zero.

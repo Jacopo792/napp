@@ -5,6 +5,75 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+### Fixed
+
+- **Account creation.** Signing up failed with "Database error saving new user".
+  The Supabase starter scaffold's `on_auth_user_created` trigger had survived the
+  rename of `public.profiles` and still inserted into columns that had not
+  existed since `20260829180000_member_profiles`, so every insert into
+  `auth.users` raised inside it. `20260830020000_two_seat_archive.sql` drops the
+  trigger and its function; the client's own `ensureProfile()` already wrote the
+  profile row.
+
+### Added
+
+- **A two-seat rule enforced by the database.** `archives.seat_limit` defaults to
+  `2` (accepting `1`-`8`), a `before insert` trigger on `archive_members` refuses
+  the row past it, and `private.issue_archive_invite()` counts members plus
+  unclaimed, unexpired invitations before issuing, so an unredeemable link is
+  never created. Settings closes the form on the same arithmetic.
+- **Withdrawing an invitation.** `revoke_archive_invite()` removes an unclaimed
+  row after the same editor check that issuing makes, which destroys the stored
+  digest, kills the link immediately, and returns the seat it was holding.
+- **Sending an invitation by email.** A finished invitation offers the same
+  one-time token two ways in the same place: copied, or handed to a `mailto:`
+  the member's own mail app composes and sends. Nothing of ours receives it.
+- **Members as a Settings section.** Roster, seats, pending invitations and the
+  invite form move out of Security into their own section, opening on the seat
+  count.
+- **Placing the avatar.** A picture is dragged and zoomed behind a round window
+  before upload, and the square that is uploaded is computed from the same three
+  numbers the preview is drawn with, instead of being cut from the middle of the
+  file. `src/lib/image.test.ts` covers the mapping.
+
+### Changed
+
+- **The login page separates its two modes.** Sign in and Create account are tabs
+  at the top of the card, and the heading, sub-line, submit label and footnote
+  belong to the tab showing. Both fields have a show/hide control. The
+  confirmation state says what the emailed link does, that signing in comes after
+  it, and where the archive comes from - without enumerating whether the address
+  could be created.
+- **Settings rows share one shape.** The profile picture became a row like the
+  others, so every label starts at one x and every value ends at another; the
+  notices in Members took the same card shape, and a section label after a card
+  has room above it.
+
+### Performance and visual
+
+- `--shadow-soft` is a contact hairline plus a negatively spread pass instead of
+  a 40 px blur spread evenly around every card, which over a wallpaper read as
+  soot ringing the pane.
+- The sidebar header no longer paints an opaque band across a translucent column,
+  and the scope switch tints its track instead of plating it with a colour darker
+  than the column holding it.
+- Toolbars inside an already-translucent, already-blurred pane take neither the
+  second coat nor the second `backdrop-filter`: one fewer full compositing pass
+  per frame each, and no darker strip across the top of the column.
+- The wallpaper layer declares `filter: none` at blur 0 rather than `blur(0)`,
+  which was still promoting a viewport-sized fixed layer and running a pass.
+
+### Removed
+
+- The word-and-character metrics subsystem in the draft store - a second listener
+  map, a per-note throttle timer, a counted-body cache and two counting helpers -
+  which fed a readout the Tiptap editor no longer has. Typing a body now
+  re-renders nothing at all. With it went `WorkspaceFooter`, `formatCount`,
+  `countChars`, `isVirtualScope` and seven CSS rules for classes no component
+  names.
+
+### Editor (carried from the Tiptap migration)
+
 - Replaced the source-text editor with a structured Tiptap document, including
   formatting, colours, checklists, editable tables, private media nodes and a
   reversible import path for existing notes.

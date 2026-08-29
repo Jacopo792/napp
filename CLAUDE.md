@@ -2,22 +2,20 @@
 
 ## Architecture
 
-- React 19 + Vite is a static SPA deployed to GitHub Pages.
-- Supabase is the only backend: Auth, Postgres, Realtime and private Storage.
-- The browser receives only `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_PUBLISHABLE_KEY`.
-- Notes, folder names, tag names and files are stored as ordinary columns and
-  Storage objects. Supabase Auth plus `archive_members` RLS is the whole access
-  boundary — members can read; only `editor` rows may write, enforced by
-  `private.can_write_archive()` and by revoking direct writes to
-  `archive_members` entirely. `owner_id` names which member's scope a row sits
-  in and is never consulted by a policy. Invitations store only a SHA-256 digest
-  for seven days and are redeemed only by a confirmed address; presence is
-  `private: true` on `presence:<archiveId>` with `realtime.messages` policies
-  for `extension = 'presence'` via `private.presence_archive_id()`. Nothing
-  under `src/` mentions the retired `owner` (`u1`/`u2`) column, the `ciphertext`
-  columns or `vault_keys`; the migration that drops them is written and waiting
-  to be run — see below.
+- React 19 + Vite, a static SPA deployed to GitHub Pages. There is no server of
+  ours.
+- Supabase is the whole backend: Auth, Postgres, Realtime, private Storage.
+- The browser gets two values, `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_PUBLISHABLE_KEY`. Nothing else.
+
+Access control is Supabase Auth plus one table. A row in `archive_members` lets
+you read the archive; a row with `role = 'editor'` lets you write it, enforced
+by `private.can_write_archive()` and by direct writes to `archive_members`
+being revoked entirely. `owner_id` names which member's scope a row sits in and
+is never read by a policy.
+
+Notes, folder names, tag names and files are ordinary columns and Storage
+objects. Nothing is encrypted; see _The retired encrypted format_ below.
 
 ## Local development
 
@@ -27,124 +25,179 @@ pnpm install
 pnpm dev
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-## Production deployment
+`pnpm preview:ui` runs the whole interface against an in-memory fixture on
+`localhost:5199`, with `@/lib/supabase`, `session`, `sync` and `presence`
+swapped for the stand-ins in `preview/`. No credentials, no network. Sign in
+with anything. Change a mock whenever you change the real module's shape —
+`preview/supabase.mock.ts` must return a **fresh** roster array from
+`loadArchive`, because handing back the same object makes every roster change
+invisible to React.
 
-GitHub repository variables required by `.github/workflows/deploy.yml`:
+## Deployment
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from repository
+variables. No service-role key, account password or archive passphrase belongs
+anywhere near the build.
 
-No Supabase service-role key, account password, archive passphrase or legacy
-GitHub credential belongs in GitHub Pages or its build.
+**Deploy before you drop.** A static SPA has no server to deploy in step with
+the database, so the oldest client still running is whatever `main` last built,
+plus anybody holding an open tab. When four `ciphertext` columns were dropped
+ahead of the client that had stopped selecting them, every query the live build
+made failed and the archive looked empty. The columns had to be re-added, empty,
+within the hour. Merge and deploy the client that no longer asks for a column,
+confirm it, and only then drop it.
 
-After upgrading an existing archive to single-step login, run
-`pnpm migrate:supabase` once with the legacy passphrases in the local migration
-environment. It rewraps the existing DEK with each account password; note rows
-and image objects are not re-encrypted.
+## Two seats
 
-An archive still holding ciphertext moves to account-only storage with
-`pnpm migrate:account-only` (preflight) followed by
-`pnpm migrate:account-only -- --apply`. Both print the same content checksum, so
-a matching pair of runs is the proof that nothing changed but the encoding.
-`pnpm verify:supabase` then checks the live archive: plaintext columns,
-cross-account reads and writes, Realtime, and that anonymous and member-less
-clients still see nothing.
+The archive is built for two people, and that is a database rule, not a message
+in the interface:
 
-Someone who should use the app without reading an existing archive needs their
-own archive, not a membership: `supabase/admin/new-archive-for-person.sql` creates
-one in the Supabase SQL editor, while the application itself does it
-atomically — `private.bootstrap_personal_archive()` behind `ensure_personal_archive()`
-with an advisory lock — the first time a freshly confirmed account signs in.
-An account that belongs to several archives picks which one to open; the
-"not connected" message only means this account has no row for this archive
-yet. Membership lets every member read; only editors write — `archives`,
-`notes`, `folders`, `tags`, `note_tags` and `note-images` all use
-`private.can_write_archive()` for inserts/updates/deletes, and the role itself
-is changed only through `set_archive_member_role()` with a guard that the last
-editor cannot be demoted.
+- `archives.seat_limit` is `2` by default (`1`–`8` allowed).
+- `archive_members` carries a `before insert` trigger,
+  `private.enforce_archive_seats()`, which refuses a row once the archive holds
+  its limit. That is the boundary — every path in, bootstrap and invitation
+  redemption alike, goes through it. Re-inserting an existing member is allowed,
+  because redemption uses `on conflict do nothing` and a before-insert trigger
+  runs ahead of the conflict.
+- `private.issue_archive_invite()` counts members plus unclaimed, unexpired
+  invitations and refuses when they already fill the archive, so a link that
+  could never be redeemed is never made. Re-inviting the same address reuses the
+  seat that address already holds.
+- Settings does the same arithmetic and closes the form first, which is a
+  courtesy, not the boundary.
 
-Inviting is how an archive grows without ever exposing an address directory:
-`create_archive_invite(archive_id, email, role)` returns a 64-hex-character raw
-token once, stores only its SHA-256 digest in `archive_invites` for seven days,
-and `claim_archive_invite(token)` checks the caller's confirmed Auth email
-before adding the membership. The browser never resolves an address to a user
-id; re-inviting an unclaimed address rewrites the same row. Connect another
-Supabase Auth account locally with `pnpm add:member` — it signs in as an
-existing member and writes the missing row with no service-role key.
+An unclaimed invitation holds a seat for seven days. `revoke_archive_invite()`
+gives it back: it deletes the row (the stored digest goes with it, so the link
+dies immediately) after checking the same editor rule that issuing checks.
 
-A member is a person: `public.profiles` carries a nickname and an avatar object
-per account, and avatars live in their own private bucket under the owner's user
-id. The rule does not change — `private.shares_archive()` lets you read the
-profile of someone you share an archive with, and only the account itself may
-write its own row. `src/lib/avatarCache.ts` keeps one object URL per avatar and
-Realtime keeps the roster live; every avatar is shown in the switch and in the
-sidebar.
+## Invitations
 
-Presence is mutual: the client is off by default and only joins
-`presence:<archiveId>` with `config.private = true` while broadcasting its own
-`{ userId, onlineAt }`. `20260829250000_private_archive_presence.sql`
-restricts `realtime.messages` for `extension = 'presence'` to members of the
-archive derived from `realtime.topic()` via `private.presence_archive_id()` —
-`SELECT` to receive and `INSERT` to publish. Postgres Changes subscriptions stay
-public channels and are filtered by table RLS as before; `private_only` is not
-turned on globally so they are not disturbed.
+`create_archive_invite(archive_id, email, role)` returns a 64-hex raw token
+once and stores only its SHA-256 digest for seven days.
+`claim_archive_invite(token)` adds the membership only when the caller's
+confirmed Auth email matches the invited address. The browser never resolves an
+address to a user id.
 
-Two things to know before writing another migration. `supabase db query --linked`
-splits a file into statements and mis-pairs `$$` blocks when a file holds more
-than one, so give every function and `do` block its own tag (`$shares$`,
-`$touch$`); apply a long migration in pieces if it still fails. And this project
-carries abandoned tables from earlier phases — `legacy_notes_20260828`,
-`legacy_profiles_20260829`, `note_shares` — so `create table if not exists` can
-silently do nothing against a name that is already taken by a different shape.
+The interface offers the finished invitation two ways, and neither passes the
+token through anything of ours: copied by hand, or handed to a `mailto:` that
+the member's own mail app composes and sends. Sending it server-side would need
+a server we do not have, and would put the token somewhere it currently never
+goes.
+
+`pnpm add:member` is the local administrative path — it signs in as an existing
+member and writes the missing row, with no service-role key.
+
+Somebody who should use the app without reading an existing archive needs their
+own archive, not a membership. `supabase/admin/new-archive-for-person.sql`
+creates one from the Supabase SQL editor; the application does it atomically for
+every new account, through `private.bootstrap_personal_archive()` behind
+`ensure_personal_archive()`, under an advisory lock so two tabs cannot make two
+archives. An account belonging to several archives picks one at sign-in; "not
+connected" only means this account has no row for _this_ archive yet.
+
+## Members and profiles
+
+`public.profiles` carries a nickname and an avatar object per account.
+`private.shares_archive()` lets you read the profile of someone you share an
+archive with; only the account itself may write its own row. Avatars live in
+their own private bucket under the owner's user id.
+`src/lib/avatarCache.ts` keeps one object URL per avatar, and Realtime keeps the
+roster live.
+
+A picture is placed before it is uploaded, not cut from the middle of the file.
+`AvatarCropper` shows a round window over the image, draggable and zoomable;
+`avatarCropRect()` in `src/lib/image.ts` turns what the window shows into the
+square `prepareAvatar()` cuts. Preview and output take the same three numbers,
+so they cannot disagree. The math has tests in `src/lib/image.test.ts`.
+
+## Presence
+
+Off by default and mutual: the client joins `presence:<archiveId>` with
+`config.private = true` only while broadcasting its own `{ userId, onlineAt }`,
+so there is no listen-only mode.
+`20260829250000_private_archive_presence.sql` restricts `realtime.messages` for
+`extension = 'presence'` to members of the archive derived from
+`realtime.topic()` via `private.presence_archive_id()` — `SELECT` to receive,
+`INSERT` to publish. Postgres Changes subscriptions stay public channels
+filtered by table RLS; `private_only` is not on globally, so they are undisturbed.
+
+## Migrations
+
+Every migration in `supabase/migrations/` is applied to the linked project.
+Apply new ones with `supabase db push --linked`.
+
+Two hazards, both found the hard way:
+
+1. `supabase db query --linked` splits a file into statements and mis-pairs `$$`
+   blocks when a file holds more than one. Give every function and `do` block
+   its own tag (`$shares$`, `$touch$`); split a long migration if it still fails.
+2. This project carries abandoned tables from earlier phases, so
+   `create table if not exists` can silently do nothing against a name already
+   taken by a different shape.
+
+Hazard 2 has bitten twice. The starter scaffold's `public.profiles` was renamed
+to `legacy_profiles_20260829` and replaced with a different shape — but its
+`on_auth_user_created` trigger survived, still inserting into
+`public.profiles (id, username, full_name, avatar_url)`. Those columns had not
+existed for a day. Every insert into `auth.users` raised inside the trigger, and
+GoTrue reported it as **"Database error saving new user"**: no account could be
+created, and nothing in this repository explained why, because the trigger was
+never in this repository. `20260830020000_two_seat_archive.sql` drops it. The
+client's own `ensureProfile()` already wrote the profile row.
+
+**When a Supabase error names a schema object you cannot find in
+`supabase/migrations/`, look in the database.** `select tgname, proname from
+pg_trigger join pg_proc …` found this in one query.
 
 ## The retired encrypted format
 
 The archive was encrypted once and is not any more. Every note, folder, tag and
-archive setting is a plaintext column, every object in Storage carries its real
-content type, and as of 2026-08-29 no code under `src/` decrypts anything: the
-client no longer unwraps a DEK at sign-in, no longer keeps a raw archive key in
-`sessionStorage`, and no longer selects a `ciphertext` column. `crypto.ts` moved
-to `scripts/lib/`, where the one-time migration tools that still need it live.
+archive setting is a plaintext column; every Storage object carries its real
+content type; no code under `src/` decrypts anything. `crypto.ts` lives in
+`scripts/lib/`, for the one-time migration tools that still need it.
 
-`supabase/migrations/20260829200000_drop_the_retired_format.sql` finished the
-job in the database on 2026-08-29 — the `ciphertext` columns, `vault_keys`, the
-`u1`/`u2` `owner` columns with their checks and composite keys, and the three
-abandoned tables. `public` now holds seven tables and not one retired column;
-`pnpm verify:supabase` passes against the result. The file's own comment records
-what was checked before it was written, and the data it removed was dumped to a
-file outside the repository first.
+`20260829200000_drop_the_retired_format.sql` and
+`20260829210000_drop_ciphertext_after_deploy.sql` finished the job in the
+database and are both applied. Two orderings in the first are load-bearing, and
+both were found by the drop being refused rather than by reading the schema:
+`owner` sits inside three-column unique keys that foreign keys point at, so the
+dependants come out before the column; and `legacy_notes_20260828` and
+`note_shares` depend on each other in both directions, so they are dropped in
+one statement rather than with `cascade`.
 
-Two orderings in that file are load-bearing, and both were found by the drop
-being refused rather than by reading the schema. `owner` sits inside
-three-column unique keys that foreign keys in other tables point at, so the
-dependants come out before the column. And `legacy_notes_20260828` and
-`note_shares` depend on each other — policies on the first read the second, a
-foreign key and a policy on the second read the first — so neither can go
-first and they are dropped in one statement instead of with `cascade`.
+## Migration tools
 
-Realtime's check in `verify:supabase` flakes about one run in three: the
-server reports SUBSCRIBED slightly before the filter is in place. A failure
-there alone, with everything above it passing, means run it again.
+`scripts/` holds local administrative tools, not part of the deployment. Their
+variables are documented in `.env.migration.example`. Never expose
+`SUPABASE_SERVICE_ROLE_KEY` through a `VITE_` variable.
 
-**Deploy before you drop.** The four `ciphertext` columns had to be added back,
-empty, within the hour: GitHub Pages was still serving the build from `main`,
-that build still selected them, and every query it made failed the moment they
-were gone. The archive looked empty. Nothing was lost — the columns had been
-null for a day — but the application was down.
+- `pnpm migrate:supabase` — one-off, rewraps a legacy DEK with each account
+  password after an upgrade to single-step login.
+- `pnpm migrate:account-only` — preflight, then `-- --apply`. Both runs print the
+  same content checksum; a matching pair is the proof nothing changed but the
+  encoding.
+- `pnpm verify:supabase` — checks the live archive: plaintext columns,
+  cross-account reads and writes, Realtime, and that anonymous and member-less
+  clients still see nothing. Its Realtime check flakes about one run in three
+  (the server reports SUBSCRIBED slightly before the filter is in place). A
+  failure there alone, with everything above it passing, means run it again.
 
-This is the ordering rule for anything this repository ever removes from the
-schema. A static SPA has no server to deploy in step with the database, so the
-oldest client still running is whatever `main` last built, plus anybody holding
-an open tab. Merge and deploy the client that has stopped asking for a column,
-confirm it, and only then drop it. `20260829210000_drop_ciphertext_after_deploy.sql`
-is that second half, waiting.
+## Interface notes worth knowing
 
-## One-time migration tools
-
-The files in `scripts/` are local administrative tools, not part of the
-production deployment. Their private variables are documented separately in
-`.env.migration.example`. Never expose `SUPABASE_SERVICE_ROLE_KEY` through a
-`VITE_` variable.
+- **No nested `backdrop-filter`.** A toolbar inside a pane that is already
+  translucent and already blurred takes neither again: the second coat darkens
+  the strip, and the second filter is a full compositing pass per frame for
+  output the eye cannot tell from one.
+- **`filter: blur(0)` is not free.** It still promotes the element and still
+  runs a pass. The wallpaper layer declares `filter: none` at blur 0.
+- **Shadows are contact, not atmosphere.** `--shadow-soft` is a hairline plus a
+  negatively spread pass, so it stays under the card. A wide even blur reads as
+  soot ringing a card once there is a wallpaper behind it.
+- Every settings row is one shape: a 34 px lead glyph, a name with a line of
+  explanation, a control flush right. The profile picture is a row like any
+  other, so the labels share a left edge and the values share a right one.
