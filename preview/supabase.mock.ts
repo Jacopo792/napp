@@ -115,6 +115,15 @@ export async function loadArchive(_session: AppSession): Promise<ArchiveSnapshot
   };
 }
 
+/** The preview has one writer, so nothing ever conflicts — but the class has
+ *  to exist, because the page tests every save failure against it. */
+export class NoteConflict extends Error {
+  constructor(readonly entry: NoteEntry | null) {
+    super("This note changed somewhere else");
+    this.name = "NoteConflict";
+  }
+}
+
 export async function createNote(
   _session: AppSession,
   note: Note,
@@ -133,8 +142,10 @@ export async function saveNote(
 ): Promise<number> {
   await sleep(420);
   const current = notes.get(note.id);
-  if (!current) throw new Error("The note no longer exists");
-  if (current.version !== expectedVersion) return current.version;
+  if (!current) throw new NoteConflict(null);
+  // Faithful to the archive: a version that has moved is a conflict, not a
+  // reason to write anyway.
+  if (current.version !== expectedVersion) throw new NoteConflict({ ...current });
   const version = current.version + 1;
   notes.set(note.id, { note: { ...note }, version });
   return version;

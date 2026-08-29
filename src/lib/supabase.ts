@@ -359,45 +359,91 @@ export async function createNote(
   return { note, version: data!.version };
 }
 
+/** Somebody else wrote this note since the caller last read it. Carries the
+ *  row that is actually there, so the caller can merge without a second trip. */
+export class NoteConflict extends Error {
+  /** Null when the note is no longer there at all. */
+  constructor(readonly entry: NoteEntry | null) {
+    super("This note changed somewhere else");
+    this.name = "NoteConflict";
+  }
+}
+
+/** Reads one note whole, for the merge that follows a conflict. */
+export async function loadNote(session: AppSession, noteId: string): Promise<NoteEntry | null> {
+  const result = await supabase
+    .from("notes")
+    .select(
+      "id, owner_id, created_at, updated_at, version, content_version, title, body, content, legacy_body",
+    )
+    .eq("archive_id", session.archiveId)
+    .eq("id", noteId)
+    .maybeSingle();
+  fail(result.error);
+  if (!result.data) return null;
+
+  const row = result.data as NoteRow & {
+    title: string | null;
+    body: string | null;
+    content: unknown;
+    legacy_body: string | null;
+  };
+  const storedBody = row.body ?? "";
+  const document = noteDocument(row.content, row.content_version, row.legacy_body ?? storedBody);
+  const note: Note = {
+    id: row.id,
+    title: row.title ?? "",
+    body: row.content_version === RICH_TEXT_VERSION ? storedBody : richTextToPlainText(document),
+    content: document,
+    contentVersion: row.content_version,
+    legacyBody: row.legacy_body ?? (row.content_version === 0 ? storedBody : null),
+    ownerId: row.owner_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  noteCache.set(row.id, { version: row.version, note });
+  return { note, version: row.version };
+}
+
+/**
+ * Writes a note, but only onto the version it was read from.
+ *
+ * The conditional update is the whole of the concurrency control. It used to
+ * be spent rather than used: when it matched nothing — which is exactly the
+ * signal that somebody else had written — the old code re-read the current
+ * version and rewrote the same payload on top of it, up to four times. Two
+ * people in one note therefore overwrote each other silently, and a whole
+ * burst of typing disappeared with no error anywhere. A miss is a conflict
+ * now, and the caller merges.
+ */
 export async function saveNote(
   session: AppSession,
   note: Note,
   expectedVersion: number,
 ): Promise<number> {
-  let version = expectedVersion;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const result = await supabase
-      .from("notes")
-      .update({
-        title: note.title,
-        body: note.body,
-        content: note.content,
-        content_version: note.contentVersion,
-        legacy_body: note.legacyBody,
-        updated_at: note.updatedAt,
-        version: version + 1,
-      })
-      .eq("archive_id", session.archiveId)
-      .eq("id", note.id)
-      .eq("version", version)
-      .select("version")
-      .maybeSingle();
-    fail(result.error);
-    if (result.data) {
-      noteCache.set(note.id, { version: result.data.version, note });
-      return result.data.version;
-    }
-
-    const current = await supabase
-      .from("notes")
-      .select("version")
-      .eq("archive_id", session.archiveId)
-      .eq("id", note.id)
-      .single();
-    fail(current.error);
-    version = current.data!.version;
+  const result = await supabase
+    .from("notes")
+    .update({
+      title: note.title,
+      body: note.body,
+      content: note.content,
+      content_version: note.contentVersion,
+      legacy_body: note.legacyBody,
+      updated_at: note.updatedAt,
+      version: expectedVersion + 1,
+    })
+    .eq("archive_id", session.archiveId)
+    .eq("id", note.id)
+    .eq("version", expectedVersion)
+    .select("version")
+    .maybeSingle();
+  fail(result.error);
+  if (result.data) {
+    noteCache.set(note.id, { version: result.data.version, note });
+    return result.data.version;
   }
-  throw new Error("The note changed repeatedly while it was being saved");
+
+  throw new NoteConflict(await loadNote(session, note.id));
 }
 
 export async function deleteNote(session: AppSession, noteId: string): Promise<void> {

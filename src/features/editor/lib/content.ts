@@ -64,7 +64,17 @@ const LegacyColorMarkdown = Extension.create({
 export const DOCUMENT_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
-    link: { openOnClick: false },
+    /* A link opens on a plain click, in a new tab. `openOnClick: false` made
+       clicking one put a caret inside the text instead, which is what a reader
+       never wants and what a writer has the toolbar's link dialog for. The
+       `rel` keeps the opened page from reaching back through `window.opener`;
+       the extension's own URI check still refuses `javascript:`. */
+    link: {
+      openOnClick: true,
+      autolink: true,
+      defaultProtocol: "https",
+      HTMLAttributes: { target: "_blank", rel: "noopener noreferrer nofollow" },
+    },
   }),
   TextStyleKit,
   TableKit,

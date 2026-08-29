@@ -514,7 +514,19 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   useEffect(() => {
     if (!editor || appliedRevision.current === revision) return;
     appliedRevision.current = revision;
+
+    /* Replacing the document sends the caret to the top, which after a merge
+       means being thrown to the start of the note mid-sentence. The offset is
+       kept and restored, clamped to whatever the new document can hold: the
+       merge puts your own blocks before the other person's, so the position
+       you were typing at is still the position you were typing at. */
+    const caret = editor.state.selection.from;
+    const focused = editor.isFocused;
     editor.commands.setContent(value, { emitUpdate: false });
+    if (focused) {
+      const end = Math.max(1, editor.state.doc.content.size - 1);
+      editor.commands.setTextSelection(Math.min(caret, end));
+    }
     // A revision bump, not a delayed render, authorises replacing the document.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, revision]);

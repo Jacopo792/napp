@@ -27,6 +27,11 @@ export interface Draft {
 
 interface Slot {
   draft: Draft;
+  /** What this draft was last in agreement with the archive about: the note as
+   *  it was read, or as it was last written. A merge needs three documents and
+   *  this is the third — without it, a save that collides with somebody else's
+   *  can only overwrite or be overwritten. */
+  base: Draft;
   /** Edited since the save queue last took it. Survives note switches, so
    *  moving away from a half-written note never strands the words. */
   dirty: boolean;
@@ -58,6 +63,11 @@ export function readDraft(id: string): Draft | undefined {
   return slots.get(id)?.draft;
 }
 
+/** The version this draft departed from, for a three-way merge. */
+export function readBase(id: string): Draft | undefined {
+  return slots.get(id)?.base;
+}
+
 export function isDirty(id: string): boolean {
   return slots.get(id)?.dirty === true;
 }
@@ -75,7 +85,7 @@ export function hasPending(): boolean {
 export function ensureDraft(id: string, stored: Draft): void {
   const slot = slots.get(id);
   if (slot?.dirty) return;
-  slots.set(id, { draft: stored, dirty: false });
+  slots.set(id, { draft: stored, base: stored, dirty: false });
   notifyTitle(id);
 }
 
@@ -97,7 +107,25 @@ export function editBody(id: string, body: string, content: JSONContent): void {
 /** Text pulled from the other device, applied only once the page has
  *  established that nothing local is waiting for this note. */
 export function replaceDraft(id: string, draft: Draft): void {
-  slots.set(id, { draft, dirty: false });
+  slots.set(id, { draft, base: draft, dirty: false });
+  notifyTitle(id);
+}
+
+/** A clean write landed. What went to the archive is what the next merge
+ *  compares against — not what is on screen now, which may have moved on. */
+export function rebaseDraft(id: string, saved: Draft): void {
+  const slot = slots.get(id);
+  if (slot) slot.base = saved;
+}
+
+/**
+ * A merged write landed. The archive now holds `base`; this editor holds
+ * `draft`, which is `base` plus anything typed while the write was in flight.
+ * Both have to be set together: a base that is not what the archive holds
+ * makes the next merge read the other person's blocks as a deletion.
+ */
+export function reconcileDraft(id: string, base: Draft, draft: Draft, dirty: boolean): void {
+  slots.set(id, { draft, base, dirty });
   notifyTitle(id);
 }
 

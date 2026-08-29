@@ -36,6 +36,7 @@ import {
   downloadObject,
   loadArchive,
   loadPendingInvites,
+  NoteConflict,
   loadProfile,
   persistMetaDiff,
   revokeArchiveInvite,
@@ -71,10 +72,19 @@ import {
   isDirty,
   readDraft,
   replaceDraft,
+  readBase,
+  rebaseDraft,
+  reconcileDraft,
   requeue,
   takePending,
 } from "@/features/editor/lib/draft";
-import { EMPTY_RICH_TEXT, RICH_TEXT_VERSION } from "@/features/editor/lib/content";
+import {
+  EMPTY_RICH_TEXT,
+  RICH_TEXT_VERSION,
+  richTextToPlainText,
+} from "@/features/editor/lib/content";
+import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
+import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -241,6 +251,9 @@ function NotesPage() {
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [syncFlash, setSyncFlash] = useState(false);
+  /** What the last merge did: a word for the readout, a sentence for its
+   *  tooltip, because the readout slot holds one state and not a paragraph. */
+  const [merge, setMerge] = useState<{ label: string; detail: string } | null>(null);
   /** Raised only when a pull replaces the open draft, so the editor knows the
    *  new text is not its own and may be applied under the caret. */
   const [syncRevision, setSyncRevision] = useState(0);
@@ -623,6 +636,147 @@ function NotesPage() {
   }, [selected]);
 
   // ── Save pipeline ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!merge) return;
+    const timer = window.setTimeout(() => setMerge(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [merge]);
+
+  const storeEntry = useCallback((note: Note, version: number) => {
+    const saved: NoteEntry = { note, version };
+    entriesRef.current = entriesRef.current.map((current) =>
+      current.note.id === note.id ? saved : current,
+    );
+    setEntries(entriesRef.current);
+  }, []);
+
+  /**
+   * Somebody else wrote this note while we were writing it.
+   *
+   * The document is the unit of the write, so the two versions cannot both be
+   * sent — but they can both be kept. `mergeDocuments` takes the blocks each
+   * side added or removed relative to the version this editor started from and
+   * produces one document holding both, which is exactly right for the case
+   * that lost text: two people adding paragraphs to the same note. Only when
+   * both edited the *same* block is there nothing to decide, and then the
+   * losing document is kept as a note of its own rather than discarded.
+   */
+  const resolveConflict = useCallback(
+    async (s: AppSession, id: string, taken: Draft, conflict: NoteConflict) => {
+      if (!conflict.entry) {
+        // ponytail: the row is gone, so there is nothing to merge onto and no
+        // metadata to recreate it under. Recreate it as a note if this ever
+        // happens to anybody in practice.
+        dropDraft(id);
+        setError("That note was removed somewhere else");
+        return;
+      }
+
+      let remote = conflict.entry;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const base = readBase(id) ?? taken;
+        const document = mergeDocuments(base.content, taken.content, remote.note.content);
+
+        if (!document) {
+          await keepUnmergedCopy(s, remote.note, taken);
+          storeEntry(remote.note, remote.version);
+          replaceDraft(id, {
+            title: remote.note.title,
+            body: remote.note.body,
+            content: remote.note.content,
+          });
+          setSyncRevision((n) => n + 1);
+          setMerge({
+            label: "Kept a copy",
+            detail:
+              "You and somebody else edited the same paragraph, so both versions could not become one. Theirs is in this note; yours is kept as a note of its own.",
+          });
+          return;
+        }
+
+        const merged: Note = {
+          ...remote.note,
+          title: mergeTitle(base.title, taken.title, remote.note.title),
+          body: richTextToPlainText(document),
+          content: document,
+          contentVersion: RICH_TEXT_VERSION,
+          updatedAt: new Date().toISOString(),
+        };
+
+        try {
+          const version = await saveNote(s, merged, remote.version);
+          storeEntry(merged, version);
+          adoptMerged(id, taken, {
+            title: merged.title,
+            body: merged.body,
+            content: document,
+          });
+          setMerge({
+            label: "Merged",
+            detail: "Somebody else wrote in this note while you did. Both changes are here.",
+          });
+          return;
+        } catch (err) {
+          // Written again while we were merging: merge onto the newer one.
+          if (!(err instanceof NoteConflict) || !err.entry) throw err;
+          remote = err.entry;
+        }
+      }
+      throw new Error("The note kept changing while it was being merged");
+    },
+    [storeEntry],
+  );
+
+  /**
+   * Puts the merged document on screen. Anything typed while the write was in
+   * flight descends from `taken`, and so does the merged document — so the same
+   * three-way merge re-applies those keystrokes on top of it. The base becomes
+   * what the archive now holds, never what is on screen, or the next merge
+   * would read the other person's blocks as a deletion.
+   */
+  function adoptMerged(id: string, taken: Draft, written: Draft) {
+    const current = readDraft(id);
+    const typedSince = isDirty(id) && current !== undefined;
+    if (!typedSince) {
+      replaceDraft(id, written);
+      setSyncRevision((n) => n + 1);
+      return;
+    }
+    const document =
+      mergeDocuments(taken.content, current.content, written.content) ?? written.content;
+    reconcileDraft(
+      id,
+      written,
+      {
+        title: mergeTitle(taken.title, current.title, written.title),
+        body: richTextToPlainText(document),
+        content: document,
+      },
+      true,
+    );
+    setSyncRevision((n) => n + 1);
+  }
+
+  /** The losing document, kept where it can be read. No marker reaches the
+   *  text of either version. */
+  async function keepUnmergedCopy(s: AppSession, remote: Note, local: Draft) {
+    const note: Note = {
+      id: crypto.randomUUID(),
+      title: `${remote.title || "Untitled"} — your version`,
+      body: local.body,
+      content: local.content,
+      contentVersion: RICH_TEXT_VERSION,
+      legacyBody: null,
+      ownerId: remote.ownerId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const entry = await createNote(s, note, { id: note.id, folderId: null, tagIds: [] });
+    entriesRef.current = [entry, ...entriesRef.current];
+    setEntries(entriesRef.current);
+  }
+
   const drain = useCallback(async () => {
     const s = sessionRef.current;
     if (!s || inFlightRef.current) return;
@@ -650,15 +804,14 @@ function NotesPage() {
             updatedAt: new Date().toISOString(),
           };
           try {
-            const version = await saveNote(s, updated, entry.version);
-            const saved: NoteEntry = { note: updated, version };
-            entriesRef.current = entriesRef.current.map((current) =>
-              current.note.id === id ? saved : current,
-            );
-            setEntries(entriesRef.current);
+            storeEntry(updated, await saveNote(s, updated, entry.version));
+            rebaseDraft(id, d);
           } catch (err) {
-            requeue(id);
-            throw err;
+            if (!(err instanceof NoteConflict)) {
+              requeue(id);
+              throw err;
+            }
+            await resolveConflict(s, id, d, err);
           }
         }
 
@@ -698,7 +851,7 @@ function NotesPage() {
         window.setTimeout(() => void refreshRemote(), 0);
       }
     }
-  }, [refreshRemote]);
+  }, [refreshRemote, resolveConflict, storeEntry]);
 
   const schedule = useCallback(() => {
     setDirty(true);
@@ -1246,6 +1399,10 @@ function NotesPage() {
     </span>
   ) : dirty ? (
     <span className="label text-ink-2">Unsaved</span>
+  ) : merge ? (
+    <span className="label text-accent" title={merge.detail}>
+      {merge.label}
+    </span>
   ) : syncFlash ? (
     <span className="label text-accent">Updated elsewhere</span>
   ) : (
