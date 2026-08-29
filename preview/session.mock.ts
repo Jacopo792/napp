@@ -25,6 +25,13 @@ export async function authenticate(email: string): Promise<AppSession> {
   return previewSession(email || EMAIL);
 }
 
+export async function registerAccount(): Promise<{
+  session: AppSession | null;
+  confirmationRequired: boolean;
+}> {
+  return { session: null, confirmationRequired: true };
+}
+
 export async function restoreSession(): Promise<AppSession | null> {
   return previewSession();
 }

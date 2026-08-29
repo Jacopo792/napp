@@ -553,6 +553,17 @@
   opacity: 0.38;
 }
 
+.login-mode {
+  display: block;
+  margin-inline: auto;
+  border-radius: 0.5rem;
+  text-underline-offset: 0.2em;
+}
+
+.login-mode:hover {
+  text-decoration: underline;
+}
+
 /* A label on the left, its value hard against the right edge — the specimen's
    one repeating row, used for every measured pair in the interface. */
 @utility field-row {

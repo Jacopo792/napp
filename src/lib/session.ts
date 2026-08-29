@@ -17,6 +17,11 @@ const SESSION_KEY = "napp:archive-session";
 
 type StoredSession = AppSession;
 
+export interface RegistrationResult {
+  session: AppSession | null;
+  confirmationRequired: boolean;
+}
+
 /** A member with no profile gets one on first sign-in, named after the local
  *  part of their address. It is a starting point, not a claim: the nickname is
  *  theirs to change, and nobody else may write it. */
@@ -42,13 +47,24 @@ export async function authenticate(email: string, password: string): Promise<App
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
-    const { data: memberships, error: membershipError } = await supabase
+    const membershipResult = await supabase
       .from("archive_members")
       .select("archive_id")
       .eq("user_id", data.user.id)
       .limit(2);
+    let memberships = membershipResult.data;
+    const membershipError = membershipResult.error;
     if (membershipError) throw new Error(membershipError.message);
-    if (!memberships || memberships.length !== 1) {
+
+    if (!memberships || memberships.length === 0) {
+      const bootstrap = await supabase.rpc("ensure_personal_archive");
+      if (bootstrap.error || !bootstrap.data) {
+        throw new Error(bootstrap.error?.message ?? "Could not create an archive for this account");
+      }
+      memberships = [{ archive_id: bootstrap.data as string }];
+    }
+
+    if (memberships.length !== 1) {
       throw new Error("This account is not connected to the archive");
     }
     const archiveId = memberships[0].archive_id;
@@ -66,6 +82,30 @@ export async function authenticate(email: string, password: string): Promise<App
     if (reason instanceof Error && reason.message.includes("not connected")) throw reason;
     throw new Error("Could not open this account");
   }
+}
+
+/** Registration deliberately gives the same completion message for a new or
+ * existing address. With confirmations enabled Supabase also returns an
+ * indistinguishable response, so the page does not become an account lookup. */
+export async function registerAccount(
+  email: string,
+  password: string,
+): Promise<RegistrationResult> {
+  const emailRedirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo },
+  });
+  if (error) throw new Error(error.message);
+
+  if (data.session && data.user) {
+    const session = await authenticate(email, password);
+    return { session, confirmationRequired: false };
+  }
+
+  sessionStorage.removeItem(SESSION_KEY);
+  return { session: null, confirmationRequired: true };
 }
 
 export async function restoreSession(): Promise<AppSession | null> {
