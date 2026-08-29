@@ -147,9 +147,13 @@ Technical constraints that outlive any design:
   update that matches nothing is a conflict, never a reason to write anyway.
   On a conflict the client merges the top-level blocks each side added or
   removed relative to the version it started from, so two people adding
-  paragraphs to one note both keep their text. When both edited the _same_
-  block there is nothing to decide: the remote version stays in the note and
-  the local one is kept as a note of its own. No conflict marker ever reaches
+  paragraphs to one note both keep their text — including the case that matters
+  most, two people typing into the single empty paragraph of a note just
+  created, which is two people writing and not a conflict. An empty paragraph
+  or heading is where the caret is parked, not content. When both rewrote the
+  _same_ block and that block actually held something, there is nothing to
+  decide: the remote version stays in the note and the local one is kept as a
+  note of its own. No conflict marker ever reaches
   the text, and the readout says which of the two happened — `Merged` or
   `Kept a copy`. The interface must never claim a merge that did not happen,
   and must never discard a version silently.
