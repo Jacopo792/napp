@@ -832,42 +832,43 @@ export function SettingsPanel({
                 <h3>Profile details</h3>
 
                 <div className="profile-portrait">
-                  <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
-                  <div className="min-w-0">
-                    <b className="text-[14px] font-[560] text-ink">Picture</b>
-                    <small className="mt-0.5 block text-[12.5px] text-ink-4">
-                      Shown to everyone in this archive. Cropped square, kept small.
-                    </small>
-                    <input
-                      ref={avatarRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) setCropping(file);
-                        event.target.value = "";
-                      }}
+                  <div className="appearance-row">
+                    <RowLead
+                      icon={<ImagePlus size={17} />}
+                      label="Picture"
+                      hint="Shown to everyone in this archive. Kept square and small."
                     />
-                    <div className="profile-portrait-actions">
+                    <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
+                  </div>
+                  <input
+                    ref={avatarRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) setCropping(file);
+                      event.target.value = "";
+                    }}
+                  />
+                  <div className="profile-portrait-actions">
+                    <button
+                      type="button"
+                      disabled={profileBusy}
+                      onClick={() => avatarRef.current?.click()}
+                    >
+                      {profile.avatarObject ? "Change picture" : "Add a picture"}
+                    </button>
+                    {profile.avatarObject && (
                       <button
                         type="button"
+                        className="is-danger"
                         disabled={profileBusy}
-                        onClick={() => avatarRef.current?.click()}
+                        onClick={onAvatarRemove}
                       >
-                        {profile.avatarObject ? "Change picture" : "Add a picture"}
+                        Remove
                       </button>
-                      {profile.avatarObject && (
-                        <button
-                          type="button"
-                          className="is-danger"
-                          disabled={profileBusy}
-                          onClick={onAvatarRemove}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -1313,12 +1314,29 @@ export function SettingsPanel({
 
                 <h3>Invite someone</h3>
                 {!canManageMembers ? (
-                  <p className="profile-note">Only editors can invite another member.</p>
+                  <dl className="settings-facts">
+                    <div>
+                      <span className="settings-lead" aria-hidden="true">
+                        <ShieldCheck size={17} />
+                      </span>
+                      <span className="settings-label">
+                        <dt>Editors only</dt>
+                        <dd>An editor in this archive can invite the other person.</dd>
+                      </span>
+                    </div>
+                  </dl>
                 ) : seatsFull ? (
-                  <p className="profile-note">
-                    Both seats are taken. Withdraw an invitation nobody claimed, and the seat it is
-                    holding comes back.
-                  </p>
+                  <dl className="settings-facts">
+                    <div>
+                      <span className="settings-lead" aria-hidden="true">
+                        <UserPlus size={17} />
+                      </span>
+                      <span className="settings-label">
+                        <dt>No seat free</dt>
+                        <dd>Withdraw an invitation nobody claimed and its seat comes back.</dd>
+                      </span>
+                    </div>
+                  </dl>
                 ) : (
                   <>
                     <div className="invite-role" role="group" aria-label="Invitation role">

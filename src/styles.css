@@ -42,7 +42,12 @@
   --glass-border: #3c3c3c;
   --glass-highlight: rgb(255 255 255 / 0.06);
 
-  --shadow-soft: 0 14px 40px rgb(0 0 0 / 0.22);
+  /* A 40px black blur at 0.22, spread evenly around a rounded card, does not
+     read as lift over a wallpaper — it reads as soot ringing the card. Two
+     layers instead: a hairline of contact directly under the edge, and a wider
+     one pulled back in by a negative spread so it stays beneath the card
+     rather than escaping past its corners. */
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.28), 0 10px 28px -12px rgb(0 0 0 / 0.5);
   --shadow-popover: 0 22px 64px rgb(0 0 0 / 0.44);
   --radius-sm: 0.7rem;
   --radius-md: 0.95rem;
@@ -195,7 +200,10 @@
     background-repeat: no-repeat;
     background-size: var(--wallpaper-fit, cover);
     content: "";
-    filter: blur(var(--wallpaper-blur, 0));
+    /* `blur(0)` is not free: it still promotes this fixed, viewport-sized
+       element and still runs a filter pass on every composite. The default is
+       no blur, so the default is no filter at all. */
+    filter: var(--wallpaper-filter, none);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--dur-base) var(--ease);
@@ -407,12 +415,20 @@
 }
 
 .has-wallpaper .sidebar-column,
-.has-wallpaper .collection-column,
-.has-wallpaper .collection-toolbar,
-.has-wallpaper .editor-toolbar {
+.has-wallpaper .collection-column {
   background: color-mix(in srgb, var(--paper) 88%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.06);
   backdrop-filter: blur(18px) saturate(1.06);
+}
+
+/* A band inside a pane that is already tinted and already blurred takes
+   neither again. The second coat of `--paper` is what made every toolbar a
+   darker strip across the top of its own column, and the second backdrop
+   filter is a full extra compositing pass per frame for output the eye cannot
+   tell from one pass. The painted hairline underneath still separates it. */
+.has-wallpaper .collection-toolbar,
+.has-wallpaper .editor-toolbar {
+  background: transparent;
 }
 
 .has-wallpaper .editor-shell,
@@ -951,7 +967,11 @@
   isolation: isolate;
   border: 1px solid var(--rule);
   border-radius: 0.8rem;
-  background: var(--surface);
+  /* A well, not a plate. Opaque `--surface` is darker than the column it sits
+     in, which over a wallpaper is a black rectangle with a hard edge — the one
+     thing in the sidebar that refused to belong to it. Tinted instead, so the
+     recess comes from the ink and the atmosphere still passes through. */
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
   padding: 3px;
 }
 
@@ -974,7 +994,7 @@
   width: round(down, calc((100% - 6px) / var(--switch-count, 2)), 1px);
   border-radius: 0.62rem;
   background: var(--accent-wash);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+  box-shadow: inset 0 0 0 1px var(--glass-highlight);
   transform: translateX(calc(100% * var(--switch-index, 0)));
   transition: transform var(--dur-base) var(--ease);
 }
@@ -1525,21 +1545,28 @@
    eye actually checks. Pretending the 72px portrait was a 34px row glyph is
    what left "Picture" starting 40px to the right of "Nickname". */
 .profile-portrait {
-  display: flex;
-  align-items: center;
-  gap: 14px;
   margin-bottom: 12px;
   border: 1px solid var(--rule-soft);
   border-radius: 0.85rem;
   background: var(--surface);
-  padding: 14px 16px;
+  padding-bottom: 14px;
+}
+
+.profile-portrait .appearance-row {
+  border-bottom: 0;
+}
+
+.profile-portrait .avatar.is-large {
+  width: 56px;
+  height: 56px;
+  font-size: 19px;
 }
 
 .profile-portrait-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 9px;
+  padding-inline: 16px;
 }
 
 .profile-portrait-actions button {
@@ -2004,6 +2031,13 @@
   font-weight: 620;
   letter-spacing: 0.075em;
   text-transform: uppercase;
+}
+
+/* A section label after a card had nothing above it: the card ended, the
+   uppercase label began on the next line, and the two read as one block that
+   had lost its border. Only the first label in a section sits tight. */
+.settings-scroll h3:not(:first-child) {
+  margin-top: 22px;
 }
 
 /* ── The specimen ────────────────────────────────────────────────────────────
@@ -3115,10 +3149,13 @@
    reading weight and full ink — a column of small grey labels reads as chrome,
    and this is content. Rows are compact and evenly pitched so a tree of a dozen
    folders is one shape rather than a scattering. ─────────────────────────── */
+/* No background of its own. Painting `--paper` here put an opaque strip across
+   the top of a column that is translucent whenever a wallpaper is set, so the
+   header read as a separate darker card sitting on the sidebar. The column
+   already paints; the bar only needs to sit above what scrolls under it. */
 .sidebar-topbar {
   position: relative;
   z-index: 30;
-  background: var(--paper);
 }
 
 /* No reserved gutter. `scrollbar-gutter: stable` was holding 10px open down

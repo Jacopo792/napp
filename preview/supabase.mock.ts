@@ -27,7 +27,15 @@ export interface Profile {
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   members: ArchiveMember[];
+  seatLimit: number;
   metas: Record<string, Meta>;
+}
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  role: "editor" | "viewer";
+  expiresAt: string;
 }
 
 const PREVIEW_AVATAR_U1 = "10000000-0000-4000-8000-000000000001";
@@ -99,7 +107,10 @@ export async function loadArchive(_session: AppSession): Promise<ArchiveSnapshot
     entries: [...notes.values()]
       .map((entry) => ({ note: { ...entry.note }, version: entry.version }))
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
-    members: MEMBERS,
+    // A fresh array, the way the real loader builds one: handing back the same
+    // object made every roster change invisible to React.
+    members: MEMBERS.map((member) => ({ ...member })),
+    seatLimit: 2,
     metas: structuredClone(metas),
   };
 }
@@ -213,9 +224,34 @@ export async function deleteAvatar(_session: AppSession, objectId: string): Prom
   avatars.delete(objectId);
 }
 
-export async function createArchiveInvite(): Promise<string> {
+let invites: PendingInvite[] = [];
+
+export async function createArchiveInvite(
+  _session: AppSession,
+  email: string,
+  role: "editor" | "viewer",
+): Promise<string> {
   await sleep(180);
+  invites = [
+    ...invites.filter((invite) => invite.email !== email),
+    {
+      id: `preview-invite-${invites.length + 1}`,
+      email,
+      role,
+      expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    },
+  ];
   return "a".repeat(64);
+}
+
+export async function loadPendingInvites(_session: AppSession): Promise<PendingInvite[]> {
+  await sleep(80);
+  return invites.map((invite) => ({ ...invite }));
+}
+
+export async function revokeArchiveInvite(inviteId: string): Promise<void> {
+  await sleep(120);
+  invites = invites.filter((invite) => invite.id !== inviteId);
 }
 
 export async function setArchiveMemberRole(

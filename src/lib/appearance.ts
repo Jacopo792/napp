@@ -144,7 +144,7 @@ const SEMANTIC = {
     "--tint-mint": "#79ddb2",
     "--tint-blue": "#8fb6f5",
     "--glass-highlight": "rgb(255 255 255 / 0.06)",
-    "--shadow-soft": "0 14px 40px rgb(0 0 0 / 0.22)",
+    "--shadow-soft": "0 1px 2px rgb(0 0 0 / 0.28), 0 10px 28px -12px rgb(0 0 0 / 0.5)",
     "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.44)",
   },
   light: {
@@ -159,7 +159,7 @@ const SEMANTIC = {
     "--tint-mint": "#0f7355",
     "--tint-blue": "#2757b0",
     "--glass-highlight": "rgb(255 255 255 / 0.72)",
-    "--shadow-soft": "0 14px 40px rgb(0 0 0 / 0.09)",
+    "--shadow-soft": "0 1px 2px rgb(0 0 0 / 0.05), 0 10px 28px -12px rgb(0 0 0 / 0.18)",
     "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.16)",
   },
 } as const;
@@ -218,7 +218,10 @@ export function applyAppearance(config = current): void {
     wallpaperUrl ? `url(${JSON.stringify(wallpaperUrl)})` : "none",
   );
   root.style.setProperty("--wallpaper-dim", String(config.wallpaperDim / 100));
-  root.style.setProperty("--wallpaper-blur", `${config.wallpaperBlur}px`);
+  root.style.setProperty(
+    "--wallpaper-filter",
+    config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : "none",
+  );
   root.style.setProperty("--wallpaper-fit", config.wallpaperFit);
   for (const [token, value] of Object.entries(SEMANTIC[dark ? "dark" : "light"])) {
     root.style.setProperty(token, value);
