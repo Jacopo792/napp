@@ -1,4 +1,13 @@
-import type { Folder, Meta, Note, Tag } from "./types";
+/* The retired encrypted format.
+ *
+ * Nothing the browser ships imports this any more: notes, folders, tags and
+ * archive settings are ordinary Postgres columns, and every stored object
+ * carries its real content type. It lives here, beside the one-time migration
+ * tools in `scripts/`, because those tools are the only thing that can still
+ * need to read the old format — and because a crypto module sitting in
+ * `src/lib` reads as part of the application's security story when it is not.
+ */
+import type { Folder, Meta, Note, Tag } from "../../src/lib/types.ts";
 
 export interface SessionKeys {
   u1?: CryptoKey;

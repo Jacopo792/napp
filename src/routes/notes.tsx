@@ -29,19 +29,25 @@ import {
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
 import {
   createNote,
+  deleteAvatar,
   deleteNote,
+  downloadAvatar,
   downloadImage,
   downloadObject,
   loadArchive,
+  loadProfile,
   persistMetaDiff,
   saveNote,
+  saveProfile,
+  uploadAvatar,
   uploadImage,
   uploadObject,
   type ArchiveMember,
   type ArchiveSnapshot,
+  type Profile,
 } from "@/lib/supabase";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
-import { prepareImageForNote } from "@/lib/image";
+import { prepareAvatar, prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
@@ -62,7 +68,13 @@ import { attachmentType } from "@/lib/attachments";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
-import { CollectionMenu, NoteMenu, SettingsPanel } from "@/components/WorkspaceMenus";
+import {
+  CollectionMenu,
+  NoteContextMenu,
+  NoteMenu,
+  SettingsPanel,
+} from "@/components/WorkspaceMenus";
+import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import type { NoteEditorHandle } from "@/components/NoteEditor";
 import {
@@ -233,6 +245,15 @@ function NotesPage() {
     loadPaneWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX),
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /* This account's own profile. The roster carries everybody's, but the one
+     being edited is read on its own so a save shows immediately rather than
+     waiting for the next archive snapshot. */
+  const [profile, setProfile] = useState<Profile>({ nickname: "", avatarObject: null });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  /** Where a right-click landed on the note page, if one has. */
+  const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The phone has no room for a permanent sidebar, so it gets the same one
    *  as a drawer — the destinations are identical, only the staging differs. */
   const [foldersOpen, setFoldersOpen] = useState(false);
@@ -321,6 +342,43 @@ function NotesPage() {
       return changed ? next : current;
     });
   }, [members]);
+
+  /* The signed-in account's own profile, read once the session exists. */
+  useEffect(() => {
+    if (!session) return;
+    let live = true;
+    void loadProfile(session)
+      .then((loaded) => {
+        if (live) setProfile(loaded);
+      })
+      .catch(() => {
+        /* A profile that will not load is not a reason to keep you out of your
+           notes: the interface falls back to initials and the address. */
+      });
+    return () => {
+      live = false;
+    };
+  }, [session]);
+
+  /* The picture, as a local object URL. Revoked when it changes, so a session
+     that swaps its avatar a few times does not leak the old ones. */
+  useEffect(() => {
+    if (!session || !profile.avatarObject) {
+      setAvatarUrl(null);
+      return;
+    }
+    let url: string | null = null;
+    let live = true;
+    void downloadAvatar(session.userId, profile.avatarObject).then((blob) => {
+      if (!live || !blob) return;
+      url = URL.createObjectURL(blob);
+      setAvatarUrl(url);
+    });
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [session, profile.avatarObject]);
 
   const setActiveMeta = useCallback(
     (m: Meta) => setMetas((current) => ({ ...current, [viewAs]: m })),
@@ -1010,6 +1068,53 @@ function NotesPage() {
     setMobileScreen("collection");
   }
 
+  /* One writer for the profile, optimistic so the field does not snap back
+     under the cursor, and rolled back with the reason if the write is refused.
+     The archive is refreshed afterwards because the roster — and so the scope
+     switch — carries the nickname that just changed. */
+  async function persistProfile(next: Profile) {
+    if (!session) return;
+    const previous = profile;
+    setProfile(next);
+    setProfileBusy(true);
+    setProfileError("");
+    try {
+      await saveProfile(session, next);
+      await refreshRemote();
+    } catch (reason) {
+      setProfile(previous);
+      setProfileError(reason instanceof Error ? reason.message : "Could not save your profile");
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
+  async function handleAvatarPick(file: File) {
+    if (!session) return;
+    setProfileBusy(true);
+    setProfileError("");
+    try {
+      const blob = await prepareAvatar(file);
+      const objectId = await uploadAvatar(session, blob);
+      const replaced = profile.avatarObject;
+      await persistProfile({ ...profile, avatarObject: objectId });
+      /* The old picture is removed only once the new one is the stored one, so
+         a failed write never leaves the profile pointing at nothing. */
+      if (replaced) await deleteAvatar(session, replaced).catch(() => {});
+    } catch (reason) {
+      setProfileError(reason instanceof Error ? reason.message : "Could not use that picture");
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!session) return;
+    const removed = profile.avatarObject;
+    await persistProfile({ ...profile, avatarObject: null });
+    if (removed) await deleteAvatar(session, removed).catch(() => {});
+  }
+
   function handleAutoLockChange(minutes: AutoLockMinutes) {
     setAutoLock(minutes);
     saveAutoLock(minutes);
@@ -1030,30 +1135,34 @@ function NotesPage() {
 
   const dragEntry = dragId ? entries.find((e) => e.note.id === dragId) : null;
 
+  /* The states have very different lengths, so the readout is given one slot of
+     a fixed width below and every state is measured against the widest of them.
+     Left to size itself it slid back and forth by 55px on each debounce, which
+     is the one thing in the toolbar that moves while you are looking at it. The
+     write error is carried in the tooltip for the same reason. */
   const saveReadout = error ? (
     <button
       onClick={saveNow}
-      title="Retry the write now"
+      title={`${error}\nClick to retry the write now`}
       className="flex items-center gap-2 text-left"
     >
-      <span className="label text-danger">Write failed</span>
-      <span className="readout max-w-[20rem] truncate text-ink-3 underline-offset-2 hover:underline">
-        {error}
-      </span>
+      <span className="label text-danger underline-offset-2 hover:underline">Save failed</span>
     </button>
   ) : saving ? (
     <span className="flex items-center gap-2">
       <span className="animate-spin inline-block h-2.5 w-2.5 rounded-full border border-accent border-t-transparent" />
-      <span className="label text-accent">Writing</span>
+      <span className="label text-accent">Saving</span>
     </span>
   ) : dirty ? (
     <span className="label text-ink-2">Unsaved</span>
   ) : syncFlash ? (
-    <span className="label text-accent">Synced from elsewhere</span>
+    <span className="label text-accent">Updated elsewhere</span>
   ) : (
     <span className="flex items-center gap-2">
-      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Committed</span>
-      {lastSavedAt && <span className="readout text-ink-4">{formatStamp(lastSavedAt)}</span>}
+      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Saved</span>
+      {lastSavedAt && (
+        <span className="readout tabular-nums text-ink-4">{formatStamp(lastSavedAt)}</span>
+      )}
     </span>
   );
 
@@ -1166,12 +1275,31 @@ function NotesPage() {
     />
   );
 
+  /* Whose notes the window is pointed at, said in the roster's own words. It
+     used to read "Jacopo's notes" or the partner's, which was the last place
+     in the interface still assuming an archive holds exactly two people. */
+  const viewedMember = members.find((member) => member.userId === viewAs);
+  const readingLabel = !viewedMember
+    ? "This archive"
+    : viewedMember.isSelf
+      ? "Your notes"
+      : `${viewedMember.nickname || "Another member"}'s notes`;
+
   const settingsPanel = (
     <SettingsPanel
       open={settingsOpen}
       email={session.email}
-      reading={viewAs === "u1" ? "Jacopo's notes" : `${partnerName}'s notes`}
+      reading={readingLabel}
       autoLock={autoLock}
+      profile={profile}
+      avatarUrl={avatarUrl}
+      joinedAt={members.find((member) => member.isSelf)?.joinedAt}
+      memberCount={members.length}
+      profileBusy={profileBusy}
+      profileError={profileError}
+      onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
+      onAvatarPick={(file) => void handleAvatarPick(file)}
+      onAvatarRemove={() => void handleAvatarRemove()}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}
@@ -1180,7 +1308,9 @@ function NotesPage() {
 
   const noteActions = selected ? (
     <>
-      <span className="mr-2 min-w-0 truncate">{saveReadout}</span>
+      <span className="mr-2 flex w-[7.5rem] shrink-0 items-center overflow-hidden">
+        {saveReadout}
+      </span>
       <button
         type="button"
         aria-label="Find in note"
@@ -1201,6 +1331,24 @@ function NotesPage() {
       />
     </>
   ) : null;
+
+  /* The same items the ⋯ carries, opened where the pointer is. The editor
+     hands the click over only when it did not land on the words. */
+  const editorMenu =
+    selected && editorMenuPoint ? (
+      <NoteContextMenu
+        point={editorMenuPoint}
+        onClose={() => setEditorMenuPoint(null)}
+        pinned={pinned}
+        folders={activeMeta.folders}
+        recent={recentNotes}
+        onTogglePin={() => handleTogglePin(selected.note.id)}
+        onFind={() => noteEditorRef.current?.openFind()}
+        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+        onRecent={handleOpenRecent}
+        onDelete={() => handleMoveToTrash(selected)}
+      />
+    ) : null;
 
   /* Always leave a useful writing surface. On narrower desktop windows the
      handles stop before either navigation pane can consume the editor. */
@@ -1269,6 +1417,7 @@ function NotesPage() {
                   onRestore={handleRestore}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  onMoveToFolder={handleMoveNote}
                 />
               </section>
             )}
@@ -1374,6 +1523,7 @@ function NotesPage() {
                   onRestore={handleRestore}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  onMoveToFolder={handleMoveNote}
                 />
               </div>
               <PaneResizer
@@ -1412,6 +1562,7 @@ function NotesPage() {
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
               resolveFile={resolveFile}
+              onContextMenu={(event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })}
               navigationAction={
                 !navigationOpen ? (
                   <>
@@ -1448,6 +1599,7 @@ function NotesPage() {
         </DragOverlay>
       </DndContext>
       {settingsPanel}
+      {editorMenu}
     </div>
   );
 }

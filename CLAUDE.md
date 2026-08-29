@@ -9,8 +9,9 @@
 - Notes, folder names, tag names and files are stored as ordinary columns and
   Storage objects. Supabase Auth plus `archive_members` RLS is the whole access
   boundary; `owner_id` names which member's scope a row sits in and is never
-  consulted by a policy. The retired `owner` (`u1`/`u2`) column is still present,
-  nullable and unwritten, until it is deliberately dropped.
+  consulted by a policy. Nothing under `src/` mentions the retired `owner`
+  (`u1`/`u2`) column, the `ciphertext` columns or `vault_keys`; the migration
+  that drops them is written and waiting to be run — see below.
 
 ## Local development
 
@@ -72,6 +73,48 @@ than one, so give every function and `do` block its own tag (`$shares$`,
 carries abandoned tables from earlier phases — `legacy_notes_20260828`,
 `legacy_profiles_20260829`, `note_shares` — so `create table if not exists` can
 silently do nothing against a name that is already taken by a different shape.
+
+## The retired encrypted format
+
+The archive was encrypted once and is not any more. Every note, folder, tag and
+archive setting is a plaintext column, every object in Storage carries its real
+content type, and as of 2026-08-29 no code under `src/` decrypts anything: the
+client no longer unwraps a DEK at sign-in, no longer keeps a raw archive key in
+`sessionStorage`, and no longer selects a `ciphertext` column. `crypto.ts` moved
+to `scripts/lib/`, where the one-time migration tools that still need it live.
+
+`supabase/migrations/20260829200000_drop_the_retired_format.sql` finished the
+job in the database on 2026-08-29 — the `ciphertext` columns, `vault_keys`, the
+`u1`/`u2` `owner` columns with their checks and composite keys, and the three
+abandoned tables. `public` now holds seven tables and not one retired column;
+`pnpm verify:supabase` passes against the result. The file's own comment records
+what was checked before it was written, and the data it removed was dumped to a
+file outside the repository first.
+
+Two orderings in that file are load-bearing, and both were found by the drop
+being refused rather than by reading the schema. `owner` sits inside
+three-column unique keys that foreign keys in other tables point at, so the
+dependants come out before the column. And `legacy_notes_20260828` and
+`note_shares` depend on each other — policies on the first read the second, a
+foreign key and a policy on the second read the first — so neither can go
+first and they are dropped in one statement instead of with `cascade`.
+
+Realtime's check in `verify:supabase` flakes about one run in three: the
+server reports SUBSCRIBED slightly before the filter is in place. A failure
+there alone, with everything above it passing, means run it again.
+
+**Deploy before you drop.** The four `ciphertext` columns had to be added back,
+empty, within the hour: GitHub Pages was still serving the build from `main`,
+that build still selected them, and every query it made failed the moment they
+were gone. The archive looked empty. Nothing was lost — the columns had been
+null for a day — but the application was down.
+
+This is the ordering rule for anything this repository ever removes from the
+schema. A static SPA has no server to deploy in step with the database, so the
+oldest client still running is whatever `main` last built, plus anybody holding
+an open tab. Merge and deploy the client that has stopped asking for a column,
+confirm it, and only then drop it. `20260829210000_drop_ciphertext_after_deploy.sql`
+is that second half, waiting.
 
 ## One-time migration tools
 

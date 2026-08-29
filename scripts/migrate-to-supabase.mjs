@@ -20,7 +20,7 @@ import {
   importArchiveKey,
   unwrapArchiveKey,
   wrapArchiveKey,
-} from "../src/lib/crypto.ts";
+} from "./lib/crypto.ts";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 

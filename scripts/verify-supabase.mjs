@@ -9,10 +9,14 @@
  * verifies exactly that boundary — every member reads and writes the same
  * archive, and nobody else reads anything at all.
  *
- * USER_ONE and USER_TWO are required. USER_THREE (an additional member, which
- * may carry no `owner` label) and USER_OUTSIDER (an authenticated account that
- * is not a member of this archive — it may well be a member of another one) are
- * verified when their credentials are present.
+ * USER_ONE and USER_TWO are required. USER_THREE (a further member) and
+ * USER_OUTSIDER (an authenticated account that is not a member of this archive
+ * — it may well be a member of another one) are verified when their credentials
+ * are present.
+ *
+ * Nothing here reads the retired `owner` label or the `ciphertext` columns. The
+ * checks are written against the shape the archive has now, so that they pass
+ * both before and after those columns are dropped.
  */
 
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
@@ -41,15 +45,11 @@ async function openMember(env, email, password) {
   const account = await signIn(env, email, password);
   const memberships = await account.supabase
     .from("archive_members")
-    .select("archive_id, owner")
+    .select("archive_id")
     .eq("user_id", account.userId);
   fail(memberships.error);
   assert(memberships.data.length === 1, `${email} does not have exactly one membership`);
-  return {
-    ...account,
-    archiveId: memberships.data[0].archive_id,
-    owner: memberships.data[0].owner,
-  };
+  return { ...account, archiveId: memberships.data[0].archive_id };
 }
 
 /** Realtime reports SUBSCRIBED slightly before the server has the filter in
@@ -98,22 +98,20 @@ const channel = second.supabase.channel(`verify:${crypto.randomUUID()}`);
 const testId = crypto.randomUUID();
 
 try {
-  // ── One archive, several members, `owner` as a label only ────────────────
+  // ── One archive, several members ─────────────────────────────────────────
   for (const member of members) {
     assert(member.archiveId === archiveId, `${member.email} points at a different archive`);
-    assert(
-      member.owner === null || member.owner === "u1" || member.owner === "u2",
-      `${member.email} carries an unknown owner label`,
-    );
   }
   const roster = await first.supabase
     .from("archive_members")
-    .select("user_id, owner")
+    .select("user_id")
     .eq("archive_id", archiveId);
   fail(roster.error);
   assert(roster.data.length >= members.length, "The roster is smaller than the verified accounts");
-  const labels = roster.data.map((row) => row.owner).filter((owner) => owner !== null);
-  assert(new Set(labels).size === labels.length, "Two members share one owner label");
+  assert(
+    new Set(roster.data.map((row) => row.user_id)).size === roster.data.length,
+    "One account holds two rows in the roster",
+  );
   for (const member of members) {
     assert(
       roster.data.some((row) => row.user_id === member.userId),
@@ -121,43 +119,26 @@ try {
     );
   }
   report.members = roster.data.length;
-  report.verifiedAccounts = members.map((member) => ({ email: member.email, owner: member.owner }));
+  report.verifiedAccounts = members.map((member) => member.email);
 
-  // ── Stored data is plaintext, not ciphertext ─────────────────────────────
+  // ── Stored data is plaintext ─────────────────────────────────────────────
   const [notes, folders, tags, archive] = await Promise.all([
-    first.supabase
-      .from("notes")
-      .select("id, owner_id, title, body, ciphertext")
-      .eq("archive_id", archiveId),
-    first.supabase
-      .from("folders")
-      .select("id, owner_id, name, ciphertext")
-      .eq("archive_id", archiveId),
-    first.supabase
-      .from("tags")
-      .select("id, owner_id, name, ciphertext")
-      .eq("archive_id", archiveId),
-    first.supabase
-      .from("archives")
-      .select("settings, settings_ciphertext")
-      .eq("id", archiveId)
-      .single(),
+    first.supabase.from("notes").select("id, owner_id, title, body").eq("archive_id", archiveId),
+    first.supabase.from("folders").select("id, owner_id, name").eq("archive_id", archiveId),
+    first.supabase.from("tags").select("id, owner_id, name").eq("archive_id", archiveId),
+    first.supabase.from("archives").select("settings").eq("id", archiveId).single(),
   ]);
   for (const result of [notes, folders, tags, archive]) fail(result.error);
   for (const row of notes.data) {
-    assert(row.ciphertext === null, `Note ${row.id} still stores ciphertext`);
     assert(typeof row.title === "string", `Note ${row.id} has no plaintext title`);
     assert(typeof row.body === "string", `Note ${row.id} has no plaintext body`);
   }
   for (const row of folders.data) {
-    assert(row.ciphertext === null, `Folder ${row.id} still stores ciphertext`);
     assert(typeof row.name === "string" && row.name.length > 0, `Folder ${row.id} has no name`);
   }
   for (const row of tags.data) {
-    assert(row.ciphertext === null, `Tag ${row.id} still stores ciphertext`);
     assert(typeof row.name === "string" && row.name.length > 0, `Tag ${row.id} has no name`);
   }
-  assert(archive.data.settings_ciphertext === null, "Archive settings still store ciphertext");
   assert(
     archive.data.settings !== null && typeof archive.data.settings === "object",
     "Archive settings are not a plain JSON object",
@@ -183,7 +164,6 @@ try {
     notes: notes.data.length,
     folders: folders.data.length,
     tags: tags.data.length,
-    ciphertextRows: 0,
   };
 
   // ── Files keep their real type behind the same membership rule ───────────
@@ -322,7 +302,6 @@ try {
   const anonymousWrite = await anonymous.from("notes").insert({
     id: crypto.randomUUID(),
     archive_id: archiveId,
-    owner: "u1",
     title: "should not exist",
     body: "",
     created_at: new Date().toISOString(),

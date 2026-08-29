@@ -1,0 +1,57 @@
+name: Checks
+
+# Nothing was checking a pull request. Lint, typecheck, tests and the build all
+# ran only on the way to Pages, which meant a branch could be reviewed and
+# merged before anything had compiled it.
+on:
+  pull_request:
+  push:
+    branches: [main, PP]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # Placeholders, not the real project. vite.config.ts refuses to build
+      # without these two, by design — a bundle that silently shipped with no
+      # backend would be worse than a failed build. What this step proves is
+      # that the code compiles, and it has to do that for a pull request from a
+      # fork, which cannot read repository variables. The real values are set
+      # in deploy.yml, and neither of them is secret in the first place.
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: https://checks.example.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
+        run: pnpm run build

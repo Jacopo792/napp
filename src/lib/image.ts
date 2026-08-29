@@ -50,6 +50,48 @@ export async function prepareImageForNote(file: File): Promise<Blob> {
   throw new Error("Image could not be reduced below 4 MB");
 }
 
+/* An avatar is a small square. The bucket accepts two megabytes and the
+   picture is drawn at 40px in a row and 72px on the profile, so nothing is
+   gained by carrying more than a 512px edge — and the square is cropped from
+   the middle rather than squashed, which is what every face expects. */
+const AVATAR_EDGE = 512;
+const MAX_AVATAR_BYTES = 1.5 * 1024 * 1024;
+
+export async function prepareAvatar(file: File): Promise<Blob> {
+  if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Use a JPG, PNG or WebP image");
+  }
+  if (file.size > MAX_SOURCE_BYTES) {
+    throw new Error("Image is too large (20 MB maximum)");
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const edge = Math.min(bitmap.width, bitmap.height);
+    const sourceX = Math.round((bitmap.width - edge) / 2);
+    const sourceY = Math.round((bitmap.height - edge) / 2);
+    const size = Math.min(AVATAR_EDGE, edge);
+
+    let quality = 0.9;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Image processing is unavailable");
+      context.drawImage(bitmap, sourceX, sourceY, edge, edge, 0, 0, size, size);
+
+      const blob = await canvasToBlob(canvas, quality);
+      if (blob.size <= MAX_AVATAR_BYTES) return blob;
+      quality -= 0.12;
+    }
+  } finally {
+    bitmap.close();
+  }
+
+  throw new Error("Picture could not be reduced far enough");
+}
+
 export function imageAltFromFilename(filename: string): string {
   return (
     filename

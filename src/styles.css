@@ -238,25 +238,29 @@
     caret-color: var(--accent);
   }
 
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  /* ── Scrollbars ────────────────────────────────────────────────────────────
+     Overlay, and quiet until the pointer is in the region they belong to.
+
+     They were being drawn as classic scrollbars, which is what giving
+     `::-webkit-scrollbar` a width does: an overlay scrollbar that costs
+     nothing becomes a channel that occupies layout. The notes list and the
+     editor were each surrendering ten real pixels to a permanent grey track
+     with a four-pixel thumb inside it — measured, not guessed, and the reason
+     the list's right edge never lined up with the header above it.
+
+     The standard properties keep the overlay. The sidebar had already moved to
+     them and was reserving nothing, so this is the sidebar's treatment applied
+     everywhere rather than a new idea, and it covers scrolling regions nobody
+     has to remember to add to a list. The thumb is still there the moment you
+     are in the region — the affordance is not removed, only the furniture. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: transparent;
-    border: 3px solid transparent;
-    background-clip: content-box;
-  }
-  *:hover::-webkit-scrollbar-thumb {
-    background: var(--ink-4);
-    background-clip: content-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--ink-3);
-    background-clip: content-box;
+
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--ink-4) transparent;
   }
 }
 
@@ -589,6 +593,12 @@
   .skeleton {
     animation: none;
   }
+
+  /* A menu that scales into place is motion nobody asked for, and it appears
+     under a pointer already moving toward it. It is simply there instead. */
+  .menu-popover {
+    animation: none;
+  }
 }
 
 /* ── Midnight Instrument shell ─────────────────────────────────────────── */
@@ -680,6 +690,15 @@
   background: var(--paper);
 }
 
+/* The rule under a toolbar is painted, not laid out. As a border it ate one of
+   the 52 pixels, leaving an odd content box, and every 32px control centred in
+   it landed on a half pixel — which is what softens a hairline and a rounded
+   hover pill alike. An inset shadow draws the same line and costs no height. */
+.collection-toolbar,
+.editor-toolbar.has-rule {
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
 .editor-toolbar {
   background: var(--page);
 }
@@ -760,7 +779,14 @@
   top: 3px;
   bottom: 3px;
   left: 3px;
+  /* Whole pixels, or the ring below is drawn across two of them. A roster of
+     three in a column the width of this one gives slots of 67.98, 68.33, 74.98
+     — measured while dragging the pane — and the thumb carries a 1px inset
+     ring at both edges. Rounding down costs at most one pixel per step of
+     alignment with the label behind it, against a ring that is crisp at every
+     width. The unrounded value stays as the fallback. */
   width: calc((100% - 6px) / var(--switch-count, 2));
+  width: round(down, calc((100% - 6px) / var(--switch-count, 2)), 1px);
   border-radius: 0.62rem;
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
@@ -817,6 +843,18 @@
 
 .menu-popover {
   overflow: hidden;
+}
+
+/* Portalled to the body, so it ranks against the page rather than against the
+   pane it was opened over. Above the toolbars, which sit at 30.
+
+   It grows from its top-left corner, not the top-right the anchored menus use:
+   this one opens *at* the pointer, so that corner is the one the reader's eye
+   and cursor are already on. */
+.context-menu {
+  position: fixed;
+  z-index: 80;
+  transform-origin: top left;
 }
 
 .menu-row {
@@ -887,11 +925,16 @@
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 1.2rem 1rem 0.55rem;
+  /* Whole pixels, like the rows underneath. 1.2rem and 0.55rem are 19.2 and
+     8.8, and the baseline row they wrap measured 22.06 — so each heading threw
+     every row below it a further fraction of a pixel off the device grid, and
+     each of those rows draws a 1px rule. */
+  padding: 19px 16px 9px;
+  line-height: 22px;
 }
 
 .note-group-heading.is-first {
-  padding-top: 0.45rem;
+  padding-top: 7px;
 }
 
 .note-group-heading h3 {
@@ -916,7 +959,9 @@
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 12px;
-  line-height: 1.35;
+  /* Whole pixels: 12 × 1.35 is 16.2, and the fraction accumulates down the
+     column until every row's hairline is drawn between two device rows. */
+  line-height: 16px;
 }
 
 .note-row-summary > span:first-child {
@@ -1048,7 +1093,7 @@
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(52rem, 100%);
+  width: min(64rem, 100%);
   height: min(46rem, calc(100dvh - 2.5rem));
   flex-direction: column;
   overflow: hidden;
@@ -1075,20 +1120,57 @@
   font-size: 13px;
 }
 
+/* Three columns: where you are, what you are changing, and who you are. The
+   third is a standing summary rather than another form — it answers "which
+   account is this?" without the reader having to go and look, and it is where
+   the actions that end a session belong. It is the first thing to go when the
+   dialog has no room for it. */
 .settings-body {
   display: grid;
   flex: 1;
-  grid-template-columns: 142px minmax(0, 1fr);
+  grid-template-columns: 176px minmax(0, 1fr) 252px;
   min-height: 0;
 }
 
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  overflow-y: auto;
   border-right: 1px solid var(--rule-soft);
-  padding: 16px 10px;
+  padding: 14px 10px;
   background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+/* The sections are grouped, because "Profile" and "Appearance" are not the
+   same kind of thing and a flat list of four says they are. */
+.settings-nav-group {
+  padding: 14px 10px 5px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.settings-nav-group:first-child {
+  padding-top: 4px;
+}
+
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.settings-nav button svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+
+.settings-nav button.is-active svg {
+  color: var(--accent-strong);
 }
 
 .settings-nav button {
@@ -1113,6 +1195,166 @@
 .settings-scroll {
   overflow-y: auto;
   padding: 0 20px 20px;
+}
+
+/* ── The summary column ─────────────────────────────────────────────────── */
+.settings-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  border-left: 1px solid var(--rule-soft);
+  padding: 18px 16px;
+  background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+.settings-aside-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-aside-block + .settings-aside-block {
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 14px;
+}
+
+.settings-aside dt,
+.settings-aside-label {
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.settings-aside dd,
+.settings-aside-value {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.settings-aside p {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.settings-aside-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── A face, or the letters standing in for one ─────────────────────────── */
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar.is-large {
+  width: 72px;
+  height: 72px;
+  font-size: 24px;
+}
+
+/* ── The profile section ────────────────────────────────────────────────── */
+.profile-portrait {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0 18px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.profile-portrait-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.profile-portrait-actions button {
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  padding: 6px 11px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 560;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.profile-portrait-actions button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.profile-portrait-actions button.is-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* On a profile row the label is the fixed part and the control is what yields.
+   The other settings rows are the other way round, because there the label
+   carries a wrapping line of explanation and the control is a switch of known
+   size. Here the control is a text field with no natural width, and leaving it
+   a fixed share clipped the label beside it: on a phone "Nickname" arrived as
+   "Ni". */
+.profile-row .settings-label {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
+.profile-field {
+  width: auto;
+  flex: 0 1 13rem;
+  min-width: 4rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+}
+
+.profile-field:focus-visible {
+  border-color: var(--accent);
+}
+
+.profile-static {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.profile-note {
+  margin-top: 14px;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 /* A settings row is a label and its value. Given the full width of the dialog
@@ -1426,6 +1668,18 @@
   margin-top: 18px;
 }
 
+/* The summary column is the first thing to go: it repeats what the profile
+   section already says, so a narrow dialog loses nothing by dropping it. */
+@media (max-width: 900px) {
+  .settings-body {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .settings-aside {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   /* The phone has no room for a line of explanation beside the control: the
      hint wraps to four lines and the row becomes a paragraph with a switch in
@@ -1433,6 +1687,14 @@
      second line, because there the value is the content, not a gloss. */
   .appearance-row .settings-label small {
     display: none;
+  }
+
+  .profile-field {
+    flex: 0 1 10rem;
+  }
+
+  .profile-static {
+    text-align: right;
   }
 
   /* The panel holds one height now, so the body has to say which of its two
@@ -1451,7 +1713,13 @@
 
   .settings-nav button {
     flex: 1;
+    justify-content: center;
     text-align: center;
+  }
+
+  .settings-nav button svg,
+  .settings-nav-group {
+    display: none;
   }
 
   .theme-preview {
@@ -2719,11 +2987,10 @@
    the right of the scrolling area, which pulled every row's right edge 10px
    short of the switch above it and the footer below it — a permanent seam down
    a column whose whole job is to look like one column. macOS overlays its
-   scrollbar anyway, so the reserve bought nothing and cost the alignment. */
-.sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule) transparent;
-}
+   scrollbar anyway, so the reserve bought nothing and cost the alignment.
+
+   The thin overlay treatment this column used to declare for itself is now the
+   base rule for every scrolling region, so there is nothing left to say here. */
 
 .sidebar-heading {
   display: flex;

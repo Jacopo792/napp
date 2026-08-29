@@ -14,13 +14,13 @@
  * without seeing these notes needs an archive of their own instead — see
  * `supabase/admin/new-archive-for-person.sql`.
  *
- * The new row carries `owner = null` by default. `owner` is an interface label
- * for the Jacopo / Lisa switch and a unique index allows one row per label per
- * archive, so additional members join unlabelled and open on the u1 view.
+ * A member is a person. The roster row carries nothing but the archive and the
+ * account; the scope a note belongs to is `owner_id`, which is the member's own
+ * user id. The retired `u1` / `u2` labels are gone from this script.
  *
  *   NEW_MEMBER_EMAIL=… NEW_MEMBER_PASSWORD=… pnpm add:member
  *   pnpm add:member -- --user-id=<uuid>
- *   pnpm add:member -- --user-id=<uuid> --owner=u2 --dry-run
+ *   pnpm add:member -- --user-id=<uuid> --dry-run
  */
 
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
@@ -32,11 +32,6 @@ function flag(name) {
 
 const dryRun = process.argv.includes("--dry-run");
 const requestedUserId = flag("user-id");
-const requestedOwner = flag("owner") ?? null;
-assert(
-  requestedOwner === null || requestedOwner === "u1" || requestedOwner === "u2",
-  "--owner accepts u1 or u2 only",
-);
 
 const env = await loadEnv();
 requireEnv(env, [
@@ -52,7 +47,7 @@ assert(
 
 const inviterClient = anonClient(env);
 const inviteeClient = requestedUserId && !env.NEW_MEMBER_EMAIL ? null : anonClient(env);
-const report = { dryRun, owner: requestedOwner };
+const report = { dryRun };
 
 try {
   const inviter = await inviterClient.auth.signInWithPassword({
@@ -62,7 +57,7 @@ try {
   fail(inviter.error);
   const inviterMembership = await inviterClient
     .from("archive_members")
-    .select("archive_id, owner")
+    .select("archive_id")
     .eq("user_id", inviter.data.user.id)
     .single();
   fail(inviterMembership.error);
@@ -94,7 +89,7 @@ try {
 
   const existing = await inviterClient
     .from("archive_members")
-    .select("user_id, owner")
+    .select("user_id")
     .eq("archive_id", archiveId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -104,14 +99,14 @@ try {
   if (!existing.data && !dryRun) {
     const inserted = await inviterClient
       .from("archive_members")
-      .insert({ archive_id: archiveId, user_id: userId, owner: requestedOwner });
+      .insert({ archive_id: archiveId, user_id: userId });
     fail(inserted.error);
     report.inserted = true;
   }
 
   const roster = await inviterClient
     .from("archive_members")
-    .select("user_id, owner")
+    .select("user_id")
     .eq("archive_id", archiveId);
   fail(roster.error);
   report.members = roster.data.length;
@@ -133,7 +128,7 @@ try {
     const wrote = await inviteeClient.from("notes").insert({
       id: probeId,
       archive_id: archiveId,
-      owner: requestedOwner ?? "u1",
+      owner_id: userId,
       title: "Membership check",
       body: "Written by the new member, removed immediately.",
       created_at: now,

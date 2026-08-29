@@ -48,24 +48,47 @@ alter table public.note_tags alter column owner drop not null;
 
 -- The composite keys that keep a note filed only in a folder of the same owner
 -- and archive, restated against the member.
-alter table public.folders add constraint folders_id_archive_owner_id_key unique (id, archive_id, owner_id);
-alter table public.tags add constraint tags_id_archive_owner_id_key unique (id, archive_id, owner_id);
-alter table public.notes add constraint notes_id_archive_owner_id_key unique (id, archive_id, owner_id);
+--
+-- Postgres has no `add constraint if not exists`, and this file was applied to
+-- the live archive by hand before it was ever run as a migration, so it has to
+-- survive being run against a database that already has all six. One `do` block
+-- with one tag: the CLI mis-pairs `$$` when a file carries more than one.
+do $constraints$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'folders_id_archive_owner_id_key') then
+    alter table public.folders add constraint folders_id_archive_owner_id_key unique (id, archive_id, owner_id);
+  end if;
 
-alter table public.notes add constraint notes_folder_owner_id_fkey
-  foreign key (folder_id, archive_id, owner_id)
-  references public.folders(id, archive_id, owner_id)
-  on delete set null (folder_id);
+  if not exists (select 1 from pg_constraint where conname = 'tags_id_archive_owner_id_key') then
+    alter table public.tags add constraint tags_id_archive_owner_id_key unique (id, archive_id, owner_id);
+  end if;
 
-alter table public.note_tags add constraint note_tags_note_owner_id_fkey
-  foreign key (note_id, archive_id, owner_id)
-  references public.notes(id, archive_id, owner_id)
-  on delete cascade;
+  if not exists (select 1 from pg_constraint where conname = 'notes_id_archive_owner_id_key') then
+    alter table public.notes add constraint notes_id_archive_owner_id_key unique (id, archive_id, owner_id);
+  end if;
 
-alter table public.note_tags add constraint note_tags_tag_owner_id_fkey
-  foreign key (tag_id, archive_id, owner_id)
-  references public.tags(id, archive_id, owner_id)
-  on delete cascade;
+  if not exists (select 1 from pg_constraint where conname = 'notes_folder_owner_id_fkey') then
+    alter table public.notes add constraint notes_folder_owner_id_fkey
+      foreign key (folder_id, archive_id, owner_id)
+      references public.folders(id, archive_id, owner_id)
+      on delete set null (folder_id);
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'note_tags_note_owner_id_fkey') then
+    alter table public.note_tags add constraint note_tags_note_owner_id_fkey
+      foreign key (note_id, archive_id, owner_id)
+      references public.notes(id, archive_id, owner_id)
+      on delete cascade;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'note_tags_tag_owner_id_fkey') then
+    alter table public.note_tags add constraint note_tags_tag_owner_id_fkey
+      foreign key (tag_id, archive_id, owner_id)
+      references public.tags(id, archive_id, owner_id)
+      on delete cascade;
+  end if;
+end
+$constraints$;
 
 create index if not exists notes_archive_owner_id_idx on public.notes (archive_id, owner_id);
 create index if not exists folders_archive_owner_id_position_idx on public.folders (archive_id, owner_id, position);

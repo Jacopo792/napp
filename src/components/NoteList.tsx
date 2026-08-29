@@ -1,7 +1,17 @@
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { useDraggable } from "@dnd-kit/core";
 import {
+  ChevronRight,
   FileText,
+  FolderInput,
   Image as ImageIcon,
   ListChecks,
   Paperclip,
@@ -18,6 +28,9 @@ import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
+import { ContextMenu } from "./ContextMenu";
+import { useContextMenu } from "@/lib/contextMenu";
+import { MenuButton } from "./WorkspaceMenus";
 
 export interface ActiveFilter {
   id: string;
@@ -52,6 +65,7 @@ interface Props {
   onRestore: (entry: NoteEntry) => void;
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (noteId: string) => void;
+  onMoveToFolder: (noteId: string, folderId: string | null) => void;
 }
 
 /* ── What a note is, at a glance ─────────────────────────────────────────────
@@ -93,6 +107,7 @@ const Row = memo(function Row({
   onRestore,
   onDeleteForever,
   onTogglePin,
+  onContextMenu,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -107,6 +122,7 @@ const Row = memo(function Row({
   onRestore: (entry: NoteEntry) => void;
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (entry: NoteEntry) => void;
+  onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -143,6 +159,7 @@ const Row = memo(function Row({
       role="option"
       aria-selected={selected}
       onClick={() => onSelect(entry)}
+      onContextMenu={(event) => onContextMenu(event, entry)}
       style={{ opacity: isDragging ? 0.4 : 1 }}
       className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
@@ -173,7 +190,11 @@ const Row = memo(function Row({
 
       <div className="min-w-0 flex-1">
         <p
-          className={`${gallery ? "text-[15px]" : mobile ? "text-[16px]" : "text-[13.5px]"} leading-[1.35] ${
+          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+             so every row below the first started on a fraction of a pixel and
+             its 1px rule was painted across two device rows at half strength —
+             the blur down the list that looked like bad icon rendering. */
+          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           style={{
@@ -314,6 +335,7 @@ export function NoteList({
   onRestore,
   onDeleteForever,
   onTogglePin,
+  onMoveToFolder,
 }: Props) {
   const hasQuery = query.trim().length > 0;
   /* The page speaks in note ids; the rows hand back the whole entry. One stable
@@ -324,6 +346,131 @@ export function NoteList({
     [onTogglePin],
   );
   const gallery = view === "gallery";
+
+  /* Right-click on the note it is about. Every item here already exists behind
+     a button somewhere; what was missing was reaching them from the row. */
+  const rowMenu = useContextMenu<NoteEntry>();
+  const [moving, setMoving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const closeRowMenu = useCallback(() => {
+    rowMenu.close();
+    setMoving(false);
+    setConfirming(false);
+  }, [rowMenu]);
+  const openRowMenu = useCallback(
+    (event: ReactMouseEvent, entry: NoteEntry) => {
+      setMoving(false);
+      setConfirming(false);
+      rowMenu.open(event, entry);
+    },
+    [rowMenu],
+  );
+
+  const menuEntry = rowMenu.target?.item ?? null;
+  const menuPinned = menuEntry
+    ? indexOf(meta).byNote.get(menuEntry.note.id)?.pinned === true
+    : false;
+
+  /* Permanent deletion asks twice here too. The row's own button has always
+     done that, and a menu item is not a good reason to make it one click. */
+  const rowMenuPanel =
+    rowMenu.target && menuEntry ? (
+      <ContextMenu point={rowMenu.target} onClose={closeRowMenu}>
+        {moving ? (
+          <>
+            <MenuButton onClick={() => setMoving(false)}>
+              <ChevronRight size={16} className="rotate-180" />
+              Back
+            </MenuButton>
+            <p className="menu-label">Move to</p>
+            <MenuButton
+              onClick={() => {
+                onMoveToFolder(menuEntry.note.id, null);
+                closeRowMenu();
+              }}
+            >
+              <FolderInput size={16} />
+              Unfiled
+            </MenuButton>
+            {meta.folders.map((folder) => (
+              <MenuButton
+                key={folder.id}
+                onClick={() => {
+                  onMoveToFolder(menuEntry.note.id, folder.id);
+                  closeRowMenu();
+                }}
+              >
+                <FolderInput size={16} />
+                <span className="truncate">{folder.name}</span>
+              </MenuButton>
+            ))}
+          </>
+        ) : trashMode ? (
+          <>
+            <MenuButton
+              onClick={() => {
+                onRestore(menuEntry);
+                closeRowMenu();
+              }}
+            >
+              <RotateCcw size={16} />
+              Restore note
+            </MenuButton>
+            <div className="menu-separator" />
+            <MenuButton
+              danger
+              onClick={() => {
+                if (!confirming) return setConfirming(true);
+                onDeleteForever(menuEntry);
+                closeRowMenu();
+              }}
+            >
+              <Trash2 size={16} />
+              {confirming ? "Delete forever?" : "Delete forever"}
+            </MenuButton>
+          </>
+        ) : (
+          <>
+            <MenuButton
+              onClick={() => {
+                onSelect(menuEntry.note.id);
+                closeRowMenu();
+              }}
+            >
+              <FileText size={16} />
+              Open note
+            </MenuButton>
+            <MenuButton
+              active={menuPinned}
+              onClick={() => {
+                onTogglePin(menuEntry.note.id);
+                closeRowMenu();
+              }}
+            >
+              <Pin size={16} />
+              {menuPinned ? "Unpin note" : "Pin note"}
+            </MenuButton>
+            <div className="menu-separator" />
+            <MenuButton onClick={() => setMoving(true)}>
+              <FolderInput size={16} />
+              Move note
+              <ChevronRight size={16} className="ml-auto" />
+            </MenuButton>
+            <div className="menu-separator" />
+            <MenuButton
+              danger
+              onClick={() => {
+                onMoveToTrash(menuEntry);
+                closeRowMenu();
+              }}
+            >
+              <Trash2 size={16} />
+              Move to Trash
+            </MenuButton>
+          </>
+        )}
+      </ContextMenu>
+    ) : null;
 
   const renderedGroups = groups.map((group, groupIndex) => (
     <section key={group.id} className="note-group" aria-labelledby={`note-group-${group.id}`}>
@@ -346,6 +493,7 @@ export function NoteList({
             onRestore={onRestore}
             onDeleteForever={onDeleteForever}
             onTogglePin={togglePinEntry}
+            onContextMenu={openRowMenu}
           />
         ))}
       </div>
@@ -459,6 +607,7 @@ export function NoteList({
             <SquarePen size={24} />
           </button>
         )}
+        {rowMenuPanel}
       </section>
     );
   }
@@ -468,7 +617,7 @@ export function NoteList({
       className={`collection-column flex h-full w-full shrink-0 flex-col ${gallery ? "is-gallery" : ""}`}
     >
       {topBar}
-      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 border-b border-rule px-4">
+      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">
@@ -548,6 +697,7 @@ export function NoteList({
         )}
       </div>
       {footer}
+      {rowMenuPanel}
     </section>
   );
 }
