@@ -15,6 +15,7 @@ export interface ArchiveMember {
   nickname: string;
   avatarObject: string | null;
   joinedAt: string;
+  role: "editor" | "viewer";
   isSelf: boolean;
 }
 
@@ -35,6 +36,7 @@ const MEMBERS: ArchiveMember[] = [
     nickname: "Preview",
     avatarObject: null,
     joinedAt: "2026-05-18T09:00:00.000Z",
+    role: "editor",
     isSelf: true,
   },
   {
@@ -42,6 +44,7 @@ const MEMBERS: ArchiveMember[] = [
     nickname: "Partner",
     avatarObject: null,
     joinedAt: "2026-06-02T09:00:00.000Z",
+    role: "editor",
     isSelf: false,
   },
 ];
@@ -197,4 +200,14 @@ export async function deleteAvatar(_session: AppSession, objectId: string): Prom
 export async function createArchiveInvite(): Promise<string> {
   await sleep(180);
   return "a".repeat(64);
+}
+
+export async function setArchiveMemberRole(
+  _session: AppSession,
+  userId: string,
+  role: "editor" | "viewer",
+): Promise<void> {
+  await sleep(160);
+  const member = MEMBERS.find((item) => item.userId === userId);
+  if (member) member.role = role;
 }

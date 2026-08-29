@@ -96,6 +96,10 @@ const archiveId = first.archiveId;
 const report = {};
 const channel = second.supabase.channel(`verify:${crypto.randomUUID()}`);
 const testId = crypto.randomUUID();
+const viewerFolderId = crypto.randomUUID();
+const viewerTagId = crypto.randomUUID();
+const viewerObjectId = crypto.randomUUID();
+let peerRoleChanged = false;
 
 try {
   // ── One archive, several members ─────────────────────────────────────────
@@ -292,6 +296,201 @@ try {
   fail(restored.error);
   report.profiles = { readableByPeer: true, writableByPeer: false };
 
+  // ── A viewer reads everything and writes nothing in the archive ─────────
+  const archiveName = await first.supabase
+    .from("archives")
+    .select("name")
+    .eq("id", archiveId)
+    .single();
+  fail(archiveName.error);
+  const folderSeed = await first.supabase.from("folders").insert({
+    id: viewerFolderId,
+    archive_id: archiveId,
+    owner_id: first.userId,
+    name: "Role verification",
+    position: 999999,
+  });
+  fail(folderSeed.error);
+  const tagSeed = await first.supabase.from("tags").insert({
+    id: viewerTagId,
+    archive_id: archiveId,
+    owner_id: first.userId,
+    name: "Role verification",
+    color: "slate",
+  });
+  fail(tagSeed.error);
+  const objectPath = `${archiveId}/${viewerObjectId}`;
+  const objectSeed = await first.supabase.storage
+    .from("note-images")
+    .upload(objectPath, new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }));
+  fail(objectSeed.error);
+
+  const demoted = await first.supabase.rpc("set_archive_member_role", {
+    archive_id: archiveId,
+    user_id: second.userId,
+    role: "viewer",
+  });
+  fail(demoted.error);
+  peerRoleChanged = true;
+
+  async function rejected(resultPromise, label) {
+    const result = await resultPromise;
+    const noRows = Array.isArray(result.data) && result.data.length === 0;
+    assert(result.error || noRows, `A viewer ${label}`);
+  }
+
+  await rejected(
+    second.supabase
+      .from("archives")
+      .update({ name: archiveName.data.name })
+      .eq("id", archiveId)
+      .select(),
+    "updated the archive",
+  );
+  await rejected(
+    second.supabase.from("notes").update({ body: "viewer write" }).eq("id", testId).select(),
+    "updated a note",
+  );
+  await rejected(
+    second.supabase.from("notes").delete().eq("id", testId).select(),
+    "deleted a note",
+  );
+  await rejected(
+    second.supabase
+      .from("notes")
+      .insert({
+        id: crypto.randomUUID(),
+        archive_id: archiveId,
+        owner_id: second.userId,
+        title: "viewer write",
+        body: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select(),
+    "inserted a note",
+  );
+  await rejected(
+    second.supabase
+      .from("folders")
+      .update({ name: "viewer write" })
+      .eq("id", viewerFolderId)
+      .select(),
+    "updated a folder",
+  );
+  await rejected(
+    second.supabase.from("folders").delete().eq("id", viewerFolderId).select(),
+    "deleted a folder",
+  );
+  await rejected(
+    second.supabase
+      .from("folders")
+      .insert({
+        id: crypto.randomUUID(),
+        archive_id: archiveId,
+        owner_id: second.userId,
+        name: "viewer write",
+      })
+      .select(),
+    "inserted a folder",
+  );
+  await rejected(
+    second.supabase.from("tags").update({ name: "viewer write" }).eq("id", viewerTagId).select(),
+    "updated a tag",
+  );
+  await rejected(
+    second.supabase.from("tags").delete().eq("id", viewerTagId).select(),
+    "deleted a tag",
+  );
+  await rejected(
+    second.supabase
+      .from("tags")
+      .insert({
+        id: crypto.randomUUID(),
+        archive_id: archiveId,
+        owner_id: second.userId,
+        name: "viewer write",
+        color: "slate",
+      })
+      .select(),
+    "inserted a tag",
+  );
+  await rejected(
+    second.supabase
+      .from("note_tags")
+      .insert({
+        note_id: testId,
+        tag_id: viewerTagId,
+        archive_id: archiveId,
+        owner_id: first.userId,
+      })
+      .select(),
+    "inserted a note-tag link",
+  );
+  await rejected(
+    second.supabase
+      .from("archive_members")
+      .update({ role: "editor" })
+      .eq("archive_id", archiveId)
+      .eq("user_id", second.userId)
+      .select(),
+    "changed a role directly",
+  );
+  await rejected(
+    second.supabase.from("archive_invites").insert({
+      archive_id: archiveId,
+      email: "viewer@example.invalid",
+      token_hash: new Uint8Array(32),
+      invited_by: second.userId,
+      role: "editor",
+    }),
+    "inserted an invitation directly",
+  );
+  await rejected(
+    second.supabase.rpc("create_archive_invite", {
+      archive_id: archiveId,
+      email: "viewer@example.invalid",
+      role: "editor",
+    }),
+    "created an invitation",
+  );
+  await rejected(
+    second.supabase.rpc("set_archive_member_role", {
+      archive_id: archiveId,
+      user_id: second.userId,
+      role: "editor",
+    }),
+    "changed a role through the editor RPC",
+  );
+
+  const viewerUpload = await second.supabase.storage
+    .from("note-images")
+    .upload(`${archiveId}/${crypto.randomUUID()}`, new Blob(["x"], { type: "image/png" }));
+  assert(viewerUpload.error, "A viewer uploaded an archive object");
+  const viewerUpdate = await second.supabase.storage
+    .from("note-images")
+    .update(objectPath, new Blob(["changed"], { type: "image/png" }));
+  assert(viewerUpdate.error, "A viewer updated an archive object");
+  const viewerDelete = await second.supabase.storage.from("note-images").remove([objectPath]);
+  const objectStillThere = await first.supabase.storage.from("note-images").download(objectPath);
+  fail(objectStillThere.error);
+  assert(
+    viewerDelete.error || (await objectStillThere.data.arrayBuffer()).byteLength > 0,
+    "A viewer deleted an archive object",
+  );
+
+  const viewerRead = await second.supabase.from("notes").select("id").eq("id", testId).single();
+  fail(viewerRead.error);
+  report.roles = { viewerReads: true, viewerWritesRejected: true };
+
+  const restoredEditor = await first.supabase.rpc("set_archive_member_role", {
+    archive_id: archiveId,
+    user_id: second.userId,
+    role: "editor",
+  });
+  fail(restoredEditor.error);
+  peerRoleChanged = false;
+
   // ── Nobody outside the roster sees anything ──────────────────────────────
   const closedTables = ["archives", "archive_members", "notes", "folders", "tags", "note_tags"];
   for (const table of closedTables) {
@@ -363,6 +562,17 @@ try {
     report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
   }
 } finally {
+  if (peerRoleChanged) {
+    await first.supabase.rpc("set_archive_member_role", {
+      archive_id: archiveId,
+      user_id: second.userId,
+      role: "editor",
+    });
+  }
+  await first.supabase.storage.from("note-images").remove([`${archiveId}/${viewerObjectId}`]);
+  await first.supabase.from("note_tags").delete().eq("tag_id", viewerTagId);
+  await first.supabase.from("folders").delete().eq("id", viewerFolderId);
+  await first.supabase.from("tags").delete().eq("id", viewerTagId);
   const removed = await first.supabase.from("notes").delete().eq("id", testId);
   const leftover = await first.supabase.from("notes").select("id").eq("id", testId);
   report.testNoteRemoved = !removed.error && leftover.data?.length === 0;

@@ -40,6 +40,7 @@ import {
   persistMetaDiff,
   saveNote,
   saveProfile,
+  setArchiveMemberRole,
   uploadAvatar,
   uploadImage,
   uploadObject,
@@ -557,7 +558,9 @@ function NotesPage() {
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
-  const canEdit = selected ? selectedFolderId !== TRASH : false;
+  const selfMember = members.find((member) => member.isSelf);
+  const canWriteArchive = selfMember?.role === "editor";
+  const canEdit = selected ? selectedFolderId !== TRASH && canWriteArchive : false;
 
   const folderLabel =
     selectedFolderId === ALL
@@ -685,14 +688,18 @@ function NotesPage() {
     };
   }, [saveNow]);
 
-  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
-    const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before uploading an image");
-    const blob = await prepareImageForNote(file);
-    const imageId = crypto.randomUUID();
-    await uploadImage(current, imageId, blob);
-    return `napp-image:${imageId}`;
-  }, []);
+  const handleUploadImage = useCallback(
+    async (file: File): Promise<string> => {
+      if (!canWriteArchive) throw new Error("This archive is view only");
+      const current = sessionRef.current;
+      if (!current) throw new Error("Sign in again before uploading an image");
+      const blob = await prepareImageForNote(file);
+      const imageId = crypto.randomUUID();
+      await uploadImage(current, imageId, blob);
+      return `napp-image:${imageId}`;
+    },
+    [canWriteArchive],
+  );
 
   const resolveImage = useCallback(async (imageId: string): Promise<Blob> => {
     const current = sessionRef.current;
@@ -701,14 +708,18 @@ function NotesPage() {
   }, []);
 
   /* Attachments and images share one private, account-protected bucket. */
-  const handleUploadFile = useCallback(async (file: File): Promise<string> => {
-    const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before attaching a file");
-    const objectId = crypto.randomUUID();
-    await uploadObject(current, objectId, file);
-    fileTypes.current.set(objectId, file.type || attachmentType(file.name));
-    return objectId;
-  }, []);
+  const handleUploadFile = useCallback(
+    async (file: File): Promise<string> => {
+      if (!canWriteArchive) throw new Error("This archive is view only");
+      const current = sessionRef.current;
+      if (!current) throw new Error("Sign in again before attaching a file");
+      const objectId = crypto.randomUUID();
+      await uploadObject(current, objectId, file);
+      fileTypes.current.set(objectId, file.type || attachmentType(file.name));
+      return objectId;
+    },
+    [canWriteArchive],
+  );
 
   const resolveFile = useCallback(async (objectId: string): Promise<Blob> => {
     const current = sessionRef.current;
@@ -721,6 +732,7 @@ function NotesPage() {
 
   const handleMetaChange = useCallback(
     (m: Meta) => {
+      if (!canWriteArchive) return;
       const pending = pendingMetaRef.current.get(viewAs);
       pendingMetaRef.current.set(viewAs, {
         before: pending?.before ?? activeMeta,
@@ -729,7 +741,7 @@ function NotesPage() {
       setActiveMeta(m);
       schedule();
     },
-    [viewAs, activeMeta, setActiveMeta, schedule],
+    [viewAs, activeMeta, setActiveMeta, schedule, canWriteArchive],
   );
 
   const handleTogglePin = useCallback(
@@ -747,6 +759,7 @@ function NotesPage() {
 
   // ── Create / delete ─────────────────────────────────────────────────────
   const handleNew = useCallback(async () => {
+    if (!canWriteArchive) return;
     const s = sessionRef.current;
     if (!s) return;
     const folderId =
@@ -789,7 +802,7 @@ function NotesPage() {
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewAs, selectedFolderId, activeMeta]);
+  }, [viewAs, selectedFolderId, activeMeta, canWriteArchive]);
 
   const handleMoveToTrash = useCallback(
     (entry: NoteEntry) => {
@@ -836,6 +849,7 @@ function NotesPage() {
 
   const handleDeleteForever = useCallback(
     async (entry: NoteEntry) => {
+      if (!canWriteArchive) return;
       const s = sessionRef.current;
       if (!s) return;
       setSaving(true);
@@ -863,7 +877,7 @@ function NotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta],
+    [selectedId, activeMeta, canWriteArchive],
   );
 
   // ── Keyboard ────────────────────────────────────────────────────────────
@@ -1259,6 +1273,7 @@ function NotesPage() {
       scopes={scopes}
       folders={activeMeta.folders}
       selectedId={selectedFolderId}
+      canWrite={canWriteArchive}
       onSelect={(id) => {
         handleSelectFolder(id);
         setFoldersOpen(false);
@@ -1296,16 +1311,22 @@ function NotesPage() {
       avatarUrl={avatarUrl}
       joinedAt={members.find((member) => member.isSelf)?.joinedAt}
       memberCount={members.length}
+      members={members}
+      canManageMembers={canWriteArchive}
       profileBusy={profileBusy}
       profileError={profileError}
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
       onAvatarPick={(file) => void handleAvatarPick(file)}
       onAvatarRemove={() => void handleAvatarRemove()}
-      onCreateInvite={async (email) => {
-        const token = await createArchiveInvite(session, email);
+      onCreateInvite={async (email, role) => {
+        const token = await createArchiveInvite(session, email, role);
         const link = new URL(import.meta.env.BASE_URL, window.location.origin);
         link.searchParams.set("invite", token);
         return link.toString();
+      }}
+      onMemberRoleChange={async (userId, role) => {
+        await setArchiveMemberRole(session, userId, role);
+        await refreshRemote();
       }}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
@@ -1316,7 +1337,7 @@ function NotesPage() {
   const noteActions = selected ? (
     <>
       <span className="mr-2 flex w-[7.5rem] shrink-0 items-center overflow-hidden">
-        {saveReadout}
+        {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
       </span>
       <button
         type="button"
@@ -1326,23 +1347,25 @@ function NotesPage() {
       >
         <Search size={16} />
       </button>
-      <NoteMenu
-        pinned={pinned}
-        folders={activeMeta.folders}
-        recent={recentNotes}
-        onTogglePin={() => handleTogglePin(selected.note.id)}
-        onFind={() => noteEditorRef.current?.openFind()}
-        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
-        onRecent={handleOpenRecent}
-        onDelete={() => handleMoveToTrash(selected)}
-      />
+      {canWriteArchive && (
+        <NoteMenu
+          pinned={pinned}
+          folders={activeMeta.folders}
+          recent={recentNotes}
+          onTogglePin={() => handleTogglePin(selected.note.id)}
+          onFind={() => noteEditorRef.current?.openFind()}
+          onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+          onRecent={handleOpenRecent}
+          onDelete={() => handleMoveToTrash(selected)}
+        />
+      )}
     </>
   ) : null;
 
   /* The same items the ⋯ carries, opened where the pointer is. The editor
      hands the click over only when it did not land on the words. */
   const editorMenu =
-    selected && editorMenuPoint ? (
+    selected && editorMenuPoint && canWriteArchive ? (
       <NoteContextMenu
         point={editorMenuPoint}
         onClose={() => setEditorMenuPoint(null)}
@@ -1414,6 +1437,7 @@ function NotesPage() {
                   query={query}
                   loading={loading}
                   busy={saving}
+                  canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
                   searchRef={searchRef}
@@ -1520,6 +1544,7 @@ function NotesPage() {
                   query={query}
                   loading={loading}
                   busy={saving}
+                  canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
                   searchRef={searchRef}
@@ -1569,7 +1594,11 @@ function NotesPage() {
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
               resolveFile={resolveFile}
-              onContextMenu={(event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })}
+              onContextMenu={
+                canWriteArchive
+                  ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
+                  : undefined
+              }
               navigationAction={
                 !navigationOpen ? (
                   <>

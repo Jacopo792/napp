@@ -581,12 +581,15 @@ export function SettingsPanel({
   avatarUrl,
   joinedAt,
   memberCount,
+  members,
+  canManageMembers,
   profileBusy,
   profileError,
   onNicknameSave,
   onAvatarPick,
   onAvatarRemove,
   onCreateInvite,
+  onMemberRoleChange,
   onAutoLockChange,
   onClose,
   onLock,
@@ -602,12 +605,20 @@ export function SettingsPanel({
   avatarUrl: string | null;
   joinedAt?: string;
   memberCount: number;
+  members: {
+    userId: string;
+    nickname: string;
+    isSelf: boolean;
+    role: "editor" | "viewer";
+  }[];
+  canManageMembers: boolean;
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
   onAvatarPick: (file: File) => void;
   onAvatarRemove: () => void;
-  onCreateInvite: (email: string) => Promise<string>;
+  onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
+  onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -619,9 +630,12 @@ export function SettingsPanel({
   const [section, setSection] = useState<SettingsSection>("profile");
   const [nickname, setNickname] = useState(profile.nickname);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteStatus, setInviteStatus] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [memberBusy, setMemberBusy] = useState("");
+  const [memberStatus, setMemberStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
 
@@ -632,6 +646,8 @@ export function SettingsPanel({
       setInviteEmail("");
       setInviteLink("");
       setInviteStatus("");
+      setInviteRole("editor");
+      setMemberStatus("");
     }
   }, [open]);
 
@@ -653,12 +669,25 @@ export function SettingsPanel({
     setInviteBusy(true);
     setInviteStatus("");
     try {
-      setInviteLink(await onCreateInvite(target));
+      setInviteLink(await onCreateInvite(target, inviteRole));
       setInviteStatus("Link ready. It expires in 7 days.");
     } catch (reason) {
       setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
     } finally {
       setInviteBusy(false);
+    }
+  }
+
+  async function changeMemberRole(userId: string, role: "editor" | "viewer") {
+    setMemberBusy(userId);
+    setMemberStatus("");
+    try {
+      await onMemberRoleChange(userId, role);
+      setMemberStatus("Role updated.");
+    } catch (reason) {
+      setMemberStatus(reason instanceof Error ? reason.message : "Role change failed");
+    } finally {
+      setMemberBusy("");
     }
   }
 
@@ -1106,31 +1135,86 @@ export function SettingsPanel({
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
 
-                <h3>Invite someone</h3>
-                <div className="invite-form">
-                  <label>
-                    <span>Email address</span>
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      placeholder="person@example.com"
-                      disabled={inviteBusy}
-                      onChange={(event) => {
-                        setInviteEmail(event.target.value);
-                        setInviteLink("");
-                        setInviteStatus("");
-                      }}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={inviteBusy || !inviteEmail.trim()}
-                    onClick={() => void createInvite()}
-                  >
-                    <UserPlus size={15} />
-                    {inviteBusy ? "Creating…" : "Create link"}
-                  </button>
+                <h3>Members</h3>
+                <div className="member-role-list">
+                  {members.map((member) => (
+                    <div key={member.userId}>
+                      <span>
+                        <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
+                        <small>
+                          {member.role === "editor" ? "Can read and write" : "Can read"}
+                        </small>
+                      </span>
+                      <select
+                        aria-label={`Role for ${member.isSelf ? "you" : member.nickname || "member"}`}
+                        value={member.role}
+                        disabled={!canManageMembers || Boolean(memberBusy)}
+                        onChange={(event) =>
+                          void changeMemberRole(
+                            member.userId,
+                            event.target.value as "editor" | "viewer",
+                          )
+                        }
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+                  ))}
                 </div>
+                {memberStatus && (
+                  <p className="profile-note" role="status">
+                    {memberStatus}
+                  </p>
+                )}
+
+                <h3>Invite someone</h3>
+                {canManageMembers ? (
+                  <>
+                    <div className="invite-role" role="group" aria-label="Invitation role">
+                      <button
+                        type="button"
+                        aria-pressed={inviteRole === "editor"}
+                        onClick={() => setInviteRole("editor")}
+                      >
+                        Editor
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={inviteRole === "viewer"}
+                        onClick={() => setInviteRole("viewer")}
+                      >
+                        Viewer
+                      </button>
+                    </div>
+                    <div className="invite-form">
+                      <label>
+                        <span>Email address</span>
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          placeholder="person@example.com"
+                          disabled={inviteBusy}
+                          onChange={(event) => {
+                            setInviteEmail(event.target.value);
+                            setInviteLink("");
+                            setInviteStatus("");
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={inviteBusy || !inviteEmail.trim()}
+                        onClick={() => void createInvite()}
+                      >
+                        <UserPlus size={15} />
+                        {inviteBusy ? "Creating…" : "Create link"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="profile-note">Only editors can invite another member.</p>
+                )}
                 {inviteLink && (
                   <div className="invite-link-row">
                     <input aria-label="Invitation link" readOnly value={inviteLink} />

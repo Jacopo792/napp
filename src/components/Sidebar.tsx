@@ -46,6 +46,7 @@ interface Props {
   scopes: Scope[];
   folders: FolderType[];
   selectedId: string;
+  canWrite: boolean;
   onSelect: (id: string) => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
@@ -315,6 +316,7 @@ export function Sidebar({
   scopes,
   folders,
   selectedId,
+  canWrite,
   onSelect,
   onCreateFolder,
   onRenameFolder,
@@ -397,6 +399,7 @@ export function Sidebar({
           glyph={active || (open && hasChildren) ? <FolderOpen size={16} /> : <Folder size={16} />}
           depth={depth}
           active={active}
+          droppable={canWrite}
           disclosure={
             hasChildren ? (
               <button
@@ -414,17 +417,23 @@ export function Sidebar({
             ) : null
           }
           actions={
-            <FolderMenu
-              onRename={() => setRenaming(node.folder.id)}
-              onNewSubfolder={() => startSubfolder(node.folder.id)}
-              onDelete={() => onDeleteFolder(node.folder.id)}
-            />
+            canWrite ? (
+              <FolderMenu
+                onRename={() => setRenaming(node.folder.id)}
+                onNewSubfolder={() => startSubfolder(node.folder.id)}
+                onDelete={() => onDeleteFolder(node.folder.id)}
+              />
+            ) : undefined
           }
           onSelect={() => onSelect(node.folder.id)}
-          onContextMenu={(event) => {
-            setConfirmDelete(false);
-            folderMenu.open(event, node.folder);
-          }}
+          onContextMenu={
+            canWrite
+              ? (event) => {
+                  setConfirmDelete(false);
+                  folderMenu.open(event, node.folder);
+                }
+              : undefined
+          }
         />
 
         {open && hasChildren && (
@@ -438,7 +447,7 @@ export function Sidebar({
           </div>
         )}
 
-        {adding === node.folder.id && (
+        {canWrite && adding === node.folder.id && (
           <NameField
             value=""
             depth={depth + 1}
@@ -458,15 +467,17 @@ export function Sidebar({
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
-        <button
-          type="button"
-          aria-label="New folder"
-          title="New folder"
-          className="toolbar-button press shrink-0"
-          onClick={() => setAdding("")}
-        >
-          <FolderPlus size={16} />
-        </button>
+        {canWrite && (
+          <button
+            type="button"
+            aria-label="New folder"
+            title="New folder"
+            className="toolbar-button press shrink-0"
+            onClick={() => setAdding("")}
+          >
+            <FolderPlus size={16} />
+          </button>
+        )}
         <span className="ml-auto" />
         <button
           type="button"
@@ -498,13 +509,19 @@ export function Sidebar({
 
         {tree.length === 0 && adding === null && (
           <p className="sidebar-empty">
-            No folders yet. Use <FolderPlus size={12} /> above to make one.
+            {canWrite ? (
+              <>
+                No folders yet. Use <FolderPlus size={12} /> above to make one.
+              </>
+            ) : (
+              "No folders yet."
+            )}
           </p>
         )}
 
         {tree.map((node) => renderNode(node, 0))}
 
-        {adding === "" && (
+        {canWrite && adding === "" && (
           <NameField
             value=""
             depth={0}
@@ -548,7 +565,7 @@ export function Sidebar({
         </button>
       </div>
 
-      {folderMenu.target && (
+      {canWrite && folderMenu.target && (
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
           <MenuButton
             onClick={() => {

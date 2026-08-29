@@ -55,6 +55,7 @@ interface Props {
   query: string;
   loading: boolean;
   busy: boolean;
+  canWrite: boolean;
   folderLabel: string;
   trashMode: boolean;
   searchRef: React.RefObject<HTMLInputElement | null>;
@@ -103,6 +104,7 @@ const Row = memo(function Row({
   selected,
   onSelect,
   trashMode,
+  canWrite,
   onMoveToTrash,
   onRestore,
   onDeleteForever,
@@ -115,6 +117,7 @@ const Row = memo(function Row({
   meta: Meta;
   selected: boolean;
   trashMode: boolean;
+  canWrite: boolean;
   /* Every handler takes the entry it acts on, so the parent can pass one stable
      function per action instead of minting a closure per row per render. */
   onSelect: (entry: NoteEntry) => void;
@@ -126,7 +129,7 @@ const Row = memo(function Row({
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
-    disabled: mobile || trashMode,
+    disabled: mobile || trashMode || !canWrite,
   });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -154,8 +157,8 @@ const Row = memo(function Row({
         setNodeRef(el);
         rowRef.current = el;
       }}
-      {...(!mobile ? listeners : {})}
-      {...(!mobile ? attributes : {})}
+      {...(!mobile && canWrite ? listeners : {})}
+      {...(!mobile && canWrite ? attributes : {})}
       role="option"
       aria-selected={selected}
       onClick={() => onSelect(entry)}
@@ -214,83 +217,85 @@ const Row = memo(function Row({
         </p>
       </div>
 
-      <div className="note-row-actions flex shrink-0 items-center gap-0.5">
-        {!trashMode && (
+      {canWrite && (
+        <div className="note-row-actions flex shrink-0 items-center gap-0.5">
+          {!trashMode && (
+            <button
+              aria-label={
+                pinned
+                  ? `Unpin ${entry.note.title || "Untitled"}`
+                  : `Pin ${entry.note.title || "Untitled"}`
+              }
+              title={pinned ? "Unpin note" : "Pin note to top"}
+              aria-pressed={pinned}
+              onClick={(event) => {
+                event.stopPropagation();
+                onTogglePin(entry);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              className={`icon-button h-7 w-7 shrink-0 transition-all ${
+                pinned
+                  ? "text-accent opacity-100"
+                  : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+              }`}
+            >
+              <Pin size={14} fill={pinned ? "currentColor" : "none"} />
+            </button>
+          )}
+          {trashMode && (
+            <button
+              aria-label={`Restore ${entry.note.title || "Untitled"}`}
+              title="Restore note"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRestore(entry);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="icon-button h-7 w-7 shrink-0 text-accent"
+            >
+              <RotateCcw size={14} />
+            </button>
+          )}
+
           <button
             aria-label={
-              pinned
-                ? `Unpin ${entry.note.title || "Untitled"}`
-                : `Pin ${entry.note.title || "Untitled"}`
+              confirmDelete
+                ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
+                : trashMode
+                  ? `Delete ${entry.note.title || "Untitled"} forever`
+                  : `Move ${entry.note.title || "Untitled"} to Trash`
             }
-            title={pinned ? "Unpin note" : "Pin note to top"}
-            aria-pressed={pinned}
-            onClick={(event) => {
-              event.stopPropagation();
-              onTogglePin(entry);
+            title={
+              confirmDelete
+                ? trashMode
+                  ? "Click again to permanently delete"
+                  : "Click again to move to Trash"
+                : trashMode
+                  ? `Delete "${entry.note.title || "Untitled"}" forever`
+                  : `Move "${entry.note.title || "Untitled"}" to Trash`
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirmDelete) {
+                if (trashMode) onDeleteForever(entry);
+                else onMoveToTrash(entry);
+              } else setConfirmDelete(true);
             }}
-            onPointerDown={(event) => event.stopPropagation()}
-            className={`icon-button h-7 w-7 shrink-0 transition-all ${
-              pinned
-                ? "text-accent opacity-100"
-                : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
+              confirmDelete
+                ? "bg-danger-fill text-on-danger opacity-100"
+                : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
             }`}
           >
-            <Pin size={14} fill={pinned ? "currentColor" : "none"} />
+            {confirmDelete ? (
+              <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
+            ) : (
+              <Trash2 size={14} />
+            )}
           </button>
-        )}
-        {trashMode && (
-          <button
-            aria-label={`Restore ${entry.note.title || "Untitled"}`}
-            title="Restore note"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRestore(entry);
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-            className="icon-button h-7 w-7 shrink-0 text-accent"
-          >
-            <RotateCcw size={14} />
-          </button>
-        )}
-
-        <button
-          aria-label={
-            confirmDelete
-              ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
-              : trashMode
-                ? `Delete ${entry.note.title || "Untitled"} forever`
-                : `Move ${entry.note.title || "Untitled"} to Trash`
-          }
-          title={
-            confirmDelete
-              ? trashMode
-                ? "Click again to permanently delete"
-                : "Click again to move to Trash"
-              : trashMode
-                ? `Delete "${entry.note.title || "Untitled"}" forever`
-                : `Move "${entry.note.title || "Untitled"}" to Trash`
-          }
-          onClick={(e) => {
-            e.stopPropagation();
-            if (confirmDelete) {
-              if (trashMode) onDeleteForever(entry);
-              else onMoveToTrash(entry);
-            } else setConfirmDelete(true);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
-            confirmDelete
-              ? "bg-danger-fill text-on-danger opacity-100"
-              : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
-          }`}
-        >
-          {confirmDelete ? (
-            <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
-          ) : (
-            <Trash2 size={14} />
-          )}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -325,6 +330,7 @@ export function NoteList({
   query,
   loading,
   busy,
+  canWrite,
   folderLabel,
   trashMode,
   searchRef,
@@ -376,7 +382,17 @@ export function NoteList({
   const rowMenuPanel =
     rowMenu.target && menuEntry ? (
       <ContextMenu point={rowMenu.target} onClose={closeRowMenu}>
-        {moving ? (
+        {!canWrite ? (
+          <MenuButton
+            onClick={() => {
+              onSelect(menuEntry.note.id);
+              closeRowMenu();
+            }}
+          >
+            <FileText size={16} />
+            Open note
+          </MenuButton>
+        ) : moving ? (
           <>
             <MenuButton onClick={() => setMoving(false)}>
               <ChevronRight size={16} className="rotate-180" />
@@ -488,6 +504,7 @@ export function NoteList({
             meta={meta}
             selected={selectedId === entry.note.id}
             trashMode={trashMode}
+            canWrite={canWrite}
             onSelect={selectEntry}
             onMoveToTrash={onMoveToTrash}
             onRestore={onRestore}
@@ -581,7 +598,7 @@ export function NoteList({
                 <p className="text-[14px] text-ink-3">
                   {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
                 </p>
-                {(hasQuery || !trashMode) && (
+                {(hasQuery || (!trashMode && canWrite)) && (
                   <button
                     onClick={() => (hasQuery ? onQueryChange("") : onNew())}
                     className="mt-3 text-[14px] font-medium text-accent"
@@ -596,7 +613,7 @@ export function NoteList({
           </div>
         </div>
 
-        {!trashMode && (
+        {canWrite && !trashMode && (
           <button
             type="button"
             onClick={onNew}
@@ -626,7 +643,7 @@ export function NoteList({
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged
             into the search field where it covered the text being typed. */}
-        {!trashMode && (
+        {canWrite && !trashMode && (
           <button
             onClick={onNew}
             disabled={busy || loading}
@@ -683,7 +700,7 @@ export function NoteList({
             <p className="readout text-ink-2">
               {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
             </p>
-            {(hasQuery || !trashMode) && (
+            {(hasQuery || (!trashMode && canWrite)) && (
               <button
                 onClick={() => (hasQuery ? onQueryChange("") : onNew())}
                 className="label mt-3 text-accent transition-opacity hover:opacity-70"

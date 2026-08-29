@@ -52,7 +52,7 @@ begin
 
   if char_length(normalized_email) < 3
      or char_length(normalized_email) > 320
-     or pg_catalog.position('@' in normalized_email) < 2 then
+     or pg_catalog.strpos(normalized_email, '@') < 2 then
     raise invalid_parameter_value using message = 'Enter a valid email address';
   end if;
 
