@@ -540,14 +540,19 @@ export function Avatar({
   name,
   email,
   large = false,
+  compact = false,
 }: {
   url: string | null;
   name: string;
   email: string;
   large?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <span className={`avatar ${large ? "is-large" : ""}`} aria-hidden="true">
+    <span
+      className={`avatar ${large ? "is-large" : ""} ${compact ? "is-compact" : ""}`}
+      aria-hidden="true"
+    >
       {url ? <img src={url} alt="" /> : initialsOf(name, email)}
     </span>
   );
@@ -828,7 +833,7 @@ export function SettingsPanel({
                   <RowLead
                     icon={<Users size={17} />}
                     label="Archive"
-                    hint="Everyone here reads and writes everything"
+                    hint="Members read everything; editors can make changes"
                   />
                   <span className="profile-static">
                     {memberCount} {memberCount === 1 ? "member" : "members"}
@@ -1237,9 +1242,9 @@ export function SettingsPanel({
                   </p>
                 )}
                 <p className="profile-note">
-                  Membership is the whole of the boundary: everyone in this archive reads and writes
-                  every note in it. Somebody who should not read these needs an archive of their
-                  own.
+                  Membership permits reading the whole archive. Editors can change notes, files and
+                  roles; viewers cannot. Somebody who should not read these needs an archive of
+                  their own.
                 </p>
               </section>
             )}

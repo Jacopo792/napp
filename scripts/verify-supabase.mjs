@@ -99,6 +99,8 @@ const testId = crypto.randomUUID();
 const viewerFolderId = crypto.randomUUID();
 const viewerTagId = crypto.randomUUID();
 const viewerObjectId = crypto.randomUUID();
+const avatarObjectId = crypto.randomUUID();
+const avatarPath = `${first.userId}/${avatarObjectId}`;
 let peerRoleChanged = false;
 
 try {
@@ -295,6 +297,35 @@ try {
     );
   fail(restored.error);
   report.profiles = { readableByPeer: true, writableByPeer: false };
+
+  // Avatar bytes follow the profile boundary: a shared member may read the
+  // picture, but only the account named by the first path segment may mutate it.
+  const avatarSeed = await first.supabase.storage
+    .from("avatars")
+    .upload(
+      avatarPath,
+      new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" }),
+    );
+  fail(avatarSeed.error);
+  const avatarByPeer = await second.supabase.storage.from("avatars").download(avatarPath);
+  fail(avatarByPeer.error);
+  assert((await avatarByPeer.data.arrayBuffer()).byteLength > 0, "A peer read an empty avatar");
+  const forgedAvatar = await second.supabase.storage
+    .from("avatars")
+    .upload(`${first.userId}/${crypto.randomUUID()}`, new Blob(["forged"], { type: "image/png" }));
+  assert(forgedAvatar.error, "A member uploaded an avatar under another member's id");
+  const changedAvatar = await second.supabase.storage
+    .from("avatars")
+    .update(avatarPath, new Blob(["forged"], { type: "image/png" }));
+  assert(changedAvatar.error, "A member replaced another member's avatar");
+  const deletedAvatar = await second.supabase.storage.from("avatars").remove([avatarPath]);
+  const avatarStillThere = await first.supabase.storage.from("avatars").download(avatarPath);
+  fail(avatarStillThere.error);
+  assert(
+    deletedAvatar.error || (await avatarStillThere.data.arrayBuffer()).byteLength > 0,
+    "A member deleted another member's avatar",
+  );
+  report.avatars = { readableByPeer: true, writableByPeer: false };
 
   // ── A viewer reads everything and writes nothing in the archive ─────────
   const archiveName = await first.supabase
@@ -519,6 +550,8 @@ try {
     anonymousObjects.error || anonymousObjects.data.length === 0,
     "An anonymous client listed archive files",
   );
+  const anonymousAvatar = await anonymous.storage.from("avatars").download(avatarPath);
+  assert(anonymousAvatar.error, "An anonymous client downloaded a member avatar");
   report.anonymous = { rows: 0, insertRejected: true, storageRejected: true };
 
   if (outsider) {
@@ -557,6 +590,8 @@ try {
       files.error || files.data.length === 0,
       "An account outside the archive listed its files",
     );
+    const strangerAvatar = await outsider.supabase.storage.from("avatars").download(avatarPath);
+    assert(strangerAvatar.error, "An account outside the archive downloaded a member avatar");
     report.authenticatedNonMember = { rows: 0, insertRejected: true, storageRejected: true };
   } else {
     report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
@@ -570,6 +605,7 @@ try {
     });
   }
   await first.supabase.storage.from("note-images").remove([`${archiveId}/${viewerObjectId}`]);
+  await first.supabase.storage.from("avatars").remove([avatarPath]);
   await first.supabase.from("note_tags").delete().eq("tag_id", viewerTagId);
   await first.supabase.from("folders").delete().eq("id", viewerFolderId);
   await first.supabase.from("tags").delete().eq("id", viewerTagId);

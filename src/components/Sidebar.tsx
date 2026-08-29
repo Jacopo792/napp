@@ -10,7 +10,6 @@ import {
   NotebookText,
   PanelLeftClose,
   Pencil,
-  Settings as SettingsIcon,
   Trash2,
   X,
 } from "lucide-react";
@@ -18,7 +17,7 @@ import { ALL, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
-import { MenuButton } from "./WorkspaceMenus";
+import { Avatar, MenuButton } from "./WorkspaceMenus";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -54,6 +53,9 @@ interface Props {
   onClose: () => void;
   onSettings: () => void;
   onLock: () => void;
+  selfAvatarUrl: string | null;
+  selfName: string;
+  selfEmail: string;
   /** The archive switch, which belongs above the destinations it re-points. */
   archiveSwitch: React.ReactNode;
 }
@@ -324,6 +326,9 @@ export function Sidebar({
   onClose,
   onSettings,
   onLock,
+  selfAvatarUrl,
+  selfName,
+  selfEmail,
   archiveSwitch,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -467,6 +472,16 @@ export function Sidebar({
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
+        <button
+          type="button"
+          aria-label="Open profile and settings"
+          title="Profile and settings"
+          className="sidebar-profile-button press"
+          onClick={onSettings}
+        >
+          <Avatar url={selfAvatarUrl} name={selfName} email={selfEmail} compact />
+          <span className="truncate">{selfName || selfEmail.split("@")[0]}</span>
+        </button>
         {canWrite && (
           <button
             type="button"
@@ -554,11 +569,6 @@ export function Sidebar({
       )}
 
       <div className="sidebar-footer">
-        <button type="button" className="sidebar-footer-button press" onClick={onSettings}>
-          <SettingsIcon size={16} />
-          <span>Settings</span>
-          <ChevronRight size={14} className="ml-auto opacity-40" />
-        </button>
         <button type="button" className="sidebar-footer-button press" onClick={onLock}>
           <Lock size={16} />
           <span>Lock &amp; sign out</span>

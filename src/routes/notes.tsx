@@ -32,7 +32,6 @@ import {
   createArchiveInvite,
   deleteAvatar,
   deleteNote,
-  downloadAvatar,
   downloadImage,
   downloadObject,
   loadArchive,
@@ -48,6 +47,7 @@ import {
   type ArchiveSnapshot,
   type Profile,
 } from "@/lib/supabase";
+import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
 import { prepareAvatar, prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
@@ -72,6 +72,7 @@ import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import {
   CollectionMenu,
+  Avatar,
   NoteContextMenu,
   NoteMenu,
   SettingsPanel,
@@ -251,7 +252,7 @@ function NotesPage() {
      being edited is read on its own so a save shows immediately rather than
      waiting for the next archive snapshot. */
   const [profile, setProfile] = useState<Profile>({ nickname: "", avatarObject: null });
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
   /** Where a right-click landed on the note page, if one has. */
@@ -362,25 +363,29 @@ function NotesPage() {
     };
   }, [session]);
 
-  /* The picture, as a local object URL. Revoked when it changes, so a session
-     that swaps its avatar a few times does not leak the old ones. */
+  /* One roster load carries every member's avatar object. The byte URLs live in
+     a module cache, so the sidebar, switch and Settings reuse one download and
+     an ordinary component unmount never revokes an image still in use. */
   useEffect(() => {
-    if (!session || !profile.avatarObject) {
-      setAvatarUrl(null);
-      return;
-    }
-    let url: string | null = null;
+    const leases: Array<ReturnType<typeof acquireAvatarUrl>> = [];
     let live = true;
-    void downloadAvatar(session.userId, profile.avatarObject).then((blob) => {
-      if (!live || !blob) return;
-      url = URL.createObjectURL(blob);
-      setAvatarUrl(url);
-    });
+    setAvatarUrls((current) =>
+      Object.fromEntries(members.map((member) => [member.userId, current[member.userId] ?? null])),
+    );
+    for (const member of members) {
+      if (!member.avatarObject) continue;
+      const lease = acquireAvatarUrl(member.userId, member.avatarObject);
+      leases.push(lease);
+      void lease.url.then((url) => {
+        if (!live) return;
+        setAvatarUrls((current) => ({ ...current, [member.userId]: url }));
+      });
+    }
     return () => {
       live = false;
-      if (url) URL.revokeObjectURL(url);
+      for (const lease of leases) lease.release();
     };
-  }, [session, profile.avatarObject]);
+  }, [members]);
 
   const setActiveMeta = useCallback(
     (m: Meta) => setMetas((current) => ({ ...current, [viewAs]: m })),
@@ -1116,6 +1121,7 @@ function NotesPage() {
       /* The old picture is removed only once the new one is the stored one, so
          a failed write never leaves the profile pointing at nothing. */
       if (replaced) await deleteAvatar(session, replaced).catch(() => {});
+      if (replaced) invalidateAvatarUrl(replaced);
     } catch (reason) {
       setProfileError(reason instanceof Error ? reason.message : "Could not use that picture");
     } finally {
@@ -1128,6 +1134,7 @@ function NotesPage() {
     const removed = profile.avatarObject;
     await persistProfile({ ...profile, avatarObject: null });
     if (removed) await deleteAvatar(session, removed).catch(() => {});
+    if (removed) invalidateAvatarUrl(removed);
   }
 
   function handleAutoLockChange(minutes: AutoLockMinutes) {
@@ -1260,6 +1267,7 @@ function NotesPage() {
           aria-pressed={viewAs === member.userId}
           className={viewAs === member.userId ? "is-active" : ""}
         >
+          <Avatar url={avatarUrls[member.userId] ?? null} name={member.nickname} email="" compact />
           <span className="truncate">
             {member.isSelf ? "My notes" : member.nickname || "Member"}
           </span>
@@ -1287,6 +1295,9 @@ function NotesPage() {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
+      selfAvatarUrl={avatarUrls[session.userId] ?? null}
+      selfName={selfMember?.nickname || profile.nickname}
+      selfEmail={session.email}
       archiveSwitch={archiveSwitch}
     />
   );
@@ -1308,7 +1319,7 @@ function NotesPage() {
       reading={readingLabel}
       autoLock={autoLock}
       profile={profile}
-      avatarUrl={avatarUrl}
+      avatarUrl={avatarUrls[session.userId] ?? null}
       joinedAt={members.find((member) => member.isSelf)?.joinedAt}
       memberCount={members.length}
       members={members}
