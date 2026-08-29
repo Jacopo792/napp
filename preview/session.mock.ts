@@ -1,14 +1,13 @@
 import { PREVIEW_U1 } from "./fixture";
 
-/* Preview-only stand-in for src/lib/session.ts. The archive is already unlocked,
-   so the notes surface can be inspected without credentials or a passphrase.
-   No archive key is needed: the preview mirrors the account-protected format. */
+/* Preview-only stand-in for src/lib/session.ts. The archive is already open, so
+   the notes surface can be inspected without credentials. There is no key of any
+   kind: the preview mirrors the account-protected format the app now uses. */
 
 export interface AppSession {
   userId: string;
   email: string;
   archiveId: string;
-  legacyKey?: CryptoKey;
 }
 
 const ARCHIVE_ID = "00000000-0000-4000-8000-000000000001";

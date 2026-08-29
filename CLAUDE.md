@@ -9,8 +9,9 @@
 - Notes, folder names, tag names and files are stored as ordinary columns and
   Storage objects. Supabase Auth plus `archive_members` RLS is the whole access
   boundary; `owner_id` names which member's scope a row sits in and is never
-  consulted by a policy. The retired `owner` (`u1`/`u2`) column is still present,
-  nullable and unwritten, until it is deliberately dropped.
+  consulted by a policy. Nothing under `src/` mentions the retired `owner`
+  (`u1`/`u2`) column, the `ciphertext` columns or `vault_keys`; the migration
+  that drops them is written and waiting to be run — see below.
 
 ## Local development
 
@@ -72,6 +73,27 @@ than one, so give every function and `do` block its own tag (`$shares$`,
 carries abandoned tables from earlier phases — `legacy_notes_20260828`,
 `legacy_profiles_20260829`, `note_shares` — so `create table if not exists` can
 silently do nothing against a name that is already taken by a different shape.
+
+## The retired encrypted format
+
+The archive was encrypted once and is not any more. Every note, folder, tag and
+archive setting is a plaintext column, every object in Storage carries its real
+content type, and as of 2026-08-29 no code under `src/` decrypts anything: the
+client no longer unwraps a DEK at sign-in, no longer keeps a raw archive key in
+`sessionStorage`, and no longer selects a `ciphertext` column. `crypto.ts` moved
+to `scripts/lib/`, where the one-time migration tools that still need it live.
+
+`supabase/migrations/20260829200000_drop_the_retired_format.sql` finishes the
+job in the database — the `ciphertext` columns, `vault_keys`, the `u1`/`u2`
+`owner` columns with their checks and composite keys, and the three abandoned
+tables. **It has not been applied.** Dropping columns is the point at which the
+rollback window closes, so it is left for a deliberate `supabase db push`
+followed by `pnpm verify:supabase`. The file's own comment records what was
+checked before it was written.
+
+Nothing else needs changing first: `add:member` and `verify:supabase` were
+rewritten off the `owner` label already, and the verifier's checks are written
+so that they pass both before and after the drop.
 
 ## One-time migration tools
 

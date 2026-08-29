@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { decryptBytes, decryptFolder, decryptJson, decryptNote, decryptTag } from "./crypto";
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
@@ -33,14 +32,12 @@ interface FolderRow {
   owner_id: string | null;
   name: string | null;
   parent_id: string | null;
-  ciphertext: string | null;
 }
 
 interface TagRow {
   id: string;
   owner_id: string | null;
   name: string | null;
-  ciphertext: string | null;
   color: Tag["color"];
 }
 
@@ -114,13 +111,10 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .eq("archive_id", archiveId),
     supabase
       .from("folders")
-      .select("id, owner_id, name, parent_id, ciphertext, position")
+      .select("id, owner_id, name, parent_id, position")
       .eq("archive_id", archiveId)
       .order("position"),
-    supabase
-      .from("tags")
-      .select("id, owner_id, name, ciphertext, color")
-      .eq("archive_id", archiveId),
+    supabase.from("tags").select("id, owner_id, name, color").eq("archive_id", archiveId),
     supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
     supabase
       .from("archive_members")
@@ -128,7 +122,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .eq("archive_id", archiveId)
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname"),
-    supabase.from("archives").select("settings, settings_ciphertext").eq("id", archiveId).single(),
+    supabase.from("archives").select("settings").eq("id", archiveId).single(),
   ]);
   for (const result of [
     notesResult,
@@ -174,14 +168,11 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     .filter((row) => noteCache.get(row.id)?.version !== row.version)
     .map((row) => row.id);
 
-  const payloads = new Map<
-    string,
-    { title: string | null; body: string | null; ciphertext: string | null }
-  >();
+  const payloads = new Map<string, { title: string | null; body: string | null }>();
   if (staleIds.length > 0) {
     const changed = await supabase
       .from("notes")
-      .select("id, title, body, ciphertext")
+      .select("id, title, body")
       .eq("archive_id", archiveId)
       .in("id", staleIds);
     fail(changed.error);
@@ -189,13 +180,11 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       id: string;
       title: string | null;
       body: string | null;
-      ciphertext: string | null;
     }[]) {
       payloads.set(row.id, row);
     }
   }
 
-  const legacyWrites: PromiseLike<{ error: { message: string } | null }>[] = [];
   const entries = await Promise.all(
     noteRows.map(async (row) => {
       const cached = noteCache.get(row.id);
@@ -209,25 +198,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         if (!cached) throw new Error("A note changed while the archive was loading");
         return { note: cached.note, version: cached.version } satisfies NoteEntry;
       }
-      let title = payload.title;
-      let body = payload.body;
-      if ((title === null || body === null) && payload.ciphertext) {
-        if (!session.legacyKey) {
-          throw new Error(
-            "This note still uses the old encrypted format. Sign out and sign in once more to migrate it.",
-          );
-        }
-        const legacy = await decryptNote(payload.ciphertext, session.legacyKey);
-        title = legacy.title;
-        body = legacy.body;
-        legacyWrites.push(
-          supabase
-            .from("notes")
-            .update({ title, body, ciphertext: null })
-            .eq("archive_id", archiveId)
-            .eq("id", row.id),
-        );
-      }
+      const { title, body } = payload;
       const note: Note = {
         title: title ?? "",
         body: body ?? "",
@@ -248,24 +219,13 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const foldersByOwner: Record<string, Folder[]> = {};
   const plainFolders = await Promise.all(
     folderRows.map(async (row) => {
-      let name = row.name;
-      let parentId = row.parent_id;
-      if (name === null && row.ciphertext) {
-        if (!session.legacyKey) throw new Error("A folder still uses the old encrypted format");
-        const legacy = await decryptFolder(row.ciphertext, session.legacyKey);
-        name = legacy.name;
-        parentId = legacy.parentId ?? null;
-        legacyWrites.push(
-          supabase
-            .from("folders")
-            .update({ name, parent_id: parentId, ciphertext: null })
-            .eq("archive_id", archiveId)
-            .eq("id", row.id),
-        );
-      }
       return {
         ownerId: scopeOf(row.owner_id),
-        folder: { id: row.id, name: name ?? "", parentId } satisfies Folder,
+        folder: {
+          id: row.id,
+          name: row.name ?? "",
+          parentId: row.parent_id,
+        } satisfies Folder,
       };
     }),
   );
@@ -274,18 +234,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const tagsByOwner: Record<string, Tag[]> = {};
   const plainTags = await Promise.all(
     tagRows.map(async (row) => {
-      let name = row.name;
-      if (name === null && row.ciphertext) {
-        if (!session.legacyKey) throw new Error("A tag still uses the old encrypted format");
-        name = (await decryptTag(row.ciphertext, session.legacyKey)).name;
-        legacyWrites.push(
-          supabase
-            .from("tags")
-            .update({ name, ciphertext: null })
-            .eq("archive_id", archiveId)
-            .eq("id", row.id),
-        );
-      }
+      const name = row.name;
       return {
         ownerId: scopeOf(row.owner_id),
         tag: { id: row.id, name: name ?? "", color: row.color } satisfies Tag,
@@ -311,25 +260,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     });
   }
 
-  let partnerName: string | undefined;
   const settings = archiveResult.data?.settings as { partnerName?: string } | null;
-  partnerName = settings?.partnerName;
-  const settingsCiphertext = archiveResult.data?.settings_ciphertext as string | null;
-  if (!partnerName && settingsCiphertext) {
-    if (!session.legacyKey) throw new Error("Archive settings still use the old encrypted format");
-    ({ partnerName } = await decryptJson<{ partnerName?: string }>(
-      session.legacyKey,
-      settingsCiphertext,
-    ));
-    legacyWrites.push(
-      supabase
-        .from("archives")
-        .update({ settings: { partnerName }, settings_ciphertext: null })
-        .eq("id", archiveId),
-    );
-  }
-
-  if (legacyWrites.length) await all(legacyWrites);
+  const partnerName = settings?.partnerName;
 
   /* One scope per member, and a scope for any member id the rows mention that
      the roster does not — so a note can never fall out of every list. */
@@ -370,7 +302,6 @@ export async function createNote(
       owner_id: note.ownerId ?? session.userId,
       title: note.title,
       body: note.body,
-      ciphertext: null,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
@@ -396,7 +327,6 @@ export async function saveNote(
       .update({
         title: note.title,
         body: note.body,
-        ciphertext: null,
         updated_at: note.updatedAt,
         version: version + 1,
       })
@@ -488,7 +418,6 @@ export async function persistMetaDiff(
         owner_id: ownerId,
         name: folder.name,
         parent_id: folder.parentId ?? null,
-        ciphertext: null,
         position,
       })),
     ),
@@ -498,7 +427,6 @@ export async function persistMetaDiff(
         archive_id: archiveId,
         owner_id: ownerId,
         name: tag.name,
-        ciphertext: null,
         color: tag.color,
       })),
     ),
@@ -510,14 +438,7 @@ export async function persistMetaDiff(
   await all([
     ...(folderRows.length ? [supabase.from("folders").upsert(folderRows)] : []),
     ...(tagRows.length ? [supabase.from("tags").upsert(tagRows)] : []),
-    ...(settings
-      ? [
-          supabase
-            .from("archives")
-            .update({ settings, settings_ciphertext: null })
-            .eq("id", archiveId),
-        ]
-      : []),
+    ...(settings ? [supabase.from("archives").update({ settings }).eq("id", archiveId)] : []),
   ]);
 
   // ── 2. Note placement, and the tag links that are being replaced ────────
@@ -615,20 +536,11 @@ export async function downloadObject(
     .download(`${session.archiveId}/${objectId}`);
   fail(result.error);
   const stored = result.data!;
+  /* Storage reports the content type it was uploaded with. Everything in the
+     bucket now carries a real one; the caller's `type` is the fallback for an
+     object stored before that was true. */
   if (stored.type && stored.type !== "application/octet-stream") return stored;
-  if (!session.legacyKey) return new Blob([await stored.arrayBuffer()], { type });
-
-  // An old encrypted object migrates in place the first time it is opened.
-  const plaintext = await decryptBytes(
-    session.legacyKey,
-    new Uint8Array(await stored.arrayBuffer()),
-  );
-  const migrated = new Blob([plaintext.slice().buffer as ArrayBuffer], { type });
-  const rewrite = await supabase.storage
-    .from(OBJECT_BUCKET)
-    .upload(`${session.archiveId}/${objectId}`, migrated, { contentType: type, upsert: true });
-  fail(rewrite.error);
-  return migrated;
+  return new Blob([await stored.arrayBuffer()], { type });
 }
 
 export const uploadImage = uploadObject;

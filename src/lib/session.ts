@@ -1,22 +1,21 @@
-import { base64ToBytes, bytesToBase64, importArchiveKey, unwrapArchiveKey } from "./crypto";
 import { resetArchiveCache, supabase } from "./supabase";
+
+/* The encrypted format is gone. Every note, folder, tag and archive setting is
+   a plaintext column and every stored object carries its real content type, so
+   there is no longer a key to unwrap, nothing to decrypt on read, and — the
+   part that mattered — no raw archive key sitting in sessionStorage for a
+   format nothing writes any more. `scripts/` keeps the tools that performed the
+   conversion, and `src/lib/crypto.ts` exists for them alone. */
 
 export interface AppSession {
   userId: string;
   email: string;
   archiveId: string;
-  /** Kept only long enough to open data written by the retired encrypted format. */
-  legacyKey?: CryptoKey;
 }
 
 const SESSION_KEY = "napp:archive-session";
 
-interface StoredSession {
-  userId: string;
-  email: string;
-  archiveId: string;
-  rawDek?: string;
-}
+type StoredSession = AppSession;
 
 /** A member with no profile gets one on first sign-in, named after the local
  *  part of their address. It is a starting point, not a claim: the nickname is
@@ -55,39 +54,11 @@ export async function authenticate(email: string, password: string): Promise<App
     const archiveId = memberships[0].archive_id;
     const address = data.user.email ?? email;
 
-    // Old rows and attachments may still need one last local decrypt. Failure
-    // is deliberately non-fatal: account authentication is now the boundary.
-    let rawDek: Uint8Array | undefined;
-    const legacy = await supabase
-      .from("vault_keys")
-      .select("wrapped_dek, kdf_salt, kdf_iterations")
-      .eq("user_id", data.user.id)
-      .eq("archive_id", archiveId)
-      .maybeSingle();
-    if (legacy.data) {
-      try {
-        rawDek = await unwrapArchiveKey(
-          {
-            wrappedDek: legacy.data.wrapped_dek,
-            kdfSalt: legacy.data.kdf_salt,
-            kdfIterations: legacy.data.kdf_iterations,
-          },
-          password,
-        );
-      } catch {
-        rawDek = undefined;
-      }
-    }
     await ensureProfile(data.user.id, address);
 
-    const stored: StoredSession = {
-      userId: data.user.id,
-      email: address,
-      archiveId,
-      rawDek: rawDek ? bytesToBase64(rawDek) : undefined,
-    };
+    const stored: StoredSession = { userId: data.user.id, email: address, archiveId };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
-    return { ...stored, legacyKey: rawDek ? await importArchiveKey(rawDek) : undefined };
+    return stored;
   } catch (reason) {
     sessionStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
@@ -104,10 +75,7 @@ export async function restoreSession(): Promise<AppSession | null> {
     const stored = JSON.parse(raw) as StoredSession;
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user || data.user.id !== stored.userId) throw new Error("Session expired");
-    return {
-      ...stored,
-      legacyKey: stored.rawDek ? await importArchiveKey(base64ToBytes(stored.rawDek)) : undefined,
-    };
+    return stored;
   } catch {
     sessionStorage.removeItem(SESSION_KEY);
     return null;

@@ -8,7 +8,7 @@ import {
   decryptTag,
   importArchiveKey,
   unwrapArchiveKey,
-} from "../src/lib/crypto.ts";
+} from "./lib/crypto.ts";
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
 
 const apply = process.argv.includes("--apply");
