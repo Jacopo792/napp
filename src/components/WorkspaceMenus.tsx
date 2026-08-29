@@ -541,19 +541,24 @@ export function Avatar({
   email,
   large = false,
   compact = false,
+  online = false,
 }: {
   url: string | null;
   name: string;
   email: string;
   large?: boolean;
   compact?: boolean;
+  online?: boolean;
 }) {
   return (
     <span
-      className={`avatar ${large ? "is-large" : ""} ${compact ? "is-compact" : ""}`}
-      aria-hidden="true"
+      className={`avatar ${large ? "is-large" : ""} ${compact ? "is-compact" : ""} ${online ? "is-online" : ""}`}
+      aria-hidden={online ? undefined : true}
+      aria-label={online ? `${name || "Member"} is online` : undefined}
+      title={online ? "Online now" : undefined}
     >
       {url ? <img src={url} alt="" /> : initialsOf(name, email)}
+      {online && <i className="avatar-presence" aria-hidden="true" />}
     </span>
   );
 }
@@ -588,6 +593,7 @@ export function SettingsPanel({
   memberCount,
   members,
   canManageMembers,
+  presenceEnabled,
   profileBusy,
   profileError,
   onNicknameSave,
@@ -595,6 +601,7 @@ export function SettingsPanel({
   onAvatarRemove,
   onCreateInvite,
   onMemberRoleChange,
+  onPresenceEnabledChange,
   onAutoLockChange,
   onClose,
   onLock,
@@ -617,6 +624,7 @@ export function SettingsPanel({
     role: "editor" | "viewer";
   }[];
   canManageMembers: boolean;
+  presenceEnabled: boolean;
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
@@ -624,6 +632,7 @@ export function SettingsPanel({
   onAvatarRemove: () => void;
   onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
   onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
+  onPresenceEnabledChange: (enabled: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -1139,6 +1148,20 @@ export function SettingsPanel({
                   }))}
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
+
+                <label className="appearance-row">
+                  <RowLead
+                    icon={<Users size={17} />}
+                    label="Live presence"
+                    hint="Share that you are here to see who else is here"
+                  />
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={presenceEnabled}
+                    onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                  />
+                </label>
 
                 <h3>Members</h3>
                 <div className="member-role-list">

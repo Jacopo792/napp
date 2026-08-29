@@ -56,6 +56,7 @@ interface Props {
   selfAvatarUrl: string | null;
   selfName: string;
   selfEmail: string;
+  selfOnline: boolean;
   /** The archive switch, which belongs above the destinations it re-points. */
   archiveSwitch: React.ReactNode;
 }
@@ -329,6 +330,7 @@ export function Sidebar({
   selfAvatarUrl,
   selfName,
   selfEmail,
+  selfOnline,
   archiveSwitch,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -479,7 +481,13 @@ export function Sidebar({
           className="sidebar-profile-button press"
           onClick={onSettings}
         >
-          <Avatar url={selfAvatarUrl} name={selfName} email={selfEmail} compact />
+          <Avatar
+            url={selfAvatarUrl}
+            name={selfName}
+            email={selfEmail}
+            compact
+            online={selfOnline}
+          />
           <span className="truncate">{selfName || selfEmail.split("@")[0]}</span>
         </button>
         {canWrite && (

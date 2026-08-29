@@ -49,6 +49,12 @@ import {
 } from "@/lib/supabase";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import {
+  loadPresencePreference,
+  savePresencePreference,
+  subscribeToPresence,
+  unsubscribeFromPresence,
+} from "@/lib/presence";
 import { prepareAvatar, prepareImageForNote } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
@@ -255,6 +261,9 @@ function NotesPage() {
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const [presenceEnabled, setPresenceEnabled] = useState(false);
+  const [presenceReady, setPresenceReady] = useState(false);
+  const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The phone has no room for a permanent sidebar, so it gets the same one
@@ -514,6 +523,22 @@ function NotesPage() {
     const channel = subscribeToArchive(session.archiveId, () => void refreshRemote());
     return () => void unsubscribeFromArchive(channel);
   }, [session, refreshRemote]);
+
+  useEffect(() => {
+    if (!session) return;
+    setPresenceEnabled(loadPresencePreference(session));
+    setPresenceReady(true);
+    return () => setPresenceReady(false);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !presenceReady || !presenceEnabled) {
+      setOnlineMemberIds(new Set());
+      return;
+    }
+    const channel = subscribeToPresence(session, setOnlineMemberIds);
+    return () => void unsubscribeFromPresence(channel);
+  }, [session, presenceReady, presenceEnabled]);
 
   /** The owner's whole catalogue, unfiltered — what the rail and the scope
    *  strip count against. Memoised so their counts are not recomputed for an
@@ -1142,6 +1167,12 @@ function NotesPage() {
     saveAutoLock(minutes);
   }
 
+  function handlePresenceChange(enabled: boolean) {
+    if (!session) return;
+    savePresencePreference(session, enabled);
+    setPresenceEnabled(enabled);
+  }
+
   function handleLock() {
     saveNow();
     clearDrafts();
@@ -1267,7 +1298,13 @@ function NotesPage() {
           aria-pressed={viewAs === member.userId}
           className={viewAs === member.userId ? "is-active" : ""}
         >
-          <Avatar url={avatarUrls[member.userId] ?? null} name={member.nickname} email="" compact />
+          <Avatar
+            url={avatarUrls[member.userId] ?? null}
+            name={member.nickname}
+            email=""
+            compact
+            online={presenceEnabled && onlineMemberIds.has(member.userId)}
+          />
           <span className="truncate">
             {member.isSelf ? "My notes" : member.nickname || "Member"}
           </span>
@@ -1298,6 +1335,7 @@ function NotesPage() {
       selfAvatarUrl={avatarUrls[session.userId] ?? null}
       selfName={selfMember?.nickname || profile.nickname}
       selfEmail={session.email}
+      selfOnline={presenceEnabled && onlineMemberIds.has(session.userId)}
       archiveSwitch={archiveSwitch}
     />
   );
@@ -1324,6 +1362,7 @@ function NotesPage() {
       memberCount={members.length}
       members={members}
       canManageMembers={canWriteArchive}
+      presenceEnabled={presenceEnabled}
       profileBusy={profileBusy}
       profileError={profileError}
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
@@ -1339,6 +1378,7 @@ function NotesPage() {
         await setArchiveMemberRole(session, userId, role);
         await refreshRemote();
       }}
+      onPresenceEnabledChange={handlePresenceChange}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}
