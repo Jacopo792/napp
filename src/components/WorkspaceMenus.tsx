@@ -25,9 +25,11 @@ import {
   Settings,
   Sun,
   Trash2,
+  UserRound,
+  Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AXIS_SPECS,
   PRESETS,
@@ -522,11 +524,66 @@ function Segmented({
   );
 }
 
+/** The letters that stand in for a face nobody has uploaded. */
+function initialsOf(name: string, email: string): string {
+  const source = name.trim() || email.split("@")[0]?.replace(/[._-]+/g, " ") || "";
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+export function Avatar({
+  url,
+  name,
+  email,
+  large = false,
+}: {
+  url: string | null;
+  name: string;
+  email: string;
+  large?: boolean;
+}) {
+  return (
+    <span className={`avatar ${large ? "is-large" : ""}`} aria-hidden="true">
+      {url ? <img src={url} alt="" /> : initialsOf(name, email)}
+    </span>
+  );
+}
+
+const SETTINGS_SECTIONS = [
+  {
+    group: "Account",
+    items: [
+      { id: "profile", name: "Profile", icon: <UserRound size={15} /> },
+      { id: "security", name: "Security", icon: <ShieldCheck size={15} /> },
+    ],
+  },
+  {
+    group: "Interface",
+    items: [
+      { id: "appearance", name: "Appearance", icon: <Palette size={15} /> },
+      { id: "reading", name: "Reading", icon: <BookOpen size={15} /> },
+    ],
+  },
+] as const;
+
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["items"][number]["id"];
+
 export function SettingsPanel({
   open,
   email,
   reading,
   autoLock,
+  profile,
+  avatarUrl,
+  joinedAt,
+  memberCount,
+  profileBusy,
+  profileError,
+  onNicknameSave,
+  onAvatarPick,
+  onAvatarRemove,
   onAutoLockChange,
   onClose,
   onLock,
@@ -537,6 +594,16 @@ export function SettingsPanel({
   /** Whose notes the window is currently pointed at. */
   reading: string;
   autoLock: AutoLockMinutes;
+  profile: { nickname: string; avatarObject: string | null };
+  /** A local object URL for the picture, resolved by whoever owns the session. */
+  avatarUrl: string | null;
+  joinedAt?: string;
+  memberCount: number;
+  profileBusy: boolean;
+  profileError: string;
+  onNicknameSave: (nickname: string) => void;
+  onAvatarPick: (file: File) => void;
+  onAvatarRemove: () => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -545,15 +612,29 @@ export function SettingsPanel({
   const preset = matchingPreset(axes);
   const appearance = useAppearance();
   const [tuning, setTuning] = useState(false);
-  const [section, setSection] = useState<"appearance" | "reading" | "account">("appearance");
+  const [section, setSection] = useState<SettingsSection>("profile");
+  const [nickname, setNickname] = useState(profile.nickname);
   const wallpaperRef = useRef<HTMLInputElement>(null);
+  const avatarRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
       setTuning(false);
-      setSection("appearance");
+      setSection("profile");
     }
   }, [open]);
+
+  /* The field follows the stored value while it is not being edited, so a
+     nickname written on another device does not sit stale behind this one. */
+  useEffect(() => {
+    setNickname(profile.nickname);
+  }, [profile.nickname]);
+
+  function commitNickname() {
+    const trimmed = nickname.trim().slice(0, 40);
+    if (trimmed === profile.nickname) return;
+    onNicknameSave(trimmed);
+  }
 
   const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
     { id: "system", name: "System", icon: <Monitor size={18} /> },
@@ -593,19 +674,124 @@ export function SettingsPanel({
 
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
-            {(["appearance", "reading", "account"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={section === item ? "is-active" : ""}
-                onClick={() => setSection(item)}
-              >
-                {item[0].toUpperCase() + item.slice(1)}
-              </button>
+            {SETTINGS_SECTIONS.map((group) => (
+              <Fragment key={group.group}>
+                <p className="settings-nav-group">{group.group}</p>
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-current={section === item.id ? "page" : undefined}
+                    className={section === item.id ? "is-active" : ""}
+                    onClick={() => setSection(item.id)}
+                  >
+                    {item.icon}
+                    {item.name}
+                  </button>
+                ))}
+              </Fragment>
             ))}
           </nav>
 
           <div className="settings-scroll">
+            {section === "profile" && (
+              <section>
+                <h3>Profile details</h3>
+
+                <div className="profile-portrait">
+                  <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
+                  <div className="min-w-0">
+                    <b className="text-[14px] font-[560] text-ink">Picture</b>
+                    <small className="mt-0.5 block text-[12.5px] text-ink-4">
+                      Shown to everyone in this archive. Cropped square, kept small.
+                    </small>
+                    <input
+                      ref={avatarRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) onAvatarPick(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <div className="profile-portrait-actions">
+                      <button
+                        type="button"
+                        disabled={profileBusy}
+                        onClick={() => avatarRef.current?.click()}
+                      >
+                        {profile.avatarObject ? "Change picture" : "Add a picture"}
+                      </button>
+                      {profile.avatarObject && (
+                        <button
+                          type="button"
+                          className="is-danger"
+                          disabled={profileBusy}
+                          onClick={onAvatarRemove}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="appearance-row">
+                  <RowLead
+                    icon={<UserRound size={17} />}
+                    label="Nickname"
+                    hint="What others in this archive call you"
+                  />
+                  <input
+                    className="profile-field"
+                    value={nickname}
+                    maxLength={40}
+                    placeholder={email.split("@")[0]}
+                    aria-label="Nickname"
+                    disabled={profileBusy}
+                    onChange={(event) => setNickname(event.target.value)}
+                    onBlur={commitNickname}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                      if (event.key === "Escape") setNickname(profile.nickname);
+                    }}
+                  />
+                </div>
+
+                <div className="appearance-row">
+                  <RowLead
+                    icon={<AtSign size={17} />}
+                    label="Email"
+                    hint="Where this account signs in"
+                  />
+                  <span className="profile-static">{email}</span>
+                </div>
+
+                <div className="appearance-row">
+                  <RowLead
+                    icon={<Users size={17} />}
+                    label="Archive"
+                    hint="Everyone here reads and writes everything"
+                  />
+                  <span className="profile-static">
+                    {memberCount} {memberCount === 1 ? "member" : "members"}
+                  </span>
+                </div>
+
+                {profileError && (
+                  <p className="profile-note text-danger" role="alert">
+                    {profileError}
+                  </p>
+                )}
+                <p className="profile-note">
+                  Your nickname and picture are the only things about you the others can see. Nobody
+                  but this account can change them.
+                </p>
+              </section>
+            )}
+
             {section === "appearance" && (
               <section>
                 <h3>Theme</h3>
@@ -852,17 +1038,17 @@ export function SettingsPanel({
               </section>
             )}
 
-            {section === "account" && (
+            {section === "security" && (
               <section>
-                <h3>Account</h3>
+                <h3>Security</h3>
                 <dl className="settings-facts">
                   <div>
                     <span className="settings-lead" aria-hidden="true">
-                      <AtSign size={17} />
+                      <ShieldCheck size={17} />
                     </span>
                     <span className="settings-label">
-                      <dt>Signed in</dt>
-                      <dd>{email}</dd>
+                      <dt>Storage</dt>
+                      <dd>Protected by your account</dd>
                     </span>
                   </div>
                   <div>
@@ -872,15 +1058,6 @@ export function SettingsPanel({
                     <span className="settings-label">
                       <dt>Reading</dt>
                       <dd>{reading}</dd>
-                    </span>
-                  </div>
-                  <div>
-                    <span className="settings-lead" aria-hidden="true">
-                      <ShieldCheck size={17} />
-                    </span>
-                    <span className="settings-label">
-                      <dt>Storage</dt>
-                      <dd>Protected by your account</dd>
                     </span>
                   </div>
                 </dl>
@@ -902,13 +1079,61 @@ export function SettingsPanel({
                   }))}
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
-                <button type="button" className="settings-lock press" onClick={onLock}>
-                  <Lock size={16} />
-                  Sign out
-                </button>
+                <p className="profile-note">
+                  Membership is the whole of the boundary: everyone in this archive reads and writes
+                  every note in it. Somebody who should not read these needs an archive of their
+                  own.
+                </p>
               </section>
             )}
           </div>
+
+          {/* Who this is, standing beside whatever is being changed. */}
+          <aside className="settings-aside" aria-label="Account summary">
+            <div className="settings-aside-block">
+              <p className="settings-aside-label">Signed in as</p>
+              <div className="settings-aside-identity">
+                <Avatar url={avatarUrl} name={profile.nickname} email={email} />
+                <span className="settings-aside-value min-w-0">
+                  {profile.nickname || email.split("@")[0]}
+                </span>
+              </div>
+            </div>
+
+            <dl className="settings-aside-block">
+              <dt>Email</dt>
+              <dd>{email}</dd>
+            </dl>
+
+            {joinedAt && (
+              <dl className="settings-aside-block">
+                <dt>Member since</dt>
+                <dd>
+                  {new Date(joinedAt).toLocaleDateString(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </dd>
+              </dl>
+            )}
+
+            <dl className="settings-aside-block">
+              <dt>Reading</dt>
+              <dd>{reading}</dd>
+            </dl>
+
+            <div className="settings-aside-block">
+              <p className="settings-aside-label">Sign out</p>
+              <p>
+                Ends this session on this device. Your notes stay where they are, and the account
+                opens them again.
+              </p>
+              <button type="button" className="settings-lock press" onClick={onLock}>
+                <Lock size={16} />
+                Sign out
+              </button>
+            </div>
+          </aside>
         </div>
       </section>
     </div>

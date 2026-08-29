@@ -1082,7 +1082,7 @@
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(52rem, 100%);
+  width: min(64rem, 100%);
   height: min(46rem, calc(100dvh - 2.5rem));
   flex-direction: column;
   overflow: hidden;
@@ -1109,20 +1109,57 @@
   font-size: 13px;
 }
 
+/* Three columns: where you are, what you are changing, and who you are. The
+   third is a standing summary rather than another form — it answers "which
+   account is this?" without the reader having to go and look, and it is where
+   the actions that end a session belong. It is the first thing to go when the
+   dialog has no room for it. */
 .settings-body {
   display: grid;
   flex: 1;
-  grid-template-columns: 142px minmax(0, 1fr);
+  grid-template-columns: 176px minmax(0, 1fr) 252px;
   min-height: 0;
 }
 
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  overflow-y: auto;
   border-right: 1px solid var(--rule-soft);
-  padding: 16px 10px;
+  padding: 14px 10px;
   background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+/* The sections are grouped, because "Profile" and "Appearance" are not the
+   same kind of thing and a flat list of four says they are. */
+.settings-nav-group {
+  padding: 14px 10px 5px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.settings-nav-group:first-child {
+  padding-top: 4px;
+}
+
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.settings-nav button svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+
+.settings-nav button.is-active svg {
+  color: var(--accent-strong);
 }
 
 .settings-nav button {
@@ -1147,6 +1184,153 @@
 .settings-scroll {
   overflow-y: auto;
   padding: 0 20px 20px;
+}
+
+/* ── The summary column ─────────────────────────────────────────────────── */
+.settings-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  border-left: 1px solid var(--rule-soft);
+  padding: 18px 16px;
+  background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+.settings-aside-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-aside-block + .settings-aside-block {
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 14px;
+}
+
+.settings-aside dt,
+.settings-aside-label {
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.settings-aside dd,
+.settings-aside-value {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.settings-aside p {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.settings-aside-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── A face, or the letters standing in for one ─────────────────────────── */
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar.is-large {
+  width: 72px;
+  height: 72px;
+  font-size: 24px;
+}
+
+/* ── The profile section ────────────────────────────────────────────────── */
+.profile-portrait {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0 18px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.profile-portrait-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.profile-portrait-actions button {
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  padding: 6px 11px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 560;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.profile-portrait-actions button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.profile-portrait-actions button.is-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.profile-field {
+  width: min(13rem, 100%);
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+}
+
+.profile-field:focus-visible {
+  border-color: var(--accent);
+}
+
+.profile-static {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.profile-note {
+  margin-top: 14px;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 /* A settings row is a label and its value. Given the full width of the dialog
@@ -1460,6 +1644,18 @@
   margin-top: 18px;
 }
 
+/* The summary column is the first thing to go: it repeats what the profile
+   section already says, so a narrow dialog loses nothing by dropping it. */
+@media (max-width: 900px) {
+  .settings-body {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .settings-aside {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   /* The phone has no room for a line of explanation beside the control: the
      hint wraps to four lines and the row becomes a paragraph with a switch in
@@ -1485,7 +1681,13 @@
 
   .settings-nav button {
     flex: 1;
+    justify-content: center;
     text-align: center;
+  }
+
+  .settings-nav button svg,
+  .settings-nav-group {
+    display: none;
   }
 
   .theme-preview {

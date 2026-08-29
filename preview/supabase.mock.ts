@@ -13,7 +13,14 @@ import { FIXTURE_META, FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 export interface ArchiveMember {
   userId: string;
   nickname: string;
+  avatarObject: string | null;
+  joinedAt: string;
   isSelf: boolean;
+}
+
+export interface Profile {
+  nickname: string;
+  avatarObject: string | null;
 }
 
 export interface ArchiveSnapshot {
@@ -23,9 +30,26 @@ export interface ArchiveSnapshot {
 }
 
 const MEMBERS: ArchiveMember[] = [
-  { userId: PREVIEW_U1, nickname: "Preview", isSelf: true },
-  { userId: PREVIEW_U2, nickname: "Partner", isSelf: false },
+  {
+    userId: PREVIEW_U1,
+    nickname: "Preview",
+    avatarObject: null,
+    joinedAt: "2026-05-18T09:00:00.000Z",
+    isSelf: true,
+  },
+  {
+    userId: PREVIEW_U2,
+    nickname: "Partner",
+    avatarObject: null,
+    joinedAt: "2026-06-02T09:00:00.000Z",
+    isSelf: false,
+  },
 ];
+
+/* The profile the preview edits, kept in memory like everything else here so
+   the page can be worked on without an account. */
+const avatars = new Map<string, Blob>();
+let profile: Profile = { nickname: "Preview", avatarObject: null };
 
 /** sync.mock.ts replaces the realtime layer, so this only has to exist. */
 export const supabase = {
@@ -133,4 +157,39 @@ export function downloadImage(session: AppSession, imageId: string): Promise<Blo
 
 export function resetArchiveCache(): void {
   /* The preview archive is a module singleton; there is nothing to invalidate. */
+}
+
+export async function loadProfile(_session: AppSession): Promise<Profile> {
+  await sleep(120);
+  return { ...profile };
+}
+
+export async function saveProfile(_session: AppSession, next: Profile): Promise<void> {
+  await sleep(200);
+  profile = { ...next };
+  const self = MEMBERS.find((member) => member.isSelf);
+  if (self) {
+    self.nickname = next.nickname;
+    self.avatarObject = next.avatarObject;
+  }
+}
+
+export async function uploadAvatar(_session: AppSession, file: Blob): Promise<string> {
+  await sleep(240);
+  const objectId = crypto.randomUUID();
+  avatars.set(objectId, file);
+  return objectId;
+}
+
+export async function downloadAvatar(
+  _userId: string,
+  objectId: string,
+): Promise<Blob | null> {
+  await sleep(80);
+  return avatars.get(objectId) ?? null;
+}
+
+export async function deleteAvatar(_session: AppSession, objectId: string): Promise<void> {
+  await sleep(80);
+  avatars.delete(objectId);
 }
