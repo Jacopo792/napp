@@ -245,6 +245,50 @@ try {
   }
   report.crossAccount = trail;
 
+  // ── A member is a person ─────────────────────────────────────────────────
+  const nickname = `Verification ${Date.now()}`;
+  const previous = await first.supabase
+    .from("profiles")
+    .select("nickname, avatar_object")
+    .eq("user_id", first.userId)
+    .maybeSingle();
+  fail(previous.error);
+  const wrote = await first.supabase
+    .from("profiles")
+    .upsert({ user_id: first.userId, nickname }, { onConflict: "user_id" });
+  fail(wrote.error);
+
+  const readByPeer = await second.supabase
+    .from("profiles")
+    .select("user_id, nickname")
+    .eq("user_id", first.userId)
+    .maybeSingle();
+  fail(readByPeer.error);
+  assert(
+    readByPeer.data?.nickname === nickname,
+    `${second.email} could not read ${first.email}'s profile`,
+  );
+
+  // Sharing an archive lets you read a profile. It does not let you write one:
+  // the row-level USING clause filters the row out, so the update matches
+  // nothing rather than failing loudly.
+  const forged = await second.supabase
+    .from("profiles")
+    .update({ nickname: "forged" })
+    .eq("user_id", first.userId)
+    .select();
+  assert(forged.error || forged.data.length === 0, "A member rewrote another member's profile");
+
+  // Put the real profile back before anything else runs.
+  const restored = await first.supabase
+    .from("profiles")
+    .upsert(
+      { user_id: first.userId, nickname: previous.data?.nickname ?? "" },
+      { onConflict: "user_id" },
+    );
+  fail(restored.error);
+  report.profiles = { readableByPeer: true, writableByPeer: false };
+
   // ── Nobody outside the roster sees anything ──────────────────────────────
   const closedTables = ["archives", "archive_members", "notes", "folders", "tags", "note_tags"];
   for (const table of closedTables) {
@@ -262,6 +306,13 @@ try {
     updated_at: new Date().toISOString(),
   });
   assert(anonymousWrite.error, "An anonymous client inserted a note");
+  // Profiles are stricter than the archive tables: `anon` holds no grant at
+  // all, so the request is refused before RLS is ever consulted.
+  const anonymousProfiles = await anonymous.from("profiles").select("*").limit(5);
+  assert(
+    anonymousProfiles.error || anonymousProfiles.data.length === 0,
+    "An anonymous client read profiles",
+  );
   const anonymousObjects = await anonymous.storage.from("note-images").list(archiveId);
   assert(
     anonymousObjects.error || anonymousObjects.data.length === 0,
@@ -291,6 +342,15 @@ try {
       updated_at: new Date().toISOString(),
     });
     assert(write.error, "An account outside the archive inserted a note");
+    const strangerProfiles = await outsider.supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", first.userId);
+    fail(strangerProfiles.error);
+    assert(
+      strangerProfiles.data.length === 0,
+      "An account outside the archive read a member's profile",
+    );
     const files = await outsider.supabase.storage.from("note-images").list(archiveId);
     assert(
       files.error || files.data.length === 0,

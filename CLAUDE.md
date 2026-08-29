@@ -58,6 +58,20 @@ the archive" message means. New members join with `owner = null`: the
 archive, and an unlabelled member opens on the u1 view while keeping the
 Jacopo / Lisa switch.
 
+A member is a person: `public.profiles` carries a nickname and an avatar object
+per account, and avatars live in their own private bucket under the owner's user
+id. The rule does not change — `private.shares_archive()` lets you read the
+profile of someone you share an archive with, and only the account itself may
+write its own row.
+
+Two things to know before writing another migration. `supabase db query --linked`
+splits a file into statements and mis-pairs `$$` blocks when a file holds more
+than one, so give every function and `do` block its own tag (`$shares$`,
+`$touch$`); apply a long migration in pieces if it still fails. And this project
+carries abandoned tables from earlier phases — `legacy_notes_20260828`,
+`legacy_profiles_20260829`, `note_shares` — so `create table if not exists` can
+silently do nothing against a name that is already taken by a different shape.
+
 ## One-time migration tools
 
 The files in `scripts/` are local administrative tools, not part of the
