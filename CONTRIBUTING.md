@@ -84,6 +84,7 @@ screenshot with the window size in it is worth more than an adjective.
 
 ## Licence
 
-The project has no licence yet, so contributions are accepted on the
-understanding that one will be chosen and applied to the whole repository,
-including your commits. If that is a problem for you, say so before you start.
+The project is under the GNU General Public License, version 3 or later. By
+opening a pull request you are offering your contribution under that licence.
+There is no separate contributor agreement and nobody is asked to assign
+copyright: you keep yours, and it stays GPL.

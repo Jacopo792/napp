@@ -122,6 +122,16 @@ variables. Nothing secret is involved, because the client holds nothing secret.
 
 ## Licence
 
-Not chosen yet. Until one is added, the ordinary default applies: the code is
-under copyright and no permission to use, copy or modify it has been granted.
-If you want to use any of it, ask first.
+GNU General Public License, version 3 or later. The full text is in
+[`LICENSE`](LICENSE).
+
+In short: use it, study it, change it, share it. If you distribute a modified
+version — as source or as a build — that version has to be free software under
+the same licence, and you have to make its source available to whoever you gave
+it to.
+
+One thing worth knowing rather than discovering: the GPL is triggered by
+*distribution*. Running a modified copy of this application on your own server
+and letting other people use it in their browser is not distribution, so it does
+not oblige you to publish those changes. The licence that closes that gap is the
+AGPL, and this project is not under it.
