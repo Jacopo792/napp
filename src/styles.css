@@ -326,9 +326,9 @@
 }
 
 /* ── The specimen's UI voice ─────────────────────────────────────────────────
-   Every label, unit and readout in this app is JetBrains Mono, uppercase and
-   tracked. It is measurement type, not a costume: these strings are all counts,
-   states, dates and axis values. ──────────────────────────────────────────── */
+   Labels, units and readouts take the platform's monospace, tracked. It is
+   measurement type, not a costume: these strings are all counts, states, dates
+   and axis values. ────────────────────────────────────────────────────────── */
 @utility measure {
   width: 100%;
   max-width: var(--read-measure);
@@ -1064,9 +1064,9 @@
 
 .settings-header h2 {
   font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 640;
-  letter-spacing: -0.01em;
+  font-size: 20px;
+  font-weight: 660;
+  letter-spacing: -0.015em;
 }
 
 .settings-header p {
@@ -1095,7 +1095,8 @@
   border-radius: 0.55rem;
   padding: 8px 10px;
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 500;
   text-align: left;
 }
 
@@ -1139,7 +1140,7 @@
   display: grid;
   gap: 7px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -1205,7 +1206,7 @@
   border-radius: 0.65rem;
   padding: 7px 8px;
   color: var(--ink-3);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .palette-presets button:hover,
@@ -1253,29 +1254,58 @@
 
 .appearance-row {
   display: flex;
-  min-height: 48px;
+  min-height: 62px;
   align-items: center;
   gap: 14px;
-  padding: 9px 13px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--rule-soft);
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .appearance-row:last-child {
   border-bottom: 0;
 }
 
-.appearance-row > span:first-child {
+/* ── Row anatomy ─────────────────────────────────────────────────────────────
+   One shape for every row, here and on the profile: a glyph saying which kind
+   of thing this is, the name of it with a line saying what it does, and the
+   control flush right. Every row reserves the lead, so the labels line up down
+   the whole column instead of each starting wherever its control ended. */
+.settings-lead {
   display: flex;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule-soft);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-3);
+}
+
+.settings-label {
+  display: flex;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: 2px;
 }
 
+.settings-label b,
+.settings-label dt {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.settings-label small,
+.settings-label dd,
 .appearance-row small {
   color: var(--ink-4);
-  font-size: 11px;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .color-control {
@@ -1300,7 +1330,7 @@
 .color-control code {
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .appearance-row input[role="switch"] {
@@ -1379,7 +1409,7 @@
   border-radius: 0.55rem;
   padding: 6px 9px;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .wallpaper-actions button:hover,
@@ -1397,8 +1427,19 @@
 }
 
 @media (max-width: 640px) {
+  /* The phone has no room for a line of explanation beside the control: the
+     hint wraps to four lines and the row becomes a paragraph with a switch in
+     it. The labels carry the meaning alone there. The account facts keep their
+     second line, because there the value is the content, not a gloss. */
+  .appearance-row .settings-label small {
+    display: none;
+  }
+
+  /* The panel holds one height now, so the body has to say which of its two
+     rows absorbs it. Without this the nav strip stretches to half the sheet. */
   .settings-body {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .settings-nav {
@@ -1428,9 +1469,9 @@
   margin-bottom: 12px;
   color: var(--ink-4);
   font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 640;
-  letter-spacing: 0.09em;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
 }
 
@@ -1483,8 +1524,8 @@
   border-radius: 0.6rem;
   padding: 4px 6px;
   color: var(--ink-3);
-  font-size: 13px;
-  font-weight: 520;
+  font-size: 14px;
+  font-weight: 540;
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
@@ -1504,7 +1545,7 @@
 
 .settings-segment small {
   color: var(--ink-4);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
 }
@@ -1535,8 +1576,8 @@
   border-radius: 0.6rem;
   padding: 7px 10px 7px 6px;
   color: var(--ink-2);
-  font-size: 13px;
-  font-weight: 520;
+  font-size: 14px;
+  font-weight: 540;
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
@@ -1561,7 +1602,7 @@
   margin-left: auto;
   color: var(--ink-4);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .settings-sliders {
@@ -1584,13 +1625,13 @@
   align-items: baseline;
   gap: 4px 1rem;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .settings-field output {
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1602,34 +1643,27 @@
 .settings-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 14px;
   margin-bottom: 12px;
-}
-
-.settings-row span {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.settings-row b {
-  color: var(--ink-2);
-  font-size: 13.5px;
-  font-weight: 600;
 }
 
 .settings-row small,
 .settings-note {
   color: var(--ink-4);
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .settings-note {
   margin-top: 12px;
 }
+
+/* One scale for the whole dialog, since the faces are the platform's and size,
+   weight and spacing are the only hierarchy available. Eighteen declarations
+   used eight sizes, five of them inside a pixel and a half of each other, which
+   reads as no scale at all: 11 uppercase for section labels, 12 mono for
+   readouts, 12.5 for hints, 13.5 for the nav, 14 for everything you actually
+   read, 20 for the title. ─────────────────────────────────────────────────── */
 
 /* ── The facts ───────────────────────────────────────────────────────────────
    Who is signed in, whose notes are on screen, and where the archive lives.
@@ -1646,27 +1680,20 @@
 
 .settings-facts > div {
   display: flex;
+  min-height: 62px;
   align-items: center;
-  gap: 1rem;
+  gap: 14px;
   background: var(--surface);
-  padding: 10px 14px;
+  padding: 12px 16px;
 }
 
-.settings-facts dt {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  font-size: 12.5px;
+.settings-facts .settings-lead {
+  background: var(--paper);
 }
 
 .settings-facts dd {
-  display: flex;
   min-width: 0;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
   overflow: hidden;
-  color: var(--ink-2);
-  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1685,7 +1712,7 @@
   border-radius: 0.8rem;
   padding-inline: 1rem;
   color: var(--ink-2);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 560;
   transition:
     background-color var(--dur-fast) var(--ease-press),
@@ -1874,9 +1901,9 @@
   font-style: normal;
 }
 
-/* Rendered markdown. Headings take Bricolage at its own optical size; the
-   markers themselves are dimmed rather than deleted, so the source is always
-   recoverable by eye and the cursor never lands on hidden characters. */
+/* Rendered markdown. Headings take the display stack a size and a weight up;
+   the markers themselves are dimmed rather than deleted, so the source is
+   always recoverable by eye and the cursor never lands on hidden characters. */
 .cm-md-mark {
   color: var(--ink-4);
   font-weight: 400;

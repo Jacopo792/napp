@@ -1,4 +1,13 @@
 import {
+  AtSign,
+  BookOpen,
+  Contrast,
+  Image,
+  Layers,
+  Palette,
+  ShieldCheck,
+  Timer,
+  Type,
   ArrowDownAZ,
   ArrowDownUp,
   CalendarDays,
@@ -380,18 +389,40 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
   );
 }
 
+/** The anatomy every settings row shares, and the one the profile page will
+ *  reuse: a leading glyph, the name of the thing with a line saying what it
+ *  does, and the control itself flush right. Naming the row is what lets the
+ *  control stop explaining itself. */
+function RowLead({ icon, label, hint }: { icon: ReactNode; label: string; hint?: string }) {
+  return (
+    <>
+      <span className="settings-lead" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="settings-label">
+        <b>{label}</b>
+        {hint ? <small>{hint}</small> : null}
+      </span>
+    </>
+  );
+}
+
 /** The appearance sliders, on the same control as the reading axes. They were
  *  bare `input[type=range]`, so the browser painted a blue nobody chose — two
  *  tabs of one dialog showing the same control two different ways. */
 function AppearanceSlider({
+  icon,
   label,
+  hint,
   min,
   max,
   value,
   readout,
   onChange,
 }: {
+  icon: ReactNode;
   label: string;
+  hint?: string;
   min: number;
   max: number;
   value: number;
@@ -401,7 +432,7 @@ function AppearanceSlider({
   const fill = ((value - min) / (max - min)) * 100;
   return (
     <label className="appearance-row is-slider">
-      <span>{label}</span>
+      <RowLead icon={icon} label={label} hint={hint} />
       <input
         type="range"
         className="axis-range"
@@ -597,13 +628,23 @@ export function SettingsPanel({
                 <div className="appearance-controls">
                   {(
                     [
-                      ["Accent", "accent"],
-                      ["Background", "background"],
-                      ["Foreground", "foreground"],
+                      [
+                        "Accent",
+                        "accent",
+                        "Selection, focus and every active state",
+                        <Palette size={17} />,
+                      ],
+                      [
+                        "Background",
+                        "background",
+                        "The colour every surface is mixed from",
+                        <Type size={17} />,
+                      ],
+                      ["Foreground", "foreground", "Text colour", <Type size={17} />],
                     ] as const
-                  ).map(([label, key]) => (
+                  ).map(([label, key, hint, icon]) => (
                     <label key={key} className="appearance-row">
-                      <span>{label}</span>
+                      <RowLead icon={icon} label={label} hint={hint} />
                       <span className="color-control">
                         <input
                           type="color"
@@ -618,7 +659,11 @@ export function SettingsPanel({
                   ))}
 
                   <label className="appearance-row">
-                    <span>Translucent sidebar</span>
+                    <RowLead
+                      icon={<Layers size={17} />}
+                      label="Translucent sidebar"
+                      hint="Let the page show through the rail"
+                    />
                     <input
                       type="checkbox"
                       role="switch"
@@ -630,7 +675,9 @@ export function SettingsPanel({
                   </label>
 
                   <AppearanceSlider
+                    icon={<Contrast size={17} />}
                     label="Contrast"
+                    hint="Distance between the stacked surfaces"
                     min={20}
                     max={80}
                     value={appearance.contrast}
@@ -639,10 +686,11 @@ export function SettingsPanel({
                   />
 
                   <div className="appearance-row wallpaper-row">
-                    <span>
-                      Background image
-                      <small>Stored only on this device</small>
-                    </span>
+                    <RowLead
+                      icon={<Image size={17} />}
+                      label="Background image"
+                      hint="Stored only on this device, never uploaded"
+                    />
                     <input
                       ref={wallpaperRef}
                       type="file"
@@ -685,6 +733,7 @@ export function SettingsPanel({
                         </span>
                       </div>
                       <AppearanceSlider
+                        icon={<Contrast size={17} />}
                         label="Darken image"
                         min={0}
                         max={80}
@@ -693,6 +742,7 @@ export function SettingsPanel({
                         onChange={(wallpaperDim) => setAppearance({ ...appearance, wallpaperDim })}
                       />
                       <AppearanceSlider
+                        icon={<Layers size={17} />}
                         label="Blur"
                         min={0}
                         max={20}
@@ -764,20 +814,38 @@ export function SettingsPanel({
                 <h3>Account</h3>
                 <dl className="settings-facts">
                   <div>
-                    <dt>Signed in</dt>
-                    <dd>{email}</dd>
+                    <span className="settings-lead" aria-hidden="true">
+                      <AtSign size={17} />
+                    </span>
+                    <span className="settings-label">
+                      <dt>Signed in</dt>
+                      <dd>{email}</dd>
+                    </span>
                   </div>
                   <div>
-                    <dt>Reading</dt>
-                    <dd>{reading}</dd>
+                    <span className="settings-lead" aria-hidden="true">
+                      <BookOpen size={17} />
+                    </span>
+                    <span className="settings-label">
+                      <dt>Reading</dt>
+                      <dd>{reading}</dd>
+                    </span>
                   </div>
                   <div>
-                    <dt>Storage</dt>
-                    <dd>Protected by your account</dd>
+                    <span className="settings-lead" aria-hidden="true">
+                      <ShieldCheck size={17} />
+                    </span>
+                    <span className="settings-label">
+                      <dt>Storage</dt>
+                      <dd>Protected by your account</dd>
+                    </span>
                   </div>
                 </dl>
                 <div className="settings-row account-lock-row">
-                  <span>
+                  <span className="settings-lead" aria-hidden="true">
+                    <Timer size={17} />
+                  </span>
+                  <span className="settings-label">
                     <b>Sign out when idle</b>
                     <small>Require the account password again after a period of inactivity.</small>
                   </span>
