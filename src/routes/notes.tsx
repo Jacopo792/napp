@@ -58,7 +58,7 @@ import {
   subscribeToPresence,
   unsubscribeFromPresence,
 } from "@/lib/presence";
-import { prepareAvatar, prepareImageForNote } from "@/lib/image";
+import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
@@ -1172,12 +1172,12 @@ function NotesPage() {
     if (settingsOpen) void refreshInvites();
   }, [settingsOpen, refreshInvites]);
 
-  async function handleAvatarPick(file: File) {
+  async function handleAvatarPick(file: File, crop?: AvatarCrop) {
     if (!session) return;
     setProfileBusy(true);
     setProfileError("");
     try {
-      const blob = await prepareAvatar(file);
+      const blob = await prepareAvatar(file, crop);
       const objectId = await uploadAvatar(session, blob);
       const replaced = profile.avatarObject;
       await persistProfile({ ...profile, avatarObject: objectId });
@@ -1406,7 +1406,7 @@ function NotesPage() {
       profileBusy={profileBusy}
       profileError={profileError}
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
-      onAvatarPick={(file) => void handleAvatarPick(file)}
+      onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
       onAvatarRemove={() => void handleAvatarRemove()}
       onCreateInvite={async (email, role) => {
         const token = await createArchiveInvite(session, email, role);

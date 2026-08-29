@@ -2446,6 +2446,147 @@
   opacity: 0.45;
 }
 
+/* ── Placing the picture ─────────────────────────────────────────────────────
+   The stage shows the picture at exactly the scale and offset the crop will
+   be taken at, so what is inside the circle is what is kept. The mask is one
+   box-shadow spread far enough to reach every corner of the stage — cheaper
+   and crisper than a second element with a radial gradient in it. */
+.cropper-layer {
+  z-index: 90;
+}
+
+.cropper-panel {
+  position: relative;
+  display: flex;
+  width: min(22rem, 100%);
+  flex-direction: column;
+  align-items: center;
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  animation: settings-reveal var(--dur-base) var(--ease-out) both;
+}
+
+.cropper-panel h2 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.cropper-panel > p {
+  margin-top: 4px;
+  margin-bottom: 16px;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.cropper-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: var(--surface);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.cropper-stage:active {
+  cursor: grabbing;
+}
+
+.cropper-stage img {
+  max-width: none;
+  will-change: transform;
+}
+
+.cropper-window {
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 9999px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px rgb(255 255 255 / 0.55);
+  pointer-events: none;
+}
+
+.cropper-grip {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.45);
+  color: rgb(255 255 255 / 0.8);
+  pointer-events: none;
+}
+
+.cropper-zoom {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--ink-4);
+}
+
+.cropper-zoom input[type="range"] {
+  flex: 1;
+}
+
+.cropper-actions {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.cropper-actions button {
+  display: inline-flex;
+  flex: 1;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--rule);
+  border-radius: 0.7rem;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 560;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press);
+}
+
+.cropper-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.cropper-actions button.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.cropper-actions button.is-primary:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.cropper-actions button:disabled {
+  opacity: 0.45;
+}
+
 .settings-lock:hover {
   border-color: var(--rule);
   background: var(--accent-wash);

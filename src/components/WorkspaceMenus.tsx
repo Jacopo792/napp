@@ -44,6 +44,8 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
+import { AvatarCropper } from "@/components/AvatarCropper";
+import type { AvatarCrop } from "@/lib/image";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE,
@@ -665,7 +667,7 @@ export function SettingsPanel({
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
-  onAvatarPick: (file: File) => void;
+  onAvatarPick: (file: File, crop: AvatarCrop) => void;
   onAvatarRemove: () => void;
   onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
@@ -686,6 +688,9 @@ export function SettingsPanel({
   const [inviteLink, setInviteLink] = useState("");
   const [inviteStatus, setInviteStatus] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
+  /** The file waits here while its square is chosen; nothing is uploaded until
+   *  the cropper is confirmed. */
+  const [cropping, setCropping] = useState<File | null>(null);
   const [memberBusy, setMemberBusy] = useState("");
   const [memberStatus, setMemberStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
@@ -700,6 +705,7 @@ export function SettingsPanel({
       setInviteStatus("");
       setInviteRole("editor");
       setMemberStatus("");
+      setCropping(null);
     }
   }, [open]);
 
@@ -839,7 +845,7 @@ export function SettingsPanel({
                       className="hidden"
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        if (file) onAvatarPick(file);
+                        if (file) setCropping(file);
                         event.target.value = "";
                       }}
                     />
@@ -1451,6 +1457,18 @@ export function SettingsPanel({
           </aside>
         </div>
       </section>
+
+      {cropping && (
+        <AvatarCropper
+          file={cropping}
+          busy={profileBusy}
+          onCancel={() => setCropping(null)}
+          onConfirm={(crop) => {
+            onAvatarPick(cropping, crop);
+            setCropping(null);
+          }}
+        />
+      )}
     </div>
   );
 }
