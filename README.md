@@ -113,6 +113,8 @@ not a membership. Roles that can read without writing are not built yet.
 | `PRODUCT.md` | Who it is for, what it is for, and the operating context |
 | `DESIGN.md` | The interface rules, and the reasoning behind them |
 | `CLAUDE.md` | Repository layout, deployment, and the migration hazards |
+| `SECURITY.md` | How to report a vulnerability privately and the security model |
+| `CHANGELOG.md` | User-visible and security-relevant changes by release date |
 
 ## Deployment
 
