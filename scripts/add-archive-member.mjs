@@ -9,6 +9,11 @@
  * row, using an existing member's own session — no service-role key involved,
  * because `archive_members_member_all` already lets a member manage the roster.
  *
+ * Membership is full read and write over every note, folder, tag and file in
+ * the archive; there is no read-only member. Someone who should use the app
+ * without seeing these notes needs an archive of their own instead — see
+ * `supabase/admin/new-archive-for-person.sql`.
+ *
  * The new row carries `owner = null` by default. `owner` is an interface label
  * for the Jacopo / Lisa switch and a unique index allows one row per label per
  * archive, so additional members join unlabelled and open on the u1 view.

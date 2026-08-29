@@ -45,12 +45,18 @@ a matching pair of runs is the proof that nothing changed but the encoding.
 cross-account reads and writes, Realtime, and that anonymous and member-less
 clients still see nothing.
 
-Connect another Supabase Auth account to the archive with `pnpm add:member`. It
-signs in as an existing member and writes the missing `public.archive_members`
-row, which is what the "This account is not connected to the archive" message
-means. New members join with `owner = null`: the `archive_members_archive_owner_idx`
-unique index keeps one `u1` and one `u2` per archive, and an unlabelled member
-opens on the u1 view while keeping the Jacopo / Lisa switch.
+Someone who should use the app without reading an existing archive needs their
+own archive, not a membership: `supabase/admin/new-archive-for-person.sql` creates
+one in the Supabase SQL editor. Membership is full read and write over every note
+in the archive, so it is only for people who are meant to share the notes.
+
+Connect another Supabase Auth account to an existing archive with
+`pnpm add:member`. It signs in as an existing member and writes the missing
+`public.archive_members` row, which is what the "This account is not connected to
+the archive" message means. New members join with `owner = null`: the
+`archive_members_archive_owner_idx` unique index keeps one `u1` and one `u2` per
+archive, and an unlabelled member opens on the u1 view while keeping the
+Jacopo / Lisa switch.
 
 ## One-time migration tools
 
