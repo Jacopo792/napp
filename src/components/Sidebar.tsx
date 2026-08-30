@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
+  Archive,
   ChevronRight,
   Folder,
   FolderOpen,
@@ -13,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { ALL, TRASH } from "@/lib/scopes";
+import { ALL, ARCHIVE, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
@@ -357,6 +358,7 @@ export function Sidebar({
   const tree = useMemo(() => buildTree(folders, counts), [folders, counts]);
   const all = scopes.find((scope) => scope.id === ALL);
   const trash = scopes.find((scope) => scope.id === TRASH);
+  const archive = scopes.find((scope) => scope.id === ARCHIVE);
 
   function toggle(id: string) {
     setExpanded((current) => {
@@ -563,16 +565,30 @@ export function Sidebar({
           list. Left inline it floated at the top of a tall empty space with the
           account controls stranded far below it; down here the column reads as
           three settled blocks — where notes are, where deleted notes go, and
-          what this session is. */}
-      {trash && (
+          what this session is.
+
+          Archive shares that block, above Trash: both are places a note leaves
+          the folders for, and the one you can come back from belongs first. */}
+      {(archive || trash) && (
         <div className="sidebar-tail">
-          <Row
-            scope={trash}
-            glyph={<Trash2 size={16} />}
-            active={selectedId === TRASH}
-            droppable={false}
-            onSelect={() => onSelect(TRASH)}
-          />
+          {archive && (
+            <Row
+              scope={archive}
+              glyph={<Archive size={16} />}
+              active={selectedId === ARCHIVE}
+              droppable={false}
+              onSelect={() => onSelect(ARCHIVE)}
+            />
+          )}
+          {trash && (
+            <Row
+              scope={trash}
+              glyph={<Trash2 size={16} />}
+              active={selectedId === TRASH}
+              droppable={false}
+              onSelect={() => onSelect(TRASH)}
+            />
+          )}
         </div>
       )}
 

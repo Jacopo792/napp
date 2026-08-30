@@ -9,6 +9,8 @@ import {
 } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import {
+  Archive,
+  ArchiveRestore,
   ChevronRight,
   FileText,
   FolderInput,
@@ -59,12 +61,14 @@ interface Props {
   canWrite: boolean;
   folderLabel: string;
   trashMode: boolean;
+  archiveMode: boolean;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
   onNew: () => void;
   onMoveToTrash: (entry: NoteEntry) => void;
   onRestore: (entry: NoteEntry) => void;
+  onArchiveChange: (entry: NoteEntry, archived: boolean) => void;
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (noteId: string) => void;
   onMoveToFolder: (noteId: string, folderId: string | null) => void;
@@ -97,9 +101,11 @@ const Row = memo(function Row({
   selected,
   onSelect,
   trashMode,
+  archiveMode,
   canWrite,
   onMoveToTrash,
   onRestore,
+  onArchiveChange,
   onDeleteForever,
   onTogglePin,
   onContextMenu,
@@ -110,19 +116,21 @@ const Row = memo(function Row({
   meta: Meta;
   selected: boolean;
   trashMode: boolean;
+  archiveMode: boolean;
   canWrite: boolean;
   /* Every handler takes the entry it acts on, so the parent can pass one stable
      function per action instead of minting a closure per row per render. */
   onSelect: (entry: NoteEntry) => void;
   onMoveToTrash: (entry: NoteEntry) => void;
   onRestore: (entry: NoteEntry) => void;
+  onArchiveChange: (entry: NoteEntry, archived: boolean) => void;
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
-    disabled: mobile || trashMode || !canWrite,
+    disabled: mobile || trashMode || archiveMode || !canWrite,
   });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -212,7 +220,7 @@ const Row = memo(function Row({
 
       {canWrite && (
         <div className="note-row-actions flex shrink-0 items-center gap-0.5">
-          {!trashMode && (
+          {!trashMode && !archiveMode && (
             <button
               aria-label={
                 pinned
@@ -245,6 +253,20 @@ const Row = memo(function Row({
               className="icon-button h-7 w-7 shrink-0 text-accent"
             >
               <RotateCcw size={14} />
+            </button>
+          )}
+          {archiveMode && (
+            <button
+              aria-label={`Move ${entry.note.title || "Untitled"} out of Archive`}
+              title="Move out of Archive"
+              onClick={(event) => {
+                event.stopPropagation();
+                onArchiveChange(entry, false);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="icon-button h-7 w-7 shrink-0 text-accent"
+            >
+              <ArchiveRestore size={14} />
             </button>
           )}
 
@@ -324,12 +346,14 @@ export function NoteList({
   canWrite,
   folderLabel,
   trashMode,
+  archiveMode,
   searchRef,
   onQueryChange,
   onSelect,
   onNew,
   onMoveToTrash,
   onRestore,
+  onArchiveChange,
   onDeleteForever,
   onTogglePin,
   onMoveToFolder,
@@ -436,6 +460,38 @@ export function NoteList({
               {confirming ? "Delete forever?" : "Delete forever"}
             </MenuButton>
           </>
+        ) : archiveMode ? (
+          <>
+            <MenuButton
+              onClick={() => {
+                onSelect(menuEntry.note.id);
+                closeRowMenu();
+              }}
+            >
+              <FileText size={16} />
+              Open note
+            </MenuButton>
+            <MenuButton
+              onClick={() => {
+                onArchiveChange(menuEntry, false);
+                closeRowMenu();
+              }}
+            >
+              <ArchiveRestore size={16} />
+              Move out of Archive
+            </MenuButton>
+            <div className="menu-separator" />
+            <MenuButton
+              danger
+              onClick={() => {
+                onMoveToTrash(menuEntry);
+                closeRowMenu();
+              }}
+            >
+              <Trash2 size={16} />
+              Move to Trash
+            </MenuButton>
+          </>
         ) : (
           <>
             <MenuButton
@@ -462,6 +518,15 @@ export function NoteList({
               <FolderInput size={16} />
               Move note
               <ChevronRight size={16} className="ml-auto" />
+            </MenuButton>
+            <MenuButton
+              onClick={() => {
+                onArchiveChange(menuEntry, true);
+                closeRowMenu();
+              }}
+            >
+              <Archive size={16} />
+              Archive note
             </MenuButton>
             <div className="menu-separator" />
             <MenuButton
@@ -495,10 +560,12 @@ export function NoteList({
             meta={meta}
             selected={selectedId === entry.note.id}
             trashMode={trashMode}
+            archiveMode={archiveMode}
             canWrite={canWrite}
             onSelect={selectEntry}
             onMoveToTrash={onMoveToTrash}
             onRestore={onRestore}
+            onArchiveChange={onArchiveChange}
             onDeleteForever={onDeleteForever}
             onTogglePin={togglePinEntry}
             onContextMenu={openRowMenu}

@@ -34,6 +34,7 @@ interface NoteRow {
   created_at: string;
   updated_at: string;
   trashed_at: string | null;
+  archived_at: string | null;
   pinned: boolean;
   folder_id: string | null;
   version: number;
@@ -124,7 +125,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase
       .from("notes")
       .select(
-        "id, owner_id, created_at, updated_at, trashed_at, pinned, folder_id, version, content_version",
+        "id, owner_id, created_at, updated_at, trashed_at, archived_at, pinned, folder_id, version, content_version",
       )
       .eq("archive_id", archiveId),
     supabase
@@ -300,6 +301,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       tagIds: tagsByNote.get(row.id) ?? [],
       pinned: row.pinned || undefined,
       trashedAt: row.trashed_at ?? undefined,
+      archivedAt: row.archived_at ?? undefined,
     });
   }
 
@@ -352,6 +354,7 @@ export async function createNote(
       created_at: note.createdAt,
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
+      archived_at: metadata.archivedAt ?? null,
       pinned: metadata.pinned ?? false,
       folder_id: metadata.folderId,
     })
@@ -544,7 +547,8 @@ export async function persistMetaDiff(
       !previous ||
       previous.folderId !== metadata.folderId ||
       previous.pinned !== metadata.pinned ||
-      previous.trashedAt !== metadata.trashedAt
+      previous.trashedAt !== metadata.trashedAt ||
+      previous.archivedAt !== metadata.archivedAt
     );
   });
   const retagged = [...afterNotes.values()].filter((metadata) => {
@@ -562,6 +566,7 @@ export async function persistMetaDiff(
           folder_id: metadata.folderId,
           pinned: metadata.pinned ?? false,
           trashed_at: metadata.trashedAt ?? null,
+          archived_at: metadata.archivedAt ?? null,
         })
         .eq("archive_id", archiveId)
         .eq("id", metadata.id),

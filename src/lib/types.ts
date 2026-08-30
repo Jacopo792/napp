@@ -62,6 +62,15 @@ export interface NoteMeta {
   pinned?: boolean;
   /** Soft-deleted notes remain recoverable in Postgres until removed from Trash. */
   trashedAt?: string;
+  /**
+   * Filed out of the way without being thrown away. Unlike the trash this is
+   * not a waiting room: an archived note stays editable, and it stays archived
+   * until somebody says otherwise.
+   *
+   * Whether the other members can see it at all is decided in Postgres, from
+   * the owner's `profiles.hide_archived`, not here.
+   */
+  archivedAt?: string;
 }
 
 export interface Meta {

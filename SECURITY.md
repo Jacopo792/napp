@@ -30,6 +30,19 @@ database access through `archive_members`, and private Storage applies the same
 archive-membership boundary. `owner_id` is organizational metadata, not an
 authorization boundary.
 
+There is one exception, and it is enforced in the same place. A note its owner
+has archived is withheld from the other members when that owner sets
+`profiles.hide_archived`: `notes_member_select` calls
+`private.archived_note_visible()`, which reads the flag from the owner's
+profile row — the one row only its own account may write. The predicate also
+guards the update and delete policies, so a withheld note is not writable by
+someone who cannot see it.
+
+What that is worth, exactly: **the other member's client cannot fetch the
+row.** It is not encryption. Nothing in this archive is encrypted, so anyone
+holding database credentials reads archived notes like any other. Hiding here
+is a boundary between members, not between a member and the database.
+
 Membership is capped in the database, not in the interface. A `before insert`
 trigger on `archive_members` refuses a row once the archive holds
 `archives.seat_limit` members, so every path in — the personal-archive

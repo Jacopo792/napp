@@ -11,11 +11,28 @@
 Access control is Supabase Auth plus one table. A row in `archive_members` lets
 you read the archive; a row with `role = 'editor'` lets you write it, enforced
 by `private.can_write_archive()` and by direct writes to `archive_members`
-being revoked entirely. `owner_id` names which member's scope a row sits in and
-is never read by a policy.
+being revoked entirely. `owner_id` names which member's scope a row sits in, and
+a policy reads it in exactly one place: `private.archived_note_visible()`, which
+withholds an archived note from the other members when its owner has set
+`profiles.hide_archived`. Everywhere else it stays a label, not a permission.
 
 Notes, folder names, tag names and files are ordinary columns and Storage
-objects. Nothing is encrypted; see _The retired encrypted format_ below.
+objects. Nothing is encrypted; see _The retired encrypted format_ below —
+including the archived notes above, which are hidden from a member, never from
+the database.
+
+## The shelf and the waiting room
+
+Trash and Archive are different places and the difference is worth keeping. A
+trashed note is on its way out: read-only, waiting to be deleted for good. An
+archived note is filed away and still yours to edit. When a note is both, the
+trash wins on screen, because being about to disappear is the more urgent thing
+to say about it.
+
+Whether the other members see your archived notes is the one boundary in this
+archive that is _not_ plain membership, and it is enforced in Postgres for the
+reason every boundary here is: a list filtered in the browser has already
+handed the rows over. `SECURITY.md` records what the hiding is worth.
 
 ## Local development
 

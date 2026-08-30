@@ -90,7 +90,7 @@ import {
   uniqueFileNames,
 } from "@/features/editor/lib/exchange";
 import type { Draft } from "@/features/editor/lib/draft";
-import { ALL, TRASH, UNFILED } from "@/lib/scopes";
+import { ALL, ARCHIVE, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -164,7 +164,7 @@ function metaShape(meta: Meta): string {
   for (const folder of meta.folders) shape += `|${folder.id}:${folder.name}`;
   for (const tag of meta.tags) shape += `|${tag.id}:${tag.name}:${tag.color}`;
   for (const note of meta.notes) {
-    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.tagIds.join(",")}`;
+    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.archivedAt ?? ""}:${note.tagIds.join(",")}`;
   }
   return shape;
 }
@@ -229,7 +229,11 @@ function NotesPage() {
   /* This account's own profile. The roster carries everybody's, but the one
      being edited is read on its own so a save shows immediately rather than
      waiting for the next archive snapshot. */
-  const [profile, setProfile] = useState<Profile>({ nickname: "", avatarObject: null });
+  const [profile, setProfile] = useState<Profile>({
+    nickname: "",
+    avatarObject: null,
+    hideArchived: false,
+  });
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -576,12 +580,21 @@ function NotesPage() {
     };
 
     const trashedIds = new Set(meta.notes.filter((note) => note.trashedAt).map((note) => note.id));
+    /* The trash wins over the shelf: a note thrown away while archived is
+       waiting to be deleted, and that is the more urgent thing to say. */
+    const archivedIds = new Set(
+      meta.notes.filter((note) => note.archivedAt && !note.trashedAt).map((note) => note.id),
+    );
     let list = ownedEntries;
 
     if (selectedFolderId === TRASH) {
       list = list.filter((entry) => trashedIds.has(entry.note.id));
+    } else if (selectedFolderId === ARCHIVE) {
+      list = list.filter((entry) => archivedIds.has(entry.note.id));
     } else {
-      list = list.filter((entry) => !trashedIds.has(entry.note.id));
+      list = list.filter(
+        (entry) => !trashedIds.has(entry.note.id) && !archivedIds.has(entry.note.id),
+      );
       if (selectedFolderId === UNFILED) {
         list = list.filter((e) => folderOf(e.note.id) === null);
       } else if (selectedFolderId !== ALL) {
@@ -617,7 +630,9 @@ function NotesPage() {
         ? "Unfiled"
         : selectedFolderId === TRASH
           ? "Trash"
-          : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
+          : selectedFolderId === ARCHIVE
+            ? "Archive"
+            : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
 
   // Seed the store from the stored note. `ensureDraft` leaves unsaved work
   // alone, so this is safe to run whenever the selection or the entry changes.
@@ -1063,7 +1078,7 @@ function NotesPage() {
         }
         setEntries(entriesRef.current);
         setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, ...added] });
-        if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
+        if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
         setStatusFlash(`Imported ${added.length} note${added.length === 1 ? "" : "s"}`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Import failed");
@@ -1079,7 +1094,10 @@ function NotesPage() {
     const s = sessionRef.current;
     if (!s) return;
     const folderId =
-      selectedFolderId === ALL || selectedFolderId === UNFILED || selectedFolderId === TRASH
+      selectedFolderId === ALL ||
+      selectedFolderId === UNFILED ||
+      selectedFolderId === TRASH ||
+      selectedFolderId === ARCHIVE
         ? null
         : selectedFolderId;
 
@@ -1106,7 +1124,7 @@ function NotesPage() {
       setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, metadata] });
 
       setQuery("");
-      if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
+      if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
       setSelectedId(note.id);
       setListPreferences((current) => ({
         ...current,
@@ -1143,6 +1161,28 @@ function NotesPage() {
               trashedAt: new Date().toISOString(),
             },
           ];
+      handleMetaChange({ ...activeMeta, notes });
+
+      if (selectedId === entry.note.id) {
+        setSelectedId(null);
+        if (compact) setMobileScreen("collection");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedId, activeMeta],
+  );
+
+  /* Onto the shelf and back off it. One handler rather than two: the halves
+     differ by a timestamp, and both leave the list the note was in. */
+  const handleArchiveChange = useCallback(
+    (entry: NoteEntry, archived: boolean) => {
+      const archivedAt = archived ? new Date().toISOString() : undefined;
+      const existing = activeMeta.notes.find((note) => note.id === entry.note.id);
+      const notes: NoteMeta[] = existing
+        ? activeMeta.notes.map((note) =>
+            note.id === entry.note.id ? { ...note, archivedAt } : note,
+          )
+        : [...activeMeta.notes, { id: entry.note.id, folderId: null, tagIds: [], archivedAt }];
       handleMetaChange({ ...activeMeta, notes });
 
       if (selectedId === entry.note.id) {
@@ -1589,10 +1629,15 @@ function NotesPage() {
     const index = indexOf(activeMeta);
     const byFolder = new Map<string, number>();
     let trash = 0;
+    let archived = 0;
     for (const entry of ownedEntries) {
       const noteMeta = index.byNote.get(entry.note.id);
       if (noteMeta?.trashedAt) {
         trash += 1;
+        continue;
+      }
+      if (noteMeta?.archivedAt) {
+        archived += 1;
         continue;
       }
       const folderId = noteMeta?.folderId ?? null;
@@ -1601,12 +1646,13 @@ function NotesPage() {
       }
     }
     return [
-      { id: ALL, label: "All notes", count: ownedEntries.length - trash },
+      { id: ALL, label: "All notes", count: ownedEntries.length - trash - archived },
       ...activeMeta.folders.map((folder) => ({
         id: folder.id,
         label: folder.name,
         count: byFolder.get(folder.id) ?? 0,
       })),
+      { id: ARCHIVE, label: "Archive", count: archived },
       { id: TRASH, label: "Trash", count: trash },
     ];
   })();
@@ -1748,6 +1794,9 @@ function NotesPage() {
       onPresenceEnabledChange={handlePresenceChange}
       proofreaderEnabled={proofreaderEnabled}
       onProofreaderEnabledChange={handleProofreaderChange}
+      /* Straight through the one profile writer: this is a column on the row,
+         and Postgres reads it back to decide what the other member may fetch. */
+      onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}
@@ -1864,12 +1913,14 @@ function NotesPage() {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
+                  archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
                   onSelect={handleSelectNote}
                   onNew={handleNew}
                   onMoveToTrash={handleMoveToTrash}
                   onRestore={handleRestore}
+                  onArchiveChange={handleArchiveChange}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   onMoveToFolder={handleMoveNote}
@@ -1974,12 +2025,14 @@ function NotesPage() {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
+                  archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
                   onSelect={handleSelectNote}
                   onNew={handleNew}
                   onMoveToTrash={handleMoveToTrash}
                   onRestore={handleRestore}
+                  onArchiveChange={handleArchiveChange}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   onMoveToFolder={handleMoveNote}

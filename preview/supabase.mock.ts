@@ -22,6 +22,7 @@ export interface ArchiveMember {
 export interface Profile {
   nickname: string;
   avatarObject: string | null;
+  hideArchived: boolean;
 }
 
 export interface ArchiveSnapshot {
@@ -76,7 +77,11 @@ const MEMBERS: ArchiveMember[] = [
 
 /* The profile the preview edits, kept in memory like everything else here so
    the page can be worked on without an account. */
-let profile: Profile = { nickname: "Preview", avatarObject: PREVIEW_AVATAR_U1 };
+let profile: Profile = {
+  nickname: "Preview",
+  avatarObject: PREVIEW_AVATAR_U1,
+  hideArchived: false,
+};
 
 /** sync.mock.ts replaces the realtime layer, so this only has to exist. */
 export const supabase = {

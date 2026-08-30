@@ -7,3 +7,6 @@
 export const ALL = "__all";
 export const UNFILED = "__unfiled";
 export const TRASH = "__trash";
+/* Filed away rather than thrown away. A note here is still editable and still
+   yours; the trash is the waiting room, this is the shelf. */
+export const ARCHIVE = "__archive";

@@ -41,26 +41,45 @@ export function downloadImage(session: AppSession, imageId: string): Promise<Blo
 export interface Profile {
   nickname: string;
   avatarObject: string | null;
+  /**
+   * Whether this account's archived notes are withheld from the other members.
+   *
+   * Stored here because the row is the one thing only its own account may
+   * write, and read back by `private.archived_note_visible()` — so the answer
+   * that reaches another member's client is Postgres's, not this browser's.
+   */
+  hideArchived: boolean;
 }
 
 export async function loadProfile(session: AppSession): Promise<Profile> {
   const result = await supabase
     .from("profiles")
-    .select("nickname, avatar_object")
+    .select("nickname, avatar_object, hide_archived")
     .eq("user_id", session.userId)
     .maybeSingle();
   fail(result.error);
-  const row = result.data as { nickname: string | null; avatar_object: string | null } | null;
-  return { nickname: row?.nickname ?? "", avatarObject: row?.avatar_object ?? null };
+  const row = result.data as {
+    nickname: string | null;
+    avatar_object: string | null;
+    hide_archived: boolean | null;
+  } | null;
+  return {
+    nickname: row?.nickname ?? "",
+    avatarObject: row?.avatar_object ?? null,
+    hideArchived: row?.hide_archived ?? false,
+  };
 }
 
 export async function saveProfile(session: AppSession, profile: Profile): Promise<void> {
-  const result = await supabase
-    .from("profiles")
-    .upsert(
-      { user_id: session.userId, nickname: profile.nickname, avatar_object: profile.avatarObject },
-      { onConflict: "user_id" },
-    );
+  const result = await supabase.from("profiles").upsert(
+    {
+      user_id: session.userId,
+      nickname: profile.nickname,
+      avatar_object: profile.avatarObject,
+      hide_archived: profile.hideArchived,
+    },
+    { onConflict: "user_id" },
+  );
   fail(result.error);
 }
 

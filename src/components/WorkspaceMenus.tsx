@@ -1,4 +1,5 @@
 import {
+  Archive,
   ClipboardCopy,
   FileDown,
   FolderDown,
@@ -622,6 +623,7 @@ export function SettingsPanel({
   onMemberRoleChange,
   onPresenceEnabledChange,
   onProofreaderEnabledChange,
+  onHideArchivedChange,
   onAutoLockChange,
   onClose,
   onLock,
@@ -632,7 +634,7 @@ export function SettingsPanel({
   /** Whose notes the window is currently pointed at. */
   reading: string;
   autoLock: AutoLockMinutes;
-  profile: { nickname: string; avatarObject: string | null };
+  profile: { nickname: string; avatarObject: string | null; hideArchived: boolean };
   /** A local object URL for the picture, resolved by whoever owns the session. */
   avatarUrl: string | null;
   joinedAt?: string;
@@ -660,6 +662,7 @@ export function SettingsPanel({
   onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
+  onHideArchivedChange: (hideArchived: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -1203,7 +1206,7 @@ export function SettingsPanel({
                   onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
                 />
 
-                <label className="appearance-row">
+                <label className="appearance-row is-bare">
                   <RowLead
                     icon={<Users size={17} />}
                     label="Live presence"
@@ -1217,7 +1220,25 @@ export function SettingsPanel({
                   />
                 </label>
 
-                <label className="appearance-row">
+                {/* The one row here that is not a preference. Postgres reads
+                    this column back when the other member's client asks for
+                    notes, so switching it on withholds the rows rather than
+                    hiding them after they arrive. */}
+                <label className="appearance-row is-bare">
+                  <RowLead
+                    icon={<Archive size={17} />}
+                    label="Keep archived notes private"
+                    hint="Archived notes stay visible only to you"
+                  />
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={profile.hideArchived}
+                    onChange={(event) => onHideArchivedChange(event.target.checked)}
+                  />
+                </label>
+
+                <label className="appearance-row is-bare">
                   <RowLead
                     icon={<SpellCheck size={17} />}
                     label="Proofreading"

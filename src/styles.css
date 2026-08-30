@@ -1892,6 +1892,14 @@
   border-bottom: 0;
 }
 
+/* A row standing on the section itself rather than inside a card. The 16px is
+   the card's inset, so out here it only pushes the lead glyph off the left edge
+   the rest of the section keeps — and the labels stop lining up. */
+.appearance-row.is-bare {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* ── Row anatomy ─────────────────────────────────────────────────────────────
    One shape for every row, here and on the profile: a glyph saying which kind
    of thing this is, the name of it with a line saying what it does, and the

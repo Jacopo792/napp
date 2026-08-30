@@ -254,6 +254,76 @@ try {
   }
   report.crossAccount = trail;
 
+  // ── An archived note can be kept from the other members ──────────────────
+  // The one place membership stops meaning "reads everything", so it is the one
+  // place worth proving on the server rather than in the interface. A list
+  // filtered in the browser would pass every check above and still have handed
+  // the rows over.
+  const priorHide = await first.supabase
+    .from("profiles")
+    .select("hide_archived")
+    .eq("user_id", first.userId)
+    .maybeSingle();
+  fail(priorHide.error);
+
+  const peerSeesTestNote = async () => {
+    const seen = await second.supabase.from("notes").select("id").eq("id", testId).maybeSingle();
+    fail(seen.error);
+    return seen.data !== null;
+  };
+
+  const archivedNow = new Date().toISOString();
+  fail(
+    (
+      await first.supabase
+        .from("profiles")
+        .upsert({ user_id: first.userId, hide_archived: true }, { onConflict: "user_id" })
+    ).error,
+  );
+  fail(
+    (await first.supabase.from("notes").update({ archived_at: archivedNow }).eq("id", testId))
+      .error,
+  );
+
+  assert(
+    !(await peerSeesTestNote()),
+    `${second.email} could still read ${first.email}'s archived note`,
+  );
+  const ownerStillSees = await first.supabase
+    .from("notes")
+    .select("id")
+    .eq("id", testId)
+    .maybeSingle();
+  fail(ownerStillSees.error);
+  assert(ownerStillSees.data !== null, `${first.email} lost sight of their own archived note`);
+
+  // And it comes back when the setting is off, so the policy is switching on
+  // the column rather than hiding every archived note outright.
+  fail(
+    (
+      await first.supabase
+        .from("profiles")
+        .upsert({ user_id: first.userId, hide_archived: false }, { onConflict: "user_id" })
+    ).error,
+  );
+  assert(
+    await peerSeesTestNote(),
+    `${second.email} could not read an archived note that is not private`,
+  );
+
+  fail((await first.supabase.from("notes").update({ archived_at: null }).eq("id", testId)).error);
+  fail(
+    (
+      await first.supabase
+        .from("profiles")
+        .upsert(
+          { user_id: first.userId, hide_archived: priorHide.data?.hide_archived ?? false },
+          { onConflict: "user_id" },
+        )
+    ).error,
+  );
+  report.archivedPrivacy = { hiddenFromPeer: true, visibleWhenOff: true };
+
   // ── A member is a person ─────────────────────────────────────────────────
   const nickname = `Verification ${Date.now()}`;
   const previous = await first.supabase
