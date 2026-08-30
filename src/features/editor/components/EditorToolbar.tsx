@@ -24,6 +24,7 @@ import {
   Pilcrow,
   Quote,
   Rows3,
+  SpellCheck,
   Strikethrough,
   Table2,
   Trash2,
@@ -56,6 +57,9 @@ interface Props {
   onImportPdfText: () => void;
   onChoosePhoto: () => void;
   onTranslate: (language: "it" | "fr" | "en") => void;
+  /** Off hides the proofreading row outright; the menu is then translation only. */
+  proofreaderEnabled: boolean;
+  onProofread: () => void;
   /** The insert-link form, anchored under the text tab that opened it. */
   linkForm?: ReactNode;
   linkOpen?: boolean;
@@ -106,6 +110,8 @@ export function EditorToolbar({
   onImportPdfText,
   onChoosePhoto,
   onTranslate,
+  proofreaderEnabled,
+  onProofread,
   linkForm,
   linkOpen = false,
   onCloseLink,
@@ -369,14 +375,25 @@ export function EditorToolbar({
         )}
       </div>
 
-      {/* ── Translation ── */}
+      {/* ── Language, on this device ── */}
       <div className="relative">
-        {tab("translate", "Translate selection", <Languages size={18} />)}
+        {tab("translate", "Language tools", <Languages size={18} />)}
         {menu(
           "translate",
-          "Translate selection",
+          "Language tools",
           "right",
           <>
+            {proofreaderEnabled && (
+              <>
+                <p className="menu-label">Selected text</p>
+                <Row
+                  icon={<SpellCheck size={16} />}
+                  label="Fix spelling and grammar"
+                  onClick={() => (setOpen(null), onProofread())}
+                />
+                <div className="menu-separator" />
+              </>
+            )}
             <p className="menu-label">Translate selected text to</p>
             <Row
               icon={<span>IT</span>}
@@ -393,9 +410,7 @@ export function EditorToolbar({
               label="English"
               onClick={() => (setOpen(null), onTranslate("en"))}
             />
-            <p className="menu-note">
-              Translation runs on this device in supported desktop browsers.
-            </p>
+            <p className="menu-note">These run on this device in supported desktop browsers.</p>
           </>,
         )}
       </div>

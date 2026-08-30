@@ -52,6 +52,10 @@ import {
   unsubscribeFromPresence,
   type PresenceMember,
 } from "@/lib/presence";
+import {
+  loadProofreaderPreference,
+  saveProofreaderPreference,
+} from "@/features/editor/lib/proofread";
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
@@ -230,6 +234,7 @@ function NotesPage() {
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [presenceEnabled, setPresenceEnabled] = useState(false);
+  const [proofreaderEnabled, setProofreaderEnabled] = useState(loadProofreaderPreference);
   const [presenceReady, setPresenceReady] = useState(false);
   const [presentMembers, setPresentMembers] = useState<Map<string, PresenceMember>>(
     () => new Map(),
@@ -1480,6 +1485,11 @@ function NotesPage() {
     setPresenceEnabled(enabled);
   }
 
+  function handleProofreaderChange(enabled: boolean) {
+    saveProofreaderPreference(enabled);
+    setProofreaderEnabled(enabled);
+  }
+
   function handleLock() {
     saveNow();
     clearDrafts();
@@ -1736,6 +1746,8 @@ function NotesPage() {
         await refreshRemote();
       }}
       onPresenceEnabledChange={handlePresenceChange}
+      proofreaderEnabled={proofreaderEnabled}
+      onProofreaderEnabledChange={handleProofreaderChange}
       onAutoLockChange={handleAutoLockChange}
       onClose={() => setSettingsOpen(false)}
       onLock={handleLock}
@@ -1878,6 +1890,7 @@ function NotesPage() {
                     entry={selected}
                     syncRevision={syncRevision}
                     canEdit={canEdit}
+                    proofreaderEnabled={proofreaderEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
                     titleRef={titleRef}
@@ -1999,6 +2012,7 @@ function NotesPage() {
               entry={selected}
               syncRevision={syncRevision}
               canEdit={canEdit}
+              proofreaderEnabled={proofreaderEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}

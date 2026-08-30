@@ -14,6 +14,7 @@ import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
+import { proofreadText } from "@/features/editor/lib/proofread";
 import { translateText, type TranslationLanguage } from "@/features/editor/lib/translation";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
@@ -25,6 +26,8 @@ interface Props {
   /** Raised when the draft store carries text pulled from the other device. */
   syncRevision: number;
   canEdit: boolean;
+  /** Whether this browser offers the on-device proofreader at all. */
+  proofreaderEnabled: boolean;
   viewingAsPartner: boolean;
   partnerName: string;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -73,6 +76,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     entry,
     syncRevision,
     canEdit,
+    proofreaderEnabled,
     viewingAsPartner,
     partnerName,
     titleRef,
@@ -268,6 +272,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     }
   }
 
+  async function handleProofread() {
+    const selected = editorRef.current?.getSelectedText() ?? "";
+    if (!selected.trim()) {
+      setFailure("Select the text you want to proofread first");
+      return;
+    }
+    setFailure("");
+    setStatus("Detecting language…");
+    try {
+      const { corrected, count } = await proofreadText(selected, (progress) => {
+        setStatus(`Downloading the proofreading model… ${progress}%`);
+      });
+      /* Nothing to change is not a correction of zero words: leaving the
+         document alone keeps a pointless step out of the undo stack and the
+         draft undirtied. */
+      if (count === 0) {
+        report("No corrections needed");
+        return;
+      }
+      editorRef.current?.replaceSelectedText(corrected);
+      report(count === 1 ? "1 correction applied" : `${count} corrections applied`);
+    } catch (error) {
+      setStatus("");
+      setFailure(error instanceof Error ? error.message : "Could not proofread the selection");
+    }
+  }
+
   const linkForm = (
     <div className="popover editor-tool-menu absolute top-full left-0 z-40 mt-2 w-72 p-3">
       <p className="label mb-2 text-ink-2">Insert link</p>
@@ -326,6 +357,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
       onTranslate={(language) => void handleTranslate(language)}
+      proofreaderEnabled={proofreaderEnabled}
+      onProofread={() => void handleProofread()}
       linkForm={linkForm}
       linkOpen={linkOpen}
       onCloseLink={closeLink}

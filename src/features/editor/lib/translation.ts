@@ -33,26 +33,35 @@ function browserApis(): { Translator?: TranslationApi; LanguageDetector?: Detect
   return window as unknown as { Translator?: TranslationApi; LanguageDetector?: DetectorApi };
 }
 
-export async function translateText(
-  text: string,
-  targetLanguage: TranslationLanguage,
-  onDownload?: (progress: number) => void,
-): Promise<string> {
-  const { Translator, LanguageDetector } = browserApis();
-  if (!Translator || !LanguageDetector) {
-    throw new Error("Translation is available in Chrome 138 or newer on desktop");
-  }
-
-  const detectorAvailability = await LanguageDetector.availability();
-  if (detectorAvailability === "unavailable") {
+/** The language of a passage, as a bare subtag: `it`, not `it-IT`.
+ *
+ *  Its own function because the proofreader needs the same answer, and asking
+ *  twice in two places is how the two would drift apart. */
+export async function detectLanguage(text: string): Promise<string> {
+  const { LanguageDetector } = browserApis();
+  if (!LanguageDetector || (await LanguageDetector.availability()) === "unavailable") {
     throw new Error("Language detection is not available in this browser");
   }
 
   const detector = await LanguageDetector.create();
   const [best] = await detector.detect(text);
   detector.destroy?.();
-  const sourceLanguage = best?.detectedLanguage?.split("-")[0];
-  if (!sourceLanguage) throw new Error("Could not detect the language of the selection");
+  const language = best?.detectedLanguage?.split("-")[0];
+  if (!language) throw new Error("Could not detect the language of the selection");
+  return language;
+}
+
+export async function translateText(
+  text: string,
+  targetLanguage: TranslationLanguage,
+  onDownload?: (progress: number) => void,
+): Promise<string> {
+  const { Translator } = browserApis();
+  if (!Translator) {
+    throw new Error("Translation is available in Chrome 138 or newer on desktop");
+  }
+
+  const sourceLanguage = await detectLanguage(text);
   if (sourceLanguage === targetLanguage)
     throw new Error("The selection is already in this language");
 

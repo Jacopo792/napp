@@ -27,6 +27,7 @@ import {
   Pin,
   Search,
   Settings,
+  SpellCheck,
   Sun,
   Trash2,
   Undo2,
@@ -610,6 +611,7 @@ export function SettingsPanel({
   invites,
   canManageMembers,
   presenceEnabled,
+  proofreaderEnabled,
   profileBusy,
   profileError,
   onNicknameSave,
@@ -619,6 +621,7 @@ export function SettingsPanel({
   onRevokeInvite,
   onMemberRoleChange,
   onPresenceEnabledChange,
+  onProofreaderEnabledChange,
   onAutoLockChange,
   onClose,
   onLock,
@@ -646,6 +649,7 @@ export function SettingsPanel({
   invites: { id: string; email: string; role: "editor" | "viewer"; expiresAt: string }[];
   canManageMembers: boolean;
   presenceEnabled: boolean;
+  proofreaderEnabled: boolean;
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
@@ -655,6 +659,7 @@ export function SettingsPanel({
   onRevokeInvite: (inviteId: string) => Promise<void>;
   onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
+  onProofreaderEnabledChange: (enabled: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
@@ -1209,6 +1214,20 @@ export function SettingsPanel({
                     role="switch"
                     checked={presenceEnabled}
                     onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                  />
+                </label>
+
+                <label className="appearance-row">
+                  <RowLead
+                    icon={<SpellCheck size={17} />}
+                    label="Proofreading"
+                    hint="Offer to fix spelling and grammar, on this device"
+                  />
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={proofreaderEnabled}
+                    onChange={(event) => onProofreaderEnabledChange(event.target.checked)}
                   />
                 </label>
               </section>
