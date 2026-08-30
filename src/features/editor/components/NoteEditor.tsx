@@ -31,6 +31,7 @@ interface Props {
   /** The draft store already holds the words; this only asks for a save. */
   onEdited: () => void;
   onNew: () => void;
+  onImportMarkdown: () => void;
   onUploadImage: (file: File) => Promise<string>;
   onUploadFile: (file: File) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
@@ -76,6 +77,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     titleRef,
     onEdited,
     onNew,
+    onImportMarkdown,
     onUploadImage,
     onUploadFile,
     resolveImage,
@@ -316,6 +318,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onFormat={(action) => editorRef.current?.format(action)}
       onLink={openLinkForm}
       onAttachPdf={() => attachPdfRef.current?.click()}
+      onImportMarkdown={onImportMarkdown}
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
       onTranslate={(language) => void handleTranslate(language)}

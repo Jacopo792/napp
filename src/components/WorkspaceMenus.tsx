@@ -1,7 +1,6 @@
 import {
   ClipboardCopy,
   FileDown,
-  FileUp,
   FolderDown,
   AtSign,
   BookOpen,
@@ -86,14 +85,10 @@ export { MenuButton } from "./MenuPrimitives";
 export function CollectionMenu({
   preferences,
   onChange,
-  canWrite,
-  onImport,
   onExportAll,
 }: {
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
-  canWrite: boolean;
-  onImport: () => void;
   onExportAll: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -165,17 +160,6 @@ export function CollectionMenu({
             <FolderDown size={16} />
             Export all as Markdown
           </MenuButton>
-          {canWrite && (
-            <MenuButton
-              onClick={() => {
-                onImport();
-                close();
-              }}
-            >
-              <FileUp size={16} />
-              Import Markdown files
-            </MenuButton>
-          )}
         </div>
       )}
     </div>

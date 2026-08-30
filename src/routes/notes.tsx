@@ -1607,8 +1607,6 @@ function NotesPage() {
     <CollectionMenu
       preferences={activeListPreferences}
       onChange={handleListPreferencesChange}
-      canWrite={canWriteArchive}
-      onImport={() => importRef.current?.click()}
       onExportAll={() => void handleExportAll()}
     />
   );
@@ -1881,6 +1879,7 @@ function NotesPage() {
                     titleRef={titleRef}
                     onEdited={handleEdited}
                     onNew={handleNew}
+                    onImportMarkdown={() => importRef.current?.click()}
                     onUploadImage={handleUploadImage}
                     onUploadFile={handleUploadFile}
                     resolveImage={resolveImage}
@@ -2001,6 +2000,7 @@ function NotesPage() {
               titleRef={titleRef}
               onEdited={handleEdited}
               onNew={handleNew}
+              onImportMarkdown={() => importRef.current?.click()}
               onUploadImage={handleUploadImage}
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
@@ -2048,8 +2048,8 @@ function NotesPage() {
       </DndContext>
       {settingsPanel}
       {editorMenu}
-      {/* The list's ⋯ opens this; a file input is the only way a browser lets a
-          page read a file the reader chose, and it has to be in the tree. */}
+      {/* The editor's attachment menu opens this; a file input is the only way
+          a browser lets a page read a file the reader chose. */}
       <input
         ref={importRef}
         type="file"

@@ -52,6 +52,7 @@ interface Props {
   onFormat: (action: FormatAction) => void;
   onLink: () => void;
   onAttachPdf: () => void;
+  onImportMarkdown: () => void;
   onImportPdfText: () => void;
   onChoosePhoto: () => void;
   onTranslate: (language: "it" | "fr" | "en") => void;
@@ -101,6 +102,7 @@ export function EditorToolbar({
   onFormat,
   onLink,
   onAttachPdf,
+  onImportMarkdown,
   onImportPdfText,
   onChoosePhoto,
   onTranslate,
@@ -411,6 +413,15 @@ export function EditorToolbar({
                 paragraph that used to explain the difference is gone: the two
                 labels already say it, and a menu that has to footnote itself is
                 a menu with the wrong labels. */}
+            <Row
+              icon={<FileUp size={16} />}
+              label="Import as Markdown"
+              onClick={() => {
+                setOpen(null);
+                onImportMarkdown();
+              }}
+            />
+            <div className="menu-separator" />
             <Row
               icon={<FileUp size={16} />}
               label="Import PDF as text"
