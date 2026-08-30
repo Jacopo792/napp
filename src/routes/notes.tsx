@@ -451,11 +451,15 @@ function NotesPage() {
     // the end, so an in-use title field keeps what it shows.
     const titleBusy = document.activeElement === titleRef.current;
     const current = readDraft(open);
-    replaceDraft(open, {
-      title: titleBusy && current ? current.title : fresh.note.title,
-      body: fresh.note.body,
-      content: fresh.note.content,
-    });
+    replaceDraft(
+      open,
+      {
+        title: titleBusy && current ? current.title : fresh.note.title,
+        body: fresh.note.body,
+        content: fresh.note.content,
+      },
+      fresh.note.updatedAt,
+    );
     setSyncRevision((n) => n + 1);
   }, []);
 
@@ -638,11 +642,15 @@ function NotesPage() {
   // alone, so this is safe to run whenever the selection or the entry changes.
   useEffect(() => {
     if (!selected) return;
-    ensureDraft(selected.note.id, {
-      title: selected.note.title,
-      body: selected.note.body,
-      content: selected.note.content,
-    });
+    ensureDraft(
+      selected.note.id,
+      {
+        title: selected.note.title,
+        body: selected.note.body,
+        content: selected.note.content,
+      },
+      selected.note.updatedAt,
+    );
   }, [selected]);
 
   // ── Save pipeline ───────────────────────────────────────────────────────
@@ -697,11 +705,15 @@ function NotesPage() {
         if (!document) {
           await keepUnmergedCopy(s, remote.note, taken);
           storeEntry(remote.note, remote.version);
-          replaceDraft(id, {
-            title: remote.note.title,
-            body: remote.note.body,
-            content: remote.note.content,
-          });
+          replaceDraft(
+            id,
+            {
+              title: remote.note.title,
+              body: remote.note.body,
+              content: remote.note.content,
+            },
+            remote.note.updatedAt,
+          );
           setSyncRevision((n) => n + 1);
           setMerge({
             label: "Kept a copy",
@@ -804,7 +816,7 @@ function NotesPage() {
 
     try {
       while (hasPending() || pendingMetaRef.current.size > 0) {
-        for (const [id, d] of takePending()) {
+        for (const { id, draft: d, restoreUpdatedAt } of takePending()) {
           const entry = entriesRef.current.find((e) => e.note.id === id);
           if (!entry) {
             dropDraft(id);
@@ -817,7 +829,7 @@ function NotesPage() {
             body: d.body,
             content: d.content,
             contentVersion: RICH_TEXT_VERSION,
-            updatedAt: new Date().toISOString(),
+            updatedAt: restoreUpdatedAt ?? new Date().toISOString(),
           };
           try {
             storeEntry(updated, await saveNote(s, updated, entry.version));
@@ -870,6 +882,11 @@ function NotesPage() {
   }, [refreshRemote, resolveConflict, storeEntry]);
 
   const schedule = useCallback(() => {
+    if (!hasPending()) {
+      window.clearTimeout(timerRef.current);
+      setDirty(pendingMetaRef.current.size > 0);
+      return;
+    }
     setDirty(true);
     window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => void drain(), AUTOSAVE_MS);
@@ -1131,11 +1148,15 @@ function NotesPage() {
         [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), note.id),
       }));
       if (compact) setMobileScreen("note");
-      ensureDraft(note.id, {
-        title: "",
-        body: "",
-        content: structuredClone(EMPTY_RICH_TEXT),
-      });
+      ensureDraft(
+        note.id,
+        {
+          title: "",
+          body: "",
+          content: structuredClone(EMPTY_RICH_TEXT),
+        },
+        note.updatedAt,
+      );
       window.setTimeout(() => titleRef.current?.focus(), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create note");

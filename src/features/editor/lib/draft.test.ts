@@ -48,3 +48,28 @@ test("signing out leaves no note text behind", () => {
   assert.equal(draft.hasPending(), false);
   assert.equal(store.has("napp:drafts"), false);
 });
+
+test("typing and then restoring the saved text does not leave a pending edit", () => {
+  const saved = { title: "A note", body: "kept", content: paragraph("kept") };
+  draft.ensureDraft("n2", saved, "2026-08-30T10:00:00.000Z");
+  draft.editBody("n2", "temporary", paragraph("temporary"));
+  assert.equal(draft.isDirty("n2"), true);
+
+  draft.editBody("n2", "kept", paragraph("kept"));
+  assert.equal(draft.isDirty("n2"), false);
+  assert.equal(draft.takePending().length, 0);
+});
+
+test("returning to the original text after an autosave restores its edit time", () => {
+  const original = { title: "A note", body: "kept", content: paragraph("kept") };
+  const changed = { title: "A note", body: "temporary", content: paragraph("temporary") };
+  draft.ensureDraft("n3", original, "2026-08-30T10:00:00.000Z");
+  draft.editBody("n3", changed.body, changed.content);
+  assert.equal(draft.takePending()[0]?.restoreUpdatedAt, null);
+  draft.rebaseDraft("n3", changed);
+  // This mirrors the catalogue render caused by the just-finished autosave.
+  draft.ensureDraft("n3", changed, "2026-08-30T12:00:00.000Z");
+
+  draft.editBody("n3", original.body, original.content);
+  assert.equal(draft.takePending()[0]?.restoreUpdatedAt, "2026-08-30T10:00:00.000Z");
+});

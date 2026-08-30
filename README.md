@@ -72,10 +72,12 @@ separate composition for the phone.
   reference, not as bytes.
 - **Language tools that run on this device.** Translation of a selection in
   place, and a proofreader that fixes spelling and grammar and says how many
-  corrections it made — nothing to fix writes nothing at all. Both use the
-  browser's built-in models, so there is no API key, no token store and no
-  server: the only kind of AI this architecture can hold. The proofreader can be
-  switched off in Settings, and then its row is absent rather than greyed.
+  corrections it made — nothing to fix writes nothing at all. Common,
+  unambiguous English contractions are also fixed as the word is completed;
+  after two automatic corrections of one spelling, the writer's third use is
+  left alone. Everything stays in the browser: no API key, no token store and
+  no server. The manual proofreader can be switched off in Settings, and then
+  its row is absent rather than greyed.
 - Themes, wallpapers, an accent colour, four reading axes (size, measure, weight,
   leading), and right-click menus on notes, folders and the note page.
 

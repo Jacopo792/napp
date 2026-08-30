@@ -31,6 +31,7 @@ import {
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
+import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
 
 export type FormatAction =
   | "bold"
@@ -154,6 +155,37 @@ function sentenceCapitalizeExtension() {
               const isAfterSentence = /[.!?]$/.test(trimmed) && /\s$/.test(before);
               if (!isStart && !isAfterSentence) return false;
               view.dispatch(view.state.tr.insertText(text.toUpperCase(), from, to));
+              return true;
+            },
+          },
+        }),
+      ];
+    },
+  });
+}
+
+/** A small, local counterpart to the familiar phone-style correction. It acts
+ * only when a word is completed, never rewrites a sentence while its meaning
+ * is still changing, and gives the writer the last word after two attempts. */
+function autocorrectExtension() {
+  return Extension.create({
+    name: "autocorrect",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey("autocorrect"),
+          props: {
+            handleTextInput(view, from, to, text) {
+              if (!/^[\s.,!?;:]$/.test(text)) return false;
+              const $from = view.state.doc.resolve(from);
+              const before = $from.parent.textBetween(0, $from.parentOffset, " ", " ");
+              const match = /([A-Za-z]+)$/.exec(before);
+              if (!match) return false;
+              const corrected = takeAutocorrection(match[1]);
+              if (!corrected) return false;
+              view.dispatch(
+                view.state.tr.insertText(`${corrected}${text}`, from - match[1].length, to),
+              );
               return true;
             },
           },
@@ -533,6 +565,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   );
 
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
+  const autocorrect = useMemo(() => autocorrectExtension(), []);
 
   const editor = useEditor({
     extensions: [
@@ -551,6 +584,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       }),
       slashMenu,
       sentenceCapitalize,
+      autocorrect,
     ],
     content: value,
     editable: !readOnly,

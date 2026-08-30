@@ -30,6 +30,11 @@ changes. The commit history remains the detailed engineering record.
   nothing to fix writes nothing at all: no undo step, no dirtied draft. It can
   be switched off in Settings, and then its row is absent from the menu rather
   than greyed out.
+- **Small spelling fixes while writing.** When an unambiguous English
+  contraction is completed, such as `doesnt`, it becomes `doesn't` directly in
+  the editor. The list is deliberately conservative, lives entirely on the
+  device, and stops correcting a spelling after doing so twice: a third use is
+  the writer's choice, not something the editor fights forever.
 
 - **Markdown in and out, which is the whole of the interoperability.** A note
   can be copied as Markdown or exported as a `.md` file from its ⋯ menu, and
@@ -54,6 +59,10 @@ changes. The commit history remains the detailed engineering record.
 
 ### Fixed
 
+- **An undone edit still said it had been edited.** Typing and returning a note
+  exactly to its previous contents now cancels the queued save. If an autosave
+  landed in the middle, restoring the old contents restores the prior edit time
+  too, so the note neither moves nor claims a change that did not survive.
 - **A refresh lost every unsaved word.** The draft store is a module-level Map,
   so a reload was amnesia — worst exactly when it mattered, because a save that
   cannot reach Postgres leaves the draft as the only copy there is. Dirty
