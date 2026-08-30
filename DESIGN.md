@@ -69,8 +69,8 @@ every one of them is repainted by the reader's theme.
 | `--page`          | `#292929`    | Note surface                      |
 | `--ink`           | `#E8E8E8`    | Body text                         |
 | `--ink-2`         | `#C7C7C7`    | Secondary text                    |
-| `--ink-3`         | `#939393`    | Muted text and list markers       |
-| `--ink-4`         | `#747474`    | Metadata only                     |
+| `--ink-3`         | `#b0b0b0`    | Muted text and list markers       |
+| `--ink-4`         | `#999999`    | Icons and large labels only       |
 | `--rule`          | `#3C3C3C`    | Hairline borders                  |
 | `--rule-soft`     | `#2F2F2F`    | Hairlines inside a list           |
 | `--accent`        | reader's     | Selection, focus, active state    |
@@ -83,6 +83,15 @@ every one of them is repainted by the reader's theme.
 | `--on-danger`     | `#FAFAFA`    | Text on destructive button        |
 | `--ok`            | `#7FD1A8`    | Success state only                |
 | `--tint-*`        | six          | Text highlight colours            |
+
+**The muted inks have a floor.** `--ink-3` holds 4.5:1 and `--ink-4` 3:1, and
+both are measured against `--paper` rather than against the note page —
+counter-intuitively `--paper` is the _lighter_ of the two on the default theme,
+so the densest text in the window sits on the lowest contrast in it. Four
+distinct tiers below `--ink` do not fit above 4.5:1 on that ground, which is
+why `--ink-4` is for an icon or a large label and never for a sentence. A
+control that is not disabled must not be drawn as though it were: idle glyphs
+on a note row are `--ink-3` and visible without the pointer, not revealed by it.
 
 **Theme.** `system`, `dark` or `light`, and `color-scheme` follows it so
 scrollbars, form controls and browser chrome stay aligned. Four presets ship —

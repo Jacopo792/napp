@@ -185,12 +185,22 @@ export function applyAppearance(config = current): void {
   root.style.setProperty("--ink", foreground);
   root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
   /* The two muted inks are the whole legibility budget of the interface: every
-     metadata line, every list marker and every idle glyph is one of them. They
-     were mixed far enough toward the ground that `--ink-4` sat at 3.7:1 against
-     the catalogue — under AA, and read as "disabled" on controls that were not.
-     Pulled back to 4.9:1 and 6.5:1. Muted still, legible now. */
-  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.3 : 0.32, dark ? "black" : "white"));
-  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.4 : 0.42, dark ? "black" : "white"));
+     metadata line, every list marker and every idle glyph is one of them, and
+     they were mixed far enough toward the ground to read as "disabled" on
+     controls that were not.
+
+     Measured against `--paper`, which is the worst case and not the obvious
+     one — on the default theme the sidebar and the catalogue are *lighter*
+     than the note page, so the densest text in the app sits on the lowest
+     contrast. `--ink-3` was 3.4:1 there and is 4.5:1 now, which is AA for a
+     sentence.
+
+     `--ink-4` cannot join it: four distinct tiers below `#e8e8e8` do not fit
+     above 4.5:1 on that ground. It is held at 3.4:1 — over the 3:1 floor for
+     an icon or a large label, which is all it is for. It is not a tier to set
+     a sentence in. */
+  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.24 : 0.26, dark ? "black" : "white"));
+  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.34 : 0.36, dark ? "black" : "white"));
   root.style.setProperty(
     "--rule",
     mix(
