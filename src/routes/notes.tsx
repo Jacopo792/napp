@@ -77,6 +77,14 @@ import {
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
+import {
+  downloadText,
+  exportFileName,
+  exportMarkdown,
+  markdownToNote,
+  noteToMarkdown,
+  uniqueFileNames,
+} from "@/features/editor/lib/exchange";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
@@ -185,6 +193,10 @@ function NotesPage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  /** A one-line answer to a command that has no other visible outcome —
+   *  "Copied as Markdown", "Imported 12 notes". It borrows the save readout's
+   *  slot, which is where this window already says what just happened. */
+  const [statusFlash, setStatusFlash] = useState("");
   const [syncFlash, setSyncFlash] = useState(false);
   /** What the last merge did: a word for the readout, a sentence for its
    *  tooltip, because the readout slot holds one state and not a paragraph. */
@@ -240,6 +252,7 @@ function NotesPage() {
   const fileTypes = useRef(new Map<string, string>());
   const searchRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
 
   // ── Refs mirroring state, so the save pipeline can read the truth
@@ -620,6 +633,12 @@ function NotesPage() {
     return () => window.clearTimeout(timer);
   }, [merge]);
 
+  useEffect(() => {
+    if (!statusFlash) return;
+    const timer = window.setTimeout(() => setStatusFlash(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [statusFlash]);
+
   const storeEntry = useCallback((note: Note, version: number) => {
     const saved: NoteEntry = { note, version };
     entriesRef.current = entriesRef.current.map((current) =>
@@ -949,6 +968,107 @@ function NotesPage() {
   );
 
   // ── Create / delete ─────────────────────────────────────────────────────
+  /* ── Markdown in and out ──────────────────────────────────────────────────
+     Deliberately files and the clipboard rather than an integration with
+     anybody's API. Obsidian is a folder of `.md`, Notion and Google Docs both
+     read pasted Markdown, and Apple Notes has no API at all — so a file and a
+     clipboard reach all three, and none of them needs an OAuth secret or the
+     server this project does not have. */
+
+  const markdownFor = useCallback((entry: NoteEntry) => {
+    /* What is on screen, not what last reached Postgres: exporting a note you
+       are still typing in should give you the words you can see. */
+    const draft = readDraft(entry.note.id);
+    return noteToMarkdown(draft?.title ?? entry.note.title, draft?.content ?? entry.note.content);
+  }, []);
+
+  const handleCopyMarkdown = useCallback(
+    async (entry: NoteEntry) => {
+      try {
+        await navigator.clipboard.writeText(markdownFor(entry));
+        setStatusFlash("Copied");
+      } catch {
+        setError("The browser would not give this page the clipboard");
+      }
+    },
+    [markdownFor],
+  );
+
+  const handleExportMarkdown = useCallback(
+    (entry: NoteEntry) => {
+      const draft = readDraft(entry.note.id);
+      downloadText(exportFileName(draft?.title ?? entry.note.title), markdownFor(entry));
+    },
+    [markdownFor],
+  );
+
+  const handleExportAll = useCallback(async () => {
+    const list = orderedVisible;
+    if (list.length === 0) {
+      setStatusFlash("Nothing to export");
+      return;
+    }
+    const names = uniqueFileNames(
+      list.map((entry) => readDraft(entry.note.id)?.title ?? entry.note.title),
+    );
+    try {
+      const shape = await exportMarkdown(
+        list.map((entry, index) => ({ name: names[index], text: markdownFor(entry) })),
+        `${folderLabel}.md`,
+      );
+      /* The readout slot is 7.5rem and clips, so every one of these is kept
+         inside the width of "Updated elsewhere". */
+      setStatusFlash(
+        shape === "folder"
+          ? `Wrote ${list.length} file${list.length === 1 ? "" : "s"}`
+          : `Exported ${list.length} note${list.length === 1 ? "" : "s"}`,
+      );
+    } catch (e) {
+      /* The directory picker throws when it is dismissed, which is not an
+         error the reader needs told back to them. */
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Export failed");
+    }
+  }, [orderedVisible, markdownFor, folderLabel]);
+
+  const handleImportFiles = useCallback(
+    async (files: FileList | null) => {
+      const s = sessionRef.current;
+      if (!s || !canWriteArchive || !files || files.length === 0) return;
+      setSaving(true);
+      setError("");
+      try {
+        const added: NoteMeta[] = [];
+        for (const file of [...files]) {
+          const { title, content } = markdownToNote(file.name, await file.text());
+          const note: Note = {
+            id: crypto.randomUUID(),
+            title,
+            body: richTextToPlainText(content),
+            content,
+            contentVersion: RICH_TEXT_VERSION,
+            legacyBody: null,
+            ownerId: viewAs,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const metadata: NoteMeta = { id: note.id, folderId: null, tagIds: [] };
+          entriesRef.current = [await createNote(s, note, metadata), ...entriesRef.current];
+          added.push(metadata);
+        }
+        setEntries(entriesRef.current);
+        setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, ...added] });
+        if (selectedFolderId === TRASH) setSelectedFolderId(ALL);
+        setStatusFlash(`Imported ${added.length} note${added.length === 1 ? "" : "s"}`);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Import failed");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [canWriteArchive, viewAs, activeMeta, setActiveMeta, selectedFolderId],
+  );
+
   const handleNew = useCallback(async () => {
     if (!canWriteArchive) return;
     const s = sessionRef.current;
@@ -1424,6 +1544,8 @@ function NotesPage() {
     </span>
   ) : dirty ? (
     <span className="label text-ink-2">Unsaved</span>
+  ) : statusFlash ? (
+    <span className="label text-accent">{statusFlash}</span>
   ) : merge ? (
     <span className="label text-accent" title={merge.detail}>
       {merge.label}
@@ -1482,7 +1604,13 @@ function NotesPage() {
       : [];
 
   const collectionActions = (
-    <CollectionMenu preferences={activeListPreferences} onChange={handleListPreferencesChange} />
+    <CollectionMenu
+      preferences={activeListPreferences}
+      onChange={handleListPreferencesChange}
+      canWrite={canWriteArchive}
+      onImport={() => importRef.current?.click()}
+      onExportAll={() => void handleExportAll()}
+    />
   );
 
   /* ── Whose notes ───────────────────────────────────────────────────────────
@@ -1630,6 +1758,8 @@ function NotesPage() {
           pinned={pinned}
           folders={activeMeta.folders}
           recent={recentNotes}
+          onCopyMarkdown={() => void handleCopyMarkdown(selected)}
+          onExportMarkdown={() => handleExportMarkdown(selected)}
           onTogglePin={() => handleTogglePin(selected.note.id)}
           onFind={() => noteEditorRef.current?.openFind()}
           onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
@@ -1650,6 +1780,8 @@ function NotesPage() {
         pinned={pinned}
         folders={activeMeta.folders}
         recent={recentNotes}
+        onCopyMarkdown={() => void handleCopyMarkdown(selected)}
+        onExportMarkdown={() => handleExportMarkdown(selected)}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
@@ -1916,6 +2048,19 @@ function NotesPage() {
       </DndContext>
       {settingsPanel}
       {editorMenu}
+      {/* The list's ⋯ opens this; a file input is the only way a browser lets a
+          page read a file the reader chose, and it has to be in the tree. */}
+      <input
+        ref={importRef}
+        type="file"
+        accept=".md,.markdown,.txt,text/markdown,text/plain"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          void handleImportFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
     </div>
   );
 }

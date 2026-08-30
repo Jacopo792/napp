@@ -147,6 +147,44 @@ export function legacyMarkdownToRichText(markdown: string): JSONContent {
   return promotePrivateMedia(legacyMarkdown.parse(cleaned));
 }
 
+/** The inverse of the legacy parser, over the same extensions, so what this
+ *  writes is what `legacyMarkdownToRichText` reads. Private media is demoted
+ *  back to the `napp-image:` / `napp-file:` references the parser promotes —
+ *  a Markdown file cannot carry a Storage object, and a reference at least
+ *  survives a round trip through this app. */
+export function richTextToMarkdown(document: JSONContent): string {
+  return legacyMarkdown.serialize(demotePrivateMedia(document));
+}
+
+function demotePrivateMedia(node: JSONContent): JSONContent {
+  if (node.type === "privateImage") {
+    return {
+      type: "image",
+      attrs: {
+        src: `napp-image:${String(node.attrs?.objectId ?? "")}`,
+        alt: typeof node.attrs?.alt === "string" ? node.attrs.alt : "Image",
+      },
+    };
+  }
+  if (node.type === "privateFile") {
+    const label = String(node.attrs?.label ?? "Attachment");
+    return {
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          text: label,
+          marks: [
+            { type: "link", attrs: { href: `napp-file:${String(node.attrs?.objectId ?? "")}` } },
+          ],
+        },
+      ],
+    };
+  }
+  const content = node.content?.map(demotePrivateMedia);
+  return content ? { ...node, content } : node;
+}
+
 export function noteDocument(
   content: unknown,
   contentVersion: number,

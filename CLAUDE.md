@@ -225,6 +225,31 @@ client's own `ensureProfile()` already wrote the profile row.
 `supabase/migrations/`, look in the database.** `select tgname, proname from
 pg_trigger join pg_proc …` found this in one query.
 
+## Markdown in and out
+
+`src/features/editor/lib/exchange.ts` is the whole of this app's
+interoperability, and deliberately so. Obsidian **is** a folder of `.md` files,
+Notion and Google Docs both read pasted Markdown, and Apple Notes has no API —
+so a file and a clipboard reach all three, and none of them needs an OAuth
+client secret, a token store or a server we do not have. Do not propose an API
+integration for any of them without first saying where the secret would live.
+
+`richTextToMarkdown()` in `content.ts` serializes through the **same**
+`MarkdownManager` and extension list the legacy parser reads with, so what it
+writes is what `legacyMarkdownToRichText()` reads. `demotePrivateMedia()` is
+the exact inverse of `promotePrivateMedia()`: a picture leaves as
+`napp-image:<id>`, which round-trips through this app and is a broken link
+anywhere else. Carrying the bytes means downloading and writing every Storage
+blob — a larger feature, not an oversight.
+
+Two things the tests pin: the round trip is stable, and the title heading is
+not left duplicated in the body.
+
+Note that `exchange.ts` imports `./content.ts` **with the extension**. `pnpm
+test` runs under `node --experimental-strip-types`, which does not resolve an
+extensionless relative import; `allowImportingTsExtensions` is already on, so
+the extension costs nothing and is what makes a source file testable.
+
 ## The retired encrypted format
 
 The archive was encrypted once and is not any more. Every note, folder, tag and

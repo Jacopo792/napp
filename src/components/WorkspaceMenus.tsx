@@ -1,4 +1,8 @@
 import {
+  ClipboardCopy,
+  FileDown,
+  FileUp,
+  FolderDown,
   AtSign,
   BookOpen,
   Contrast,
@@ -82,9 +86,15 @@ export { MenuButton } from "./MenuPrimitives";
 export function CollectionMenu({
   preferences,
   onChange,
+  canWrite,
+  onImport,
+  onExportAll,
 }: {
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
+  canWrite: boolean;
+  onImport: () => void;
+  onExportAll: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -145,6 +155,27 @@ export function CollectionMenu({
             <CalendarDays size={16} />
             Group by date
           </MenuButton>
+          <div className="menu-separator" />
+          <MenuButton
+            onClick={() => {
+              onExportAll();
+              close();
+            }}
+          >
+            <FolderDown size={16} />
+            Export all as Markdown
+          </MenuButton>
+          {canWrite && (
+            <MenuButton
+              onClick={() => {
+                onImport();
+                close();
+              }}
+            >
+              <FileUp size={16} />
+              Import Markdown files
+            </MenuButton>
+          )}
         </div>
       )}
     </div>
@@ -161,6 +192,8 @@ function NoteMenuContent({
   onFind,
   onMove,
   onRecent,
+  onCopyMarkdown,
+  onExportMarkdown,
   onDelete,
   close,
 }: {
@@ -171,6 +204,8 @@ function NoteMenuContent({
   onFind: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
+  onCopyMarkdown: () => void;
+  onExportMarkdown: () => void;
   onDelete: () => void;
   close: () => void;
 }) {
@@ -214,6 +249,28 @@ function NoteMenuContent({
             <Clock3 size={16} />
             Recent notes
             <ChevronRight size={16} className="ml-auto" />
+          </MenuButton>
+          <div className="menu-separator" />
+          {/* Both doors out of this app, and neither needs a server: the
+              clipboard is what Notion and Google Docs read, and the file is
+              what Obsidian keeps a vault of. */}
+          <MenuButton
+            onClick={() => {
+              onCopyMarkdown();
+              close();
+            }}
+          >
+            <ClipboardCopy size={16} />
+            Copy as Markdown
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              onExportMarkdown();
+              close();
+            }}
+          >
+            <FileDown size={16} />
+            Export as Markdown
           </MenuButton>
           <div className="menu-separator" />
           <MenuButton
@@ -287,6 +344,8 @@ export function NoteMenu(props: {
   onFind: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
+  onCopyMarkdown: () => void;
+  onExportMarkdown: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -330,6 +389,8 @@ export function NoteContextMenu({
   onFind: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
+  onCopyMarkdown: () => void;
+  onExportMarkdown: () => void;
   onDelete: () => void;
 }) {
   return (

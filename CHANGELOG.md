@@ -7,6 +7,18 @@ changes. The commit history remains the detailed engineering record.
 
 ### Added
 
+- **Markdown in and out, which is the whole of the interoperability.** A note
+  can be copied as Markdown or exported as a `.md` file from its ⋯ menu, and
+  the list's ⋯ exports everything it is showing — a folder of `.md` files where
+  the browser can write one, which is exactly what an Obsidian vault is, and
+  one combined file where it cannot. `.md` files import back, taking their
+  title from a leading `# heading` or from the filename. Copying is what Notion
+  and Google Docs read from the clipboard, and Apple Notes has no API at all,
+  so a file and a clipboard reach all three without an OAuth client secret, a
+  token store, or the server this project does not have. Images and attachments
+  leave as a `napp-image:` reference rather than as bytes: a note that leaves
+  and comes back here is whole, and the same file in Obsidian shows a broken
+  link where the picture was.
 - **Who else is in the note you are writing.** With live presence on, the other
   member appears in the note's own header as a pill carrying their picture and
   their nickname, and a caret while they are actually typing. It is filtered to

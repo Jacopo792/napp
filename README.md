@@ -57,6 +57,12 @@ separate composition for the phone.
   have open and whether you are typing, so the other member appears in that
   note's header with their picture, their nickname and a caret while they
   write.
+- **Markdown in and out.** Copy a note as Markdown, export one as a `.md` file,
+  or export the whole list — a folder of files where the browser can write one,
+  one combined file where it cannot. `.md` files import back. That is the
+  interoperability: Obsidian is a folder of Markdown, Notion and Google Docs
+  read pasted Markdown, and Apple Notes has no API. Pictures leave as a
+  reference, not as bytes.
 - Themes, wallpapers, an accent colour, four reading axes (size, measure, weight,
   leading), translation of a selection in place, and right-click menus on notes,
   folders and the note page.
