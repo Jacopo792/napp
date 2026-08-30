@@ -19,6 +19,10 @@ separate composition for the phone.
 - **Rich-text notes** in a Tiptap editor: headings, lists, checklists, tables,
   colours, links, images, PDF attachments and PDF text import. Existing Markdown
   is converted losslessly on first open and kept in `legacy_body`.
+- **Writing controls at the caret:** `/` opens filtered block and colour commands,
+  selected text gets a compact formatting bar, and desktop blocks can be reordered
+  with a drag handle. Italian smart punctuation is enabled without changing the
+  stored document format.
 - **Folders** that nest, a trash that restores, pinning, and search over the
   whole archive.
 - **A scope switch** built from the roster: your notes, and the other member's,

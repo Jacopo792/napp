@@ -3794,6 +3794,60 @@
   color: var(--ink-3);
 }
 
+.slash-menu {
+  z-index: 70;
+  width: min(18rem, calc(100vw - 2rem));
+  max-height: min(22rem, calc(100dvh - 3rem));
+  overflow-y: auto;
+  box-shadow: var(--shadow-soft);
+}
+
+.slash-menu .menu-row.is-selected {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.rich-bubble-menu {
+  box-shadow: var(--shadow-soft);
+}
+
+.rich-bubble-menu .toolbar-button {
+  width: 2rem;
+  height: 2rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.rich-bubble-menu .menu-swatch {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.rich-bubble-separator {
+  width: 1px;
+  height: 1.4rem;
+  margin: 0 0.15rem;
+}
+
+.rich-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.9rem;
+  border-radius: 0.5rem;
+  color: var(--ink-4);
+  opacity: 1;
+  transition: background-color var(--dur-fast) var(--ease-press);
+}
+
+.rich-drag-handle:hover,
+.rich-drag-handle:focus-visible {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  opacity: 1;
+}
+
 /* One sentence saying what a menu will actually do, where a menu of verbs is
    otherwise ambiguous about its target. */
 .menu-note {

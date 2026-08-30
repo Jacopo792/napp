@@ -58,6 +58,7 @@ const READER_ROOM = 170;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
+  openLink: () => void;
   focus: () => void;
 }
 
@@ -125,6 +126,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         findRef.current?.focus();
         findRef.current?.select();
       }, 0);
+    },
+    openLink() {
+      openLinkForm();
     },
     focus() {
       editorRef.current?.focus();
@@ -560,6 +564,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             onEdited();
           }}
           onPasteImage={handlePastedImage}
+          onOpenLink={openLinkForm}
+          mobile={mobile}
           resolveImage={resolveImage}
           resolveFile={resolveFile}
         />

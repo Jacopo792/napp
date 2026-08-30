@@ -1241,6 +1241,10 @@ function NotesPage() {
       }
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        if (canEdit && el?.closest(".rich-text-content")) {
+          noteEditorRef.current?.openLink();
+          return;
+        }
         searchRef.current?.focus();
         searchRef.current?.select();
         return;
@@ -1271,7 +1275,7 @@ function NotesPage() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [moveSelection, handleNew, saveNow, selectedId, selected]);
+  }, [moveSelection, handleNew, saveNow, selectedId, selected, canEdit]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
