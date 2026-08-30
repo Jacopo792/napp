@@ -138,7 +138,8 @@ function Login() {
         <span className="login-mark is-quiet">
           <MailCheck size={20} />
         </span>
-        <h1 className="login-title">Confirm {confirmation}</h1>
+        <h1 className="login-title">Confirm your address</h1>
+        <p className="login-address">{confirmation}</p>
         <p className="login-lede">
           A message is on its way. Opening the link in it proves the address is yours and finishes
           the account.

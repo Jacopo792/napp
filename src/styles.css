@@ -591,6 +591,24 @@
   line-height: 1.55;
 }
 
+/* An address is data, not a heading. Setting it at display size ran
+   jacopovincenzoansalone@gmail.com straight off the edge of the card: an email
+   has no spaces to break at, so nothing was going to wrap it. It gets its own
+   line, at reading size, and is allowed to break anywhere it has to. */
+.login-address {
+  margin-top: 0.6rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 560;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* A title still must not be able to push the card open. */
+.login-title {
+  overflow-wrap: anywhere;
+}
+
 /* Which of the two things you are doing is a choice, so it is a control at the
    top of the card rather than a link under it. The mark stays; the tabs sit
    between it and a heading that now only ever names one of them. */

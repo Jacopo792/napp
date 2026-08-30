@@ -39,6 +39,18 @@ invisible to React.
 
 ## Deployment
 
+The deployed origin is `https://jacopo792.github.io/note-sharing-app/`, and
+Supabase Auth has to agree with it: the Site URL and the redirect allow-list are
+what a confirmation email is built from, so a stale value there sends new
+accounts to whatever was deployed last year. `supabase/config.toml` is the
+source of truth and `supabase config push` applies it — the remote had been
+pointing at an abandoned Vercel deployment because nobody had ever pushed it.
+
+Note that `config push` sends the _whole_ local config, so it will also reset
+anything tuned in the dashboard and never written down here. It did:
+`auth.email.max_frequency`, `otp_length` and the TOTP flags all came back as CLI
+defaults and had to be restored in the file. Read the diff it prints.
+
 Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from repository
 variables. No service-role key, account password or archive passphrase belongs

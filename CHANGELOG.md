@@ -25,6 +25,17 @@ changes. The commit history remains the detailed engineering record.
   a blank block from two sides is two people writing, not a conflict: both texts
   are kept, in order, in the one note. Rewriting the same block when it actually
   held something is still a conflict, and still keeps a copy.
+- **The confirmation email pointed at an old Vercel deployment.** The Supabase
+  project's Site URL had never been aligned with `supabase/config.toml`, which
+  already named `https://jacopo792.github.io/note-sharing-app/`. `supabase
+config push` aligned it; the redirect allow-list now holds only that origin
+  and localhost. Email confirmation stays on — `private.redeem_archive_invite()`
+  refuses a caller whose `email_confirmed_at` is null, so turning it off would
+  make invitations unclaimable.
+- **A long address ran off the confirmation card.** It was set as the heading at
+  display size, and an email has no spaces to wrap at. The heading is
+  "Confirm your address" now and the address sits below it at reading size,
+  allowed to break anywhere.
 - **Links could not be clicked.** `openOnClick` was false, so clicking a link put
   a caret inside its text instead of opening it. A plain click opens the target
   in a new tab, with `rel="noopener noreferrer nofollow"`; editing a link goes
