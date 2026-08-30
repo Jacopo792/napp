@@ -23,8 +23,11 @@ separate composition for the phone.
   selected text gets a compact formatting bar, and desktop blocks can be reordered
   with a drag handle. Italian smart punctuation is enabled without changing the
   stored document format.
-- **Folders** that nest, a trash that restores, pinning, and search over the
-  whole archive.
+- **Folders** that nest, a trash that restores, an archive that does not, pinning,
+  and search over the whole archive. An archived note is filed off the folder list
+  and stays editable — the trash is the waiting room, the archive is the shelf —
+  and you can set your archived notes to be yours alone, enforced by a row-level
+  policy rather than by a filtered list.
 - **A scope switch** built from the roster: your notes, and the other member's,
   by nickname. Each account opens on its own scope.
 - **Realtime sync with a block-level merge.** Two people writing in one note both
@@ -67,9 +70,14 @@ separate composition for the phone.
   interoperability: Obsidian is a folder of Markdown, Notion and Google Docs
   read pasted Markdown, and Apple Notes has no API. Pictures leave as a
   reference, not as bytes.
+- **Language tools that run on this device.** Translation of a selection in
+  place, and a proofreader that fixes spelling and grammar and says how many
+  corrections it made — nothing to fix writes nothing at all. Both use the
+  browser's built-in models, so there is no API key, no token store and no
+  server: the only kind of AI this architecture can hold. The proofreader can be
+  switched off in Settings, and then its row is absent rather than greyed.
 - Themes, wallpapers, an accent colour, four reading axes (size, measure, weight,
-  leading), translation of a selection in place, and right-click menus on notes,
-  folders and the note page.
+  leading), and right-click menus on notes, folders and the note page.
 
 ## Running it
 
@@ -118,7 +126,8 @@ All four run on every pull request.
 `src/components/` holds the sidebar, note list, menus and the avatar cropper.
 `src/features/editor/` holds the editor domain — `components/` for
 `EditorToolbar`, `RichTextEditor`, `NoteEditor` and `TitleField`, `lib/` for
-`draft`, `content`, `attachments`, `pdf` and `translation`. `src/lib/` holds the
+`draft`, `content`, `merge`, `exchange`, `attachments`, `pdf`, `translation` and
+`proofread`. `src/lib/` holds the
 rest with no markup in it: the Supabase client, session and archive bootstrap,
 invite and role helpers, sync, private presence, avatar cache, image
 processing, appearance and reading axes.
@@ -129,8 +138,10 @@ columns; files are ordinary Storage objects. Any member may read any row in
 their archive; only editors may change `notes`, `folders`, `tags`,
 `note_tags`, `archives` and `note-images`, enforced by
 `private.can_write_archive()` and by direct writes to `archive_members` being
-revoked. `owner_id` names which member's scope a row sits in and is never
-consulted by a policy. Profiles and avatars are personal:
+revoked. `owner_id` names which member's scope a row sits in, and one policy
+consults it: `private.archived_note_visible()` withholds an archived note from
+the other members when its owner has set `profiles.hide_archived`. Everywhere
+else it is organisational. Profiles and avatars are personal:
 `private.shares_archive()` lets you read a peer's, and only the account itself
 may write its own.
 
@@ -176,6 +187,11 @@ variables. Nothing secret is involved, because the client holds nothing secret.
 The database must stay compatible with the last deployed client: an old build in
 an open tab still queries the columns it was built against. Deploy the client
 that has stopped asking for a column before dropping it.
+
+It runs the other way too, and the window is narrower. A client that selects a
+column the database does not have yet fails the whole query, not that field —
+the archive looks empty. So `supabase db push --linked` goes **before** the push
+to `main` that adds the column to a select list, never after.
 
 ## Licence
 

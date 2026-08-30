@@ -81,6 +81,15 @@ made failed and the archive looked empty. The columns had to be re-added, empty,
 within the hour. Merge and deploy the client that no longer asks for a column,
 confirm it, and only then drop it.
 
+**And migrate before you deploy.** The same asymmetry runs the other way, with
+a narrower window: PostgREST fails the _whole_ select when one column in the
+list is unknown, so a client deployed ahead of its migration does not lose a
+field, it loses the archive. `archived_at` joined the select list in
+`supabase.ts` before it existed in Postgres; `supabase db push --linked` has to
+land first, and pushing to `main` is the deploy. Adding a column is safe for the
+old build — it never asks for it — so there is no reason to do these in the
+other order.
+
 ## Two seats
 
 The archive is built for two people, and that is a database rule, not a message

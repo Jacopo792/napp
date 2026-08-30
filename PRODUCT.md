@@ -161,9 +161,22 @@ Technical constraints that outlive any design:
   the text, and the readout says which of the two happened — `Merged` or
   `Kept a copy`. The interface must never claim a merge that did not happen,
   and must never discard a version silently.
-- Folders, tags, pinning, Trash state and tag assignments are structural rows. Folder
-  and tag names are ordinary account-protected columns, and `owner_id` remains
-  organisational only.
+- Folders, tags, pinning, Trash state, Archive state and tag assignments are
+  structural rows. Folder and tag names are ordinary account-protected columns.
+- Archive is not Trash. A trashed note is on its way out and is read-only until
+  it is restored or deleted for good; an archived note is filed off the folder
+  list and stays editable. A note that is both reads as trashed, because the
+  more urgent thing to say about it is that it is about to disappear.
+- **The one boundary that is not plain membership.** Every member reads every
+  scope, with a single exception: a member may set `profiles.hide_archived` and
+  their archived notes are then withheld from the others. It is enforced in
+  Postgres — `notes_member_select` calls `private.archived_note_visible()`,
+  which reads the flag from the owner's own profile row — and it guards update
+  and delete alike, so a note you cannot see is not a note you can write. This
+  is the only place a policy consults `owner_id`; everywhere else it stays
+  organisational. What it is worth is bounded and stated in `SECURITY.md`: the
+  other member's client cannot fetch the row, and nothing here is encrypted, so
+  it hides a note from a member and never from the database.
 - Every member has a `public.profiles` row: a nickname and an optional avatar. You
   may read the profile of anyone you share an archive with, and write only your
   own. A new account gets a nickname from its address on first sign-in. Avatars

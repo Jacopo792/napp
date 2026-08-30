@@ -7,6 +7,30 @@ changes. The commit history remains the detailed engineering record.
 
 ### Added
 
+- **An archive for notes, and the first thing in this archive one member can
+  keep from another.** Archive sits above Trash in the sidebar and is the other
+  kind of leaving: a trashed note is read-only and on its way out, an archived
+  note is filed off the folder list and still yours to edit. A note that is both
+  reads as trashed. In Settings, "Keep archived notes private" withholds your
+  archived notes from the other members — and it is a row-level policy, not a
+  filtered list: `notes_member_select` calls
+  `private.archived_note_visible()`, which reads `profiles.hide_archived` from
+  the owner's own row, and the same predicate guards update and delete, because
+  a row you cannot see must not be a row you can write. Hiding a list in the
+  browser would have handed the rows over first. Bounded deliberately, and
+  recorded in `SECURITY.md`: the other member's client cannot fetch the row,
+  and nothing here is encrypted, so it hides a note from a member and never
+  from the database. Default off — nothing visible today stops being visible.
+- **A proofreader that runs on this device.** Select a passage and the Language
+  tools menu will fix its spelling, grammar and punctuation using the browser's
+  built-in model — the same family as the translator already there, so there is
+  no API key, no token store and no server. The readout says how many
+  corrections were applied, because replacing a passage silently leaves you
+  unable to tell a clean paragraph from one the model declined to touch, and
+  nothing to fix writes nothing at all: no undo step, no dirtied draft. It can
+  be switched off in Settings, and then its row is absent from the menu rather
+  than greyed out.
+
 - **Markdown in and out, which is the whole of the interoperability.** A note
   can be copied as Markdown or exported as a `.md` file from its ⋯ menu, and
   the list's ⋯ exports everything it is showing — a folder of `.md` files where
