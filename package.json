@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && cp dist/index.html dist/404.html",
     "preview:dist": "vite preview",
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "lint": "eslint .",

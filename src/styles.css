@@ -11,8 +11,8 @@
 
   --ink: #e8e8e8;
   --ink-2: #c7c7c7;
-  --ink-3: #939393;
-  --ink-4: #747474;
+  --ink-3: #a2a2a2;
+  --ink-4: #8b8b8b;
 
   --rule: #3c3c3c;
   --rule-soft: #2f2f2f;
@@ -971,13 +971,16 @@
   min-width: 0;
   isolation: isolate;
   border: 1px solid var(--rule);
-  border-radius: 0.8rem;
+  /* Fully round. The two halves each hold a face, and a face is a circle; a
+     0.8rem rectangle around two circles is a box with something round rattling
+     inside it. The pill is the shape the contents already have. */
+  border-radius: var(--radius-pill);
   /* A well, not a plate. Opaque `--surface` is darker than the column it sits
      in, which over a wallpaper is a black rectangle with a hard edge — the one
      thing in the sidebar that refused to belong to it. Tinted instead, so the
      recess comes from the ink and the atmosphere still passes through. */
   background: color-mix(in srgb, var(--surface) 62%, transparent);
-  padding: 3px;
+  padding: 4px;
 }
 
 /* The thumb used to be half the track, moved once. A roster is any length, so
@@ -986,18 +989,18 @@
 .archive-switch-thumb {
   position: absolute;
   z-index: -1;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
   /* Whole pixels, or the ring below is drawn across two of them. A roster of
      three in a column the width of this one gives slots of 67.98, 68.33, 74.98
      — measured while dragging the pane — and the thumb carries a 1px inset
      ring at both edges. Rounding down costs at most one pixel per step of
      alignment with the label behind it, against a ring that is crisp at every
      width. The unrounded value stays as the fallback. */
-  width: calc((100% - 6px) / var(--switch-count, 2));
-  width: round(down, calc((100% - 6px) / var(--switch-count, 2)), 1px);
-  border-radius: 0.62rem;
+  width: calc((100% - 8px) / var(--switch-count, 2));
+  width: round(down, calc((100% - 8px) / var(--switch-count, 2)), 1px);
+  border-radius: var(--radius-pill);
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1px var(--glass-highlight);
   transform: translateX(calc(100% * var(--switch-index, 0)));
@@ -1010,12 +1013,12 @@
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 0.62rem;
-  color: var(--ink-4);
+  min-height: 34px;
+  padding: 0 12px 0 4px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
   font-size: 13px;
-  font-weight: 520;
+  font-weight: 540;
   transition:
     color var(--dur-fast) var(--ease-press),
     transform var(--dur-press) var(--ease-press);
@@ -1520,12 +1523,31 @@
 }
 
 .archive-switch button {
-  gap: 5px;
+  gap: 7px;
 }
 
+/* Big enough to be a person rather than a bullet. The ring is what keeps a
+   photograph from bleeding into the track behind it — a portrait needs an edge
+   of its own, and the initials placeholder gets the same one so the two read
+   as the same object. */
 .archive-switch .avatar.is-compact {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+  box-shadow: inset 0 0 0 1px var(--glass-highlight);
+}
+
+/* The phone app bar has a bar's worth of room, not a column's. The portrait
+   gives back what the name needs there: a face nobody can read beside a name
+   nobody can read is two things lost instead of one. */
+.archive-switch-tight button {
+  padding-inline: 7px 9px;
+  font-size: 12.5px;
+}
+
+.archive-switch-tight .avatar.is-compact {
+  width: 21px;
+  height: 21px;
   font-size: 8px;
 }
 

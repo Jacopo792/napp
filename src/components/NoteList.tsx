@@ -227,9 +227,7 @@ const Row = memo(function Row({
               }}
               onPointerDown={(event) => event.stopPropagation()}
               className={`icon-button h-7 w-7 shrink-0 transition-all ${
-                pinned
-                  ? "text-accent opacity-100"
-                  : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-accent"
+                pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
               }`}
             >
               <Pin size={14} fill={pinned ? "currentColor" : "none"} />
@@ -278,7 +276,7 @@ const Row = memo(function Row({
             className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
               confirmDelete
                 ? "bg-danger-fill text-on-danger opacity-100"
-                : "text-ink-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger"
+                : "text-ink-3 hover:text-danger"
             }`}
           >
             {confirmDelete ? (

@@ -1412,7 +1412,7 @@ function NotesPage() {
           ),
         } as React.CSSProperties
       }
-      className={`archive-switch ${compact ? "w-44 shrink-0" : "w-full"}`}
+      className={`archive-switch ${compact ? "archive-switch-tight w-52 shrink-0" : "w-full"}`}
     >
       <span className="archive-switch-thumb" aria-hidden="true" />
       {members.map((member) => (
@@ -1431,7 +1431,7 @@ function NotesPage() {
             online={presenceEnabled && onlineMemberIds.has(member.userId)}
           />
           <span className="truncate">
-            {member.isSelf ? "My notes" : member.nickname || "Member"}
+            {member.isSelf ? (compact ? "Mine" : "My notes") : member.nickname || "Member"}
           </span>
         </button>
       ))}

@@ -184,8 +184,13 @@ export function applyAppearance(config = current): void {
   );
   root.style.setProperty("--ink", foreground);
   root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
-  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.38 : 0.42, dark ? "black" : "white"));
-  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.52 : 0.54, dark ? "black" : "white"));
+  /* The two muted inks are the whole legibility budget of the interface: every
+     metadata line, every list marker and every idle glyph is one of them. They
+     were mixed far enough toward the ground that `--ink-4` sat at 3.7:1 against
+     the catalogue — under AA, and read as "disabled" on controls that were not.
+     Pulled back to 4.9:1 and 6.5:1. Muted still, legible now. */
+  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.3 : 0.32, dark ? "black" : "white"));
+  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.4 : 0.42, dark ? "black" : "white"));
   root.style.setProperty(
     "--rule",
     mix(
@@ -226,6 +231,11 @@ export function applyAppearance(config = current): void {
   for (const [token, value] of Object.entries(SEMANTIC[dark ? "dark" : "light"])) {
     root.style.setProperty(token, value);
   }
+  /* The browser paints its own chrome — address bar on the phone, the band
+     behind a scrolled page — from this tag, and it was nailed to the graphite
+     default in the markup. A reader on the Paper theme got a black strip above
+     a white app. */
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
 }
 
 function openDb(): Promise<IDBDatabase> {
