@@ -1,15 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   FolderTree,
@@ -87,6 +77,7 @@ import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
+import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
@@ -147,67 +138,6 @@ function loadPaneWidth(key: string, fallback: number, min: number, max: number):
   } catch {
     return fallback;
   }
-}
-
-function PaneResizer({
-  label,
-  value,
-  min,
-  max,
-  defaultValue,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  defaultValue: number;
-  onChange: (width: number) => void;
-}) {
-  const drag = useRef<{ x: number; width: number } | null>(null);
-
-  function finish(event: ReactPointerEvent<HTMLDivElement>) {
-    drag.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    document.documentElement.classList.remove("is-pane-resizing");
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    const step = event.shiftKey ? 24 : 8;
-    onChange(clamp(value + (event.key === "ArrowLeft" ? -step : step), min, max));
-  }
-
-  return (
-    <div
-      role="separator"
-      tabIndex={0}
-      aria-label={label}
-      aria-orientation="vertical"
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={Math.round(value)}
-      title="Drag to resize · double-click to reset"
-      className="pane-resizer"
-      onDoubleClick={() => onChange(clamp(defaultValue, min, max))}
-      onKeyDown={handleKeyDown}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        drag.current = { x: event.clientX, width: value };
-        event.currentTarget.setPointerCapture(event.pointerId);
-        document.documentElement.classList.add("is-pane-resizing");
-      }}
-      onPointerMove={(event) => {
-        if (!drag.current) return;
-        onChange(clamp(drag.current.width + event.clientX - drag.current.x, min, max));
-      }}
-      onPointerUp={finish}
-      onPointerCancel={finish}
-    />
-  );
 }
 
 /* Enough of a fingerprint to notice that folders, tags or note placement moved,

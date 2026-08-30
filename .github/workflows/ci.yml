@@ -44,6 +44,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Format
+        run: pnpm format:check
+
       # Placeholders, not the real project. vite.config.ts refuses to build
       # without these two, by design — a bundle that silently shipped with no
       # backend would be worse than a failed build. What this step proves is

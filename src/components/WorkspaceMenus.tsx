@@ -13,7 +13,6 @@ import {
   ArrowDownAZ,
   ArrowDownUp,
   CalendarDays,
-  Check,
   ChevronRight,
   Clock3,
   FolderInput,
@@ -59,50 +58,10 @@ import type { Folder } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
+import { MenuButton } from "./MenuPrimitives";
+import { useDismiss } from "./useDismiss";
 
-function useDismiss(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const dismiss = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) close();
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("mousedown", dismiss);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("mousedown", dismiss);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open, close]);
-  return ref;
-}
-
-export function MenuButton({
-  children,
-  active = false,
-  danger = false,
-  onClick,
-}: {
-  children: ReactNode;
-  active?: boolean;
-  danger?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className={`menu-row ${danger ? "text-danger" : active ? "text-accent" : "text-ink-2"}`}
-    >
-      {children}
-      {active && <Check size={14} className="ml-auto" />}
-    </button>
-  );
-}
+export { MenuButton } from "./MenuPrimitives";
 
 /**
  * Settings and the lock, at the bottom of the leftmost column.

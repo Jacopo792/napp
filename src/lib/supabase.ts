@@ -1,24 +1,31 @@
-import { createClient } from "@supabase/supabase-js";
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
+import { fail, supabase } from "./supabaseClient";
 import {
   noteDocument,
   richTextToPlainText,
   RICH_TEXT_VERSION,
 } from "@/features/editor/lib/content";
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-
-export const supabase = createClient(url, publishableKey, {
-  auth: {
-    storage: typeof window === "undefined" ? undefined : window.sessionStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false,
-  },
-});
+export { supabase } from "./supabaseClient";
+export {
+  createArchiveInvite,
+  deleteAvatar,
+  downloadAvatar,
+  downloadImage,
+  downloadObject,
+  loadPendingInvites,
+  loadProfile,
+  revokeArchiveInvite,
+  saveProfile,
+  setArchiveMemberRole,
+  uploadAvatar,
+  uploadImage,
+  uploadObject,
+  type PendingInvite,
+  type Profile,
+} from "./archiveAssets";
 
 /** What the cheap first pass selects: everything except the payload. */
 interface NoteRow {
@@ -100,10 +107,6 @@ export interface ArchiveSnapshot {
   seatLimit: number;
   /** One scope per member, keyed by member id. */
   metas: Record<string, Meta>;
-}
-
-function fail(error: { message: string } | null): void {
-  if (error) throw new Error(error.message);
 }
 
 export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot> {
@@ -599,181 +602,4 @@ export async function persistMetaDiff(
       ? [supabase.from("tags").delete().eq("archive_id", archiveId).in("id", goneTags)]
       : []),
   ]);
-}
-
-/* One private bucket holds every blob a note can carry. Access is enforced by
-   archive membership in Storage RLS; bytes keep their real media type. */
-const OBJECT_BUCKET = "note-images";
-
-export async function uploadObject(
-  session: AppSession,
-  objectId: string,
-  blob: Blob,
-): Promise<void> {
-  const result = await supabase.storage
-    .from(OBJECT_BUCKET)
-    .upload(`${session.archiveId}/${objectId}`, blob, {
-      contentType: blob.type || "application/octet-stream",
-      upsert: false,
-    });
-  fail(result.error);
-}
-
-export async function downloadObject(
-  session: AppSession,
-  objectId: string,
-  type: string,
-): Promise<Blob> {
-  const result = await supabase.storage
-    .from(OBJECT_BUCKET)
-    .download(`${session.archiveId}/${objectId}`);
-  fail(result.error);
-  const stored = result.data!;
-  /* Storage reports the content type it was uploaded with. Everything in the
-     bucket now carries a real one; the caller's `type` is the fallback for an
-     object stored before that was true. */
-  if (stored.type && stored.type !== "application/octet-stream") return stored;
-  return new Blob([await stored.arrayBuffer()], { type });
-}
-
-export const uploadImage = uploadObject;
-
-export function downloadImage(session: AppSession, imageId: string): Promise<Blob> {
-  return downloadObject(session, imageId, "image/webp");
-}
-
-/* ── Who you are in this archive ─────────────────────────────────────────────
-   A profile is a person's own row: nobody else may write it, and anybody who
-   shares an archive with them may read it. Avatars live in their own private
-   bucket under the owner's user id, which is what the Storage policy reads —
-   so the path is not a detail, it is the authorization. */
-const AVATAR_BUCKET = "avatars";
-
-export interface Profile {
-  nickname: string;
-  avatarObject: string | null;
-}
-
-export async function loadProfile(session: AppSession): Promise<Profile> {
-  const result = await supabase
-    .from("profiles")
-    .select("nickname, avatar_object")
-    .eq("user_id", session.userId)
-    .maybeSingle();
-  fail(result.error);
-  const row = result.data as { nickname: string | null; avatar_object: string | null } | null;
-  return { nickname: row?.nickname ?? "", avatarObject: row?.avatar_object ?? null };
-}
-
-export async function saveProfile(session: AppSession, profile: Profile): Promise<void> {
-  const result = await supabase.from("profiles").upsert(
-    {
-      user_id: session.userId,
-      nickname: profile.nickname,
-      avatar_object: profile.avatarObject,
-    },
-    { onConflict: "user_id" },
-  );
-  fail(result.error);
-}
-
-/** The picture, uploaded under this account's own id. Returns the new object
- *  id; the caller is what decides to point the profile at it. */
-export async function uploadAvatar(session: AppSession, file: Blob): Promise<string> {
-  const objectId = crypto.randomUUID();
-  const result = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(`${session.userId}/${objectId}`, file, {
-      contentType: file.type || "image/webp",
-      upsert: false,
-    });
-  fail(result.error);
-  return objectId;
-}
-
-export async function downloadAvatar(userId: string, objectId: string): Promise<Blob | null> {
-  const result = await supabase.storage.from(AVATAR_BUCKET).download(`${userId}/${objectId}`);
-  /* A picture that will not load is not a reason to fail: the interface falls
-     back to initials, which is what it shows for a member who has never set
-     one anyway. */
-  if (result.error) return null;
-  return result.data;
-}
-
-export async function deleteAvatar(session: AppSession, objectId: string): Promise<void> {
-  const result = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .remove([`${session.userId}/${objectId}`]);
-  fail(result.error);
-}
-
-/** Returns the raw invitation token once. Postgres stores only its digest, so
- * the caller is responsible for turning it into the link the member shares. */
-export async function createArchiveInvite(
-  session: AppSession,
-  email: string,
-  role: "editor" | "viewer",
-): Promise<string> {
-  const result = await supabase.rpc("create_archive_invite", {
-    archive_id: session.archiveId,
-    email,
-    role,
-  });
-  fail(result.error);
-  if (typeof result.data !== "string") throw new Error("The invitation could not be created");
-  return result.data;
-}
-
-/** An invitation nobody has claimed yet. The token is not here and never was:
- *  only its digest is stored, so a pending invitation can be withdrawn or left
- *  to expire, but not re-read. */
-export interface PendingInvite {
-  id: string;
-  email: string;
-  role: "editor" | "viewer";
-  expiresAt: string;
-}
-
-export async function loadPendingInvites(session: AppSession): Promise<PendingInvite[]> {
-  const result = await supabase
-    .from("archive_invites")
-    .select("id, email, role, expires_at")
-    .eq("archive_id", session.archiveId)
-    .is("claimed_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at");
-  fail(result.error);
-  return (
-    (result.data ?? []) as {
-      id: string;
-      email: string;
-      role: "editor" | "viewer";
-      expires_at: string;
-    }[]
-  ).map((row) => ({
-    id: row.id,
-    email: row.email,
-    role: row.role,
-    expiresAt: row.expires_at,
-  }));
-}
-
-/** Frees the seat an unclaimed invitation is holding. The stored digest goes
- *  with it, so the link that was sent stops working immediately. */
-export async function revokeArchiveInvite(inviteId: string): Promise<void> {
-  const result = await supabase.rpc("revoke_archive_invite", { invite_id: inviteId });
-  fail(result.error);
-}
-
-export async function setArchiveMemberRole(
-  session: AppSession,
-  userId: string,
-  role: "editor" | "viewer",
-): Promise<void> {
-  const result = await supabase.rpc("set_archive_member_role", {
-    archive_id: session.archiveId,
-    user_id: userId,
-    role,
-  });
-  fail(result.error);
 }
