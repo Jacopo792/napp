@@ -45,27 +45,44 @@ interface Slot {
 const slots = new Map<string, Slot>();
 const pending = new Set<string>();
 
-/** A trailing empty paragraph is what the editor leaves after a writer adds a
- * line, writes there and deletes the words again. It has no readable content,
- * so it must not turn an otherwise restored note into a new edit. Keep the one
- * empty paragraph that represents a genuinely blank note. */
-function withoutTrailingEmptyParagraphs(content: JSONContent): JSONContent {
+/** A trailing empty paragraph or space is what the editor leaves after a writer
+ * adds something at the end and deletes the visible characters again. Neither
+ * has readable content, so it must not turn an otherwise restored note into a
+ * new edit. Keep the one empty paragraph that represents a genuinely blank
+ * note. */
+function withoutInvisibleDocumentEnding(content: JSONContent): JSONContent {
   if (content.type !== "doc" || !Array.isArray(content.content)) return content;
   const normalized = structuredClone(content);
   const nodes = normalized.content;
   if (!nodes) return normalized;
-  while (nodes.length > 1 && nodes.at(-1)?.type === "paragraph" && !nodes.at(-1)?.content?.length) {
+  trimFinalTextWhitespace(normalized);
+  while (nodes.length > 1 && isEmptyParagraph(nodes.at(-1))) {
     nodes.pop();
   }
   return normalized;
 }
 
+function trimFinalTextWhitespace(node: JSONContent): void {
+  const last = node.content?.at(-1);
+  if (last) return trimFinalTextWhitespace(last);
+  if (node.type === "text" && typeof node.text === "string")
+    node.text = node.text.replace(/\s+$/, "");
+}
+
+function isEmptyParagraph(node: JSONContent | undefined): boolean {
+  return (
+    node?.type === "paragraph" &&
+    (!node.content?.length ||
+      node.content.every((child) => child.type === "text" && !(child.text ?? "")))
+  );
+}
+
 function sameDraft(left: Draft, right: Draft): boolean {
   return (
-    left.title === right.title &&
-    left.body === right.body &&
-    JSON.stringify(withoutTrailingEmptyParagraphs(left.content)) ===
-      JSON.stringify(withoutTrailingEmptyParagraphs(right.content))
+    left.title.trimEnd() === right.title.trimEnd() &&
+    left.body.trimEnd() === right.body.trimEnd() &&
+    JSON.stringify(withoutInvisibleDocumentEnding(left.content)) ===
+      JSON.stringify(withoutInvisibleDocumentEnding(right.content))
   );
 }
 

@@ -75,6 +75,15 @@ test("an empty final paragraph left by an erased new line is not an edit", () =>
   assert.equal(draft.takePending().length, 0);
 });
 
+test("a final space left after erasing a word is not an edit", () => {
+  const saved = { title: "A note", body: "kept", content: paragraph("kept") };
+  draft.ensureDraft("n5", saved, "2026-08-30T10:00:00.000Z");
+  draft.editBody("n5", "kept", paragraph("kept "));
+
+  assert.equal(draft.isDirty("n5"), false);
+  assert.equal(draft.takePending().length, 0);
+});
+
 test("returning to the original text after an autosave restores its edit time", () => {
   const original = { title: "A note", body: "kept", content: paragraph("kept") };
   const changed = { title: "A note", body: "temporary", content: paragraph("temporary") };
