@@ -91,9 +91,19 @@ dies immediately) after checking the same editor rule that issuing checks.
 
 `create_archive_invite(archive_id, email, role)` returns a 64-hex raw token
 once and stores only its SHA-256 digest for seven days.
-`claim_archive_invite(token)` adds the membership only when the caller's
-confirmed Auth email matches the invited address. The browser never resolves an
-address to a user id.
+`claim_archive_invite(token)` adds the membership when the caller's Auth email
+matches the invited address. The browser never resolves an address to a user id.
+
+**Email confirmation is off**, and that is load-bearing here.
+`20260830040000_invites_without_email_confirmation.sql` took the
+`email_confirmed_at` check out of `private.redeem_archive_invite()`, because
+leaving it in with confirmations disabled makes every invitation permanently
+unclaimable — the archive looks fine and simply refuses every new member. The
+two settings have to move together. Supabase's built-in mail service only
+delivers to the project's own team addresses, which is why nothing arrived;
+turning confirmation back on means configuring `[auth.email.smtp]` first, then
+`enable_confirmations`, then restoring that check. `SECURITY.md` records what
+the address check is worth without it.
 
 The interface offers the finished invitation two ways, and neither passes the
 token through anything of ours: copied by hand, or handed to a `mailto:` that

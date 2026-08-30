@@ -39,9 +39,12 @@ personal archive atomically behind `ensure_personal_archive()` the first time it
 signs in, held by an advisory lock so two tabs do not race; an account that
 belongs to several archives picks which one to open on sign-in. Joining an
 existing archive requires an invitation link: a 64-hex-character one-time token
-whose SHA-256 digest is stored for seven days. Claiming checks that the
-caller's `auth.users.email_confirmed_at` is set and lower-cased equals the
-invited address, then adds the membership — the browser never resolves an
+whose SHA-256 digest is stored for seven days. Claiming checks that the caller's
+address lower-cased equals the invited one, then adds the membership. Email
+confirmation was turned off on 2026-08-30 — the built-in mail service delivers
+only to the project's own team addresses, so it blocked signup instead of
+protecting it — which means the address is no longer proof of owning the
+mailbox and the one-time token is the whole of the secret — the browser never resolves an
 address to a user id. `pnpm add:member` remains as a local administrative path
 that writes the row through an existing member's own session, with no
 service-role key involved.
@@ -117,14 +120,15 @@ goes through the toolbar's explicit text and URL fields rather than through the 
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
-- Supabase Auth public signup is enabled with email confirmations required; a new
-  account reaches the archive either by bootstrapping its own personal archive
-  atomically or by claiming a seven-day invitation link that checks the confirmed
-  address. Invitations store only a SHA-256 digest, never the raw token or a
-  resolvable directory of addresses. Sign-in and account creation are separate
-  modes on the login page, each with its own copy and a show/hide password
-  control; the confirmation state says what the emailed link does and where the
-  archive comes from.
+- Supabase Auth public signup is enabled and email confirmation is off (see
+  `SECURITY.md` for what that costs). A new account reaches the archive either by
+  bootstrapping its own personal archive atomically or by claiming a seven-day
+  invitation link addressed to it. Invitations store only a SHA-256 digest, never
+  the raw token or a resolvable directory of addresses. Sign-in and account
+  creation are separate modes on the login page, each with its own copy and a
+  show/hide password control. The confirmation screen remains in the client and
+  is shown only when Supabase withholds a session, so turning confirmations back
+  on needs no client change — only SMTP and the `email_confirmed_at` check.
 - The seat limit lives in the database, not in the interface:
   `private.enforce_archive_seats()` is a `before insert` trigger on
   `archive_members`, and `private.issue_archive_invite()` counts members plus

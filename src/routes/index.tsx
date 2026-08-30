@@ -8,15 +8,19 @@ export const Route = createFileRoute("/")({ component: Login });
 type Mode = "sign-in" | "sign-up";
 
 /* The two things this page does are not variations of each other. Signing in
-   opens an archive that exists; creating an account starts one, by way of an
-   address you have to confirm first. The old page said "Continue" to both and
-   put the difference in a link under the fold, which is how somebody ends up
-   typing a new password into the sign-in form. Two tabs, and every line of
-   copy on the card belongs to the tab that is showing. */
+   opens an archive that exists; creating an account starts one. The old page
+   said "Continue" to both and put the difference in a link under the fold,
+   which is how somebody ends up typing a new password into the sign-in form.
+   Two tabs, and every line of copy on the card belongs to the tab showing.
+
+   The confirmation screen below is not dead code even though this project has
+   email confirmation turned off: whether it appears is decided by whether
+   Supabase hands back a session, which is a server fact. Configure SMTP and
+   turn confirmations back on and it is correct again. */
 const COPY: Record<Mode, { title: string; lede: string; action: string; footnote: string }> = {
   "sign-in": {
     title: "Sign in to your notes",
-    lede: "The account you confirmed opens the archive it belongs to.",
+    lede: "Your account opens the archive it belongs to.",
     action: "Sign in",
     footnote: "Signed in on this device until you sign out or the session times out.",
   },
@@ -24,7 +28,8 @@ const COPY: Record<Mode, { title: string; lede: string; action: string; footnote
     title: "Create your account",
     lede: "A private archive is created for you, and stays private until you invite someone.",
     action: "Create account",
-    footnote: "At least 8 characters. Confirm your address, then the archive is made for you.",
+    footnote:
+      "At least 8 characters. Your archive is created with the account, and only you can read it.",
   },
 };
 
@@ -202,7 +207,7 @@ function Login() {
           You followed an invitation.{" "}
           {mode === "sign-in"
             ? "Sign in with the invited address to join that archive."
-            : "Create the account with the invited address — the invitation is claimed once you confirm it."}
+            : "Create the account with the invited address — the invitation is claimed as soon as it exists."}
         </p>
       )}
 

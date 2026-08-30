@@ -225,8 +225,13 @@ enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
-# If enabled, users need to confirm their email address before signing in.
-enable_confirmations = true
+# Off. Supabase's built-in mail service only delivers to the project's own team
+# addresses, so the confirmation message never reached anybody else and no
+# account could be finished. Turning it back on means configuring
+# [auth.email.smtp] first, and restoring the `email_confirmed_at` check that
+# `20260830040000_invites_without_email_confirmation.sql` removed from
+# `private.redeem_archive_invite()`.
+enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.

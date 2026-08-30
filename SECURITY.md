@@ -45,6 +45,19 @@ either through the clipboard or through their own mail client — the applicatio
 has no mail path, and adding one would put the token on a server it currently
 never reaches.
 
+**Email confirmation is off** (2026-08-30). Supabase's built-in mail service
+only delivers to the project's own team addresses, so the message never reached
+anybody else and no account could be finished; the project is used by its owner
+and a couple of friends, and confirmation was removed at their request. The
+consequence is stated rather than hidden: an address is no longer proof that
+the caller owns that mailbox, so the one-time token is the whole of an
+invitation's secret. It is still 64 hex characters, still stored only as a
+digest, still single-use, and still expires in seven days — the ordinary
+invite-link model, not the stronger one it replaced. Restoring the earlier
+guarantee means configuring `[auth.email.smtp]`, setting
+`enable_confirmations = true`, and putting the `email_confirmed_at` check back
+into `private.redeem_archive_invite()`.
+
 The browser receives only the Supabase project URL and publishable key. Service
 role keys, account passwords, session tokens, and migration credentials must
 never be committed, placed in Vite variables, or included in a build.

@@ -35,16 +35,18 @@ separate composition for the phone.
   larger group is a value change rather than a rewrite.
 - **Invitations** that never turn an address into a directory: a one-time link
   whose raw token is shown once, whose SHA-256 digest is stored, that expires in
-  seven days and is claimable only by an account whose confirmed Auth email
-  matches. Copy it, or hand it to your own mail app — it never passes through
-  anything of ours. An unclaimed one can be withdrawn to free its seat.
+  seven days and is claimable only by an account using the invited address. Copy
+  it, or hand it to your own mail app — it never passes through anything of
+  ours. An unclaimed one can be withdrawn to free its seat.
 - **Roles.** Both members read everything; only editors write notes, folders,
   tags and files, rename the archive, invite, or change a role. The last editor
   cannot be demoted.
 - **Accounts.** Sign in and create-account are separate modes with their own
-  copy, both with a show/hide password control. Confirm your address, and the
-  first archive is created for you atomically. An account in several archives
-  picks one at sign-in.
+  copy, both with a show/hide password control. The first archive is created for
+  you atomically on first sign-in. An account in several archives picks one at
+  sign-in. Email confirmation is off — Supabase's built-in mail service only
+  delivers to the project's own team addresses, so it blocked signup rather than
+  protecting it. `SECURITY.md` records what that costs an invitation.
 - **Profiles.** A nickname and an optional picture, stored under the account's
   own id, readable by whoever shares your archive and writable only by you. The
   picture is placed in a round window — dragged and zoomed — before it is
@@ -134,8 +136,8 @@ creates a personal archive atomically on first sign-in, behind
 - **To invite the other person:** create an invitation in Settings → Members, or
   use `pnpm add:member` locally (it signs in as an existing member — no
   service-role key). The link is one-time, expires in seven days, and can only be
-  claimed by the confirmed address it was issued to. The same address can be
-  re-invited without creating a duplicate.
+  claimed by an account using the address it was issued to. The same address can
+  be re-invited without creating a duplicate.
 - **To give somebody an archive of their own:**
   `supabase/admin/new-archive-for-person.sql`, run in the Supabase SQL editor.
 

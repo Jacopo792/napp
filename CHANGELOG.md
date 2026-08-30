@@ -25,6 +25,16 @@ changes. The commit history remains the detailed engineering record.
   a blank block from two sides is two people writing, not a conflict: both texts
   are kept, in order, in the one note. Rewriting the same block when it actually
   held something is still a conflict, and still keeps a copy.
+- **Email confirmation is off, and no confirmation email ever arrived.**
+  Supabase's built-in mail service only delivers to the project's own team
+  addresses, so the message reached nobody else and no account could be
+  finished. Confirmation is disabled at the owner's request.
+  `20260830040000_invites_without_email_confirmation.sql` removes the matching
+  `email_confirmed_at` check from `private.redeem_archive_invite()` — left in
+  place it would have made every invitation permanently unclaimable. The
+  address must still match the invited one, but it is no longer proof of owning
+  that mailbox: the one-time token is now the whole of an invitation's secret.
+  `SECURITY.md` states the trade and how to restore the earlier guarantee.
 - **The confirmation email pointed at an old Vercel deployment.** The Supabase
   project's Site URL had never been aligned with `supabase/config.toml`, which
   already named `https://jacopo792.github.io/note-sharing-app/`. `supabase
