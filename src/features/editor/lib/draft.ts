@@ -45,11 +45,27 @@ interface Slot {
 const slots = new Map<string, Slot>();
 const pending = new Set<string>();
 
+/** A trailing empty paragraph is what the editor leaves after a writer adds a
+ * line, writes there and deletes the words again. It has no readable content,
+ * so it must not turn an otherwise restored note into a new edit. Keep the one
+ * empty paragraph that represents a genuinely blank note. */
+function withoutTrailingEmptyParagraphs(content: JSONContent): JSONContent {
+  if (content.type !== "doc" || !Array.isArray(content.content)) return content;
+  const normalized = structuredClone(content);
+  const nodes = normalized.content;
+  if (!nodes) return normalized;
+  while (nodes.length > 1 && nodes.at(-1)?.type === "paragraph" && !nodes.at(-1)?.content?.length) {
+    nodes.pop();
+  }
+  return normalized;
+}
+
 function sameDraft(left: Draft, right: Draft): boolean {
   return (
     left.title === right.title &&
     left.body === right.body &&
-    JSON.stringify(left.content) === JSON.stringify(right.content)
+    JSON.stringify(withoutTrailingEmptyParagraphs(left.content)) ===
+      JSON.stringify(withoutTrailingEmptyParagraphs(right.content))
   );
 }
 

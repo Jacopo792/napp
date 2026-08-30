@@ -60,6 +60,21 @@ test("typing and then restoring the saved text does not leave a pending edit", (
   assert.equal(draft.takePending().length, 0);
 });
 
+test("an empty final paragraph left by an erased new line is not an edit", () => {
+  const saved = { title: "A note", body: "kept", content: paragraph("kept") };
+  draft.ensureDraft("n4", saved, "2026-08-30T10:00:00.000Z");
+  draft.editBody("n4", "kept", {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "kept" }] },
+      { type: "paragraph" },
+    ],
+  });
+
+  assert.equal(draft.isDirty("n4"), false);
+  assert.equal(draft.takePending().length, 0);
+});
+
 test("returning to the original text after an autosave restores its edit time", () => {
   const original = { title: "A note", body: "kept", content: paragraph("kept") };
   const changed = { title: "A note", body: "temporary", content: paragraph("temporary") };
