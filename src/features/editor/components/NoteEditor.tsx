@@ -37,6 +37,8 @@ interface Props {
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
   headerActions?: ReactNode;
+  /** Who else has this note open, built by the page from the roster. */
+  readers?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
 }
@@ -47,6 +49,11 @@ interface Props {
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
 const TOOLBAR_ROOM = 500;
+/* A reader pill is a portrait, a name and a caret. It is the same kind of claim
+   on the row as the format cluster, so it is added to the budget rather than
+   left to overflow the column it sits in — which it did, straight across the
+   save readout. */
+const READER_ROOM = 170;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -75,6 +82,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     resolveFile,
     navigationAction,
     headerActions,
+    readers,
     onContextMenu,
   },
   ref,
@@ -334,7 +342,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   /* Inline while there is room for it; on its own row otherwise. */
   const inlineToolbar =
-    !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
+    !mobile &&
+    Boolean(toolbar) &&
+    (shellWidth === null || shellWidth >= TOOLBAR_ROOM + (readers ? READER_ROOM : 0));
 
   const fileInputs = (
     <>
@@ -413,9 +423,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       >
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
-          {!mobile && (
+          {!mobile && !readers && (
             <span className="label truncate text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
           )}
+          {/* The other person displaces the mode label rather than crowding
+              it: "Editing" is what you already know, and who else is in the
+              note with you is not. */}
+          {readers}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the

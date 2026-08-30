@@ -956,6 +956,86 @@
   color: var(--ink);
 }
 
+/* ── Who else is in this note ────────────────────────────────────────────────
+   The pill is the shape identity already has in this interface, so the other
+   person arrives as one: their face, their name, and a caret when they are
+   actually typing. It takes the place of the "Editing" label rather than
+   sitting beside it — the mode is what you already know, and this is not.
+
+   Typing is the only state that takes the accent. Present-but-still is a
+   hairline, because somebody reading over your shoulder is not an event. */
+.note-readers {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-reader {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px 3px 3px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 540;
+  transition:
+    color var(--dur-base) var(--ease),
+    background-color var(--dur-base) var(--ease),
+    border-color var(--dur-base) var(--ease);
+}
+
+.note-reader .avatar.is-compact {
+  width: 22px;
+  height: 22px;
+  font-size: 8px;
+  box-shadow: inset 0 0 0 1px var(--glass-highlight);
+}
+
+.note-reader-name {
+  max-width: 8rem;
+}
+
+.note-reader.is-typing {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+/* A caret, not three bouncing dots: this interface already tells you something
+   is happening with a caret, and it is the smallest mark that reads as "text
+   is arriving" without becoming an animation you watch. */
+.note-reader-caret {
+  width: 2px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 1px;
+  background: currentColor;
+  animation: reader-caret 1.05s steps(1) infinite;
+}
+
+@keyframes reader-caret {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-reader-caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* ── The archive switch ──────────────────────────────────────────────────────
    Two names, one track, and a thumb that travels between them. It was two
    buttons with a background that blinked from one to the other, at 12px in the

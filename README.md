@@ -53,7 +53,10 @@ separate composition for the phone.
   uploaded, rather than cut from the middle of the file.
 - **Live presence**, off by default and mutual: the client joins the channel only
   while broadcasting its own, and the server allows presence only to members of
-  that archive on a private Realtime channel.
+  that archive on a private Realtime channel. What it carries is the note you
+  have open and whether you are typing, so the other member appears in that
+  note's header with their picture, their nickname and a caret while they
+  write.
 - Themes, wallpapers, an accent colour, four reading axes (size, measure, weight,
   leading), translation of a selection in place, and right-click menus on notes,
   folders and the note page.

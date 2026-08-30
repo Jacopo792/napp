@@ -180,8 +180,17 @@ so they cannot disagree. The math has tests in `src/lib/image.test.ts`.
 ## Presence
 
 Off by default and mutual: the client joins `presence:<archiveId>` with
-`config.private = true` only while broadcasting its own `{ userId, onlineAt }`,
-so there is no listen-only mode.
+`config.private = true` only while broadcasting its own
+`{ userId, onlineAt, noteId, typing }`, so there is no listen-only mode.
+
+`noteId` and `typing` are what the note header reads to show who else is on
+this page. `typing` is a **flag the writer raises and lowers**, not a
+timestamp: a timestamp would need a clock, an expiry and a re-render tick in
+every reader to notice it lapse, for something the writer already knows.
+`markTyping()` in `notes.tsx` announces once when a burst starts and once
+`TYPING_IDLE_MS` after it ends — two packets per burst, not one per keystroke.
+Changing note re-announces with `typing: false`, so a raised flag can never be
+left behind on a page nobody is on.
 `20260829250000_private_archive_presence.sql` restricts `realtime.messages` for
 `extension = 'presence'` to members of the archive derived from
 `realtime.topic()` via `private.presence_archive_id()` — `SELECT` to receive,

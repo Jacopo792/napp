@@ -16,6 +16,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { restoreSession, clearSession, type AppSession } from "@/lib/session";
 import {
   createNote,
@@ -45,9 +46,11 @@ import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
 import {
   loadPresencePreference,
+  publishPresence,
   savePresencePreference,
   subscribeToPresence,
   unsubscribeFromPresence,
+  type PresenceMember,
 } from "@/lib/presence";
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
@@ -112,6 +115,8 @@ export const Route = createFileRoute("/notes")({
 
 /** A Postgres row write is cheap enough to commit shortly after typing stops. */
 const AUTOSAVE_MS = 250;
+/** How long a pause has to be before the other person is told you stopped. */
+const TYPING_IDLE_MS = 2500;
 
 /* A failed write is retried on its own, backing off so a server that is down
    is not hammered — but never so slowly that a recovered connection is missed. */
@@ -214,7 +219,12 @@ function NotesPage() {
   const [profileError, setProfileError] = useState("");
   const [presenceEnabled, setPresenceEnabled] = useState(false);
   const [presenceReady, setPresenceReady] = useState(false);
-  const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
+  const [presentMembers, setPresentMembers] = useState<Map<string, PresenceMember>>(
+    () => new Map(),
+  );
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const typingOffRef = useRef<number | undefined>(undefined);
+  const typingRef = useRef(false);
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The phone has no room for a permanent sidebar, so it gets the same one
@@ -486,12 +496,49 @@ function NotesPage() {
 
   useEffect(() => {
     if (!session || !presenceReady || !presenceEnabled) {
-      setOnlineMemberIds(new Set());
+      setPresentMembers(new Map());
       return;
     }
-    const channel = subscribeToPresence(session, setOnlineMemberIds);
-    return () => void unsubscribeFromPresence(channel);
+    const channel = subscribeToPresence(session, setPresentMembers);
+    presenceChannelRef.current = channel;
+    return () => {
+      presenceChannelRef.current = null;
+      window.clearTimeout(typingOffRef.current);
+      typingRef.current = false;
+      void unsubscribeFromPresence(channel);
+    };
   }, [session, presenceReady, presenceEnabled]);
+
+  const onlineMemberIds = useMemo(() => new Set(presentMembers.keys()), [presentMembers]);
+
+  /* Opening a note is an announcement; closing one is the same announcement
+     with a null. Typing stops when you do, so leaving a note cancels the flag
+     rather than leaving it raised on a page nobody is on. */
+  useEffect(() => {
+    const channel = presenceChannelRef.current;
+    if (!channel || !session) return;
+    window.clearTimeout(typingOffRef.current);
+    typingRef.current = false;
+    publishPresence(channel, session, { noteId: selectedId, typing: false });
+  }, [selectedId, session, presenceEnabled]);
+
+  /* One announcement when the burst starts and one when it ends, rather than a
+     packet per keystroke. TYPING_IDLE_MS is how long a pause has to be before
+     the other person is told you stopped. */
+  const markTyping = useCallback(() => {
+    const channel = presenceChannelRef.current;
+    if (!channel || !session) return;
+    window.clearTimeout(typingOffRef.current);
+    if (!typingRef.current) {
+      typingRef.current = true;
+      publishPresence(channel, session, { noteId: selectedIdRef.current, typing: true });
+    }
+    typingOffRef.current = window.setTimeout(() => {
+      typingRef.current = false;
+      const live = presenceChannelRef.current;
+      if (live) publishPresence(live, session, { noteId: selectedIdRef.current, typing: false });
+    }, TYPING_IDLE_MS);
+  }, [session]);
 
   /** The owner's whole catalogue, unfiltered — what the rail and the scope
    *  strip count against. Memoised so their counts are not recomputed for an
@@ -793,6 +840,13 @@ function NotesPage() {
     window.clearTimeout(timerRef.current);
     void drain();
   }, [drain]);
+
+  /** One keystroke, two consequences: a save is queued, and whoever else has
+   *  this note open is told somebody is writing in it. */
+  const handleEdited = useCallback(() => {
+    schedule();
+    markTyping();
+  }, [schedule, markTyping]);
 
   useEffect(
     () => () => {
@@ -1309,6 +1363,39 @@ function NotesPage() {
     navigate({ to: "/" });
   }
 
+  /* Who else is on this page right now. Filtered to the note that is open, so
+     the other person appears when they arrive and goes when they leave — the
+     roster in Settings answers "who is online", and this answers the narrower
+     question you actually have while writing. Nothing renders while presence
+     is off, on either side: the channel is mutual and so is this. */
+  const noteReaders = useMemo(() => {
+    if (!presenceEnabled || !selectedId) return null;
+    const here = members.filter(
+      (member) => !member.isSelf && presentMembers.get(member.userId)?.noteId === selectedId,
+    );
+    if (here.length === 0) return null;
+    return (
+      <span className="note-readers" aria-live="polite">
+        {here.map((member) => {
+          const name = member.nickname || "Member";
+          const typing = presentMembers.get(member.userId)?.typing === true;
+          return (
+            <span
+              key={member.userId}
+              className={`note-reader ${typing ? "is-typing" : ""}`}
+              title={typing ? `${name} is writing` : `${name} has this note open`}
+            >
+              <Avatar url={avatarUrls[member.userId] ?? null} name={name} email="" compact />
+              <span className="note-reader-name truncate">{name}</span>
+              {typing && <i className="note-reader-caret" aria-hidden="true" />}
+              <span className="sr-only">{typing ? " is writing" : " has this note open"}</span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  }, [presenceEnabled, selectedId, members, presentMembers, avatarUrls]);
+
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, handleLock);
@@ -1660,7 +1747,7 @@ function NotesPage() {
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
                     titleRef={titleRef}
-                    onEdited={schedule}
+                    onEdited={handleEdited}
                     onNew={handleNew}
                     onUploadImage={handleUploadImage}
                     onUploadFile={handleUploadFile}
@@ -1678,6 +1765,7 @@ function NotesPage() {
                       </button>
                     }
                     headerActions={noteActions}
+                    readers={noteReaders}
                   />
                 </Suspense>
               </section>
@@ -1779,7 +1867,7 @@ function NotesPage() {
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}
-              onEdited={schedule}
+              onEdited={handleEdited}
               onNew={handleNew}
               onUploadImage={handleUploadImage}
               onUploadFile={handleUploadFile}
@@ -1813,6 +1901,7 @@ function NotesPage() {
                 ) : null
               }
               headerActions={noteActions}
+              readers={noteReaders}
             />
           </Suspense>
         </div>

@@ -5,7 +5,38 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+### Added
+
+- **Who else is in the note you are writing.** With live presence on, the other
+  member appears in the note's own header as a pill carrying their picture and
+  their nickname, and a caret while they are actually typing. It is filtered to
+  the note that is open, so the roster in Settings still answers "who is
+  online" and the header answers the narrower question you have while writing.
+  The presence payload gained `noteId` and a `typing` flag; the channel, its
+  RLS and its mutuality are unchanged, so nothing renders unless both sides
+  have presence on.
+
 ### Fixed
+
+- **A refresh lost every unsaved word.** The draft store is a module-level Map,
+  so a reload was amnesia — worst exactly when it mattered, because a save that
+  cannot reach Postgres leaves the draft as the only copy there is. Dirty
+  drafts are mirrored to `sessionStorage`, beside the auth session, and read
+  back on load; signing out clears them with the session. The `base` each draft
+  departed from travels with it, or the next merge would read the other
+  person's blocks as a deletion.
+- **Every address but the root returned GitHub's own 404.** Pages serves files
+  and the application is one file, so a refresh on `/note-sharing-app/notes`
+  found nothing and the reader had to walk back to the root. The build now also
+  writes `404.html`, which is what Pages serves for an unknown path.
+- **The controls on a note row were invisible until the pointer arrived.** Pin,
+  restore and delete were `md:opacity-0`, so Trash in particular read as a list
+  you could not act on. They are visible now.
+- **The two muted inks were under AA.** `--ink-4` sat at 3.7:1 against the
+  catalogue, which is why idle glyphs read as disabled. 4.9:1 and 6.5:1 now,
+  and every metadata line in the app moves with them.
+- **`theme-color` was nailed to the graphite default**, so the Paper theme drew
+  a black band above a white app. It follows the reader's background.
 
 - **Text lost when two people wrote in the same note.** `saveNote` wrote
   conditionally on the `version` column and then defeated it: a conditional
