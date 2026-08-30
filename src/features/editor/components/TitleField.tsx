@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { editTitle, useDraftTitle } from "@/features/editor/lib/draft";
 
 interface Props {
@@ -7,6 +7,10 @@ interface Props {
   canEdit: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onEdited: () => void;
+}
+
+function capitalizeSentences(text: string): string {
+  return text.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, (m) => m.toUpperCase());
 }
 
 /* The title owns its own state.
@@ -22,18 +26,39 @@ interface Props {
 export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited }: Props) {
   const title = useDraftTitle(noteId);
 
-  useEffect(() => {
+  // Keep the field tall enough for its content. Height is derived from
+  // scrollHeight, so it must be recomputed after every value change and when
+  // the container width changes (wrapping). The previous implementation
+  // observed the parent's *height* as well, which meant every height write
+  // triggered another observation and a second write (`auto` → scrollHeight)
+  // on the same frame — visible as a continuous flicker while typing and, on
+  // fast typing, a dropped final character when React reconciled the
+  // intermediate `auto` value. Observing only *width* changes removes the
+  // feedback loop.
+  useLayoutEffect(() => {
     const el = titleRef.current;
     if (!el) return;
-    const resize = () => {
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(el.parentElement ?? el);
-    return () => observer.disconnect();
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   }, [noteId, title, titleRef]);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    let lastWidth = parent.clientWidth;
+    const observer = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      if (w === lastWidth) return;
+      lastWidth = w;
+      const target = titleRef.current;
+      if (!target) return;
+      target.style.height = "auto";
+      target.style.height = `${target.scrollHeight}px`;
+    });
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [noteId, titleRef]);
 
   return (
     <textarea
@@ -42,8 +67,18 @@ export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited }: Prop
       value={title}
       onChange={(event) => {
         if (!canEdit) return;
-        editTitle(noteId, event.target.value);
+        const el = event.target;
+        const raw = el.value;
+        const next = capitalizeSentences(raw);
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        editTitle(noteId, next);
         onEdited();
+        if (next !== raw && start !== null && end !== null) {
+          window.requestAnimationFrame(() => {
+            if (document.activeElement === el) el.setSelectionRange(start, end);
+          });
+        }
       }}
       onInput={(event) => {
         event.currentTarget.style.height = "auto";
@@ -59,6 +94,9 @@ export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited }: Prop
       readOnly={!canEdit}
       lang="it"
       aria-label="Note title"
+      autoCapitalize="sentences"
+      autoCorrect="on"
+      spellCheck
       className={`note-title font-display block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-4 ${
         mobile ? "note-title-mobile" : ""
       }`}

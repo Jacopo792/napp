@@ -4,7 +4,7 @@ import { FindAndReplace } from "@tiptap/extension-find-and-replace";
 import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
-import { NodeSelection } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import {
   EditorContent,
   NodeViewWrapper,
@@ -130,6 +130,38 @@ const SLASH_COMMANDS: SlashCommand[] = [
     action: `color-${color}` as FormatAction,
   })),
 ];
+
+function capitalizeSentences(text: string): string {
+  return text.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, (m) => m.toUpperCase());
+}
+
+function sentenceCapitalizeExtension() {
+  return Extension.create({
+    name: "sentenceCapitalize",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey("sentenceCapitalize"),
+          props: {
+            handleTextInput(view, from, to, text) {
+              if (text.length !== 1) return false;
+              const isLetter = text.toLowerCase() !== text.toUpperCase();
+              if (!isLetter) return false;
+              if (text !== text.toLowerCase()) return false;
+              const before = view.state.doc.textBetween(0, from, "\n", "\n");
+              const trimmed = before.trimEnd();
+              const isStart = trimmed === "";
+              const isAfterSentence = /[.!?]$/.test(trimmed) && /\s$/.test(before);
+              if (!isStart && !isAfterSentence) return false;
+              view.dispatch(view.state.tr.insertText(text.toUpperCase(), from, to));
+              return true;
+            },
+          },
+        }),
+      ];
+    },
+  });
+}
 
 function slashMenuExtension(run: (action: SlashCommand["action"]) => void) {
   return Extension.create({
@@ -500,6 +532,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     [onOpenLink],
   );
 
+  const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
+
   const editor = useEditor({
     extensions: [
       ...DOCUMENT_EXTENSIONS,
@@ -516,13 +550,23 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         superscriptThree: false,
       }),
       slashMenu,
+      sentenceCapitalize,
     ],
     content: value,
     editable: !readOnly,
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     editorProps: {
-      attributes: { class: "rich-text-content", lang: "it" },
+      attributes: {
+        class: "rich-text-content",
+        lang: "it",
+        autocapitalize: "sentences",
+        autocorrect: "on",
+        spellcheck: "true",
+      },
+      transformPastedText(text) {
+        return capitalizeSentences(text);
+      },
       handlePaste(view, event) {
         const clipboard = event.clipboardData;
         const item = Array.from(clipboard?.items ?? []).find((candidate) =>

@@ -38,6 +38,7 @@ interface Slot {
 }
 
 const slots = new Map<string, Slot>();
+const pending = new Set<string>();
 
 /* ── Surviving a reload ──────────────────────────────────────────────────────
    The Map above is memory, and a refresh is amnesia: until this existed, F5 on
@@ -73,7 +74,7 @@ function persist(): void {
   try {
     const dirty: Record<string, { draft: Draft; base: Draft }> = {};
     for (const [id, slot] of slots) {
-      if (slot.dirty) dirty[id] = { draft: slot.draft, base: slot.base };
+      if (slot.dirty || pending.has(id)) dirty[id] = { draft: slot.draft, base: slot.base };
     }
     if (Object.keys(dirty).length === 0) sessionStorage.removeItem(STORE_KEY);
     else sessionStorage.setItem(STORE_KEY, JSON.stringify(dirty));
@@ -129,12 +130,12 @@ export function readBase(id: string): Draft | undefined {
 }
 
 export function isDirty(id: string): boolean {
-  return slots.get(id)?.dirty === true;
+  return slots.get(id)?.dirty === true || pending.has(id);
 }
 
 export function hasPending(): boolean {
   for (const slot of slots.values()) if (slot.dirty) return true;
-  return false;
+  return pending.size > 0;
 }
 
 // ── Writing ────────────────────────────────────────────────────────────────
@@ -144,8 +145,9 @@ export function hasPending(): boolean {
  *  never shadow an edit that arrived from the other device. */
 export function ensureDraft(id: string, stored: Draft): void {
   const slot = slots.get(id);
-  if (slot?.dirty) return;
+  if (slot && isDirty(id)) return;
   slots.set(id, { draft: stored, base: stored, dirty: false });
+  pending.delete(id);
   writeThrough();
   notifyTitle(id);
 }
@@ -171,6 +173,7 @@ export function editBody(id: string, body: string, content: JSONContent): void {
  *  established that nothing local is waiting for this note. */
 export function replaceDraft(id: string, draft: Draft): void {
   slots.set(id, { draft, base: draft, dirty: false });
+  pending.delete(id);
   writeThrough();
   notifyTitle(id);
 }
@@ -181,6 +184,7 @@ export function rebaseDraft(id: string, saved: Draft): void {
   const slot = slots.get(id);
   if (!slot) return;
   slot.base = saved;
+  pending.delete(id);
   writeThrough();
 }
 
@@ -192,17 +196,22 @@ export function rebaseDraft(id: string, saved: Draft): void {
  */
 export function reconcileDraft(id: string, base: Draft, draft: Draft, dirty: boolean): void {
   slots.set(id, { draft, base, dirty });
+  if (!dirty) pending.delete(id);
+  else pending.delete(id);
   writeThrough();
   notifyTitle(id);
 }
 
 export function dropDraft(id: string): void {
   slots.delete(id);
+  pending.delete(id);
   writeThrough();
+  notifyTitle(id);
 }
 
 export function clearDrafts(): void {
   for (const id of [...slots.keys()]) slots.delete(id);
+  pending.clear();
   clearTimeout(writeTimer);
   try {
     sessionStorage.removeItem(STORE_KEY);
@@ -220,6 +229,7 @@ export function takePending(): [string, Draft][] {
   for (const [id, slot] of slots) {
     if (!slot.dirty) continue;
     slot.dirty = false;
+    pending.add(id);
     taken.push([id, slot.draft]);
   }
   writeThrough();
@@ -230,6 +240,7 @@ export function takePending(): [string, Draft][] {
 export function requeue(id: string): void {
   const slot = slots.get(id);
   if (slot) slot.dirty = true;
+  pending.delete(id);
   writeThrough();
 }
 
