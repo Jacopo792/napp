@@ -39,6 +39,66 @@ interface Slot {
 
 const slots = new Map<string, Slot>();
 
+/* ── Surviving a reload ──────────────────────────────────────────────────────
+   The Map above is memory, and a refresh is amnesia: until this existed, F5 on
+   a half-written note threw the words away with no error and no trace. The
+   flush on `pagehide` covers a deliberate close; it does not cover a reload
+   that beats the write, and it cannot cover one made offline.
+
+   `sessionStorage`, not `localStorage`, and on purpose: the auth session lives
+   there too, so an unsaved note has exactly the lifetime of the sign-in that
+   can save it. A reload keeps it. Closing the tab drops it, the same as the
+   session — signing out already calls `clearDrafts()`, which now clears this
+   as well, so no note text outlives the archive being open.
+
+   `base` is stored beside `draft` because the three-way merge needs it. A
+   draft restored without the version it departed from would read the other
+   person's blocks as a deletion — the one failure this store exists to
+   prevent. ──────────────────────────────────────────────────────────────── */
+
+const STORE_KEY = "napp:drafts";
+
+let writeTimer: ReturnType<typeof setTimeout> | undefined;
+
+/* Below AUTOSAVE_MS, and that is the whole specification. Coalescing for
+   longer than the save takes to fire means the mirror is written only after
+   the draft has already gone clean — an empty store that looks like it works
+   until the day the network is down and it is the only copy. */
+function writeThrough(): void {
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(persist, 150);
+}
+
+function persist(): void {
+  try {
+    const dirty: Record<string, { draft: Draft; base: Draft }> = {};
+    for (const [id, slot] of slots) {
+      if (slot.dirty) dirty[id] = { draft: slot.draft, base: slot.base };
+    }
+    if (Object.keys(dirty).length === 0) sessionStorage.removeItem(STORE_KEY);
+    else sessionStorage.setItem(STORE_KEY, JSON.stringify(dirty));
+  } catch {
+    /* A full or unavailable store costs the reload, not the session. */
+  }
+}
+
+function restore(): void {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw) as Record<string, { draft: Draft; base: Draft }>;
+    for (const [id, { draft, base }] of Object.entries(stored)) {
+      if (typeof draft?.title === "string" && typeof base?.title === "string") {
+        slots.set(id, { draft, base, dirty: true });
+      }
+    }
+  } catch {
+    /* Unreadable is the same as absent: the archive still holds the note. */
+  }
+}
+
+restore();
+
 const titleListeners = new Map<string, Set<() => void>>();
 
 function notifyTitle(id: string): void {
@@ -86,6 +146,7 @@ export function ensureDraft(id: string, stored: Draft): void {
   const slot = slots.get(id);
   if (slot?.dirty) return;
   slots.set(id, { draft: stored, base: stored, dirty: false });
+  writeThrough();
   notifyTitle(id);
 }
 
@@ -94,6 +155,7 @@ export function editTitle(id: string, title: string): void {
   if (!slot || slot.draft.title === title) return;
   slot.draft = { title, body: slot.draft.body, content: slot.draft.content };
   slot.dirty = true;
+  writeThrough();
   notifyTitle(id);
 }
 
@@ -102,12 +164,14 @@ export function editBody(id: string, body: string, content: JSONContent): void {
   if (!slot) return;
   slot.draft = { title: slot.draft.title, body, content };
   slot.dirty = true;
+  writeThrough();
 }
 
 /** Text pulled from the other device, applied only once the page has
  *  established that nothing local is waiting for this note. */
 export function replaceDraft(id: string, draft: Draft): void {
   slots.set(id, { draft, base: draft, dirty: false });
+  writeThrough();
   notifyTitle(id);
 }
 
@@ -115,7 +179,9 @@ export function replaceDraft(id: string, draft: Draft): void {
  *  compares against — not what is on screen now, which may have moved on. */
 export function rebaseDraft(id: string, saved: Draft): void {
   const slot = slots.get(id);
-  if (slot) slot.base = saved;
+  if (!slot) return;
+  slot.base = saved;
+  writeThrough();
 }
 
 /**
@@ -126,15 +192,23 @@ export function rebaseDraft(id: string, saved: Draft): void {
  */
 export function reconcileDraft(id: string, base: Draft, draft: Draft, dirty: boolean): void {
   slots.set(id, { draft, base, dirty });
+  writeThrough();
   notifyTitle(id);
 }
 
 export function dropDraft(id: string): void {
   slots.delete(id);
+  writeThrough();
 }
 
 export function clearDrafts(): void {
-  for (const id of [...slots.keys()]) dropDraft(id);
+  for (const id of [...slots.keys()]) slots.delete(id);
+  clearTimeout(writeTimer);
+  try {
+    sessionStorage.removeItem(STORE_KEY);
+  } catch {
+    /* Nothing to clear is the outcome we wanted anyway. */
+  }
 }
 
 // ── The save queue's view ──────────────────────────────────────────────────
@@ -148,6 +222,7 @@ export function takePending(): [string, Draft][] {
     slot.dirty = false;
     taken.push([id, slot.draft]);
   }
+  writeThrough();
   return taken;
 }
 
@@ -155,6 +230,7 @@ export function takePending(): [string, Draft][] {
 export function requeue(id: string): void {
   const slot = slots.get(id);
   if (slot) slot.dirty = true;
+  writeThrough();
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────────

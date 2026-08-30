@@ -802,6 +802,14 @@ function NotesPage() {
     [],
   );
 
+  /* A draft restored from the reload has never reached Postgres, and the
+     archive is the only place it is safe. `drain` needs the entry it belongs
+     to, so this waits for the catalogue rather than firing on mount. */
+  useEffect(() => {
+    if (loading || !hasPending()) return;
+    saveNow();
+  }, [loading, saveNow]);
+
   // Never leave the tab holding unsaved words.
   useEffect(() => {
     function onHide() {
