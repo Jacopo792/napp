@@ -7,6 +7,19 @@ changes. The commit history remains the detailed engineering record.
 
 ### Added
 
+- **Live collaborative documents.** Title and rich-text content now share one
+  Yjs document served by Hocuspocus. Supabase still decides access through
+  `archive_members`; Redis/Valkey connects overlapping server instances; an
+  authorized open note keeps accepting edits offline and converges on
+  reconnect. The toolbar reports Connecting, Live, Offline or Unavailable.
+- **Page covers and icons in the existing interface.** A note may use one of
+  six curated covers or a private uploaded image, reposition it vertically,
+  replace or remove it, and choose an emoji or line symbol without rewriting
+  the live document.
+- **Operational collaboration service.** `/healthz` is dependency-free
+  liveness, `/readyz` checks Supabase and optional Redis with timeouts, and CI
+  runs the real local integration, multi-instance and Docker checks before
+  publishing.
 - **An archive for notes, and the first thing in this archive one member can
   keep from another.** Archive sits above Trash in the sidebar and is the other
   kind of leaving: a trashed note is read-only and on its way out, an archived
@@ -24,7 +37,7 @@ changes. The commit history remains the detailed engineering record.
 - **A proofreader that runs on this device.** Select a passage and the Language
   tools menu will fix its spelling, grammar and punctuation using the browser's
   built-in model — the same family as the translator already there, so there is
-  no API key, no token store and no server. The readout says how many
+  no API key, token store or remote request. The readout says how many
   corrections were applied, because replacing a passage silently leaves you
   unable to tell a clean paragraph from one the model declined to touch, and
   nothing to fix writes nothing at all: no undo step, no dirtied draft. It can
@@ -63,13 +76,6 @@ changes. The commit history remains the detailed engineering record.
   exactly to its previous contents now cancels the queued save. If an autosave
   landed in the middle, restoring the old contents restores the prior edit time
   too, so the note neither moves nor claims a change that did not survive.
-- **A refresh lost every unsaved word.** The draft store is a module-level Map,
-  so a reload was amnesia — worst exactly when it mattered, because a save that
-  cannot reach Postgres leaves the draft as the only copy there is. Dirty
-  drafts are mirrored to `sessionStorage`, beside the auth session, and read
-  back on load; signing out clears them with the session. The `base` each draft
-  departed from travels with it, or the next merge would read the other
-  person's blocks as a deletion.
 - **Every address but the root returned GitHub's own 404.** Pages serves files
   and the application is one file, so a refresh on `/note-sharing-app/notes`
   found nothing and the reader had to walk back to the root. The build now also
@@ -83,24 +89,6 @@ changes. The commit history remains the detailed engineering record.
 - **`theme-color` was nailed to the graphite default**, so the Paper theme drew
   a black band above a white app. It follows the reader's background.
 
-- **Text lost when two people wrote in the same note.** `saveNote` wrote
-  conditionally on the `version` column and then defeated it: a conditional
-  update that matched nothing — the signal that somebody else had written — made
-  it re-read the current version and rewrite the same payload on top, up to four
-  times. Two people in one note overwrote each other silently, with no error
-  anywhere, and an image upload took the whole document with it like any other
-  write. A miss is a conflict now, and colliding writes are merged by top-level
-  block so both people keep their text; when both edited the same block the
-  remote version stays in the note and the local one is kept as
-  `"<title> — your version"`. The readout says `Merged` or `Kept a copy`. This
-  reverses the last-write-wins decision of 2026-08-27, which had accepted a rare
-  loss and turned out not to be rare.
-- **A new note used to split in two the moment both people used it.** A fresh
-  note is one empty paragraph, so two people opening one to talk both typed into
-  the same block, and the merge called that a conflict and made a copy. Filling
-  a blank block from two sides is two people writing, not a conflict: both texts
-  are kept, in order, in the one note. Rewriting the same block when it actually
-  held something is still a conflict, and still keeps a copy.
 - **Email confirmation is off, and no confirmation email ever arrived.**
   Supabase's built-in mail service only delivers to the project's own team
   addresses, so the message reached nobody else and no account could be

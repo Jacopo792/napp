@@ -71,6 +71,21 @@ guarantee means configuring `[auth.email.smtp]`, setting
 `enable_confirmations = true`, and putting the `email_confirmed_at` check back
 into `private.redeem_archive_invite()`.
 
-The browser receives only the Supabase project URL and publishable key. Service
-role keys, account passwords, session tokens, and migration credentials must
-never be committed, placed in Vite variables, or included in a build.
+Live documents pass through the Hocuspocus service. It authorizes a socket with
+the caller's Supabase token and repeats that check while the connection stays
+open; membership, editor role, Trash state and archived-note visibility remain
+Supabase decisions. Awareness identity is overwritten by the server, so a
+browser cannot choose another member's name or id. `note_documents` has RLS
+enabled and grants no browser policy: only the service role persists its binary.
+Redis/Valkey distributes updates between instances and is not durable storage.
+
+IndexedDB Yjs stores are plaintext, scoped by archive, account and note. A
+cached document never authorizes its own display: the server must first accept
+and synchronize that note. The current PP implementation deliberately does not
+delete these stores on logout, because doing so can destroy offline edits; this
+retention must be resolved before production deployment.
+
+The browser receives only the Supabase project URL, publishable key and public
+collaboration URL. Service role keys, account passwords, session tokens, and
+migration credentials must never be committed, placed in Vite variables, or
+included in a build.

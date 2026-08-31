@@ -12,7 +12,7 @@ import type {
 } from "@/lib/collab";
 import { FIXTURE_NOTES } from "./fixture";
 
-export { collaborationColor } from "@/lib/collab";
+export { collaborationColor } from "@/features/editor/lib/ydoc";
 export type { CollaborationIdentity, CollaborativeNote, ConnectionState, Peer } from "@/lib/collab";
 
 const documents = new Map<string, Y.Doc>();

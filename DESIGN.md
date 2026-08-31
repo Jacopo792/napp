@@ -150,40 +150,29 @@ does on a row.
 
 - Signing in and creating an account are two things, not two moods of one thing. The login card carries a pair of tabs at the top, and the heading, the sub-line, the submit label and the footnote all belong to the tab showing; both fields can reveal what was typed. Confirmation is required, and the confirmation state is a numbered account of what happens next — the link proves the address, signing in comes after it, and the archive is made then — rather than a single neutral sentence. It still does not enumerate whether the address could be created. The first personal archive is created atomically behind `ensure_personal_archive()` with an advisory lock. An account that belongs to several archives picks which one to open; "not connected" only means this account has no membership row for this archive yet.
 - Members and invitations are their own Settings section, not a tail on Security. It opens on the seat count, then the roster, then any invitation waiting to be claimed with the seat it holds and a way to withdraw it, then the form. When the seats are full the form is replaced by a row in the same card shape saying so, because a disabled form is a worse explanation than a sentence.
-- An invitation is a one-time link whose raw 64-hex token is shown once. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. Redemption runs behind a private security-definer function and succeeds only when the caller's `auth.users.email_confirmed_at` is set and lower-cased equals the invited address. The client never resolves an address to a user id and never lists existing addresses as a directory. The finished link is offered two ways in the same place — copied, or handed to a `mailto:` the member's own mail app composes — because there is no server here to send mail with, and adding one would put the token somewhere it currently never goes.
+- An invitation is a one-time link whose raw 64-hex token is shown once. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. The client never resolves an address to a user id and never lists existing addresses as a directory. The finished link is offered two ways in the same place — copied, or handed to a `mailto:` the member's own mail app composes — because the collaboration service has no outbound-mail role and must never receive the token.
 - Roles are binary and visible: every member can read every note and list; only editors can write notes, folders, tags, archive settings and `note-images` objects, or create invites and change roles. A viewer sees the same notes and scopes but the editor is read-only and the write menus and actions are inert. Changing another member's role is done through `set_archive_member_role()`, and the last editor cannot be demoted. Storage mirrors the table boundary.
 - A member is a person. Settings shows who belongs to the archive, by nickname and join date, and every member's avatar appears in the scope switch and in the sidebar while you are present. A picture is _placed_, not cropped for you: a round window over the image, dragged and zoomed, and what the window shows is exactly the square that is uploaded. A centre crop is right for a portrait and wrong for everything else. The rule stays the same: you may read a peer's `profiles` row and avatar when you share an archive; only the account itself may write its own `profiles` row and upload or delete under `avatars/<your user id>/…`. The avatar URL cache (`src/lib/avatarCache.ts`) keeps one object URL per avatar and Realtime keeps the roster live.
 - Presence is off by default and mutual: joining `presence:<archiveId>` with `{ private: true }` happens only while broadcasting `{ userId, onlineAt }`, so there is no listen-only mode in the client and the server enforces the same boundary on `realtime.messages` (`extension = 'presence'`, verified through `private.presence_archive_id()` against `archive_members`). The Settings toggle is per-archive and persisted in `localStorage`. When enabled, online members are indicated on the scope switch and in the member list.
 
 ## Honest persistence
 
-Saving is a visible network state, not an implied local success. The editor
-toolbar must distinguish:
+The editor toolbar describes the collaboration connection, not an obsolete
+client-side save queue:
 
-- **Unsaved** while changes are waiting for the debounce;
-- **Saving** with a small spinner while a commit is in flight;
-- **Saved** with the last successful timestamp after persistence;
-- **Updated elsewhere** when another member's write arrives over Realtime;
-- **Merged** when your write collided with somebody else's and both survived;
-- **Kept a copy** when both of you edited the same block, so the two versions could not become one and yours was kept as a note of its own;
-- **Save failed** in danger color, with the actual error available and the state actionable for retry.
+- **Connecting** until the server has authorized and synchronized the document;
+- **Live** while the Hocuspocus connection is current;
+- **Offline** after an authorized editor loses the connection, with a tooltip
+  saying changes remain on this device and synchronize on reconnect;
+- **Unavailable** when the server refuses the note, with the reason available.
 
-Say “Saved” only once the Postgres write has completed — never ahead of it, and
-never as a local-only reassurance. Before it completes the state is **Unsaved**
-or **Saving**. The wording stays in the user's vocabulary: no “committed”, no
-“write”, no other borrowing from version control or from the database.
+Metadata operations such as moving, pinning, covers and icons keep their own
+Saving/Save failed feedback where the action happens. Opening, selecting,
+focusing or moving the caret is never presented as a save and must never change
+the note timestamp.
 
-Say **Merged** only when a merge actually happened, and **Kept a copy** when it
-could not. Never claim one for the other, and never let a version disappear
-without saying so: the whole reason these two states exist is that silence used
-to mean somebody's paragraph had been thrown away. Both are one word in the
-readout with the sentence in the tooltip, because the slot holds a state and not
-a paragraph. No conflict marker is ever written into the text of either version.
-
-The readout occupies a slot of one fixed width, sized to the longest state, and
-the states differ enough in length that any other arrangement makes the label
-slide horizontally on every debounce. Anything unbounded — a server error string
-above all — belongs in the tooltip, not in the row.
+The readout occupies one stable slot. Unbounded refusal or server error text
+belongs in a tooltip or alert, never in the toolbar row.
 
 ## Accessibility and motion
 

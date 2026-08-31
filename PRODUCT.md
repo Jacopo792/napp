@@ -60,9 +60,10 @@ open, so the notes actually land here instead of in Apple Notes.
 
 ## Positioning
 
-Account-protected shared notes with a deliberately small backend surface: Supabase
-Auth, Postgres, Realtime and private Storage provide identity, persistence and sync,
-while search and content processing remain local.
+Account-protected shared notes with a deliberately small backend surface:
+Supabase provides identity, RLS, metadata and private files; Yjs/Hocuspocus is
+the authoritative live document path; Redis/Valkey connects overlapping server
+instances. Search and language processing remain local.
 
 ## Operating Context
 
@@ -79,12 +80,13 @@ while search and content processing remain local.
   (`MAPPA 5: SK GROUP (il chaebol che ha catturato i pezzi giusti)`). A note list that
   truncates titles to one short line destroys the user's own naming scheme.
 - Content language is Italian; the interface language is English today.
-- Saves are Postgres row writes and cross-device changes arrive through Realtime.
-  Persistence is still network-bound, so save state remains a visible fact.
+- Title and content edits are Yjs updates. The collaboration server persists the
+  binary and its readable projections transactionally; metadata remains ordinary
+  Postgres writes. Connection state is always visible.
 
 ## Capabilities and Constraints
 
-Confirmed functionality: create / edit / delete notes, fast debounced autosave,
+Confirmed functionality: create / edit / delete notes, simultaneous Yjs editing,
 pinning, folders, colored tags, full-text search, drag a note onto a folder, the
 `viewAs` scope switch every member can use, invitations with a one-time link and
 role, a personal-archive bootstrap and multi-archive chooser, per-member nicknames
@@ -97,8 +99,8 @@ avatar remains writable only by its owner. Appearance supports system, light and
 dark modes, curated palettes, custom colours and an optional device-local
 background image. Opening a note is read-only state selection: it must never
 update `updatedAt` or trigger a database write. Typing and then restoring a
-note's exact saved contents is not an edit either: it cancels the queued write,
-or restores the former edit time when an autosave had already landed.
+note's exact saved contents is not an edit. Notes may also carry emoji or line
+icons and curated or private uploaded covers with vertical repositioning.
 
 **Editor direction (updated 2026-08-30):** use a structured Tiptap rich-text document
 in one reading-and-writing surface, with no Markdown delimiters and no separate preview
@@ -122,6 +124,9 @@ goes through the toolbar's explicit text and URL fields rather than through the 
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
+- Hocuspocus 4 owns live title/body documents. The client authenticates with its
+  current Supabase access token, the server reauthorizes long-lived sockets, and
+  Redis/Valkey is the multi-instance bus rather than durable storage.
 - Supabase Auth public signup is enabled and email confirmation is off (see
   `SECURITY.md` for what that costs). A new account reaches the archive either by
   bootstrapping its own personal archive atomically or by claiming a seven-day
@@ -147,22 +152,12 @@ Technical constraints that outlive any design:
   `presence:<archiveId>` members via `private.presence_archive_id()`, with the
   client joining `config.private = true`. Postgres Changes subscriptions remain
   public channels and are filtered by table RLS.
-- Concurrent edits are merged at block granularity (changed 2026-08-30, after
-  last-write-wins lost a whole burst of typing in practice). The `version`
-  column is the optimistic concurrency check and is now honoured: a conditional
-  update that matches nothing is a conflict, never a reason to write anyway.
-  On a conflict the client merges the top-level blocks each side added or
-  removed relative to the version it started from, so two people adding
-  paragraphs to one note both keep their text — including the case that matters
-  most, two people typing into the single empty paragraph of a note just
-  created, which is two people writing and not a conflict. An empty paragraph
-  or heading is where the caret is parked, not content. When both rewrote the
-  _same_ block and that block actually held something, there is nothing to
-  decide: the remote version stays in the note and the local one is kept as a
-  note of its own. No conflict marker ever reaches
-  the text, and the readout says which of the two happened — `Merged` or
-  `Kept a copy`. The interface must never claim a merge that did not happen,
-  and must never discard a version silently.
+- Title and body are one Yjs document (`Y.Text("title")` and
+  `Y.XmlFragment("default")`). Opening, selecting or focusing a note must not
+  write or change timestamps. IndexedDB stores are scoped by archive, account
+  and note, and never authorize the editor: a server sync must succeed before
+  cached content is shown. Once authorised, an open editor remains usable while
+  offline and converges on reconnect.
 - Folders, tags, pinning, Trash state, Archive state and tag assignments are
   structural rows. Folder and tag names are ordinary account-protected columns.
 - Archive is not Trash. A trashed note is on its way out and is read-only until

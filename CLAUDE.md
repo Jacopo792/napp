@@ -2,11 +2,14 @@
 
 ## Architecture
 
-- React 19 + Vite, a static SPA deployed to GitHub Pages. There is no server of
-  ours.
-- Supabase is the whole backend: Auth, Postgres, Realtime, private Storage.
-- The browser gets two values, `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_PUBLISHABLE_KEY`. Nothing else.
+- React 19 + Vite SPA on GitHub Pages, plus a Node 22 Hocuspocus service in
+  `server/`.
+- Supabase supplies Auth, Postgres RLS, metadata, Realtime and private Storage.
+  Yjs/Hocuspocus is authoritative for live title and content documents.
+- Redis/Valkey is the bus between overlapping server instances; durable Yjs
+  binaries live in `note_documents`.
+- The browser gets `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
+  `VITE_COLLAB_URL`. The service role key belongs only to the server.
 
 Access control is Supabase Auth plus one table. A row in `archive_members` lets
 you read the archive; a row with `role = 'editor'` lets you write it, enforced
@@ -43,6 +46,7 @@ pnpm dev
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:server
 pnpm build
 ```
 
@@ -73,8 +77,7 @@ Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
 variables. No service-role key, account password or archive passphrase belongs
 anywhere near the build.
 
-**Deploy before you drop.** A static SPA has no server to deploy in step with
-the database, so the oldest client still running is whatever `main` last built,
+**Deploy before you drop.** The oldest client still running is whatever `main` last built,
 plus anybody holding an open tab. When four `ciphertext` columns were dropped
 ahead of the client that had stopped selecting them, every query the live build
 made failed and the archive looked empty. The columns had to be re-added, empty,
@@ -132,10 +135,9 @@ turning confirmation back on means configuring `[auth.email.smtp]` first, then
 the address check is worth without it.
 
 The interface offers the finished invitation two ways, and neither passes the
-token through anything of ours: copied by hand, or handed to a `mailto:` that
-the member's own mail app composes and sends. Sending it server-side would need
-a server we do not have, and would put the token somewhere it currently never
-goes.
+token through an outbound service: copied by hand, or handed to a `mailto:`
+that the member's own mail app composes and sends. The collaboration server has
+no mail capability and never receives invitation tokens.
 
 `pnpm add:member` is the local administrative path — it signs in as an existing
 member and writes the missing row, with no service-role key.
@@ -150,43 +152,29 @@ connected" only means this account has no row for _this_ archive yet.
 
 ## Two people in one note
 
-The document is the unit of the write, so a note saved by two people at once is
-the one place text can be lost. It was being lost. `saveNote` wrote
-conditionally on `version` and then, when the condition matched nothing —
-exactly the signal that somebody else had written — re-read the current version
-and rewrote the same payload on top of it, four times over. Silent, total, no
-error anywhere.
+Title and content are one Yjs document. The browser holds it in memory and in
+an IndexedDB store scoped by archive, account and note; Hocuspocus distributes
+updates and persists the binary plus the readable Postgres projections.
 
-The rule now:
+The collaboration server is part of the authorization boundary:
 
-- A conditional update that matches nothing is a **conflict**, never a reason to
-  write anyway. `NoteConflict` carries the row that is actually there, so the
-  merge costs no extra round trip.
-- `mergeDocuments()` in `src/features/editor/lib/merge.ts` is a three-way merge
-  over the document's **top-level blocks**. It does not merge prose, and it
-  never writes a marker into the text. Blocks are compared by identity — the
-  same JSON is the same block — and the changed window on each side is found by
-  trimming the common prefix and suffix rather than by an LCS, which is exact
-  for edits that sit in one place.
-- Overlapping windows are resolved when what **both sides replaced was blank** —
-  an empty paragraph or heading. A new note is exactly one empty paragraph, so
-  two people opening one to talk both type into the same block; that is two
-  people writing, not a conflict, and both texts are kept in order. Anything
-  holding content — words, an image, a table — is real, and two sides rewriting
-  the same real block returns `null`.
-- On `null` the remote version stays in the note and the local one becomes a
-  note of its own, `"<title> — your version"`. Nothing is discarded either way,
-  and the readout says which happened.
-- The merge needs three documents, so `draft.ts` keeps the `base` each draft
-  departed from. **The base must always be a document the archive actually
-  holds** — set it to what is on screen and the next merge reads the other
-  person's blocks as a deletion. `reconcileDraft()` is the one that sets both
-  together, for keystrokes made while a merged write was in flight.
+- The caller's Supabase token is checked at connection and rechecked while the
+  socket remains open. Membership allows reading; the archive role, Trash and
+  archived-note visibility decide writing.
+- Awareness identity is stamped by the server. Never trust a browser-provided
+  nickname, account id or caret colour.
+- A local cache never opens an editor. The server must authorize and complete a
+  sync first; after that, an open editor may continue offline and reconnect.
+- Redis/Valkey carries Yjs and awareness updates between instances. It is not
+  persistence, and the app must still work with one instance when REDIS_URL is
+  absent.
+- Opening, selecting, focusing or receiving an awareness update must not write
+  the note or change updated_at. Only a readable document change is persisted.
 
-`applySnapshot` still withholds remote content from a note you are typing in,
-and that is fine now: the merge on the next save (250 ms after you pause) is
-what delivers it. Do not make it apply remote content to a dirty draft — that
-is the overwrite this whole section exists to prevent.
+The old draft/three-way merge path is compatibility code for a pre-Yjs client,
+not the live writer. Do not call saveNote() from the collaborative editor.
+Exports must project the live Yjs document so they include text still being
+typed.
 
 ## Members and profiles
 

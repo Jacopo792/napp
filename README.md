@@ -4,11 +4,10 @@ A private notes application for two people who share one archive. Each signs in
 with their own account, both read every note, and each person's material keeps
 its own scope so the archive reads as two desks rather than one pile.
 
-It is a static React single-page application with Supabase behind it. There is
-no server of our own: Supabase Auth is the identity, Postgres row-level security
-is the access boundary, Realtime carries the other person's edits, private
-Storage holds pictures and attachments under the same rule, and Presence is
-opt-in and visible only while you share your own.
+It is a React single-page application backed by Supabase and a small
+Hocuspocus collaboration service. Supabase Auth is the identity, Postgres
+row-level security is the access boundary, Yjs carries simultaneous edits,
+private Storage holds pictures and attachments, and Presence is opt-in.
 
 Written for long-form study material — multi-section notes, long titles, Italian
 — rather than quick capture, and tuned first for a wide desktop window, with a
@@ -30,12 +29,14 @@ separate composition for the phone.
   policy rather than by a filtered list.
 - **A scope switch** built from the roster: your notes, and the other member's,
   by nickname. Each account opens on its own scope.
-- **Realtime sync with a block-level merge.** Two people writing in one note both
-  keep their text: a write that collides is merged by top-level block, not
-  overwritten. When both edited the same block, the remote version stays and
-  yours is kept as a note of its own. Save state is always visible: Unsaved,
-  Saving, Saved with the time, Updated elsewhere, Merged, Kept a copy, Save
-  failed with the error and a retry.
+- **Simultaneous editing with Yjs.** Title and body are one shared document,
+  Hocuspocus authenticates every connection through Supabase, Redis/Valkey
+  links overlapping server instances, and IndexedDB keeps an authorised open
+  document usable through a disconnect. The toolbar says Connecting, Live or
+  Offline; optional presence adds collaborative carets.
+- **Page identity.** Notes can carry an emoji or line icon and a curated or
+  privately uploaded cover. Uploaded covers can be replaced, removed and
+  repositioned vertically without rewriting the note document.
 - **Two seats, enforced by the database.** `archives.seat_limit` defaults to 2, a
   trigger on `archive_members` refuses the row past it, and issuing an invitation
   counts the seats unclaimed invitations already hold. The column takes 1–8, so a
@@ -75,9 +76,10 @@ separate composition for the phone.
   corrections it made — nothing to fix writes nothing at all. Common,
   unambiguous English contractions are also fixed as the word is completed;
   after two automatic corrections of one spelling, the writer's third use is
-  left alone. Everything stays in the browser: no API key, no token store and
-  no server. The manual proofreader can be switched off in Settings, and then
-  its row is absent rather than greyed.
+  left alone. Everything stays in the browser: no API key, token store or
+  remote request. The manual proofreader can be switched off in Settings, and then
+  its row is absent rather than greyed. These language tools use no remote
+  application service.
 - Themes, wallpapers, an accent colour, four reading axes (size, measure, weight,
   leading), and right-click menus on notes, folders and the note page.
 
@@ -89,16 +91,23 @@ pnpm install
 pnpm dev
 ```
 
-`.env.local` needs two values, both meant to reach the browser:
+`.env.local` needs three public values meant to reach the browser:
 
 ```
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_COLLAB_URL=ws://127.0.0.1:1234
 ```
 
-Nothing else belongs in the client. There is no service-role key, no passphrase
-and no shared secret in the bundle: an account plus a row in `archive_members`
-is the whole of the access control.
+The collaboration service is a separate workspace package:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... pnpm --filter @notes-app/collab-server start
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` belongs only to that server. It persists Yjs binary
+documents but never decides access; authorization is performed with the
+caller's Supabase token and the existing `archive_members` RLS boundary.
 
 ### Without a Supabase project
 
@@ -117,6 +126,7 @@ change, and it is what the layout work here is verified against.
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:server
 pnpm build
 ```
 
@@ -124,15 +134,17 @@ All four run on every pull request.
 
 ## How it fits together
 
-`src/routes/notes.tsx` owns the workspace state and the save pipeline.
+`src/routes/notes.tsx` owns workspace and metadata state.
 `src/components/` holds the sidebar, note list, menus and the avatar cropper.
 `src/features/editor/` holds the editor domain — `components/` for
 `EditorToolbar`, `RichTextEditor`, `NoteEditor` and `TitleField`, `lib/` for
-`draft`, `content`, `merge`, `exchange`, `attachments`, `pdf`, `translation` and
+`content`, `ydoc`, `exchange`, `attachments`, `pdf`, `translation` and
 `proofread`. `src/lib/` holds the
 rest with no markup in it: the Supabase client, session and archive bootstrap,
 invite and role helpers, sync, private presence, avatar cache, image
-processing, appearance and reading axes.
+processing, appearance, reading axes and the collaboration provider. `server/`
+holds the Hocuspocus service, continuous authorization, persistence and health
+probes.
 
 Persistence is deliberately plain. Note documents are versioned JSONB with a
 plain-text body for search and previews; folder and tag names are ordinary
@@ -182,9 +194,11 @@ own archive, not a membership.
 
 ## Deployment
 
-Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from repository
-variables. Nothing secret is involved, because the client holds nothing secret.
+Pushing to `main` publishes only after frontend checks, the real local Supabase
+integration suite, multi-instance Redis tests and the server image build pass.
+The Pages build reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
+`VITE_COLLAB_URL`; the collaboration service is deployed separately from
+`render.yaml`.
 
 The database must stay compatible with the last deployed client: an old build in
 an open tab still queries the columns it was built against. Deploy the client

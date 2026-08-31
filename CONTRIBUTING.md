@@ -19,8 +19,9 @@ That is enough for anything that does not touch the database: the preview runs
 the whole interface against an in-memory fixture, with no credentials and no
 archive. Sign in with any email and password.
 
-For work that does touch Supabase you need a project of your own and a
-`.env.local` — see the README.
+For work that touches persistence or collaboration, start local Supabase and a
+Valkey-compatible Redis on port 6380, then run the server workspace described
+in the README.
 
 ## The loop
 
@@ -28,10 +29,13 @@ For work that does touch Supabase you need a project of your own and a
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:server
 pnpm build
 ```
 
-All four run on every pull request, so run them before opening one. Formatting
+The CI also runs the server against a fresh local Supabase, exercises two
+instances through Redis, and builds the Docker image. Run `pnpm healthcheck`
+before opening a pull request. Formatting
 is Prettier through ESLint; `pnpm exec eslint . --fix` settles it.
 
 ## Branches
