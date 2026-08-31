@@ -32,6 +32,7 @@ import {
   persistMetaDiff,
   revokeArchiveInvite,
   saveNote,
+  updateNoteProperties,
   saveProfile,
   setArchiveMemberRole,
   uploadAvatar,
@@ -975,6 +976,31 @@ function NotesPage() {
     if (!current) throw new Error("Sign in again to open this attachment");
     return downloadObject(current, objectId, fileTypes.current.get(objectId) ?? "application/pdf");
   }, []);
+
+  const handleUpdatePageProperties = useCallback(
+    async (values: Pick<Note, "pageIcon" | "cover">) => {
+      const current = sessionRef.current;
+      const noteId = selectedIdRef.current;
+      if (!current || !noteId || !canWriteArchive) throw new Error("This archive is view only");
+      const previous = entriesRef.current.find((entry) => entry.note.id === noteId);
+      if (!previous) return;
+      const changed = { ...previous, note: { ...previous.note, ...values } };
+      entriesRef.current = entriesRef.current.map((entry) =>
+        entry.note.id === noteId ? changed : entry,
+      );
+      setEntries(entriesRef.current);
+      try {
+        await updateNoteProperties(current, noteId, values);
+      } catch (reason) {
+        entriesRef.current = entriesRef.current.map((entry) =>
+          entry.note.id === noteId ? previous : entry,
+        );
+        setEntries(entriesRef.current);
+        throw reason;
+      }
+    },
+    [canWriteArchive],
+  );
 
   /* The editor has already written the words into the draft store; the page
      only has to decide when they reach Postgres. */
@@ -1979,6 +2005,7 @@ function NotesPage() {
                     onUploadFile={handleUploadFile}
                     resolveImage={resolveImage}
                     resolveFile={resolveFile}
+                    onUpdatePageProperties={handleUpdatePageProperties}
                     navigationAction={
                       <button
                         type="button"
@@ -2103,6 +2130,7 @@ function NotesPage() {
               onUploadFile={handleUploadFile}
               resolveImage={resolveImage}
               resolveFile={resolveFile}
+              onUpdatePageProperties={handleUpdatePageProperties}
               onContextMenu={
                 canWriteArchive
                   ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })

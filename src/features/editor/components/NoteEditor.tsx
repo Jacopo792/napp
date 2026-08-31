@@ -19,6 +19,7 @@ import { translateText, type TranslationLanguage } from "@/features/editor/lib/t
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
+import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
 
 interface Props {
   mobile?: boolean;
@@ -45,6 +46,7 @@ interface Props {
   readers?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
+  onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
 }
 
 /* The toolbar's three groups — the mode label, the format cluster, the save
@@ -91,6 +93,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     headerActions,
     readers,
     onContextMenu,
+    onUpdatePageProperties,
   },
   ref,
 ) {
@@ -446,6 +449,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     );
   }
 
+  const updatePageProperties = (values: PagePropertyValues) => {
+    void onUpdatePageProperties?.(values).catch((reason) =>
+      setFailure(reason instanceof Error ? reason.message : "Could not update this page"),
+    );
+  };
+
   return (
     <section
       key={entry.note.id}
@@ -493,6 +502,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       )}
 
       {fileInputs}
+
+      <PageCover
+        cover={entry.note.cover}
+        icon={entry.note.pageIcon}
+        canEdit={canEdit}
+        resolveImage={resolveImage}
+        uploadImage={onUploadImage}
+        onChange={updatePageProperties}
+        onError={setFailure}
+      />
 
       {findOpen && (
         <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
@@ -554,6 +573,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <header className={`shrink-0 ${mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}`}>
         <div className="measure">
           <div className="font-sans text-base">
+            <PageIdentity
+              icon={entry.note.pageIcon}
+              cover={entry.note.cover}
+              canEdit={canEdit}
+              onChange={updatePageProperties}
+            />
             {viewingAsPartner && (
               <p className="label mb-3 text-ink-3">
                 {partnerName}&apos;s archive{!canEdit && " · read only"}

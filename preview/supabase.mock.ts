@@ -140,6 +140,17 @@ export async function createNote(
   return { note: { ...note }, version: 1 };
 }
 
+export async function updateNoteProperties(
+  _session: AppSession,
+  noteId: string,
+  values: Pick<Note, "pageIcon" | "cover">,
+): Promise<void> {
+  await sleep(120);
+  const entry = notes.get(noteId);
+  if (!entry) return;
+  entry.note = { ...entry.note, ...structuredClone(values) };
+}
+
 export async function saveNote(
   _session: AppSession,
   note: Note,

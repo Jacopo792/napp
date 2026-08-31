@@ -4228,3 +4228,149 @@
 .rich-media-file-action.is-danger:hover {
   color: var(--danger);
 }
+
+.note-page-cover {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  touch-action: none;
+}
+
+.note-page-cover.is-placing {
+  cursor: ns-resize;
+}
+
+.note-cover-actions {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-cover-actions > span,
+.note-property-action {
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: var(--radius-md);
+  background: rgb(20 20 22 / 0.76);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.2);
+  color: #f5f2ed;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  backdrop-filter: blur(12px);
+}
+
+.note-cover-actions > span {
+  padding: 6px 9px;
+}
+
+.note-property-action {
+  padding: 6px 10px;
+}
+
+.note-property-action:hover {
+  background: rgb(20 20 22 / 0.9);
+}
+
+.note-cover-picker {
+  width: 286px;
+  cursor: default;
+}
+
+.note-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.note-cover-grid button {
+  height: 52px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+}
+
+.note-cover-grid button[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.note-page-identity {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.note-page-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 27px;
+}
+
+.note-page-icon svg {
+  width: 25px;
+  height: 25px;
+  stroke-width: 1.7;
+}
+
+.note-page-icon:hover:not(:disabled),
+.note-add-property:hover {
+  background: var(--paper-2);
+}
+
+.note-add-property {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: var(--radius-md);
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
+.note-icon-picker {
+  width: 298px;
+}
+
+.note-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+
+.note-icon-grid button {
+  display: grid;
+  height: 31px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ink-2);
+  font-size: 18px;
+}
+
+.note-icon-grid button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .note-page-cover {
+    height: 160px;
+  }
+
+  .note-cover-actions {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .note-cover-actions > span {
+    display: none;
+  }
+}

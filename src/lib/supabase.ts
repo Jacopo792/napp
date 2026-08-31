@@ -379,6 +379,21 @@ export async function createNote(
   return { note, version: data!.version };
 }
 
+/** Updates page decoration without serialising title or content, so changing a
+ * cover can never overwrite somebody else's live document edit. */
+export async function updateNoteProperties(
+  session: AppSession,
+  noteId: string,
+  values: Pick<Note, "pageIcon" | "cover">,
+): Promise<void> {
+  const result = await supabase
+    .from("notes")
+    .update({ page_icon: values.pageIcon, cover: values.cover })
+    .eq("archive_id", session.archiveId)
+    .eq("id", noteId);
+  fail(result.error);
+}
+
 /** Somebody else wrote this note since the caller last read it. Carries the
  *  row that is actually there, so the caller can merge without a second trip. */
 export class NoteConflict extends Error {
