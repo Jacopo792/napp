@@ -27,6 +27,27 @@ export function localStack(): LocalStack | null {
   }
 }
 
+/* GoTrue signs a token from the clock inside its container, and that clock
+   can sit a fraction ahead of this host's. A token stamped in the future is
+   rejected by the very next request until the two agree, which is a second at
+   most and has nothing to do with what any test is asserting.
+
+   Only this one message is waited out, and only a few times. Anything else is
+   the answer the test asked for and is returned on the first try — a fixture
+   that swallowed errors would turn a broken server into a slow one. */
+const FUTURE_JWT = "JWT issued at future";
+
+async function pastClockSkew<T extends { error: { message: string } | null }>(
+  step: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const result = await step();
+    if (!result.error?.message.includes(FUTURE_JWT)) return result;
+    await new Promise((wake) => setTimeout(wake, 200));
+  }
+  return step();
+}
+
 export interface Account {
   userId: string;
   email: string;
@@ -43,13 +64,15 @@ export async function makeAccount(stack: LocalStack, label: string): Promise<Acc
   });
   const email = `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
   const password = "correct horse battery staple";
-  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const created = await pastClockSkew(() =>
+    admin.auth.admin.createUser({ email, password, email_confirm: true }),
+  );
   if (created.error) throw new Error(created.error.message);
 
   const client = createClient(stack.apiUrl, stack.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const signedIn = await client.auth.signInWithPassword({ email, password });
+  const signedIn = await pastClockSkew(() => client.auth.signInWithPassword({ email, password }));
   if (signedIn.error) throw new Error(signedIn.error.message);
 
   const userId = signedIn.data.user!.id;
@@ -61,7 +84,11 @@ export async function makeAccount(stack: LocalStack, label: string): Promise<Acc
   // Plain insert, the way `ensureProfile()` does it: PostgREST's upsert takes
   // the `on conflict do update` path and that does not satisfy this table's
   // insert-only policy for `authenticated`.
-  const profile = await client.from("profiles").insert({ user_id: userId, nickname });
+  // `await`ed inside the callback: PostgREST's builder is a thenable, not a
+  // promise, and `pastClockSkew` has to be handed one that is.
+  const profile = await pastClockSkew(
+    async () => await client.from("profiles").insert({ user_id: userId, nickname }),
+  );
   if (profile.error) throw new Error(profile.error.message);
 
   const token = signedIn.data.session!.access_token;
