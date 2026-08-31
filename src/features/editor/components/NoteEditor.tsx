@@ -510,7 +510,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       <PageCover
         cover={entry.note.cover}
-        icon={entry.note.pageIcon}
+        photo={entry.note.photo}
         canEdit={canEdit}
         resolveImage={resolveImage}
         uploadImage={onUploadImage}
@@ -579,9 +579,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         <div className="measure">
           <div className="font-sans text-base">
             <PageIdentity
-              icon={entry.note.pageIcon}
+              photo={entry.note.photo}
               cover={entry.note.cover}
               canEdit={canEdit}
+              resolveImage={resolveImage}
               onChange={updatePageProperties}
             />
             {viewingAsPartner && (

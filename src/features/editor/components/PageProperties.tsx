@@ -1,106 +1,18 @@
-import {
-  BookOpen,
-  Bookmark,
-  Check,
-  Flag,
-  Heart,
-  Home,
-  Image as ImageIcon,
-  Lightbulb,
-  Smile,
-  Star,
-  Target,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { Image as ImageIcon, Upload } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useDismiss } from "@/components/useDismiss";
+import { useStoredImage } from "@/lib/media";
 import { clampCoverPosition, COVER_PRESETS, coverBackground } from "@/lib/pageProperties";
-import { PAGE_SYMBOLS, type NoteCover, type PageIcon, type PageSymbol } from "@/lib/types";
-
-const EMOJI = [
-  "📝",
-  "📚",
-  "✅",
-  "💡",
-  "🎯",
-  "⭐",
-  "🏠",
-  "❤️",
-  "🔖",
-  "🚩",
-  "📌",
-  "🗓️",
-  "☀️",
-  "🌙",
-  "🔥",
-  "🌱",
-  "🧭",
-  "🧩",
-  "🎧",
-  "🍵",
-  "✈️",
-  "🏔️",
-  "💬",
-  "📎",
-];
-
-const SYMBOLS = {
-  book: BookOpen,
-  bookmark: Bookmark,
-  bulb: Lightbulb,
-  check: Check,
-  flag: Flag,
-  heart: Heart,
-  home: Home,
-  star: Star,
-  target: Target,
-} satisfies Record<PageSymbol, typeof BookOpen>;
+import type { NoteCover, NotePhoto } from "@/lib/types";
 
 export interface PagePropertyValues {
-  pageIcon: PageIcon;
+  photo: NotePhoto;
   cover: NoteCover;
-}
-
-export function PageIconGlyph({ icon }: { icon: PageIcon }) {
-  if (!icon) return null;
-  if (icon.kind === "emoji") return <>{icon.value}</>;
-  const Glyph = SYMBOLS[icon.value];
-  return <Glyph aria-hidden="true" />;
-}
-
-function useCoverUrl(cover: NoteCover, resolveImage: (objectId: string) => Promise<Blob>) {
-  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
-  const objectId = cover?.kind === "upload" ? cover.objectId : null;
-
-  useEffect(() => {
-    if (!objectId) {
-      setUploadedUrl(null);
-      return;
-    }
-    let live = true;
-    let url = "";
-    void resolveImage(objectId)
-      .then((blob) => {
-        if (!live) return;
-        url = URL.createObjectURL(blob);
-        setUploadedUrl(url);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [objectId, resolveImage]);
-
-  if (!cover) return null;
-  if (cover.kind === "preset") return coverBackground(cover);
-  return uploadedUrl ? `url("${uploadedUrl}")` : null;
 }
 
 export function PageCover({
   cover,
-  icon,
+  photo,
   canEdit,
   resolveImage,
   uploadImage,
@@ -108,14 +20,14 @@ export function PageCover({
   onError,
 }: {
   cover: NoteCover;
-  icon: PageIcon;
+  photo: NotePhoto;
   canEdit: boolean;
   resolveImage: (objectId: string) => Promise<Blob>;
   uploadImage: (file: File) => Promise<string>;
   onChange: (values: PagePropertyValues) => void;
   onError: (message: string) => void;
 }) {
-  const background = useCoverUrl(cover, resolveImage);
+  const uploaded = useStoredImage(cover?.kind === "upload" ? cover.objectId : null, resolveImage);
   const [position, setPosition] = useState(cover?.position ?? 0.5);
   const [placing, setPlacing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -127,14 +39,19 @@ export function PageCover({
   useEffect(() => setPosition(cover?.position ?? 0.5), [cover]);
   if (!cover) return null;
   const activeCover = cover;
+  const image = cover.kind === "preset" ? coverBackground(cover) : uploaded && `url("${uploaded}")`;
 
   function startReposition(event: ReactPointerEvent<HTMLDivElement>) {
     if (!canEdit || activeCover.kind !== "upload") return;
+    /* The controls sit on the picture, so a press on one is a press on the
+       button and nothing else. Capturing the pointer here would retarget the
+       click that follows to this surface — which is exactly how Change cover
+       and Remove came to do nothing once a picture was set. */
+    if ((event.target as HTMLElement).closest(".note-cover-actions")) return;
     const box = surfaceRef.current?.getBoundingClientRect();
     if (!box) return;
     const startY = event.clientY;
     const initial = position;
-    event.currentTarget.setPointerCapture(event.pointerId);
     setPlacing(true);
     const move = (moved: PointerEvent) =>
       setPosition(clampCoverPosition(initial + (moved.clientY - startY) / box.height));
@@ -144,7 +61,7 @@ export function PageCover({
       setPlacing(false);
       setPosition((settled) => {
         if (settled !== activeCover.position)
-          onChange({ pageIcon: icon, cover: { ...activeCover, position: settled } });
+          onChange({ photo, cover: { ...activeCover, position: settled } });
         return settled;
       });
     };
@@ -157,7 +74,7 @@ export function PageCover({
     setBusy(true);
     try {
       const objectId = await uploadImage(file);
-      onChange({ pageIcon: icon, cover: { kind: "upload", objectId, position: 0.5 } });
+      onChange({ photo, cover: { kind: "upload", objectId, position: 0.5 } });
       onError("");
       setPickerOpen(false);
     } catch (reason) {
@@ -172,8 +89,13 @@ export function PageCover({
     <div
       ref={surfaceRef}
       className={`note-page-cover ${placing ? "is-placing" : ""}`}
+      /* Longhands, never the `background` shorthand: React writes only the
+         properties that changed, so a shorthand applied after a new picture
+         was chosen reset `background-position` to the top and the focal point
+         set by dragging was lost. */
       style={{
-        background: background ?? "var(--paper-2)",
+        backgroundColor: "var(--paper-2)",
+        backgroundImage: image || undefined,
         backgroundSize: "cover",
         backgroundPosition: `center ${position * 100}%`,
       }}
@@ -198,10 +120,7 @@ export function PageCover({
               Change cover
             </button>
             {pickerOpen && (
-              <div
-                className="popover note-cover-picker absolute top-full right-0 z-50 mt-2 p-2"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
+              <div className="popover note-cover-picker absolute top-full right-0 z-50 mt-2 p-2">
                 <p className="menu-label">Gallery</p>
                 <div className="note-cover-grid">
                   {COVER_PRESETS.map((preset) => (
@@ -213,7 +132,7 @@ export function PageCover({
                       style={{ background: preset.background }}
                       onClick={() => {
                         onChange({
-                          pageIcon: icon,
+                          photo,
                           cover: { kind: "preset", id: preset.id, position: 0.5 },
                         });
                         setPickerOpen(false);
@@ -236,7 +155,7 @@ export function PageCover({
           <button
             type="button"
             className="note-property-action"
-            onClick={() => onChange({ pageIcon: icon, cover: null })}
+            onClick={() => onChange({ photo, cover: null })}
           >
             Remove
           </button>
@@ -246,56 +165,35 @@ export function PageCover({
   );
 }
 
+/** The note's own picture, and the one control the page still offers itself.
+ *  A photo is set from the note's context menu, where the note is named. */
 export function PageIdentity({
-  icon,
+  photo,
   cover,
   canEdit,
+  resolveImage,
   onChange,
 }: {
-  icon: PageIcon;
+  photo: NotePhoto;
   cover: NoteCover;
   canEdit: boolean;
+  resolveImage: (objectId: string) => Promise<Blob>;
   onChange: (values: PagePropertyValues) => void;
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useDismiss(pickerOpen, () => setPickerOpen(false));
-  const choose = (next: PageIcon) => {
-    onChange({ pageIcon: next, cover });
-    setPickerOpen(false);
-  };
+  const url = useStoredImage(photo?.objectId ?? null, resolveImage);
+
+  if (!photo && (!canEdit || cover)) return null;
 
   return (
     <div className="note-page-identity">
-      {icon ? (
-        <div ref={pickerRef} className="relative inline-flex">
-          <button
-            type="button"
-            className="note-page-icon"
-            aria-label="Change page icon"
-            disabled={!canEdit}
-            onClick={() => setPickerOpen((open) => !open)}
-          >
-            <PageIconGlyph icon={icon} />
-          </button>
-          {pickerOpen && <IconPicker onChoose={choose} onRemove={() => choose(null)} />}
-        </div>
-      ) : canEdit ? (
-        <button
-          type="button"
-          className="note-add-property"
-          onClick={() => onChange({ pageIcon: { kind: "emoji", value: "📝" }, cover })}
-        >
-          <Smile size={15} />
-          Add icon
-        </button>
-      ) : null}
+      {photo && <span className="note-photo is-page">{url && <img src={url} alt="" />}</span>}
       {!cover && canEdit && (
         <button
           type="button"
           className="note-add-property"
           onClick={() =>
             onChange({
-              pageIcon: icon,
+              photo,
               cover: { kind: "preset", id: COVER_PRESETS[0].id, position: 0.5 },
             })
           }
@@ -304,54 +202,6 @@ export function PageIdentity({
           Add cover
         </button>
       )}
-    </div>
-  );
-}
-
-function IconPicker({
-  onChoose,
-  onRemove,
-}: {
-  onChoose: (icon: PageIcon) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="popover note-icon-picker absolute top-full left-0 z-50 mt-1 p-2">
-      <div className="flex items-center justify-between">
-        <p className="menu-label">Emoji</p>
-        <button type="button" className="icon-button" aria-label="Remove icon" onClick={onRemove}>
-          <Trash2 size={15} />
-        </button>
-      </div>
-      <div className="note-icon-grid">
-        {EMOJI.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            aria-label={emoji}
-            onClick={() => onChoose({ kind: "emoji", value: emoji })}
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-      <div className="menu-separator" />
-      <p className="menu-label">Symbols</p>
-      <div className="note-icon-grid">
-        {PAGE_SYMBOLS.map((symbol) => {
-          const Glyph = SYMBOLS[symbol];
-          return (
-            <button
-              key={symbol}
-              type="button"
-              aria-label={symbol}
-              onClick={() => onChoose({ kind: "symbol", value: symbol })}
-            >
-              <Glyph size={18} />
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

@@ -15,10 +15,12 @@ import {
   FileText,
   FolderInput,
   Image as ImageIcon,
+  ImageOff,
   ListChecks,
   Paperclip,
   Pin,
   RotateCcw,
+  Camera,
   Search,
   SquarePen,
   Table2,
@@ -26,6 +28,9 @@ import {
   X,
 } from "lucide-react";
 import type { Meta } from "@/lib/types";
+import { AvatarCropper } from "./AvatarCropper";
+import type { AvatarCrop } from "@/lib/image";
+import { useStoredImage } from "@/lib/media";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { documentGlyph } from "@/features/editor/lib/content";
@@ -72,6 +77,9 @@ interface Props {
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (noteId: string) => void;
   onMoveToFolder: (noteId: string, folderId: string | null) => void;
+  /** A picture for the note itself. A null file takes the current one off. */
+  onSetPhoto: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
+  resolveImage: (objectId: string) => Promise<Blob>;
 }
 
 /* ── What a note is, at a glance ─────────────────────────────────────────────
@@ -109,6 +117,7 @@ const Row = memo(function Row({
   onDeleteForever,
   onTogglePin,
   onContextMenu,
+  resolveImage,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -127,6 +136,7 @@ const Row = memo(function Row({
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
+  resolveImage: (objectId: string) => Promise<Blob>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -151,6 +161,7 @@ const Row = memo(function Row({
   const pinned = noteMeta?.pinned === true;
   const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
+  const photoUrl = useStoredImage(entry.note.photo?.objectId ?? null, resolveImage);
 
   return (
     <div
@@ -181,16 +192,24 @@ const Row = memo(function Row({
             : "hover:bg-page"
       }`}
     >
-      <span
-        title={glyph.label}
-        aria-label={glyph.label}
-        role="img"
-        className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
-          selected ? "is-selected" : ""
-        } ${pinned ? "is-pinned" : ""}`}
-      >
-        <Glyph size={mobile && !gallery ? 16 : 14} />
-      </span>
+      {/* The note's own picture stands where its kind-of-document glyph
+          stands: one place in the row says what you are about to open. */}
+      {entry.note.photo ? (
+        <span className={`note-photo is-row ${gallery ? "is-gallery" : ""}`}>
+          {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
+        </span>
+      ) : (
+        <span
+          title={glyph.label}
+          aria-label={glyph.label}
+          role="img"
+          className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
+            selected ? "is-selected" : ""
+          } ${pinned ? "is-pinned" : ""}`}
+        >
+          <Glyph size={mobile && !gallery ? 16 : 14} />
+        </span>
+      )}
 
       <div className="min-w-0 flex-1">
         <p
@@ -357,6 +376,8 @@ export function NoteList({
   onDeleteForever,
   onTogglePin,
   onMoveToFolder,
+  onSetPhoto,
+  resolveImage,
 }: Props) {
   const hasQuery = query.trim().length > 0;
   /* The page speaks in note ids; the rows hand back the whole entry. One stable
@@ -373,6 +394,11 @@ export function NoteList({
   const rowMenu = useContextMenu<NoteEntry>();
   const [moving, setMoving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  /* Which note the picture being cut is for: the menu is gone by the time the
+     cropper is on screen. */
+  const [cropping, setCropping] = useState<{ noteId: string; file: File } | null>(null);
+  const photoNoteRef = useRef<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const closeRowMenu = useCallback(() => {
     rowMenu.close();
     setMoving(false);
@@ -513,6 +539,27 @@ export function NoteList({
               <Pin size={16} />
               {menuPinned ? "Unpin note" : "Pin note"}
             </MenuButton>
+            <MenuButton
+              onClick={() => {
+                photoNoteRef.current = menuEntry.note.id;
+                photoInputRef.current?.click();
+                closeRowMenu();
+              }}
+            >
+              <Camera size={16} />
+              {menuEntry.note.photo ? "Change photo" : "Add photo"}
+            </MenuButton>
+            {menuEntry.note.photo && (
+              <MenuButton
+                onClick={() => {
+                  onSetPhoto(menuEntry.note.id, null);
+                  closeRowMenu();
+                }}
+              >
+                <ImageOff size={16} />
+                Remove photo
+              </MenuButton>
+            )}
             <div className="menu-separator" />
             <MenuButton onClick={() => setMoving(true)}>
               <FolderInput size={16} />
@@ -544,6 +591,36 @@ export function NoteList({
       </ContextMenu>
     ) : null;
 
+  /* One input and one cropper for the whole list: the menu names the note,
+     the ref carries it across the file dialog. */
+  const photoPicker = (
+    <>
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          const noteId = photoNoteRef.current;
+          if (file && noteId) setCropping({ noteId, file });
+          event.target.value = "";
+        }}
+      />
+      {cropping && (
+        <AvatarCropper
+          file={cropping.file}
+          busy={false}
+          onCancel={() => setCropping(null)}
+          onConfirm={(crop) => {
+            onSetPhoto(cropping.noteId, cropping.file, crop);
+            setCropping(null);
+          }}
+        />
+      )}
+    </>
+  );
+
   const renderedGroups = groups.map((group, groupIndex) => (
     <section key={group.id} className="note-group" aria-labelledby={`note-group-${group.id}`}>
       <div className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}>
@@ -569,6 +646,7 @@ export function NoteList({
             onDeleteForever={onDeleteForever}
             onTogglePin={togglePinEntry}
             onContextMenu={openRowMenu}
+            resolveImage={resolveImage}
           />
         ))}
       </div>
@@ -683,6 +761,7 @@ export function NoteList({
           </button>
         )}
         {rowMenuPanel}
+        {photoPicker}
       </section>
     );
   }
@@ -773,6 +852,7 @@ export function NoteList({
       </div>
       {footer}
       {rowMenuPanel}
+      {photoPicker}
     </section>
   );
 }

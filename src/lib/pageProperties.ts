@@ -1,4 +1,4 @@
-import { PAGE_SYMBOLS, type NoteCover, type PageIcon } from "./types.ts";
+import type { NoteCover, NotePhoto } from "./types.ts";
 
 export const COVER_PRESETS = [
   {
@@ -18,7 +18,7 @@ export const COVER_PRESETS = [
 ] as const;
 
 const presetIds = new Set<string>(COVER_PRESETS.map((preset) => preset.id));
-const symbols = new Set<string>(PAGE_SYMBOLS);
+const OBJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function clampCoverPosition(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -26,19 +26,15 @@ export function clampCoverPosition(value: unknown): number {
     : 0.5;
 }
 
-export function pageIconFromStorage(value: unknown): PageIcon {
+export function notePhotoFromStorage(value: unknown): NotePhoto {
   if (!value || typeof value !== "object") return null;
-  const candidate = value as { kind?: unknown; value?: unknown };
-  if (candidate.kind === "emoji" && typeof candidate.value === "string") {
-    const emoji = candidate.value.trim();
-    return emoji && emoji.length <= 16 ? { kind: "emoji", value: emoji } : null;
-  }
+  const candidate = value as { kind?: unknown; objectId?: unknown };
   if (
-    candidate.kind === "symbol" &&
-    typeof candidate.value === "string" &&
-    symbols.has(candidate.value)
+    candidate.kind === "photo" &&
+    typeof candidate.objectId === "string" &&
+    OBJECT_ID.test(candidate.objectId)
   ) {
-    return { kind: "symbol", value: candidate.value as NonNullable<PageIcon>["value"] } as PageIcon;
+    return { kind: "photo", objectId: candidate.objectId };
   }
   return null;
 }
@@ -62,7 +58,7 @@ export function coverFromStorage(value: unknown): NoteCover {
   if (
     candidate.kind === "upload" &&
     typeof candidate.objectId === "string" &&
-    /^[0-9a-f-]{36}$/i.test(candidate.objectId)
+    OBJECT_ID.test(candidate.objectId)
   ) {
     return { kind: "upload", objectId: candidate.objectId, position };
   }

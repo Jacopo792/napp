@@ -329,6 +329,9 @@
 
   .mobile-editor .rich-text-editor {
     scrollbar-gutter: auto;
+  }
+
+  .mobile-editor .rich-text-content {
     padding-bottom: max(40vh, calc(env(safe-area-inset-bottom) + 6rem));
   }
 
@@ -3872,7 +3875,6 @@
   height: 100%;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding-bottom: 45vh;
   color: var(--ink);
   font-family: var(--font-reading);
   font-size: var(--read-size);
@@ -3880,7 +3882,13 @@
   line-height: var(--read-leading);
 }
 
+/* The run-out below the last line is the content's, not the scroll box's. As
+   padding on the box it was counted inside `height: 100%` under
+   `box-sizing: border-box`: once a cover left the editor shorter than 45vh the
+   used height snapped up to the padding, the box overflowed the pane, and the
+   note read as frozen. */
 .rich-text-content {
+  padding-bottom: 45vh;
   width: 100%;
   min-height: 10rem;
   max-width: var(--read-measure);
@@ -4296,6 +4304,40 @@
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+/* The note's picture: round like a profile picture, because that is what it
+   is — the note wearing a face wherever it is named. */
+.note-photo {
+  display: grid;
+  overflow: hidden;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.note-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.note-photo.is-row {
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+}
+
+.note-photo.is-row.is-gallery {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 8px;
+}
+
+.note-photo.is-page {
+  width: 40px;
+  height: 40px;
+}
+
 .note-page-identity {
   display: flex;
   min-height: 34px;
@@ -4304,23 +4346,6 @@
   margin-bottom: 7px;
 }
 
-.note-page-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: var(--radius-md);
-  color: var(--ink);
-  font-size: 27px;
-}
-
-.note-page-icon svg {
-  width: 25px;
-  height: 25px;
-  stroke-width: 1.7;
-}
-
-.note-page-icon:hover:not(:disabled),
 .note-add-property:hover {
   background: var(--paper-2);
 }
@@ -4334,30 +4359,6 @@
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: 11px;
-}
-
-.note-icon-picker {
-  width: 298px;
-}
-
-.note-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-}
-
-.note-icon-grid button {
-  display: grid;
-  height: 31px;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--ink-2);
-  font-size: 18px;
-}
-
-.note-icon-grid button:hover {
-  background: var(--paper-2);
-  color: var(--ink);
 }
 
 @media (max-width: 700px) {

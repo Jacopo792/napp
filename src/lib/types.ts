@@ -1,23 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 
-export const PAGE_SYMBOLS = [
-  "book",
-  "bookmark",
-  "bulb",
-  "check",
-  "flag",
-  "heart",
-  "home",
-  "star",
-  "target",
-] as const;
-
-export type PageSymbol = (typeof PAGE_SYMBOLS)[number];
-
-export type PageIcon =
-  | { kind: "emoji"; value: string }
-  | { kind: "symbol"; value: PageSymbol }
-  | null;
+/** A picture chosen for a note, the way an account has a profile picture. */
+export type NotePhoto = { kind: "photo"; objectId: string } | null;
 
 export type NoteCover =
   | { kind: "preset"; id: string; position: number }
@@ -34,8 +18,8 @@ export interface Note {
   contentVersion: number;
   /** Original source retained after conversion so migration is reversible. */
   legacyBody: string | null;
-  /** Optional frontispiece shown above the title. */
-  pageIcon: PageIcon;
+  /** Optional picture that stands for the note wherever it is named. */
+  photo: NotePhoto;
   /** Curated or private uploaded cover, with a normalized vertical focal point. */
   cover: NoteCover;
   /**

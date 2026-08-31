@@ -2,7 +2,7 @@ import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
 import { fail, supabase } from "./supabaseClient";
-import { coverFromStorage, pageIconFromStorage } from "./pageProperties";
+import { coverFromStorage, notePhotoFromStorage } from "./pageProperties";
 import {
   noteDocument,
   richTextToPlainText,
@@ -256,7 +256,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         content: document,
         contentVersion: row.content_version,
         legacyBody: legacyBody ?? (row.content_version === 0 ? storedBody : null),
-        pageIcon: pageIconFromStorage(page_icon),
+        photo: notePhotoFromStorage(page_icon),
         cover: coverFromStorage(cover),
         id: row.id,
         ownerId: scopeOf(row.owner_id),
@@ -363,7 +363,7 @@ export async function createNote(
       content: note.content,
       content_version: note.contentVersion,
       legacy_body: note.legacyBody,
-      page_icon: note.pageIcon,
+      page_icon: note.photo,
       cover: note.cover,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
@@ -384,11 +384,11 @@ export async function createNote(
 export async function updateNoteProperties(
   session: AppSession,
   noteId: string,
-  values: Pick<Note, "pageIcon" | "cover">,
+  values: Pick<Note, "photo" | "cover">,
 ): Promise<void> {
   const result = await supabase
     .from("notes")
-    .update({ page_icon: values.pageIcon, cover: values.cover })
+    .update({ page_icon: values.photo, cover: values.cover })
     .eq("archive_id", session.archiveId)
     .eq("id", noteId);
   fail(result.error);
@@ -434,7 +434,7 @@ export async function loadNote(session: AppSession, noteId: string): Promise<Not
     content: document,
     contentVersion: row.content_version,
     legacyBody: row.legacy_body ?? (row.content_version === 0 ? storedBody : null),
-    pageIcon: pageIconFromStorage(row.page_icon),
+    photo: notePhotoFromStorage(row.page_icon),
     cover: coverFromStorage(row.cover),
     ownerId: row.owner_id,
     createdAt: row.created_at,
@@ -468,7 +468,7 @@ export async function saveNote(
       content: note.content,
       content_version: note.contentVersion,
       legacy_body: note.legacyBody,
-      page_icon: note.pageIcon,
+      page_icon: note.photo,
       cover: note.cover,
       updated_at: note.updatedAt,
       version: expectedVersion + 1,

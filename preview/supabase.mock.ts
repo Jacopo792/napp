@@ -143,7 +143,7 @@ export async function createNote(
 export async function updateNoteProperties(
   _session: AppSession,
   noteId: string,
-  values: Pick<Note, "pageIcon" | "cover">,
+  values: Pick<Note, "photo" | "cover">,
 ): Promise<void> {
   await sleep(120);
   const entry = notes.get(noteId);

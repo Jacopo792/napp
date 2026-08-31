@@ -315,7 +315,7 @@ describe("the collaboration server", { skip }, () => {
     const patched = await asUser(local, editor.token)
       .from("notes")
       .update({
-        page_icon: { kind: "symbol", value: "star" },
+        page_icon: { kind: "photo", objectId: crypto.randomUUID() },
         cover: { kind: "preset", id: "forest", position: 0.25 },
       })
       .eq("id", noteId);
@@ -328,6 +328,8 @@ describe("the collaboration server", { skip }, () => {
        check functions coalesce to false: a missing key makes every comparison
        on it null, and a check constraint that evaluates to null passes. */
     const refused: Record<string, unknown>[] = [
+      { page_icon: { kind: "photo", objectId: "../../etc/passwd" } },
+      { page_icon: { kind: "photo" } },
       { page_icon: { kind: "symbol", value: "database" } },
       { page_icon: { kind: "wallpaper", value: "star" } },
       { page_icon: { kind: "symbol" } },

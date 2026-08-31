@@ -20,7 +20,7 @@ function entry(id: string, updatedAt: string, createdAt = updatedAt, title = id)
       content: { type: "doc", content: [{ type: "paragraph" }] },
       contentVersion: 1,
       legacyBody: null,
-      pageIcon: null,
+      photo: null,
       cover: null,
       createdAt,
       updatedAt,

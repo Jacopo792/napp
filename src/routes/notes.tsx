@@ -96,7 +96,7 @@ import { ALL, ARCHIVE, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
-import { useIsCompact } from "@/lib/media";
+import { forgetStoredImage, useIsCompact } from "@/lib/media";
 import { useCollaborativeNote } from "@/lib/collab";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import {
@@ -812,7 +812,7 @@ function NotesPage() {
       content: local.content,
       contentVersion: RICH_TEXT_VERSION,
       legacyBody: null,
-      pageIcon: remote.pageIcon,
+      photo: remote.photo,
       cover: remote.cover,
       ownerId: remote.ownerId,
       createdAt: new Date().toISOString(),
@@ -993,9 +993,9 @@ function NotesPage() {
   }, []);
 
   const handleUpdatePageProperties = useCallback(
-    async (values: Pick<Note, "pageIcon" | "cover">) => {
+    async (values: Pick<Note, "photo" | "cover">, forNoteId?: string) => {
       const current = sessionRef.current;
-      const noteId = selectedIdRef.current;
+      const noteId = forNoteId ?? selectedIdRef.current;
       if (!current || !noteId || !canWriteArchive) throw new Error("This archive is view only");
       const previous = entriesRef.current.find((entry) => entry.note.id === noteId);
       if (!previous) return;
@@ -1015,6 +1015,31 @@ function NotesPage() {
       }
     },
     [canWriteArchive],
+  );
+
+  /* A note's picture is chosen where the note is named — its own context menu
+     — and cut by the cropper the profile picture already uses, so the two
+     pictures are made the same way. Passing null takes it off. */
+  const handleNotePhoto = useCallback(
+    async (noteId: string, file: File | null, crop?: AvatarCrop) => {
+      const current = sessionRef.current;
+      const entry = entriesRef.current.find((item) => item.note.id === noteId);
+      if (!current || !entry) return;
+      const replaced = entry.note.photo?.objectId ?? null;
+      try {
+        let photo: Note["photo"] = null;
+        if (file) {
+          const objectId = crypto.randomUUID();
+          await uploadImage(current, objectId, await prepareAvatar(file, crop));
+          photo = { kind: "photo", objectId };
+        }
+        await handleUpdatePageProperties({ photo, cover: entry.note.cover }, noteId);
+        if (replaced) forgetStoredImage(replaced);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Could not use that picture");
+      }
+    },
+    [handleUpdatePageProperties],
   );
 
   /* The editor has already written the words into the draft store; the page
@@ -1135,7 +1160,7 @@ function NotesPage() {
             content,
             contentVersion: RICH_TEXT_VERSION,
             legacyBody: null,
-            pageIcon: null,
+            photo: null,
             cover: null,
             ownerId: viewAs,
             createdAt: new Date().toISOString(),
@@ -1177,7 +1202,7 @@ function NotesPage() {
       content: structuredClone(EMPTY_RICH_TEXT),
       contentVersion: RICH_TEXT_VERSION,
       legacyBody: null,
-      pageIcon: null,
+      photo: null,
       cover: null,
       ownerId: viewAs,
       createdAt: new Date().toISOString(),
@@ -2011,6 +2036,8 @@ function NotesPage() {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   onMoveToFolder={handleMoveNote}
+                  onSetPhoto={handleNotePhoto}
+                  resolveImage={resolveImage}
                 />
               </section>
             )}
@@ -2132,6 +2159,8 @@ function NotesPage() {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   onMoveToFolder={handleMoveNote}
+                  onSetPhoto={handleNotePhoto}
+                  resolveImage={resolveImage}
                 />
               </div>
               <PaneResizer

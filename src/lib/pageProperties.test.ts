@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clampCoverPosition, coverFromStorage, pageIconFromStorage } from "./pageProperties.ts";
+import { clampCoverPosition, coverFromStorage, notePhotoFromStorage } from "./pageProperties.ts";
 
 test("cover positions are normalized before reaching layout", () => {
   assert.equal(clampCoverPosition(-2), 0);
@@ -9,11 +9,12 @@ test("cover positions are normalized before reaching layout", () => {
 });
 
 test("page properties reject unknown persisted shapes", () => {
-  assert.deepEqual(pageIconFromStorage({ kind: "symbol", value: "star" }), {
-    kind: "symbol",
-    value: "star",
-  });
-  assert.equal(pageIconFromStorage({ kind: "symbol", value: "database" }), null);
+  const objectId = "b0a8f0de-2b2e-4a3c-9a1f-6d5e4c3b2a10";
+  assert.deepEqual(notePhotoFromStorage({ kind: "photo", objectId }), { kind: "photo", objectId });
+  /* A path is the reason this is a uuid test and not a string test: the id is
+     appended to a Storage prefix. */
+  assert.equal(notePhotoFromStorage({ kind: "photo", objectId: "../../secrets" }), null);
+  assert.equal(notePhotoFromStorage({ kind: "symbol", value: "star" }), null);
   assert.deepEqual(coverFromStorage({ kind: "preset", id: "forest", position: 9 }), {
     kind: "preset",
     id: "forest",
