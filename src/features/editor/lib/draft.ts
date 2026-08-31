@@ -77,12 +77,27 @@ function isEmptyParagraph(node: JSONContent | undefined): boolean {
   );
 }
 
+/** ProseMirror may emit the same node with object keys in a different order
+ * after an edit (for example `text, marks` becomes `marks, text`). Object-key
+ * order is not part of the document, so a raw JSON.stringify would turn an
+ * invisible serialization detail into a real edit. Arrays stay ordered because
+ * node and mark order is meaningful. */
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, canonicalJson(child)]),
+  );
+}
+
 function sameDraft(left: Draft, right: Draft): boolean {
   return (
     left.title.trimEnd() === right.title.trimEnd() &&
     left.body.trimEnd() === right.body.trimEnd() &&
-    JSON.stringify(withoutInvisibleDocumentEnding(left.content)) ===
-      JSON.stringify(withoutInvisibleDocumentEnding(right.content))
+    JSON.stringify(canonicalJson(withoutInvisibleDocumentEnding(left.content))) ===
+      JSON.stringify(canonicalJson(withoutInvisibleDocumentEnding(right.content)))
   );
 }
 

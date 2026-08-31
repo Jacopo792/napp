@@ -84,6 +84,39 @@ test("a final space left after erasing a word is not an edit", () => {
   assert.equal(draft.takePending().length, 0);
 });
 
+test("Tiptap object-key reordering after an erased edit is not an edit", () => {
+  const original = {
+    title: "A note",
+    body: "kept",
+    content: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "kept", marks: [{ type: "italic" }] }],
+        },
+      ],
+    },
+  };
+  draft.ensureDraft("n6", original, "2026-08-30T10:00:00.000Z");
+  draft.editBody("n6", "temporary", paragraph("temporary"));
+  draft.takePending();
+  draft.rebaseDraft("n6", { ...original, body: "temporary", content: paragraph("temporary") });
+
+  draft.editBody("n6", "kept", {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", marks: [{ type: "italic" }], text: "kept" }],
+      },
+      { type: "paragraph" },
+    ],
+  });
+
+  assert.equal(draft.takePending()[0]?.restoreUpdatedAt, "2026-08-30T10:00:00.000Z");
+});
+
 test("returning to the original text after an autosave restores its edit time", () => {
   const original = { title: "A note", body: "kept", content: paragraph("kept") };
   const changed = { title: "A note", body: "temporary", content: paragraph("temporary") };
