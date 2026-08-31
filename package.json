@@ -18,7 +18,8 @@
     "migrate:supabase": "node --experimental-strip-types scripts/migrate-to-supabase.mjs",
     "migrate:account-only": "node --experimental-strip-types scripts/migrate-to-account-only.mjs",
     "add:member": "node --experimental-strip-types scripts/add-archive-member.mjs",
-    "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs"
+    "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs",
+    "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/note-sharing-app/ pnpm build && git diff --check"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
