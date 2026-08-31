@@ -1,0 +1,36 @@
+# The collaboration server, and nothing else. The app itself is a static bundle
+# on GitHub Pages and Supabase is the rest of the backend; this is the one
+# process this project runs, because a Yjs document needs somewhere to be
+# authoritative and a static site has no server to be it.
+#
+# Always on, and one instance. Two instances would each hold their own copy of
+# an open document and neither would see the other's updates, so scaling this
+# horizontally needs a shared backend (Hocuspocus has a Redis extension) before
+# the instance count moves off one.
+services:
+  - type: web
+    name: notes-collab
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    numInstances: 1
+    envVars:
+      - key: PORT
+        value: 8080
+      # Only the deployed site and a developer's own machine. A WebSocket
+      # upgrade carries an Origin like any other browser request, and one that
+      # is not on this list is refused before authentication is even attempted.
+      - key: ALLOWED_ORIGINS
+        value: https://jacopo792.github.io,http://localhost:5173,http://localhost:5199
+      # Set in the Render dashboard, never in this file. The service role key in
+      # particular is the only key in this system that bypasses row level
+      # security, and it exists in exactly one place: this service's environment.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

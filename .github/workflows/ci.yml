@@ -44,6 +44,12 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # The collaboration server's own suite. Its integration tests skip
+      # themselves without a local Supabase, so what runs here is the
+      # authorisation logic — which is the part a pull request can break.
+      - name: Test the collaboration server
+        run: pnpm test:server
+
       - name: Format
         run: pnpm format:check
 

@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 
-/* The UI preview. Identical application code, with the three modules that talk
+/* The UI preview. Identical application code, with the modules that talk
    to Supabase swapped for the in-memory stand-ins in preview/ — so the notes
    surface can be looked at, on either breakpoint, without credentials, a
    network or a real archive. Never used by `pnpm build`. */
@@ -19,6 +19,7 @@ export default defineConfig({
       { find: /^@\/lib\/session$/, replacement: here("./preview/session.mock.ts") },
       { find: /^@\/lib\/sync$/, replacement: here("./preview/sync.mock.ts") },
       { find: /^@\/lib\/presence$/, replacement: here("./preview/presence.mock.ts") },
+      { find: /^@\/lib\/collab$/, replacement: here("./preview/collab.mock.ts") },
     ],
   },
   plugins: [

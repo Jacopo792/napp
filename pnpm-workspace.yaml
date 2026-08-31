@@ -1,2 +1,9 @@
+packages:
+  - "."
+  - "server"
+
+# esbuild fetches its platform binary in a postinstall step, and Vite needs it.
+# Once a workspace file exists pnpm refuses to install with an unanswered build
+# script rather than silently skipping one, so the answer is written down here.
 allowBuilds:
   esbuild: true

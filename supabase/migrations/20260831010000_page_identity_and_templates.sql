@@ -1,5 +1,61 @@
 -- Page identity and archive-private reusable templates.
 -- Existing notes remain unchanged: null means the page has neither adornment.
+--
+-- The two shapes are validated in Postgres and not only in the browser, for
+-- the reason every boundary here is: a shape checked in the client has already
+-- been written by anything that is not the client. `pageProperties.ts` holds
+-- the same two whitelists, and the two have to move together.
+
+create or replace function private.valid_page_icon(value jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $icon$
+  select value is null
+    or (
+      jsonb_typeof(value) = 'object'
+      and (
+        (
+          value ->> 'kind' = 'emoji'
+          and jsonb_typeof(value -> 'value') = 'string'
+          and char_length(value ->> 'value') between 1 and 16
+        )
+        or (
+          value ->> 'kind' = 'symbol'
+          and value ->> 'value' in (
+            'book', 'bookmark', 'bulb', 'check', 'flag',
+            'heart', 'home', 'star', 'target'
+          )
+        )
+      )
+    );
+$icon$;
+
+create or replace function private.valid_note_cover(value jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $cover$
+  select value is null
+    or (
+      jsonb_typeof(value) = 'object'
+      and jsonb_typeof(value -> 'position') = 'number'
+      and (value ->> 'position')::double precision between 0 and 1
+      and (
+        (
+          value ->> 'kind' = 'preset'
+          and value ->> 'id' in ('museum', 'dusk', 'forest', 'ocean', 'paper', 'ember')
+        )
+        or (
+          value ->> 'kind' = 'upload'
+          and value ->> 'objectId' ~*
+            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        )
+      )
+    );
+$cover$;
 
 alter table public.notes
   add column if not exists page_icon jsonb,
@@ -7,29 +63,9 @@ alter table public.notes
 
 alter table public.notes
   drop constraint if exists notes_page_icon_check,
-  add constraint notes_page_icon_check check (
-    page_icon is null
-    or (
-      jsonb_typeof(page_icon) = 'object'
-      and page_icon ->> 'kind' in ('emoji', 'symbol')
-      and jsonb_typeof(page_icon -> 'value') = 'string'
-    )
-  ),
+  add constraint notes_page_icon_check check (private.valid_page_icon(page_icon)),
   drop constraint if exists notes_cover_check,
-  add constraint notes_cover_check check (
-    cover is null
-    or (
-      jsonb_typeof(cover) = 'object'
-      and cover ->> 'kind' in ('preset', 'upload')
-      and jsonb_typeof(cover -> 'position') = 'number'
-      and (cover ->> 'position')::double precision between 0 and 1
-      and (
-        (cover ->> 'kind' = 'preset' and jsonb_typeof(cover -> 'id') = 'string')
-        or
-        (cover ->> 'kind' = 'upload' and jsonb_typeof(cover -> 'objectId') = 'string')
-      )
-    )
-  );
+  add constraint notes_cover_check check (private.valid_note_cover(cover));
 
 create table if not exists public.note_templates (
   id uuid primary key,
@@ -45,28 +81,8 @@ create table if not exists public.note_templates (
   cover jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint note_templates_page_icon_check check (
-    page_icon is null
-    or (
-      jsonb_typeof(page_icon) = 'object'
-      and page_icon ->> 'kind' in ('emoji', 'symbol')
-      and jsonb_typeof(page_icon -> 'value') = 'string'
-    )
-  ),
-  constraint note_templates_cover_check check (
-    cover is null
-    or (
-      jsonb_typeof(cover) = 'object'
-      and cover ->> 'kind' in ('preset', 'upload')
-      and jsonb_typeof(cover -> 'position') = 'number'
-      and (cover ->> 'position')::double precision between 0 and 1
-      and (
-        (cover ->> 'kind' = 'preset' and jsonb_typeof(cover -> 'id') = 'string')
-        or
-        (cover ->> 'kind' = 'upload' and jsonb_typeof(cover -> 'objectId') = 'string')
-      )
-    )
-  )
+  constraint note_templates_page_icon_check check (private.valid_page_icon(page_icon)),
+  constraint note_templates_cover_check check (private.valid_note_cover(cover))
 );
 
 create index if not exists note_templates_archive_updated_idx
