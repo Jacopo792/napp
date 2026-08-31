@@ -7,13 +7,7 @@
    is simply never reached: nothing here encrypts, and the fixture is plaintext. */
 import type { NoteEntry } from "@/lib/entries";
 import type { AppSession } from "@/lib/session";
-import {
-  EMPTY_META,
-  type Meta,
-  type Note,
-  type NoteMeta,
-  type NoteTemplate,
-} from "@/lib/types";
+import { EMPTY_META, type Meta, type Note, type NoteMeta } from "@/lib/types";
 import { FIXTURE_META, FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 
 export interface ArchiveMember {
@@ -34,7 +28,6 @@ export interface Profile {
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   members: ArchiveMember[];
-  templates: NoteTemplate[];
   seatLimit: number;
   metas: Record<string, Meta>;
 }
@@ -112,7 +105,6 @@ const metas: Record<string, Meta> = {
   [PREVIEW_U2]: { ...structuredClone(EMPTY_META), partnerName: FIXTURE_META.partnerName },
 };
 const images = new Map<string, Blob>();
-const templates = new Map<string, NoteTemplate>();
 
 export async function loadArchive(_session: AppSession): Promise<ArchiveSnapshot> {
   await sleep(240);
@@ -123,45 +115,9 @@ export async function loadArchive(_session: AppSession): Promise<ArchiveSnapshot
     // A fresh array, the way the real loader builds one: handing back the same
     // object made every roster change invisible to React.
     members: MEMBERS.map((member) => ({ ...member })),
-    templates: [...templates.values()].map((template) => structuredClone(template)),
     seatLimit: 2,
     metas: structuredClone(metas),
   };
-}
-
-export async function createTemplate(
-  _session: AppSession,
-  template: NoteTemplate,
-): Promise<NoteTemplate> {
-  await sleep(220);
-  templates.set(template.id, structuredClone(template));
-  return structuredClone(template);
-}
-
-export async function updateTemplate(
-  _session: AppSession,
-  templateId: string,
-  values: { name: string; description: string },
-): Promise<NoteTemplate> {
-  await sleep(180);
-  const template = templates.get(templateId);
-  if (!template) throw new Error("That template no longer exists");
-  const next = {
-    ...template,
-    name: values.name.trim(),
-    description: values.description.trim(),
-    updatedAt: new Date().toISOString(),
-  };
-  templates.set(templateId, next);
-  return structuredClone(next);
-}
-
-export async function deleteTemplate(
-  _session: AppSession,
-  templateId: string,
-): Promise<void> {
-  await sleep(140);
-  templates.delete(templateId);
 }
 
 /** The preview has one writer, so nothing ever conflicts — but the class has

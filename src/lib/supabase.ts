@@ -1,6 +1,6 @@
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
-import type { Folder, Meta, Note, NoteMeta, NoteTemplate, Tag } from "./types";
+import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
 import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, pageIconFromStorage } from "./pageProperties";
 import {
@@ -42,20 +42,6 @@ interface NoteRow {
   content_version: number;
 }
 
-interface TemplateRow {
-  id: string;
-  archive_id: string;
-  created_by: string | null;
-  name: string;
-  description: string;
-  title: string;
-  content: unknown;
-  page_icon: unknown;
-  cover: unknown;
-  created_at: string;
-  updated_at: string;
-}
-
 interface FolderRow {
   id: string;
   owner_id: string | null;
@@ -73,23 +59,6 @@ interface TagRow {
 interface NoteTagRow {
   note_id: string;
   tag_id: string;
-}
-
-function templateFromRow(row: TemplateRow): NoteTemplate {
-  return {
-    id: row.id,
-    archiveId: row.archive_id,
-    createdBy: row.created_by,
-    name: row.name,
-    description: row.description,
-    title: row.title,
-    content: noteDocument(row.content, RICH_TEXT_VERSION, ""),
-    pageIcon: pageIconFromStorage(row.page_icon),
-    cover: coverFromStorage(row.cover),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    builtIn: false,
-  };
 }
 
 /* ── The note cache ──────────────────────────────────────────────────────────
@@ -136,7 +105,6 @@ export interface ArchiveMember {
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   members: ArchiveMember[];
-  templates: NoteTemplate[];
   /** How many members this archive may hold. Two, unless the row says otherwise. */
   seatLimit: number;
   /** One scope per member, keyed by member id. */
@@ -154,7 +122,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     membersResult,
     profilesResult,
     archiveResult,
-    templatesResult,
   ] = await Promise.all([
     supabase
       .from("notes")
@@ -176,13 +143,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
     supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).single(),
-    supabase
-      .from("note_templates")
-      .select(
-        "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
-      )
-      .eq("archive_id", archiveId)
-      .order("updated_at", { ascending: false }),
   ]);
   for (const result of [
     notesResult,
@@ -191,7 +151,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     noteTagsResult,
     membersResult,
     archiveResult,
-    templatesResult,
   ]) {
     fail(result.error);
   }
@@ -383,7 +342,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
     members,
-    templates: ((templatesResult.data ?? []) as TemplateRow[]).map(templateFromRow),
     seatLimit: (archiveResult.data?.seat_limit as number | null) ?? 2,
     metas,
   };
@@ -419,64 +377,6 @@ export async function createNote(
   fail(error);
   noteCache.set(note.id, { version: data!.version, note });
   return { note, version: data!.version };
-}
-
-export async function createTemplate(
-  session: AppSession,
-  template: NoteTemplate,
-): Promise<NoteTemplate> {
-  const result = await supabase
-    .from("note_templates")
-    .insert({
-      id: template.id,
-      archive_id: session.archiveId,
-      created_by: session.userId,
-      name: template.name,
-      description: template.description,
-      title: template.title,
-      content: template.content,
-      page_icon: template.pageIcon,
-      cover: template.cover,
-      created_at: template.createdAt,
-      updated_at: template.updatedAt,
-    })
-    .select(
-      "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
-    )
-    .single();
-  fail(result.error);
-  return templateFromRow(result.data as TemplateRow);
-}
-
-export async function updateTemplate(
-  session: AppSession,
-  templateId: string,
-  values: { name: string; description: string },
-): Promise<NoteTemplate> {
-  const result = await supabase
-    .from("note_templates")
-    .update({
-      name: values.name.trim(),
-      description: values.description.trim(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("archive_id", session.archiveId)
-    .eq("id", templateId)
-    .select(
-      "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
-    )
-    .single();
-  fail(result.error);
-  return templateFromRow(result.data as TemplateRow);
-}
-
-export async function deleteTemplate(session: AppSession, templateId: string): Promise<void> {
-  const result = await supabase
-    .from("note_templates")
-    .delete()
-    .eq("archive_id", session.archiveId)
-    .eq("id", templateId);
-  fail(result.error);
 }
 
 /** Somebody else wrote this note since the caller last read it. Carries the

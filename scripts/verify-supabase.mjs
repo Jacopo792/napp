@@ -96,7 +96,6 @@ const archiveId = first.archiveId;
 const report = {};
 const channel = second.supabase.channel(`verify:${crypto.randomUUID()}`);
 const testId = crypto.randomUUID();
-const templateId = crypto.randomUUID();
 const viewerFolderId = crypto.randomUUID();
 const viewerTagId = crypto.randomUUID();
 const viewerObjectId = crypto.randomUUID();
@@ -689,59 +688,6 @@ try {
   );
   report.openingIsNotEditing = true;
 
-  // ── Templates ────────────────────────────────────────────────────────────
-  const templateSeed = {
-    archive_id: archiveId,
-    name: "Verification template",
-    description: "written by verify:supabase",
-    title: "Daily note",
-    content: { type: "doc", content: [{ type: "paragraph" }] },
-    page_icon: { kind: "emoji", value: "\u2600\ufe0f" },
-    cover: null,
-  };
-  const templateInsert = await first.supabase
-    .from("note_templates")
-    .insert({ ...templateSeed, id: templateId, created_by: first.userId })
-    .select("id, name")
-    .single();
-  fail(templateInsert.error);
-
-  const peerReadsTemplate = await second.supabase
-    .from("note_templates")
-    .select("id, name")
-    .eq("id", templateId)
-    .maybeSingle();
-  fail(peerReadsTemplate.error);
-  assert(
-    peerReadsTemplate.data?.name === "Verification template",
-    "A member could not read an archive template",
-  );
-
-  const forgedAuthor = await second.supabase
-    .from("note_templates")
-    .insert({ ...templateSeed, id: crypto.randomUUID(), created_by: first.userId });
-  assert(forgedAuthor.error, "A member created a template attributed to somebody else");
-
-  const badTemplateCover = await first.supabase
-    .from("note_templates")
-    .update({ cover: { kind: "preset", id: "nope", position: 0.5 } })
-    .eq("id", templateId);
-  assert(badTemplateCover.error, "A template accepted an unknown cover preset");
-
-  const renamed = await first.supabase
-    .from("note_templates")
-    .update({ name: "Renamed by the peer" })
-    .eq("id", templateId)
-    .select("name")
-    .single();
-  fail(renamed.error);
-  report.templates = {
-    memberReads: true,
-    editorWrites: true,
-    authorshipEnforced: true,
-    whitelistEnforced: true,
-  };
-
   // ── Nobody outside the roster sees anything ──────────────────────────────
   const closedTables = ["archives", "archive_members", "notes", "folders", "tags", "note_tags"];
   for (const table of closedTables) {
@@ -772,16 +718,11 @@ try {
   );
   const anonymousAvatar = await anonymous.storage.from("avatars").download(avatarPath);
   assert(anonymousAvatar.error, "An anonymous client downloaded a member avatar");
-  /* These two are revoked from `anon` outright rather than merely filtered, so
-     an anonymous read is a permission error and not an empty list. Either
-     answer is the right one; a row is not. */
-  for (const table of ["note_documents", "note_templates"]) {
-    const anonymousRead = await anonymous.from(table).select("*").limit(5);
-    assert(
-      anonymousRead.error || anonymousRead.data.length === 0,
-      `An anonymous client read ${table}`,
-    );
-  }
+  const anonymousDocuments = await anonymous.from("note_documents").select("*").limit(5);
+  assert(
+    anonymousDocuments.error || anonymousDocuments.data.length === 0,
+    "An anonymous client read note_documents",
+  );
   report.anonymous = { rows: 0, insertRejected: true, storageRejected: true };
 
   if (outsider) {
@@ -822,15 +763,6 @@ try {
     );
     const strangerAvatar = await outsider.supabase.storage.from("avatars").download(avatarPath);
     assert(strangerAvatar.error, "An account outside the archive downloaded a member avatar");
-    const strangerTemplates = await outsider.supabase
-      .from("note_templates")
-      .select("id")
-      .eq("archive_id", archiveId);
-    fail(strangerTemplates.error);
-    assert(
-      strangerTemplates.data.length === 0,
-      "An account outside the archive read its templates",
-    );
     report.authenticatedNonMember = { rows: 0, insertRejected: true, storageRejected: true };
   } else {
     report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
@@ -845,7 +777,6 @@ try {
   }
   await first.supabase.storage.from("note-images").remove([`${archiveId}/${viewerObjectId}`]);
   await first.supabase.storage.from("avatars").remove([avatarPath]);
-  await first.supabase.from("note_templates").delete().eq("id", templateId);
   await first.supabase.from("note_tags").delete().eq("tag_id", viewerTagId);
   await first.supabase.from("folders").delete().eq("id", viewerFolderId);
   await first.supabase.from("tags").delete().eq("id", viewerTagId);

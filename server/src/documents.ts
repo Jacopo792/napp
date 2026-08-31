@@ -83,7 +83,7 @@ async function readDocument(service: SupabaseClient, noteId: string): Promise<Ui
 }
 
 /** One real edit. The binary and the projections every list, search, preview,
- *  export and template read from it are written in the same transaction. */
+ *  export reads from it are written in the same transaction. */
 export async function storeDocument(
   service: SupabaseClient,
   noteId: string,

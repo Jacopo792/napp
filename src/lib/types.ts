@@ -50,21 +50,6 @@ export interface Note {
   updatedAt: string;
 }
 
-export interface NoteTemplate {
-  id: string;
-  archiveId: string | null;
-  createdBy: string | null;
-  name: string;
-  description: string;
-  title: string;
-  content: JSONContent;
-  pageIcon: PageIcon;
-  cover: NoteCover;
-  createdAt: string | null;
-  updatedAt: string | null;
-  builtIn: boolean;
-}
-
 export interface Folder {
   id: string;
   name: string;

@@ -4,7 +4,7 @@
 -- `Y.XmlFragment("default")` inside one `Y.Doc`. The binary below is the whole
 -- truth of a note's text; `notes.title`, `notes.body` and `notes.content` stay
 -- as projections of it, because every list, search, preview, export and
--- template in this app reads those and none of them should have to understand
+-- export in this app reads those and should not have to understand
 -- a CRDT.
 --
 -- The browser never touches this table. It is written by the collaboration
@@ -139,7 +139,7 @@ $seed$;
 
 -- One real edit: the binary and every projection read from it land together or
 -- not at all. Anything that reads a note — the list, search, the preview, the
--- export, a template made from it — reads the projections, so a binary saved
+-- export reads the projections, so a binary saved
 -- without them would show the archive a note that had not changed.
 create or replace function public.save_note_document(
   target_note_id uuid,

@@ -49,7 +49,7 @@ export function seedDocument(title: string, content: unknown): Y.Doc {
 }
 
 /** What the rest of the archive reads: lists, search, preview, export and
- *  templates all take the projection, never the binary. */
+ *  exports take the projection, never the binary. */
 export function projectDocument(doc: Y.Doc): { title: string; content: JSONContent } {
   return {
     title: doc.getText(TITLE_TEXT).toString(),
