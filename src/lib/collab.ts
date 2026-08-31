@@ -10,18 +10,15 @@
  * closed laptop, a crashed tab or a train tunnel costs nothing: the words are
  * still there when the tab comes back, and they reach the archive on reconnect.
  *
- * The one thing this file is careful about is starting from nothing. A note
- * this device has never opened, on a connection that cannot reach the server,
- * must not be given a fresh empty document to type into — an empty document
- * shares no history with the real one, so reconnecting would append the whole
- * body a second time rather than merge with it. Until either IndexedDB or the
- * server hands over a document that genuinely exists, `ready` stays false and
- * the editor does not mount. */
+ * Local stores are scoped to both archive and account. They are never enough
+ * to open an editor on their own: the collaboration server must authorise and
+ * sync the note first. Losing the network after that keeps the mounted editor
+ * usable and reconnect sends its Yjs updates normally. */
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { useEffect, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
-import { isUntouched } from "@/features/editor/lib/ydoc";
+import { collaborationColor } from "@/features/editor/lib/ydoc";
 import { supabase } from "./supabaseClient";
 
 const COLLAB_URL = import.meta.env.VITE_COLLAB_URL as string;
@@ -30,6 +27,7 @@ export type ConnectionState = "connecting" | "connected" | "offline";
 
 export interface CollaborationIdentity {
   userId: string;
+  archiveId: string;
   name: string;
 }
 
@@ -58,26 +56,20 @@ const CLOSED: CollaborativeNote = {
   refusal: "",
 };
 
-/** One hue per account, the same in every tab and on every device, so a caret
- *  in the margin belongs to a person rather than to a session. */
-export function collaborationColor(userId: string): string {
-  let hash = 0;
-  for (let index = 0; index < userId.length; index++) {
-    hash = (hash * 31 + userId.charCodeAt(index)) >>> 0;
-  }
-  return `hsl(${hash % 360} 64% 62%)`;
-}
+export { collaborationColor };
 
 export function useCollaborativeNote(
   noteId: string | null,
   identity: CollaborationIdentity | null,
+  publishPresence = false,
 ): CollaborativeNote {
   const [state, setState] = useState<CollaborativeNote>(CLOSED);
   const userId = identity?.userId ?? null;
+  const archiveId = identity?.archiveId ?? null;
   const name = identity?.name ?? "";
 
   useEffect(() => {
-    if (!noteId || !userId) {
+    if (!noteId || !userId || !archiveId) {
       setState(CLOSED);
       return;
     }
@@ -87,7 +79,7 @@ export function useCollaborativeNote(
     };
 
     const doc = new Y.Doc();
-    const local = new IndexeddbPersistence(`napp:note:${noteId}`, doc);
+    const local = new IndexeddbPersistence(`napp:yjs:${archiveId}:${userId}:${noteId}`, doc);
     const provider = new HocuspocusProvider({
       url: COLLAB_URL,
       name: noteId,
@@ -100,24 +92,20 @@ export function useCollaborativeNote(
         update({ connection: status === "connected" ? "connected" : "connecting" }),
       onDisconnect: () => update({ connection: "offline" }),
       onAuthenticationFailed: ({ reason }) =>
-        update({ refusal: reason || "This note is not available to you" }),
+        update({ ready: false, refusal: reason || "This note is not available to you" }),
     });
 
-    provider.awareness?.setLocalStateField("user", {
-      userId,
-      name: name || "Someone",
-      color: collaborationColor(userId),
-    });
+    if (publishPresence) {
+      provider.awareness?.setLocalStateField("user", {
+        userId,
+        name: name || "Someone",
+        color: collaborationColor(userId),
+      });
+    } else {
+      provider.awareness?.setLocalState(null);
+    }
 
     setState({ doc, provider, ready: false, connection: "connecting", refusal: "" });
-
-    void local.whenSynced.then(() => {
-      // Something is stored for this note on this device, which means the
-      // archive handed it over at least once. Its history is real, so it is
-      // safe to type into before the server answers — and that is the whole of
-      // working offline.
-      if (!isUntouched(doc)) update({ ready: true });
-    });
 
     return () => {
       closed = true;
@@ -125,7 +113,7 @@ export function useCollaborativeNote(
       void local.destroy();
       doc.destroy();
     };
-  }, [noteId, userId, name]);
+  }, [noteId, userId, archiveId, name, publishPresence]);
 
   return state;
 }
