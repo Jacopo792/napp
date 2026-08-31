@@ -2,11 +2,20 @@
 # bundle on GitHub Pages and Supabase is the rest of the backend; this is the
 # one process this project runs, because a Yjs document needs somewhere to be
 # authoritative and a static site has no server to be it.
+# Note that the live service was created through the Render API rather than as
+# a blueprint, so this file documents it — it does not drive it. Changing a
+# value here changes nothing until the service is either recreated from this
+# blueprint or edited to match.
 services:
   - type: web
     name: notes-collab
     runtime: docker
-    plan: starter
+    # Free, by decision on 2026-08-31. A free web service sleeps after fifteen
+    # idle minutes and takes about fifty seconds to wake, and an editor does
+    # not open before the server has authorised and synced — so the first note
+    # opened after a quiet spell waits. `starter` is the upgrade when that
+    # wait stops being acceptable.
+    plan: free
     region: frankfurt
     dockerfilePath: ./server/Dockerfile
     dockerContext: .
