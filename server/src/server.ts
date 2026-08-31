@@ -46,6 +46,18 @@ export interface CollaborationConfig {
   instanceName?: string;
 }
 
+function health(
+  response: {
+    writeHead(status: number, headers: Record<string, string>): void;
+    end(body: string): void;
+  },
+  status: number,
+): never {
+  response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  response.end(JSON.stringify({ status: status === 200 ? "ok" : "unavailable" }));
+  throw null;
+}
+
 export interface Context {
   userId: string;
   noteId: string;
@@ -210,12 +222,19 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
 
     async onRequest({ request, response }) {
       if (request.url === "/healthz") {
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ status: "ok" }));
-        /* Hocuspocus's own convention: its request handler swallows a falsy
-           throw and writes its welcome page for anything that returns, so this
-           is how a hook says "answered, stop here". */
-        throw null;
+        return health(response, 200);
+      }
+      if (request.url === "/readyz") {
+        /* A short caller-side timeout keeps an unhealthy Supabase connection
+           from making Render wait on a request forever. Redis is only a bus;
+           Hocuspocus owns its reconnecting clients, so readiness must not
+           create a second long-lived connection merely to probe it. */
+        const ready = await Promise.race([
+          service.from("archives").select("id", { head: true, count: "exact" }).limit(1),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+        ]);
+        if (!ready || ("error" in ready && ready.error)) return health(response, 503);
+        return health(response, 200);
       }
     },
   });

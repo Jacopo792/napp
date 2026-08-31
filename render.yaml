@@ -10,7 +10,7 @@ services:
     region: frankfurt
     dockerfilePath: ./server/Dockerfile
     dockerContext: .
-    healthCheckPath: /healthz
+    healthCheckPath: /readyz
     numInstances: 1
     envVars:
       - key: PORT
