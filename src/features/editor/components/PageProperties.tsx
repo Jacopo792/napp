@@ -1,5 +1,5 @@
 import { Image as ImageIcon, Upload } from "lucide-react";
-import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useDismiss } from "@/components/useDismiss";
 import { useStoredImage } from "@/lib/media";
 import { clampCoverPosition, COVER_PRESETS, coverBackground } from "@/lib/pageProperties";
@@ -34,7 +34,6 @@ export function PageCover({
   const [busy, setBusy] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const fileInputId = useId();
   const pickerRef = useDismiss(pickerOpen, () => setPickerOpen(false));
 
   useEffect(() => setPosition(cover?.position ?? 0.5), [cover]);
@@ -102,14 +101,6 @@ export function PageCover({
       }}
       onPointerDown={startReposition}
     >
-      <input
-        ref={fileRef}
-        id={fileInputId}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-        className="hidden"
-        onChange={(event) => void upload(event.target.files?.[0])}
-      />
       {canEdit && (
         <div
           className="note-cover-actions"
@@ -149,17 +140,23 @@ export function PageCover({
                     />
                   ))}
                 </div>
-                <label
-                  htmlFor={fileInputId}
-                  className="menu-row mt-1"
-                  aria-disabled={busy}
-                  onClick={(event) => {
-                    if (busy) event.preventDefault();
-                  }}
-                >
+                <div className="menu-row relative mt-1" aria-disabled={busy}>
                   <Upload size={16} />
                   {busy ? "Uploading…" : "Upload a picture"}
-                </label>
+                  {/* The transparent native control receives the user gesture
+                      itself. That keeps the chooser working even when a
+                      browser rejects labels or scripted clicks on hidden file
+                      inputs. */}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    aria-label="Upload a picture"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    disabled={busy}
+                    onChange={(event) => void upload(event.target.files?.[0])}
+                  />
+                </div>
               </div>
             )}
           </div>
