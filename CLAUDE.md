@@ -73,9 +73,26 @@ anything tuned in the dashboard and never written down here. It did:
 defaults and had to be restored in the file. Read the diff it prints.
 
 Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from repository
-variables. No service-role key, account password or archive passphrase belongs
-anywhere near the build.
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and `VITE_COLLAB_URL` from
+repository variables. No service-role key, account password or archive
+passphrase belongs anywhere near the build.
+
+All three are required — `vite.config.ts` throws on a missing one — and the
+throw happens in the `deploy` job, after `checks` and `backend` are already
+green. Pages then keeps serving the previous build, so the site looks healthy
+while nothing has shipped. `VITE_COLLAB_URL` was missing for the whole life of
+the collaboration branch and that is exactly how it read. Check the run, not the
+site: `gh run list --branch main --limit 1`.
+
+The collaboration server is `notes-collab` on Render, in Frankfurt, built from
+`server/Dockerfile` with the repository root as its build context, with the
+Valkey instance `notes-collab-bus` beside it. `render.yaml` describes it and
+does not drive it: the live service was created through the Render API, because
+the CLI has no flag for a Dockerfile outside the root and the blueprint was
+never connected. Editing that file changes nothing by itself. It deploys on
+every push to `main`, and on the free plan it sleeps after fifteen idle minutes
+and takes about fifty seconds to wake — during which no editor opens, because an
+editor opens only after the server has authorized and synced.
 
 **Deploy before you drop.** The oldest client still running is whatever `main` last built,
 plus anybody holding an open tab. When four `ciphertext` columns were dropped
@@ -190,6 +207,37 @@ A picture is placed before it is uploaded, not cut from the middle of the file.
 `avatarCropRect()` in `src/lib/image.ts` turns what the window shows into the
 square `prepareAvatar()` cuts. Preview and output take the same three numbers,
 so they cannot disagree. The math has tests in `src/lib/image.test.ts`.
+
+## A picture for the note, and one behind the title
+
+They are different things and are set in different places. The **photo** is the
+note's own picture, chosen from the note's context menu — where the note is
+named — cut by `AvatarCropper` and shown wherever the note is named: in place of
+the document glyph in the list, and beside the title on the page. The **cover**
+is the band across the top of the page, set from the page, and either one of six
+curated gradients or an uploaded picture with a vertical focal point.
+
+The photo lives in `notes.page_icon`, which held the retired emoji and symbol
+icons. The check in `20260831030000_note_photo.sql` was **widened** rather than
+replaced: a check constraint is validated against existing rows when it is
+added, so narrowing it would have refused to apply against any note that still
+carried an emoji. The client reads only `{"kind":"photo","objectId":<uuid>}`;
+the rest is dead shape kept alive for the rows that hold it.
+
+Three traps, all found by the covers being unusable rather than by reading:
+
+1. **Padding on a scrolling box is inside its height.** `.rich-text-editor` is
+   `height: 100%` and `border-box`, so a `padding-bottom: 45vh` larger than the
+   space the flex row gives it makes the used height the padding — the box
+   overflows the pane, and the note reads as frozen. The run-out belongs to
+   `.rich-text-content`.
+2. **Never `setPointerCapture` on a surface that carries buttons.** A captured
+   pointer retargets the click that follows to the capturing element, so every
+   control on the cover went dead the moment a picture made the surface
+   draggable. The `window` listeners a drag needs were doing the work anyway.
+3. **Never mix the `background` shorthand with `background-position`.** React
+   writes only the properties that changed, so a shorthand rewritten for a new
+   picture resets the position the drag had set. Longhands only.
 
 ## Presence
 

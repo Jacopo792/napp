@@ -99,8 +99,9 @@ avatar remains writable only by its owner. Appearance supports system, light and
 dark modes, curated palettes, custom colours and an optional device-local
 background image. Opening a note is read-only state selection: it must never
 update `updatedAt` or trigger a database write. Typing and then restoring a
-note's exact saved contents is not an edit. Notes may also carry emoji or line
-icons and curated or private uploaded covers with vertical repositioning.
+note's exact saved contents is not an edit. Notes may also carry a picture of
+their own — set from the note's context menu, shown wherever the note is named —
+and curated or private uploaded covers with vertical repositioning.
 
 **Editor direction (updated 2026-08-30):** use a structured Tiptap rich-text document
 in one reading-and-writing surface, with no Markdown delimiters and no separate preview

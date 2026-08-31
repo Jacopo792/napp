@@ -12,10 +12,15 @@ changes. The commit history remains the detailed engineering record.
   `archive_members`; Redis/Valkey connects overlapping server instances; an
   authorized open note keeps accepting edits offline and converges on
   reconnect. The toolbar reports Connecting, Live, Offline or Unavailable.
-- **Page covers and icons in the existing interface.** A note may use one of
-  six curated covers or a private uploaded image, reposition it vertically,
-  replace or remove it, and choose an emoji or line symbol without rewriting
-  the live document.
+- **A picture per note.** Right-click a note and give it a photograph of its
+  own, cut in the same round window the profile picture uses. It stands where
+  the document glyph stands in the list, and beside the title on the page, so
+  a note you recognise by sight no longer has to be read to be found. It is
+  kept in the column the retired emoji icons used, in the archive's private
+  image bucket like every other picture here.
+- **Page covers in the existing interface.** A note may use one of six curated
+  covers or a private uploaded image, reposition it vertically, and replace or
+  remove it without rewriting the live document.
 - **Operational collaboration service.** `/healthz` is dependency-free
   liveness, `/readyz` checks Supabase and optional Redis with timeouts, and CI
   runs the real local integration, multi-instance and Docker checks before
@@ -70,8 +75,29 @@ changes. The commit history remains the detailed engineering record.
   RLS and its mutuality are unchanged, so nothing renders unless both sides
   have presence on.
 
+### Removed
+
+- **The page icon.** An emoji or line symbol above the title said less about a
+  note than a picture of it does, and the picker was a grid nobody returned to.
+  The photograph above replaces it. Icons already chosen stop being displayed;
+  the column still accepts their shape, so no stored row was invalidated.
+
 ### Fixed
 
+- **A note with a cover would not scroll.** The run-out below the last line was
+  padding on the scrolling box itself, which is `height: 100%` and
+  `border-box`: once a cover left the editor shorter than that padding, the
+  used height snapped up to the padding alone and the box overflowed the pane
+  it was meant to fit, taking the end of the text below the clip. The padding
+  belongs to the content, not to the box that scrolls it.
+- **Change cover and Remove did nothing once a picture was set.** The cover
+  captured the pointer on every press so the focal point could be dragged, and
+  a captured pointer takes the click that follows with it — to the cover,
+  never to the button under the finger.
+- **Choosing a new cover threw its focal point back to the top.** The
+  `background` shorthand was written beside `background-position`, and only the
+  properties that changed are rewritten, so the shorthand quietly reset what
+  the drag had set.
 - **An undone edit still said it had been edited.** Typing and returning a note
   exactly to its previous contents now cancels the queued save. If an autosave
   landed in the middle, restoring the old contents restores the prior edit time

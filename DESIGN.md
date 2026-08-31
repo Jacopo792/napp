@@ -166,7 +166,7 @@ client-side save queue:
   saying changes remain on this device and synchronize on reconnect;
 - **Unavailable** when the server refuses the note, with the reason available.
 
-Metadata operations such as moving, pinning, covers and icons keep their own
+Metadata operations such as moving, pinning, covers and photos keep their own
 Saving/Save failed feedback where the action happens. Opening, selecting,
 focusing or moving the caret is never presented as a save and must never change
 the note timestamp.

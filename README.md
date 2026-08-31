@@ -34,9 +34,11 @@ separate composition for the phone.
   links overlapping server instances, and IndexedDB keeps an authorised open
   document usable through a disconnect. The toolbar says Connecting, Live or
   Offline; optional presence adds collaborative carets.
-- **Page identity.** Notes can carry an emoji or line icon and a curated or
-  privately uploaded cover. Uploaded covers can be replaced, removed and
-  repositioned vertically without rewriting the note document.
+- **A picture per note.** A note carries a photograph of its own, chosen from
+  its row's context menu and cut in the same round cropper the profile picture
+  uses; it stands wherever the note is named. A note may also carry a curated
+  or privately uploaded cover, which can be replaced, removed and repositioned
+  vertically. Neither rewrites the note document.
 - **Two seats, enforced by the database.** `archives.seat_limit` defaults to 2, a
   trigger on `archive_members` refuses the row past it, and issuing an invitation
   counts the seats unclaimed invitations already hold. The column takes 1–8, so a
@@ -96,7 +98,7 @@ pnpm dev
 ```
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
-VITE_COLLAB_URL=ws://127.0.0.1:1234
+VITE_COLLAB_URL=ws://127.0.0.1:8080
 ```
 
 The collaboration service is a separate workspace package:
@@ -197,8 +199,14 @@ own archive, not a membership.
 Pushing to `main` publishes only after frontend checks, the real local Supabase
 integration suite, multi-instance Redis tests and the server image build pass.
 The Pages build reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
-`VITE_COLLAB_URL`; the collaboration service is deployed separately from
-`render.yaml`.
+`VITE_COLLAB_URL`, all three GitHub repository variables. A missing one throws
+in `vite.config.ts`, which fails the deploy job after the checks have passed and
+leaves the previous build serving — so read the run, not the site.
+
+The collaboration service is deployed separately, as `notes-collab` on Render
+with a Valkey instance beside it. `render.yaml` describes it but does not drive
+it: the live service was created through the Render API, because the image needs
+the repository root as its build context and the blueprint was never connected.
 
 The database must stay compatible with the last deployed client: an old build in
 an open tab still queries the columns it was built against. Deploy the client
