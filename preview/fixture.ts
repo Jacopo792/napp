@@ -225,6 +225,8 @@ export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
     content,
     contentVersion: 0,
     legacyBody: seed.body,
+    pageIcon: null,
+    cover: index === 0 ? { kind: "preset", id: "museum", position: 0.5 } : null,
     ownerId: PREVIEW_U1,
     createdAt: iso(seed.days + 30),
     updatedAt: iso(seed.days),

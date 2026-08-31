@@ -1,7 +1,8 @@
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
-import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
+import type { Folder, Meta, Note, NoteMeta, NoteTemplate, Tag } from "./types";
 import { fail, supabase } from "./supabaseClient";
+import { coverFromStorage, pageIconFromStorage } from "./pageProperties";
 import {
   noteDocument,
   richTextToPlainText,
@@ -41,6 +42,20 @@ interface NoteRow {
   content_version: number;
 }
 
+interface TemplateRow {
+  id: string;
+  archive_id: string;
+  created_by: string | null;
+  name: string;
+  description: string;
+  title: string;
+  content: unknown;
+  page_icon: unknown;
+  cover: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
 interface FolderRow {
   id: string;
   owner_id: string | null;
@@ -58,6 +73,23 @@ interface TagRow {
 interface NoteTagRow {
   note_id: string;
   tag_id: string;
+}
+
+function templateFromRow(row: TemplateRow): NoteTemplate {
+  return {
+    id: row.id,
+    archiveId: row.archive_id,
+    createdBy: row.created_by,
+    name: row.name,
+    description: row.description,
+    title: row.title,
+    content: noteDocument(row.content, RICH_TEXT_VERSION, ""),
+    pageIcon: pageIconFromStorage(row.page_icon),
+    cover: coverFromStorage(row.cover),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    builtIn: false,
+  };
 }
 
 /* ── The note cache ──────────────────────────────────────────────────────────
@@ -104,6 +136,7 @@ export interface ArchiveMember {
 export interface ArchiveSnapshot {
   entries: NoteEntry[];
   members: ArchiveMember[];
+  templates: NoteTemplate[];
   /** How many members this archive may hold. Two, unless the row says otherwise. */
   seatLimit: number;
   /** One scope per member, keyed by member id. */
@@ -121,6 +154,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     membersResult,
     profilesResult,
     archiveResult,
+    templatesResult,
   ] = await Promise.all([
     supabase
       .from("notes")
@@ -142,6 +176,13 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
     supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).single(),
+    supabase
+      .from("note_templates")
+      .select(
+        "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
+      )
+      .eq("archive_id", archiveId)
+      .order("updated_at", { ascending: false }),
   ]);
   for (const result of [
     notesResult,
@@ -150,6 +191,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     noteTagsResult,
     membersResult,
     archiveResult,
+    templatesResult,
   ]) {
     fail(result.error);
   }
@@ -203,12 +245,19 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
 
   const payloads = new Map<
     string,
-    { title: string | null; body: string | null; content: unknown; legacy_body: string | null }
+    {
+      title: string | null;
+      body: string | null;
+      content: unknown;
+      legacy_body: string | null;
+      page_icon: unknown;
+      cover: unknown;
+    }
   >();
   if (staleIds.length > 0) {
     const changed = await supabase
       .from("notes")
-      .select("id, title, body, content, legacy_body")
+      .select("id, title, body, content, legacy_body, page_icon, cover")
       .eq("archive_id", archiveId)
       .in("id", staleIds);
     fail(changed.error);
@@ -218,6 +267,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       body: string | null;
       content: unknown;
       legacy_body: string | null;
+      page_icon: unknown;
+      cover: unknown;
     }[]) {
       payloads.set(row.id, row);
     }
@@ -236,7 +287,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         if (!cached) throw new Error("A note changed while the archive was loading");
         return { note: cached.note, version: cached.version } satisfies NoteEntry;
       }
-      const { title, body, content, legacy_body: legacyBody } = payload;
+      const { title, body, content, legacy_body: legacyBody, page_icon, cover } = payload;
       const storedBody = body ?? "";
       const document = noteDocument(content, row.content_version, legacyBody ?? storedBody);
       const note: Note = {
@@ -246,6 +297,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
         content: document,
         contentVersion: row.content_version,
         legacyBody: legacyBody ?? (row.content_version === 0 ? storedBody : null),
+        pageIcon: pageIconFromStorage(page_icon),
+        cover: coverFromStorage(cover),
         id: row.id,
         ownerId: scopeOf(row.owner_id),
         createdAt: row.created_at,
@@ -330,6 +383,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
     members,
+    templates: ((templatesResult.data ?? []) as TemplateRow[]).map(templateFromRow),
     seatLimit: (archiveResult.data?.seat_limit as number | null) ?? 2,
     metas,
   };
@@ -351,6 +405,8 @@ export async function createNote(
       content: note.content,
       content_version: note.contentVersion,
       legacy_body: note.legacyBody,
+      page_icon: note.pageIcon,
+      cover: note.cover,
       created_at: note.createdAt,
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
@@ -363,6 +419,64 @@ export async function createNote(
   fail(error);
   noteCache.set(note.id, { version: data!.version, note });
   return { note, version: data!.version };
+}
+
+export async function createTemplate(
+  session: AppSession,
+  template: NoteTemplate,
+): Promise<NoteTemplate> {
+  const result = await supabase
+    .from("note_templates")
+    .insert({
+      id: template.id,
+      archive_id: session.archiveId,
+      created_by: session.userId,
+      name: template.name,
+      description: template.description,
+      title: template.title,
+      content: template.content,
+      page_icon: template.pageIcon,
+      cover: template.cover,
+      created_at: template.createdAt,
+      updated_at: template.updatedAt,
+    })
+    .select(
+      "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
+    )
+    .single();
+  fail(result.error);
+  return templateFromRow(result.data as TemplateRow);
+}
+
+export async function updateTemplate(
+  session: AppSession,
+  templateId: string,
+  values: { name: string; description: string },
+): Promise<NoteTemplate> {
+  const result = await supabase
+    .from("note_templates")
+    .update({
+      name: values.name.trim(),
+      description: values.description.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("archive_id", session.archiveId)
+    .eq("id", templateId)
+    .select(
+      "id, archive_id, created_by, name, description, title, content, page_icon, cover, created_at, updated_at",
+    )
+    .single();
+  fail(result.error);
+  return templateFromRow(result.data as TemplateRow);
+}
+
+export async function deleteTemplate(session: AppSession, templateId: string): Promise<void> {
+  const result = await supabase
+    .from("note_templates")
+    .delete()
+    .eq("archive_id", session.archiveId)
+    .eq("id", templateId);
+  fail(result.error);
 }
 
 /** Somebody else wrote this note since the caller last read it. Carries the
@@ -380,7 +494,7 @@ export async function loadNote(session: AppSession, noteId: string): Promise<Not
   const result = await supabase
     .from("notes")
     .select(
-      "id, owner_id, created_at, updated_at, version, content_version, title, body, content, legacy_body",
+      "id, owner_id, created_at, updated_at, version, content_version, title, body, content, legacy_body, page_icon, cover",
     )
     .eq("archive_id", session.archiveId)
     .eq("id", noteId)
@@ -393,6 +507,8 @@ export async function loadNote(session: AppSession, noteId: string): Promise<Not
     body: string | null;
     content: unknown;
     legacy_body: string | null;
+    page_icon: unknown;
+    cover: unknown;
   };
   const storedBody = row.body ?? "";
   const document = noteDocument(row.content, row.content_version, row.legacy_body ?? storedBody);
@@ -403,6 +519,8 @@ export async function loadNote(session: AppSession, noteId: string): Promise<Not
     content: document,
     contentVersion: row.content_version,
     legacyBody: row.legacy_body ?? (row.content_version === 0 ? storedBody : null),
+    pageIcon: pageIconFromStorage(row.page_icon),
+    cover: coverFromStorage(row.cover),
     ownerId: row.owner_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -435,6 +553,8 @@ export async function saveNote(
       content: note.content,
       content_version: note.contentVersion,
       legacy_body: note.legacyBody,
+      page_icon: note.pageIcon,
+      cover: note.cover,
       updated_at: note.updatedAt,
       version: expectedVersion + 1,
     })

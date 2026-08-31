@@ -1,5 +1,29 @@
 import type { JSONContent } from "@tiptap/core";
 
+export const PAGE_SYMBOLS = [
+  "book",
+  "bookmark",
+  "bulb",
+  "check",
+  "flag",
+  "heart",
+  "home",
+  "star",
+  "target",
+] as const;
+
+export type PageSymbol = (typeof PAGE_SYMBOLS)[number];
+
+export type PageIcon =
+  | { kind: "emoji"; value: string }
+  | { kind: "symbol"; value: PageSymbol }
+  | null;
+
+export type NoteCover =
+  | { kind: "preset"; id: string; position: number }
+  | { kind: "upload"; objectId: string; position: number }
+  | null;
+
 export interface Note {
   id: string;
   title: string;
@@ -10,6 +34,10 @@ export interface Note {
   contentVersion: number;
   /** Original source retained after conversion so migration is reversible. */
   legacyBody: string | null;
+  /** Optional frontispiece shown above the title. */
+  pageIcon: PageIcon;
+  /** Curated or private uploaded cover, with a normalized vertical focal point. */
+  cover: NoteCover;
   /**
    * The member whose scope this note sits in. It is an organisational label,
    * not a permission: every member of the archive reads and writes every
@@ -20,6 +48,21 @@ export interface Note {
   ownerId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NoteTemplate {
+  id: string;
+  archiveId: string | null;
+  createdBy: string | null;
+  name: string;
+  description: string;
+  title: string;
+  content: JSONContent;
+  pageIcon: PageIcon;
+  cover: NoteCover;
+  createdAt: string | null;
+  updatedAt: string | null;
+  builtIn: boolean;
 }
 
 export interface Folder {
