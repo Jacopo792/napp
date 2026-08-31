@@ -81,6 +81,7 @@ import {
   RICH_TEXT_VERSION,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
+import { projectDocument } from "@/features/editor/lib/ydoc";
 import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
 import {
   downloadText,
@@ -1054,12 +1055,19 @@ function NotesPage() {
      clipboard reach all three, and none of them needs an OAuth secret or the
      server this project does not have. */
 
-  const markdownFor = useCallback((entry: NoteEntry) => {
-    /* What is on screen, not what last reached Postgres: exporting a note you
+  const markdownFor = useCallback(
+    (entry: NoteEntry) => {
+      if (entry.note.id === selectedId && collaborative.ready && collaborative.doc) {
+        const live = projectDocument(collaborative.doc);
+        return noteToMarkdown(live.title, live.content);
+      }
+      /* What is on screen, not what last reached Postgres: exporting a note you
        are still typing in should give you the words you can see. */
-    const draft = readDraft(entry.note.id);
-    return noteToMarkdown(draft?.title ?? entry.note.title, draft?.content ?? entry.note.content);
-  }, []);
+      const draft = readDraft(entry.note.id);
+      return noteToMarkdown(draft?.title ?? entry.note.title, draft?.content ?? entry.note.content);
+    },
+    [selectedId, collaborative.ready, collaborative.doc],
+  );
 
   const handleCopyMarkdown = useCallback(
     async (entry: NoteEntry) => {
@@ -1650,7 +1658,11 @@ function NotesPage() {
      Left to size itself it slid back and forth by 55px on each debounce, which
      is the one thing in the toolbar that moves while you are looking at it. The
      write error is carried in the tooltip for the same reason. */
-  const saveReadout = error ? (
+  const saveReadout = collaborative.refusal ? (
+    <span className="label text-danger" title={collaborative.refusal}>
+      Unavailable
+    </span>
+  ) : error ? (
     <button
       onClick={saveNow}
       title={`${error}\nClick to retry the write now`}
@@ -1667,6 +1679,12 @@ function NotesPage() {
     <span className="label text-ink-2">Unsaved</span>
   ) : statusFlash ? (
     <span className="label text-accent">{statusFlash}</span>
+  ) : selectedId && !collaborative.ready ? (
+    <span className="label text-ink-4">Connecting</span>
+  ) : selectedId && collaborative.connection === "offline" ? (
+    <span className="label text-ink-2" title="Changes stay on this device and sync on reconnect">
+      Offline
+    </span>
   ) : merge ? (
     <span className="label text-accent" title={merge.detail}>
       {merge.label}
@@ -1675,7 +1693,9 @@ function NotesPage() {
     <span className="label text-accent">Updated elsewhere</span>
   ) : (
     <span className="flex items-center gap-2">
-      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Saved</span>
+      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>
+        {selectedId ? "Live" : "Saved"}
+      </span>
       {lastSavedAt && (
         <span className="readout tabular-nums text-ink-4">{formatStamp(lastSavedAt)}</span>
       )}
@@ -2022,7 +2042,10 @@ function NotesPage() {
                     onUpdatePageProperties={handleUpdatePageProperties}
                     collaboration={
                       collaborative.ready && collaborative.doc
-                        ? { document: collaborative.doc, provider: collaborative.provider }
+                        ? {
+                            document: collaborative.doc,
+                            provider: presenceEnabled ? collaborative.provider : null,
+                          }
                         : null
                     }
                     navigationAction={
@@ -2152,7 +2175,10 @@ function NotesPage() {
               onUpdatePageProperties={handleUpdatePageProperties}
               collaboration={
                 collaborative.ready && collaborative.doc
-                  ? { document: collaborative.doc, provider: collaborative.provider }
+                  ? {
+                      document: collaborative.doc,
+                      provider: presenceEnabled ? collaborative.provider : null,
+                    }
                   : null
               }
               onContextMenu={
