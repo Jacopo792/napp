@@ -63,4 +63,5 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://checks.example.invalid
           VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
+          VITE_COLLAB_URL: wss://checks.example.invalid
         run: pnpm run build
