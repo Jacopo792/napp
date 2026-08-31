@@ -1,8 +1,11 @@
-name: Checks
+name: Checks and deploy
 
-# Nothing was checking a pull request. Lint, typecheck, tests and the build all
-# ran only on the way to Pages, which meant a branch could be reviewed and
-# merged before anything had compiled it.
+# One workflow, because two could not be made to depend on each other. Lint,
+# typecheck, tests and the build used to run only on the way to Pages, so a
+# branch could be reviewed and merged before anything had compiled it; then
+# the checks moved here and Pages was published by a workflow of its own,
+# which meant a red backend job did not stop a deploy. `needs` below is the
+# only way into the `deploy` job, and there is no input that skips it.
 on:
   pull_request:
   push:
@@ -14,7 +17,9 @@ permissions:
 
 concurrency:
   group: checks-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run that might be publishing: on `main` this one ends at
+  # Pages, and half a deploy is worse than a slow queue.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   checks:
@@ -119,3 +124,55 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: supabase stop
+
+  # Pages is published by a run that proved both halves and by nothing else.
+  # `needs` is the whole guard: a failed frontend job or a failed
+  # Supabase/Redis/Docker job leaves this one skipped, and `workflow_dispatch`
+  # takes no input that could get past it.
+  deploy:
+    needs: [checks, backend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    env:
+      VITE_BASE_PATH: /note-sharing-app/
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      # The collaboration server on Render. Public, like the two above.
+      VITE_COLLAB_URL: ${{ vars.VITE_COLLAB_URL }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The checks job built with placeholders to prove the code compiles.
+      # This is the same build against the real values and the deployed base
+      # path, which is the artifact itself.
+      - name: Build
+        run: pnpm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - uses: actions/deploy-pages@v4
+        id: deploy
