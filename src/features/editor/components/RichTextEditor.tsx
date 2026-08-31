@@ -13,6 +13,8 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import { Download, ExternalLink, GripVertical, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -34,6 +36,9 @@ import {
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
 import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
+import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type * as Y from "yjs";
 
 export type FormatAction =
   | "bold"
@@ -90,6 +95,7 @@ interface Props {
   mobile?: boolean;
   resolveImage: (objectId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
+  collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
 }
 
 interface ImagePreview {
@@ -512,6 +518,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     mobile = false,
     resolveImage,
     resolveFile,
+    collaboration = null,
   },
   ref,
 ) {
@@ -543,69 +550,87 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
   const autocorrect = useMemo(() => autocorrectExtension(), []);
 
-  const editor = useEditor({
-    extensions: [
-      ...BASE_EXTENSIONS,
-      ...mediaExtensions,
-      Placeholder.configure({ placeholder }),
-      FindAndReplace.configure({ searchDebounceMs: 0 }),
-      Typography.configure({
-        oneHalf: false,
-        oneQuarter: false,
-        threeQuarters: false,
-        plusMinus: false,
-        notEqual: false,
-        superscriptTwo: false,
-        superscriptThree: false,
-      }),
-      slashMenu,
-      sentenceCapitalize,
-      autocorrect,
-    ],
-    content: value,
-    editable: !readOnly,
-    immediatelyRender: true,
-    shouldRerenderOnTransaction: false,
-    editorProps: {
-      attributes: {
-        class: "rich-text-content",
-        lang: "it",
-        autocapitalize: "sentences",
-        autocorrect: "on",
-        spellcheck: "true",
-      },
-      transformPastedText(text) {
-        return capitalizeSentences(text);
-      },
-      handlePaste(view, event) {
-        const clipboard = event.clipboardData;
-        const item = Array.from(clipboard?.items ?? []).find((candidate) =>
-          candidate.type.startsWith("image/"),
-        );
-        const file =
-          item?.getAsFile() ??
-          Array.from(clipboard?.files ?? []).find((candidate) =>
+  const editor = useEditor(
+    {
+      extensions: [
+        ...BASE_EXTENSIONS,
+        ...(collaboration
+          ? [
+              Collaboration.configure({ document: collaboration.document, field: BODY_FRAGMENT }),
+              ...(collaboration.provider
+                ? [
+                    CollaborationCaret.configure({
+                      provider: collaboration.provider,
+                      user: { name: "You", color: "var(--accent)" },
+                    }),
+                  ]
+                : []),
+            ]
+          : []),
+        ...mediaExtensions,
+        Placeholder.configure({ placeholder }),
+        FindAndReplace.configure({ searchDebounceMs: 0 }),
+        Typography.configure({
+          oneHalf: false,
+          oneQuarter: false,
+          threeQuarters: false,
+          plusMinus: false,
+          notEqual: false,
+          superscriptTwo: false,
+          superscriptThree: false,
+        }),
+        slashMenu,
+        sentenceCapitalize,
+        autocorrect,
+      ],
+      content: collaboration ? undefined : value,
+      editable: !readOnly,
+      immediatelyRender: true,
+      shouldRerenderOnTransaction: false,
+      editorProps: {
+        attributes: {
+          class: "rich-text-content",
+          lang: "it",
+          autocapitalize: "sentences",
+          autocorrect: "on",
+          spellcheck: "true",
+        },
+        transformPastedText(text) {
+          return capitalizeSentences(text);
+        },
+        handlePaste(view, event) {
+          const clipboard = event.clipboardData;
+          const item = Array.from(clipboard?.items ?? []).find((candidate) =>
             candidate.type.startsWith("image/"),
           );
-        if (!file || !onPasteImageRef.current || !view.editable) return false;
-        event.preventDefault();
-        void onPasteImageRef.current(file).then((prepared) => {
-          if (!prepared || view.isDestroyed) return;
-          const node = view.state.schema.nodes.privateImage?.create({
-            objectId: prepared.objectId,
-            alt: prepared.alt,
+          const file =
+            item?.getAsFile() ??
+            Array.from(clipboard?.files ?? []).find((candidate) =>
+              candidate.type.startsWith("image/"),
+            );
+          if (!file || !onPasteImageRef.current || !view.editable) return false;
+          event.preventDefault();
+          void onPasteImageRef.current(file).then((prepared) => {
+            if (!prepared || view.isDestroyed) return;
+            const node = view.state.schema.nodes.privateImage?.create({
+              objectId: prepared.objectId,
+              alt: prepared.alt,
+            });
+            if (node) view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
           });
-          if (node) view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
-        });
-        return true;
+          return true;
+        },
+      },
+      onUpdate({ editor: current, transaction }) {
+        if (!transaction.docChanged) return;
+        if (!collaboration) {
+          const document = current.getJSON();
+          onChangeRef.current(document, richTextToPlainText(document));
+        }
       },
     },
-    onUpdate({ editor: current, transaction }) {
-      if (!transaction.docChanged) return;
-      const document = current.getJSON();
-      onChangeRef.current(document, richTextToPlainText(document));
-    },
-  });
+    [collaboration?.document, collaboration?.provider],
+  );
 
   const format = useCallback(
     (action: FormatAction) => {
@@ -724,7 +749,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   }, [editor, readOnly]);
 
   useEffect(() => {
-    if (!editor || appliedRevision.current === revision) return;
+    if (!editor || collaboration || appliedRevision.current === revision) return;
     appliedRevision.current = revision;
 
     /* Replacing the document sends the caret to the top, which after a merge
@@ -741,7 +766,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     }
     // A revision bump, not a delayed render, authorises replacing the document.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, revision]);
+  }, [editor, revision, collaboration]);
 
   return (
     <>

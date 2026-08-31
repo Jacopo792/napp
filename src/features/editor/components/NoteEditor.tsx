@@ -20,6 +20,9 @@ import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
+import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type * as Y from "yjs";
 
 interface Props {
   mobile?: boolean;
@@ -47,6 +50,7 @@ interface Props {
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
   onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
+  collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
 }
 
 /* The toolbar's three groups — the mode label, the format cluster, the save
@@ -94,6 +98,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     readers,
     onContextMenu,
     onUpdatePageProperties,
+    collaboration = null,
   },
   ref,
 ) {
@@ -593,6 +598,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               canEdit={canEdit}
               titleRef={titleRef}
               onEdited={onEdited}
+              yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
             />
 
             {(status || failure) && (
@@ -626,6 +632,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           mobile={mobile}
           resolveImage={resolveImage}
           resolveFile={resolveFile}
+          collaboration={collaboration}
         />
       </div>
     </section>

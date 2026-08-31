@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import type * as Y from "yjs";
 import { editTitle, useDraftTitle } from "@/features/editor/lib/draft";
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   canEdit: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onEdited: () => void;
+  /** The live document is authoritative whenever collaboration is connected. */
+  yTitle?: Y.Text | null;
 }
 
 function capitalizeSentences(text: string): string {
@@ -23,8 +26,22 @@ function capitalizeSentences(text: string): string {
    Long titles are a first-class case here: the field wraps freely and grows to
    its content. It must never become fixed-height or horizontally scrolling. */
 
-export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited }: Props) {
-  const title = useDraftTitle(noteId);
+export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited, yTitle = null }: Props) {
+  const draftTitle = useDraftTitle(noteId);
+  const [collaborativeTitle, setCollaborativeTitle] = useState(() => yTitle?.toString() ?? "");
+
+  useEffect(() => {
+    if (!yTitle) {
+      setCollaborativeTitle("");
+      return;
+    }
+    const sync = () => setCollaborativeTitle(yTitle.toString());
+    sync();
+    yTitle.observe(sync);
+    return () => yTitle.unobserve(sync);
+  }, [yTitle]);
+
+  const title = yTitle ? collaborativeTitle : draftTitle;
 
   // Keep the field tall enough for its content. Height is derived from
   // scrollHeight, so it must be recomputed after every value change and when
@@ -72,8 +89,15 @@ export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited }: Prop
         const next = capitalizeSentences(raw);
         const start = el.selectionStart;
         const end = el.selectionEnd;
-        editTitle(noteId, next);
-        onEdited();
+        if (yTitle) {
+          yTitle.doc?.transact(() => {
+            yTitle.delete(0, yTitle.length);
+            yTitle.insert(0, next);
+          });
+        } else {
+          editTitle(noteId, next);
+          onEdited();
+        }
         if (next !== raw && start !== null && end !== null) {
           window.requestAnimationFrame(() => {
             if (document.activeElement === el) el.setSelectionRange(start, end);

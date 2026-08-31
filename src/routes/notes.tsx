@@ -96,6 +96,7 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { useIsCompact } from "@/lib/media";
+import { useCollaborativeNote } from "@/lib/collab";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import {
   CollectionMenu,
@@ -264,6 +265,19 @@ function NotesPage() {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
+
+  const collaborationIdentity = useMemo(
+    () =>
+      session
+        ? {
+            userId: session.userId,
+            archiveId: session.archiveId,
+            name: profile.nickname || session.email.split("@")[0] || "Someone",
+          }
+        : null,
+    [session, profile.nickname],
+  );
+  const collaborative = useCollaborativeNote(selectedId, collaborationIdentity, presenceEnabled);
 
   // ── Refs mirroring state, so the save pipeline can read the truth
   //    synchronously without waiting for a React commit. ───────────────────
@@ -1993,7 +2007,7 @@ function NotesPage() {
                     mobile
                     entry={selected}
                     syncRevision={syncRevision}
-                    canEdit={canEdit}
+                    canEdit={canEdit && (!selectedId || collaborative.ready)}
                     proofreaderEnabled={proofreaderEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
@@ -2006,6 +2020,11 @@ function NotesPage() {
                     resolveImage={resolveImage}
                     resolveFile={resolveFile}
                     onUpdatePageProperties={handleUpdatePageProperties}
+                    collaboration={
+                      collaborative.ready && collaborative.doc
+                        ? { document: collaborative.doc, provider: collaborative.provider }
+                        : null
+                    }
                     navigationAction={
                       <button
                         type="button"
@@ -2118,7 +2137,7 @@ function NotesPage() {
               key={selected?.note.id ?? "empty"}
               entry={selected}
               syncRevision={syncRevision}
-              canEdit={canEdit}
+              canEdit={canEdit && (!selectedId || collaborative.ready)}
               proofreaderEnabled={proofreaderEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
@@ -2131,6 +2150,11 @@ function NotesPage() {
               resolveImage={resolveImage}
               resolveFile={resolveFile}
               onUpdatePageProperties={handleUpdatePageProperties}
+              collaboration={
+                collaborative.ready && collaborative.doc
+                  ? { document: collaborative.doc, provider: collaborative.provider }
+                  : null
+              }
               onContextMenu={
                 canWriteArchive
                   ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })

@@ -95,6 +95,9 @@ export function useCollaborativeNote(
         update({ ready: false, refusal: reason || "This note is not available to you" }),
     });
 
+    /* The local caret only. What other people see is written by the server in
+       `beforeHandleAwareness`, from the identity it read for itself — nothing a
+       browser sends about who it is, is believed. */
     if (publishPresence) {
       provider.awareness?.setLocalStateField("user", {
         userId,
@@ -102,6 +105,8 @@ export function useCollaborativeNote(
         color: collaborationColor(userId),
       });
     } else {
+      /* Presence is mutual. Do not leave a listen-only local awareness state
+         that Tiptap can serialise as a cursor after the preference is off. */
       provider.awareness?.setLocalState(null);
     }
 
