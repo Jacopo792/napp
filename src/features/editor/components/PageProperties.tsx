@@ -109,7 +109,14 @@ export function PageCover({
         onChange={(event) => void upload(event.target.files?.[0])}
       />
       {canEdit && (
-        <div className="note-cover-actions">
+        <div
+          className="note-cover-actions"
+          /* Keep every cover control out of the draggable surface. This is
+             stronger than recognizing individual descendants in the surface
+             handler: nested SVGs and the file-picker trigger never start a
+             reposition gesture before their own click can run. */
+          onPointerDown={(event) => event.stopPropagation()}
+        >
           {cover.kind === "upload" && <span>Drag to reposition</span>}
           <div ref={pickerRef} className="relative">
             <button
