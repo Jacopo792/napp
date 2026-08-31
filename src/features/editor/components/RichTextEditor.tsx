@@ -25,7 +25,9 @@ import {
   useState,
 } from "react";
 import {
-  DOCUMENT_EXTENSIONS,
+  BASE_EXTENSIONS,
+  PrivateFile,
+  PrivateImage,
   TEXT_COLOR_VALUE,
   type TextColor,
   richTextToPlainText,
@@ -420,23 +422,11 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
   );
 }
 
+/* The schema lives in `content.ts`, where the collaboration server can read it
+   without React. What is added here is only what a browser can do with it. */
 function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["open"]) {
-  return Node.create<PrivateImageOptions>({
-    name: "privateImage",
-    group: "block",
-    atom: true,
-    draggable: true,
+  return PrivateImage.extend<PrivateImageOptions>({
     addOptions: () => ({ resolve, open }),
-    addAttributes() {
-      return {
-        objectId: { default: "" },
-        alt: { default: "Image" },
-      };
-    },
-    parseHTML: () => [{ tag: "napp-private-image" }],
-    renderHTML({ HTMLAttributes }) {
-      return ["napp-private-image", mergeAttributes(HTMLAttributes)];
-    },
     addNodeView() {
       return ReactNodeViewRenderer(PrivateImageView);
     },
@@ -444,22 +434,8 @@ function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["ope
 }
 
 function privateFileExtension(resolve: Resolver) {
-  return Node.create<PrivateFileOptions>({
-    name: "privateFile",
-    group: "block",
-    atom: true,
-    draggable: true,
+  return PrivateFile.extend<PrivateFileOptions>({
     addOptions: () => ({ resolve }),
-    addAttributes() {
-      return {
-        objectId: { default: "" },
-        label: { default: "Attachment" },
-      };
-    },
-    parseHTML: () => [{ tag: "napp-private-file" }],
-    renderHTML({ HTMLAttributes }) {
-      return ["napp-private-file", mergeAttributes(HTMLAttributes)];
-    },
     addNodeView() {
       return ReactNodeViewRenderer(PrivateFileView);
     },
@@ -569,7 +545,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   const editor = useEditor({
     extensions: [
-      ...DOCUMENT_EXTENSIONS,
+      ...BASE_EXTENSIONS,
       ...mediaExtensions,
       Placeholder.configure({ placeholder }),
       FindAndReplace.configure({ searchDebounceMs: 0 }),

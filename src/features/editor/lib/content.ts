@@ -1,4 +1,10 @@
-import { Extension, type JSONContent, type MarkdownToken } from "@tiptap/core";
+import {
+  Extension,
+  Node,
+  mergeAttributes,
+  type JSONContent,
+  type MarkdownToken,
+} from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
@@ -60,8 +66,43 @@ const LegacyColorMarkdown = Extension.create({
   },
 });
 
-/** Extensions that define the persisted document schema and the legacy parser. */
-export const DOCUMENT_EXTENSIONS = [
+/* The schema half of the two private-media nodes. The editor extends each with
+   its React node view and a resolver; everything that only needs to know the
+   shape of the document — the legacy parser, the Markdown serializer, the Yjs
+   conversion in `ydoc.ts` and the collaboration server — takes them as they
+   are, and none of that can run React. Keeping one definition is what stops a
+   note written in the browser from being unreadable to the server. */
+export const PrivateImage = Node.create({
+  name: "privateImage",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { objectId: { default: "" }, alt: { default: "Image" } };
+  },
+  parseHTML: () => [{ tag: "napp-private-image" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["napp-private-image", mergeAttributes(HTMLAttributes)];
+  },
+});
+
+export const PrivateFile = Node.create({
+  name: "privateFile",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { objectId: { default: "" }, label: { default: "Attachment" } };
+  },
+  parseHTML: () => [{ tag: "napp-private-file" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["napp-private-file", mergeAttributes(HTMLAttributes)];
+  },
+});
+
+/** Everything the schema holds except the two private-media nodes, which the
+ *  editor supplies in an extended form. */
+export const BASE_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
     /* A link opens on a plain click, in a new tab. `openOnClick: false` made
@@ -83,6 +124,9 @@ export const DOCUMENT_EXTENSIONS = [
   Image.configure({ allowBase64: true }),
   LegacyColorMarkdown,
 ];
+
+/** The persisted document schema, whole. */
+export const DOCUMENT_EXTENSIONS = [...BASE_EXTENSIONS, PrivateImage, PrivateFile];
 
 const legacyMarkdown = new MarkdownManager({
   extensions: DOCUMENT_EXTENSIONS,
