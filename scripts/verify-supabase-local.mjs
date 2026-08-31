@@ -62,6 +62,30 @@ if (invited.error) throw new Error(`invite: ${invited.error.message}`);
 const claimed = await secondClient.rpc("claim_archive_invite", { token: invited.data });
 if (claimed.error) throw new Error(`claim: ${claimed.error.message}`);
 
+/* A freshly reset local stack reports Realtime as healthy before its tenant
+ * has installed the first Postgres Changes subscription. Prime that one-time
+ * path here so the archive verification measures delivery rather than the
+ * container's cold start. */
+const session = (await secondClient.auth.getSession()).data.session;
+if (!session) throw new Error("Realtime warm-up has no authenticated session");
+await secondClient.realtime.setAuth(session.access_token);
+const warmup = secondClient.channel(`verify-warmup:${crypto.randomUUID()}`);
+await new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => reject(new Error("Realtime warm-up timed out")), 20_000);
+  warmup.subscribe((status, error) => {
+    if (status === "SUBSCRIBED") {
+      clearTimeout(timeout);
+      resolve();
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      clearTimeout(timeout);
+      reject(new Error(`Realtime warm-up failed: ${error?.message ?? status}`));
+    }
+  });
+});
+await new Promise((resolve) => setTimeout(resolve, 3_000));
+await secondClient.removeChannel(warmup);
+secondClient.realtime.disconnect();
+
 process.env.VITE_SUPABASE_URL = url;
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = key;
 process.env.USER_ONE_EMAIL = one.email;
