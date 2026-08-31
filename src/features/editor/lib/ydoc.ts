@@ -63,6 +63,15 @@ export function isUntouched(doc: Y.Doc): boolean {
   return Y.encodeStateVector(doc).length <= 1;
 }
 
+/** Stable colour shared by the browser and collaboration server. */
+export function collaborationColor(userId: string): string {
+  let hash = 0;
+  for (let index = 0; index < userId.length; index++) {
+    hash = (hash * 31 + userId.charCodeAt(index)) >>> 0;
+  }
+  return `hsl(${hash % 360} 64% 62%)`;
+}
+
 export function encodeDocument(doc: Y.Doc): Uint8Array {
   return Y.encodeStateAsUpdate(doc);
 }
