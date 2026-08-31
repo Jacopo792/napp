@@ -1,21 +1,28 @@
 /* The collaboration server.
  *
- * One process, one WebSocket endpoint, one note per document name. It does
- * three things and nothing else: decide whether a connection may open a note,
- * hand that connection the note's Yjs document, and write the document back
- * when it actually changes.
+ * One WebSocket endpoint, one note per document name. It does three things and
+ * nothing else: decide whether a connection may open a note, hand that
+ * connection the note's Yjs document, and write the document back when it
+ * actually changes.
  *
  * It is not a second source of truth. Authorisation is Supabase's, read
  * through the caller's own token so row level security answers exactly as it
- * answers the browser. Awareness — cursors, selections, who is on the page —
- * passes through and is never stored.
+ * answers the browser — and it is read again and again, not once at the
+ * handshake, because a socket outlives a membership. `authorize.ts` is that
+ * single answer; every hook below asks it rather than deciding anything.
+ *
+ * Awareness — cursors, selections, who is on the page — passes through, is
+ * never stored, and never carries what a browser says about who it is.
  *
  * Configuration arrives as an argument rather than out of `process.env`, which
- * is what lets the integration test stand one of these up against a local
- * Supabase and drive two real clients through it. */
-import { Server } from "@hocuspocus/server";
+ * is what lets the tests stand two of these up against one Redis and drive
+ * real clients through both. */
+import { Redis } from "@hocuspocus/extension-redis";
+import { Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
-import { decideAccess, noteIdOf, originAllowed, type NoteRow } from "./access.ts";
+import IORedis from "ioredis";
+import { noteIdOf, originAllowed } from "./access.ts";
+import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";
 
 export interface CollaborationConfig {
@@ -26,12 +33,50 @@ export interface CollaborationConfig {
   port: number;
   /** How long a burst of keystrokes is gathered before it becomes one save. */
   debounce?: number;
+  /** How long an authorisation answer is trusted before the archive is asked
+   *  again. This is the delay between losing access and being cut off. */
+  authorizationTtl?: number;
+  /** How often the server asks a connected client for a fresh access token.
+   *  Each answer is a full, uncached authorisation. */
+  tokenRefresh?: number;
+  /** The bus between instances. Without it this process is on its own, which
+   *  is correct for one instance and wrong for two. */
+  redisUrl?: string;
+  /** Names this instance on that bus. */
+  instanceName?: string;
 }
 
 export interface Context {
   userId: string;
   noteId: string;
   archiveId: string;
+  /** The nickname the archive holds, not one a browser offered. */
+  name: string;
+  color: string;
+  /** The most recent token this connection proved itself with. Kept so an
+   *  update can be revalidated without asking the client mid-keystroke. */
+  token: string;
+}
+
+function redisExtension(config: CollaborationConfig): Extension[] {
+  if (!config.redisUrl) return [];
+  return [
+    new Redis({
+      /* A fresh client per call: the extension keeps a publisher and a
+         subscriber, and a subscribed ioredis connection accepts no commands. */
+      createClient: () =>
+        new IORedis(config.redisUrl as string, {
+          maxRetriesPerRequest: null,
+          // Redis is the bus, never the record. If it is briefly away the
+          // instance keeps serving its own clients and rejoins on its own;
+          // what is already in Postgres is untouched either way.
+          enableOfflineQueue: true,
+          lazyConnect: false,
+        }),
+      identifier: config.instanceName ?? `notes-collab-${process.pid}`,
+      prefix: "notes-collab",
+    }) as unknown as Extension,
+  ];
 }
 
 export function createCollaborationServer(config: CollaborationConfig): Server<Context> {
@@ -41,17 +86,21 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  /** The caller, as Postgres sees them. Every read below goes through row level
-   *  security, so a note the archive withholds is withheld here too. */
+  /** The caller, as Postgres sees them. */
   const asCaller = (token: string) =>
     createClient(config.supabaseUrl, config.publishableKey, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
+  const authorize: Authorizer = createAuthorizer(supabaseLookup(asCaller), {
+    ttl: config.authorizationTtl ?? 5000,
+  });
+  const tokenRefresh = config.tokenRefresh ?? 60_000;
+
   return new Server<Context>({
     port: config.port,
-    name: "notes-collab",
+    name: config.instanceName ?? "notes-collab",
     quiet: true,
     // A save is a database transaction: batch a burst of keystrokes into one,
     // but never let a long unbroken session go unsaved.
@@ -59,6 +108,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     maxDebounce: 10000,
     // Handled by the caller, so the flush can be awaited and logged.
     stopOnSignals: false,
+    extensions: redisExtension(config),
 
     /* Refused before the WebSocket exists at all. `onConnect` below is the
        same check one layer in, for a socket that reached a document by another
@@ -82,35 +132,71 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       const noteId = noteIdOf(documentName);
       if (!noteId) throw new Error("That is not a note");
 
-      const caller = asCaller(token);
-      const { data: identity, error } = await caller.auth.getUser(token);
-      if (error || !identity?.user) throw new Error("Sign in again");
+      const answer = await authorize(token, noteId, { fresh: true });
+      if (!answer.allowed) throw new Error(answer.reason);
 
-      const note = await caller
-        .from("notes")
-        .select("id, archive_id, trashed_at")
-        .eq("id", noteId)
-        .maybeSingle();
-      if (note.error) throw new Error(note.error.message);
+      connectionConfig.readOnly = answer.readOnly;
+      return {
+        userId: answer.identity.userId,
+        noteId,
+        archiveId: answer.archiveId,
+        name: answer.identity.name,
+        color: answer.identity.color,
+        token,
+      };
+    },
 
-      const membership = note.data
-        ? await caller
-            .from("archive_members")
-            .select("role")
-            .eq("archive_id", (note.data as NoteRow).archive_id)
-            .eq("user_id", identity.user.id)
-            .maybeSingle()
-        : { data: null, error: null };
-      if (membership.error) throw new Error(membership.error.message);
+    /* The handshake is a moment; a socket is an afternoon. Ask the client for a
+       fresh token on a schedule, and treat every answer as a full
+       authorisation — that is how a revoked member stops being connected
+       without anybody having to reload. */
+    async connected({ connection }) {
+      const timer = setInterval(() => connection.requestToken(), tokenRefresh);
+      connection.onClose(() => clearInterval(timer));
+    },
 
-      const access = decideAccess(
-        (note.data as NoteRow | null) ?? null,
-        (membership.data as { role: string } | null)?.role ?? null,
-      );
-      if (!access.allowed) throw new Error(access.reason);
+    async onTokenSync({ documentName, token, connection, connectionConfig }) {
+      const noteId = noteIdOf(documentName);
+      if (!noteId) return;
 
-      connectionConfig.readOnly = access.readOnly;
-      return { userId: identity.user.id, noteId, archiveId: access.archiveId };
+      const answer = await authorize(token, noteId, { fresh: true });
+      if (!answer.allowed) {
+        connection.close();
+        return;
+      }
+      connection.context.token = token;
+      connection.readOnly = answer.readOnly;
+      connectionConfig.readOnly = answer.readOnly;
+    },
+
+    /* Before anything is applied. The answer is cached for `authorizationTtl`,
+       so this is a map lookup for all but one keystroke in a few seconds —
+       and the flag it sets is read by the receiver on this very message, so a
+       demotion takes effect on the update that arrives after it. */
+    async beforeHandleMessage({ connection, context, documentName }) {
+      const noteId = noteIdOf(documentName);
+      if (!noteId || !context?.token) return;
+
+      const answer = await authorize(context.token, noteId);
+      if (!answer.allowed) {
+        connection.close();
+        throw new Error(answer.reason);
+      }
+      connection.readOnly = answer.readOnly;
+    },
+
+    /* Nothing a browser says about who it is, is believed. The identity that
+       reaches everybody else is the one the archive gave this server, and the
+       colour is derived from the account id rather than chosen. */
+    async beforeHandleAwareness({ states, context }) {
+      if (!context) return;
+      for (const [clientId, state] of states) {
+        if (!state) continue;
+        states.set(clientId, {
+          ...state,
+          user: { userId: context.userId, name: context.name, color: context.color },
+        });
+      }
     },
 
     async onLoadDocument({ documentName, document }) {

@@ -22,6 +22,7 @@ import {
   type Account,
   type LocalStack,
 } from "./fixture.ts";
+import { TITLE_TEXT as TITLE } from "../../src/features/editor/lib/ydoc.ts";
 import { createCollaborationServer, type Context } from "./server.ts";
 
 const ORIGIN = "http://localhost:5173";
@@ -53,7 +54,9 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
   let server: Server<Context>;
   let port: number;
   let editor: Account;
-  let second: Account;
+  /** A second, genuinely separate editor: its own account, its own token. */
+  let mate: Account;
+  let viewer: Account;
   let outsider: Account;
   let archiveId: string;
 
@@ -99,25 +102,39 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
     return id;
   }
 
+  async function admit(account: Account, role: "editor" | "viewer") {
+    const invite = await editor.client.rpc("create_archive_invite", {
+      archive_id: archiveId,
+      email: account.email,
+      role,
+    });
+    assert.equal(invite.error, null, invite.error?.message);
+    const claimed = await account.client.rpc("claim_archive_invite", {
+      token: invite.data as string,
+    });
+    assert.equal(claimed.error, null, claimed.error?.message);
+  }
+
   before(async () => {
     editor = await makeAccount(local, "editor");
-    second = await makeAccount(local, "second");
+    mate = await makeAccount(local, "mate");
+    viewer = await makeAccount(local, "viewer");
     outsider = await makeAccount(local, "outsider");
 
     const bootstrap = await editor.client.rpc("ensure_personal_archive");
     assert.equal(bootstrap.error, null, bootstrap.error?.message);
     archiveId = bootstrap.data as string;
 
-    const invite = await editor.client.rpc("create_archive_invite", {
-      archive_id: archiveId,
-      email: second.email,
-      role: "viewer",
-    });
-    assert.equal(invite.error, null, invite.error?.message);
-    const claimed = await second.client.rpc("claim_archive_invite", {
-      token: invite.data as string,
-    });
-    assert.equal(claimed.error, null, claimed.error?.message);
+    // Two seats is the product; four is this test, which needs an owner, a
+    // second editor and a viewer in one archive at once.
+    const seats = await editor.client
+      .from("archives")
+      .update({ seat_limit: 4 })
+      .eq("id", archiveId);
+    assert.equal(seats.error, null, seats.error?.message);
+
+    await admit(mate, "editor");
+    await admit(viewer, "viewer");
 
     port = 9000 + Math.floor(Math.random() * 500);
     server = createCollaborationServer({
@@ -127,6 +144,9 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
       allowedOrigins: [ORIGIN],
       port,
       debounce: 150,
+      // Short enough that a revocation shows up inside a test, and the same
+      // mechanism a deployment runs with a longer one.
+      authorizationTtl: 150,
     });
     await server.listen();
   });
@@ -141,7 +161,7 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
     const { doc, provider } = connect(noteId, editor.token);
     await until(() => provider.isSynced);
 
-    assert.equal(doc.getText("title").toString(), "Field notes");
+    assert.equal(doc.getText(TITLE).toString(), "Field notes");
     assert.match(JSON.stringify(doc.getXmlFragment("default").toJSON()), /the first line/);
     provider.destroy();
   });
@@ -181,8 +201,8 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
     const yours = connect(noteId, editor.token);
     await until(() => yours.provider.isSynced);
 
-    mine.doc.getText("title").insert(0, "Our ");
-    yours.doc.getText("title").insert(mine.doc.getText("title").length, " together");
+    mine.doc.getText(TITLE).insert(0, "Our ");
+    yours.doc.getText(TITLE).insert(mine.doc.getText(TITLE).length, " together");
 
     const line = (doc: Y.Doc) => doc.getXmlFragment("default").get(0) as Y.XmlElement;
     (line(mine.doc).get(0) as Y.XmlText).insert(0, "mine: ");
@@ -190,12 +210,12 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
 
     await until(
       () =>
-        mine.doc.getText("title").toString() === yours.doc.getText("title").toString() &&
+        mine.doc.getText(TITLE).toString() === yours.doc.getText(TITLE).toString() &&
         JSON.stringify(mine.doc.getXmlFragment("default").toJSON()) ===
           JSON.stringify(yours.doc.getXmlFragment("default").toJSON()),
     );
 
-    const title = mine.doc.getText("title").toString();
+    const title = mine.doc.getText(TITLE).toString();
     assert.ok(
       title.includes("Our") && title.includes("Shared") && title.includes("together"),
       `both edits should survive, got ${JSON.stringify(title)}`,
@@ -220,7 +240,7 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
 
   it("lets a viewer read and refuses their writes", async () => {
     const noteId = await newNote("Read only", "for the viewer");
-    const { provider } = connect(noteId, second.token);
+    const { provider } = connect(noteId, viewer.token);
     await until(() => provider.isSynced);
     assert.equal(provider.authorizedScope, "readonly");
     provider.destroy();
@@ -327,5 +347,237 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
       target_note_id: noteId,
     });
     assert.notEqual(call.error, null, "a signed-in browser could call load_note_document");
+  });
+  /* ── Access that changes while a socket is open ──────────────────────────
+     A handshake is a moment and a connection is an afternoon. Everything below
+     changes the archive underneath a client that is already connected and
+     synced, and asks what the server does about it. */
+
+  async function titleOf(noteId: string): Promise<string> {
+    const row = await asService(local).from("notes").select("title").eq("id", noteId).single();
+    return (row.data as { title: string }).title;
+  }
+
+  /** Type at the end of the title, the way a person would. */
+  function append(doc: Y.Doc, text: string) {
+    const title = doc.getText(TITLE);
+    title.insert(title.length, text);
+  }
+
+  it("converges two people who are genuinely two accounts", async () => {
+    const noteId = await newNote("Between us", "one line");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    append(mine.doc, " — mine");
+    append(theirs.doc, " — theirs");
+
+    await until(() => mine.doc.getText(TITLE).toString() === theirs.doc.getText(TITLE).toString());
+    const title = mine.doc.getText(TITLE).toString();
+    assert.ok(title.includes("mine") && title.includes("theirs"), title);
+
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if ((await titleOf(noteId)) === title) break;
+      await sleep(150);
+    }
+    assert.equal(await titleOf(noteId), title, "the note row did not follow both writers");
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  it("stamps awareness with the identity the archive holds, not the one sent", async () => {
+    const noteId = await newNote("Who is there", "cursors only");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    // A client claiming to be somebody else, in somebody else's colour.
+    theirs.provider.awareness?.setLocalStateField("user", {
+      userId: editor.userId,
+      name: "Administrator",
+      color: "#000000",
+    });
+
+    let seen: { userId?: string; name?: string; color?: string } | undefined;
+    await until(() => {
+      for (const [, state] of mine.provider.awareness?.getStates() ?? []) {
+        const user = (state as { user?: { userId?: string } }).user;
+        if (user?.userId === mate.userId) {
+          seen = user;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    assert.equal(seen?.userId, mate.userId, "a client was believed about who it is");
+    assert.equal(seen?.name, mate.nickname, "the name came from the client, not the archive");
+    assert.match(seen?.color ?? "", /^hsl\(/, "the colour was not assigned by the server");
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  it("puts an editor demoted to viewer into read-only without a reload", async () => {
+    const noteId = await newNote("Demotion", "watch this");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    append(theirs.doc, " [before]");
+    await until(() => mine.doc.getText(TITLE).toString().includes("[before]"));
+
+    const demoted = await editor.client.rpc("set_archive_member_role", {
+      archive_id: archiveId,
+      user_id: mate.userId,
+      role: "viewer",
+    });
+    assert.equal(demoted.error, null, demoted.error?.message);
+    await sleep(400); // past the authorisation window
+
+    append(theirs.doc, " [after]");
+    await sleep(1200);
+
+    assert.ok(
+      !mine.doc.getText(TITLE).toString().includes("[after]"),
+      "a demoted editor was still writing to everybody else's document",
+    );
+    await sleep(600);
+    assert.ok(!(await titleOf(noteId)).includes("[after]"), "the demoted write was persisted");
+
+    // Put the seat back for the tests that follow.
+    await editor.client.rpc("set_archive_member_role", {
+      archive_id: archiveId,
+      user_id: mate.userId,
+      role: "editor",
+    });
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  it("closes the connection of a member who is removed from the archive", async () => {
+    const evicted = await makeAccount(local, "evicted");
+    await admit(evicted, "editor");
+
+    const noteId = await newNote("Revocation", "still a member");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, evicted.token);
+    await until(() => theirs.provider.isSynced);
+
+    let refused = false;
+    theirs.provider.on("authenticationFailed", () => {
+      refused = true;
+    });
+
+    const removed = await asService(local)
+      .from("archive_members")
+      .delete()
+      .eq("archive_id", archiveId)
+      .eq("user_id", evicted.userId);
+    assert.equal(removed.error, null, removed.error?.message);
+    await sleep(400);
+
+    append(theirs.doc, " [after eviction]");
+    await sleep(1500);
+
+    assert.ok(
+      !mine.doc.getText(TITLE).toString().includes("after eviction"),
+      "a removed member was still writing",
+    );
+    await until(() => refused || !theirs.provider.isAuthenticated, 10000);
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  it("makes a note read-only the moment it reaches the trash", async () => {
+    const noteId = await newNote("To the trash", "on its way out");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    const trashed = await editor.client
+      .from("notes")
+      .update({ trashed_at: new Date().toISOString() })
+      .eq("id", noteId);
+    assert.equal(trashed.error, null, trashed.error?.message);
+    await sleep(400);
+
+    append(theirs.doc, " [in the trash]");
+    await sleep(1500);
+
+    assert.ok(
+      !mine.doc.getText(TITLE).toString().includes("in the trash"),
+      "a trashed note was still being written to",
+    );
+    assert.ok(!(await titleOf(noteId)).includes("in the trash"));
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  it("withdraws a note its owner archives out of sight", async () => {
+    const noteId = await newNote("Kept back", "mine alone");
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    let refused = false;
+    theirs.provider.on("authenticationFailed", () => {
+      refused = true;
+    });
+
+    const hidden = await editor.client
+      .from("profiles")
+      .update({ hide_archived: true })
+      .eq("user_id", editor.userId)
+      .select("user_id");
+    assert.equal((hidden.data ?? []).length, 1, "the owner has no profile to hide behind");
+    assert.equal(hidden.error, null, hidden.error?.message);
+    const archived = await editor.client
+      .from("notes")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", noteId);
+    assert.equal(archived.error, null, archived.error?.message);
+    await sleep(400);
+
+    append(theirs.doc, " [should not land]");
+    await sleep(1500);
+
+    assert.ok(!(await titleOf(noteId)).includes("should not land"));
+    await until(() => refused || !theirs.provider.isAuthenticated, 10000);
+
+    theirs.provider.destroy();
+    await editor.client
+      .from("profiles")
+      .update({ hide_archived: false })
+      .eq("user_id", editor.userId);
+  });
+
+  it("neither transmits nor persists what a viewer types", async () => {
+    const noteId = await newNote("Viewer", "reads only");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, viewer.token);
+    await until(() => theirs.provider.isSynced);
+    assert.equal(theirs.provider.authorizedScope, "readonly");
+
+    append(theirs.doc, " [from a viewer]");
+    await sleep(1500);
+
+    assert.ok(
+      !mine.doc.getText(TITLE).toString().includes("from a viewer"),
+      "a viewer's typing reached another client",
+    );
+    assert.ok(!(await titleOf(noteId)).includes("from a viewer"), "a viewer's typing was saved");
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
   });
 });

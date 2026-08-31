@@ -30,6 +30,9 @@ export function localStack(): LocalStack | null {
 export interface Account {
   userId: string;
   email: string;
+  /** What the archive holds for this account, and so what the server stamps
+   *  into awareness however the client introduces itself. */
+  nickname: string;
   token: string;
   client: SupabaseClient;
 }
@@ -49,8 +52,20 @@ export async function makeAccount(stack: LocalStack, label: string): Promise<Acc
   const signedIn = await client.auth.signInWithPassword({ email, password });
   if (signedIn.error) throw new Error(signedIn.error.message);
 
+  const userId = signedIn.data.user!.id;
+  /* The application writes this row on first sign-in. The fixture signs in
+     directly, so it has to write it too — without it `hide_archived` has no
+     row to be true on, and the nickname the server stamps into awareness has
+     nothing to come from. */
+  const nickname = label.charAt(0).toUpperCase() + label.slice(1);
+  // Plain insert, the way `ensureProfile()` does it: PostgREST's upsert takes
+  // the `on conflict do update` path and that does not satisfy this table's
+  // insert-only policy for `authenticated`.
+  const profile = await client.from("profiles").insert({ user_id: userId, nickname });
+  if (profile.error) throw new Error(profile.error.message);
+
   const token = signedIn.data.session!.access_token;
-  return { userId: signedIn.data.user!.id, email, token, client };
+  return { userId, email, token, nickname, client };
 }
 
 export function asUser(stack: LocalStack, token: string): SupabaseClient {
