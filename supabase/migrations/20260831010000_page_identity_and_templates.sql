@@ -12,7 +12,12 @@ language sql
 immutable
 set search_path = ''
 as $icon$
-  select value is null
+  -- `coalesce(..., false)` is the whole point. A missing key makes
+  -- `value -> 'value'` SQL null, every comparison on it null, and the check
+  -- constraint *passes*: a null check expression is not a failed one. Without
+  -- this a page icon with no value at all was accepted.
+  select coalesce(
+    value is null
     or (
       jsonb_typeof(value) = 'object'
       and (
@@ -29,7 +34,9 @@ as $icon$
           )
         )
       )
-    );
+    ),
+    false
+  );
 $icon$;
 
 create or replace function private.valid_note_cover(value jsonb)
@@ -38,7 +45,11 @@ language sql
 immutable
 set search_path = ''
 as $cover$
-  select value is null
+  -- Same three-valued trap as above, and it had the same hole: a cover with no
+  -- `position` was stored, because `jsonb_typeof(null) = 'number'` is null
+  -- rather than false.
+  select coalesce(
+    value is null
     or (
       jsonb_typeof(value) = 'object'
       and jsonb_typeof(value -> 'position') = 'number'
@@ -54,7 +65,9 @@ as $cover$
             '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         )
       )
-    );
+    ),
+    false
+  );
 $cover$;
 
 alter table public.notes
@@ -75,7 +88,7 @@ create table if not exists public.note_templates (
   description text not null default '' check (char_length(description) <= 240),
   title text not null default '',
   content jsonb not null check (
-    jsonb_typeof(content) = 'object' and content ->> 'type' = 'doc'
+    coalesce(jsonb_typeof(content) = 'object' and content ->> 'type' = 'doc', false)
   ),
   page_icon jsonb,
   cover jsonb,

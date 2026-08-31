@@ -63,12 +63,24 @@ async function redisReachable(): Promise<boolean> {
   }
 }
 
+/* In CI the stack is started for this job, so a missing one is a broken job
+   rather than a reason to pass quietly. Nothing here may report success
+   because it was skipped. */
+function refuseToSkip(reason: string | false): string | false {
+  if (reason && process.env.REQUIRE_INTEGRATION === "1") {
+    throw new Error(`REQUIRE_INTEGRATION is set and the suite cannot run: ${reason}`);
+  }
+  return reason;
+}
+
 const reachable = stack ? await redisReachable() : false;
-const skip = !stack
-  ? "run `supabase start` first"
-  : !reachable
-    ? `no Redis at ${REDIS_URL} — start one with \`docker run -p 6380:6379 valkey/valkey:8-alpine\``
-    : false;
+const skip = refuseToSkip(
+  !stack
+    ? "run `supabase start` first"
+    : !reachable
+      ? `no Redis at ${REDIS_URL} — start one with \`docker run -p 6380:6379 valkey/valkey:8-alpine\``
+      : false,
+);
 
 describe("two instances behind one archive", { skip }, () => {
   const local = stack as LocalStack;

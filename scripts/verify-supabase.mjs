@@ -96,6 +96,7 @@ const archiveId = first.archiveId;
 const report = {};
 const channel = second.supabase.channel(`verify:${crypto.randomUUID()}`);
 const testId = crypto.randomUUID();
+const templateId = crypto.randomUUID();
 const viewerFolderId = crypto.randomUUID();
 const viewerTagId = crypto.randomUUID();
 const viewerObjectId = crypto.randomUUID();
@@ -592,6 +593,155 @@ try {
   fail(restoredEditor.error);
   peerRoleChanged = false;
 
+  // ── The collaborative document ───────────────────────────────────────────
+  // `note_documents` holds the Yjs binary for every note. Row level security is
+  // on and there is no policy at all, so a signed-in member reads nothing and
+  // writes nothing; the three calls the collaboration server makes are granted
+  // to `service_role` alone. This is the one table in the archive a browser is
+  // never meant to reach, so it is checked as a member and not only as a
+  // stranger.
+  const documentRead = await first.supabase.from("note_documents").select("note_id").limit(5);
+  assert(
+    documentRead.error || documentRead.data.length === 0,
+    "A signed-in member read note_documents",
+  );
+  const documentWrite = await first.supabase
+    .from("note_documents")
+    .insert({ note_id: testId, archive_id: archiveId, state: "\\x00" });
+  assert(documentWrite.error, "A signed-in member wrote note_documents");
+
+  for (const [name, args] of [
+    ["load_note_document", { target_note_id: testId }],
+    [
+      "seed_note_document",
+      { target_note_id: testId, document_state_base64: "", document_format_version: 1 },
+    ],
+    [
+      "save_note_document",
+      {
+        target_note_id: testId,
+        document_state_base64: "",
+        document_format_version: 1,
+        projected_title: "should not happen",
+        projected_body: "should not happen",
+        projected_content: { type: "doc", content: [] },
+      },
+    ],
+  ]) {
+    const called = await first.supabase.rpc(name, args);
+    assert(called.error, `A signed-in member called ${name}`);
+  }
+  report.collaborativeDocuments = { unreadable: true, unwritable: true, rpcsServiceOnly: true };
+
+  // ── Page identity ────────────────────────────────────────────────────────
+  // The two whitelists live in `pageProperties.ts` and in Postgres, and the one
+  // that matters is Postgres's: a shape checked only in the browser has already
+  // been written by anything that is not the browser.
+  const identityWritten = await first.supabase
+    .from("notes")
+    .update({
+      page_icon: { kind: "symbol", value: "star" },
+      cover: { kind: "preset", id: "forest", position: 0.25 },
+    })
+    .eq("id", testId)
+    .select("page_icon, cover")
+    .single();
+  fail(identityWritten.error);
+  assert(
+    identityWritten.data.page_icon.value === "star" &&
+      identityWritten.data.cover.id === "forest" &&
+      identityWritten.data.cover.position === 0.25,
+    "A valid page icon and cover did not come back as written",
+  );
+
+  for (const patch of [
+    { page_icon: { kind: "symbol", value: "database" } },
+    { page_icon: { kind: "wallpaper", value: "star" } },
+    { cover: { kind: "preset", id: "not-a-preset", position: 0.5 } },
+    { cover: { kind: "preset", id: "forest", position: 4 } },
+    { cover: { kind: "preset", id: "forest" } },
+    { cover: { kind: "upload", objectId: "../../etc/passwd", position: 0.5 } },
+  ]) {
+    const write = await first.supabase.from("notes").update(patch).eq("id", testId);
+    assert(write.error, `Postgres accepted ${JSON.stringify(patch)}`);
+  }
+  report.pageIdentity = { stored: true, whitelistEnforced: true };
+
+  // ── Opening a note is not editing it ─────────────────────────────────────
+  // Selection, hover and the initial sync all read. None of them may restamp a
+  // note or move it up a list, which is what `updated_at` and `version` decide.
+  const columns = "updated_at, version, title, body, content, page_icon, cover";
+  const beforeReading = await first.supabase
+    .from("notes")
+    .select(columns)
+    .eq("id", testId)
+    .single();
+  fail(beforeReading.error);
+  for (let look = 0; look < 3; look++) {
+    fail((await first.supabase.from("notes").select(columns).eq("id", testId).single()).error);
+    fail((await second.supabase.from("notes").select(columns).eq("id", testId).single()).error);
+  }
+  const afterReading = await first.supabase.from("notes").select(columns).eq("id", testId).single();
+  fail(afterReading.error);
+  assert(
+    JSON.stringify(afterReading.data) === JSON.stringify(beforeReading.data),
+    "Reading a note changed it",
+  );
+  report.openingIsNotEditing = true;
+
+  // ── Templates ────────────────────────────────────────────────────────────
+  const templateSeed = {
+    archive_id: archiveId,
+    name: "Verification template",
+    description: "written by verify:supabase",
+    title: "Daily note",
+    content: { type: "doc", content: [{ type: "paragraph" }] },
+    page_icon: { kind: "emoji", value: "\u2600\ufe0f" },
+    cover: null,
+  };
+  const templateInsert = await first.supabase
+    .from("note_templates")
+    .insert({ ...templateSeed, id: templateId, created_by: first.userId })
+    .select("id, name")
+    .single();
+  fail(templateInsert.error);
+
+  const peerReadsTemplate = await second.supabase
+    .from("note_templates")
+    .select("id, name")
+    .eq("id", templateId)
+    .maybeSingle();
+  fail(peerReadsTemplate.error);
+  assert(
+    peerReadsTemplate.data?.name === "Verification template",
+    "A member could not read an archive template",
+  );
+
+  const forgedAuthor = await second.supabase
+    .from("note_templates")
+    .insert({ ...templateSeed, id: crypto.randomUUID(), created_by: first.userId });
+  assert(forgedAuthor.error, "A member created a template attributed to somebody else");
+
+  const badTemplateCover = await first.supabase
+    .from("note_templates")
+    .update({ cover: { kind: "preset", id: "nope", position: 0.5 } })
+    .eq("id", templateId);
+  assert(badTemplateCover.error, "A template accepted an unknown cover preset");
+
+  const renamed = await first.supabase
+    .from("note_templates")
+    .update({ name: "Renamed by the peer" })
+    .eq("id", templateId)
+    .select("name")
+    .single();
+  fail(renamed.error);
+  report.templates = {
+    memberReads: true,
+    editorWrites: true,
+    authorshipEnforced: true,
+    whitelistEnforced: true,
+  };
+
   // ── Nobody outside the roster sees anything ──────────────────────────────
   const closedTables = ["archives", "archive_members", "notes", "folders", "tags", "note_tags"];
   for (const table of closedTables) {
@@ -622,6 +772,16 @@ try {
   );
   const anonymousAvatar = await anonymous.storage.from("avatars").download(avatarPath);
   assert(anonymousAvatar.error, "An anonymous client downloaded a member avatar");
+  /* These two are revoked from `anon` outright rather than merely filtered, so
+     an anonymous read is a permission error and not an empty list. Either
+     answer is the right one; a row is not. */
+  for (const table of ["note_documents", "note_templates"]) {
+    const anonymousRead = await anonymous.from(table).select("*").limit(5);
+    assert(
+      anonymousRead.error || anonymousRead.data.length === 0,
+      `An anonymous client read ${table}`,
+    );
+  }
   report.anonymous = { rows: 0, insertRejected: true, storageRejected: true };
 
   if (outsider) {
@@ -662,6 +822,15 @@ try {
     );
     const strangerAvatar = await outsider.supabase.storage.from("avatars").download(avatarPath);
     assert(strangerAvatar.error, "An account outside the archive downloaded a member avatar");
+    const strangerTemplates = await outsider.supabase
+      .from("note_templates")
+      .select("id")
+      .eq("archive_id", archiveId);
+    fail(strangerTemplates.error);
+    assert(
+      strangerTemplates.data.length === 0,
+      "An account outside the archive read its templates",
+    );
     report.authenticatedNonMember = { rows: 0, insertRejected: true, storageRejected: true };
   } else {
     report.authenticatedNonMember = "skipped: set USER_OUTSIDER_EMAIL and USER_OUTSIDER_PASSWORD";
@@ -676,6 +845,7 @@ try {
   }
   await first.supabase.storage.from("note-images").remove([`${archiveId}/${viewerObjectId}`]);
   await first.supabase.storage.from("avatars").remove([avatarPath]);
+  await first.supabase.from("note_templates").delete().eq("id", templateId);
   await first.supabase.from("note_tags").delete().eq("tag_id", viewerTagId);
   await first.supabase.from("folders").delete().eq("id", viewerFolderId);
   await first.supabase.from("tags").delete().eq("id", viewerTagId);

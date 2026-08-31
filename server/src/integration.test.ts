@@ -49,7 +49,19 @@ async function until(check: () => boolean, timeout = 8000): Promise<void> {
   throw new Error("timed out waiting for a condition");
 }
 
-describe("the collaboration server", { skip: stack ? false : "run `supabase start` first" }, () => {
+/* In CI the stack is started for this job, so a missing one is a broken job
+   rather than a reason to pass quietly. Nothing here may report success
+   because it was skipped. */
+function refuseToSkip(reason: string | false): string | false {
+  if (reason && process.env.REQUIRE_INTEGRATION === "1") {
+    throw new Error(`REQUIRE_INTEGRATION is set and the suite cannot run: ${reason}`);
+  }
+  return reason;
+}
+
+const skip = refuseToSkip(stack ? false : "run `supabase start` first");
+
+describe("the collaboration server", { skip }, () => {
   const local = stack as LocalStack;
   let server: Server<Context>;
   let port: number;
@@ -312,23 +324,35 @@ describe("the collaboration server", { skip: stack ? false : "run `supabase star
 
   it("refuses a page property the whitelist does not know", async () => {
     const noteId = await newNote("Bad cover", "unchanged");
-    const bogus = await asUser(local, editor.token)
-      .from("notes")
-      .update({ cover: { kind: "preset", id: "not-a-preset", position: 0.5 } })
-      .eq("id", noteId);
-    assert.notEqual(bogus.error, null, "an unknown cover preset was stored");
+    /* Every one of these used to be a way in. The last two are the reason the
+       check functions coalesce to false: a missing key makes every comparison
+       on it null, and a check constraint that evaluates to null passes. */
+    const refused: Record<string, unknown>[] = [
+      { page_icon: { kind: "symbol", value: "database" } },
+      { page_icon: { kind: "wallpaper", value: "star" } },
+      { page_icon: { kind: "symbol" } },
+      { cover: { kind: "preset", id: "not-a-preset", position: 0.5 } },
+      { cover: { kind: "preset", id: "forest", position: 4 } },
+      { cover: { kind: "preset", id: "forest", position: -0.5 } },
+      { cover: { kind: "preset", id: "forest" } },
+      { cover: { kind: "preset", position: 0.5 } },
+      { cover: { kind: "upload", objectId: "../../etc/passwd", position: 0.5 } },
+      { cover: { kind: "upload", objectId: "not-a-uuid", position: 0.5 } },
+    ];
+    for (const patch of refused) {
+      const write = await asUser(local, editor.token).from("notes").update(patch).eq("id", noteId);
+      assert.notEqual(write.error, null, `Postgres stored ${JSON.stringify(patch)}`);
+    }
 
-    const outOfRange = await asUser(local, editor.token)
+    // And the shapes that are meant to work still do.
+    const accepted = await asUser(local, editor.token)
       .from("notes")
-      .update({ cover: { kind: "preset", id: "forest", position: 4 } })
+      .update({
+        page_icon: { kind: "emoji", value: "\u2600\ufe0f" },
+        cover: { kind: "upload", objectId: crypto.randomUUID(), position: 0 },
+      })
       .eq("id", noteId);
-    assert.notEqual(outOfRange.error, null, "a cover position outside 0..1 was stored");
-
-    const notAnUpload = await asUser(local, editor.token)
-      .from("notes")
-      .update({ cover: { kind: "upload", objectId: "../../etc/passwd", position: 0.5 } })
-      .eq("id", noteId);
-    assert.notEqual(notAnUpload.error, null, "a cover upload id that is not a uuid was stored");
+    assert.equal(accepted.error, null, accepted.error?.message);
   });
 
   it("keeps the collaborative binary out of every browser's reach", async () => {

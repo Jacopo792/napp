@@ -44,12 +44,6 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # The collaboration server's own suite. Its integration tests skip
-      # themselves without a local Supabase, so what runs here is the
-      # authorisation logic — which is the part a pull request can break.
-      - name: Test the collaboration server
-        run: pnpm test:server
-
       - name: Format
         run: pnpm format:check
 
@@ -65,3 +59,63 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
           VITE_COLLAB_URL: wss://checks.example.invalid
         run: pnpm run build
+
+  # The collaboration server, against a real Postgres and a real Redis. Running
+  # its suite without those would let every integration test report success
+  # because it skipped, which is worse than not running them: `REQUIRE_INTEGRATION`
+  # turns a missing stack into a failed job rather than a quiet pass.
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      # The bus between instances. Two Hocuspocus processes are started by the
+      # multi-instance test and have to find each other through this.
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Applies every migration in `supabase/migrations/` to a fresh database,
+      # which is also the dry run: a migration that cannot be applied fails the
+      # job here rather than against the linked project.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test the collaboration server
+        env:
+          REQUIRE_INTEGRATION: "1"
+          REDIS_URL: redis://127.0.0.1:6380
+        run: pnpm test:server
+
+      # The image is what Render runs, so a Dockerfile that no longer builds is
+      # a broken deploy waiting for somebody to notice.
+      - name: Build the collaboration server image
+        run: docker build -f server/Dockerfile -t notes-collab:ci .
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
