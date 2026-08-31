@@ -1,5 +1,5 @@
 import { Image as ImageIcon, Upload } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useDismiss } from "@/components/useDismiss";
 import { useStoredImage } from "@/lib/media";
 import { clampCoverPosition, COVER_PRESETS, coverBackground } from "@/lib/pageProperties";
@@ -34,6 +34,7 @@ export function PageCover({
   const [busy, setBusy] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
   const pickerRef = useDismiss(pickerOpen, () => setPickerOpen(false));
 
   useEffect(() => setPosition(cover?.position ?? 0.5), [cover]);
@@ -103,6 +104,7 @@ export function PageCover({
     >
       <input
         ref={fileRef}
+        id={fileInputId}
         type="file"
         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
         className="hidden"
@@ -147,15 +149,17 @@ export function PageCover({
                     />
                   ))}
                 </div>
-                <button
-                  type="button"
+                <label
+                  htmlFor={fileInputId}
                   className="menu-row mt-1"
-                  disabled={busy}
-                  onClick={() => fileRef.current?.click()}
+                  aria-disabled={busy}
+                  onClick={(event) => {
+                    if (busy) event.preventDefault();
+                  }}
                 >
                   <Upload size={16} />
                   {busy ? "Uploading…" : "Upload a picture"}
-                </button>
+                </label>
               </div>
             )}
           </div>
