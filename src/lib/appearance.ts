@@ -74,6 +74,41 @@ export const APPEARANCE_PRESETS = [
     background: "#f7f3ea",
     foreground: "#29251f",
   },
+  /* Four more, and all four dark on purpose. `setTheme()` below still replaces
+     the three colours whenever the THEME segment is touched, so a light preset
+     added here would be wiped by the click that selects its own theme. */
+  {
+    id: "fjord",
+    name: "Fjord",
+    theme: "dark" as const,
+    accent: "#88c0d0",
+    background: "#2e3440",
+    foreground: "#eceff4",
+  },
+  {
+    id: "moss",
+    name: "Moss",
+    theme: "dark" as const,
+    accent: "#1db954",
+    background: "#141a16",
+    foreground: "#e9ede9",
+  },
+  {
+    id: "indigo",
+    name: "Indigo",
+    theme: "dark" as const,
+    accent: "#7f7bff",
+    background: "#1a1a26",
+    foreground: "#eeeef5",
+  },
+  {
+    id: "solar",
+    name: "Solar",
+    theme: "dark" as const,
+    accent: "#4aa3d8",
+    background: "#002b36",
+    foreground: "#e6ddc4",
+  },
 ] as const;
 
 const LIGHT_DEFAULTS = {

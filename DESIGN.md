@@ -94,8 +94,11 @@ control that is not disabled must not be drawn as though it were: idle glyphs
 on a note row are `--ink-3` and visible without the pointer, not revealed by it.
 
 **Theme.** `system`, `dark` or `light`, and `color-scheme` follows it so
-scrollbars, form controls and browser chrome stay aligned. Four presets ship —
-Graphite, Midnight, Aubergine, Paper — and each is only a starting point for the
+scrollbars, form controls and browser chrome stay aligned. Nine presets ship —
+Ink, Graphite, Midnight, Aubergine, Paper, Fjord, Moss, Indigo, Solar — and
+eight of the nine are dark, because `setTheme()` still replaces a reader's three
+colours whenever the THEME segment is touched, so a light preset is wiped by the
+click that selects its own theme. Each is only a starting point for the
 three values the reader actually sets: accent, background and foreground. A
 wallpaper is optional, with its own dim, blur and fit; when one is on, the panes
 lean on translucency so the picture is visible without the text sitting on it.

@@ -289,6 +289,11 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
   const resolveImage = options.resolve;
   const [src, setSrc] = useState("");
   const [error, setError] = useState("");
+  /* A picture is fetched once, and one failed fetch used to be forever: a
+     token that expired mid-session, or a peer whose upload had not landed in
+     Storage yet, left a permanent "could not be displayed" in a note whose
+     picture was perfectly fine. Bumping this re-runs the effect. */
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -309,7 +314,7 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [objectId, resolveImage]);
+  }, [objectId, resolveImage, attempt]);
 
   return (
     <NodeViewWrapper className={`rich-media-image ${error ? "is-error" : ""}`}>
@@ -325,6 +330,15 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
       ) : (
         <div className="rich-media-loading" contentEditable={false}>
           {error || "Loading image…"}
+          {error && (
+            <button
+              type="button"
+              className="rich-media-retry"
+              onClick={() => setAttempt((count) => count + 1)}
+            >
+              Try again
+            </button>
+          )}
         </div>
       )}
       {editor.isEditable && (

@@ -182,6 +182,15 @@ The collaboration server is part of the authorization boundary:
   nickname, account id or caret colour.
 - A local cache never opens an editor. The server must authorize and complete a
   sync first; after that, an open editor may continue offline and reconnect.
+  This is enforced by not mounting `RichTextEditor` at all until `collaboration`
+  is non-null — one place, and it also removed the double build that made the
+  text paint twice per note switch. Do **not** re-add a pre-sync editor built
+  from the Postgres projection: it painted the note, then destroyed the whole
+  ProseMirror instance and rebuilt it against the Yjs fragment on `onSynced`.
+- `canEdit` is a question about the archive and the note — your role, and
+  whether this is Trash. Never `&& collaborative.ready`: a sleeping Render
+  instance then takes away the page's own controls, including **Add cover**,
+  which writes to Postgres and never needed the socket.
 - Redis/Valkey carries Yjs and awareness updates between instances. It is not
   persistence, and the app must still work with one instance when REDIS_URL is
   absent.
@@ -201,6 +210,12 @@ archive with; only the account itself may write its own row. Avatars live in
 their own private bucket under the owner's user id.
 `src/lib/avatarCache.ts` keeps one object URL per avatar, and Realtime keeps the
 roster live.
+
+Who is on the _note_ is a different question, and it is asked of Yjs awareness
+(`useCollaborationPeers`), not of the Realtime presence channel: a peer in that
+list is connected to this note's document by construction, so there is no
+`noteId` filter to get wrong. Realtime presence still carries the `typing` flag
+and still feeds the Settings roster.
 
 A picture is placed before it is uploaded, not cut from the middle of the file.
 `AvatarCropper` shows a round window over the image, draggable and zoomable;

@@ -20,6 +20,8 @@ import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
+import { BotanicalFlower } from "@/components/BotanicalFlowers";
+import { flowerFor } from "@/lib/botanical";
 import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
@@ -465,7 +467,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       key={entry.note.id}
       ref={shellRef}
       onContextMenu={handlePageContextMenu}
-      className={`editor-shell page-in flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
+      className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <div
@@ -569,7 +571,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           cover used to be pinned above the scrolling text, which on a laptop
           left the note itself a slot a few lines deep and no way to push the
           picture out of the way. */}
-      <div className="editor-scroll min-h-0 flex-1">
+      {/* `page-in` belongs to the column, never to the pane. On the pane it was
+          an `opacity: 0` on the one element carrying `background: var(--page)`,
+          so the first frames of every note switch showed the reader's wallpaper
+          through a hole where the page should be. */}
+      <div className="editor-scroll page-in min-h-0 flex-1">
         <PageCover
           cover={entry.note.cover}
           photo={entry.note.photo}
@@ -619,27 +625,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           </div>
         </header>
 
-        {/* The text itself. */}
+        {/* The text itself, and not before the server has said so. Building an
+            editor from the projection first and rebuilding it against the Yjs
+            fragment on `onSynced` painted the note twice, and the second paint
+            is the bounce. One document, one instance, mounted once. */}
         <div className={mobile ? "px-5" : "px-10"}>
-          <RichTextEditor
-            key={entry.note.id}
-            ref={editorRef}
-            value={readDraft(entry.note.id)?.content ?? entry.note.content}
-            revision={syncRevision}
-            readOnly={!canEdit}
-            placeholder="Start writing…"
-            onChange={(content, body) => {
-              if (!canEdit) return;
-              editBody(entry.note.id, body, content);
-              onEdited();
-            }}
-            onPasteImage={handlePastedImage}
-            onOpenLink={openLinkForm}
-            mobile={mobile}
-            resolveImage={resolveImage}
-            resolveFile={resolveFile}
-            collaboration={collaboration}
-          />
+          {collaboration && (
+            <RichTextEditor
+              key={entry.note.id}
+              ref={editorRef}
+              value={readDraft(entry.note.id)?.content ?? entry.note.content}
+              revision={syncRevision}
+              readOnly={!canEdit}
+              placeholder="Start writing…"
+              onChange={(content, body) => {
+                if (!canEdit) return;
+                editBody(entry.note.id, body, content);
+                onEdited();
+              }}
+              onPasteImage={handlePastedImage}
+              onOpenLink={openLinkForm}
+              mobile={mobile}
+              resolveImage={resolveImage}
+              resolveFile={resolveFile}
+              collaboration={collaboration}
+            />
+          )}
+          {/* A tailpiece, in the run-out the text already leaves below itself.
+              A sibling of the editor and never a node inside it: anything in
+              the document would be editable, would serialise into Markdown, and
+              would sync to the other reader as content. The note keeps its own
+              flower, because the seed is its id. */}
+          <BotanicalFlower flower={flowerFor(entry.note.id)} className="note-tailpiece" />
         </div>
       </div>
     </section>

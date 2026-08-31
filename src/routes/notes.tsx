@@ -97,7 +97,7 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact } from "@/lib/media";
-import { useCollaborativeNote } from "@/lib/collab";
+import { useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
 import {
   CollectionMenu,
@@ -279,6 +279,10 @@ function NotesPage() {
     [session, profile.nickname],
   );
   const collaborative = useCollaborativeNote(selectedId, collaborationIdentity, presenceEnabled);
+  /* Who is on this note, asked of the note's own document rather than of a
+     second channel that has to be told which note that is. A peer in this
+     list is connected to this note by construction. */
+  const notePeers = useCollaborationPeers(collaborative.provider, session?.userId ?? null);
 
   // ── Refs mirroring state, so the save pipeline can read the truth
   //    synchronously without waiting for a React commit. ───────────────────
@@ -641,6 +645,14 @@ function NotesPage() {
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
   const selfMember = members.find((member) => member.isSelf);
   const canWriteArchive = selfMember?.role === "editor";
+  /* A question about the archive and the note — your role, and whether this is
+     Trash. It used to be answered by the websocket as well
+     (`canEdit && collaborative.ready`), so a collaboration server that was slow
+     or asleep took away the page's own controls: the format bar, and the Add
+     cover button, which writes to Postgres and never needed the socket at all.
+     What the socket gates is the *text*, and it gates it by not mounting the
+     editor at all until it has synced — which is the boundary CLAUDE.md asks
+     for, applied in one place instead of two. */
   const canEdit = selected ? selectedFolderId !== TRASH && canWriteArchive : false;
 
   const folderLabel =
@@ -1643,23 +1655,24 @@ function NotesPage() {
      question you actually have while writing. Nothing renders while presence
      is off, on either side: the channel is mutual and so is this. */
   const noteReaders = useMemo(() => {
-    if (!presenceEnabled || !selectedId) return null;
-    const here = members.filter(
-      (member) => !member.isSelf && presentMembers.get(member.userId)?.noteId === selectedId,
-    );
-    if (here.length === 0) return null;
+    if (!presenceEnabled || !selectedId || notePeers.length === 0) return null;
     return (
       <span className="note-readers" aria-live="polite">
-        {here.map((member) => {
-          const name = member.nickname || "Member";
-          const typing = presentMembers.get(member.userId)?.typing === true;
+        {notePeers.map((peer) => {
+          /* The roster is where a face and a chosen nickname live. Awareness is
+             where *being here* lives, and it is the one the caret in the text
+             already agrees with. A peer the roster has not loaded yet still
+             appears, under the name the server stamped. */
+          const member = members.find((candidate) => candidate.userId === peer.userId);
+          const name = member?.nickname || peer.name;
+          const typing = presentMembers.get(peer.userId)?.typing === true;
           return (
             <span
-              key={member.userId}
+              key={peer.userId}
               className={`note-reader ${typing ? "is-typing" : ""}`}
               title={typing ? `${name} is writing` : `${name} has this note open`}
             >
-              <Avatar url={avatarUrls[member.userId] ?? null} name={name} email="" compact />
+              <Avatar url={avatarUrls[peer.userId] ?? null} name={name} email="" compact />
               <span className="note-reader-name truncate">{name}</span>
               {typing && <i className="note-reader-caret" aria-hidden="true" />}
               <span className="sr-only">{typing ? " is writing" : " has this note open"}</span>
@@ -1668,7 +1681,7 @@ function NotesPage() {
         })}
       </span>
     );
-  }, [presenceEnabled, selectedId, members, presentMembers, avatarUrls]);
+  }, [presenceEnabled, selectedId, notePeers, members, presentMembers, avatarUrls]);
 
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
@@ -2054,7 +2067,7 @@ function NotesPage() {
                     mobile
                     entry={selected}
                     syncRevision={syncRevision}
-                    canEdit={canEdit && (!selectedId || collaborative.ready)}
+                    canEdit={canEdit}
                     proofreaderEnabled={proofreaderEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
@@ -2189,7 +2202,7 @@ function NotesPage() {
               key={selected?.note.id ?? "empty"}
               entry={selected}
               syncRevision={syncRevision}
-              canEdit={canEdit && (!selectedId || collaborative.ready)}
+              canEdit={canEdit}
               proofreaderEnabled={proofreaderEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}

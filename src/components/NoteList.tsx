@@ -88,6 +88,17 @@ interface Props {
    open — a checklist, a note with a picture in it, a note carrying a file — the
    way the sidebar's glyphs say what a scope is. Same alphabet in both columns,
    so the two read as one interface. ──────────────────────────────────────── */
+const COLLAPSED_GROUPS_KEY = "napp:note-groups-closed";
+
+function loadCollapsedGroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_GROUPS_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
 const GLYPHS = {
   attachment: { icon: Paperclip, label: "Has an attachment" },
   image: { icon: ImageIcon, label: "Has a picture" },
@@ -397,6 +408,28 @@ export function NoteList({
   /* Which note the picture being cut is for: the menu is gone by the time the
      cropper is on screen. */
   const [cropping, setCropping] = useState<{ noteId: string; file: File } | null>(null);
+  /* Which date groups are folded shut. The *closed* ones are what is stored, so
+     a bucket that appears for the first time — a new month, a new year — opens
+     rather than arriving already hidden. Same shape as the folder tree's
+     `napp:folders-open`, one key over. */
+  const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsedGroups);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...collapsed]));
+    } catch {
+      /* The preference is optional; the groups still fold without storage. */
+    }
+  }, [collapsed]);
+
+  const toggleGroup = useCallback((id: string) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const photoNoteRef = useRef<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const closeRowMenu = useCallback(() => {
@@ -621,37 +654,59 @@ export function NoteList({
     </>
   );
 
-  const renderedGroups = groups.map((group, groupIndex) => (
-    <section key={group.id} className="note-group" aria-labelledby={`note-group-${group.id}`}>
-      <div className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}>
-        <h3 id={`note-group-${group.id}`}>{group.label}</h3>
-        <span>{group.entries.length}</span>
-      </div>
-      <div className={gallery ? "note-gallery-grid" : ""}>
-        {group.entries.map((entry) => (
-          <Row
-            mobile={mobile}
-            gallery={gallery}
-            key={entry.note.id}
-            entry={entry}
-            meta={meta}
-            selected={selectedId === entry.note.id}
-            trashMode={trashMode}
-            archiveMode={archiveMode}
-            canWrite={canWrite}
-            onSelect={selectEntry}
-            onMoveToTrash={onMoveToTrash}
-            onRestore={onRestore}
-            onArchiveChange={onArchiveChange}
-            onDeleteForever={onDeleteForever}
-            onTogglePin={togglePinEntry}
-            onContextMenu={openRowMenu}
-            resolveImage={resolveImage}
+  const renderedGroups = groups.map((group, groupIndex) => {
+    const open = !collapsed.has(group.id);
+    return (
+      <section key={group.id} className="note-group" aria-labelledby={`note-group-${group.id}`}>
+        {/* The heading is the control. The count stays out on the right whether
+          the group is open or shut, because "Previous 30 Days · 24" is the
+          whole reason to fold it and still the reason to keep it on screen. */}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`note-group-body-${group.id}`}
+          onClick={() => toggleGroup(group.id)}
+          className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}
+        >
+          <ChevronRight
+            size={14}
+            aria-hidden="true"
+            className={`note-group-twisty ${open ? "is-open" : ""}`}
           />
-        ))}
-      </div>
-    </section>
-  ));
+          <h3 id={`note-group-${group.id}`}>{group.label}</h3>
+          <span>{group.entries.length}</span>
+        </button>
+        <div
+          id={`note-group-body-${group.id}`}
+          className={`note-group-body ${open ? "is-open" : ""}`}
+        >
+          <div className={gallery ? "note-gallery-grid" : ""}>
+            {group.entries.map((entry) => (
+              <Row
+                mobile={mobile}
+                gallery={gallery}
+                key={entry.note.id}
+                entry={entry}
+                meta={meta}
+                selected={selectedId === entry.note.id}
+                trashMode={trashMode}
+                archiveMode={archiveMode}
+                canWrite={canWrite}
+                onSelect={selectEntry}
+                onMoveToTrash={onMoveToTrash}
+                onRestore={onRestore}
+                onArchiveChange={onArchiveChange}
+                onDeleteForever={onDeleteForever}
+                onTogglePin={togglePinEntry}
+                onContextMenu={openRowMenu}
+                resolveImage={resolveImage}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  });
 
   /* What is narrowing the list, and how to stop it narrowing. With the folder
      rail gone this is the only standing sign of a scope that is not "everything",

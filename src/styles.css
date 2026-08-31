@@ -607,6 +607,27 @@
   }
 }
 
+/* The tailpiece under a note. It lives in the 40vh of run-out `.rich-text-content`
+   leaves below the last line, pulled up into it rather than stacked after it —
+   otherwise you would scroll a third of a screen past the end of your own note
+   to find it. Never interactive: the padding beneath belongs to the editor, and
+   clicking it should still put the caret at the end of the text. */
+.note-tailpiece {
+  position: relative;
+  display: block;
+  height: 76px;
+  margin: -32vh auto 0;
+  color: var(--ink-4);
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  .note-tailpiece {
+    height: 58px;
+  }
+}
+
 /* The one authored moment on this surface: the plant draws itself, base to
    tip, while the card settles. `pathLength` normalises every path to 1, so a
    vein and a stem take the same dash and differ only in when they start. */
@@ -1270,6 +1291,70 @@
   }
 }
 
+/* ── The other person's caret, in the text ───────────────────────────────────
+   `@tiptap/extension-collaboration-caret` ships markup and no stylesheet: a
+   `<span class="collaboration-carets__caret">` carrying an inline
+   `border-color`, wrapping a `<div class="collaboration-carets__label">`
+   carrying an inline `background-color`. Both colours arrive already correct,
+   stamped by the server in `beforeHandleAwareness`.
+
+   Unstyled, that inner `div` is a block box sitting in the paragraph's flow —
+   which is why a peer's name read as a band of their colour across the whole
+   line, pushing the sentence down a row. The label has to leave the flow
+   entirely. Everything here is position and paint; the extension owns the
+   colour and we never override it. */
+.collaboration-carets__caret {
+  position: relative;
+  display: inline;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid;
+  border-right: 0;
+  word-break: normal;
+  pointer-events: none;
+}
+
+/* Out of the flow, and resting exactly on top of the caret it names.
+   `bottom: 100%` against the caret's own inline box needs no measurement and no
+   em arithmetic — `top: -1.35em` would resolve that em against the *label's*
+   11px, not the line's, and leave the pill sitting across the words. Measured:
+   a line with two carets on it is exactly as tall as the same line without
+   them. The square bottom-left corner is the tail pointing back down. */
+.collaboration-carets__label {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  z-index: 20;
+  border-radius: 4px 4px 4px 0;
+  padding: 1px 6px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.5;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  /* Two people on the same word put two labels in the same place. Letting them
+     overlap is the reference behaviour and the honest one: the labels are
+     translucent enough to read the one behind, and neither moves the text. */
+  transform-origin: 0 100%;
+  animation: caret-label-in var(--dur-fast) var(--ease-spring) both;
+}
+
+@keyframes caret-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collaboration-carets__label {
+    animation: none;
+  }
+}
+
 /* ── The archive switch ──────────────────────────────────────────────────────
    Two names, one track, and a thumb that travels between them. It was two
    buttons with a background that blinked from one to the other, at 12px in the
@@ -1434,10 +1519,15 @@
   font-weight: 650;
 }
 
+/* The heading folds the group. A date bucket is the one grouping in this list
+   nobody chose — the app decided that six notes were "Yesterday" — so the least
+   it can do is let you put the old ones away. */
 .note-group-heading {
   display: flex;
-  align-items: baseline;
+  width: 100%;
+  align-items: center;
   gap: 0.5rem;
+  text-align: left;
   /* Whole pixels, like the rows underneath. 1.2rem and 0.55rem are 19.2 and
      8.8, and the baseline row they wrap measured 22.06 — so each heading threw
      every row below it a further fraction of a pixel off the device grid, and
@@ -1459,9 +1549,62 @@
 }
 
 .note-group-heading span {
+  margin-left: auto;
   color: var(--ink-4);
   font-family: var(--font-mono);
   font-size: 0.63rem;
+}
+
+/* Rotation, not a scale: a chevron is a shape, and turning one costs nothing.
+   Scaling a 14px glyph is what `svg.lucide` at the top of this file forbids. */
+.note-group-twisty {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.note-group-twisty.is-open {
+  transform: rotate(90deg);
+}
+
+.note-group-heading:hover .note-group-twisty {
+  color: var(--ink-2);
+}
+
+/* `0fr → 1fr` again, the same trick the folder tree uses: it animates to the
+   rows' real height without anyone measuring it. The delayed `visibility` is
+   what takes a closed group out of the accessibility tree and out of tab
+   order — after the fold, so it does not cut the animation short. */
+.note-group-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-base) var(--ease);
+}
+
+.note-group-body.is-open {
+  grid-template-rows: 1fr;
+}
+
+.note-group-body > * {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s linear var(--dur-base);
+}
+
+.note-group-body.is-open > * {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-group-body,
+  .note-group-body > *,
+  .note-group-twisty {
+    transition: none;
+  }
 }
 
 .note-row-summary {
@@ -3304,7 +3447,7 @@
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -3312,8 +3455,11 @@
   }
 }
 
+/* On the scrolling column, not on the pane — see NoteEditor. Shorter and
+   smaller than it was: 360ms of travel is an entrance for a screen, and this
+   is a column of text being replaced inside a frame that never moved. */
 .page-in {
-  animation: page-in var(--dur-slow) var(--ease) both;
+  animation: page-in var(--dur-base) var(--ease) both;
 }
 
 /* Phone screens push and pop the way the platform does: the incoming screen
@@ -3525,7 +3671,10 @@
 
 .sidebar-tail {
   flex-shrink: 0;
-  padding: 4px 8px 6px;
+  /* Four pixels left of the scrolling rows above. The tail is a different kind
+     of place — where things go, not where things are — and it is the only
+     block here whose horizontal padding is its own to set. */
+  padding: 4px 8px 6px 4px;
 }
 
 .sidebar-row {
@@ -4131,12 +4280,14 @@
    used height snapped up to the padding, the box overflowed the pane, and the
    note read as frozen. */
 .rich-text-content {
-  padding-bottom: 40vh;
   width: 100%;
   min-height: 10rem;
   max-width: var(--read-measure);
   margin-inline: auto;
-  padding: 0;
+  /* One declaration, not two: `padding: 0` written after `padding-bottom: 40vh`
+     is the shorthand quietly deleting the longhand above it, which is how the
+     run-out this whole comment exists to defend came to not exist. */
+  padding: 0 0 40vh;
   outline: none;
   caret-color: var(--accent);
   overflow-wrap: anywhere;
@@ -4356,12 +4507,29 @@
   font-size: 0.75rem;
 }
 .rich-media-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   border: 1px dashed var(--rule);
   border-radius: 0.75rem;
   padding: 1rem;
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 0.8rem;
+}
+
+.rich-media-retry {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.rich-media-retry:hover {
+  background: var(--paper-2);
+  color: var(--ink);
 }
 
 .rich-text-content .ProseMirror-selectednode {
@@ -4597,10 +4765,6 @@
   margin-bottom: 7px;
 }
 
-.note-add-property:hover {
-  background: var(--paper-2);
-}
-
 .note-add-property {
   display: inline-flex;
   align-items: center;
@@ -4610,6 +4774,10 @@
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: 11px;
+}
+
+.note-add-property:hover {
+  background: var(--paper-2);
 }
 
 @media (max-width: 700px) {
