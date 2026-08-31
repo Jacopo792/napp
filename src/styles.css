@@ -4669,6 +4669,14 @@
   cursor: ns-resize;
 }
 
+/* `cover-in` animates a transform and therefore makes the cover a stacking
+   context. Without ranking that context, the title and editor that follow it
+   paint over the picker and receive its clicks, regardless of the picker's own
+   z-index. Lift the cover only for the lifetime of the open picker. */
+.note-page-cover.is-picker-open {
+  z-index: 40;
+}
+
 .note-cover-actions {
   position: absolute;
   right: 18px;

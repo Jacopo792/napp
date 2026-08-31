@@ -88,7 +88,7 @@ export function PageCover({
   return (
     <div
       ref={surfaceRef}
-      className={`note-page-cover ${placing ? "is-placing" : ""}`}
+      className={`note-page-cover ${placing ? "is-placing" : ""} ${pickerOpen ? "is-picker-open" : ""}`}
       /* Longhands, never the `background` shorthand: React writes only the
          properties that changed, so a shorthand applied after a new picture
          was chosen reset `background-position` to the top and the focal point
