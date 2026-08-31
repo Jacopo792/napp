@@ -1,12 +1,7 @@
-# The collaboration server, and nothing else. The app itself is a static bundle
-# on GitHub Pages and Supabase is the rest of the backend; this is the one
-# process this project runs, because a Yjs document needs somewhere to be
+# The collaboration server, and the bus it needs. The app itself is a static
+# bundle on GitHub Pages and Supabase is the rest of the backend; this is the
+# one process this project runs, because a Yjs document needs somewhere to be
 # authoritative and a static site has no server to be it.
-#
-# Always on, and one instance. Two instances would each hold their own copy of
-# an open document and neither would see the other's updates, so scaling this
-# horizontally needs a shared backend (Hocuspocus has a Redis extension) before
-# the instance count moves off one.
 services:
   - type: web
     name: notes-collab
@@ -22,9 +17,26 @@ services:
         value: 8080
       # Only the deployed site and a developer's own machine. A WebSocket
       # upgrade carries an Origin like any other browser request, and one that
-      # is not on this list is refused before authentication is even attempted.
+      # is not on this list is refused before authentication is attempted.
       - key: ALLOWED_ORIGINS
         value: https://jacopo792.github.io,http://localhost:5173,http://localhost:5199
+      # The bus below. One instance is the plan, but Render starts the new
+      # instance before it stops the old one, so every deploy has a minute in
+      # which two processes hold the same note — long enough to lose somebody's
+      # paragraph if neither knows about the other.
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: notes-collab-bus
+          property: connectionString
+      # How long an authorisation answer is trusted before the archive is asked
+      # again. This is the delay between a member losing access and their socket
+      # noticing, so it is short — and it is a value, not a constant, because
+      # the right number is a judgement about load.
+      - key: AUTHORIZATION_TTL_MS
+        value: 5000
+      - key: TOKEN_REFRESH_MS
+        value: 60000
       # Set in the Render dashboard, never in this file. The service role key in
       # particular is the only key in this system that bypasses row level
       # security, and it exists in exactly one place: this service's environment.
@@ -34,3 +46,16 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+
+  # Strictly a bus between instances: which document changed, and how. Nothing
+  # here is the record — every document lives in `note_documents`, and losing
+  # this store costs a reconnect rather than a note. That is why it may evict
+  # under pressure, and why the free plan is the right size for it.
+  - type: keyvalue
+    name: notes-collab-bus
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: allkeys-lru
+    # Empty: reachable only from services inside this region, over the internal
+    # network. Nothing outside Render may connect to it at all.
+    ipAllowList: []

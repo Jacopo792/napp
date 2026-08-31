@@ -25,6 +25,13 @@ function fail(error: { message: string } | null): void {
  *  be: a second seed built later would share no history with this one, and
  *  merging the two appends the whole body a second time.
  *
+ *  Which is why the seed is built in a document of its own and never applied
+ *  here. Two instances can open the same untouched note in the same instant —
+ *  a deploy window is exactly that — and only one of them wins `on conflict do
+ *  nothing`. Applying our own seed and *then* discovering we lost would be the
+ *  duplication this is all arranged to prevent, so what gets applied is always
+ *  what the archive ended up holding, ours or the other instance's.
+ *
  *  Seeding deliberately does not touch `public.notes`. Opening a note is not
  *  editing it, and must not restamp it or move it up a list. */
 export async function loadDocument(
@@ -32,12 +39,9 @@ export async function loadDocument(
   noteId: string,
   document: Y.Doc,
 ): Promise<void> {
-  const stored = await service.rpc("load_note_document", { target_note_id: noteId });
-  fail(stored.error);
-
-  const row = (stored.data as { state_base64: string; format_version: number }[] | null)?.[0];
-  if (row) {
-    Y.applyUpdate(document, Buffer.from(row.state_base64, "base64"));
+  const stored = await readDocument(service, noteId);
+  if (stored) {
+    Y.applyUpdate(document, stored);
     return;
   }
 
@@ -57,21 +61,25 @@ export async function loadDocument(
       note.data.legacy_body ?? note.data.body ?? "",
     ),
   );
-  const state = Y.encodeStateAsUpdate(seed);
-  Y.applyUpdate(document, state);
 
   const seeded = await service.rpc("seed_note_document", {
     target_note_id: noteId,
-    document_state_base64: Buffer.from(state).toString("base64"),
+    document_state_base64: Buffer.from(Y.encodeStateAsUpdate(seed)).toString("base64"),
     document_format_version: DOCUMENT_FORMAT_VERSION,
   });
   fail(seeded.error);
-  // ponytail: one instance, and Hocuspocus builds a document name once, so
-  // losing this race is impossible today. If a second instance is ever added,
-  // this has to become "discard the seed and re-read", not "carry on".
-  if (seeded.data === false) {
-    throw new Error("This note was seeded by another instance; reconnect to pick it up");
-  }
+
+  const settled = await readDocument(service, noteId);
+  if (!settled) throw new Error("The document could not be created for this note");
+  Y.applyUpdate(document, settled);
+}
+
+/** The stored binary, or `null` when this note has never been opened. */
+async function readDocument(service: SupabaseClient, noteId: string): Promise<Uint8Array | null> {
+  const stored = await service.rpc("load_note_document", { target_note_id: noteId });
+  fail(stored.error);
+  const row = (stored.data as { state_base64: string; format_version: number }[] | null)?.[0];
+  return row ? Buffer.from(row.state_base64, "base64") : null;
 }
 
 /** One real edit. The binary and the projections every list, search, preview,
