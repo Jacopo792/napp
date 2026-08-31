@@ -46,16 +46,31 @@ export interface CollaborationConfig {
   instanceName?: string;
 }
 
-function health(
+/** Answer a probe and stop Hocuspocus from handling the request itself. A
+ *  falsy throw is its way of saying "already answered". */
+function respond(
   response: {
     writeHead(status: number, headers: Record<string, string>): void;
     end(body: string): void;
   },
   status: number,
+  body: Record<string, unknown>,
 ): never {
   response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
-  response.end(JSON.stringify({ status: status === 200 ? "ok" : "unavailable" }));
+  response.end(JSON.stringify(body));
   throw null;
+}
+
+/** Every dependency probe is bounded, so an unreachable backend answers the
+ *  probe with "not ready" rather than making the platform wait on a socket
+ *  that will never reply. */
+const PROBE_MS = 1200;
+
+async function within<T>(work: PromiseLike<T>): Promise<T | null> {
+  return Promise.race([
+    Promise.resolve(work).catch(() => null),
+    new Promise<null>((resolve) => setTimeout(resolve, PROBE_MS)),
+  ]);
 }
 
 export interface Context {
@@ -104,6 +119,36 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+
+  /* The bus, asked whether it is there. `null` means this deployment has no
+     bus at all, which is correct for a single instance and must not be
+     reported as unready.
+
+     A client per probe rather than a pooled one: readiness runs every few
+     seconds, connect-ping-quit costs a round trip, and nothing is left holding
+     the event loop open when the server is destroyed — which is what a
+     long-lived probe client would do to every test in this directory.
+     ponytail: per-probe client; pool it if readiness ever becomes a hot path. */
+  async function probeRedis(): Promise<boolean | null> {
+    if (!config.redisUrl) return null;
+    const client = new IORedis(config.redisUrl, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null,
+    });
+    /* A refused connection is the answer this probe wanted, not an unhandled
+       error event on the way to it. */
+    client.on("error", () => undefined);
+    const answered = await within(
+      client
+        .connect()
+        .then(() => client.ping())
+        .then((reply) => reply === "PONG"),
+    );
+    client.disconnect();
+    return answered === true;
+  }
 
   const authorize: Authorizer = createAuthorizer(supabaseLookup(asCaller), {
     ttl: config.authorizationTtl ?? 5000,
@@ -220,21 +265,35 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       await storeDocument(service, noteIdOf(documentName)!, document);
     },
 
+    /* Two probes, and the difference between them is the whole point.
+       `/healthz` is liveness: this process is up and its event loop is
+       turning. It must never consult a dependency, or a Supabase outage
+       restarts every instance for a fault that is not theirs.
+       `/readyz` is readiness: every backend this process needs to serve a
+       document answered within `PROBE_MS`. Render takes an unready instance
+       out of rotation and leaves it running, which is the correct response to
+       a database that is briefly away. */
     async onRequest({ request, response }) {
       if (request.url === "/healthz") {
-        return health(response, 200);
+        return respond(response, 200, { status: "ok" });
       }
       if (request.url === "/readyz") {
-        /* A short caller-side timeout keeps an unhealthy Supabase connection
-           from making Render wait on a request forever. Redis is only a bus;
-           Hocuspocus owns its reconnecting clients, so readiness must not
-           create a second long-lived connection merely to probe it. */
-        const ready = await Promise.race([
-          service.from("archives").select("id", { head: true, count: "exact" }).limit(1),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+        const [supabaseOk, redisOk] = await Promise.all([
+          within(
+            service
+              .from("archives")
+              .select("id", { head: true, count: "exact" })
+              .limit(1)
+              .then((result) => !result.error),
+          ),
+          probeRedis(),
         ]);
-        if (!ready || ("error" in ready && ready.error)) return health(response, 503);
-        return health(response, 200);
+        const checks = { supabase: supabaseOk === true, redis: redisOk };
+        const ready = checks.supabase && checks.redis !== false;
+        return respond(response, ready ? 200 : 503, {
+          status: ready ? "ok" : "unavailable",
+          checks,
+        });
       }
     },
   });
