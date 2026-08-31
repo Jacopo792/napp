@@ -40,3 +40,21 @@ test("the bound is half of what the scaled image has over the viewport", () => {
   // The short side exactly covers the viewport, so it cannot move at all.
   assert.equal(avatarDragBound({ imageSide: 800, imageShortSide: 800, viewport: 240, zoom: 1 }), 0);
 });
+
+test("the square cut is exactly the circle the cropper drew", () => {
+  /* The one identity the two halves have to agree on: scale the cut square by
+     the same factor the preview scales the picture with, and it must come back
+     as the viewport itself. It did not, for as long as the drawn circle was
+     inset inside the square being measured. */
+  for (const zoom of [1, 1.4, 2, 3]) {
+    for (const offsetX of [0, 40, -40]) {
+      const view = { ...landscape, zoom, offsetX, offsetY: 0 };
+      const scale = (view.viewport / Math.min(view.imageWidth, view.imageHeight)) * zoom;
+      assert.equal(
+        Math.round(avatarCropRect(view).edge * scale),
+        view.viewport,
+        `zoom ${zoom} cut a square the circle did not show`,
+      );
+    }
+  }
+});

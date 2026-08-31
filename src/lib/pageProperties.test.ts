@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clampCoverPosition, coverFromStorage, notePhotoFromStorage } from "./pageProperties.ts";
+import {
+  clampCoverPosition,
+  coverFromStorage,
+  notePhotoFromStorage,
+  withPageProperties,
+} from "./pageProperties.ts";
 
 test("cover positions are normalized before reaching layout", () => {
   assert.equal(clampCoverPosition(-2), 0);
@@ -21,4 +26,38 @@ test("page properties reject unknown persisted shapes", () => {
     position: 1,
   });
   assert.equal(coverFromStorage({ kind: "preset", id: "missing" }), null);
+});
+
+test("a cached note takes the picture the archive holds now", () => {
+  const cached = {
+    id: "n1",
+    title: "Note",
+    body: "",
+    content: { type: "doc", content: [] },
+    contentVersion: 1,
+    legacyBody: null,
+    photo: null,
+    cover: null,
+    ownerId: null,
+    createdAt: "",
+    updatedAt: "",
+  } as unknown as Parameters<typeof withPageProperties>[0];
+
+  /* Nothing changed: the same object, or every row in the list re-renders on
+     every refresh. */
+  assert.equal(withPageProperties(cached, { page_icon: null, cover: null }), cached);
+
+  /* A cover set without touching the text does not move the row's version, so
+     this is the only path by which it reaches the screen at all. */
+  const withCover = withPageProperties(cached, {
+    page_icon: null,
+    cover: { kind: "preset", id: "forest", position: 0.5 },
+  });
+  assert.notEqual(withCover, cached);
+  assert.deepEqual(withCover.cover, { kind: "preset", id: "forest", position: 0.5 });
+  assert.equal(withCover.title, "Note");
+  assert.equal(
+    withPageProperties(withCover, { page_icon: null, cover: withCover.cover }),
+    withCover,
+  );
 });

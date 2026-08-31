@@ -770,7 +770,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   return (
     <>
-      <EditorContent editor={editor} className="rich-text-editor h-full" />
+      <EditorContent editor={editor} className="rich-text-editor" />
       {editor && !readOnly && (
         <>
           <BubbleMenu

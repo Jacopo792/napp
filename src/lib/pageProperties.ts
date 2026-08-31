@@ -1,4 +1,4 @@
-import type { NoteCover, NotePhoto } from "./types.ts";
+import type { Note, NoteCover, NotePhoto } from "./types.ts";
 
 export const COVER_PRESETS = [
   {
@@ -68,4 +68,22 @@ export function coverFromStorage(value: unknown): NoteCover {
 export function coverBackground(cover: NoteCover): string | null {
   if (cover?.kind !== "preset") return null;
   return COVER_PRESETS.find((preset) => preset.id === cover.id)?.background ?? null;
+}
+
+/**
+ * The note as it was cached, carrying whatever picture the archive holds now.
+ *
+ * Setting a cover or a photo writes neither the text nor the row's version, so
+ * the payload the version gates is never re-fetched for it — which is how a
+ * cover came to vanish a moment after being chosen, taken back by the cached
+ * note when the write's own Realtime event returned. Returns the very same
+ * object when nothing changed, so a refresh does not re-render every row in
+ * the list for a note nobody touched.
+ */
+export function withPageProperties(note: Note, row: { page_icon: unknown; cover: unknown }): Note {
+  const photo = notePhotoFromStorage(row.page_icon);
+  const cover = coverFromStorage(row.cover);
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if (same(photo, note.photo) && same(cover, note.cover)) return note;
+  return { ...note, photo, cover };
 }

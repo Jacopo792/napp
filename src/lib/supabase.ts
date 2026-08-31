@@ -2,7 +2,7 @@ import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
 import { fail, supabase } from "./supabaseClient";
-import { coverFromStorage, notePhotoFromStorage } from "./pageProperties";
+import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
 import {
   noteDocument,
   richTextToPlainText,
@@ -40,6 +40,11 @@ interface NoteRow {
   folder_id: string | null;
   version: number;
   content_version: number;
+  /* A picture is metadata, not payload. Both travel with every row rather
+     than with the payload the version gates, because neither one moves the
+     version — see `pageProperties` below. */
+  page_icon: unknown;
+  cover: unknown;
 }
 
 interface FolderRow {
@@ -126,7 +131,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase
       .from("notes")
       .select(
-        "id, owner_id, created_at, updated_at, trashed_at, archived_at, pinned, folder_id, version, content_version",
+        "id, owner_id, created_at, updated_at, trashed_at, archived_at, pinned, folder_id, version, content_version, page_icon, cover",
       )
       .eq("archive_id", archiveId),
     supabase
@@ -237,7 +242,14 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     noteRows.map(async (row) => {
       const cached = noteCache.get(row.id);
       if (cached?.version === row.version) {
-        return { note: cached.note, version: row.version } satisfies NoteEntry;
+        /* Setting a cover or a photo writes neither the text nor the version,
+           so the payload above is never re-fetched for it and the cache would
+           hand back the note as it was before the picture — which is what a
+           cover did on screen: it appeared, the write's own Realtime event
+           came back, and the cached note took it away again. */
+        const note = withPageProperties(cached.note, row);
+        if (note !== cached.note) noteCache.set(row.id, { version: row.version, note });
+        return { note, version: row.version } satisfies NoteEntry;
       }
       const payload = payloads.get(row.id);
       // A row that appeared between the two queries: keep whatever is cached

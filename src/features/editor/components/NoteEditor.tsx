@@ -508,16 +508,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       {fileInputs}
 
-      <PageCover
-        cover={entry.note.cover}
-        photo={entry.note.photo}
-        canEdit={canEdit}
-        resolveImage={resolveImage}
-        uploadImage={onUploadImage}
-        onChange={updatePageProperties}
-        onError={setFailure}
-      />
-
       {findOpen && (
         <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
           <Search size={16} className="shrink-0 text-ink-4" />
@@ -575,66 +565,82 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         </div>
       )}
 
-      <header className={`shrink-0 ${mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}`}>
-        <div className="measure">
-          <div className="font-sans text-base">
-            <PageIdentity
-              photo={entry.note.photo}
-              cover={entry.note.cover}
-              canEdit={canEdit}
-              resolveImage={resolveImage}
-              onChange={updatePageProperties}
-            />
-            {viewingAsPartner && (
-              <p className="label mb-3 text-ink-3">
-                {partnerName}&apos;s archive{!canEdit && " · read only"}
-              </p>
-            )}
-
-            <p className="note-date">{formatStamp(entry.note.updatedAt)}</p>
-
-            <TitleField
-              mobile={mobile}
-              noteId={entry.note.id}
-              canEdit={canEdit}
-              titleRef={titleRef}
-              onEdited={onEdited}
-              yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
-            />
-
-            {(status || failure) && (
-              <p
-                role={failure ? "alert" : "status"}
-                className={`mt-2 text-[11px] ${failure ? "text-danger" : "text-accent"}`}
-              >
-                {failure || status}
-              </p>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* The text itself. */}
-      <div className={`min-h-0 flex-1 ${mobile ? "px-5" : "px-10"}`}>
-        <RichTextEditor
-          key={entry.note.id}
-          ref={editorRef}
-          value={readDraft(entry.note.id)?.content ?? entry.note.content}
-          revision={syncRevision}
-          readOnly={!canEdit}
-          placeholder="Start writing…"
-          onChange={(content, body) => {
-            if (!canEdit) return;
-            editBody(entry.note.id, body, content);
-            onEdited();
-          }}
-          onPasteImage={handlePastedImage}
-          onOpenLink={openLinkForm}
-          mobile={mobile}
+      {/* The cover, the frontispiece and the text scroll as one column. The
+          cover used to be pinned above the scrolling text, which on a laptop
+          left the note itself a slot a few lines deep and no way to push the
+          picture out of the way. */}
+      <div className="editor-scroll min-h-0 flex-1">
+        <PageCover
+          cover={entry.note.cover}
+          photo={entry.note.photo}
+          canEdit={canEdit}
           resolveImage={resolveImage}
-          resolveFile={resolveFile}
-          collaboration={collaboration}
+          uploadImage={onUploadImage}
+          onChange={updatePageProperties}
+          onError={setFailure}
         />
+
+        <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
+          <div className="measure">
+            <div className="font-sans text-base">
+              <PageIdentity
+                photo={entry.note.photo}
+                cover={entry.note.cover}
+                canEdit={canEdit}
+                resolveImage={resolveImage}
+                onChange={updatePageProperties}
+              />
+              {viewingAsPartner && (
+                <p className="label mb-3 text-ink-3">
+                  {partnerName}&apos;s archive{!canEdit && " · read only"}
+                </p>
+              )}
+
+              <p className="note-date">{formatStamp(entry.note.updatedAt)}</p>
+
+              <TitleField
+                mobile={mobile}
+                noteId={entry.note.id}
+                canEdit={canEdit}
+                titleRef={titleRef}
+                onEdited={onEdited}
+                yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
+              />
+
+              {(status || failure) && (
+                <p
+                  role={failure ? "alert" : "status"}
+                  className={`mt-2 text-[11px] ${failure ? "text-danger" : "text-accent"}`}
+                >
+                  {failure || status}
+                </p>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* The text itself. */}
+        <div className={mobile ? "px-5" : "px-10"}>
+          <RichTextEditor
+            key={entry.note.id}
+            ref={editorRef}
+            value={readDraft(entry.note.id)?.content ?? entry.note.content}
+            revision={syncRevision}
+            readOnly={!canEdit}
+            placeholder="Start writing…"
+            onChange={(content, body) => {
+              if (!canEdit) return;
+              editBody(entry.note.id, body, content);
+              onEdited();
+            }}
+            onPasteImage={handlePastedImage}
+            onOpenLink={openLinkForm}
+            mobile={mobile}
+            resolveImage={resolveImage}
+            resolveFile={resolveFile}
+            collaboration={collaboration}
+          />
+        </div>
       </div>
     </section>
   );

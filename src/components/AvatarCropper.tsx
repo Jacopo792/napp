@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Loader2, Move, ZoomIn } from "lucide-react";
 import { avatarCropRect, avatarDragBound, type AvatarCrop } from "@/lib/image";
 
@@ -9,7 +9,15 @@ import { avatarCropRect, avatarDragBound, type AvatarCrop } from "@/lib/image";
    slider. What the window shows is exactly what `avatarCropRect` cuts, because
    both are given the same three numbers. */
 
-const VIEWPORT = 260;
+/* The stage is the whole picture you can see; the circle inside it is the crop.
+   `VIEWPORT` is the circle, because the circle is what is cut — the inset used
+   to live only in the stylesheet, so the square being cut was the stage and
+   every picture came back a tenth wider than the one that had been framed. The
+   inset is handed to CSS below from this constant, so the two cannot drift
+   apart again. */
+const STAGE = 260;
+const WINDOW_INSET = 10;
+const VIEWPORT = STAGE - WINDOW_INSET * 2;
 const MAX_ZOOM = 3;
 
 export function AvatarCropper({
@@ -105,7 +113,13 @@ export function AvatarCropper({
 
         <div
           className="cropper-stage"
-          style={{ width: VIEWPORT, height: VIEWPORT }}
+          style={
+            {
+              width: STAGE,
+              height: STAGE,
+              "--cropper-inset": `${WINDOW_INSET}px`,
+            } as CSSProperties
+          }
           onPointerDown={(event) => {
             if (!size) return;
             drag.current = {

@@ -327,7 +327,7 @@
     overscroll-behavior: contain;
   }
 
-  .mobile-editor .rich-text-editor {
+  .mobile-editor .editor-scroll {
     scrollbar-gutter: auto;
   }
 
@@ -504,91 +504,242 @@
   background: var(--page);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
+  /* A menu that is simply present on the next frame reads as a jump cut. This
+     is short enough that it is never a wait — the list is legible before the
+     eye has finished travelling to it — and it comes from the corner the menu
+     hangs off, so the panel looks attached to the control that opened it. */
+  animation: menu-in var(--dur-fast) var(--ease-out) both;
+  transform-origin: top center;
 }
 
+.popover.right-0 {
+  transform-origin: top right;
+}
+
+.popover.left-0 {
+  transform-origin: top left;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+
+.context-menu {
+  animation: menu-in 130ms var(--ease-out) both;
+}
+
+/* ══ The door ════════════════════════════════════════════════════════════════
+   The only screen in the app with nothing of the reader's on it yet, which is
+   the one place it may say what kind of place this is. It says it with a drawn
+   plate and a ruled form, not with a floating grey box. ────────────────────── */
 .login-shell {
+  position: relative;
+  /* Clipped sideways so the plate may bleed off both edges, but never
+     vertically: on a short laptop window the sign-up card is taller than the
+     viewport, and `overflow: hidden` would have cut its head and feet off with
+     no way to reach either. */
+  overflow-x: clip;
   background: var(--surface);
+}
+
+.login-garden {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.botanical-plate {
+  position: absolute;
+  color: var(--ink);
+  stroke: currentColor;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.botanical-plate .stem {
+  stroke-width: 1.9;
+}
+
+.botanical-plate .stalk {
+  stroke-width: 1.1;
+}
+
+.botanical-plate .blade {
+  stroke-width: 1.15;
+}
+
+.botanical-plate .vein {
+  stroke-width: 0.7;
+  opacity: 0.72;
+}
+
+/* Near: climbing the right edge, its cut end off the bottom of the window.
+   Far: smaller, dimmer, behind the card's shoulder — one plant seen twice, so
+   the window reads as a page from a herbarium rather than as one sticker. */
+.botanical-plate.is-near {
+  right: -6vh;
+  bottom: -12vh;
+  height: 116vh;
+  opacity: 0.15;
+}
+
+.botanical-plate.is-far {
+  bottom: -22vh;
+  left: -14vh;
+  height: 78vh;
+  transform: scaleX(-1) rotate(9deg);
+  opacity: 0.07;
+}
+
+@media (max-width: 760px) {
+  .botanical-plate.is-near {
+    right: -22vh;
+    height: 92vh;
+    opacity: 0.12;
+  }
+
+  .botanical-plate.is-far {
+    display: none;
+  }
+}
+
+/* The one authored moment on this surface: the plant draws itself, base to
+   tip, while the card settles. `pathLength` normalises every path to 1, so a
+   vein and a stem take the same dash and differ only in when they start. */
+.botanical-plate .stem,
+.botanical-plate .sprig {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: plate-draw 900ms var(--ease-out) forwards;
+  animation-delay: calc(120ms + var(--i) * 78ms);
+}
+
+@keyframes plate-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.login-head {
+  position: relative;
+  display: flex;
+  height: 4.5rem;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0 clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.login-wordmark {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.login-tagline {
+  color: var(--ink-4);
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .login-tagline {
+    display: none;
+  }
+}
+
+.login-main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1.25rem 3.5rem;
 }
 
 /* No drop shadow. A 90px black blur over a near-black ground did not read as
    lift, it read as a smudge ringing the card. The hairline and the paper step
    already separate it; the inset highlight catches the top edge. */
 .login-card {
+  width: 100%;
+  max-width: 27rem;
   border: 1px solid var(--rule);
   border-radius: 1.25rem;
   background: var(--paper);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--shadow-soft);
+  padding: clamp(1.75rem, 4vw, 2.4rem);
+  animation: login-settle var(--dur-slow) var(--ease-out) both;
 }
 
-.login-input {
-  display: block;
-  width: 100%;
-  border: 1px solid var(--rule);
-  border-radius: 0.8rem;
-  background: var(--surface);
-  padding: 0.8rem 0.9rem;
-  color: var(--ink);
-  font-size: 0.9rem;
-  outline: none;
-  transition:
-    border-color 160ms var(--ease),
-    background-color 160ms var(--ease);
+@keyframes login-settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
-.login-input:focus {
-  border-color: var(--accent);
-  background: var(--page);
+/* Which of the two things you are doing is a choice, so it is a control at the
+   top of the card rather than a link under it. The rule under the pair carries
+   a marker that travels, so the two modes read as two pages of one card. */
+.login-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--rule);
 }
 
-.login-submit {
-  border: 1px solid var(--accent);
-  border-radius: 0.8rem;
-  background: var(--accent);
-  color: var(--on-accent);
-  transition:
-    background-color 160ms var(--ease),
-    border-color 160ms var(--ease);
+.login-tabs button {
+  padding: 0 2px 12px;
+  color: var(--ink-4);
+  font-size: 13px;
+  font-weight: 560;
+  text-align: left;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
-.login-submit:hover:not(:disabled) {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
-}
-
-.login-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
-}
-
-.login-mark {
-  display: flex;
-  width: 44px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--glass-border);
-  border-radius: 0.75rem;
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-
-.login-mark.is-quiet {
-  background: var(--surface);
+.login-tabs button:hover {
   color: var(--ink-2);
 }
 
-.login-title {
-  margin-top: 1.5rem;
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.035em;
+.login-tabs button.is-active {
   color: var(--ink);
+  font-weight: 640;
+}
+
+.login-tabs-marker {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 50%;
+  height: 1px;
+  background: var(--accent);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.login-tabs-marker[data-mode="sign-up"] {
+  transform: translateX(100%);
+}
+
+.login-title {
+  margin-top: 1.6rem;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
 }
 
 .login-lede {
-  margin-top: 0.5rem;
+  margin-top: 0.55rem;
   color: var(--ink-3);
   font-size: 0.875rem;
   line-height: 1.55;
@@ -607,49 +758,78 @@
   overflow-wrap: anywhere;
 }
 
-/* A title still must not be able to push the card open. */
-.login-title {
-  overflow-wrap: anywhere;
+.login-form {
+  margin-top: 1.75rem;
 }
 
-/* Which of the two things you are doing is a choice, so it is a control at the
-   top of the card rather than a link under it. The mark stays; the tabs sit
-   between it and a heading that now only ever names one of them. */
-.login-tabs {
+/* Ruled, not boxed: a rule under a field is what a form on paper looks like,
+   and it stops the card being three nested frames deep before a character is
+   typed. The rule takes the accent and doubles under the caret. */
+.login-field {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
+  gap: 0.35rem;
+}
+
+.login-field + .login-field {
   margin-top: 1.5rem;
-  border: 1px solid var(--rule);
-  border-radius: 0.8rem;
-  background: var(--surface);
-  padding: 3px;
 }
 
-.login-tabs button {
-  border-radius: 0.62rem;
-  padding: 8px 10px;
-  color: var(--ink-4);
-  font-size: 13px;
-  font-weight: 560;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
+.login-field .label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--ink-3);
 }
 
-.login-tabs button:hover {
-  color: var(--ink-2);
-}
-
-.login-tabs button.is-active {
-  background: var(--accent-wash);
-  box-shadow: inset 0 0 0 1px var(--glass-highlight);
+.login-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.45rem 0 0.55rem;
   color: var(--ink);
-  font-weight: 640;
+  font-size: 0.95rem;
+  outline: none;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.login-input:hover {
+  border-color: var(--ink-4);
+}
+
+.login-input:focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+
+.login-secret .login-input {
+  padding-right: 2.5rem;
+}
+
+.login-reveal {
+  position: absolute;
+  right: -0.25rem;
+  bottom: 0;
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.55rem;
+  color: var(--ink-4);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.login-reveal:hover,
+.login-reveal[aria-pressed="true"] {
+  color: var(--ink);
 }
 
 .login-hint {
-  margin-left: auto;
   color: var(--ink-4);
   font-size: 11.5px;
   font-weight: 500;
@@ -657,34 +837,64 @@
   text-transform: none;
 }
 
-/* The field keeps its own padding; the button is laid over the end of it and
-   the input is told to stop short, so the text never runs under the eye. */
-.login-secret {
-  position: relative;
-}
-
-.login-secret .login-input {
-  padding-right: 2.75rem;
-}
-
-.login-reveal {
-  position: absolute;
-  top: 50%;
-  right: 0.35rem;
+.login-submit {
   display: flex;
-  width: 34px;
-  height: 34px;
+  width: 100%;
   align-items: center;
   justify-content: center;
-  transform: translateY(-50%);
-  border-radius: 0.55rem;
-  color: var(--ink-4);
-  transition: color var(--dur-fast) var(--ease);
+  gap: 0.5rem;
+  margin-top: 1.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.8rem;
+  background: var(--accent);
+  padding: 0.8rem 1rem;
+  color: var(--on-accent);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
 }
 
-.login-reveal:hover,
-.login-reveal[aria-pressed="true"] {
-  color: var(--ink);
+.login-submit:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.login-submit svg {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.login-submit:hover:not(:disabled) svg {
+  transform: translateX(2px);
+}
+
+.login-mark {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 0.75rem;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.login-mark.is-quiet {
+  background: var(--surface);
+  color: var(--ink-2);
 }
 
 .login-steps {
@@ -713,6 +923,15 @@
   margin-top: 1.25rem;
 }
 
+.login-footnote {
+  margin-top: 1.4rem;
+}
+
+.login-error {
+  margin-top: 0.9rem;
+  color: var(--danger);
+}
+
 .login-invite-note {
   margin-top: 1rem;
   border: 1px solid var(--rule);
@@ -722,6 +941,18 @@
   color: var(--ink-2);
   font-size: 12.5px;
   line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card {
+    animation: none;
+  }
+
+  .botanical-plate .stem,
+  .botanical-plate .sprig {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
 }
 
 .archive-choice-list {
@@ -2637,9 +2868,12 @@
   will-change: transform;
 }
 
+/* The inset comes from the component, which is the same number its crop
+   arithmetic uses. Hard-coding it here once made the drawn circle and the cut
+   square two different sizes. */
 .cropper-window {
   position: absolute;
-  inset: 10px;
+  inset: var(--cropper-inset, 10px);
   border-radius: 50%;
   box-shadow:
     0 0 0 9999px rgb(0 0 0 / 0.5),
@@ -3215,7 +3449,7 @@
    Animating that scroll means the caret is chasing a moving page, which is the
    single least smooth thing the app did. The lists keep it: those scrolls are
    navigation, and navigation is worth watching travel. */
-.rich-text-editor {
+.editor-scroll {
   scroll-behavior: auto;
 }
 
@@ -3225,11 +3459,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .list-in {
+  .list-in,
+  .popover,
+  .context-menu,
+  .note-page-cover {
     animation: none;
   }
 
-  .rich-text-editor,
+  .editor-scroll,
   .sidebar-scroll,
   .collection-column [role="listbox"] {
     scroll-behavior: auto;
@@ -3871,10 +4108,16 @@
 /* ══ Structured rich text (Tiptap) ═══════════════════════════════════════════
    The document now contains real paragraphs, marks and nodes. These rules keep
    the reading page visually unchanged without exposing storage syntax. */
-.rich-text-editor {
-  height: 100%;
+/* The page scrolls, not the text inside it: `.editor-scroll` is the one
+   scrolling box, so the cover and the title travel up out of the way with the
+   words instead of standing over them. */
+.editor-scroll {
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.rich-text-editor {
   color: var(--ink);
   font-family: var(--font-reading);
   font-size: var(--read-size);
@@ -3888,7 +4131,7 @@
    used height snapped up to the padding, the box overflowed the pane, and the
    note read as frozen. */
 .rich-text-content {
-  padding-bottom: 45vh;
+  padding-bottom: 40vh;
   width: 100%;
   min-height: 10rem;
   max-width: var(--read-measure);
@@ -4239,11 +4482,19 @@
 
 .note-page-cover {
   position: relative;
+  animation: cover-in var(--dur-slow) var(--ease-out) both;
   width: 100%;
   height: 240px;
   flex-shrink: 0;
   background-repeat: no-repeat;
   touch-action: none;
+}
+
+@keyframes cover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .note-page-cover.is-placing {

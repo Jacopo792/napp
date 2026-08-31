@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
+import { BotanicalPlate } from "@/components/BotanicalPlate";
 
 export const Route = createFileRoute("/")({ component: Login });
 
@@ -25,11 +26,10 @@ const COPY: Record<Mode, { title: string; lede: string; action: string; footnote
     footnote: "Signed in on this device until you sign out or the session times out.",
   },
   "sign-up": {
-    title: "Create your account",
-    lede: "A private archive is created for you, and stays private until you invite someone.",
+    title: "Start an archive",
+    lede: "The account and the archive are made together, in one step.",
     action: "Create account",
-    footnote:
-      "At least 8 characters. Your archive is created with the account, and only you can read it.",
+    footnote: "At least 8 characters. Nobody can reset a password you have not written down.",
   },
 };
 
@@ -164,7 +164,7 @@ function Login() {
         </p>
         <button
           type="button"
-          className="login-submit label mt-6 flex w-full items-center justify-center py-3"
+          className="login-submit label"
           onClick={() => {
             setConfirmation("");
             switchMode("sign-in");
@@ -178,8 +178,10 @@ function Login() {
 
   return (
     <LoginFrame>
-      <LoginMark />
-
+      {/* Which of the two you are doing is decided before anything is typed,
+          and the whole card answers to it — heading, explanation, button and
+          footnote — so creating an account is never the sign-in page wearing
+          a different word. */}
       <div className="login-tabs" role="group" aria-label="Sign in or create an account">
         <button
           type="button"
@@ -197,6 +199,7 @@ function Login() {
         >
           Create account
         </button>
+        <span className="login-tabs-marker" data-mode={mode} />
       </div>
 
       <h1 className="login-title">{copy.title}</h1>
@@ -212,30 +215,34 @@ function Login() {
       )}
 
       <form
-        className="mt-6"
+        className="login-form"
         onSubmit={(event) => {
           event.preventDefault();
           void handleSubmit();
         }}
       >
-        <label className="field-row mb-2" htmlFor="email">
-          <span className="label text-ink-2">Email</span>
-        </label>
-        <input
-          id="email"
-          autoFocus
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="login-input"
-        />
+        {/* Ruled fields, not boxes. Two outlined rectangles on a plane inside a
+            plane is three frames deep before a single character is typed. */}
+        <div className="login-field">
+          <label className="label" htmlFor="email">
+            Email
+          </label>
+          <input
+            id="email"
+            autoFocus
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="login-input"
+          />
+        </div>
 
-        <label className="field-row mt-4 mb-2" htmlFor="password">
-          <span className="label text-ink-2">Password</span>
-          {mode === "sign-up" && <span className="login-hint">8 characters or more</span>}
-        </label>
-        <div className="login-secret">
+        <div className="login-field login-secret">
+          <label className="label" htmlFor="password">
+            Password
+            {mode === "sign-up" && <span className="login-hint">8 characters or more</span>}
+          </label>
           <input
             id="password"
             type={revealed ? "text" : "password"}
@@ -258,7 +265,7 @@ function Login() {
         <button
           type="submit"
           disabled={loading || !email.trim() || !password}
-          className="login-submit label mt-5 flex w-full items-center justify-center gap-2 py-3"
+          className="login-submit label"
         >
           {loading ? (
             mode === "sign-up" ? (
@@ -275,11 +282,11 @@ function Login() {
       </form>
 
       {error && (
-        <p role="alert" className="readout mt-3 text-danger">
+        <p role="alert" className="readout login-error">
           {error}
         </p>
       )}
-      <p className="login-note mt-5">{copy.footnote}</p>
+      <p className="login-note login-footnote">{copy.footnote}</p>
     </LoginFrame>
   );
 }
@@ -287,16 +294,21 @@ function Login() {
 function LoginFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="login-shell flex min-h-screen flex-col">
-      <header className="flex h-16 shrink-0 items-center px-6">
-        <span
-          className="font-display text-[15px] text-ink"
-          style={{ fontWeight: 650, letterSpacing: "-0.02em" }}
-        >
-          Notes
-        </span>
+      {/* Two sprigs of one plate: the near one climbing the right of the
+          window, a smaller one behind the shoulder of the card. They are the
+          ground the card sits on, never a layer over it. */}
+      <div className="login-garden" aria-hidden="true">
+        <BotanicalPlate className="is-near" />
+        <BotanicalPlate className="is-far" />
+      </div>
+
+      <header className="login-head">
+        <span className="login-wordmark">Notes</span>
+        <span className="login-tagline">A quiet place for long notes</span>
       </header>
-      <main className="flex flex-1 items-center justify-center px-5 pb-16">
-        <div className="login-card w-full max-w-[28rem] p-8 sm:p-10">{children}</div>
+
+      <main className="login-main">
+        <div className="login-card">{children}</div>
       </main>
     </div>
   );

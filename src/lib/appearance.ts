@@ -15,10 +15,15 @@ export interface Appearance {
   wallpaperFit: "cover" | "contain";
 }
 
+/* The palette the archive's own reader settled on, and so the one a new
+   account opens to: near-black paper, one grey accent, no colour anywhere the
+   words are not. The accent is deliberately darker than it can be drawn — the
+   derivation below lifts it to the contrast floor rather than taking it
+   literally, which is how a value this low is safe to ship as a default. */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "dark",
-  accent: "#f5f5f5",
-  background: "#292929",
+  accent: "#151313",
+  background: "#030202",
   foreground: "#e8e8e8",
   contrast: 50,
   translucentSidebar: false,
@@ -29,6 +34,14 @@ export const DEFAULT_APPEARANCE: Appearance = {
 };
 
 export const APPEARANCE_PRESETS = [
+  {
+    id: "ink",
+    name: "Ink",
+    theme: "dark" as const,
+    accent: "#151313",
+    background: "#030202",
+    foreground: "#e8e8e8",
+  },
   {
     id: "graphite",
     name: "Graphite",
@@ -127,6 +140,51 @@ function mix(hex: string, amount: number, toward: "black" | "white"): string {
     .join("")}`;
 }
 
+/* ── What a colour is worth on the ground it is drawn on ─────────────────────
+   The accent is the reader's, and the interface asks two different things of
+   it: it fills controls, and it draws lines and words. A colour can be fine
+   for one and useless for the other, and picking `--on-accent` from the theme
+   rather than from the accent is what made a near-black accent paint black
+   text on a black button — "New note" was there and unreadable, and so was
+   every focus ring and active rule.
+
+   So: the hue stays the reader's, and the value is moved only as far as it has
+   to be for the thing to be visible at all. WCAG relative luminance, and the
+   ordinary contrast ratio between two opaque colours. */
+function channels(hex: string): [number, number, number] {
+  return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16)) as [
+    number,
+    number,
+    number,
+  ];
+}
+
+function luminance(hex: string): number {
+  const [r, g, b] = channels(hex).map((channel) => {
+    const unit = channel / 255;
+    return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrastRatio(a: string, b: string): number {
+  const one = luminance(a);
+  const other = luminance(b);
+  const [high, low] = one > other ? [one, other] : [other, one];
+  return (high + 0.05) / (low + 0.05);
+}
+
+/** The same colour, moved toward the far end of the scale in small steps until
+ *  it can be seen against `ground` — and not one step further. */
+export function legibleOn(colour: string, ground: string, ratio: number): string {
+  const toward = luminance(ground) < 0.18 ? "white" : "black";
+  let lifted = colour;
+  for (let step = 1; step <= 20 && contrastRatio(lifted, ground) < ratio; step++) {
+    lifted = mix(colour, step * 0.05, toward);
+  }
+  return lifted;
+}
+
 /* Semantic colour has to answer to the mode as well. These values were tuned
    against a near-black ground; on a cream one the pale red and the pale mint
    are the same brightness as the paper they sit on, which is how a light
@@ -217,10 +275,23 @@ export function applyAppearance(config = current): void {
       dark ? "white" : "black",
     ),
   );
-  root.style.setProperty("--accent", config.accent);
-  root.style.setProperty("--accent-strong", mix(config.accent, 0.13, dark ? "white" : "black"));
-  root.style.setProperty("--accent-wash", `${config.accent}24`);
-  root.style.setProperty("--on-accent", dark ? "#161616" : "#ffffff");
+  /* Drawn on `--paper`, which is where the accent does most of its work: the
+     active row, the focus ring, the marker under a tab. 3:1 is the floor for a
+     line or a large label; `--accent-strong` carries sentences, so it takes
+     the 4.5:1 one. A colour that already clears them is left exactly as the
+     reader chose it. */
+  const paper = mix(
+    background,
+    dark ? 0.11 + contrastShift * 0.08 : 0.035,
+    dark ? "white" : "black",
+  );
+  const accent = legibleOn(config.accent, paper, 3);
+  const onAccent =
+    contrastRatio(accent, "#f7f7f7") >= contrastRatio(accent, "#161616") ? "#f7f7f7" : "#161616";
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--accent-strong", legibleOn(config.accent, paper, 4.5));
+  root.style.setProperty("--accent-wash", `${accent}24`);
+  root.style.setProperty("--on-accent", onAccent);
   root.style.setProperty(
     "--glass",
     config.translucentSidebar ? `${background}cc` : mix(background, 0.09, dark ? "white" : "black"),
