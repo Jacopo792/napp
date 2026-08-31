@@ -85,6 +85,18 @@ export function PageCover({
     }
   }
 
+  function openFilePicker() {
+    const input = fileRef.current;
+    if (!input) return;
+    try {
+      input.showPicker();
+    } catch {
+      /* Older browsers have no usable showPicker implementation, but still
+         allow a file input to be activated from this same user gesture. */
+      input.click();
+    }
+  }
+
   return (
     <div
       ref={surfaceRef}
@@ -101,6 +113,13 @@ export function PageCover({
       }}
       onPointerDown={startReposition}
     >
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={(event) => void upload(event.target.files?.[0])}
+      />
       {canEdit && (
         <div
           className="note-cover-actions"
@@ -140,23 +159,15 @@ export function PageCover({
                     />
                   ))}
                 </div>
-                <div className="menu-row relative mt-1" aria-disabled={busy}>
+                <button
+                  type="button"
+                  className="menu-row mt-1"
+                  disabled={busy}
+                  onClick={openFilePicker}
+                >
                   <Upload size={16} />
                   {busy ? "Uploading…" : "Upload a picture"}
-                  {/* The transparent native control receives the user gesture
-                      itself. That keeps the chooser working even when a
-                      browser rejects labels or scripted clicks on hidden file
-                      inputs. */}
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                    aria-label="Upload a picture"
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    disabled={busy}
-                    onChange={(event) => void upload(event.target.files?.[0])}
-                  />
-                </div>
+                </button>
               </div>
             )}
           </div>
