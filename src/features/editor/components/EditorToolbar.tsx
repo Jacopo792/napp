@@ -101,6 +101,40 @@ function Row({
   );
 }
 
+/* ── The dock ────────────────────────────────────────────────────────────────
+   Six equal icons in a pill is a dock, so it behaves like one: the icon under
+   the pointer grows, its neighbours grow less, and everything to either side
+   steps out of the way rather than being overlapped.
+
+   The stepping-aside is the half of it people notice only when it is missing —
+   an icon that grows without displacing its neighbours slides under them, and
+   the row reads as a rendering bug. It is not computed as a rule about
+   neighbours, though: the row is simply laid out twice, once at rest and once
+   at the grown widths, and each button is told the difference. Anything else
+   turns into a special case about the button the pointer is straddling, which
+   belongs to both sides at once.
+
+   The expansion is centred on the cluster rather than on the pointer, which is
+   what the real dock does: hovering the leftmost icon nudges the whole row
+   right instead of pushing five icons off the end.
+
+   Positions are measured once when the pointer arrives and not per frame: by
+   the second frame the buttons are already scaled, so their own boxes have
+   stopped saying where they sit. */
+
+/** How far from the pointer the bulge reaches, in px — about three buttons. */
+const DOCK_REACH = 96;
+/** How much the icon directly under the pointer grows. */
+const DOCK_LIFT = 0.42;
+
+/** Smooth, and genuinely zero at the edge of the reach, so the outermost icon
+ *  settles rather than stopping mid-move. */
+function bump(t: number): number {
+  if (t >= 1) return 0;
+  const falling = 1 - t * t;
+  return falling * falling;
+}
+
 export function EditorToolbar({
   mobile = false,
   onFormat,
@@ -118,6 +152,52 @@ export function EditorToolbar({
 }: Props) {
   const [open, setOpen] = useState<Tool | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const dock = useRef<{ button: HTMLElement; x: number; width: number }[]>([]);
+
+  function measureDock() {
+    const cluster = root.current;
+    if (!cluster) return;
+    dock.current = [...cluster.querySelectorAll<HTMLElement>(".editor-tool-button")].map(
+      (button) => {
+        const box = button.getBoundingClientRect();
+        return { button, x: box.left + box.width / 2, width: box.width };
+      },
+    );
+  }
+
+  function magnify(pointerX: number) {
+    const items = dock.current;
+    if (items.length === 0) return;
+    const growth = items.map((item) => DOCK_LIFT * bump(Math.abs(pointerX - item.x) / DOCK_REACH));
+
+    // Lay the row out at the grown widths, then again at rest, in one shared
+    // coordinate space. The gap between buttons is whatever it already is.
+    const gap = items.length > 1 ? items[1].x - items[0].x - items[0].width : 0;
+    let grownEdge = 0;
+    let restingEdge = 0;
+    const offsets = items.map((item, index) => {
+      const grownWidth = item.width * (1 + growth[index]);
+      const offset = grownEdge + grownWidth / 2 - (restingEdge + item.width / 2);
+      grownEdge += grownWidth + gap;
+      restingEdge += item.width + gap;
+      return offset;
+    });
+
+    // Half the total growth, taken off every button, is what centres the bulge
+    // on the cluster instead of letting the row grow to the right only.
+    const drift = (grownEdge - restingEdge) / 2;
+    items.forEach((item, index) => {
+      item.button.style.setProperty("--mag", String(1 + growth[index]));
+      item.button.style.setProperty("--dock-shift", `${offsets[index] - drift}px`);
+    });
+  }
+
+  function settleDock() {
+    for (const item of dock.current) {
+      item.button.style.removeProperty("--mag");
+      item.button.style.removeProperty("--dock-shift");
+    }
+  }
   const id = useId();
 
   useEffect(() => {
@@ -148,6 +228,10 @@ export function EditorToolbar({
 
   function toggle(tool: Tool) {
     onCloseLink?.();
+    // A menu hangs off its button's resting position, not its magnified one, so
+    // the dock stands down for as long as one is open rather than sliding the
+    // button out from under its own popover.
+    settleDock();
     setOpen((current) => (current === tool ? null : tool));
   }
 
@@ -191,6 +275,18 @@ export function EditorToolbar({
       className={`editor-tool-cluster glass-toolbar flex items-center p-1 ${
         mobile ? "is-mobile" : ""
       }`}
+      /* A finger has no position between taps, so there is nothing for a dock
+         to follow: mice and trackpads only. */
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse" || open) return;
+        measureDock();
+        magnify(event.clientX);
+      }}
+      onPointerMove={(event) => {
+        if (event.pointerType !== "mouse" || open || dock.current.length === 0) return;
+        magnify(event.clientX);
+      }}
+      onPointerLeave={settleDock}
     >
       {/* ── Text ── */}
       <div className="relative">

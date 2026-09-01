@@ -2129,6 +2129,15 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
+/* `--mag` and `--dock-shift` are written by the toolbar itself while the
+   pointer is over the cluster, and removed when it leaves. Both default here,
+   so the button is a plain button until something says otherwise.
+
+   It grows from its own foot, so the icon rises out of the bar the way a dock
+   icon does rather than pushing down through it. The transition is short
+   because it is doing two jobs at once: smoothing the tracking, and animating
+   the settle when the pointer leaves. Long enough to see is long enough to
+   lag. */
 .editor-tool-button {
   display: inline-flex;
   width: 2rem;
@@ -2137,6 +2146,8 @@
   justify-content: center;
   border-radius: 0.55rem;
   color: var(--ink-2);
+  transform: translateX(var(--dock-shift, 0)) scale(var(--mag, 1));
+  transform-origin: 50% 100%;
   transition:
     color 160ms var(--ease),
     background-color 160ms var(--ease);
@@ -4067,8 +4078,11 @@
     transform var(--dur-press) var(--ease-press);
 }
 
+/* The press multiplies the magnification rather than replacing it: a button
+   that snapped from 1.4 back to 0.92 on mousedown would jump, and a button
+   that lost `--dock-shift` would jump sideways as well. */
 .editor-tool-button:active {
-  transform: scale(0.92);
+  transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4080,6 +4094,9 @@
   .mobile-compose:active,
   .note-row-actions button:active,
   .archive-switch:active,
+  /* Not `:active` — the dock magnification is a hover state, and this is the
+     rule that switches the whole of it off. */
+  .editor-tool-button,
   .editor-tool-button:active {
     transform: none;
   }
