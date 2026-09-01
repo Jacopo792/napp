@@ -37,6 +37,9 @@ interface Props {
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   /** The draft store already holds the words; this only asks for a save. */
   onEdited: () => void;
+  /** The server has synced this note, as opposed to it being drawn from the
+   *  local store while the socket is still on its way. */
+  synced?: boolean;
   onNew: () => void;
   onImportMarkdown: () => void;
   onUploadImage: (file: File) => Promise<string>;
@@ -89,6 +92,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     partnerName,
     titleRef,
     onEdited,
+    synced = false,
     onNew,
     onImportMarkdown,
     onUploadImage,
@@ -613,6 +617,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 titleRef={titleRef}
                 onEdited={onEdited}
                 yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
+                synced={synced}
               />
 
               {(status || failure) && (

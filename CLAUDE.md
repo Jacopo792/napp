@@ -180,13 +180,21 @@ The collaboration server is part of the authorization boundary:
   archived-note visibility decide writing.
 - Awareness identity is stamped by the server. Never trust a browser-provided
   nickname, account id or caret colour.
-- A local cache never opens an editor. The server must authorize and complete a
-  sync first; after that, an open editor may continue offline and reconnect.
-  This is enforced by not mounting `RichTextEditor` at all until `collaboration`
-  is non-null — one place, and it also removed the double build that made the
-  text paint twice per note switch. Do **not** re-add a pre-sync editor built
-  from the Postgres projection: it painted the note, then destroyed the whole
-  ProseMirror instance and rebuilt it against the Yjs fragment on `onSynced`.
+- **Postgres authorizes reading a note; the collaboration server authorizes
+  writing it.** An editor mounts once `collaboration` is non-null, which is
+  either when the server has synced or when this device's IndexedDB store has
+  the note *and* the note is in the catalogue RLS just returned — `entries`.
+  That row is the permission: a member who has lost access is handed none, so
+  no editor is built. Every write is still authorized by the server on every
+  message, and `RichTextEditor` is still mounted exactly once, against one
+  `Y.Doc`, and never rebuilt.
+  The store is only ever a faster source for that one document, which is what
+  makes it safe: the server's state arrives as a merge into the live document.
+  Do **not** re-add a pre-sync editor built from the *Postgres projection* —
+  that was a second document, so it painted the note and then destroyed the
+  whole ProseMirror instance to rebuild it against the Yjs fragment on
+  `onSynced`. An empty store is not a hit: an empty editor is worse than the
+  bars that stand in for one.
 - `canEdit` is a question about the archive and the note — your role, and
   whether this is Trash. Never `&& collaborative.ready`: a sleeping Render
   instance then takes away the page's own controls, including **Add cover**,

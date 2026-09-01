@@ -32,10 +32,10 @@ export function useCollaborativeNote(
   }, [noteId]);
 
   if (!noteId || !identity) {
-    return { doc: null, provider: null, ready: false, connection: "connecting", refusal: "" };
+    return { doc: null, provider: null, ready: false, cached: false, connection: "connecting", refusal: "" };
   }
   const doc = documents.get(noteId) ?? null;
-  return { doc, provider: null, ready: Boolean(doc), connection: "connected", refusal: "" };
+  return { doc, provider: null, ready: Boolean(doc), cached: Boolean(doc), connection: "connected", refusal: "" };
 }
 
 /* The presence stand-in already puts the other member on whichever note you

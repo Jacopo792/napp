@@ -10,15 +10,18 @@
  * closed laptop, a crashed tab or a train tunnel costs nothing: the words are
  * still there when the tab comes back, and they reach the archive on reconnect.
  *
- * Local stores are scoped to both archive and account. They are never enough
- * to open an editor on their own: the collaboration server must authorise and
- * sync the note first. Losing the network after that keeps the mounted editor
- * usable and reconnect sends its Yjs updates normally. */
+ * Local stores are scoped to both archive and account, and they do put words
+ * on screen — but they never decide that they may. What authorises a note's
+ * *display* is Postgres: `notes.tsx` opens an editor only for a note in the
+ * catalogue row level security just returned, and a member who has lost access
+ * is handed no such row. What authorises a *write* is still the collaboration
+ * server, on every message. Losing the network keeps the mounted editor usable
+ * and reconnect sends its Yjs updates normally. */
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
 import { useEffect, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
-import { collaborationColor } from "@/features/editor/lib/ydoc";
+import { BODY_FRAGMENT, collaborationColor, TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import { supabase } from "./supabaseClient";
 
 const COLLAB_URL = import.meta.env.VITE_COLLAB_URL as string;
@@ -43,6 +46,10 @@ export interface CollaborativeNote {
   provider: HocuspocusProvider | null;
   /** The editor may mount: this is a document the archive actually holds. */
   ready: boolean;
+  /** This device already has the note, and the catalogue Postgres returned
+   *  under RLS a moment ago still lists it — so the words can go on screen
+   *  while the socket is still on its way. Never true for an empty store. */
+  cached: boolean;
   connection: ConnectionState;
   /** Why the server closed the door: signed out, not a member, no such note. */
   refusal: string;
@@ -52,6 +59,7 @@ const CLOSED: CollaborativeNote = {
   doc: null,
   provider: null,
   ready: false,
+  cached: false,
   connection: "connecting",
   refusal: "",
 };
@@ -121,7 +129,23 @@ export function useCollaborativeNote(
        reason the `provider.destroy()` below leaves the shared socket alone. */
     provider.attach();
 
-    setState({ doc, provider, ready: false, connection: "connecting", refusal: "" });
+    setState({ doc, provider, ready: false, cached: false, connection: "connecting", refusal: "" });
+
+    /* The local store, which is milliseconds away rather than a continent.
+       Its job is only to put the words on screen; it decides nothing. What
+       makes that safe is the caller: `notes.tsx` opens an editor for a note in
+       the catalogue Postgres just returned under row level security, and a
+       member who has lost access is handed no such row. An empty store is not
+       a cache hit — an empty editor is worse than the bars that stand in for
+       one — and this is the same `Y.Doc` the server will update, so its
+       arrival is a merge into a live document, never the second build of a
+       second document that once made the text paint twice. */
+    void local.whenSynced.then(() => {
+      if (closed) return;
+      const hasWords =
+        doc.getXmlFragment(BODY_FRAGMENT).length > 0 || doc.getText(TITLE_TEXT).length > 0;
+      if (hasWords) update({ cached: true });
+    });
 
     return () => {
       closed = true;

@@ -85,8 +85,13 @@ enabled and grants no browser policy: only the service role persists its binary.
 Redis/Valkey distributes updates between instances and is not durable storage.
 
 IndexedDB Yjs stores are plaintext, scoped by archive, account and note. A
-cached document never authorizes its own display: the server must first accept
-and synchronize that note. The current PP implementation deliberately does not
+cached document still never authorizes its own display — it is only ever a
+faster source for a note something else has already permitted. What permits it
+is Postgres: the client opens an editor only for a note present in the
+catalogue row level security returned for this session, so a former member, a
+signed-out browser or an offline tab with a stale store is handed no row and
+gets no editor. Writing is unchanged and remains the collaboration server's
+decision, taken per document and repeated on every message. The current PP implementation deliberately does not
 delete these stores on logout, because doing so can destroy offline edits; this
 retention must be resolved before production deployment.
 

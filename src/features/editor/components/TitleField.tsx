@@ -8,6 +8,9 @@ interface Props {
   canEdit: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onEdited: () => void;
+  /** The collaboration server has completed a sync for this note. Until it
+   *  has, an empty collaborative title is not yet an answer. */
+  synced?: boolean;
   /** The live document is authoritative whenever collaboration is connected. */
   yTitle?: Y.Text | null;
 }
@@ -26,7 +29,15 @@ function capitalizeSentences(text: string): string {
    Long titles are a first-class case here: the field wraps freely and grows to
    its content. It must never become fixed-height or horizontally scrolling. */
 
-export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited, yTitle = null }: Props) {
+export function TitleField({
+  mobile,
+  noteId,
+  canEdit,
+  titleRef,
+  onEdited,
+  yTitle = null,
+  synced = false,
+}: Props) {
   const draftTitle = useDraftTitle(noteId);
   const [collaborativeTitle, setCollaborativeTitle] = useState(() => yTitle?.toString() ?? "");
 
@@ -41,7 +52,12 @@ export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited, yTitle
     return () => yTitle.unobserve(sync);
   }, [yTitle]);
 
-  const title = yTitle ? collaborativeTitle : draftTitle;
+  /* Once the server has synced, the live document is the title — including a
+     title somebody deliberately emptied. Before that the page may be drawn from
+     this device's own store, and an empty `yTitle` there means "not filled in
+     yet", not "no title": Postgres already handed us one with the catalogue, so
+     it is shown rather than a blank field that fills itself in a moment later. */
+  const title = yTitle && (synced || collaborativeTitle) ? collaborativeTitle : draftTitle;
 
   // Keep the field tall enough for its content. Height is derived from
   // scrollHeight, so it must be recomputed after every value change and when

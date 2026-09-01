@@ -657,7 +657,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
            A remote update is a document change too, and it arrives carrying
            `ySyncPluginKey`. Announcing on those would tell the other person
            that you are writing because they are. */
-        if (!transaction.getMeta(ySyncPluginKey)) onLocalEditRef.current?.();
+        /* Deferred out of the transaction. Tiptap can run `onUpdate` inside a
+           React render, and the page's own handler sets state — which React
+           refuses mid-render ("cannot update a component while rendering a
+           different component"). Nothing here is urgent: it says a person is
+           typing, and it can say so on the next tick. */
+        if (!transaction.getMeta(ySyncPluginKey)) queueMicrotask(() => onLocalEditRef.current?.());
       },
     },
     [collaboration?.document, collaboration?.provider],

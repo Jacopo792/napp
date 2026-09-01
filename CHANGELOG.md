@@ -224,6 +224,21 @@ config push` aligned it; the redirect allow-list now holds only that origin
 - A nickname arriving from the profile, or the presence preference being
   toggled, no longer tears the connection down and redoes the handshake. Both
   left the connection effect for one of their own.
+- **A note opens from this device, not from Frankfurt.** The editor waited for
+  the collaboration server to authorize and sync before it would mount, so on
+  the free plan — which sleeps after fifteen idle minutes — opening a note
+  after a break meant about fifty seconds of empty page. The words are already
+  on this machine, in the same IndexedDB Yjs store that has always been there,
+  so they go on screen at once and the socket connects behind them.
+  Nothing is granted by the cache. What permits a note to be drawn is Postgres:
+  an editor is built only for a note present in the catalogue row level
+  security returned for this session, so a former member, a signed-out browser
+  or an offline tab with a stale store is handed no row and gets no editor.
+  Writing is still the collaboration server's decision, on every message. An
+  empty store is not a hit — an empty editor is worse than the bars that stand
+  in for one — and because the store fills the *same* document the server will
+  update, its arrival is a merge into a live editor rather than the second
+  build of a second document that once made the text paint twice.
 - **Pictures are fetched once, not once per visit.** Note photographs and
   covers were held in a map that lived as long as the tab, so every reload sent
   the whole catalogue's pictures back to Storage in eu-west-1 — a fresh TLS

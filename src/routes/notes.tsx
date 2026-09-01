@@ -657,9 +657,16 @@ function NotesPage() {
      (`canEdit && collaborative.ready`), so a collaboration server that was slow
      or asleep took away the page's own controls: the format bar, and the Add
      cover button, which writes to Postgres and never needed the socket at all.
-     What the socket gates is the *text*, and it gates it by not mounting the
-     editor at all until it has synced — which is the boundary CLAUDE.md asks
-     for, applied in one place instead of two. */
+     What the socket gates is the *text*, and it gates it at the mount: the
+     editor is built once, against one document, and never rebuilt.
+
+     That document may arrive from either side. The server is one source; this
+     device's own IndexedDB store is the other, and it is milliseconds away
+     rather than a continent — which is the difference between reading your
+     note now and reading it after a sleeping instance has woken. The store
+     decides nothing: what is drawn is a note in `entries`, and `entries` is
+     the catalogue Postgres returned under row level security a moment ago, so
+     somebody who has lost access is handed no row to draw. */
   const canEdit = selected ? selectedFolderId !== TRASH && canWriteArchive : false;
 
   const folderLabel =
@@ -2129,7 +2136,7 @@ function NotesPage() {
                     resolveFile={resolveFile}
                     onUpdatePageProperties={handleUpdatePageProperties}
                     collaboration={
-                      collaborative.ready && collaborative.doc
+                      (collaborative.ready || collaborative.cached) && collaborative.doc
                         ? {
                             document: collaborative.doc,
                             provider: presenceEnabled ? collaborative.provider : null,
@@ -2149,6 +2156,7 @@ function NotesPage() {
                     }
                     headerActions={noteActions}
                     readers={noteReaders}
+                    synced={collaborative.ready}
                   />
                 </Suspense>
               </section>
@@ -2264,7 +2272,7 @@ function NotesPage() {
               resolveFile={resolveFile}
               onUpdatePageProperties={handleUpdatePageProperties}
               collaboration={
-                collaborative.ready && collaborative.doc
+                (collaborative.ready || collaborative.cached) && collaborative.doc
                   ? {
                       document: collaborative.doc,
                       provider: presenceEnabled ? collaborative.provider : null,
@@ -2300,6 +2308,7 @@ function NotesPage() {
               }
               headerActions={noteActions}
               readers={noteReaders}
+              synced={collaborative.ready}
             />
           </Suspense>
         </div>
