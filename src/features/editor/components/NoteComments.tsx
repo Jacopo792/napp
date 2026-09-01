@@ -39,6 +39,9 @@ interface Props {
   /** A thread the bubble menu has just anchored and not yet said anything in. */
   pendingThread: string | null;
   onPendingHandled: () => void;
+  /** A thread arrived at by clicking its passage in the note. */
+  focusThread: string | null;
+  onFocusHandled: () => void;
   onClose: () => void;
   onReveal: (threadId: string) => void;
   onRemoveAnchor: (threadId: string) => void;
@@ -52,6 +55,8 @@ export function NoteComments({
   quotes,
   pendingThread,
   onPendingHandled,
+  focusThread,
+  onFocusHandled,
   onClose,
   onReveal,
   onRemoveAnchor,
@@ -62,6 +67,7 @@ export function NoteComments({
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [showResolved, setShowResolved] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const threadRefs = useRef(new Map<string, HTMLElement>());
 
   useEffect(() => {
     let live = true;
@@ -85,6 +91,33 @@ export function NoteComments({
   useEffect(() => {
     if (pendingThread) composerRef.current?.focus();
   }, [pendingThread]);
+
+  /* Arriving from the passage. The thread has to be *found* in a panel that
+     may be scrolled anywhere and may be hiding it — a resolved thread is
+     filtered out of the list, and clicking its underline would otherwise open
+     an empty panel and look broken. So: unhide first, then scroll, then mark
+     it for a moment, because a panel that jumps without saying where it landed
+     leaves the reader to find the thread again themselves.
+
+     `loading` is in the deps because the row may not be in the DOM yet when
+     the click arrives — the panel opens and fetches at the same time. */
+  useEffect(() => {
+    if (!focusThread) return;
+    const resolved = comments.some(
+      (comment) => comment.threadId === focusThread && comment.resolvedAt,
+    );
+    if (resolved && !showResolved) {
+      setShowResolved(true);
+      return;
+    }
+    const row = threadRefs.current.get(focusThread);
+    if (!row) return;
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    row.classList.add("is-arrived");
+    const timer = window.setTimeout(() => row.classList.remove("is-arrived"), 1400);
+    onFocusHandled();
+    return () => window.clearTimeout(timer);
+  }, [focusThread, comments, loading, showResolved, onFocusHandled]);
 
   const say = useCallback(
     async (threadId: string) => {
@@ -239,6 +272,10 @@ export function NoteComments({
         {shown.map((thread) => (
           <article
             key={thread.threadId}
+            ref={(node) => {
+              if (node) threadRefs.current.set(thread.threadId, node);
+              else threadRefs.current.delete(thread.threadId);
+            }}
             className={`note-comment-thread ${thread.resolved ? "is-resolved" : ""}`}
           >
             <button

@@ -112,6 +112,8 @@ interface Props {
    *  the preview and anywhere else without an archive behind it. */
   notes?: { id: string; title: string }[];
   onOpenNote?: (noteId: string) => void;
+  /** Clicking the underlined passage opens the conversation about it. */
+  onOpenComment?: (threadId: string) => void;
   /** Open a comment on whatever is selected. Absent when the note cannot be
    *  commented on — Trash, or a reader who may not write. */
   onComment?: () => void;
@@ -673,6 +675,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onComment,
     notes,
     onOpenNote,
+    onOpenComment,
     mobile = false,
     resolveImage,
     resolveFile,
@@ -713,6 +716,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   notesRef.current = notes ?? [];
   const onOpenNoteRef = useRef(onOpenNote);
   onOpenNoteRef.current = onOpenNote;
+  const onOpenCommentRef = useRef(onOpenComment);
+  onOpenCommentRef.current = onOpenComment;
   const noteLinks = useMemo(() => noteLinkExtension(notesRef), []);
 
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
@@ -773,12 +778,33 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
            list of notes is — the handler must never be a reason to rebuild the
            editor. */
         handleClickOn(_view, _pos, _node, _nodePos, event) {
-          const anchor = (event.target as HTMLElement | null)?.closest?.("a[data-note]");
+          const target = event.target as HTMLElement | null;
+
+          const anchor = target?.closest?.("a[data-note]");
           const noteId = anchor?.getAttribute("data-note");
-          if (!noteId || !onOpenNoteRef.current) return false;
-          event.preventDefault();
-          onOpenNoteRef.current(noteId);
-          return true;
+          if (noteId && onOpenNoteRef.current) {
+            event.preventDefault();
+            onOpenNoteRef.current(noteId);
+            return true;
+          }
+
+          /* The underline under a commented passage is the only sign that a
+             conversation exists, so it has to be the way into it. Reading the
+             thread id off the rendered mark rather than resolving the position
+             back through the schema: the mark puts it in the DOM already, and
+             a click lands on the span that carries it.
+
+             Deliberately not `preventDefault()` — the caret still goes where
+             you clicked, because clicking a word in your own paragraph must
+             not stop being a way to start typing there. */
+          const commented = target?.closest?.("span[data-comment-thread]");
+          const threadId = commented?.getAttribute("data-comment-thread");
+          if (threadId && onOpenCommentRef.current) {
+            onOpenCommentRef.current(threadId);
+            return false;
+          }
+
+          return false;
         },
         handlePaste(view, event) {
           const clipboard = event.clipboardData;

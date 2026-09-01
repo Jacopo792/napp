@@ -658,6 +658,37 @@
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
+/* The underline was the only sign a conversation existed and it already had
+   `cursor: pointer` — it simply did nothing when clicked, which is worse than
+   no affordance at all. Now it opens the thread, and the solid rule says the
+   passage is a control rather than merely marked. */
+.note-comment-anchor:active {
+  border-bottom-style: solid;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Landing. A panel that scrolls without saying where it stopped leaves the
+   reader to find the thread a second time, so the one they asked for is held
+   up for a beat and then let go. It is a fade, not a flash: the thread is
+   already the one in view, and this only has to say which. */
+.note-comment-thread.is-arrived {
+  animation: comment-arrived 1.4s var(--ease) both;
+}
+
+@keyframes comment-arrived {
+  0%,
+  55% {
+    border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-comment-thread.is-arrived {
+    animation-duration: 1ms;
+  }
+}
+
 /* The panel is a column beside the page, not a layer over it: reading the
    remark and reading the passage it is about is one act, and a popover that
    covers the text makes them two. */
@@ -5185,9 +5216,34 @@
   color: var(--ink);
 }
 
+/* A selected block is ringed, not boxed.
+ *
+ * `outline` does not follow a border radius in every engine that matters, so a
+ * 2px line held 3px off the element drew a hard rectangle around a card whose
+ * own corners are 0.75rem — and around the picture, its caption and its delete
+ * button all together, which is three things in one box. On an accent that
+ * happens to be blue it read as an error state on the image you had just
+ * inserted rather than as "this is selected".
+ *
+ * A ring painted on the object itself follows the shape the object already
+ * has, and at this weight it says the same thing more quietly. */
 .rich-text-content .ProseMirror-selectednode {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: none;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* A picture's rounded surface is *inside* its wrapper — the wrapper is a
+   full-width block that also holds the caption — so the ring belongs on the
+   surface, or the caption gets ringed in with the image again. */
+.rich-text-content .rich-media-image.ProseMirror-selectednode {
+  box-shadow: none;
+}
+
+.rich-text-content .rich-media-image.ProseMirror-selectednode .rich-media-image-open,
+.rich-text-content .rich-media-image.ProseMirror-selectednode .rich-media-loading {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .rich-text-content .find-and-replace-result {
   border-radius: 0.15em;

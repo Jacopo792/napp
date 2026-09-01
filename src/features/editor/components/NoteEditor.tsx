@@ -177,6 +177,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      It exists in the document and not yet in the archive, which is why it is
      held here rather than being read back with the rest. */
   const [pendingThread, setPendingThread] = useState<string | null>(null);
+  /* The thread the panel should scroll to and outline, set by clicking the
+     underlined passage it belongs to. Not the same thing as `pendingThread`,
+     which is a thread that has been anchored and not yet said anything in. */
+  const [focusThread, setFocusThread] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Map<string, string>>(() => new Map());
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
@@ -776,6 +780,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 collaboration={collaboration}
                 notes={linkable}
                 onOpenNote={onOpenNote}
+                /* Clicking the underline opens the conversation about that
+                   passage. The quotes are re-read first for the same reason
+                   the ⋯ button re-reads them: they come from the live
+                   document, which has been edited since the panel last
+                   looked. */
+                onOpenComment={(threadId) => {
+                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                  setCommentsOpen(true);
+                  setFocusThread(threadId);
+                }}
               />
             )}
 
@@ -832,6 +846,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             quotes={quotes}
             pendingThread={pendingThread}
             onPendingHandled={() => setPendingThread(null)}
+            focusThread={focusThread}
+            onFocusHandled={() => setFocusThread(null)}
             onClose={() => {
               setCommentsOpen(false);
               setPendingThread(null);
