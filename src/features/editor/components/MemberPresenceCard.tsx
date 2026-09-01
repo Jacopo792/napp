@@ -6,7 +6,6 @@ import { useDismiss } from "@/components/useDismiss";
 interface Props {
   avatarUrl: string | null;
   name: string;
-  active: boolean;
   typing: boolean;
   noteJoinedAt: string;
   archiveJoinedAt?: string;
@@ -27,10 +26,22 @@ function memberSince(value: string): string {
   });
 }
 
+/* Everyone this card is drawn for is on the note.
+ *
+ * It used to take an `active` flag from the Realtime presence channel and
+ * print "Offline" when it was false — but the card is only rendered for a peer
+ * in `useCollaborationPeers`, which reads Yjs awareness, and a peer in that
+ * list is connected to this note's document by construction. Presence is
+ * opt-in and mutual, so a member who simply has it switched off was absent
+ * from that channel and got marked offline while she was typing into the
+ * paragraph you were reading. Two sources answering one question, and the card
+ * was asking the one that does not know.
+ *
+ * Awareness answers "is she here". The presence channel still answers "is she
+ * typing", which is the flag it was built to carry. */
 export function MemberPresenceCard({
   avatarUrl,
   name,
-  active,
   typing,
   noteJoinedAt,
   archiveJoinedAt,
@@ -56,7 +67,7 @@ export function MemberPresenceCard({
         title={typing ? `${name} is writing` : `${name} has this note open`}
         onClick={() => setOpen((current) => !current)}
       >
-        <Avatar url={avatarUrl} name={name} email="" compact online={active} />
+        <Avatar url={avatarUrl} name={name} email="" compact online />
         {typing && <i className="note-reader-caret" aria-hidden="true" />}
       </button>
 
@@ -67,12 +78,12 @@ export function MemberPresenceCard({
           aria-label={`${name} profile`}
         >
           <span className="member-presence-heading">
-            <Avatar url={avatarUrl} name={name} email="" large online={active} />
+            <Avatar url={avatarUrl} name={name} email="" large online />
             <span>
               <strong>{name}</strong>
-              <small className={active ? "is-active" : ""}>
+              <small className="is-active">
                 <i aria-hidden="true" />
-                {typing ? "Writing now" : active ? "Active now" : "Offline"}
+                {typing ? "Writing now" : "Active now"}
               </small>
             </span>
           </span>

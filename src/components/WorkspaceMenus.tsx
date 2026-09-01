@@ -802,10 +802,31 @@ export function SettingsPanel({
      right offset. */
   const [marker, setMarker] = useState<{ top: number; height: number } | null>(null);
 
+  /* Re-measured whenever anything in the rail changes size, not only when the
+     section changes. Measuring once on open was wrong by ten pixels every
+     first open: the effect runs before the rail has settled — the group
+     headings restyle when the sans face swaps in, the identity block above
+     resizes when the avatar and the nickname arrive — and the marker then sat
+     ten pixels above the button it was supposed to be behind until the first
+     click on another section re-ran this. A ResizeObserver over the list and
+     its children answers "did anything move?" without having to name which of
+     those three it was, and covers the window resize the deps never mentioned
+     either. */
   useEffect(() => {
     if (!open) return;
-    const active = navList.current?.querySelector<HTMLElement>("button.is-active");
-    setMarker(active ? { top: active.offsetTop, height: active.offsetHeight } : null);
+    const list = navList.current;
+    if (!list) return;
+
+    const measure = () => {
+      const active = list.querySelector<HTMLElement>("button.is-active");
+      setMarker(active ? { top: active.offsetTop, height: active.offsetHeight } : null);
+    };
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const child of list.children) observer.observe(child);
+    return () => observer.disconnect();
   }, [open, section]);
 
   useEffect(() => {

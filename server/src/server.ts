@@ -83,6 +83,10 @@ export interface Context {
   /** The most recent token this connection proved itself with. Kept so an
    *  update can be revalidated without asking the client mid-keystroke. */
   token: string;
+  /** When this connection opened this note. Stamped once, in `onAuthenticate`,
+   *  and broadcast with the awareness identity so every reader is told the
+   *  same time rather than the moment their own tab happened to notice. */
+  since: string;
 }
 
 function redisExtension(config: CollaborationConfig): Extension[] {
@@ -200,6 +204,14 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         name: answer.identity.name,
         color: answer.identity.color,
         token,
+        /* When this client opened *this note*, stamped once, here. The browser
+           used to answer "in this note since" from the moment it first saw the
+           peer in awareness, which is a fact about the reader rather than
+           about the peer: open a note somebody has been writing in all evening
+           and it said they arrived just now. One socket carries every note, so
+           this hook runs per document subscription and the stamp is the note's,
+           not the session's. */
+        since: new Date().toISOString(),
       };
     },
 
@@ -251,7 +263,12 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         if (!state) continue;
         states.set(clientId, {
           ...state,
-          user: { userId: context.userId, name: context.name, color: context.color },
+          user: {
+            userId: context.userId,
+            name: context.name,
+            color: context.color,
+            since: context.since,
+          },
         });
       }
     },

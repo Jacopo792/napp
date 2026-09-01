@@ -1888,7 +1888,6 @@ function NotesPage() {
               key={peer.userId}
               avatarUrl={avatarUrls[peer.userId] ?? null}
               name={name}
-              active={presentMembers.has(peer.userId)}
               typing={typing}
               noteJoinedAt={peer.joinedAt}
               archiveJoinedAt={member?.joinedAt}

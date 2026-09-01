@@ -498,6 +498,44 @@ describe("the collaboration server", { skip }, () => {
     theirs.provider.destroy();
   });
 
+  /* "In this note since" is a claim about somebody else, so it may not be
+     computed from the reader's own clock. It used to be: the browser stamped
+     the moment it first noticed the peer, so opening a note somebody had been
+     writing in for an hour reported that they had just arrived. */
+  it("stamps awareness with when the peer opened the note", async () => {
+    const noteId = await newNote("Since when", "two clocks");
+    const before = Date.now();
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    theirs.provider.awareness?.setLocalStateField("user", { since: "1999-01-01T00:00:00.000Z" });
+
+    let since: string | undefined;
+    await until(() => {
+      for (const [, state] of mine.provider.awareness?.getStates() ?? []) {
+        const user = (state as { user?: { userId?: string; since?: string } }).user;
+        if (user?.userId === mate.userId && user.since) {
+          since = user.since;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    assert.notEqual(since, "1999-01-01T00:00:00.000Z", "a client was believed about its own time");
+    const stamped = Date.parse(since ?? "");
+    assert.ok(Number.isFinite(stamped), `since is not a date: ${since}`);
+    assert.ok(
+      stamped >= before && stamped <= Date.now(),
+      "the stamp is not from this connection's lifetime",
+    );
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
   it("puts an editor demoted to viewer into read-only without a reload", async () => {
     const noteId = await newNote("Demotion", "watch this");
     const mine = connect(noteId, editor.token);

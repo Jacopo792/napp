@@ -39,7 +39,10 @@ export interface Peer {
   userId: string;
   name: string;
   color: string;
-  /** When this browser first saw the peer on the current note. */
+  /** When the peer opened this note, stamped by the server in its awareness
+   *  identity so every reader is told the same time. Falls back to the moment
+   *  this browser first saw them, which is what it always used to be and is
+   *  wrong by however long they were already here. */
   joinedAt: string;
 }
 
@@ -204,7 +207,7 @@ export function useCollaborationPeers(
     const read = () => {
       const seen = new Map<string, Peer>();
       for (const [clientId, state] of awareness.getStates()) {
-        const user = (state as { user?: Partial<Peer> }).user;
+        const user = (state as { user?: Partial<Peer> & { since?: string } }).user;
         if (!user?.userId || user.userId === selfId) continue;
         if (!peerJoinedAt.has(user.userId)) {
           peerJoinedAt.set(user.userId, new Date().toISOString());
@@ -214,7 +217,7 @@ export function useCollaborationPeers(
           userId: user.userId,
           name: user.name || "Someone",
           color: user.color || collaborationColor(user.userId),
-          joinedAt: peerJoinedAt.get(user.userId)!,
+          joinedAt: user.since ?? peerJoinedAt.get(user.userId)!,
         });
       }
       for (const userId of peerJoinedAt.keys()) {

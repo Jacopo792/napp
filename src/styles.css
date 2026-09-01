@@ -1485,6 +1485,18 @@
   z-index: 30;
 }
 
+/* And the same trap once more, one level in. Two toolbars that are siblings
+   and share a rank are still decided by document order, so the format bar —
+   which comes second — painted over the header's own menus. On the phone the
+   header is the only place the ⋯ menu can open from and the format bar sits
+   directly under it, so every item in the top third of that menu was covered
+   by a strip of formatting buttons. The row that opens menus outranks the row
+   that does not; the format bar's own popovers open downward, away from the
+   header, so nothing is lost by ranking it below. */
+.editor-toolbar {
+  z-index: 40;
+}
+
 .toolbar-button,
 .icon-button {
   display: inline-flex;
