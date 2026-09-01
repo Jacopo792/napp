@@ -230,10 +230,15 @@
     color: inherit;
   }
 
-  /* Surfaces the browser draws for us still belong to the design. */
+  /* Surfaces the browser draws for us still belong to the design.
+
+     No `color` here. Setting one made the selection repaint every glyph it
+     covered in the accent, so choosing a colour for text you had just selected
+     showed you the accent until you clicked away — the one moment the colour
+     needs to be visible is the one moment it was not. A wash the words show
+     through says "selected" perfectly well, and lets them keep their own ink. */
   ::selection {
-    background: rgb(255 255 255 / 0.18);
-    color: var(--accent);
+    background: rgb(255 255 255 / 0.22);
   }
 
   :focus-visible {
@@ -1854,12 +1859,22 @@
 
 .settings-nav {
   display: flex;
+  min-height: 0;
   flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
   border-right: 1px solid var(--rule-soft);
   padding: 14px 10px;
   background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+/* Only the sections scroll. Sign out is not one of them and must not be able
+   to scroll out of reach of the column it belongs to. */
+.settings-nav-list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
 }
 
 /* The sections are grouped, because "Profile" and "Appearance" are not the
@@ -2904,25 +2919,25 @@
 
 /* Signing out is a deliberate action, not the section's primary one. It gets a
    button's width, not the panel's. */
-.settings-lock {
+/* Shaped like the rows above it, because it sits in their column and reaching
+   it is the same gesture — separated by a rule and a little air, because it is
+   the one row that ends the session rather than changing the panel. */
+.settings-nav-signout {
   display: flex;
-  width: fit-content;
   align-items: center;
-  justify-content: center;
-  gap: var(--rail-gap);
-  min-height: 40px;
-  margin-top: 14px;
-  border: 1px solid var(--rule);
-  border-radius: 0.8rem;
-  padding-inline: 1rem;
-  color: var(--ink-2);
-  font-size: 14px;
-  font-weight: 560;
+  gap: 9px;
+  flex-shrink: 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 12px;
+  color: var(--ink-3);
   transition:
     background-color var(--dur-fast) var(--ease-press),
-    border-color var(--dur-fast) var(--ease-press),
-    color var(--dur-fast) var(--ease-press),
-    transform var(--dur-press) var(--ease-press);
+    color var(--dur-fast) var(--ease-press);
+}
+
+.settings-nav-signout:hover {
+  color: var(--danger);
 }
 
 .invite-form {
@@ -3261,12 +3276,6 @@
 
 .cropper-actions button:disabled {
   opacity: 0.45;
-}
-
-.settings-lock:hover {
-  border-color: var(--rule);
-  background: var(--accent-wash);
-  color: var(--ink);
 }
 
 /* Phone navigation is a real stack: folders, collection, then note. */
@@ -4943,10 +4952,17 @@
   margin-bottom: 7px;
 }
 
+/* The hover pill needs padding; the glyph inside it still has to start where
+   the date, the title and the first line of text start. Padding alone put it
+   seven pixels to their right — enough to read as the one thing on the page
+   that is not in the column. The negative margin gives the padding back to the
+   margin, so the pill keeps its breathing room and the mark it contains sits on
+   the edge. */
 .note-add-property {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  margin-left: -7px;
   padding: 5px 7px;
   border-radius: var(--radius-md);
   color: var(--ink-4);

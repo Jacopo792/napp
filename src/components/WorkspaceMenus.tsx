@@ -832,23 +832,35 @@ export function SettingsPanel({
 
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
-            {SETTINGS_SECTIONS.map((group) => (
-              <Fragment key={group.group}>
-                <p className="settings-nav-group">{group.group}</p>
-                {group.items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    aria-current={section === item.id ? "page" : undefined}
-                    className={section === item.id ? "is-active" : ""}
-                    onClick={() => setSection(item.id)}
-                  >
-                    {item.icon}
-                    {item.name}
-                  </button>
-                ))}
-              </Fragment>
-            ))}
+            <div className="settings-nav-list">
+              {SETTINGS_SECTIONS.map((group) => (
+                <Fragment key={group.group}>
+                  <p className="settings-nav-group">{group.group}</p>
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-current={section === item.id ? "page" : undefined}
+                      className={section === item.id ? "is-active" : ""}
+                      onClick={() => setSection(item.id)}
+                    >
+                      {item.icon}
+                      {item.name}
+                    </button>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+
+            {/* Leaving is not a section of Settings, so it does not sit in the
+                list of them — it sits under the list, at the bottom of the
+                column, which is where an application has put "sign out" for
+                thirty years. The summary opposite keeps the sentence about
+                what leaving costs; this is the door. */}
+            <button type="button" className="settings-nav-signout press" onClick={onLock}>
+              <Lock size={16} />
+              Sign out
+            </button>
           </nav>
 
           <div className="settings-scroll">
@@ -1592,12 +1604,8 @@ export function SettingsPanel({
               <p className="settings-aside-label">Sign out</p>
               <p>
                 Ends this session on this device. Your notes stay where they are, and the account
-                opens them again.
+                opens them again. The button is at the foot of the list on the left.
               </p>
-              <button type="button" className="settings-lock press" onClick={onLock}>
-                <Lock size={16} />
-                Sign out
-              </button>
             </div>
           </aside>
         </div>
