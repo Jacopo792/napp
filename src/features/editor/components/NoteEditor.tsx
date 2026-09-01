@@ -33,6 +33,7 @@ import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
 import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
+import { useDock } from "./useDock";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
@@ -67,6 +68,11 @@ interface Props {
   resolveImage: (imageId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
+  /** What the header says about the note — the save readout, the faces of who
+   *  else is on it. It stands beside the controls rather than inside them: a
+   *  dock magnifies what a pointer can press, and neither of these is a
+   *  button. */
+  headerStatus?: ReactNode;
   headerActions?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
@@ -152,6 +158,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     resolveImage,
     resolveFile,
     navigationAction,
+    headerStatus,
     headerActions,
     onContextMenu,
     onUpdatePageProperties,
@@ -191,6 +198,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const linkUrlRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const findRef = useRef<HTMLInputElement>(null);
+
+  /* The header's controls are a dock like the formatting cluster: the same
+     pill and the same magnification, so the two read as one thing. The state
+     it reports — the readout, the faces — gets the pill without the dock, and
+     the left of the header keeps neither: "Editing" and Add cover were there
+     before any of this and stay as they were. The phone gets none of it, its
+     header being one tight row already. */
+  const rightDock = useDock<HTMLSpanElement>(mobile);
   const [shellWidth, setShellWidth] = useState<number | null>(null);
 
   const shellRef = useCallback((node: HTMLElement | null) => {
@@ -512,12 +527,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <section
         className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
-        {(navigationAction || headerActions) && (
+        {(navigationAction || headerStatus || headerActions) && (
           <header className="editor-toolbar has-rule flex h-13 shrink-0 items-center px-4">
             {navigationAction && (
               <span className="flex items-center gap-1">{navigationAction}</span>
             )}
-            <span className="ml-auto flex items-center gap-1">{headerActions}</span>
+            <span className="ml-auto flex items-center gap-1">
+              {headerStatus}
+              {headerActions}
+            </span>
           </header>
         )}
         <div className="flex flex-1 items-center justify-center px-8">
@@ -608,38 +626,59 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
 
         <span
-          className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
+          className={`flex min-w-0 items-center justify-end gap-2 justify-self-end ${
+            inlineToolbar ? "" : "ml-auto"
+          }`}
         >
-          <button
-            type="button"
-            className={`toolbar-button press ${outlineOpen ? "is-active" : ""}`}
-            aria-label="Outline"
-            aria-pressed={outlineOpen}
-            title="Outline"
-            onClick={() => setOutlineOpen((open) => !open)}
+          {/* The readout and the faces get a pill of their own rather than a
+              seat in the dock: they are what the header says, not what it
+              does, and a dock that carried them would be moving its icons
+              around two things that never move. */}
+          <span
+            className={`flex min-w-0 items-center gap-2 ${
+              mobile ? "" : "editor-tool-group glass-toolbar"
+            }`}
           >
-            <ListTree size={16} />
-          </button>
-          {session && commentAuthors && (
+            {headerStatus}
+          </span>
+          <span
+            ref={rightDock.ref}
+            {...rightDock.handlers}
+            className={`flex min-w-0 items-center justify-end gap-1 ${
+              mobile ? "gap-1" : "editor-tool-group glass-toolbar"
+            }`}
+          >
             <button
               type="button"
-              className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
-              aria-label="Comments"
-              aria-pressed={commentsOpen}
-              title="Comments"
-              onClick={() => {
-                if (commentsOpen) {
-                  closeComments();
-                  return;
-                }
-                setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-                setCommentsOpen(true);
-              }}
+              className={`toolbar-button press ${outlineOpen ? "is-active" : ""}`}
+              aria-label="Outline"
+              aria-pressed={outlineOpen}
+              title="Outline"
+              onClick={() => setOutlineOpen((open) => !open)}
             >
-              <MessageSquare size={16} />
+              <ListTree size={16} />
             </button>
-          )}
-          {headerActions}
+            {session && commentAuthors && (
+              <button
+                type="button"
+                className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
+                aria-label="Comments"
+                aria-pressed={commentsOpen}
+                title="Comments"
+                onClick={() => {
+                  if (commentsOpen) {
+                    closeComments();
+                    return;
+                  }
+                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                  setCommentsOpen(true);
+                }}
+              >
+                <MessageSquare size={16} />
+              </button>
+            )}
+            {headerActions}
+          </span>
         </span>
       </div>
 

@@ -2386,12 +2386,19 @@ function NotesPage() {
     />
   );
 
-  const noteActions = selected ? (
+  /* What the header says about the note, beside the pill of things it can do:
+     whether the last write landed, and who else is reading over your shoulder. */
+  const noteStatus = selected ? (
     <>
-      <span className="mr-1 flex shrink-0 items-center overflow-hidden">
+      <span className="flex shrink-0 items-center overflow-hidden">
         {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
       </span>
       {noteReaders}
+    </>
+  ) : null;
+
+  const noteActions = selected ? (
+    <>
       <button
         type="button"
         aria-label="Find in note"
@@ -2570,6 +2577,7 @@ function NotesPage() {
                         <span className="max-w-28 truncate">{folderLabel}</span>
                       </button>
                     }
+                    headerStatus={noteStatus}
                     headerActions={noteActions}
                     synced={collaborative.ready}
                     session={session}
@@ -2731,6 +2739,7 @@ function NotesPage() {
                   </>
                 ) : null
               }
+              headerStatus={noteStatus}
               headerActions={noteActions}
               synced={collaborative.ready}
               session={session}

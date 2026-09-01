@@ -2358,6 +2358,41 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
+/* The right of the header is the same pill as the formatting cluster — same
+   glass, same corner, same height — so the header reads as groups rather than
+   one group and a scatter: what the note says about itself in one, what can be
+   done to it in the next. Only the second magnifies: a dock is for icons,
+   and the group that carries the readout and the faces holds still, having
+   nothing in it a pointer can press. Desktop only: the phone's header is
+   already one tight row, and pills there ran the groups into each other.
+   `:empty` is the second note in a split, which has actions and no readout. */
+.editor-tool-group {
+  height: 2.35rem;
+  padding-inline: 0.45rem;
+  border-radius: 0.85rem;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+.editor-tool-group:empty {
+  display: none;
+}
+
+/* Inside the pill a button is the cluster's button: a wash, no second frame,
+   and the same dock magnification — `--mag` and `--dock-shift` are written by
+   `useDock`, which drives all three groups. It grows from its own foot, so the
+   icon rises out of the bar the way a dock icon does. */
+.editor-tool-group .toolbar-button {
+  transform: translateX(var(--dock-shift, 0)) scale(var(--mag, 1));
+  transform-origin: 50% 100%;
+}
+
+.editor-tool-group .toolbar-button:hover,
+.editor-tool-group .toolbar-button.is-active {
+  border-color: transparent;
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
 /* `--mag` and `--dock-shift` are written by the toolbar itself while the
    pointer is over the cluster, and removed when it leaves. Both default here,
    so the button is a plain button until something says otherwise.
@@ -4407,6 +4442,18 @@
   transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
 }
 
+.editor-tool-group .toolbar-button {
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.editor-tool-group .toolbar-button:active {
+  transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
+}
+
 /* While the pointer is over the cluster the dock follows it exactly. A
    transition here would mean the row is permanently chasing a target it never
    reaches: the icons lag the cursor and rubber-band when it stops, which reads
@@ -4416,6 +4463,13 @@
   transition:
     color var(--dur-fast) var(--ease-press),
     background-color var(--dur-fast) var(--ease-press);
+}
+
+.editor-tool-group.is-docked .toolbar-button {
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press);
 }
 
 /* The pill keeps its own height while the icons rise out of it. */
@@ -4436,7 +4490,9 @@
   /* Not `:active` — the dock magnification is a hover state, and this is the
      rule that switches the whole of it off. */
   .editor-tool-button,
-  .editor-tool-button:active {
+  .editor-tool-button:active,
+  .editor-tool-group .toolbar-button,
+  .editor-tool-group .toolbar-button:active {
     transform: none;
   }
 
