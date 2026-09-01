@@ -5744,3 +5744,77 @@
     transition: none;
   }
 }
+
+/* ── The outline ─────────────────────────────────────────────────────────────
+   A column beside the page, on the same terms as the remarks: the note and the
+   thing about the note are read together, and a layer over the text makes them
+   two separate acts. */
+.note-outline {
+  display: flex;
+  width: 232px;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  border-left: 1px solid var(--rule-soft);
+  background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+}
+
+@container editor (max-width: 700px) {
+  .note-outline {
+    position: absolute;
+    z-index: 45;
+    inset: 0 0 0 auto;
+    width: min(260px, 100%);
+    box-shadow: -18px 0 40px rgb(0 0 0 / 0.28);
+  }
+}
+
+.note-outline-list {
+  overflow-y: auto;
+  padding: 2px 6px 14px;
+}
+
+.note-outline-empty {
+  padding: 14px 10px;
+  color: var(--ink-4);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* The current heading is marked with a rule on the edge rather than a filled
+   row: this is a place in the text, and a place is a mark in the margin. */
+.note-outline-row {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-left: 2px solid transparent;
+  border-radius: 0 0.45rem 0.45rem 0;
+  padding: 6px 8px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-base) var(--ease),
+    background-color var(--dur-fast) var(--ease-press);
+}
+
+.note-outline-row:hover {
+  background: var(--glass);
+  color: var(--ink);
+}
+
+.note-outline-row.is-current {
+  border-left-color: var(--accent-strong);
+  color: var(--ink);
+  font-weight: 580;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-outline-row {
+    transition: none;
+  }
+}

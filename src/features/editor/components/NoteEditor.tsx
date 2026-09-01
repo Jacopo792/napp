@@ -1,4 +1,12 @@
-import { ChevronDown, ChevronUp, Image as ImageIcon, MessageSquare, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Image as ImageIcon,
+  ListTree,
+  MessageSquare,
+  Search,
+  X,
+} from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -22,6 +30,7 @@ import { translateText, type TranslationLanguage } from "@/features/editor/lib/t
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
+import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
@@ -151,6 +160,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [status, setStatus] = useState("");
   const [failure, setFailure] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  /* The scrolling column, handed to the outline so it can ask both questions
+     it has — what the headings say, and where they are — of one element. */
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   /* A passage the bubble menu has just anchored, waiting for its first remark.
      It exists in the document and not yet in the archive, which is why it is
      held here rather than being read back with the rest. */
@@ -569,6 +582,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         <span
           className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
         >
+          <button
+            type="button"
+            className={`toolbar-button press ${outlineOpen ? "is-active" : ""}`}
+            aria-label="Outline"
+            aria-pressed={outlineOpen}
+            title="Outline"
+            onClick={() => setOutlineOpen((open) => !open)}
+          >
+            <ListTree size={16} />
+          </button>
           {session && commentAuthors && (
             <button
               type="button"
@@ -662,7 +685,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           so the first frames of every note switch showed the reader's wallpaper
           through a hole where the page should be. */}
       <div className="editor-body flex min-h-0 flex-1">
-        <div className="editor-scroll page-in min-h-0 flex-1">
+        <div ref={setScroller} className="editor-scroll page-in min-h-0 flex-1">
           <PageCover
             cover={entry.note.cover}
             photo={entry.note.photo}
@@ -761,6 +784,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             {collaboration && <NoteTailpiece noteId={entry.note.id} />}
           </div>
         </div>
+
+        {outlineOpen && <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />}
 
         {commentsOpen && session && commentAuthors && (
           <NoteComments
