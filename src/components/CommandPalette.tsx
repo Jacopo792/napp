@@ -169,6 +169,7 @@ const SHORTCUTS: { group: string; keys: string; what: string }[] = [
   { group: "Anywhere", keys: "⌘N", what: "New note" },
   { group: "Anywhere", keys: "⌘S", what: "Save now" },
   { group: "Anywhere", keys: "?", what: "This list" },
+  { group: "Anywhere", keys: "Esc", what: "Leave focus mode" },
   { group: "The list", keys: "/", what: "Jump to the search field" },
   { group: "The list", keys: "N", what: "New note" },
   { group: "The list", keys: "↑ ↓", what: "Move between notes" },

@@ -9,6 +9,8 @@ import {
   FolderTree,
   Keyboard,
   Lock,
+  Maximize2,
+  Minimize2,
   NotebookText,
   PanelLeftOpen,
   Search,
@@ -249,6 +251,16 @@ function NotesPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  /* Focus is the two panes put away and the page's own controls stepping back
+     while you write. It is not a third layout: the workspace already knows how
+     to run without the rail and the list, so this is that state plus a way in
+     that is not a small button in a corner, plus a class the stylesheet reads. */
+  const [focusMode, setFocusMode] = useState(false);
+  /* Raised by a keystroke and lowered by the pointer. Deliberately not the
+     presence `typing` flag: that one needs a channel, and presence is off by
+     default — the page's own chrome must not depend on a socket to get out of
+     the way. */
+  const [quiet, setQuiet] = useState(false);
   /* This account's own profile. The roster carries everybody's, but the one
      being edited is read on its own so a save shows immediately rather than
      waiting for the next archive snapshot. */
@@ -973,7 +985,39 @@ function NotesPage() {
   const handleEdited = useCallback(() => {
     schedule();
     markTyping();
+    setQuiet(true);
   }, [schedule, markTyping]);
+
+  /* The pointer brings the controls back — not a timer. A writer who has
+     stopped typing has not necessarily stopped reading, and a toolbar that
+     reappears on its own two seconds after the last keystroke arrives in the
+     middle of a sentence rather than when it is wanted. */
+  useEffect(() => {
+    if (!quiet) return;
+    const wake = () => setQuiet(false);
+    window.addEventListener("pointermove", wake, { once: true });
+    window.addEventListener("pointerdown", wake, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", wake);
+      window.removeEventListener("pointerdown", wake);
+    };
+  }, [quiet]);
+
+  /* Focus puts the two panes away and gives them back on the way out — the
+     rail's own open state is remembered across the trip, because whether you
+     had it open is a different question from whether you are focusing. */
+  const restoreNavigation = useRef(true);
+  const toggleFocus = useCallback(() => {
+    setFocusMode((current) => {
+      if (current) {
+        setNavigationOpen(restoreNavigation.current);
+        return false;
+      }
+      restoreNavigation.current = navigationOpen;
+      setNavigationOpen(false);
+      return true;
+    });
+  }, [navigationOpen]);
 
   useEffect(
     () => () => {
@@ -1546,6 +1590,12 @@ function NotesPage() {
         return;
       }
 
+      if (e.key === "Escape" && focusMode) {
+        e.preventDefault();
+        toggleFocus();
+        return;
+      }
+
       if (e.key === "n") {
         e.preventDefault();
         void handleNew();
@@ -1565,7 +1615,7 @@ function NotesPage() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [moveSelection, handleNew, saveNow, selectedId, selected, canEdit]);
+  }, [moveSelection, handleNew, saveNow, selectedId, selected, canEdit, focusMode, toggleFocus]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -1932,6 +1982,17 @@ function NotesPage() {
     .filter((note): note is Note => Boolean(note))
     .map((note) => ({ id: note.id, title: note.title }));
 
+  /* The pinned notes the rail lists. Trash and Archive are left out: a pin is
+     a note you are coming back to, and neither of those is that. */
+  const pinnedNotes = ownedEntries
+    .filter(
+      (entry) =>
+        indexOf(activeMeta).byNote.get(entry.note.id)?.pinned &&
+        !trashedIds.has(entry.note.id) &&
+        !archivedIds.has(entry.note.id),
+    )
+    .map((entry) => ({ id: entry.note.id, title: entry.note.title }));
+
   /* Scope counts, computed once for the sidebar. */
   const scopes: Scope[] = (() => {
     const index = indexOf(activeMeta);
@@ -2016,6 +2077,15 @@ function NotesPage() {
         hint: "⌘N",
         icon: <SquarePen size={15} />,
         run: () => void handleNew(),
+      },
+      {
+        id: "focus",
+        group: "Do",
+        name: focusMode ? "Leave focus" : "Focus mode",
+        hint: focusMode ? "Esc" : "One column, nothing else",
+        keywords: "zen distraction free writing",
+        icon: focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />,
+        run: toggleFocus,
       },
       {
         id: "settings",
@@ -2132,6 +2202,9 @@ function NotesPage() {
       folders={activeMeta.folders}
       selectedId={selectedFolderId}
       canWrite={canWriteArchive}
+      pinned={pinnedNotes}
+      selectedNoteId={selectedId}
+      onSelectNote={handleOpenRecent}
       onSelect={(id) => {
         handleSelectFolder(id);
         setFoldersOpen(false);
@@ -2426,7 +2499,11 @@ function NotesPage() {
   }
 
   return (
-    <div className="workspace-shell h-screen overflow-hidden">
+    <div
+      className={`workspace-shell h-screen overflow-hidden ${focusMode ? "is-focus" : ""} ${
+        focusMode && quiet ? "is-quiet" : ""
+      }`}
+    >
       <DndContext
         key="desktop-dnd"
         sensors={sensors}

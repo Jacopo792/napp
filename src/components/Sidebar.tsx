@@ -11,6 +11,7 @@ import {
   NotebookText,
   PanelLeftClose,
   Pencil,
+  Pin,
   Trash2,
   X,
 } from "lucide-react";
@@ -47,6 +48,12 @@ interface Props {
   folders: FolderType[];
   selectedId: string;
   canWrite: boolean;
+  /** The pinned notes, in the order the list already pins them. Notes rather
+   *  than a destination: a pin is about one note, so the rail carries the note
+   *  itself and not a scope that would then have to be filtered. */
+  pinned: { id: string; title: string }[];
+  selectedNoteId: string | null;
+  onSelectNote: (id: string) => void;
   onSelect: (id: string) => void;
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
@@ -321,6 +328,9 @@ export function Sidebar({
   folders,
   selectedId,
   canWrite,
+  pinned,
+  selectedNoteId,
+  onSelectNote,
   onSelect,
   onCreateFolder,
   onRenameFolder,
@@ -525,6 +535,43 @@ export function Sidebar({
             active={selectedId === ALL}
             onSelect={() => onSelect(ALL)}
           />
+        )}
+
+        {/* Pinned notes, above the folders and below All notes. A pin already
+            floats a note to the top of its list; up here it is reachable from
+            whichever list you are in, which is the thing pinning was for. The
+            block simply is not there when nothing is pinned — an empty
+            "Pinned" heading teaches the reader to ignore that part of the
+            column. */}
+        {pinned.length > 0 && (
+          <>
+            <p className="sidebar-heading">
+              Pinned
+              <span>{pinned.length}</span>
+            </p>
+            {pinned.map((note) => (
+              <div
+                key={note.id}
+                className={`sidebar-row ${selectedNoteId === note.id ? "is-active" : ""}`}
+              >
+                {/* The empty twisty is the folder rows' own alignment: without
+                    it a pinned note's glyph sits where a folder's disclosure
+                    arrow does, and the column has two left edges. */}
+                <span className="sidebar-twisty" />
+                <button
+                  type="button"
+                  aria-current={selectedNoteId === note.id ? "true" : undefined}
+                  className="sidebar-target press"
+                  onClick={() => onSelectNote(note.id)}
+                >
+                  <span className="sidebar-glyph">
+                    <Pin size={15} />
+                  </span>
+                  <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
+                </button>
+              </div>
+            ))}
+          </>
         )}
 
         <p className="sidebar-heading">

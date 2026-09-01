@@ -5697,3 +5697,50 @@
     animation: none;
   }
 }
+
+/* ══ Focus ════════════════════════════════════════════════════════════════════
+   Not a third layout. The workspace already knows how to run without the rail
+   and the list — focus is that state, plus the page's own controls stepping
+   back while the writing is happening, plus a way in that is not a small
+   button in a corner.
+
+   The measure does not change. A page that widens when you focus is a page
+   that reflows every line you have already written the moment you decide to
+   concentrate. ═══════════════════════════════════════════════════════════ */
+.workspace-shell.is-focus .workspace-grid {
+  justify-content: center;
+}
+
+/* One column, and it stops being a pane: no frame, no seam, nothing to say
+   where it ends, because there is nothing beside it any more. */
+.workspace-shell.is-focus .editor-shell.soft-pane {
+  max-width: 62rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Quiet: raised by a keystroke, lowered by the pointer. The controls fade
+   rather than leave — a toolbar that is removed from the layout takes the
+   text with it as the page reflows, and the reflow is the distraction the
+   whole mode is against. */
+.workspace-shell.is-focus .editor-toolbar {
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.workspace-shell.is-focus.is-quiet .editor-toolbar {
+  opacity: 0.12;
+}
+
+/* Coming back is not conditional on the pointer reaching the strip itself:
+   any movement wakes it. This only covers the case where it is already
+   under the cursor. */
+.workspace-shell.is-focus .editor-toolbar:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell.is-focus .editor-toolbar {
+    transition: none;
+  }
+}
