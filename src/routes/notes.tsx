@@ -1,11 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
   ChevronLeft,
+  FileText,
+  Folder,
+  FolderDown,
   FolderTree,
+  Keyboard,
+  Lock,
+  NotebookText,
   PanelLeftOpen,
   Search,
+  Settings,
   Settings as SettingsIcon,
+  SquarePen,
+  Trash2,
 } from "lucide-react";
 import {
   DndContext,
@@ -109,6 +119,7 @@ import {
 } from "@/components/WorkspaceMenus";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
+import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
 import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
 import {
@@ -236,6 +247,8 @@ function NotesPage() {
     loadPaneWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX),
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /* This account's own profile. The roster carries everybody's, but the one
      being edited is read on its own so a save shows immediately rather than
      waiting for the next archive snapshot. */
@@ -1511,12 +1524,13 @@ function NotesPage() {
       }
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        /* Inside the text ⌘K is still "link these words" — that convention is
+           older than the palette's and the reader is holding a selection. */
         if (canEdit && el?.closest(".rich-text-content")) {
           noteEditorRef.current?.openLink();
           return;
         }
-        searchRef.current?.focus();
-        searchRef.current?.select();
+        setPaletteOpen(true);
         return;
       }
       if (mod && e.key.toLowerCase() === "n") {
@@ -1525,6 +1539,12 @@ function NotesPage() {
         return;
       }
       if (typing) return;
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
 
       if (e.key === "n") {
         e.preventDefault();
@@ -1951,6 +1971,84 @@ function NotesPage() {
       ? [{ id: "scope", label: folderLabel, onClear: () => handleSelectFolder(ALL) }]
       : [];
 
+  /* Everything the palette can reach, in the order a resting palette should
+     show it: where you were going, then what you were looking for, then the
+     things the window itself does. The notes come from the same entries and
+     the same `derivedOf` haystack the list searches, so a note found here and
+     a note found in the list are found by the same rule. */
+  const paletteCommands: Command[] = ((): Command[] => {
+    if (!paletteOpen) return [];
+    const open = (id: string) => () => {
+      setQuery("");
+      setSelectedFolderId(ALL);
+      handleSelectNote(id);
+    };
+    return [
+      ...scopes.map((scope) => ({
+        id: `scope:${scope.id}`,
+        group: "Go to",
+        name: scope.label,
+        icon:
+          scope.id === TRASH ? (
+            <Trash2 size={15} />
+          ) : scope.id === ARCHIVE ? (
+            <Archive size={15} />
+          ) : scope.id === ALL ? (
+            <NotebookText size={15} />
+          ) : (
+            <Folder size={15} />
+          ),
+        run: () => handleSelectFolder(scope.id),
+      })),
+      ...ownedEntries.map((entry) => ({
+        id: `note:${entry.note.id}`,
+        group: "Notes",
+        name: entry.note.title || "Untitled",
+        hint: derivedOf(entry.note).preview || undefined,
+        keywords: derivedOf(entry.note).haystack,
+        icon: <FileText size={15} />,
+        run: open(entry.note.id),
+      })),
+      {
+        id: "new",
+        group: "Do",
+        name: "New note",
+        hint: "⌘N",
+        icon: <SquarePen size={15} />,
+        run: () => void handleNew(),
+      },
+      {
+        id: "settings",
+        group: "Do",
+        name: "Settings",
+        icon: <Settings size={15} />,
+        run: () => setSettingsOpen(true),
+      },
+      {
+        id: "export",
+        group: "Do",
+        name: "Export all as Markdown",
+        icon: <FolderDown size={15} />,
+        run: () => void handleExportAll(),
+      },
+      {
+        id: "shortcuts",
+        group: "Do",
+        name: "Keyboard shortcuts",
+        hint: "?",
+        icon: <Keyboard size={15} />,
+        run: () => setShortcutsOpen(true),
+      },
+      {
+        id: "lock",
+        group: "Do",
+        name: "Lock & sign out",
+        icon: <Lock size={15} />,
+        run: () => handleLock(),
+      },
+    ];
+  })();
+
   const collectionActions = (
     <CollectionMenu
       preferences={activeListPreferences}
@@ -2064,6 +2162,19 @@ function NotesPage() {
     : viewedMember.isSelf
       ? "Your notes"
       : `${viewedMember.nickname || "Another member"}'s notes`;
+
+  /* Both keyboard sheets travel with the settings panel, because both layouts
+     mount that and neither wants a second copy of this. */
+  const keyboardSheets = (
+    <>
+      <CommandPalette
+        open={paletteOpen}
+        commands={paletteCommands}
+        onClose={() => setPaletteOpen(false)}
+      />
+      <ShortcutSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+    </>
+  );
 
   const settingsPanel = (
     <SettingsPanel
@@ -2309,6 +2420,7 @@ function NotesPage() {
           </div>
         )}
         {settingsPanel}
+        {keyboardSheets}
       </div>
     );
   }
@@ -2457,6 +2569,7 @@ function NotesPage() {
         </DragOverlay>
       </DndContext>
       {settingsPanel}
+      {keyboardSheets}
       {editorMenu}
       {/* The editor's attachment menu opens this; a file input is the only way
           a browser lets a page read a file the reader chose. */}

@@ -5489,3 +5489,211 @@
     display: none;
   }
 }
+
+/* ══ The palette, and the shortcut sheet ══════════════════════════════════════
+   Both are the same surface: a sheet that arrives over the window, leaves on
+   Escape, and is there to be reached without the pointer. They sit above
+   Settings' own layer because either can be opened from it.
+
+   High rather than centred. A palette that grows downward from a fixed top
+   edge keeps its search field under the cursor as the results change; one
+   centred vertically moves the field every time you type a letter that
+   changes how many rows match. ═══════════════════════════════════════════ */
+.palette-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding: max(9vh, 3rem) 1.25rem 1.25rem;
+}
+
+/* Denser than the glass it inherits. A sheet that is mostly its own margins —
+   which the shortcut sheet is — lets the note list read straight through it,
+   and two lists on top of each other is neither. */
+.palette {
+  position: relative;
+  display: flex;
+  width: min(38rem, 100%);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  backdrop-filter: blur(22px) saturate(1.06);
+  max-height: min(30rem, calc(100dvh - 14vh));
+  flex-direction: column;
+  overflow: hidden;
+  animation: palette-in var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 0 14px;
+  color: var(--ink-4);
+}
+
+.palette-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 15px 0;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  outline: none;
+}
+
+.palette-search input::placeholder {
+  color: var(--ink-4);
+}
+
+.palette kbd,
+.shortcut-sheet kbd {
+  flex-shrink: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0.35rem;
+  padding: 2px 6px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.palette-results {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette-empty {
+  padding: 26px 10px 30px;
+  color: var(--ink-4);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.palette-group-label {
+  padding: 10px 10px 5px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.palette-group:first-child .palette-group-label {
+  padding-top: 4px;
+}
+
+/* One row, whichever hand is driving: the pointer moves the same cursor the
+   arrows do, so there is never a hovered row and a selected row at once. */
+.palette-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  border-radius: 0.6rem;
+  padding: 8px 10px;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.palette-row.is-active {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.palette-row-icon {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: var(--glass);
+  color: var(--ink-3);
+}
+
+.palette-row.is-active .palette-row-icon {
+  color: var(--accent-strong);
+}
+
+.palette-row b {
+  display: block;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-row small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The shortcut sheet ─────────────────────────────────────────────────── */
+.shortcut-sheet {
+  width: min(34rem, 100%);
+  padding: 16px 18px 20px;
+}
+
+.shortcut-sheet header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.shortcut-sheet h2 {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.shortcut-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 4px 26px;
+  overflow-y: auto;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 7px 2px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.shortcut-row:last-child {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palette {
+    animation: none;
+  }
+}
