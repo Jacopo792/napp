@@ -37,6 +37,14 @@ archive that is _not_ plain membership, and it is enforced in Postgres for the
 reason every boundary here is: a list filtered in the browser has already
 handed the rows over. `SECURITY.md` records what the hiding is worth.
 
+Each place has one act it can perform on everything in it, in the ⋯ menu beside
+"Export all as Markdown", and they are not the same kind of act: emptying the
+trash destroys, clearing the archive only files everything back. Both read the
+whole scope rather than the visible slice, so a search left in the box cannot
+quietly narrow what "all" means, and both take the two clicks a single trashed
+row already asks for. `deleteNote` is one call into `deleteNotes`, which is the
+same statement with `.in` where it had `.eq`.
+
 ## Local development
 
 ```bash
@@ -214,6 +222,18 @@ The collaboration server is part of the authorization boundary:
   absent.
 - Opening, selecting, focusing or receiving an awareness update must not write
   the note or change updated_at. Only a readable document change is persisted.
+- **What counts as an edit is decided by one `where` clause and one
+  normalisation.** `save_note_document` restamps `updated_at` only when a
+  projection differs from the stored row, so an invisible difference is a
+  visible one: type a word at the end of a note and delete it again and the
+  editor leaves a trailing space and an empty paragraph behind. `storeDocument`
+  runs the projection through `withoutInvisibleDocumentEnding()` in
+  `content.ts` — shared with the legacy draft path, which is where it used to
+  live alone — before it goes to Postgres. Inside it, trimming and popping
+  alternate: a trailing `"  "` paragraph does not read as empty until it is
+  trimmed, and the trim reaches the last real text node only once the empty
+  paragraphs after it are gone. Deleting words that were already there is still
+  an edit, and `integration.test.ts` pins both halves.
 
 The old draft/three-way merge path is compatibility code for a pre-Yjs client,
 not the live writer. Do not call saveNote() from the collaborative editor.
@@ -356,10 +376,26 @@ the exact inverse of `promotePrivateMedia()`: a picture leaves as
 anywhere else. Carrying the bytes means downloading and writing every Storage
 blob — a larger feature, not an oversight.
 
-Two things the tests pin: the round trip is stable, and the title heading is
-not left duplicated in the body.
+A `[[note]]` link is the one mark that keeps something of itself on the way
+out, and for a reason the comment anchor does not have: `[[Title]]` is
+Obsidian's own syntax, so a link exported with the archive around it resolves in
+the vault it lands in. One-way, deliberately — reading it back would mean
+resolving a title to a note id, which needs the archive, and `content.ts` has
+none and is not going to grow one. The id never leaves; a uuid in somebody
+else's file is exactly the broken link `demotePrivateMedia` avoids inventing.
 
-Note that `exchange.ts` imports `./content.ts` **with the extension**. `pnpm
+What points at a note is found by walking the Tiptap JSON of the notes already
+in memory (`linksTo()` in `src/lib/derived.ts`), never by querying a column: a
+link is a mark inside the document, so there is nothing to index. It therefore
+follows the Postgres projection, which means a link written now appears in the
+other note's foot when the save lands rather than as it is typed.
+
+Three things the tests pin: the round trip is stable, the title heading is not
+left duplicated in the body, and a note link leaves as `[[Title]]` and never as
+an id.
+
+Note that `exchange.ts` and `derived.ts` import their neighbours **with the
+extension**. `pnpm
 test` runs under `node --experimental-strip-types`, which does not resolve an
 extensionless relative import; `allowImportingTsExtensions` is already on, so
 the extension costs nothing and is what makes a source file testable.
@@ -411,3 +447,30 @@ variables are documented in `.env.migration.example`. Never expose
 - Every settings row is one shape: a 34 px lead glyph, a name with a line of
   explanation, a control flush right. The profile picture is a row like any
   other, so the labels share a left edge and the values share a right one.
+  Settings is a rail and one column of cards; the standing summary column that
+  used to sit opposite is gone, because everything it said the form said too.
+- **A capped measure in a wider column has to be centred in it.** Otherwise the
+  cap that stops a label and its control drifting apart just moves the
+  imbalance to the other side — which is what a 64 rem Settings panel with a
+  218 px rail produced: the form on the left and a hand of nothing on the right.
+- **A `1fr` grid track is floored at its content's min-content width.** Use
+  `minmax(0, 1fr)`. The phone's Settings column ran off the side of the panel
+  and took every control with it for exactly this reason.
+- **Nothing that tracks the pointer may have a transition on `transform`.** The
+  toolbar's dock magnification chases a target it never reaches otherwise: the
+  icons lag the cursor and rubber-band when it stops, which reads as latency
+  rather than as magnification. `EditorToolbar` adds `is-docked` while
+  tracking, which takes the transition off, and removes it in the same tick as
+  the properties so the settle animates.
+- **Two `Suggestion` plugins in one editor need two `pluginKey`s.** Every
+  instance defaults to `suggestion$`, and ProseMirror refuses two plugins that
+  share a key — so adding `[[` beside `/` threw on every note until the second
+  one was named.
+- **The plate at the end of a note draws once a visit, not once a note.** It was
+  removed from there before because it restaged on every note switch, and a
+  thing that moves each time you change page is a thing you end up watching
+  instead of reading. A module-level flag is the whole of what makes putting it
+  back safe.
+- A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `?` and Focus
+  mode are all named in the ⋯ menus that already open, and `src/lib/shortcuts.ts`
+  is the single list both the `?` sheet and the Settings section read.
