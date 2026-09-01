@@ -37,6 +37,7 @@ import { documentGlyph } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
 import type { SwipeAction } from "@/lib/writingPreferences";
+import { nextSwipeOffset, SWIPE_ACTION_OFFSET } from "@/lib/swipe";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuButton } from "./WorkspaceMenus";
@@ -197,14 +198,14 @@ const Row = memo(function Row({
   }
 
   function handleSwipe(event: React.WheelEvent<HTMLDivElement>) {
-    if (!canSwipe || Math.abs(event.deltaX) < Math.abs(event.deltaY) * 1.15) return;
+    if (!canSwipe || Math.abs(event.deltaX) < 3) return;
     event.preventDefault();
     window.clearTimeout(swipeResetRef.current);
-    const next = Math.max(-118, Math.min(0, swipeXRef.current + event.deltaX));
+    const next = nextSwipeOffset(swipeXRef.current, event.deltaX);
     swipeXRef.current = next;
     setSwipeX(next);
 
-    if (next <= -104 && !swipeActionRef.current) {
+    if (next <= SWIPE_ACTION_OFFSET && !swipeActionRef.current) {
       swipeActionRef.current = true;
       if (swipeLeftAction === "archive") onArchiveChange(entry, true);
       else onMoveToTrash(entry);
