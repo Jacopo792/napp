@@ -2,12 +2,15 @@ import { ChevronDown, ChevronUp, Image as ImageIcon, MessageSquare, Search, X } 
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { BotanicalFlower, FLOWER_HEAD_BOX } from "@/components/BotanicalFlowers";
+import { flowerFor } from "@/lib/botanical";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
@@ -78,6 +81,40 @@ export interface NoteEditorHandle {
    is the reading measure, so the display line is set over the exact text it
    introduces — the specimen's core arrangement, and the reason the title is
    not a full-bleed input bar. */
+
+/* Has the plate drawn itself yet on this visit? Module scope and not state,
+   because the answer has to outlive every mount: the drawing is worth watching
+   once, and a thing that redraws each time you change note is a thing you end
+   up watching instead of reading. That is exactly why a plate was taken out of
+   here before, and the flag is the whole of what makes putting one back safe. */
+let tailpieceDrawn = false;
+
+/** The mark at the end of a note, in the run-out the text already leaves below
+ *  itself: a plate in the bottom margin, on the outer edge, the way a botanical
+ *  book puts one there.
+ *
+ *  A sibling of the editor and never a node inside it — anything in the
+ *  document would be editable, would serialise into Markdown, and would reach
+ *  the other reader as content. Never interactive either: the padding beneath
+ *  belongs to the editor, and clicking it should still put the caret at the end
+ *  of the text.
+ *
+ *  Which flower it is, is seeded by the note's id, so a note keeps its own. */
+function NoteTailpiece({ noteId }: { noteId: string }) {
+  const [drawing] = useState(() => !tailpieceDrawn);
+  useEffect(() => {
+    tailpieceDrawn = true;
+  }, []);
+  return (
+    <div className="note-tailpiece" aria-hidden="true">
+      <BotanicalFlower
+        flower={flowerFor(noteId)}
+        viewBox={FLOWER_HEAD_BOX}
+        className={`note-tailpiece-plate ${drawing ? "" : "is-drawn"}`}
+      />
+    </div>
+  );
+}
 
 export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEditor(
   {
@@ -721,16 +758,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <div className="skeleton" style={{ width: "45%" }} />
               </div>
             )}
-            {/* A tailpiece, in the run-out the text already leaves below itself.
-              A sibling of the editor and never a node inside it: anything in
-              the document would be editable, would serialise into Markdown, and
-              would sync to the other reader as content.
-
-              It was a botanical plate, which is a 200×260 drawing asked to be
-              58px wide at 16% opacity — a smudge that redrew itself petal by
-              petal on every note switch. A rule and a lozenge say the same
-              thing, "the note ends here", and say it legibly. */}
-            {collaboration && <div className="note-tailpiece" aria-hidden="true" />}
+            {collaboration && <NoteTailpiece noteId={entry.note.id} />}
           </div>
         </div>
 

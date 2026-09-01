@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
-import { BotanicalPlate } from "@/components/BotanicalPlate";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 
@@ -295,35 +294,27 @@ function Login() {
 
 /* The day, as a string. `toDateString()` and not the clock, so the plate is
    settled for as long as the reader is looking at it. */
-function plantOfTheDay(): "sprig" | ReturnType<typeof flowerFor> {
-  const day = new Date().toDateString();
-  return day.charCodeAt(day.length - 1) % 2 === 0 ? "sprig" : flowerFor(day);
+function plantOfTheDay(): ReturnType<typeof flowerFor> {
+  return flowerFor(new Date().toDateString());
 }
 
 function LoginFrame({ children }: { children: React.ReactNode }) {
   const plant = plantOfTheDay();
   return (
     <div className="login-shell flex min-h-screen flex-col">
-      {/* Two sprigs of one plate: the near one climbing the right of the
+      {/* Two plates of one plant: the near one climbing the right of the
           window, a smaller one behind the shoulder of the card. They are the
           ground the card sits on, never a layer over it.
 
-          Which plant it is turns with the date — the sprig most days, a
-          narcissus, a lycoris or a lotus on the others. Seeded by the day and
-          not by chance, so a door that changes never changes while you are
-          standing in it. */}
+          Which flower it is turns with the date — a lotus, a narcissus, a
+          lycoris or a peony. Seeded by the day and not by chance, so a door
+          that changes never changes while you are standing in it. The plain
+          sprig that used to take every other day is gone: this is the one
+          surface in the app that gets to be a drawing, and a twig was not
+          spending it. */}
       <div className="login-garden" aria-hidden="true">
-        {plant === "sprig" ? (
-          <>
-            <BotanicalPlate className="is-near" />
-            <BotanicalPlate className="is-far" />
-          </>
-        ) : (
-          <>
-            <BotanicalFlower flower={plant} className="is-near" />
-            <BotanicalFlower flower={plant} className="is-far" />
-          </>
-        )}
+        <BotanicalFlower flower={plant} className="is-near" />
+        <BotanicalFlower flower={plant} className="is-far" />
       </div>
 
       <header className="login-head">

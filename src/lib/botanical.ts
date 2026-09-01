@@ -2,9 +2,9 @@
    components and nothing else — React Fast Refresh gives up on a module that
    mixes the two. */
 
-export type PlateFlower = "narcissus" | "lycoris" | "lotus";
+export type PlateFlower = "narcissus" | "lycoris" | "lotus" | "peony";
 
-const PLATE_FLOWERS: PlateFlower[] = ["narcissus", "lycoris", "lotus"];
+const PLATE_FLOWERS: PlateFlower[] = ["narcissus", "lycoris", "lotus", "peony"];
 
 /** Stable, and stored nowhere: a note keeps its flower because the seed is its
  *  id, and the login screen changes because the seed is the day. */

@@ -883,9 +883,9 @@
   }
 }
 
-/* The tailpiece under a note: a hairline that fades out at both ends, broken in
-   the middle for a small lozenge. The printer's mark for "this is the end of
-   the text", which is the whole of what is being said here.
+/* The tailpiece under a note: a botanical plate in the bottom margin, on the
+   outer edge, the way a printed book puts one there. The printer's mark for
+   "this is the end of the text", and the only picture the reading surface has.
 
    It lives in the 40vh of run-out `.rich-text-content` leaves below the last
    line, pulled up into it rather than stacked after it — otherwise you would
@@ -893,48 +893,40 @@
    interactive: the padding beneath belongs to the editor, and clicking it
    should still put the caret at the end of the text.
 
-   No animation. The drawing that was here restaged itself on every note
-   switch, and a thing that moves each time you change page is a thing you
-   end up watching instead of reading. */
+   The drawing here used to restage itself on every note switch, and a thing
+   that moves each time you change page is a thing you end up watching instead
+   of reading. It draws once a visit now — `is-drawn` is the class the second
+   note onward gets — so the one authored moment stays a moment. */
 .note-tailpiece {
-  position: relative;
-  display: block;
-  width: min(180px, 55%);
-  height: 1px;
-  margin: -32vh auto 0;
-  /* A fade, not a colour field: one ink, varying only in alpha. */
-  background: linear-gradient(90deg, transparent, var(--rule) 28%, var(--rule) 72%, transparent);
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -34vh;
+  padding-right: clamp(0px, 4vw, 40px);
   pointer-events: none;
 }
 
-/* The gap the mark sits in, painted in the page's own colour so the rule stops
-   short of the lozenge rather than running under it. */
-.note-tailpiece::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 3px;
-  transform: translate(-50%, -50%);
-  background: var(--page);
+.botanical-plate.note-tailpiece-plate {
+  position: static;
+  height: 118px;
+  opacity: 0.14;
 }
 
-.note-tailpiece::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  transform: translate(-50%, -50%) rotate(45deg);
-  background: var(--ink-4);
-  opacity: 0.55;
+/* Already drawn this visit: the plate is simply there, at full length and with
+   no animation to restage. */
+.botanical-plate.note-tailpiece-plate.is-drawn .stem,
+.botanical-plate.note-tailpiece-plate.is-drawn .sprig {
+  animation: none;
+  stroke-dashoffset: 0;
 }
 
 @media (max-width: 700px) {
   .note-tailpiece {
-    width: min(140px, 60%);
+    margin-top: -30vh;
+    padding-right: 6px;
+  }
+
+  .botanical-plate.note-tailpiece-plate {
+    height: 84px;
   }
 }
 
@@ -4109,6 +4101,7 @@
   .settings-specimen p {
     transition: none;
   }
+
 
   /* The cover chips still appear on hover — that is the affordance, not the
      motion. Only the slide goes. */
