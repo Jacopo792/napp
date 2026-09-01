@@ -79,3 +79,25 @@ export async function deleteComment(session: AppSession, commentId: string): Pro
     .eq("id", commentId);
   fail(result.error);
 }
+
+/** Only the author may change the words. RLS admits editors because the same
+ *  UPDATE policy also resolves threads; the database trigger distinguishes an
+ *  author's edit from somebody else changing resolution state. */
+export async function updateComment(
+  session: AppSession,
+  commentId: string,
+  body: string,
+): Promise<NoteComment> {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("A comment needs something in it");
+  const result = await supabase
+    .from("note_comments")
+    .update({ body: trimmed })
+    .eq("archive_id", session.archiveId)
+    .eq("id", commentId)
+    .eq("author_id", session.userId)
+    .select("id, thread_id, author_id, body, created_at, resolved_at")
+    .single();
+  fail(result.error);
+  return toComment(result.data as CommentRow);
+}

@@ -254,6 +254,51 @@ try {
   }
   report.crossAccount = trail;
 
+  // ── Comment words belong to their author; resolution belongs to editors ─
+  const commentThreadId = crypto.randomUUID();
+  const openedComment = await first.supabase
+    .from("note_comments")
+    .insert({
+      archive_id: archiveId,
+      note_id: testId,
+      thread_id: commentThreadId,
+      author_id: first.userId,
+      body: "Original verification comment",
+    })
+    .select("id")
+    .single();
+  fail(openedComment.error);
+
+  const ownEdit = await first.supabase
+    .from("note_comments")
+    .update({ body: "Edited by its author" })
+    .eq("id", openedComment.data.id)
+    .select("body")
+    .single();
+  fail(ownEdit.error);
+  assert(ownEdit.data.body === "Edited by its author", "An author could not edit their comment");
+
+  const forgedComment = await second.supabase
+    .from("note_comments")
+    .update({ body: "Edited by somebody else" })
+    .eq("id", openedComment.data.id)
+    .select("body");
+  assert(forgedComment.error, "A member rewrote somebody else's comment");
+
+  const resolvedComment = await second.supabase
+    .from("note_comments")
+    .update({ resolved_at: new Date().toISOString() })
+    .eq("id", openedComment.data.id)
+    .select("body, resolved_at")
+    .single();
+  fail(resolvedComment.error);
+  assert(resolvedComment.data.resolved_at, "A peer editor could not resolve a comment thread");
+  assert(
+    resolvedComment.data.body === "Edited by its author",
+    "Resolving a thread changed the comment body",
+  );
+  report.comments = { authorCanEdit: true, peerCannotEdit: true, peerCanResolve: true };
+
   // ── An archived note can be kept from the other members ──────────────────
   // The one place membership stops meaning "reads everything", so it is the one
   // place worth proving on the server rather than in the interface. A list

@@ -28,7 +28,7 @@
  * It loads for itself. Comments are not part of the catalogue and must not be
  * on the way to opening a note — the panel is closed until somebody asks for
  * it, and the note is readable long before this has finished. */
-import { Check, ChevronDown, MessageSquare, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
 import {
@@ -38,6 +38,7 @@ import {
   resolveThread,
   threadsOf,
   type NoteComment,
+  updateComment,
 } from "@/lib/comments";
 import type { CommentThread } from "@/lib/commentThreads";
 import { collaborationColor } from "@/features/editor/lib/ydoc";
@@ -67,6 +68,7 @@ interface Props {
   onClose: () => void;
   onReveal: (threadId: string) => void;
   onRemoveAnchor: (threadId: string) => void;
+  onResolveAnchor: (threadId: string, resolved: boolean) => void;
 }
 
 /** A thread longer than this is folded in the middle. Somebody arriving at a
@@ -86,6 +88,7 @@ export function NoteComments({
   onClose,
   onReveal,
   onRemoveAnchor,
+  onResolveAnchor,
 }: Props) {
   const [comments, setComments] = useState<NoteComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +99,8 @@ export function NoteComments({
    *  underline in the text, and whether the composer is more than a line. */
   const [active, setActive] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const threadRefs = useRef(new Map<string, HTMLElement>());
 
@@ -103,7 +108,15 @@ export function NoteComments({
     let live = true;
     setLoading(true);
     loadComments(session, noteId)
-      .then((rows) => live && setComments(rows))
+      .then((rows) => {
+        if (!live) return;
+        setComments(rows);
+        /* Older anchors predate the resolved attribute. Bring them in step
+           with the database once the comments are deliberately opened. */
+        for (const thread of threadsOf(rows)) {
+          onResolveAnchor(thread.threadId, thread.resolved);
+        }
+      })
       .catch(
         (reason) =>
           live && setFailure(reason instanceof Error ? reason.message : "Could not load comments"),
@@ -112,7 +125,7 @@ export function NoteComments({
     return () => {
       live = false;
     };
-  }, [session, noteId]);
+  }, [session, noteId, onResolveAnchor]);
 
   /* A thread just anchored has no row yet, so it cannot come from the archive.
      It is shown as an empty conversation with the composer already focused —
@@ -185,8 +198,26 @@ export function NoteComments({
       setComments((current) =>
         current.map((c) => (c.threadId === threadId ? { ...c, resolvedAt: at } : c)),
       );
+      onResolveAnchor(threadId, resolved);
+      setActive(null);
     } catch (reason) {
       setFailure(reason instanceof Error ? reason.message : "Could not update that thread");
+    }
+  }
+
+  async function saveEdit(comment: NoteComment) {
+    const body = editDraft.trim();
+    if (!body) return;
+    try {
+      const saved = await updateComment(session, comment.id, body);
+      setComments((current) =>
+        current.map((candidate) => (candidate.id === comment.id ? saved : candidate)),
+      );
+      setEditing(null);
+      setEditDraft("");
+      setFailure("");
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : "Could not edit that comment");
     }
   }
 
@@ -205,7 +236,10 @@ export function NoteComments({
 
   function composer(threadId: string, placeholder: string, open: boolean) {
     return (
-      <div className={`note-comment-composer ${open ? "is-open" : ""}`}>
+      <div
+        className={`note-comment-composer ${open ? "is-open" : ""}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <textarea
           ref={threadId === pendingThread ? composerRef : undefined}
           value={draft[threadId] ?? ""}
@@ -273,18 +307,80 @@ export function NoteComments({
             {mine && <span className="note-comment-you">you</span>}
             <span className="readout note-comment-stamp">{formatStamp(comment.createdAt)}</span>
             {mine && (
-              <button
-                type="button"
-                className="note-comment-action is-quiet press"
-                aria-label={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                title={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                onClick={() => void remove(comment, onlyOne)}
-              >
-                <Trash2 size={12.5} />
-              </button>
+              <span className="note-comment-own-actions">
+                <button
+                  type="button"
+                  className="note-comment-action is-quiet press"
+                  aria-label={head ? "Edit this comment" : "Edit this reply"}
+                  title={head ? "Edit this comment" : "Edit this reply"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setEditing(comment.id);
+                    setEditDraft(comment.body);
+                  }}
+                >
+                  <Pencil size={12.5} />
+                </button>
+                <button
+                  type="button"
+                  className="note-comment-action is-quiet is-delete press"
+                  aria-label={head && onlyOne ? "Delete this comment" : "Delete this reply"}
+                  title={head && onlyOne ? "Delete this comment" : "Delete this reply"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void remove(comment, onlyOne);
+                  }}
+                >
+                  <Trash2 size={12.5} />
+                </button>
+              </span>
             )}
           </p>
-          <p className="note-comment-body">{comment.body}</p>
+          {editing === comment.id ? (
+            <div className="note-comment-editor" onClick={(event) => event.stopPropagation()}>
+              <textarea
+                value={editDraft}
+                onChange={(event) => setEditDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setEditing(null);
+                    setEditDraft("");
+                  } else if (
+                    event.key === "Enter" &&
+                    (event.metaKey || event.ctrlKey) &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    void saveEdit(comment);
+                  }
+                }}
+                aria-label={head ? "Edit comment" : "Edit reply"}
+                autoFocus
+              />
+              <div className="note-comment-editor-actions">
+                <button
+                  type="button"
+                  className="note-comment-action press"
+                  onClick={() => {
+                    setEditing(null);
+                    setEditDraft("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="note-comment-send press"
+                  disabled={!editDraft.trim() || editDraft.trim() === comment.body}
+                  onClick={() => void saveEdit(comment)}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="note-comment-body">{comment.body}</p>
+          )}
         </div>
       </div>
     );

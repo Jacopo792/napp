@@ -36,6 +36,7 @@ import {
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
 import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
+import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
@@ -87,6 +88,12 @@ export interface RichTextEditorHandle {
    *  in one pass — a comment without the words it is about is a note nobody
    *  can place. */
   commentQuotes: () => Map<string, string>;
+  /** Collapse a passage selection when the comments UI no longer needs to
+   *  point at it. The comment mark remains; only the editor selection goes. */
+  clearCommentSelection: () => void;
+  /** Keep the anchor in the shared document so its quote remains available,
+   *  while letting resolved passages return to ordinary text visually. */
+  setCommentResolved: (threadId: string, resolved: boolean) => void;
   /** Take the anchor away — used when a thread is deleted, so no passage is
    *  left underlined with nothing behind it. */
   removeComment: (threadId: string) => void;
@@ -965,21 +972,35 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         return true;
       },
       commentQuotes() {
-        const quotes = new Map<string, string>();
-        if (!editor) return quotes;
-        editor.state.doc.descendants((node) => {
+        if (!editor) return new Map();
+        return commentQuotes(editor.state.doc);
+      },
+      clearCommentSelection() {
+        if (!editor) return;
+        const { to } = editor.state.selection;
+        editor.commands.setTextSelection(to);
+      },
+      setCommentResolved(threadId, resolved) {
+        if (!editor || readOnly) return;
+        const ranges: { from: number; to: number }[] = [];
+        editor.state.doc.descendants((node, pos) => {
           if (!node.isText) return true;
-          for (const mark of node.marks) {
-            if (mark.type.name !== "comment") continue;
-            const id = mark.attrs.threadId as string;
-            if (!id) continue;
-            /* A passage broken by a colour or a bold run is several text nodes
-               carrying the same thread; they are one quotation. */
-            quotes.set(id, (quotes.get(id) ?? "") + (node.text ?? ""));
+          const mark = node.marks.find(
+            (candidate) =>
+              candidate.type.name === "comment" && candidate.attrs.threadId === threadId,
+          );
+          if (mark && Boolean(mark.attrs.resolved) !== resolved) {
+            ranges.push({ from: pos, to: pos + node.nodeSize });
           }
           return true;
         });
-        return quotes;
+        if (ranges.length === 0) return;
+        const chain = editor.chain();
+        for (const range of ranges.reverse()) {
+          chain.setTextSelection(range).setMark("comment", { threadId, resolved });
+        }
+        chain.run();
+        editor.commands.setTextSelection(ranges[0].to);
       },
       removeComment(threadId) {
         if (!editor || readOnly) return;

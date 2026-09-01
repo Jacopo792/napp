@@ -658,6 +658,16 @@
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
+/* Resolution closes the visual annotation without deleting its structural
+   anchor: the panel can still quote and reopen the exact passage later. */
+.note-comment-anchor[data-comment-resolved="true"],
+.note-comment-anchor[data-comment-resolved="true"]:hover,
+.note-comment-anchor[data-comment-resolved="true"]:active {
+  border-bottom-color: transparent;
+  background: transparent;
+  cursor: text;
+}
+
 /* The underline was the only sign a conversation existed and it already had
    `cursor: pointer` — it simply did nothing when clicked, which is worse than
    no affordance at all. Now it opens the thread, and the solid rule says the
@@ -896,8 +906,13 @@
   opacity: 1;
 }
 
-.note-comment-action.is-quiet:hover {
+.note-comment-action.is-quiet.is-delete:hover {
   color: var(--danger);
+}
+
+.note-comment-own-actions {
+  display: inline-flex;
+  margin-left: auto;
 }
 
 /* The folded middle of a long conversation. */
@@ -967,6 +982,32 @@
 .note-comment.is-reply .note-comment-body {
   color: var(--ink-2);
   font-size: 12.5px;
+}
+
+.note-comment-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.note-comment-editor textarea {
+  width: 100%;
+  min-height: 5.2em;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+  padding: 7px 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.note-comment-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
 .note-comment-action {

@@ -492,6 +492,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     </>
   );
 
+  const syncCommentResolution = useCallback((threadId: string, resolved: boolean) => {
+    editorRef.current?.setCommentResolved(threadId, resolved);
+  }, []);
+
+  const closeComments = useCallback(() => {
+    /* A pending thread exists only as a mark in the document. Closing without
+       saying anything cancels it, so it must not leave an orphan highlight. */
+    if (pendingThread) editorRef.current?.removeComment(pendingThread);
+    editorRef.current?.clearCommentSelection();
+    setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+    setCommentsOpen(false);
+    setPendingThread(null);
+    setFocusThread(null);
+  }, [pendingThread]);
+
   if (!entry) {
     return (
       <section
@@ -613,8 +628,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               aria-pressed={commentsOpen}
               title="Comments"
               onClick={() => {
+                if (commentsOpen) {
+                  closeComments();
+                  return;
+                }
                 setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-                setCommentsOpen((open) => !open);
+                setCommentsOpen(true);
               }}
             >
               <MessageSquare size={16} />
@@ -848,15 +867,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             onPendingHandled={() => setPendingThread(null)}
             focusThread={focusThread}
             onFocusHandled={() => setFocusThread(null)}
-            onClose={() => {
-              setCommentsOpen(false);
-              setPendingThread(null);
-            }}
+            onClose={closeComments}
             onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
             onRemoveAnchor={(threadId) => {
               editorRef.current?.removeComment(threadId);
               setQuotes(editorRef.current?.commentQuotes() ?? new Map());
             }}
+            onResolveAnchor={syncCommentResolution}
           />
         )}
       </div>

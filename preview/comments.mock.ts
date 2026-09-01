@@ -88,3 +88,24 @@ export async function deleteComment(_session: AppSession, commentId: string): Pr
       rows.filter((c) => c.id !== commentId),
     );
 }
+
+export async function updateComment(
+  session: AppSession,
+  commentId: string,
+  body: string,
+): Promise<NoteComment> {
+  await sleep(100);
+  for (const [noteId, rows] of store) {
+    const found = rows.find(
+      (comment) => comment.id === commentId && comment.authorId === session.userId,
+    );
+    if (!found) continue;
+    const saved = { ...found, body: body.trim() };
+    store.set(
+      noteId,
+      rows.map((comment) => (comment.id === commentId ? saved : comment)),
+    );
+    return saved;
+  }
+  throw new Error("Only the author may edit this comment");
+}
