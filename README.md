@@ -2,7 +2,7 @@
 
 A private notes app built around one shared archive.
 
-![App preview](docs/app-preview.png)
+![App preview](docs/app-preview-v2.png)
 
 ## Why I built it
 
