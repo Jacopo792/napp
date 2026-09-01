@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
+import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
 
 export interface Command {
   id: string;
@@ -161,28 +162,9 @@ export function CommandPalette({
   );
 }
 
-/* ── The shortcut sheet ─────────────────────────────────────────────────────
-   Every shortcut the window answers to, in the groups they are used in. It is
-   a list and not a feature: the one thing it must be is true, so it is written
-   beside the handler it describes and read from the same place the palette
-   offers it. */
-
-const SHORTCUTS: { group: string; keys: string; what: string }[] = [
-  { group: "Anywhere", keys: "⌘K", what: "Search notes and commands" },
-  { group: "Anywhere", keys: "⌘N", what: "New note" },
-  { group: "Anywhere", keys: "⌘S", what: "Save now" },
-  { group: "Anywhere", keys: "?", what: "This list" },
-  { group: "Anywhere", keys: "Esc", what: "Leave focus mode" },
-  { group: "The list", keys: "/", what: "Jump to the search field" },
-  { group: "The list", keys: "N", what: "New note" },
-  { group: "The list", keys: "↑ ↓", what: "Move between notes" },
-  { group: "The list", keys: "J K", what: "Move between notes" },
-  { group: "The list", keys: "↵", what: "Open the title of the selected note" },
-  { group: "In a note", keys: "⌘F", what: "Find in this note" },
-  { group: "In a note", keys: "⌘K", what: "Link the selected words" },
-  { group: "In a note", keys: "Esc", what: "Leave the text" },
-];
-
+/* The `?` sheet: the same list Settings shows, over the window instead of
+   inside a section, because the question "what were the keys again" is asked
+   in the middle of doing something else. */
 export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   useEffect(() => {
     if (!open) return;
@@ -195,7 +177,7 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   if (!open) return null;
 
-  const groups = [...new Set(SHORTCUTS.map((entry) => entry.group))];
+  const groups = shortcutGroups();
   return (
     <div className="palette-layer is-shortcuts" role="presentation">
       <button type="button" aria-label="Close" className="settings-scrim" onClick={onClose} />

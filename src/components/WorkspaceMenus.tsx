@@ -54,6 +54,7 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
+import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
@@ -689,6 +690,7 @@ const SETTINGS_SECTIONS = [
       { id: "appearance", name: "Appearance", icon: <Palette size={15} /> },
       { id: "reading", name: "Reading", icon: <BookOpen size={15} /> },
       { id: "writing", name: "Writing", icon: <Type size={15} /> },
+      { id: "shortcuts", name: "Shortcuts", icon: <Keyboard size={15} /> },
     ],
   },
 ] as const;
@@ -1448,6 +1450,33 @@ export function SettingsPanel({
                     </button>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {/* The keys, where somebody looking for a setting will find them.
+                The same list the `?` sheet shows, from the same place — two
+                copies of this would be one copy and one lie. */}
+            {section === "shortcuts" && (
+              <section>
+                {shortcutGroups().map((group) => (
+                  <Fragment key={group}>
+                    <h3>{group}</h3>
+                    <div className="appearance-controls">
+                      {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
+                        <div key={`${entry.keys}-${entry.what}`} className="appearance-row">
+                          <span className="settings-label">
+                            <b>{entry.what}</b>
+                          </span>
+                          <kbd className="settings-key">{entry.keys}</kbd>
+                        </div>
+                      ))}
+                    </div>
+                  </Fragment>
+                ))}
+                <p className="profile-note">
+                  Nothing here is a preference — these are the keys the window already answers to.
+                  ⌘K also opens a list of everything it can do, by name.
+                </p>
               </section>
             )}
 

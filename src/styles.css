@@ -5934,3 +5934,29 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* A key, as a value in a settings row. */
+.settings-key {
+  flex-shrink: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0.4rem;
+  padding: 3px 8px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* A row that is a fact rather than a control has no explanation under its
+   name, so it does not need the height one takes. */
+.appearance-row:has(> .settings-key) {
+  min-height: 0;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.appearance-row .settings-label {
+  flex: 1;
+  min-width: 0;
+}
