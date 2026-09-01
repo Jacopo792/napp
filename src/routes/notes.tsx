@@ -110,6 +110,7 @@ import {
 import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
+import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
 import {
   groupEntries,
   createListPreferences,
@@ -1697,30 +1698,20 @@ function NotesPage() {
           const member = members.find((candidate) => candidate.userId === peer.userId);
           const name = member?.nickname || peer.name;
           const typing = presentMembers.get(peer.userId)?.typing === true;
+          const palette = presencePaletteFor(writingPreferences.presencePalette);
           return (
-            <span
+            <MemberPresenceCard
               key={peer.userId}
-              className={`note-reader has-custom-presence ${typing ? "is-typing" : ""}`}
-              style={
-                {
-                  "--presence-color": presencePaletteFor(writingPreferences.presencePalette).color,
-                  "--presence-wash": presencePaletteFor(writingPreferences.presencePalette).wash,
-                } as React.CSSProperties
-              }
-              title={typing ? `${name} is writing` : `${name} has this note open`}
-            >
-              <Avatar url={avatarUrls[peer.userId] ?? null} name={name} email="" compact />
-              {typing && <i className="note-reader-caret" aria-hidden="true" />}
-              {/* The face carries it. On this side of the toolbar the pill sits
-                  beside the save readout and two buttons, and a name there is
-                  squeezed to a two-pixel sliver long before it is legible — so
-                  the name is in the tooltip and in the line below, where they
-                  are readable, and the toolbar shows a portrait. */}
-              <span className="sr-only">
-                {name}
-                {typing ? " is writing" : " has this note open"}
-              </span>
-            </span>
+              avatarUrl={avatarUrls[peer.userId] ?? null}
+              name={name}
+              active={presentMembers.has(peer.userId)}
+              typing={typing}
+              noteJoinedAt={peer.joinedAt}
+              archiveJoinedAt={member?.joinedAt}
+              role={member?.role}
+              color={palette.color}
+              wash={palette.wash}
+            />
           );
         })}
       </span>
@@ -2003,9 +1994,10 @@ function NotesPage() {
 
   const noteActions = selected ? (
     <>
-      <span className="mr-2 flex w-[7.5rem] shrink-0 items-center overflow-hidden">
+      <span className="mr-1 flex shrink-0 items-center overflow-hidden">
         {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
       </span>
+      {noteReaders}
       <button
         type="button"
         aria-label="Find in note"
@@ -2173,7 +2165,6 @@ function NotesPage() {
                       </button>
                     }
                     headerActions={noteActions}
-                    readers={noteReaders}
                     synced={collaborative.ready}
                     session={session}
                     commentAuthors={commentAuthors}
@@ -2327,7 +2318,6 @@ function NotesPage() {
                 ) : null
               }
               headerActions={noteActions}
-              readers={noteReaders}
               synced={collaborative.ready}
               session={session}
               commentAuthors={commentAuthors}

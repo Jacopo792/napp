@@ -471,6 +471,9 @@
 }
 
 .note-title {
+  margin: 0;
+  border: 0;
+  padding: 0;
   font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
   line-height: 1.14;
   letter-spacing: -0.028em;
@@ -480,6 +483,15 @@
      as damage rather than typesetting. */
   hyphens: auto;
   hyphenate-limit-chars: 10 5 4;
+}
+
+/* `--read-measure` is expressed in `ch`, so its physical width follows the
+   weight of the element resolving it. The body uses the configured reading
+   weight; the title wrapper used 400 and ended a few pixels narrower, moving
+   both of its edges inward. Resolve the frontispiece at the same weight, then
+   let the title itself keep its display weight. */
+.note-frontispiece-measure {
+  font-weight: var(--read-weight);
 }
 
 .note-title-mobile {
@@ -1525,7 +1537,8 @@
    hairline, because somebody reading over your shoulder is not an event. */
 .note-readers {
   display: flex;
-  min-width: 0;
+  min-width: max-content;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
 }
@@ -1533,6 +1546,7 @@
 .note-reader {
   display: inline-flex;
   min-width: 0;
+  flex-shrink: 0;
   align-items: center;
   gap: 5px;
   border: 1px solid var(--rule-soft);
@@ -1565,6 +1579,119 @@
   border-color: color-mix(in srgb, var(--presence-color, var(--accent)) 60%, transparent);
   background: var(--presence-wash, var(--accent-wash));
   color: var(--presence-color, var(--accent-strong));
+}
+
+.member-presence {
+  display: inline-flex;
+  min-width: max-content;
+  flex-shrink: 0;
+}
+
+.member-presence > .note-reader {
+  cursor: pointer;
+}
+
+.member-presence > .note-reader[aria-expanded="true"] {
+  border-color: var(--presence-color);
+  box-shadow: 0 0 0 3px var(--presence-wash);
+}
+
+.member-presence-popover {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 10px);
+  right: 0;
+  display: flex;
+  width: 17.5rem;
+  max-width: calc(100vw - 1.5rem);
+  flex-direction: column;
+  padding: 14px;
+  color: var(--ink);
+  text-align: left;
+}
+
+.member-presence-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.member-presence-heading .avatar.is-large {
+  width: 46px;
+  height: 46px;
+  font-size: 16px;
+}
+
+.member-presence-heading > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.member-presence-heading strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-presence-heading small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+
+.member-presence-heading small i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+
+.member-presence-heading small.is-active {
+  color: var(--ok);
+}
+
+.member-presence-heading small.is-active i {
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.member-presence-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding-top: 13px;
+}
+
+.member-presence-facts > span {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--ink-3);
+}
+
+.member-presence-facts > span > span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.member-presence-facts small {
+  color: var(--ink-4);
+  font-size: 10.5px;
+}
+
+.member-presence-facts strong {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 560;
 }
 
 /* A caret, not three bouncing dots: this interface already tells you something

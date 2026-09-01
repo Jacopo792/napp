@@ -54,6 +54,7 @@ export function useCollaborationPeers(_provider: unknown, selfId: string | null)
               userId: PREVIEW_U2,
               name: "Partner",
               color: collaborationColor(PREVIEW_U2),
+              joinedAt: "2026-09-01T09:30:00.000Z",
             },
           ],
     [selfId],

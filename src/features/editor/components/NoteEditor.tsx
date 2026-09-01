@@ -55,8 +55,6 @@ interface Props {
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
   headerActions?: ReactNode;
-  /** Who else has this note open, built by the page from the roster. */
-  readers?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
   onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
@@ -68,14 +66,7 @@ interface Props {
    the cluster takes a row of its own, the way the phone already gives it one.
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
-const TOOLBAR_ROOM = 500;
-/* A reader pill is a portrait and a caret — about 44px of it. It is the same
-   kind of claim on the row as the format cluster, so it is added to the budget
-   rather than left to overflow the column it sits in, which it did, straight
-   across the save readout. It was 170 while the pill carried a name and had a
-   whole column to itself on the left; on the right it shares the column with
-   the readout and two buttons, and the name went with the move. */
-const READER_ROOM = 70;
+const TOOLBAR_ROOM = 550;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -110,7 +101,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     resolveFile,
     navigationAction,
     headerActions,
-    readers,
     onContextMenu,
     onUpdatePageProperties,
     collaboration = null,
@@ -411,9 +401,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   /* Inline while there is room for it; on its own row otherwise. */
   const inlineToolbar =
-    !mobile &&
-    Boolean(toolbar) &&
-    (shellWidth === null || shellWidth >= TOOLBAR_ROOM + (readers ? READER_ROOM : 0));
+    !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
 
   const fileInputs = (
     <>
@@ -541,15 +529,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             save readout, and no width of readout could have avoided it. */}
         {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
 
-        {/* Who else is in the note sits with the other things this toolbar
-            says about the note's state — "Live", the time of the last write —
-            rather than beside "Editing", which is about you. It used to
-            displace that label for room; on this side it needs nobody's seat,
-            so the mode label can always show. */}
         <span
           className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
         >
-          {readers}
           {session && commentAuthors && (
             <button
               type="button"
@@ -655,7 +637,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           />
 
           <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
-            <div className="measure">
+            <div className="measure note-frontispiece-measure">
               <div className="font-sans text-base">
                 <PageIdentity
                   photo={entry.note.photo}

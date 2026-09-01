@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 
-export function useDismiss(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
+export function useDismiss<T extends HTMLElement = HTMLDivElement>(
+  open: boolean,
+  close: () => void,
+) {
+  const ref = useRef<T>(null);
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: MouseEvent) => {

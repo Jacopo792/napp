@@ -18,7 +18,7 @@
  * server, on every message. Losing the network keeps the mounted editor usable
  * and reconnect sends its Yjs updates normally. */
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { BODY_FRAGMENT, collaborationColor, TITLE_TEXT } from "@/features/editor/lib/ydoc";
@@ -39,6 +39,8 @@ export interface Peer {
   userId: string;
   name: string;
   color: string;
+  /** When this browser first saw the peer on the current note. */
+  joinedAt: string;
 }
 
 export interface CollaborativeNote {
@@ -190,6 +192,7 @@ export function useCollaborationPeers(
   selfId: string | null,
 ): Peer[] {
   const [peers, setPeers] = useState<Peer[]>([]);
+  const joinedAt = useRef(new Map<string, string>());
 
   useEffect(() => {
     const awareness = provider?.awareness;
@@ -197,23 +200,34 @@ export function useCollaborationPeers(
       setPeers([]);
       return;
     }
+    const peerJoinedAt = joinedAt.current;
     const read = () => {
       const seen = new Map<string, Peer>();
       for (const [clientId, state] of awareness.getStates()) {
         const user = (state as { user?: Partial<Peer> }).user;
         if (!user?.userId || user.userId === selfId) continue;
+        if (!peerJoinedAt.has(user.userId)) {
+          peerJoinedAt.set(user.userId, new Date().toISOString());
+        }
         seen.set(user.userId, {
           clientId,
           userId: user.userId,
           name: user.name || "Someone",
           color: user.color || collaborationColor(user.userId),
+          joinedAt: peerJoinedAt.get(user.userId)!,
         });
+      }
+      for (const userId of peerJoinedAt.keys()) {
+        if (!seen.has(userId)) peerJoinedAt.delete(userId);
       }
       setPeers([...seen.values()]);
     };
     read();
     awareness.on("change", read);
-    return () => awareness.off("change", read);
+    return () => {
+      awareness.off("change", read);
+      peerJoinedAt.clear();
+    };
   }, [provider, selfId]);
 
   return peers;
