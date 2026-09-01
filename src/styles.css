@@ -2503,7 +2503,19 @@
   text-transform: uppercase;
 }
 
-.settings-nav-group:first-child {
+/* `:first-of-type`, not `:first-child`, and the difference is a bug that took
+   three attempts to find. The travelling marker is an absolutely positioned
+   span rendered as the list's first child — but only once it has been measured,
+   because until then there is nothing to place. So the first render had the
+   heading as `:first-child` at 4px of padding, the marker was measured against
+   that, and rendering it took `:first-child` away from the heading: 14px of
+   padding, everything below it ten pixels lower, and the marker left behind
+   sitting ten pixels above the row it belongs to.
+
+   The marker moved the thing it was measuring. `:first-of-type` counts only the
+   `p` siblings, so the heading's padding no longer depends on whether the
+   marker exists. */
+.settings-nav-group:first-of-type {
   padding-top: 4px;
 }
 

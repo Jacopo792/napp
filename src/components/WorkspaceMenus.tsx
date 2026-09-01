@@ -836,9 +836,13 @@ export function SettingsPanel({
     };
     measure();
 
+    /* `border-box`, because the change that started all of this was a change of
+       padding — and a content box does not notice one, which is why this
+       observer sat there watching the exact element that moved and reported
+       nothing. */
     const observer = new ResizeObserver(measure);
-    observer.observe(list);
-    for (const child of list.children) observer.observe(child);
+    observer.observe(list, { box: "border-box" });
+    for (const child of list.children) observer.observe(child, { box: "border-box" });
     return () => observer.disconnect();
   }, [open, section]);
 
