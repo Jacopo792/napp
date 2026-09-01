@@ -2361,7 +2361,6 @@
   padding: 4px 26px 24px;
 }
 
-
 /* ── A face, or the letters standing in for one ─────────────────────────── */
 .avatar {
   position: relative;
@@ -4232,7 +4231,6 @@
   .settings-specimen p {
     transition: none;
   }
-
 
   /* The cover chips still appear on hover — that is the affordance, not the
      motion. Only the slide goes. */
