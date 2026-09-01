@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { JSONContent } from "@tiptap/core";
+import { withoutInvisibleDocumentEnding } from "./content.ts";
 
 /* ── The draft store ─────────────────────────────────────────────────────────
    The text being typed does not live in React state, and this is the whole
@@ -44,38 +45,6 @@ interface Slot {
 
 const slots = new Map<string, Slot>();
 const pending = new Set<string>();
-
-/** A trailing empty paragraph or space is what the editor leaves after a writer
- * adds something at the end and deletes the visible characters again. Neither
- * has readable content, so it must not turn an otherwise restored note into a
- * new edit. Keep the one empty paragraph that represents a genuinely blank
- * note. */
-function withoutInvisibleDocumentEnding(content: JSONContent): JSONContent {
-  if (content.type !== "doc" || !Array.isArray(content.content)) return content;
-  const normalized = structuredClone(content);
-  const nodes = normalized.content;
-  if (!nodes) return normalized;
-  trimFinalTextWhitespace(normalized);
-  while (nodes.length > 1 && isEmptyParagraph(nodes.at(-1))) {
-    nodes.pop();
-  }
-  return normalized;
-}
-
-function trimFinalTextWhitespace(node: JSONContent): void {
-  const last = node.content?.at(-1);
-  if (last) return trimFinalTextWhitespace(last);
-  if (node.type === "text" && typeof node.text === "string")
-    node.text = node.text.replace(/\s+$/, "");
-}
-
-function isEmptyParagraph(node: JSONContent | undefined): boolean {
-  return (
-    node?.type === "paragraph" &&
-    (!node.content?.length ||
-      node.content.every((child) => child.type === "text" && !(child.text ?? "")))
-  );
-}
 
 /** ProseMirror may emit the same node with object keys in a different order
  * after an edit (for example `text, marks` becomes `marks, text`). Object-key

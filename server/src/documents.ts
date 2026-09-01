@@ -6,7 +6,11 @@
  * theirs to open. The service role persists; it never authorises. */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Y from "yjs";
-import { noteDocument, richTextToPlainText } from "../../src/features/editor/lib/content.ts";
+import {
+  noteDocument,
+  richTextToPlainText,
+  withoutInvisibleDocumentEnding,
+} from "../../src/features/editor/lib/content.ts";
 import {
   DOCUMENT_FORMAT_VERSION,
   projectDocument,
@@ -83,18 +87,32 @@ async function readDocument(service: SupabaseClient, noteId: string): Promise<Ui
 }
 
 /** One real edit. The binary and the projections every list, search, preview,
- *  export reads from it are written in the same transaction. */
+ *  export reads from it are written in the same transaction.
+ *
+ *  The projection is normalised first, and that is what decides whether the
+ *  note counts as edited at all. `save_note_document` restamps `updated_at`
+ *  only when a projection differs from the stored row, so an invisible
+ *  difference is a visible one: type a word at the end of a note and delete it
+ *  again and the editor leaves a trailing empty paragraph behind, which is a
+ *  structurally different jsonb and used to move the note to the top of the
+ *  list with nothing to show for it. Deleting text that was already there
+ *  still changes the projection, and still counts — that is the whole
+ *  distinction.
+ *
+ *  The binary is stored unnormalised, because it is the document's history and
+ *  not a projection of it. */
 export async function storeDocument(
   service: SupabaseClient,
   noteId: string,
   document: Y.Doc,
 ): Promise<void> {
-  const { title, content } = projectDocument(document);
+  const projected = projectDocument(document);
+  const content = withoutInvisibleDocumentEnding(projected.content);
   const saved = await service.rpc("save_note_document", {
     target_note_id: noteId,
     document_state_base64: Buffer.from(Y.encodeStateAsUpdate(document)).toString("base64"),
     document_format_version: DOCUMENT_FORMAT_VERSION,
-    projected_title: title,
+    projected_title: projected.title.trimEnd(),
     projected_body: richTextToPlainText(content),
     projected_content: content,
   });

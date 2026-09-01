@@ -206,6 +206,56 @@ describe("the collaboration server", { skip }, () => {
     assert.equal((seeded.data as unknown[]).length, 1);
   });
 
+  it("does not restamp a note whose words come back to where they were", async () => {
+    const noteId = await newNote("Steady", "Now it works");
+    const { doc, provider } = connect(noteId, editor.token);
+    await until(() => provider.isSynced);
+    await sleep(400);
+
+    const before = await asService(local)
+      .from("notes")
+      .select("updated_at, version, body")
+      .eq("id", noteId)
+      .single();
+
+    /* What a writer leaves behind by typing at the end of a note and deleting
+       it again: a trailing space, and the empty paragraph the return made.
+       Neither reads, so neither may move the note up the list. */
+    const body = doc.getXmlFragment("default");
+    const trailing = new Y.XmlElement("paragraph");
+    doc.transact(() => body.push([trailing]));
+    await sleep(400);
+    doc.transact(() => body.delete(body.length - 1, 1));
+    await sleep(600);
+    provider.destroy();
+    await sleep(400);
+
+    const idle = await asService(local)
+      .from("notes")
+      .select("updated_at, version, body")
+      .eq("id", noteId)
+      .single();
+    assert.deepEqual(idle.data, before.data, "an invisible ending restamped the note");
+
+    /* And the other half of the distinction: words that were already there,
+       taken away, are an edit. */
+    const second = connect(noteId, editor.token);
+    await until(() => second.provider.isSynced);
+    const text = second.doc.getXmlFragment("default");
+    second.doc.transact(() => text.delete(0, text.length));
+    await sleep(600);
+    second.provider.destroy();
+    await sleep(400);
+
+    const edited = await asService(local)
+      .from("notes")
+      .select("updated_at, version, body")
+      .eq("id", noteId)
+      .single();
+    assert.notEqual(edited.data?.updated_at, before.data?.updated_at);
+    assert.equal(edited.data?.body, "");
+  });
+
   it("converges two people typing in the same note, and projects the result", async () => {
     const noteId = await newNote("Shared", "start");
     const mine = connect(noteId, editor.token);
