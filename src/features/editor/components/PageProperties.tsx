@@ -201,8 +201,12 @@ export function PageIdentity({
 }) {
   const url = useStoredImage(photo?.objectId ?? null, resolveImage);
 
-  if (!photo && (!canEdit || cover)) return null;
-
+  /* Always rendered, and always the same height. This row used to disappear
+     whenever it had nothing to show — no photo, and either a cover already set
+     or no right to add one — so giving a note a picture pushed the date, the
+     title and the whole body down by the height of the row that had just
+     appeared. The slot is reserved instead: the photo arrives into space it
+     already occupied, and nothing below it moves. */
   return (
     <div className="note-page-identity">
       {photo && <span className="note-photo is-page">{url && <img src={url} alt="" />}</span>}

@@ -290,3 +290,9 @@ export async function setArchiveMemberRole(
   const member = MEMBERS.find((item) => item.userId === userId);
   if (member) member.role = role;
 }
+
+/** The fixture archive is the only one there is, so leaving it is a no-op that
+ *  still takes a moment — enough for the caller's confirmation to settle. */
+export async function leaveArchive(_session: AppSession): Promise<void> {
+  await sleep(160);
+}

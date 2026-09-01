@@ -20,8 +20,6 @@ import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
-import { BotanicalFlower } from "@/components/BotanicalFlowers";
-import { flowerFor } from "@/lib/botanical";
 import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
@@ -61,11 +59,13 @@ interface Props {
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
 const TOOLBAR_ROOM = 500;
-/* A reader pill is a portrait, a name and a caret. It is the same kind of claim
-   on the row as the format cluster, so it is added to the budget rather than
-   left to overflow the column it sits in — which it did, straight across the
-   save readout. */
-const READER_ROOM = 170;
+/* A reader pill is a portrait and a caret — about 44px of it. It is the same
+   kind of claim on the row as the format cluster, so it is added to the budget
+   rather than left to overflow the column it sits in, which it did, straight
+   across the save readout. It was 170 while the pill carried a name and had a
+   whole column to itself on the left; on the right it shares the column with
+   the readout and two buttons, and the name went with the move. */
+const READER_ROOM = 70;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -479,13 +479,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       >
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
-          {!mobile && !readers && (
+          {!mobile && (
             <span className="label truncate text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
           )}
-          {/* The other person displaces the mode label rather than crowding
-              it: "Editing" is what you already know, and who else is in the
-              note with you is not. */}
-          {readers}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the
@@ -495,9 +491,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             save readout, and no width of readout could have avoided it. */}
         {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
 
+        {/* Who else is in the note sits with the other things this toolbar
+            says about the note's state — "Live", the time of the last write —
+            rather than beside "Editing", which is about you. It used to
+            displace that label for room; on this side it needs nobody's seat,
+            so the mode label can always show. */}
         <span
           className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
         >
+          {readers}
           {headerActions}
         </span>
       </div>
@@ -651,12 +653,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               collaboration={collaboration}
             />
           )}
+
+          {/* The title paints from the draft store the moment you click, and
+              the body cannot: it waits for the server to authorise and sync.
+              That asymmetry is what made the wait read as broken rather than
+              slow — a title over nothing at all. Three bars on the measure the
+              text is about to use say the same thing honestly, and the
+              toolbar's "Connecting" says why. */}
+          {!collaboration && (
+            <div className="note-body-waiting" aria-hidden="true">
+              <div className="skeleton" style={{ width: "92%" }} />
+              <div className="skeleton" style={{ width: "78%" }} />
+              <div className="skeleton" style={{ width: "45%" }} />
+            </div>
+          )}
           {/* A tailpiece, in the run-out the text already leaves below itself.
               A sibling of the editor and never a node inside it: anything in
               the document would be editable, would serialise into Markdown, and
-              would sync to the other reader as content. The note keeps its own
-              flower, because the seed is its id. */}
-          <BotanicalFlower flower={flowerFor(entry.note.id)} className="note-tailpiece" />
+              would sync to the other reader as content.
+
+              It was a botanical plate, which is a 200×260 drawing asked to be
+              58px wide at 16% opacity — a smudge that redrew itself petal by
+              petal on every note switch. A rule and a lozenge say the same
+              thing, "the note ends here", and say it legibly. */}
+          {collaboration && <div className="note-tailpiece" aria-hidden="true" />}
         </div>
       </div>
     </section>

@@ -191,6 +191,16 @@ The collaboration server is part of the authorization boundary:
   whether this is Trash. Never `&& collaborative.ready`: a sleeping Render
   instance then takes away the page's own controls, including **Add cover**,
   which writes to Postgres and never needed the socket.
+- **One socket for the session, not one per note.** `collab.ts` holds a single
+  module-level `HocuspocusProviderWebsocket` and gives it to every
+  `HocuspocusProvider`; each note then costs an auth and a sync message on an
+  open connection instead of a TCP handshake, a TLS handshake and a token round
+  trip. Passing `url` instead makes the provider build and destroy its own
+  socket per note, which is what made opening a note take seconds — and it let
+  the free Render instance fall asleep mid-session. A supplied socket means
+  `manageSocket` is false, so the provider must `attach()` itself and its
+  `destroy()` leaves the socket alone. Keep `name` and `publishPresence` out of
+  that effect's deps: a nickname arriving is not a reason to reconnect.
 - Redis/Valkey carries Yjs and awareness updates between instances. It is not
   persistence, and the app must still work with one instance when REDIS_URL is
   absent.

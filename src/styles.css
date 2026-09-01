@@ -607,24 +607,75 @@
   }
 }
 
-/* The tailpiece under a note. It lives in the 40vh of run-out `.rich-text-content`
-   leaves below the last line, pulled up into it rather than stacked after it —
-   otherwise you would scroll a third of a screen past the end of your own note
-   to find it. Never interactive: the padding beneath belongs to the editor, and
-   clicking it should still put the caret at the end of the text. */
+/* The body's placeholder while the note is still syncing. Laid out on the same
+   measure and the same line rhythm as the text that replaces it, so nothing
+   shifts sideways or jumps a line when the words arrive. */
+.note-body-waiting {
+  display: flex;
+  width: 100%;
+  max-width: var(--read-measure);
+  flex-direction: column;
+  margin-inline: auto;
+  gap: 0.85rem;
+  padding-top: 0.3rem;
+}
+
+.note-body-waiting .skeleton {
+  height: 0.72em;
+}
+
+/* The tailpiece under a note: a hairline that fades out at both ends, broken in
+   the middle for a small lozenge. The printer's mark for "this is the end of
+   the text", which is the whole of what is being said here.
+
+   It lives in the 40vh of run-out `.rich-text-content` leaves below the last
+   line, pulled up into it rather than stacked after it — otherwise you would
+   scroll a third of a screen past the end of your own note to find it. Never
+   interactive: the padding beneath belongs to the editor, and clicking it
+   should still put the caret at the end of the text.
+
+   No animation. The drawing that was here restaged itself on every note
+   switch, and a thing that moves each time you change page is a thing you
+   end up watching instead of reading. */
 .note-tailpiece {
   position: relative;
   display: block;
-  height: 76px;
+  width: min(180px, 55%);
+  height: 1px;
   margin: -32vh auto 0;
-  color: var(--ink-4);
-  opacity: 0.16;
+  /* A fade, not a colour field: one ink, varying only in alpha. */
+  background: linear-gradient(90deg, transparent, var(--rule) 28%, var(--rule) 72%, transparent);
   pointer-events: none;
+}
+
+/* The gap the mark sits in, painted in the page's own colour so the rule stops
+   short of the lozenge rather than running under it. */
+.note-tailpiece::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  background: var(--page);
+}
+
+.note-tailpiece::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--ink-4);
+  opacity: 0.55;
 }
 
 @media (max-width: 700px) {
   .note-tailpiece {
-    height: 58px;
+    width: min(140px, 60%);
   }
 }
 
@@ -1213,9 +1264,15 @@
 
 /* ── Who else is in this note ────────────────────────────────────────────────
    The pill is the shape identity already has in this interface, so the other
-   person arrives as one: their face, their name, and a caret when they are
-   actually typing. It takes the place of the "Editing" label rather than
-   sitting beside it — the mode is what you already know, and this is not.
+   person arrives as one: their face, and a caret when they are actually
+   typing. It sits on the right, with the other things this toolbar says about
+   the state of the note — "Live", the time of the last write — rather than on
+   the left, which is about you.
+
+   No name on it. Sharing that side with the save readout and two buttons
+   leaves the name about fifty pixels short of legible, and a name crushed to a
+   sliver is worse than a portrait that was never going to carry one. The name
+   is on the tooltip and in the caret's own line.
 
    Typing is the only state that takes the accent. Present-but-still is a
    hairline, because somebody reading over your shoulder is not an event. */
@@ -1230,10 +1287,10 @@
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   border: 1px solid var(--rule-soft);
   border-radius: var(--radius-pill);
-  padding: 3px 10px 3px 3px;
+  padding: 3px;
   color: var(--ink-2);
   font-family: var(--font-sans);
   font-size: 12.5px;
@@ -1249,10 +1306,6 @@
   height: 22px;
   font-size: 8px;
   box-shadow: inset 0 0 0 1px var(--glass-highlight);
-}
-
-.note-reader-name {
-  max-width: 8rem;
 }
 
 .note-reader.has-custom-presence {
@@ -4873,9 +4926,13 @@
   height: 40px;
 }
 
+/* A fixed height, never `min-height`: this row is the note photo's reserved
+   slot, and it holds that height whether or not there is a photo in it. The
+   photo is 40px, so a picture exactly fills the space the empty slot already
+   took and the title below it never moves. */
 .note-page-identity {
   display: flex;
-  min-height: 34px;
+  height: 40px;
   align-items: center;
   gap: 7px;
   margin-bottom: 7px;

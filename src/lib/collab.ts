@@ -14,7 +14,7 @@
  * to open an editor on their own: the collaboration server must authorise and
  * sync the note first. Losing the network after that keeps the mounted editor
  * usable and reconnect sends its Yjs updates normally. */
-import { HocuspocusProvider } from "@hocuspocus/provider";
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
 import { useEffect, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
@@ -58,6 +58,27 @@ const CLOSED: CollaborativeNote = {
 
 export { collaborationColor };
 
+/* One socket for the whole session, not one per note.
+ *
+ * A `HocuspocusProvider` given a `url` builds and owns its own WebSocket, and
+ * destroys it again when the note closes — so every note switch paid a fresh
+ * TCP handshake, a TLS handshake and a token round trip before it could even
+ * ask for the document. Hocuspocus already multiplexes documents by name over
+ * one socket; this is the same arrangement `server/src/integration.test.ts`
+ * connects with.
+ *
+ * Holding it open has a second effect worth as much as the first: the free
+ * Render instance sleeps after fifteen idle minutes and takes about fifty
+ * seconds to wake, and an open socket is never idle. The cold start is paid
+ * once at sign-in instead of at whichever note switch happens to fall after a
+ * quarter hour of reading. */
+let shared: HocuspocusProviderWebsocket | null = null;
+
+function sharedSocket(): HocuspocusProviderWebsocket {
+  shared ??= new HocuspocusProviderWebsocket({ url: COLLAB_URL });
+  return shared;
+}
+
 export function useCollaborativeNote(
   noteId: string | null,
   identity: CollaborationIdentity | null,
@@ -81,7 +102,7 @@ export function useCollaborativeNote(
     const doc = new Y.Doc();
     const local = new IndexeddbPersistence(`napp:yjs:${archiveId}:${userId}:${noteId}`, doc);
     const provider = new HocuspocusProvider({
-      url: COLLAB_URL,
+      websocketProvider: sharedSocket(),
       name: noteId,
       document: doc,
       /* A function, not a string: the socket reconnects long after the access
@@ -95,20 +116,10 @@ export function useCollaborativeNote(
         update({ ready: false, refusal: reason || "This note is not available to you" }),
     });
 
-    /* The local caret only. What other people see is written by the server in
-       `beforeHandleAwareness`, from the identity it read for itself — nothing a
-       browser sends about who it is, is believed. */
-    if (publishPresence) {
-      provider.awareness?.setLocalStateField("user", {
-        userId,
-        name: name || "Someone",
-        color: collaborationColor(userId),
-      });
-    } else {
-      /* Presence is mutual. Do not leave a listen-only local awareness state
-         that Tiptap can serialise as a cursor after the preference is off. */
-      provider.awareness?.setLocalState(null);
-    }
+    /* Supplying our own websocket means the provider does not attach itself —
+       `manageSocket` is only true when it built the socket. For the same
+       reason the `provider.destroy()` below leaves the shared socket alone. */
+    provider.attach();
 
     setState({ doc, provider, ready: false, connection: "connecting", refusal: "" });
 
@@ -118,7 +129,32 @@ export function useCollaborativeNote(
       void local.destroy();
       doc.destroy();
     };
-  }, [noteId, userId, archiveId, name, publishPresence]);
+  }, [noteId, userId, archiveId]);
+
+  /* Who you are is a separate question from which note is open, and it arrives
+     later: `name` is read from the profile after sign-in and `publishPresence`
+     is a preference that flips at any time. Both used to sit in the effect
+     above, where either one landing mid-note destroyed the connection and
+     redid the whole handshake for a caret colour. */
+  const provider = state.provider;
+  useEffect(() => {
+    const awareness = provider?.awareness;
+    if (!awareness) return;
+    /* The local caret only. What other people see is written by the server in
+       `beforeHandleAwareness`, from the identity it read for itself — nothing a
+       browser sends about who it is, is believed. */
+    if (publishPresence && userId) {
+      awareness.setLocalStateField("user", {
+        userId,
+        name: name || "Someone",
+        color: collaborationColor(userId),
+      });
+    } else {
+      /* Presence is mutual. Do not leave a listen-only local awareness state
+         that Tiptap can serialise as a cursor after the preference is off. */
+      awareness.setLocalState(null);
+    }
+  }, [provider, publishPresence, userId, name]);
 
   return state;
 }

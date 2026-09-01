@@ -1703,9 +1703,16 @@ function NotesPage() {
               title={typing ? `${name} is writing` : `${name} has this note open`}
             >
               <Avatar url={avatarUrls[peer.userId] ?? null} name={name} email="" compact />
-              <span className="note-reader-name truncate">{name}</span>
               {typing && <i className="note-reader-caret" aria-hidden="true" />}
-              <span className="sr-only">{typing ? " is writing" : " has this note open"}</span>
+              {/* The face carries it. On this side of the toolbar the pill sits
+                  beside the save readout and two buttons, and a name there is
+                  squeezed to a two-pixel sliver long before it is legible — so
+                  the name is in the tooltip and in the line below, where they
+                  are readable, and the toolbar shows a portrait. */}
+              <span className="sr-only">
+                {name}
+                {typing ? " is writing" : " has this note open"}
+              </span>
             </span>
           );
         })}
