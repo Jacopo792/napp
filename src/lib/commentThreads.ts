@@ -60,27 +60,3 @@ export function threadsOf(comments: NoteComment[]): CommentThread[] {
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
-
-/** The panel in the order the note reads.
- *
- * Threads arrive grouped by when their first remark was written, which is the
- * order a chat has and not the order a document has: a note commented at the
- * top yesterday and near the end this morning listed the end first, and the
- * reader had to match each quote back to a passage by eye to know where they
- * were. `quoteOrder` is the thread ids in the order their marks appear in the
- * document — `commentQuotes()` builds it by walking the document, so it is
- * document order for free and there is nothing to keep in step.
- *
- * A thread whose passage has been deleted has no place in the text, so it
- * keeps its place in time and goes last rather than being dropped: the remarks
- * are still somebody's, and the panel already says the passage is gone.
- */
-export function inDocumentOrder(
-  threads: CommentThread[],
-  quoteOrder: Iterable<string>,
-): CommentThread[] {
-  const place = new Map<string, number>();
-  for (const threadId of quoteOrder) if (!place.has(threadId)) place.set(threadId, place.size);
-  const at = (thread: CommentThread) => place.get(thread.threadId) ?? Number.MAX_SAFE_INTEGER;
-  return [...threads].sort((a, b) => at(a) - at(b) || a.createdAt.localeCompare(b.createdAt));
-}

@@ -1,32 +1,35 @@
-/* The conversation about a note, beside the passage it is about.
+/* The conversation about a note.
  *
  * A thread is a passage in the document plus the remarks about it. The passage
  * is a mark in the Yjs document and the remarks are rows in `note_comments`, so
  * this panel is the one place the two halves are put back together: the quote
  * comes from the live document, the words from the archive.
  *
- * ── Why the cards are anchored ──────────────────────────────────────────────
- * They used to be a list. A list beside a document is two documents: the reader
- * had a column of quotes on the right and a column of underlines on the left
- * and had to match them up by eye, every time. So each card now sits at the
- * height of the passage it belongs to, and the matching is done by the layout
- * instead of by the reader.
+ * ── A column that starts at the top ─────────────────────────────────────────
+ * The cards were briefly pinned to the exact height of their passages, and it
+ * was wrong for a reason that only shows once you use it: a card level with its
+ * passage is off screen whenever the passage is, so opening the panel on a note
+ * you are reading from the top showed an empty column, and a thread on a
+ * passage near the foot of the pane was cut off by the panel's bottom edge with
+ * nothing to scroll — the column had no scrolling of its own, by construction.
+ * Every position in it was decided by where the document happened to be.
  *
- * The cards live in a layer that is moved with the editor's own scrolling
- * rather than in a second scroller kept in step with the first — one
- * `translateY` per frame, set on the element and never through React, because
- * the note list and the whole page hang off this component's parent and a
- * scroll position in state would re-render all of it sixty times a second.
+ * So the column starts at the top and grows downward, in the order the passages
+ * appear in the note. The first thread is always the first thing you see, the
+ * panel scrolls like a panel, and `scrollIntoView` works because there is
+ * something to scroll.
  *
- * Anchoring needs room. Below the width where the panel stops being a column
- * and starts covering the page, aligning to text nobody can see is worse than
- * not aligning, so it falls back to the plain list it always was.
+ * What that costs is the eye-line between a card and its passage, and that is
+ * paid back a different way: the open card lights its own passage in the text,
+ * and clicking a passage opens and scrolls to its card. The link is stated
+ * rather than implied by alignment, and unlike alignment it survives the
+ * passage being off screen.
  *
  * It loads for itself. Comments are not part of the catalogue and must not be
  * on the way to opening a note — the panel is closed until somebody asks for
  * it, and the note is readable long before this has finished. */
 import { Check, ChevronDown, MessageSquare, RotateCcw, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
 import {
   addComment,
@@ -36,7 +39,8 @@ import {
   threadsOf,
   type NoteComment,
 } from "@/lib/comments";
-import { inDocumentOrder, type CommentThread } from "@/lib/commentThreads";
+import type { CommentThread } from "@/lib/commentThreads";
+import { collaborationColor } from "@/features/editor/lib/ydoc";
 import { formatStamp } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
 
@@ -60,19 +64,11 @@ interface Props {
   /** A thread arrived at by clicking its passage in the note. */
   focusThread: string | null;
   onFocusHandled: () => void;
-  /** Whether there is room to stand the cards beside their passages. */
-  anchored: boolean;
-  /** The editor's scrolling element, so the layer can follow it. */
-  scroller: HTMLElement | null;
-  /** Where each thread's passage sits, in the scroller's content space. */
-  measureAnchors: () => Map<string, number>;
   onClose: () => void;
   onReveal: (threadId: string) => void;
   onRemoveAnchor: (threadId: string) => void;
 }
 
-/** Air between two cards that would otherwise overlap. */
-const CARD_GAP = 10;
 /** A thread longer than this is folded in the middle. Somebody arriving at a
  *  conversation wants how it opened and how it stands, not the middle of it. */
 const REPLIES_SHOWN = 2;
@@ -87,9 +83,6 @@ export function NoteComments({
   onPendingHandled,
   focusThread,
   onFocusHandled,
-  anchored,
-  scroller,
-  measureAnchors,
   onClose,
   onReveal,
   onRemoveAnchor,
@@ -103,9 +96,7 @@ export function NoteComments({
    *  underline in the text, and whether the composer is more than a line. */
   const [active, setActive] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [anchors, setAnchors] = useState<Map<string, number>>(() => new Map());
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const layerRef = useRef<HTMLDivElement>(null);
   const threadRefs = useRef(new Map<string, HTMLElement>());
 
   useEffect(() => {
@@ -134,51 +125,6 @@ export function NoteComments({
     }
   }, [pendingThread]);
 
-  /* Where the passages are. Re-measured when the text reflows for any reason —
-     an edit, a picture finishing loading, the pane being resized — because a
-     card anchored to where a paragraph used to be is worse than a card in a
-     list, which at least never claimed to point anywhere. */
-  const remeasure = useCallback(() => setAnchors(measureAnchors()), [measureAnchors]);
-
-  useEffect(() => {
-    if (!anchored || !scroller) return;
-    remeasure();
-    const observer = new ResizeObserver(remeasure);
-    observer.observe(scroller);
-    const content = scroller.querySelector(".rich-text-content");
-    if (content) observer.observe(content);
-    return () => observer.disconnect();
-  }, [anchored, scroller, remeasure, comments, quotes]);
-
-  /* The layer follows the editor's scrolling. Imperatively and on a frame,
-     never through state: this component's parent owns the whole page. */
-  useEffect(() => {
-    if (!anchored || !scroller) return;
-    let frame = 0;
-    const sync = () => {
-      frame = 0;
-      const layer = layerRef.current;
-      const field = layer?.parentElement;
-      if (!layer || !field) return;
-      /* The layer starts below this panel's header and the text starts at the
-         top of the pane, so the two coordinate systems are offset by however
-         tall the header happens to be — and it is not a constant: the failure
-         banner appears between them. Measured each time rather than assumed,
-         which costs one rect on a frame that is already reading one. */
-      const offset = scroller.getBoundingClientRect().top - field.getBoundingClientRect().top;
-      layer.style.transform = `translateY(${offset - scroller.scrollTop}px)`;
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(sync);
-    };
-    sync();
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [anchored, scroller]);
-
   const say = useCallback(
     async (threadId: string) => {
       const body = (draft[threadId] ?? "").trim();
@@ -196,12 +142,16 @@ export function NoteComments({
     [draft, session, noteId, pendingThread, onPendingHandled],
   );
 
-  /* `quotes` is built by walking the document, so its key order is the order
-     the passages appear in the note — which is the order the panel reads in. */
-  const threads = useMemo(
-    () => inDocumentOrder(threadsOf(comments), quotes.keys()),
-    [comments, quotes],
-  );
+  /* Oldest first, so the column is a log: the thread you opened first stays at
+     the top and each new one is added underneath. `threadsOf` already sorts
+     that way.
+
+     Not document order, which this briefly was. Ordering by where the passage
+     sits reads well until you go back and remark on something earlier — and
+     then the remark you just made appears *above* the one before it, in a
+     column you were watching grow downward. A conversation is a sequence of
+     things said, and the panel is read as one. */
+  const threads = useMemo(() => threadsOf(comments), [comments]);
   const pendingIsNew = pendingThread && !threads.some((t) => t.threadId === pendingThread);
   const shown = threads.filter((thread) => showResolved || !thread.resolved);
   const resolvedCount = threads.filter((thread) => thread.resolved).length;
@@ -221,29 +171,12 @@ export function NoteComments({
     setActive(focusThread);
     const row = threadRefs.current.get(focusThread);
     if (!row) return;
-    if (!anchored) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
     row.classList.add("is-arrived");
     const timer = window.setTimeout(() => row.classList.remove("is-arrived"), 1400);
     onFocusHandled();
     return () => window.clearTimeout(timer);
-  }, [focusThread, comments, loading, showResolved, anchored, onFocusHandled]);
-
-  /* Standing the cards beside their passages, without letting them overlap.
-     One sweep down the column: each card wants to be level with its own
-     passage and takes the first position at or below that which is still free.
-     Done here rather than in the render because it needs each card's measured
-     height, and a card's height is not known until it has been laid out. */
-  useLayoutEffect(() => {
-    const layer = layerRef.current;
-    if (!anchored || !layer) return;
-    let next = 0;
-    for (const card of layer.querySelectorAll<HTMLElement>("[data-thread]")) {
-      const wanted = anchors.get(card.dataset.thread ?? "") ?? next;
-      const top = Math.max(wanted, next);
-      card.style.top = `${top}px`;
-      next = top + card.offsetHeight + CARD_GAP;
-    }
-  });
+  }, [focusThread, comments, loading, showResolved, onFocusHandled]);
 
   async function toggleResolved(threadId: string, resolved: boolean) {
     try {
@@ -279,10 +212,18 @@ export function NoteComments({
           onChange={(event) => setDraft((c) => ({ ...c, [threadId]: event.target.value }))}
           onFocus={() => setActive(threadId)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              void say(threadId);
-            }
+            /* Enter sends. A remark is a line or two said to one other person,
+               so the common case is the one that should cost one key — ⌘↵ made
+               the short reply the awkward one. Shift+Enter is the way to a new
+               line, and ⌘↵ still works for the hands that already learnt it.
+
+               `isComposing` is the guard that matters: while an input method
+               is mid-word, Enter is how the *word* is accepted, and sending
+               there would post a half-typed one. */
+            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+            if (event.shiftKey) return;
+            event.preventDefault();
+            void say(threadId);
           }}
           placeholder={placeholder}
           rows={open ? 2 : 1}
@@ -290,7 +231,9 @@ export function NoteComments({
         />
         {open && (
           <div className="note-comment-composer-actions">
-            <kbd className="readout">⌘↵</kbd>
+            <kbd className="readout" title="Shift + Enter for a new line">
+              ⇧↵
+            </kbd>
             <button
               type="button"
               className="note-comment-send press"
@@ -311,14 +254,25 @@ export function NoteComments({
   function remark(comment: NoteComment, head: boolean, onlyOne: boolean) {
     const author = authors.get(comment.authorId);
     const name = author?.name || "Someone";
+    const mine = comment.authorId === session.userId;
+    /* The same colour this person's caret has in the text. Two people writing
+       to each other need to be told apart at a glance and one grey name above
+       another does not do it — but a second colour system would be worse than
+       none, so this is the one the note already uses. */
+    const colour = collaborationColor(comment.authorId);
     return (
-      <div key={comment.id} className={`note-comment ${head ? "is-head" : "is-reply"}`}>
+      <div
+        key={comment.id}
+        className={`note-comment ${head ? "is-head" : "is-reply"} ${mine ? "is-mine" : ""}`}
+        style={{ "--author": colour } as React.CSSProperties}
+      >
         <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
         <div className="note-comment-said">
           <p className="note-comment-signature">
             <span className="note-comment-name truncate">{name}</span>
+            {mine && <span className="note-comment-you">you</span>}
             <span className="readout note-comment-stamp">{formatStamp(comment.createdAt)}</span>
-            {comment.authorId === session.userId && (
+            {mine && (
               <button
                 type="button"
                 className="note-comment-action is-quiet press"
@@ -363,14 +317,12 @@ export function NoteComments({
             Standing beside the passage it is a repetition of what the reader is
             already looking at, so it shrinks to a label and stops being a
             paragraph of its own. */}
-        {!anchored && (
-          <p className="note-comment-quote">
-            {quotes.get(thread.threadId) || "The passage this was about is gone"}
-          </p>
-        )}
-        {anchored && !quotes.has(thread.threadId) && (
-          <p className="note-comment-quote is-orphan">The passage this was about is gone</p>
-        )}
+        {/* The passage, as the thread's title. It is how you know what is being
+            discussed without hunting for the underline, and clicking the card
+            lights that underline in the text. */}
+        <p className={`note-comment-quote ${quotes.has(thread.threadId) ? "" : "is-orphan"}`}>
+          {quotes.get(thread.threadId) || "The passage this was about is gone"}
+        </p>
 
         {remark(head, true, thread.comments.length === 1)}
 
@@ -443,11 +395,21 @@ export function NoteComments({
     </>
   );
 
+  /* The other half of the link. A card knows which passage it belongs to and
+     says so by standing beside it; the passage has to be able to say it back,
+     or the reader is still guessing which underline the open card came from.
+     Written as one rule aimed at that thread's mark rather than by putting a
+     class on the span: the spans are ProseMirror's to render, and a class this
+     component wrote there would be dropped on its next redraw. The id comes
+     from `crypto.randomUUID`, and is checked against that shape before it is
+     put in a stylesheet. */
+  const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
+
   return (
-    <aside
-      className={`note-comments ${anchored ? "is-anchored" : ""}`}
-      aria-label="Comments on this note"
-    >
+    <aside className="note-comments" aria-label="Comments on this note">
+      {lit && (
+        <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
+      )}
       <header className="note-comments-header">
         <MessageSquare size={15} />
         <span className="note-comments-title">
@@ -479,15 +441,7 @@ export function NoteComments({
         </p>
       )}
 
-      {anchored ? (
-        <div className="note-comments-field">
-          <div ref={layerRef} className="note-comments-layer">
-            {body}
-          </div>
-        </div>
-      ) : (
-        <div className="note-comments-scroll">{body}</div>
-      )}
+      <div className="note-comments-scroll">{body}</div>
     </aside>
   );
 }

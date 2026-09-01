@@ -718,40 +718,6 @@
   }
 }
 
-/* ── The margin ──────────────────────────────────────────────────────────────
-   Where the cards stand beside their passages. The field clips; the layer
-   inside it is moved by `translateY` as the editor scrolls, so there is one
-   scrollbar on the page and not two pretending to be one. The layer is as tall
-   as it needs to be and is never scrolled itself — its own position is the
-   whole mechanism. */
-.note-comments-field {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.note-comments-layer {
-  position: absolute;
-  inset: 0 10px auto 10px;
-  will-change: transform;
-}
-
-/* Absolute, because a card's place is decided by where its passage is and not
-   by the card before it. The sweep in `useLayoutEffect` writes `top`. */
-.note-comments-layer .note-comment-thread {
-  position: absolute;
-  right: 0;
-  left: 0;
-}
-
-.note-comments-layer .note-comments-empty {
-  position: absolute;
-  right: 0;
-  left: 0;
-  top: 0;
-}
-
 .note-comments-header {
   display: flex;
   align-items: center;
@@ -866,6 +832,14 @@
   color: var(--ink);
 }
 
+/* A thread whose passage has been deleted has nothing to point at, so it stops
+   pretending to: no accent rule, and the sentence says what happened. */
+.note-comment-quote.is-orphan {
+  border-left-color: var(--rule);
+  color: var(--ink-4);
+  font-style: italic;
+}
+
 /* A remark is a face and what was said beside it. The one that opened the
    thread is at full weight; a reply is indented under a rail and set a shade
    quieter, so the shape of the card says which is which before a word of it is
@@ -945,13 +919,36 @@
   color: var(--ink-2);
 }
 
+/* Who said it. Two people writing to each other have to be told apart at a
+   glance, and one grey name above another does not do it. The colour is the
+   one this person's caret already has in the text — a second colour system
+   would be worse than none. */
 .note-comment-name {
   flex: 1;
   min-width: 0;
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 560;
-  color: var(--ink-2);
+  font-weight: 620;
+  color: var(--author, var(--ink-2));
+}
+
+.note-comment > .avatar.is-compact {
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--author, var(--rule)) 70%, transparent);
+}
+
+/* Your own remarks are said so once, in words, rather than by a different
+   colour — the colours already mean "which person", and a second meaning on
+   the same channel is how a legend becomes necessary. */
+.note-comment-you {
+  border-radius: 999px;
+  background: var(--paper-2);
+  padding: 0 5px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  font-weight: 640;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .note-comment-stamp {
