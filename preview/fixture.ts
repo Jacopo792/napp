@@ -24,13 +24,12 @@ function iso(daysAgo: number, hour = 11): string {
   return d.toISOString();
 }
 
-type Seed = { title: string; body: string; days: number; folder: string | null; tags: string[] };
+type Seed = { title: string; body: string; days: number; folder: string | null };
 
 const SEEDS: Seed[] = [
   {
     title: "MAPPA 5: I CONGLOMERATI COREANI (e perché nessuno li ha copiati)",
     folder: F_STUDIO,
-    tags: ["t-mappe"],
     days: 0,
     body: `Il punto non è la dimensione. È **la struttura di controllo incrociato**, che
 permette a una famiglia di governare trenta società con il 3% del capitale.
@@ -61,7 +60,6 @@ problema con la banca al centro invece che con la famiglia.`,
   {
     title: "La filiera dei chip, dal sabbia alla fotolitografia",
     folder: F_STUDIO,
-    tags: ["t-mappe", "t-daRivedere"],
     days: 0,
     body: `Cinque stadi, e in ognuno c'è un collo di bottiglia diverso.
 
@@ -90,7 +88,6 @@ Dove il valore torna a chi ha il rapporto col cliente finale.`,
   {
     title: "Aforismi",
     folder: F_APPUNTI,
-    tags: [],
     days: 1,
     body: `Raccolta aperta. Nessun ordine.
 
@@ -103,7 +100,6 @@ Dove il valore torna a chi ha il rapporto col cliente finale.`,
   {
     title: "Discord web hooks — payload minimo che funziona",
     folder: F_TECNICA,
-    tags: ["t-codice"],
     days: 2,
     body: `Il messaggio più corto che Discord accetta senza lamentarsi:
 
@@ -125,7 +121,6 @@ Vedi anche [la documentazione ufficiale](https://discord.com/developers/docs).`,
   {
     title: "Parole da memorizzare",
     folder: F_APPUNTI,
-    tags: ["t-daRivedere"],
     days: 3,
     body: `**ancipite** — a due punte, ambiguo
 **cesura** — interruzione netta, in metrica e altrove
@@ -136,7 +131,6 @@ Vedi anche [la documentazione ufficiale](https://discord.com/developers/docs).`,
   {
     title: "Distillazione del petrolio: perché le frazioni escono in quell'ordine",
     folder: F_STUDIO,
-    tags: [],
     days: 5,
     body: `La colonna non separa per "tipo" ma per **temperatura di ebollizione**, e
 l'ordine delle frazioni è semplicemente l'ordine crescente della lunghezza
@@ -156,7 +150,6 @@ serve per staccare le molecole. Tutto qui.`,
   {
     title: "Elettricità — appunti sparsi da sistemare",
     folder: null,
-    tags: ["t-daRivedere"],
     days: 8,
     body: `Tensione è differenza di potenziale, non "quantità". La quantità è la carica.
 
@@ -168,7 +161,6 @@ Da chiarire: perché il neutro è a potenziale di terra ma non è la terra.`,
   {
     title: "Abbozzi",
     folder: null,
-    tags: [],
     days: 14,
     body: `Cose iniziate e mai finite. Non cancellare.
 
@@ -178,7 +170,6 @@ Da chiarire: perché il neutro è a potenziale di terra ma non è la terra.`,
   {
     title: "BHAGAVAD GĪTĀ — il problema del secondo capitolo",
     folder: F_STUDIO,
-    tags: [],
     days: 21,
     body: `Arjuna non rifiuta di combattere per codardia. Rifiuta perché ha capito
 qualcosa di vero: che la vittoria costa esattamente ciò che vuole difendere.
@@ -190,7 +181,6 @@ agisce sia lo stesso sé che raccoglie il risultato.`,
   {
     title: "Nota senza titolo di prova",
     folder: null,
-    tags: [],
     days: 40,
     body: "",
   },
@@ -204,15 +194,9 @@ export const FIXTURE_META: Meta = {
     { id: F_APPUNTI, name: "Appunti" },
     { id: F_TECNICA, name: "Tecnica" },
   ],
-  tags: [
-    { id: "t-mappe", name: "mappe", color: "blue" },
-    { id: "t-daRivedere", name: "da rivedere", color: "amber" },
-    { id: "t-codice", name: "codice", color: "emerald" },
-  ],
   notes: SEEDS.map((s, i) => ({
     id: `n${i}`,
     folderId: s.folder,
-    tagIds: s.tags,
   })),
 };
 

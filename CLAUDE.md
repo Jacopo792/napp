@@ -19,10 +19,24 @@ a policy reads it in exactly one place: `private.archived_note_visible()`, which
 withholds an archived note from the other members when its owner has set
 `profiles.hide_archived`. Everywhere else it stays a label, not a permission.
 
-Notes, folder names, tag names and files are ordinary columns and Storage
-objects. Nothing is encrypted; see _The retired encrypted format_ below —
-including the archived notes above, which are hidden from a member, never from
-the database.
+Notes, folder names and files are ordinary columns and Storage objects. Nothing
+is encrypted; see _The retired encrypted format_ below — including the archived
+notes above, which are hidden from a member, never from the database.
+
+## Tags
+
+There is no tag feature and there has not been one for a while, but the client
+kept paying for it: `loadArchive` selected `tags` and `note_tags` in the same
+`Promise.all` as everything else — two of seven queries on every archive open —
+`sync.ts` subscribed to both tables so every insert into either woke a full
+reload, and `persistMetaDiff` carried an upsert, a delete and an insert for
+links that were always empty. Creating a note fired a redundant `note_tags`
+DELETE, because a note with no row in `before` counts as "retagged".
+
+All of that is gone from `src/`. **The Postgres side is untouched**: `tags`,
+`note_tags`, their policies and their rows all still stand, which is what makes
+this a deletion and not a migration. Re-adding the feature means re-adding the
+reads. Do not re-propose the tag _interface_ — it was removed on purpose.
 
 ## The shelf and the waiting room
 
@@ -432,6 +446,20 @@ variables are documented in `.env.migration.example`. Never expose
   clients still see nothing. Its Realtime check flakes about one run in three
   (the server reports SUBSCRIBED slightly before the filter is in place). A
   failure there alone, with everything above it passing, means run it again.
+
+## What the sign-in page is allowed to import
+
+`src/lib/session.ts` is the login screen's entire back end and imports
+`./supabaseClient` and `./noteStore` — never `./supabase`. `supabase.ts` reaches
+`content.ts` for the note projection, `content.ts` builds the Tiptap schema, and
+Rollup then puts all of ProseMirror in the chunk both routes share: the sign-in
+form was downloading 224 kB gzipped of rich-text editor before you could type a
+password. It is 59 kB now, and the editor moved into the lazy `/notes` chunk
+where it belongs.
+
+The in-memory note cache (`noteCache`, `resetArchiveCache`, `adoptArchiveCache`)
+lives in `noteStore.ts` for that reason and no other — `session.ts` has to clear
+it on sign-out, and that one import was the whole rope. Keep it there.
 
 ## Interface notes worth knowing
 

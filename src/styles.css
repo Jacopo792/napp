@@ -320,11 +320,6 @@
     box-shadow: 0 8px 26px oklch(0 0 0 / 0.5);
   }
 
-  .mobile-editor-meta > .readout:nth-of-type(1),
-  .mobile-editor-meta > .readout:nth-of-type(4) {
-    display: none;
-  }
-
   .mobile-editor .popover {
     width: min(19rem, calc(100vw - 1.5rem));
     max-height: min(26rem, calc(100dvh - 7rem));
@@ -2928,18 +2923,6 @@
   box-shadow: 0 0 0 2px var(--surface);
 }
 
-.writing-choice-row select {
-  max-width: 10.5rem;
-  margin-left: auto;
-  border: 1px solid var(--rule);
-  border-radius: 0.55rem;
-  background: var(--surface);
-  padding: 7px 28px 7px 10px;
-  color: var(--ink-2);
-  font: inherit;
-  font-size: 12.5px;
-}
-
 .leave-archive-card {
   display: flex;
   min-height: 64px;
@@ -3025,10 +3008,6 @@
 
 .settings-reset {
   margin-top: 12px;
-}
-
-.account-lock-row {
-  margin-top: 18px;
 }
 
 @media (max-width: 900px) {
@@ -3327,20 +3306,6 @@
 
 .settings-field input {
   grid-column: 1 / -1;
-}
-
-/* ── Labelled rows ───────────────────────────────────────────────────────── */
-.settings-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.settings-row small {
-  color: var(--ink-4);
-  font-size: 12.5px;
-  line-height: 1.55;
 }
 
 /* One scale for the whole dialog, since the faces are the platform's and size,

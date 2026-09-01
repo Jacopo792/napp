@@ -115,3 +115,30 @@ export async function clearNoteStore(): Promise<void> {
     /* Nothing to clear, or nothing that can be. */
   }
 }
+
+/* ── The same cache, in memory ───────────────────────────────────────────────
+   Realtime is only a wake-up signal, so every event must not rebuild the
+   entire archive. `version` is the cache key and changes on every write.
+
+   Reusing the cached Note object also preserves its identity across snapshots,
+   which is what lets the WeakMap in lib/derived.ts keep the preview and search
+   text it already computed for an unchanged note.
+
+   It lives here rather than beside `loadArchive` for a reason that is not
+   tidiness: `session.ts` has to clear it, and reaching into `supabase.ts` for
+   that pulled the whole Tiptap schema — `supabase.ts` imports `content.ts` —
+   into the chunk the sign-in page loads. A login form was downloading
+   ProseMirror. ────────────────────────────────────────────────────────────── */
+let cacheArchiveId: string | null = null;
+export const noteCache = new Map<string, CachedNote>();
+
+export function resetArchiveCache(): void {
+  cacheArchiveId = null;
+  noteCache.clear();
+}
+
+export function adoptArchiveCache(archiveId: string): void {
+  if (cacheArchiveId === archiveId) return;
+  resetArchiveCache();
+  cacheArchiveId = archiveId;
+}

@@ -1,12 +1,17 @@
-import { resetArchiveCache, supabase } from "./supabase";
-import { clearNoteStore } from "./noteStore";
+/* From `supabaseClient` and `noteStore` rather than from `supabase.ts`, and
+   deliberately: `supabase.ts` imports the Tiptap schema through `content.ts`,
+   so importing it here put all of ProseMirror in the chunk the sign-in page
+   loads before you can type a password. This module is the login screen's
+   entire back end and must stay editor-free. */
+import { supabase } from "./supabaseClient";
+import { clearNoteStore, resetArchiveCache } from "./noteStore";
 
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
    a plaintext column and every stored object carries its real content type, so
    there is no longer a key to unwrap, nothing to decrypt on read, and — the
    part that mattered — no raw archive key sitting in sessionStorage for a
    format nothing writes any more. `scripts/` keeps the tools that performed the
-   conversion, and `src/lib/crypto.ts` exists for them alone. */
+   conversion, and `scripts/lib/crypto.ts` exists for them alone. */
 
 export interface AppSession {
   userId: string;

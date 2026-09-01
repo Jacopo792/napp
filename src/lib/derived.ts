@@ -3,7 +3,7 @@
    extensionless relative import. `allowImportingTsExtensions` is already on, so
    the extension costs nothing and is what makes this file testable. */
 import { countWords, previewOf } from "./format.ts";
-import type { Note, Folder, Meta, NoteMeta, Tag } from "./types.ts";
+import type { Note, Folder, Meta, NoteMeta } from "./types.ts";
 
 /* ── Derived reading, computed once ──────────────────────────────────────────
    Building a preview and counting words are both full passes over
@@ -42,14 +42,13 @@ export function derivedOf(note: Note): Derived {
 
 /* ── Metadata, indexed ───────────────────────────────────────────────────────
    `meta.notes.find(...)` reads well and costs nothing once. It was being called
-   inside loops in five places — the folder filter, the tag filter, each row's
-   tags, each row's pin state, and the rail's counts — which turns a list render
-   into O(notes × metadata). Same trick: the index is cached on the Meta object,
-   which is likewise replaced rather than mutated. ────────────────────────── */
+   inside loops — the folder filter, each row's pin state, and the rail's counts
+   — which turns a list render into O(notes × metadata). Same trick: the index
+   is cached on the Meta object, which is likewise replaced rather than
+   mutated. ──────────────────────────────────────────────────────────────── */
 
 export interface MetaIndex {
   byNote: Map<string, NoteMeta>;
-  byTag: Map<string, Tag>;
   byFolder: Map<string, Folder>;
 }
 
@@ -60,7 +59,6 @@ export function indexOf(meta: Meta): MetaIndex {
   if (!index) {
     index = {
       byNote: new Map(meta.notes.map((note) => [note.id, note])),
-      byTag: new Map(meta.tags.map((tag) => [tag.id, tag])),
       byFolder: new Map(meta.folders.map((folder) => [folder.id, folder])),
     };
     metas.set(meta, index);

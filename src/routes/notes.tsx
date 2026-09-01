@@ -16,7 +16,6 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
-  Settings as SettingsIcon,
   SquarePen,
   Trash2,
   X,
@@ -182,14 +181,13 @@ function loadPaneWidth(key: string, fallback: number, min: number, max: number):
   }
 }
 
-/* Enough of a fingerprint to notice that folders, tags or note placement moved,
+/* Enough of a fingerprint to notice that folders or note placement moved,
    without serialising every note's metadata on every realtime wake-up. */
 function metaShape(meta: Meta): string {
-  let shape = `${meta.partnerName ?? ""}|${meta.folders.length}|${meta.tags.length}`;
+  let shape = `${meta.partnerName ?? ""}|${meta.folders.length}`;
   for (const folder of meta.folders) shape += `|${folder.id}:${folder.name}`;
-  for (const tag of meta.tags) shape += `|${tag.id}:${tag.name}:${tag.color}`;
   for (const note of meta.notes) {
-    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.archivedAt ?? ""}:${note.tagIds.join(",")}`;
+    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.archivedAt ?? ""}`;
   }
   return shape;
 }
@@ -216,7 +214,7 @@ function NotesPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ALL);
   const [query, setQuery] = useState("");
 
-  /** One scope of folders, tags and note placement per member. */
+  /** One scope of folders and note placement per member. */
   const [metas, setMetas] = useState<Record<string, Meta>>({});
 
   const [dirty, setDirty] = useState(false);
@@ -897,7 +895,7 @@ function NotesPage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    const entry = await createNote(s, note, { id: note.id, folderId: null, tagIds: [] });
+    const entry = await createNote(s, note, { id: note.id, folderId: null });
     entriesRef.current = [entry, ...entriesRef.current];
     setEntries(entriesRef.current);
   }
@@ -1180,7 +1178,7 @@ function NotesPage() {
           ? prev.notes.map((note) =>
               note.id === noteId ? { ...note, pinned: !note.pinned } : note,
             )
-          : [...prev.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
+          : [...prev.notes, { id: noteId, folderId: null, pinned: true }];
         return { ...prev, notes };
       });
     },
@@ -1281,7 +1279,7 @@ function NotesPage() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          const metadata: NoteMeta = { id: note.id, folderId: null, tagIds: [] };
+          const metadata: NoteMeta = { id: note.id, folderId: null };
           entriesRef.current = [await createNote(s, note, metadata), ...entriesRef.current];
           added.push(metadata);
         }
@@ -1361,7 +1359,7 @@ function NotesPage() {
         }
       }
 
-      const metadata: NoteMeta = { id: note.id, folderId, tagIds: [] };
+      const metadata: NoteMeta = { id: note.id, folderId };
       const entry = await createNote(s, note, metadata);
       entriesRef.current = [entry, ...entriesRef.current];
       setEntries(entriesRef.current);
@@ -1410,7 +1408,6 @@ function NotesPage() {
               {
                 id: entry.note.id,
                 folderId: null,
-                tagIds: [],
                 trashedAt: new Date().toISOString(),
               },
             ];
@@ -1435,7 +1432,7 @@ function NotesPage() {
         const existing = prev.notes.find((note) => note.id === entry.note.id);
         const notes: NoteMeta[] = existing
           ? prev.notes.map((note) => (note.id === entry.note.id ? { ...note, archivedAt } : note))
-          : [...prev.notes, { id: entry.note.id, folderId: null, tagIds: [], archivedAt }];
+          : [...prev.notes, { id: entry.note.id, folderId: null, archivedAt }];
         return { ...prev, notes };
       });
 
@@ -1647,7 +1644,7 @@ function NotesPage() {
         ...prev,
         notes: existing
           ? prev.notes.map((n) => (n.id === noteId ? { ...n, folderId } : n))
-          : [...prev.notes, { id: noteId, folderId, tagIds: [] }],
+          : [...prev.notes, { id: noteId, folderId }],
       };
     });
   }
@@ -1705,7 +1702,7 @@ function NotesPage() {
         ...prev,
         notes: existing
           ? prev.notes.map((note) => (note.id === noteId ? { ...note, folderId } : note))
-          : [...prev.notes, { id: noteId, folderId, tagIds: [] }],
+          : [...prev.notes, { id: noteId, folderId }],
       };
     });
     if (selectedFolderId !== ALL) setSelectedFolderId(folderId ?? ALL);
@@ -1931,6 +1928,32 @@ function NotesPage() {
     [members, avatarUrls],
   );
 
+  /* Which notes reached this one. Found by walking the Tiptap JSON of the
+     notes already in memory rather than by asking Postgres: a link is a mark
+     inside the document, so there is no column to index and no query to write,
+     and the documents are here anyway because the list is drawn from them.
+
+     Memoised, and that is not an optimisation to take back later. It is the
+     only full-depth walk over every document in the archive, and it sat
+     unmemoised in the render body of a component that re-renders on every
+     keystroke — the typing flag, the save readout and the presence roster all
+     land here. The projection only changes when a save lands, so the deps say
+     so and the scan runs then. */
+  const backlinks = useMemo(
+    () =>
+      selectedId
+        ? ownedEntries
+            .filter(
+              (entry) =>
+                entry.note.id !== selectedId &&
+                !trashedIds.has(entry.note.id) &&
+                linksTo(entry.note.content, selectedId),
+            )
+            .map((entry) => ({ id: entry.note.id, title: entry.note.title }))
+        : [],
+    [ownedEntries, trashedIds, selectedId],
+  );
+
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, handleLock);
@@ -1997,27 +2020,11 @@ function NotesPage() {
     .filter((note): note is Note => Boolean(note))
     .map((note) => ({ id: note.id, title: note.title }));
 
-  /* Which notes `[[` can reach, and which notes reached this one.
-     The backlinks are found by walking the Tiptap JSON of the notes already in
-     memory rather than by asking Postgres: a link is a mark inside the
-     document, so there is no column to index and no query to write, and the
-     documents are here anyway because the list is drawn from them. It is a
-     scan over one archive's notes on the render that opens one — not per
-     keystroke, since the projection only changes when a save lands. */
+  /* Which notes `[[` can reach. The backlinks that answer the other half of
+     the question are computed above, in a memo. */
   const linkableNotes = ownedEntries
     .filter((entry) => !trashedIds.has(entry.note.id))
     .map((entry) => ({ id: entry.note.id, title: entry.note.title }));
-
-  const backlinks = selectedId
-    ? ownedEntries
-        .filter(
-          (entry) =>
-            entry.note.id !== selectedId &&
-            !trashedIds.has(entry.note.id) &&
-            linksTo(entry.note.content, selectedId),
-        )
-        .map((entry) => ({ id: entry.note.id, title: entry.note.title }))
-    : [];
 
   /* Nothing may be beside itself. And nothing in the trash: `canEdit` is
      computed for the note in the primary column, so a trashed note opened
@@ -2483,7 +2490,7 @@ function NotesPage() {
                       className="toolbar-button press shrink-0"
                       onClick={() => setSettingsOpen(true)}
                     >
-                      <SettingsIcon size={18} />
+                      <Settings size={18} />
                     </button>
                     <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
                   </div>
@@ -2720,7 +2727,7 @@ function NotesPage() {
                       aria-label="Settings"
                       className="toolbar-button press"
                     >
-                      <SettingsIcon size={16} />
+                      <Settings size={16} />
                     </button>
                   </>
                 ) : null

@@ -217,10 +217,6 @@ export function downloadImage(session: AppSession, imageId: string): Promise<Blo
   return downloadObject(session, imageId, "image/webp");
 }
 
-export function resetArchiveCache(): void {
-  /* The preview archive is a module singleton; there is nothing to invalidate. */
-}
-
 export async function loadProfile(_session: AppSession): Promise<Profile> {
   await sleep(120);
   return { ...profile };

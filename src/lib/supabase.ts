@@ -1,9 +1,15 @@
 import type { NoteEntry } from "./entries";
 import type { AppSession } from "./session";
-import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
+import type { Folder, Meta, Note, NoteMeta } from "./types";
 import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
-import { readCachedNotes, writeCachedNotes, type CachedNote as StoredNote } from "./noteStore";
+import {
+  adoptArchiveCache,
+  noteCache,
+  readCachedNotes,
+  resetArchiveCache,
+  writeCachedNotes,
+} from "./noteStore";
 import {
   noteDocument,
   richTextToPlainText,
@@ -56,42 +62,6 @@ interface FolderRow {
   parent_id: string | null;
 }
 
-interface TagRow {
-  id: string;
-  owner_id: string | null;
-  name: string | null;
-  color: Tag["color"];
-}
-
-interface NoteTagRow {
-  note_id: string;
-  tag_id: string;
-}
-
-/* ── The note cache ──────────────────────────────────────────────────────────
-   Realtime is only a wake-up signal, so every event must not rebuild the
-   entire archive. `version` is the cache key and changes on every write.
-
-   Reusing the cached Note object also preserves its identity across snapshots,
-   which is what lets the WeakMap in lib/derived.ts keep the preview and search
-   text it already computed for an unchanged note. ─────────────────────────── */
-
-type CachedNote = StoredNote;
-
-let cacheArchiveId: string | null = null;
-const noteCache = new Map<string, CachedNote>();
-
-export function resetArchiveCache(): void {
-  cacheArchiveId = null;
-  noteCache.clear();
-}
-
-function adoptArchiveCache(archiveId: string): void {
-  if (cacheArchiveId === archiveId) return;
-  resetArchiveCache();
-  cacheArchiveId = archiveId;
-}
-
 /** Who is in this archive, in the order they joined. `nickname` is empty until
  *  the member sets one; the interface, not this module, decides what to call
  *  them then. */
@@ -121,8 +91,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const [
     notesResult,
     foldersResult,
-    tagsResult,
-    noteTagsResult,
     membersResult,
     profilesResult,
     archiveResult,
@@ -142,8 +110,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .select("id, owner_id, name, parent_id, position")
       .eq("archive_id", archiveId)
       .order("position"),
-    supabase.from("tags").select("id, owner_id, name, color").eq("archive_id", archiveId),
-    supabase.from("note_tags").select("note_id, tag_id").eq("archive_id", archiveId),
     supabase
       .from("archive_members")
       .select("user_id, created_at, role")
@@ -158,14 +124,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
      written has a moved version and is declared stale below regardless. */
   if (persisted)
     for (const [id, entry] of persisted) if (!noteCache.has(id)) noteCache.set(id, entry);
-  for (const result of [
-    notesResult,
-    foldersResult,
-    tagsResult,
-    noteTagsResult,
-    membersResult,
-    archiveResult,
-  ]) {
+  for (const result of [notesResult, foldersResult, membersResult, archiveResult]) {
     fail(result.error);
   }
 
@@ -208,8 +167,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
 
   const noteRows = (notesResult.data ?? []) as NoteRow[];
   const folderRows = (foldersResult.data ?? []) as FolderRow[];
-  const tagRows = (tagsResult.data ?? []) as TagRow[];
-  const noteTagRows = (noteTagsResult.data ?? []) as NoteTagRow[];
 
   // Only rows whose version moved need their payload at all.
   const staleIds = noteRows
@@ -319,30 +276,11 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   );
   for (const item of plainFolders) (foldersByOwner[item.ownerId] ??= []).push(item.folder);
 
-  const tagsByOwner: Record<string, Tag[]> = {};
-  const plainTags = await Promise.all(
-    tagRows.map(async (row) => {
-      const name = row.name;
-      return {
-        ownerId: scopeOf(row.owner_id),
-        tag: { id: row.id, name: name ?? "", color: row.color } satisfies Tag,
-      };
-    }),
-  );
-  for (const item of plainTags) (tagsByOwner[item.ownerId] ??= []).push(item.tag);
-
-  const tagsByNote = new Map<string, string[]>();
-  for (const relation of noteTagRows) {
-    const current = tagsByNote.get(relation.note_id) ?? [];
-    current.push(relation.tag_id);
-    tagsByNote.set(relation.note_id, current);
-  }
   const notesByOwner: Record<string, NoteMeta[]> = {};
   for (const row of noteRows) {
     (notesByOwner[scopeOf(row.owner_id)] ??= []).push({
       id: row.id,
       folderId: row.folder_id,
-      tagIds: tagsByNote.get(row.id) ?? [],
       pinned: row.pinned || undefined,
       trashedAt: row.trashed_at ?? undefined,
       archivedAt: row.archived_at ?? undefined,
@@ -358,7 +296,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const scopes = new Set([
     ...members.map((member) => member.userId),
     ...Object.keys(foldersByOwner),
-    ...Object.keys(tagsByOwner),
     ...Object.keys(notesByOwner),
   ]);
   for (const scope of scopes) {
@@ -366,7 +303,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       v: 1,
       partnerName: scope === fallbackOwner ? partnerName : undefined,
       folders: foldersByOwner[scope] ?? [],
-      tags: tagsByOwner[scope] ?? [],
       notes: notesByOwner[scope] ?? [],
     };
   }
@@ -545,16 +481,15 @@ async function all(work: PromiseLike<{ error: { message: string } | null }>[]): 
   for (const result of await Promise.all(work)) fail(result.error);
 }
 
-/* Renaming three folders used to be three sequential round trips, and retagging
-   a note two more — every await waiting on the one before it although nothing
-   depended on it. The work is now grouped: rows of a kind go up in one batched
-   call, independent calls run together, and the only sequencing left is the one
-   the foreign keys actually require —
+/* Renaming three folders used to be three sequential round trips — every await
+   waiting on the one before it although nothing depended on it. The work is now
+   grouped: rows of a kind go up in one batched call, independent calls run
+   together, and the only sequencing left is the one the foreign keys actually
+   require —
 
-     1. folders and tags exist,      before
-     2. notes point at them and old tag links go,   before
-     3. new tag links are written,   before
-     4. emptied folders and tags are deleted. */
+     1. folders exist,               before
+     2. notes point at them,         before
+     3. emptied folders are deleted. */
 export async function persistMetaDiff(
   session: AppSession,
   ownerId: string,
@@ -568,8 +503,6 @@ export async function persistMetaDiff(
   const afterFolders = new Map(
     after.folders.map((folder, position) => [folder.id, { folder, position }]),
   );
-  const beforeTags = new Map(before.tags.map((tag) => [tag.id, tag]));
-  const afterTags = new Map(after.tags.map((tag) => [tag.id, tag]));
   const beforeNotes = new Map(before.notes.map((note) => [note.id, note]));
   const afterNotes = new Map(after.notes.map((note) => [note.id, note]));
 
@@ -578,12 +511,7 @@ export async function persistMetaDiff(
     const previous = beforeFolders.get(folder.id);
     return !previous || !sameJson(previous, { folder, position });
   });
-  const changedTags = [...afterTags.values()].filter((tag) => {
-    const previous = beforeTags.get(tag.id);
-    return !previous || !sameJson(previous, tag);
-  });
-
-  const [folderRows, tagRows, settings] = await Promise.all([
+  const [folderRows, settings] = await Promise.all([
     Promise.resolve(
       changedFolders.map(({ folder, position }) => ({
         id: folder.id,
@@ -594,15 +522,6 @@ export async function persistMetaDiff(
         position,
       })),
     ),
-    Promise.resolve(
-      changedTags.map((tag) => ({
-        id: tag.id,
-        archive_id: archiveId,
-        owner_id: ownerId,
-        name: tag.name,
-        color: tag.color,
-      })),
-    ),
     ownerId === session.userId && before.partnerName !== after.partnerName
       ? Promise.resolve({ partnerName: after.partnerName })
       : Promise.resolve(null),
@@ -610,11 +529,10 @@ export async function persistMetaDiff(
 
   await all([
     ...(folderRows.length ? [supabase.from("folders").upsert(folderRows)] : []),
-    ...(tagRows.length ? [supabase.from("tags").upsert(tagRows)] : []),
     ...(settings ? [supabase.from("archives").update({ settings }).eq("id", archiveId)] : []),
   ]);
 
-  // ── 2. Note placement, and the tag links that are being replaced ────────
+  // ── 2. Note placement ───────────────────────────────────────────────────
   const movedNotes = [...afterNotes.values()].filter((metadata) => {
     const previous = beforeNotes.get(metadata.id);
     return (
@@ -625,11 +543,6 @@ export async function persistMetaDiff(
       previous.archivedAt !== metadata.archivedAt
     );
   });
-  const retagged = [...afterNotes.values()].filter((metadata) => {
-    const previous = beforeNotes.get(metadata.id);
-    return !previous || !sameJson(previous.tagIds, metadata.tagIds);
-  });
-
   await all([
     // Each note carries its own values, so these stay separate statements —
     // but they no longer wait on one another.
@@ -645,40 +558,13 @@ export async function persistMetaDiff(
         .eq("archive_id", archiveId)
         .eq("id", metadata.id),
     ),
-    ...(retagged.length
-      ? [
-          supabase
-            .from("note_tags")
-            .delete()
-            .eq("archive_id", archiveId)
-            .in(
-              "note_id",
-              retagged.map((metadata) => metadata.id),
-            ),
-        ]
-      : []),
   ]);
 
-  // ── 3. The new tag links, all of them in one insert ─────────────────────
-  const links = retagged.flatMap((metadata) =>
-    metadata.tagIds.map((tagId) => ({
-      note_id: metadata.id,
-      tag_id: tagId,
-      archive_id: archiveId,
-      owner_id: ownerId,
-    })),
-  );
-  if (links.length > 0) await all([supabase.from("note_tags").insert(links)]);
-
-  // ── 4. What nothing points at any more ──────────────────────────────────
+  // ── 3. What nothing points at any more ──────────────────────────────────
   const goneFolders = [...beforeFolders.keys()].filter((id) => !afterFolders.has(id));
-  const goneTags = [...beforeTags.keys()].filter((id) => !afterTags.has(id));
-  await all([
-    ...(goneFolders.length
-      ? [supabase.from("folders").delete().eq("archive_id", archiveId).in("id", goneFolders)]
-      : []),
-    ...(goneTags.length
-      ? [supabase.from("tags").delete().eq("archive_id", archiveId).in("id", goneTags)]
-      : []),
-  ]);
+  if (goneFolders.length > 0) {
+    await all([
+      supabase.from("folders").delete().eq("archive_id", archiveId).in("id", goneFolders),
+    ]);
+  }
 }

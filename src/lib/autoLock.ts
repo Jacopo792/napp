@@ -1,14 +1,15 @@
 import { useEffect, useRef } from "react";
 
 /* ── Locking the archive when nobody is there ─────────────────────────────────
-   This is the one preference in the app that protects something. The archive
-   key lives in this browser for as long as the tab does, so a laptop left open
-   on a kitchen table is an unlocked archive — and it is a *shared* archive, so
-   it is not only your own notes sitting there.
+   This is the one preference in the app that protects something. The signed-in
+   session lives in this tab for as long as the tab does, so a laptop left open
+   on a kitchen table is an open archive — and it is a *shared* archive, so it
+   is not only your own notes sitting there.
 
-   Locking is exactly what the sign-out button already does: the session is dropped,
-   the drafts are flushed first so nothing is lost, and reading again means
-   signing in again. Nothing is deleted and nothing is sent anywhere.
+   Locking is exactly what the sign-out button already does: the session is
+   dropped, the drafts are flushed first so nothing is lost, the cached notes
+   leave this device with `clearNoteStore()`, and reading again means signing
+   in again. Nothing is deleted from the archive and nothing is sent anywhere.
 
    "Never" is the default, because an archive that locks itself unasked is a
    surprise, and surprises about your own notes are worse than the setting being

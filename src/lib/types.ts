@@ -45,31 +45,14 @@ export interface Folder {
   parentId?: string | null;
 }
 
-/* The ids are fixed by the Postgres CHECK constraint. Tags keep their muted
-   semantic colours while the surrounding interface remains neutral. */
-export const TAG_COLORS = [
-  { id: "blue", darkFg: "#96bef2" },
-  { id: "rose", darkFg: "#f2abaf" },
-  { id: "emerald", darkFg: "#86d3ad" },
-  { id: "amber", darkFg: "#d6c084" },
-  { id: "violet", darkFg: "#ddabe0" },
-  { id: "sky", darkFg: "#8cc9e5" },
-  { id: "orange", darkFg: "#ebb593" },
-  { id: "slate", darkFg: "#b8bbc2" },
-] as const;
-
-export type TagColorId = (typeof TAG_COLORS)[number]["id"];
-
-export interface Tag {
-  id: string;
-  name: string;
-  color: TagColorId;
-}
-
+/* Tags are gone from the interface and their tables are left standing in
+   Postgres, holding whatever they held. Nothing here reads them: the client
+   stopped selecting `tags` and `note_tags`, so a note's metadata is a folder,
+   a pin and two timestamps. Re-adding the feature means re-adding the reads —
+   the rows never went anywhere. */
 export interface NoteMeta {
   id: string;
   folderId: string | null;
-  tagIds: string[];
   /** Optional for backward compatibility with metadata written before pinning existed. */
   pinned?: boolean;
   /** Soft-deleted notes remain recoverable in Postgres until removed from Trash. */
@@ -89,8 +72,7 @@ export interface Meta {
   v: 1;
   partnerName?: string;
   folders: Folder[];
-  tags: Tag[];
   notes: NoteMeta[];
 }
 
-export const EMPTY_META: Meta = { v: 1, folders: [], tags: [], notes: [] };
+export const EMPTY_META: Meta = { v: 1, folders: [], notes: [] };

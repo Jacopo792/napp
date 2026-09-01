@@ -87,7 +87,7 @@ instances. Search and language processing remain local.
 ## Capabilities and Constraints
 
 Confirmed functionality: create / edit / delete notes, simultaneous Yjs editing,
-pinning, folders, colored tags, full-text search, drag a note onto a folder, the
+pinning, folders, full-text search, drag a note onto a folder, the
 `viewAs` scope switch every member can use, invitations with a one-time link and
 role, a personal-archive bootstrap and multi-archive chooser, per-member nicknames
 and private avatars cached as object URLs, and opt-in live presence that is
@@ -159,11 +159,16 @@ Technical constraints that outlive any design:
 - Title and body are one Yjs document (`Y.Text("title")` and
   `Y.XmlFragment("default")`). Opening, selecting or focusing a note must not
   write or change timestamps. IndexedDB stores are scoped by archive, account
-  and note, and never authorize the editor: a server sync must succeed before
-  cached content is shown. Once authorised, an open editor remains usable while
-  offline and converges on reconnect.
-- Folders, tags, pinning, Trash state, Archive state and tag assignments are
-  structural rows. Folder and tag names are ordinary account-protected columns.
+  and note, and never authorize the editor. What authorizes _display_ is
+  Postgres: the note has to be in the catalogue RLS just returned, and a member
+  who has lost access is handed no such row — so a non-empty local store may
+  paint the words before the socket answers. What authorizes a _write_ is the
+  collaboration server, on every message. Once mounted, an editor remains
+  usable while offline and converges on reconnect.
+- Folders, pinning, Trash state and Archive state are structural rows; folder
+  names are ordinary account-protected columns. The `tags` and `note_tags`
+  tables and their policies still stand, holding whatever they held, but no
+  client code reads or writes them — see _Tags_ in `CLAUDE.md`.
 - Archive is not Trash. A trashed note is on its way out and is read-only until
   it is restored or deleted for good; an archived note is filed off the folder
   list and stays editable. A note that is both reads as trashed, because the
