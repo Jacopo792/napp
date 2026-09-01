@@ -4346,10 +4346,13 @@
 
 .sidebar-tail {
   flex-shrink: 0;
-  /* Four pixels left of the scrolling rows above. The tail is a different kind
-     of place — where things go, not where things are — and it is the only
-     block here whose horizontal padding is its own to set. */
-  padding: 4px 8px 6px 4px;
+  /* The same 8px every other block in this column uses. It used to sit four
+     pixels left of the scrolling rows, on the grounds that the tail is a
+     different kind of place — but a column with two left edges reads as a
+     column that has slipped, and the block below it (the lock) was on the
+     other edge, so Archive and Trash were the only two rows in the rail that
+     lined up with nothing. */
+  padding: 4px 8px 6px;
 }
 
 .sidebar-row {
