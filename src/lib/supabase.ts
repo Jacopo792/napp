@@ -520,13 +520,20 @@ export async function saveNote(
 }
 
 export async function deleteNote(session: AppSession, noteId: string): Promise<void> {
+  return deleteNotes(session, [noteId]);
+}
+
+/** Emptying the trash is one statement, not one per note. The filter that
+ *  matters is `archive_id`, which was already here — the ids only narrow it. */
+export async function deleteNotes(session: AppSession, noteIds: string[]): Promise<void> {
+  if (noteIds.length === 0) return;
   const result = await supabase
     .from("notes")
     .delete()
     .eq("archive_id", session.archiveId)
-    .eq("id", noteId);
+    .in("id", noteIds);
   fail(result.error);
-  noteCache.delete(noteId);
+  for (const id of noteIds) noteCache.delete(id);
 }
 
 function sameJson(left: unknown, right: unknown): boolean {

@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArchiveRestore,
   ClipboardCopy,
   FileDown,
   FolderDown,
@@ -90,13 +91,21 @@ export function CollectionMenu({
   preferences,
   onChange,
   onExportAll,
+  bulk,
 }: {
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
   onExportAll: () => void;
+  /** The one act this scope can perform on everything in it at once, or
+   *  nothing at all — most scopes have none. */
+  bulk?: { label: string; confirm: string; danger: boolean; count: number; run: () => void };
 }) {
   const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
+  const [confirming, setConfirming] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setConfirming(false);
+  };
   const ref = useDismiss(open, close);
 
   return (
@@ -164,6 +173,28 @@ export function CollectionMenu({
             <FolderDown size={16} />
             Export all as Markdown
           </MenuButton>
+          {bulk && bulk.count > 0 && (
+            <>
+              <div className="menu-separator" />
+              {/* Two clicks, the same two the trash asks for on a single row.
+                  A confirmation that replaces the label in place says what is
+                  about to happen without moving the pointer to a new box. */}
+              <MenuButton
+                danger={bulk.danger}
+                onClick={() => {
+                  if (!confirming) {
+                    setConfirming(true);
+                    return;
+                  }
+                  bulk.run();
+                  close();
+                }}
+              >
+                {bulk.danger ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}
+                {confirming ? bulk.confirm : `${bulk.label} (${bulk.count})`}
+              </MenuButton>
+            </>
+          )}
         </div>
       )}
     </div>

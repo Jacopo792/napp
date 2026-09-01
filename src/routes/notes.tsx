@@ -22,7 +22,7 @@ import {
   createNote,
   createArchiveInvite,
   deleteAvatar,
-  deleteNote,
+  deleteNotes,
   leaveArchive,
   downloadImage,
   downloadObject,
@@ -602,6 +602,25 @@ function NotesPage() {
     [entries, viewAs],
   );
 
+  /* The trash wins over the shelf: a note thrown away while archived is
+     waiting to be deleted, and that is the more urgent thing to say. Both sets
+     are named here rather than inside the slice below, because emptying either
+     place asks the same question the filter does. */
+  const trashedIds = useMemo(
+    () => new Set(activeMeta.notes.filter((note) => note.trashedAt).map((note) => note.id)),
+    [activeMeta],
+  );
+
+  const archivedIds = useMemo(
+    () =>
+      new Set(
+        activeMeta.notes
+          .filter((note) => note.archivedAt && !note.trashedAt)
+          .map((note) => note.id),
+      ),
+    [activeMeta],
+  );
+
   // ── The visible slice: folder → search, newest first ────────────────────
   const visible = useMemo(() => {
     const meta = activeMeta;
@@ -611,12 +630,6 @@ function NotesPage() {
       return fid && index.byFolder.has(fid) ? fid : null;
     };
 
-    const trashedIds = new Set(meta.notes.filter((note) => note.trashedAt).map((note) => note.id));
-    /* The trash wins over the shelf: a note thrown away while archived is
-       waiting to be deleted, and that is the more urgent thing to say. */
-    const archivedIds = new Set(
-      meta.notes.filter((note) => note.archivedAt && !note.trashedAt).map((note) => note.id),
-    );
     let list = ownedEntries;
 
     if (selectedFolderId === TRASH) {
@@ -640,7 +653,7 @@ function NotesPage() {
     }
 
     return list;
-  }, [ownedEntries, activeMeta, selectedFolderId, query]);
+  }, [ownedEntries, activeMeta, trashedIds, archivedIds, selectedFolderId, query]);
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -1380,29 +1393,33 @@ function NotesPage() {
     [selectedId, handleMetaChange],
   );
 
-  const handleDeleteForever = useCallback(
-    async (entry: NoteEntry) => {
-      if (!canWriteArchive) return;
+  /* One note or the whole trash: the same four prunes either way — the draft
+     store, the loaded entries, this scope's metadata, and the selection if it
+     was pointing at something that just stopped existing. */
+  const deleteForever = useCallback(
+    async (targets: NoteEntry[]) => {
+      if (!canWriteArchive || targets.length === 0) return;
       const s = sessionRef.current;
       if (!s) return;
+      const doomed = new Set(targets.map((entry) => entry.note.id));
       setSaving(true);
       setError("");
       try {
-        dropDraft(entry.note.id);
-        await deleteNote(s, entry.note.id);
+        for (const id of doomed) dropDraft(id);
+        await deleteNotes(s, [...doomed]);
 
-        entriesRef.current = entriesRef.current.filter((e) => e.note.id !== entry.note.id);
+        entriesRef.current = entriesRef.current.filter((e) => !doomed.has(e.note.id));
         setEntries(entriesRef.current);
 
         setMetas((current) => {
           const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
           return {
             ...current,
-            [viewAs]: { ...base, notes: base.notes.filter((note) => note.id !== entry.note.id) },
+            [viewAs]: { ...base, notes: base.notes.filter((note) => !doomed.has(note.id)) },
           };
         });
 
-        if (selectedId === entry.note.id) {
+        if (selectedId && doomed.has(selectedId)) {
           setSelectedId(null);
           if (compact) setMobileScreen("collection");
         }
@@ -1415,6 +1432,42 @@ function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedId, viewAs, canWriteArchive],
   );
+
+  const handleDeleteForever = useCallback(
+    (entry: NoteEntry) => void deleteForever([entry]),
+    [deleteForever],
+  );
+
+  /* The two bulk actions the shelf and the waiting room each want, and they
+     are not the same kind of act: emptying the trash destroys, clearing the
+     archive only files everything back. Both read the whole scope rather than
+     the visible slice, so a search left in the box cannot quietly narrow what
+     "all" means. */
+  const trashedEntries = useMemo(
+    () => ownedEntries.filter((entry) => trashedIds.has(entry.note.id)),
+    [ownedEntries, trashedIds],
+  );
+
+  const archivedEntries = useMemo(
+    () => ownedEntries.filter((entry) => archivedIds.has(entry.note.id)),
+    [ownedEntries, archivedIds],
+  );
+
+  const handleEmptyTrash = useCallback(
+    () => void deleteForever(trashedEntries),
+    [deleteForever, trashedEntries],
+  );
+
+  const handleEmptyArchive = useCallback(() => {
+    if (archivedEntries.length === 0) return;
+    const returning = new Set(archivedEntries.map((entry) => entry.note.id));
+    handleMetaChange((prev) => ({
+      ...prev,
+      notes: prev.notes.map((note) =>
+        returning.has(note.id) ? { ...note, archivedAt: undefined } : note,
+      ),
+    }));
+  }, [archivedEntries, handleMetaChange]);
 
   // ── Keyboard ────────────────────────────────────────────────────────────
   const moveSelection = useCallback(
@@ -1903,6 +1956,27 @@ function NotesPage() {
       preferences={activeListPreferences}
       onChange={handleListPreferencesChange}
       onExportAll={() => void handleExportAll()}
+      bulk={
+        !canWriteArchive
+          ? undefined
+          : selectedFolderId === TRASH
+            ? {
+                label: "Delete all",
+                confirm: "Delete all forever?",
+                danger: true,
+                count: trashedEntries.length,
+                run: handleEmptyTrash,
+              }
+            : selectedFolderId === ARCHIVE
+              ? {
+                  label: "Remove all from Archive",
+                  confirm: "Move all back?",
+                  danger: false,
+                  count: archivedEntries.length,
+                  run: handleEmptyArchive,
+                }
+              : undefined
+      }
     />
   );
 

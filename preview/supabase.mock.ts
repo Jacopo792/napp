@@ -167,9 +167,14 @@ export async function saveNote(
   return version;
 }
 
-export async function deleteNote(_session: AppSession, noteId: string): Promise<void> {
+export async function deleteNote(session: AppSession, noteId: string): Promise<void> {
+  return deleteNotes(session, [noteId]);
+}
+
+export async function deleteNotes(_session: AppSession, noteIds: string[]): Promise<void> {
+  if (noteIds.length === 0) return;
   await sleep(200);
-  notes.delete(noteId);
+  for (const id of noteIds) notes.delete(id);
 }
 
 export async function persistMetaDiff(

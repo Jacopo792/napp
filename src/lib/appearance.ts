@@ -43,14 +43,6 @@ export const APPEARANCE_PRESETS = [
     foreground: "#e8e8e8",
   },
   {
-    id: "graphite",
-    name: "Graphite",
-    theme: "dark" as const,
-    accent: "#f5f5f5",
-    background: "#292929",
-    foreground: "#e8e8e8",
-  },
-  {
     id: "midnight",
     name: "Midnight",
     theme: "dark" as const,
@@ -74,9 +66,10 @@ export const APPEARANCE_PRESETS = [
     background: "#f7f3ea",
     foreground: "#29251f",
   },
-  /* Four more, and all four dark on purpose. `setTheme()` below still replaces
-     the three colours whenever the THEME segment is touched, so a light preset
-     added here would be wiped by the click that selects its own theme. */
+  /* The rest, and all of them dark on purpose. `setTheme()` below still
+     replaces the three colours whenever the THEME segment is touched, so a
+     light preset added here would be wiped by the click that selects its own
+     theme. */
   {
     id: "fjord",
     name: "Fjord",
@@ -86,14 +79,6 @@ export const APPEARANCE_PRESETS = [
     foreground: "#eceff4",
   },
   {
-    id: "moss",
-    name: "Moss",
-    theme: "dark" as const,
-    accent: "#1db954",
-    background: "#141a16",
-    foreground: "#e9ede9",
-  },
-  {
     id: "indigo",
     name: "Indigo",
     theme: "dark" as const,
@@ -101,13 +86,33 @@ export const APPEARANCE_PRESETS = [
     background: "#1a1a26",
     foreground: "#eeeef5",
   },
+  /* Three warmths the six above do not have between them: lamplight, a green
+     that is a colour and not a signal, and a rose. Each background carries the
+     accent's own hue at a fraction of its saturation, which is what keeps a
+     palette from reading as one colour dropped onto neutral grey. */
   {
-    id: "solar",
-    name: "Solar",
+    id: "amber",
+    name: "Amber",
     theme: "dark" as const,
-    accent: "#4aa3d8",
-    background: "#002b36",
-    foreground: "#e6ddc4",
+    accent: "#e5975c",
+    background: "#1c1714",
+    foreground: "#f2e8df",
+  },
+  {
+    id: "sage",
+    name: "Sage",
+    theme: "dark" as const,
+    accent: "#a3c9a8",
+    background: "#1a201c",
+    foreground: "#e8eee9",
+  },
+  {
+    id: "rosewood",
+    name: "Rosewood",
+    theme: "dark" as const,
+    accent: "#e59aa4",
+    background: "#221c1e",
+    foreground: "#f3e9ea",
   },
 ] as const;
 

@@ -4109,6 +4109,13 @@
   .settings-specimen p {
     transition: none;
   }
+
+  /* The cover chips still appear on hover — that is the affordance, not the
+     motion. Only the slide goes. */
+  .note-cover-actions {
+    transform: none;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
 }
 
 /* ── Motion ──────────────────────────────────────────────────────────────────
@@ -5228,6 +5235,32 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Three chips sitting on the picture at all times are three chips you read
+   every time you open the note, for a decision you make once. They belong to
+   the cover, so they arrive with the pointer and leave with it.
+
+   Only where a pointer can hover: a touch screen reports no hover at all, and
+   a control that never appears is a control that does not exist. `:focus-within`
+   is the keyboard's way in, and `.is-picker-open` keeps them while the gallery
+   is up — the pointer is over the popover by then, not over the cover. */
+@media (hover: hover) {
+  .note-cover-actions {
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+  }
+
+  .note-page-cover:hover .note-cover-actions,
+  .note-page-cover:focus-within .note-cover-actions,
+  .note-page-cover.is-placing .note-cover-actions,
+  .note-page-cover.is-picker-open .note-cover-actions {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .note-cover-actions > span,
