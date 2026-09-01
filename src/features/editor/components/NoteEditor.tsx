@@ -85,6 +85,11 @@ interface Props {
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
 const TOOLBAR_ROOM = 550;
+/* Below this the comments panel stops being a column and covers the page — the
+   same threshold the stylesheet uses — and a card standing beside a passage
+   nobody can see is worse than a card in a list. Anchoring is switched off
+   there and the panel is the plain list it always was. */
+const COMMENT_MARGIN_ROOM = 700;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -461,6 +466,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     event.stopPropagation();
     onContextMenu(event);
   }
+
+  /* Where each commented passage sits, measured in the scroller's own content
+     space so the answer does not change as the reader scrolls: the layer that
+     holds the cards is moved by the same amount, so both live in the same
+     coordinates. The first mark of a thread wins — a passage split across two
+     text nodes by a bold word in the middle is still one passage. */
+  const measureAnchors = useCallback(() => {
+    const found = new Map<string, number>();
+    if (!scroller) return found;
+    const origin = scroller.getBoundingClientRect().top - scroller.scrollTop;
+    for (const mark of scroller.querySelectorAll<HTMLElement>("span[data-comment-thread]")) {
+      const threadId = mark.getAttribute("data-comment-thread");
+      if (!threadId || found.has(threadId)) continue;
+      found.set(threadId, Math.round(mark.getBoundingClientRect().top - origin));
+    }
+    return found;
+  }, [scroller]);
+
+  const anchoredComments = !mobile && shellWidth !== null && shellWidth > COMMENT_MARGIN_ROOM;
 
   /* Inline while there is room for it; on its own row otherwise. */
   const inlineToolbar =
@@ -848,6 +872,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             onPendingHandled={() => setPendingThread(null)}
             focusThread={focusThread}
             onFocusHandled={() => setFocusThread(null)}
+            anchored={anchoredComments}
+            scroller={scroller}
+            measureAnchors={measureAnchors}
             onClose={() => {
               setCommentsOpen(false);
               setPendingThread(null);
