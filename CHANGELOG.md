@@ -236,7 +236,7 @@ config push` aligned it; the redirect allow-list now holds only that origin
   or an offline tab with a stale store is handed no row and gets no editor.
   Writing is still the collaboration server's decision, on every message. An
   empty store is not a hit — an empty editor is worse than the bars that stand
-  in for one — and because the store fills the *same* document the server will
+  in for one — and because the store fills the _same_ document the server will
   update, its arrival is a merge into a live editor rather than the second
   build of a second document that once made the text paint twice.
 - **Pictures are fetched once, not once per visit.** Note photographs and

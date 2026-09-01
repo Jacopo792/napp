@@ -183,14 +183,14 @@ The collaboration server is part of the authorization boundary:
 - **Postgres authorizes reading a note; the collaboration server authorizes
   writing it.** An editor mounts once `collaboration` is non-null, which is
   either when the server has synced or when this device's IndexedDB store has
-  the note *and* the note is in the catalogue RLS just returned — `entries`.
+  the note _and_ the note is in the catalogue RLS just returned — `entries`.
   That row is the permission: a member who has lost access is handed none, so
   no editor is built. Every write is still authorized by the server on every
   message, and `RichTextEditor` is still mounted exactly once, against one
   `Y.Doc`, and never rebuilt.
   The store is only ever a faster source for that one document, which is what
   makes it safe: the server's state arrives as a merge into the live document.
-  Do **not** re-add a pre-sync editor built from the *Postgres projection* —
+  Do **not** re-add a pre-sync editor built from the _Postgres projection_ —
   that was a second document, so it painted the note and then destroyed the
   whole ProseMirror instance to rebuild it against the Yjs fragment on
   `onSynced`. An empty store is not a hit: an empty editor is worse than the
