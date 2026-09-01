@@ -1693,13 +1693,18 @@
   white-space: nowrap;
 }
 
+/* The header is one left edge: the photograph, the date and the title all
+   start where the text below them starts. The date was centred over a
+   left-aligned title, which on a note with a picture read as the picture being
+   out of line rather than the date being — the photo sits directly above it
+   and takes the blame for the stagger. */
 .note-date {
   margin-bottom: 1.15rem;
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 12px;
   line-height: 1.4;
-  text-align: center;
+  text-align: left;
 }
 
 .note-gallery-grid {
