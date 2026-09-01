@@ -3801,9 +3801,20 @@
   padding-inline: 0.9rem;
 }
 
+/* The floor was 11.5rem, which is not a card height — it is the height of the
+   *tallest* card, applied to every card. A note with a one-line title got a
+   216px box with a hundred pixels of nothing under the date, and a phone that
+   is 812px tall showed five notes. The point of the gallery is to see what you
+   have.
+
+   A floor is still wanted, because a grid row of one short note beside one
+   long one should not be a ragged pair, and because the actions along the
+   bottom need somewhere to sit. This is that floor and not a target: the cards
+   in a row still stretch to match each other, so a tall title lifts its
+   neighbour exactly as before. */
 .mobile-note-list .note-gallery-item {
-  min-height: 11.5rem;
-  padding: 1rem;
+  min-height: 8.25rem;
+  padding: 0.85rem 0.9rem;
 }
 
 .mobile-note-list .note-gallery-item p:first-child {

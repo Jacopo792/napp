@@ -19,6 +19,7 @@ import {
   threadsOf,
   type NoteComment,
 } from "@/lib/comments";
+import { inDocumentOrder } from "@/lib/commentThreads";
 import { formatStamp } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
 
@@ -136,7 +137,12 @@ export function NoteComments({
     [draft, session, noteId, pendingThread, onPendingHandled],
   );
 
-  const threads = threadsOf(comments);
+  /* `quotes` is built by walking the document, so its key order is the order
+     the passages appear in the note — which is the order the panel should read
+     in. Threads arrive in the order their first remark was written, and a
+     conversation about the first paragraph is not less relevant for having
+     been started yesterday. */
+  const threads = inDocumentOrder(threadsOf(comments), quotes.keys());
   const pendingIsNew = pendingThread && !threads.some((t) => t.threadId === pendingThread);
   const shown = threads.filter((thread) => showResolved || !thread.resolved);
   const resolvedCount = threads.filter((thread) => thread.resolved).length;
