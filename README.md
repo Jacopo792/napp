@@ -34,6 +34,8 @@ private files.
 
 ## Make it yours
 
+![Appearance settings](docs/customisation-preview.png)
+
 The app is highly customisable, and each person can set it up independently. You can
 start from a ready-made palette or choose the accent, background and text colours
 yourself; switch between light, dark and system themes; adjust contrast and sidebar
