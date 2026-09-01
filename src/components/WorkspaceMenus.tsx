@@ -728,6 +728,20 @@ export function SettingsPanel({
   const [leaveStatus, setLeaveStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
+  const navList = useRef<HTMLDivElement>(null);
+  /* Where the selection sits in the rail. One element that travels, rather than
+     a background that appears on the button you clicked and disappears from the
+     one you left: the difference is whether the eye is told the selection
+     moved, or has to work out that it did. Measured, because the group
+     headings between the buttons mean no arithmetic on the index gives the
+     right offset. */
+  const [marker, setMarker] = useState<{ top: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const active = navList.current?.querySelector<HTMLElement>("button.is-active");
+    setMarker(active ? { top: active.offsetTop, height: active.offsetHeight } : null);
+  }, [open, section]);
 
   useEffect(() => {
     if (!open) {
@@ -863,7 +877,27 @@ export function SettingsPanel({
 
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
-            <div className="settings-nav-list">
+            {/* Who this is, at the head of the rail rather than in a column of
+                its own on the far side. It was a standing summary opposite the
+                form, and everything it said the form said too — the one thing
+                it added was the answer to "which account is this?", which
+                belongs beside the way out, not beside the controls. */}
+            <div className="settings-identity">
+              <Avatar url={avatarUrl} name={profile.nickname} email={email} />
+              <div className="min-w-0">
+                <b>{profile.nickname || email.split("@")[0]}</b>
+                <small>{email}</small>
+              </div>
+            </div>
+
+            <div ref={navList} className="settings-nav-list">
+              {marker && (
+                <span
+                  aria-hidden="true"
+                  className="settings-nav-marker"
+                  style={{ transform: `translateY(${marker.top}px)`, height: marker.height }}
+                />
+              )}
               {SETTINGS_SECTIONS.map((group) => (
                 <Fragment key={group.group}>
                   <p className="settings-nav-group">{group.group}</p>
@@ -894,7 +928,7 @@ export function SettingsPanel({
             </button>
           </nav>
 
-          <div className="settings-scroll">
+          <div key={section} className="settings-scroll">
             {section === "profile" && (
               <section>
                 <h3>Profile details</h3>
@@ -982,6 +1016,34 @@ export function SettingsPanel({
                       {memberCount} {memberCount === 1 ? "member" : "members"}
                     </span>
                   </div>
+
+                  {/* The two facts the summary column carried and no section
+                      did. They are facts about this account, so this is where
+                      they were always going to end up. */}
+                  <div className="appearance-row profile-row">
+                    <RowLead
+                      icon={<Layers size={17} />}
+                      label="Reading"
+                      hint="Whose notes the window is pointed at"
+                    />
+                    <span className="profile-static">{reading}</span>
+                  </div>
+
+                  {joinedAt && (
+                    <div className="appearance-row profile-row">
+                      <RowLead
+                        icon={<CalendarDays size={17} />}
+                        label="Member since"
+                        hint="When this account joined the archive"
+                      />
+                      <span className="profile-static">
+                        {new Date(joinedAt).toLocaleDateString(undefined, {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {profileError && (
@@ -1349,56 +1411,62 @@ export function SettingsPanel({
                     </span>
                   </div>
                 </dl>
-                <div className="settings-row account-lock-row">
-                  <span className="settings-lead" aria-hidden="true">
-                    <Timer size={17} />
-                  </span>
-                  <span className="settings-label">
-                    <b>Sign out when idle</b>
-                    <small>Require the account password again after a period of inactivity.</small>
-                  </span>
+                <h3>Signing out</h3>
+                <div className="appearance-controls">
+                  <div className="appearance-row">
+                    <RowLead
+                      icon={<Timer size={17} />}
+                      label="Sign out when idle"
+                      hint="Require the account password again after a period of inactivity"
+                    />
+                  </div>
+                  <div className="appearance-row is-stacked">
+                    <Segmented
+                      label="Sign out when idle"
+                      value={String(autoLock)}
+                      options={AUTO_LOCK_CHOICES.map((minutes) => ({
+                        id: String(minutes),
+                        name: AUTO_LOCK_LABELS[minutes],
+                      }))}
+                      onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
+                    />
+                  </div>
                 </div>
-                <Segmented
-                  label="Sign out when idle"
-                  value={String(autoLock)}
-                  options={AUTO_LOCK_CHOICES.map((minutes) => ({
-                    id: String(minutes),
-                    name: AUTO_LOCK_LABELS[minutes],
-                  }))}
-                  onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
-                />
 
-                <label className="appearance-row is-bare">
-                  <RowLead
-                    icon={<Users size={17} />}
-                    label="Live presence"
-                    hint="Share that you are here to see who else is here"
-                  />
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={presenceEnabled}
-                    onChange={(event) => onPresenceEnabledChange(event.target.checked)}
-                  />
-                </label>
+                <h3>Privacy</h3>
+                <div className="appearance-controls">
+                  <label className="appearance-row">
+                    <RowLead
+                      icon={<Users size={17} />}
+                      label="Live presence"
+                      hint="Share that you are here to see who else is here"
+                    />
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={presenceEnabled}
+                      onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                    />
+                  </label>
 
-                {/* The one row here that is not a preference. Postgres reads
-                    this column back when the other member's client asks for
-                    notes, so switching it on withholds the rows rather than
-                    hiding them after they arrive. */}
-                <label className="appearance-row is-bare">
-                  <RowLead
-                    icon={<Archive size={17} />}
-                    label="Keep archived notes private"
-                    hint="Archived notes stay visible only to you"
-                  />
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={profile.hideArchived}
-                    onChange={(event) => onHideArchivedChange(event.target.checked)}
-                  />
-                </label>
+                  {/* The one row here that is not a preference. Postgres reads
+                      this column back when the other member's client asks for
+                      notes, so switching it on withholds the rows rather than
+                      hiding them after they arrive. */}
+                  <label className="appearance-row">
+                    <RowLead
+                      icon={<Archive size={17} />}
+                      label="Keep archived notes private"
+                      hint="Archived notes stay visible only to you"
+                    />
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={profile.hideArchived}
+                      onChange={(event) => onHideArchivedChange(event.target.checked)}
+                    />
+                  </label>
+                </div>
               </section>
             )}
 
@@ -1596,41 +1664,6 @@ export function SettingsPanel({
               </section>
             )}
           </div>
-
-          {/* Who this is, standing beside whatever is being changed. */}
-          <aside className="settings-aside" aria-label="Account summary">
-            <div className="settings-aside-block">
-              <p className="settings-aside-label">Signed in as</p>
-              <div className="settings-aside-identity">
-                <Avatar url={avatarUrl} name={profile.nickname} email={email} />
-                <span className="settings-aside-value min-w-0">
-                  {profile.nickname || email.split("@")[0]}
-                </span>
-              </div>
-            </div>
-
-            <dl className="settings-aside-block">
-              <dt>Email</dt>
-              <dd>{email}</dd>
-            </dl>
-
-            {joinedAt && (
-              <dl className="settings-aside-block">
-                <dt>Member since</dt>
-                <dd>
-                  {new Date(joinedAt).toLocaleDateString(undefined, {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </dd>
-              </dl>
-            )}
-
-            <dl className="settings-aside-block">
-              <dt>Reading</dt>
-              <dd>{reading}</dd>
-            </dl>
-          </aside>
         </div>
       </section>
 

@@ -2217,15 +2217,17 @@
   font-size: 13px;
 }
 
-/* Three columns: where you are, what you are changing, and who you are. The
-   third is a standing summary rather than another form — it answers "which
-   account is this?" without the reader having to go and look, and it is where
-   the actions that end a session belong. It is the first thing to go when the
-   dialog has no room for it. */
+/* Two columns: where you are, and what you are changing. There was a third — a
+   standing summary of the account, on the far side — and it was cut because
+   everything it said the form said too. The one thing it added, the answer to
+   "which account is this?", is at the head of the rail now, beside the way
+   out, where it belongs. What the content column got in exchange is the room
+   to be one column of full-width cards instead of a form squeezed between two
+   panels. */
 .settings-body {
   display: grid;
   flex: 1;
-  grid-template-columns: 176px minmax(0, 1fr) 252px;
+  grid-template-columns: 218px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -2234,19 +2236,68 @@
   min-height: 0;
   flex-direction: column;
   border-right: 1px solid var(--rule-soft);
-  padding: 14px 10px;
+  padding: 12px 10px 14px;
   background: color-mix(in srgb, var(--surface) 76%, var(--paper));
+}
+
+/* The account, at the head of the rail. */
+.settings-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  border-radius: 0.7rem;
+  padding: 8px 8px 10px;
+}
+
+.settings-identity b {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-identity small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Only the sections scroll. Sign out is not one of them and must not be able
    to scroll out of reach of the column it belongs to. */
 .settings-nav-list {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+}
+
+/* One element that travels between the sections, rather than a background that
+   appears under the button you clicked and vanishes from the one you left. The
+   difference is whether the eye is told the selection moved or has to work out
+   that it did — and it is the same device the archive switch already uses for
+   its thumb. Behind the buttons, never over them. */
+.settings-nav-marker {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  border-radius: 0.55rem;
+  background: var(--accent-wash);
+  pointer-events: none;
+  transition:
+    transform var(--dur-base) var(--ease),
+    height var(--dur-base) var(--ease);
 }
 
 /* The sections are grouped, because "Profile" and "Appearance" are not the
@@ -2281,82 +2332,38 @@
 }
 
 .settings-nav button {
+  position: relative;
+  z-index: 1;
   border-radius: 0.55rem;
   padding: 8px 10px;
   color: var(--ink-3);
   font-size: 13.5px;
   font-weight: 500;
   text-align: left;
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press);
 }
 
 .settings-nav button:hover {
+  background: var(--glass);
   color: var(--ink);
 }
 
-.settings-nav button.is-active {
-  background: var(--accent-wash);
+/* No background of its own: the marker behind it is the background, and two of
+   them would double up while the marker is still travelling. */
+.settings-nav button.is-active,
+.settings-nav button.is-active:hover {
+  background: transparent;
   color: var(--accent-strong);
   font-weight: 620;
 }
 
 .settings-scroll {
   overflow-y: auto;
-  padding: 0 20px 20px;
+  padding: 4px 26px 24px;
 }
 
-/* ── The summary column ─────────────────────────────────────────────────── */
-.settings-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  border-left: 1px solid var(--rule-soft);
-  padding: 18px 16px;
-  background: color-mix(in srgb, var(--surface) 76%, var(--paper));
-}
-
-.settings-aside-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.settings-aside-block + .settings-aside-block {
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 14px;
-}
-
-.settings-aside dt,
-.settings-aside-label {
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 640;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.settings-aside dd,
-.settings-aside-value {
-  overflow-wrap: anywhere;
-  margin-top: 2px;
-  overflow-wrap: anywhere;
-  color: var(--ink);
-  font-size: 13.5px;
-  font-weight: 560;
-}
-
-.settings-aside p {
-  color: var(--ink-3);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-.settings-aside-identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
 /* ── A face, or the letters standing in for one ─────────────────────────── */
 .avatar {
@@ -2570,16 +2577,28 @@
 
 /* A settings row is a label and its value. Given the full width of the dialog
    they end up a hand's width apart with nothing in between, and the eye has to
-   travel the whole way to pair them. Cap the measure instead. */
+   travel the whole way to pair them. Cap the measure instead.
+
+   The rule under a section went with the summary column: with one column of
+   cards, the cards already say where each group starts and stops, and a border
+   between them is a second thing saying it. */
 .settings-scroll > section {
-  max-width: 34rem;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--rule-soft);
+  max-width: 37rem;
+  padding: 18px 0 22px;
 }
 
-.settings-scroll > section:last-child {
-  border-bottom: 0;
-  padding-bottom: 4px;
+/* Changing section changes the page, so it arrives rather than replacing the
+   last one in place. The column is keyed by section in React, so this runs on
+   the swap and nowhere else. */
+.settings-scroll {
+  animation: settings-page var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes settings-page {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .theme-picker {
@@ -2643,9 +2662,13 @@
   background: rgb(128 128 128 / 0.38);
 }
 
+/* Three across, and nine palettes: three full rows. Four across left the
+   ninth chip alone on a row of its own, which reads as one palette that did
+   not fit rather than as the last of the set. It also lines the grid up with
+   the three theme cards above it. */
 .palette-presets {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 18px;
 }
@@ -2699,9 +2722,15 @@
   height: 28px;
 }
 
+/* The card. With the form on its own it is the thing that says "these rows
+   belong together", so it stands on the page rather than being outlined on it:
+   a face a shade off the surface, a hairline, and the contact shadow the rest
+   of the app uses. */
 .appearance-controls {
   border: 1px solid var(--rule-soft);
   border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--surface) 55%, var(--paper));
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
@@ -2716,7 +2745,8 @@
   font-size: 14px;
 }
 
-.appearance-row:last-child {
+.appearance-row:last-child,
+.appearance-row:has(+ .appearance-row.is-stacked) {
   border-bottom: 0;
 }
 
@@ -2726,6 +2756,15 @@
 .appearance-row.is-bare {
   padding-left: 0;
   padding-right: 0;
+}
+
+/* A control too wide to sit beside its own label: it takes the row under the
+   one that names it, inside the same card, rather than escaping the card and
+   standing loose on the page. */
+.appearance-row.is-stacked {
+  display: block;
+  min-height: 0;
+  padding-top: 0;
 }
 
 /* ── Row anatomy ─────────────────────────────────────────────────────────────
@@ -2989,15 +3028,13 @@
   margin-top: 18px;
 }
 
-/* The summary column is the first thing to go: it repeats what the profile
-   section already says, so a narrow dialog loses nothing by dropping it. */
 @media (max-width: 900px) {
   .settings-body {
-    grid-template-columns: 176px minmax(0, 1fr);
+    grid-template-columns: 184px minmax(0, 1fr);
   }
 
-  .settings-aside {
-    display: none;
+  .settings-scroll {
+    padding: 4px 18px 20px;
   }
 }
 
@@ -3019,9 +3056,14 @@
   }
 
   /* The panel holds one height now, so the body has to say which of its two
-     rows absorbs it. Without this the nav strip stretches to half the sheet. */
+     rows absorbs it. Without this the nav strip stretches to half the sheet.
+
+     `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track is floored at the
+     min-content width of what is in it, so one wide row of cards pushed the
+     whole column past the edge of the panel and took the controls off the
+     right-hand side with it. */
   .settings-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
 
@@ -3032,15 +3074,63 @@
     padding: 8px 12px;
   }
 
-  .settings-nav button {
-    flex: 1;
+  /* Each section takes the width of its own name, and the strip scrolls. `flex:
+     1` shared the row out between them, which meant six names each too narrow
+     to read and Sign out — also a button in this nav — taking a third of the
+     strip for itself. */
+  .settings-nav-list button {
+    flex: 0 0 auto;
     justify-content: center;
     text-align: center;
   }
 
-  .settings-nav button svg,
-  .settings-nav-group {
+  .settings-nav-list button svg,
+  .settings-nav-group,
+  .settings-identity {
     display: none;
+  }
+
+  /* A horizontal strip is not the column the marker measured itself against.
+     The active button paints its own background there. */
+  .settings-nav-marker {
+    display: none;
+  }
+
+  /* Six sections do not fit across a phone, so the strip scrolls rather than
+     dropping the ones that did not fit. */
+  .settings-nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav button {
+    white-space: nowrap;
+  }
+
+  /* Sign out is not one of the sections and must not be sized like one: beside
+     a scrolling strip it takes the room it needs and no more. */
+  .settings-nav-signout {
+    flex: 0 0 auto;
+    margin-top: 0;
+    margin-left: 10px;
+    border-top: 0;
+    border-left: 1px solid var(--rule-soft);
+    padding-top: 8px;
+    padding-left: 12px;
+  }
+
+  .settings-scroll {
+    padding: 4px 14px 20px;
+  }
+
+  .settings-nav button.is-active,
+  .settings-nav button.is-active:hover {
+    background: var(--accent-wash);
   }
 
   .theme-preview {
@@ -3055,7 +3145,8 @@
 /* Section labels speak in the sidebar's voice, so the two columns of the app
    read as one interface rather than two. */
 .settings-scroll h3 {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  padding-left: 2px;
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: 11px;
@@ -4101,7 +4192,8 @@
     transform: none;
   }
 
-  .archive-switch-thumb {
+  .archive-switch-thumb,
+  .settings-nav-marker {
     transition: none;
   }
 
@@ -4109,6 +4201,7 @@
   .menu-popover,
   .settings-scrim,
   .settings-panel,
+  .settings-scroll,
   .settings-sliders,
   .page-in,
   .mobile-screen {
