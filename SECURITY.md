@@ -90,6 +90,15 @@ and synchronize that note. The current PP implementation deliberately does not
 delete these stores on logout, because doing so can destroy offline edits; this
 retention must be resolved before production deployment.
 
+Two further caches hold archive content on the device. `napp:notes` (IndexedDB,
+`src/lib/noteStore.ts`) keeps the note payloads `loadArchive` would otherwise
+re-fetch in full on every visit, and `napp:image:v1` (Cache API,
+`src/lib/media.ts`) keeps note photographs and cover pictures. Neither is ever
+consulted for a permission: a cached note is redrawn only after Postgres has
+returned the row under RLS, and a cached picture only for an object the archive
+still names. The note store is emptied by `clearSession()` on sign-out, which
+is the retention the Yjs stores above still owe.
+
 The browser receives only the Supabase project URL, publishable key and public
 collaboration URL. Service role keys, account passwords, session tokens, and
 migration credentials must never be committed, placed in Vite variables, or

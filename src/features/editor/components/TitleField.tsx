@@ -94,6 +94,12 @@ export function TitleField({ mobile, noteId, canEdit, titleRef, onEdited, yTitle
             yTitle.delete(0, yTitle.length);
             yTitle.insert(0, next);
           });
+          /* Yjs has the words; this says a person is putting them there. It
+             used to sit only in the branch below, so with collaboration on —
+             which is always — renaming a note announced nothing. `schedule()`
+             on the other side of it is a no-op here: the draft store stays
+             empty in this mode, so no legacy write is woken by saying so. */
+          onEdited();
         } else {
           editTitle(noteId, next);
           onEdited();

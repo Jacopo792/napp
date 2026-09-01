@@ -1,4 +1,5 @@
 import { resetArchiveCache, supabase } from "./supabase";
+import { clearNoteStore } from "./noteStore";
 
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
    a plaintext column and every stored object carries its real content type, so
@@ -193,5 +194,8 @@ export async function restoreSession(): Promise<AppSession | null> {
 export async function clearSession(): Promise<void> {
   sessionStorage.removeItem(SESSION_KEY);
   resetArchiveCache();
+  /* The in-memory cache goes with the tab; the one on disk has to be asked.
+     Signing out is the moment the archive's words stop being welcome here. */
+  await clearNoteStore();
   await supabase.auth.signOut({ scope: "local" });
 }

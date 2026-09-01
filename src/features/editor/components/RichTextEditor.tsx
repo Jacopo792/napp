@@ -38,6 +38,7 @@ import { attachmentExtension } from "@/features/editor/lib/attachments";
 import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
+import { ySyncPluginKey } from "y-prosemirror";
 import type * as Y from "yjs";
 
 export type FormatAction =
@@ -90,6 +91,9 @@ interface Props {
   placeholder: string;
   revision?: number;
   onChange: (document: JSONContent, plainText: string) => void;
+  /** Raised on a document change this browser made, never on one that arrived
+   *  from the other reader. Yjs is the writer; this is only who is writing. */
+  onLocalEdit?: () => void;
   onPasteImage?: (file: File) => Promise<{ objectId: string; alt: string } | null>;
   onOpenLink: () => void;
   mobile?: boolean;
@@ -527,6 +531,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     placeholder,
     revision = 0,
     onChange,
+    onLocalEdit,
     onPasteImage,
     onOpenLink,
     mobile = false,
@@ -538,10 +543,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 ) {
   const [preview, setPreview] = useState<ImagePreview | null>(null);
   const onChangeRef = useRef(onChange);
+  const onLocalEditRef = useRef(onLocalEdit);
   const onPasteImageRef = useRef(onPasteImage);
   const appliedRevision = useRef(revision);
   const formatRef = useRef<(action: FormatAction) => void>(() => undefined);
   onChangeRef.current = onChange;
+  onLocalEditRef.current = onLocalEdit;
   onPasteImageRef.current = onPasteImage;
 
   const mediaExtensions = useMemo(
@@ -640,7 +647,17 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         if (!collaboration) {
           const document = current.getJSON();
           onChangeRef.current(document, richTextToPlainText(document));
+          return;
         }
+        /* Yjs writes the note, so nothing is serialised here — but somebody is
+           still writing, and the flag that says so used to be raised inside the
+           branch above. With collaboration on, which is always, it never fired:
+           the caret in the other reader's header only ever appeared while the
+           *title* was being typed.
+           A remote update is a document change too, and it arrives carrying
+           `ySyncPluginKey`. Announcing on those would tell the other person
+           that you are writing because they are. */
+        if (!transaction.getMeta(ySyncPluginKey)) onLocalEditRef.current?.();
       },
     },
     [collaboration?.document, collaboration?.provider],

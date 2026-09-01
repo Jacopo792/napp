@@ -103,34 +103,70 @@ export function createAuthorizer(
   };
 }
 
+/** The `sub` claim, read without verifying anything.
+ *
+ *  This is not a security decision and must never become one: it only says
+ *  which rows are worth asking for, so that the profile read can leave at the
+ *  same time as the note read instead of queueing behind `getUser`. Every
+ *  answer built from it is checked against the verified id below, and the
+ *  queries themselves go through PostgREST, which verifies the signature and
+ *  the expiry before it returns a row. A token this cannot parse simply costs
+ *  the extra round trip it used to cost every time. */
+export function unverifiedSubject(token: string): string | null {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString();
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === "string" && sub ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The archive, read through the caller's own token so row level security
- *  answers this server exactly as it answers the browser. */
+ *  answers this server exactly as it answers the browser.
+ *
+ *  Three round trips used to run one after another — `getUser`, then the note,
+ *  then membership and profile — because each waited for an id the one before
+ *  it produced. Only membership genuinely waits: it needs the archive the note
+ *  turned out to belong to. The rest go together, which halves the latency of
+ *  opening a note and takes nothing away, since `getUser` still runs, still
+ *  decides, and its id is still the one every answer is built from. */
 export function supabaseLookup(asCaller: (token: string) => SupabaseClient): Lookup {
   return async (token, noteId) => {
     const caller = asCaller(token);
-    const identity = await caller.auth.getUser(token);
+    const claimed = unverifiedSubject(token);
+
+    const [identity, note, claimedProfile] = await Promise.all([
+      caller.auth.getUser(token),
+      caller.from("notes").select("id, archive_id, trashed_at").eq("id", noteId).maybeSingle(),
+      claimed
+        ? caller.from("profiles").select("nickname").eq("user_id", claimed).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
     if (identity.error || !identity.data?.user) return null;
     const userId = identity.data.user.id;
-
-    const note = await caller
-      .from("notes")
-      .select("id, archive_id, trashed_at")
-      .eq("id", noteId)
-      .maybeSingle();
     if (note.error) throw new Error(note.error.message);
     const row = (note.data as NoteRow | null) ?? null;
 
-    const [membership, profile] = await Promise.all([
-      row
-        ? caller
-            .from("archive_members")
-            .select("role")
-            .eq("archive_id", row.archive_id)
-            .eq("user_id", userId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      caller.from("profiles").select("nickname").eq("user_id", userId).maybeSingle(),
-    ]);
+    /* The guess is only ever an optimisation. If it named anybody but the
+       account the token actually belongs to, the profile it fetched is thrown
+       away and the real one is read. */
+    const profile =
+      claimed === userId
+        ? claimedProfile
+        : await caller.from("profiles").select("nickname").eq("user_id", userId).maybeSingle();
+
+    const membership = row
+      ? await caller
+          .from("archive_members")
+          .select("role")
+          .eq("archive_id", row.archive_id)
+          .eq("user_id", userId)
+          .maybeSingle()
+      : { data: null, error: null };
     if (membership.error) throw new Error(membership.error.message);
 
     return {

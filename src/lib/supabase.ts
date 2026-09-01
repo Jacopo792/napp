@@ -3,6 +3,7 @@ import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta, Tag } from "./types";
 import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
+import { readCachedNotes, writeCachedNotes, type CachedNote as StoredNote } from "./noteStore";
 import {
   noteDocument,
   richTextToPlainText,
@@ -75,10 +76,7 @@ interface NoteTagRow {
    which is what lets the WeakMap in lib/derived.ts keep the preview and search
    text it already computed for an unchanged note. ─────────────────────────── */
 
-interface CachedNote {
-  version: number;
-  note: Note;
-}
+type CachedNote = StoredNote;
 
 let cacheArchiveId: string | null = null;
 const noteCache = new Map<string, CachedNote>();
@@ -128,6 +126,10 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     membersResult,
     profilesResult,
     archiveResult,
+    /* Read beside the queries it exists to save, never before them: on a warm
+       tab it is already in memory and this costs nothing, and on a cold one it
+       finishes long before the network does. */
+    persisted,
   ] = await Promise.all([
     supabase
       .from("notes")
@@ -149,7 +151,13 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
     supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).single(),
+    noteCache.size === 0 ? readCachedNotes(archiveId) : Promise.resolve(null),
   ]);
+
+  /* Only what this tab has not already got. A note edited since the store was
+     written has a moved version and is declared stale below regardless. */
+  if (persisted)
+    for (const [id, entry] of persisted) if (!noteCache.has(id)) noteCache.set(id, entry);
   for (const result of [
     notesResult,
     foldersResult,
@@ -283,7 +291,18 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
 
   // Notes deleted elsewhere should not keep their plaintext alive in this tab.
   const present = new Set(noteRows.map((row) => row.id));
-  for (const id of [...noteCache.keys()]) if (!present.has(id)) noteCache.delete(id);
+  const dropped: string[] = [];
+  for (const id of [...noteCache.keys()])
+    if (!present.has(id)) {
+      noteCache.delete(id);
+      dropped.push(id);
+    }
+
+  /* Deliberately not awaited. The catalogue is built and about to be returned;
+     writing it down is for the next visit and must never hold up this one. */
+  const rewritten = staleIds.map((id) => noteCache.get(id)).filter((entry) => entry !== undefined);
+  if (rewritten.length > 0 || dropped.length > 0)
+    void writeCachedNotes(archiveId, rewritten, dropped);
 
   const foldersByOwner: Record<string, Folder[]> = {};
   const plainFolders = await Promise.all(

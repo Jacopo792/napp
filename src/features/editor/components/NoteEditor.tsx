@@ -645,6 +645,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 editBody(entry.note.id, body, content);
                 onEdited();
               }}
+              /* Typing in the body is what the other reader's caret is about,
+                 and Yjs carries the words, so this is the only thing the page
+                 still needs to hear about a keystroke. */
+              onLocalEdit={onEdited}
               onPasteImage={handlePastedImage}
               onOpenLink={openLinkForm}
               mobile={mobile}

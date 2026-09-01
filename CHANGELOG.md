@@ -224,6 +224,30 @@ config push` aligned it; the redirect allow-list now holds only that origin
 - A nickname arriving from the profile, or the presence preference being
   toggled, no longer tears the connection down and redoes the handshake. Both
   left the connection effect for one of their own.
+- **Pictures are fetched once, not once per visit.** Note photographs and
+  covers were held in a map that lived as long as the tab, so every reload sent
+  the whole catalogue's pictures back to Storage in eu-west-1 — a fresh TLS
+  handshake and about a third of a second each. They are kept in the Cache API
+  now: measured in the browser, a cached picture is a 0.1 ms read instead.
+- **The catalogue is not re-downloaded to draw a list.** `loadArchive` already
+  refused to re-fetch a note whose version had not moved, but the versions
+  lived only in memory, so every reload declared every note stale and pulled
+  `title`, `body` and the entire Tiptap `content` of all of them in one query.
+  The versioned cache is written to IndexedDB and read back beside the queries
+  it saves, so a note crosses the wire when its version moves and not other-
+  wise. It is emptied on sign-out.
+- **Opening a note asks the archive two questions instead of three.** The
+  collaboration server ran `getUser`, then the note, then membership and
+  profile, each waiting for an id the one before produced. Only membership
+  genuinely waits — it needs the archive the note turned out to belong to — so
+  the rest now leave together. `getUser` still runs and still decides.
+- **The other reader's caret never appeared while you wrote.** `onEdited` —
+  which raises the "is writing" flag — sat in the branch taken only when
+  collaboration is off, in both the body and the title. With collaboration on,
+  which is always, typing announced nothing at all. Local document changes now
+  raise it, and changes arriving from the other person do not: those carry
+  `ySyncPluginKey`, and announcing on them would tell somebody you were writing
+  because they were.
 - **The tailpiece under a note is a rule and a lozenge.** It was a botanical
   plate drawn at 200x260 and asked to be 58 pixels wide at 16% opacity, which
   is a smudge, and it restaged its petal-by-petal draw on every note switch —

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { NoteRow } from "./access.ts";
-import { createAuthorizer, type Lookup } from "./authorize.ts";
+import { createAuthorizer, unverifiedSubject, type Lookup } from "./authorize.ts";
 
 const NOTE: NoteRow = { id: "note", archive_id: "archive", trashed_at: null };
 
@@ -122,4 +122,38 @@ test("two accounts on one server never share an answer", async () => {
     yours.allowed && yours.identity.color,
     "two accounts were given the same caret colour",
   );
+});
+
+/* `unverifiedSubject` only decides which profile row is worth fetching early.
+   It must never throw on a token it cannot read, because the fallback path —
+   ask again once `getUser` has answered — is what its `null` selects. */
+function jwt(payload: object): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `header.${body}.signature`;
+}
+
+test("the unverified subject reads sub from a well-formed token", () => {
+  assert.equal(unverifiedSubject(jwt({ sub: "member", exp: 1 })), "member");
+});
+
+test("the unverified subject refuses anything it cannot read", () => {
+  for (const token of [
+    "",
+    "not-a-jwt",
+    "header..signature",
+    "header.$$$notbase64$$$.signature",
+    jwt({ exp: 1 }),
+    jwt({ sub: "" }),
+    jwt({ sub: 42 }),
+  ]) {
+    assert.equal(unverifiedSubject(token), null, `accepted ${JSON.stringify(token)}`);
+  }
+});
+
+test("base64url tokens decode as well as base64 ones", () => {
+  /* `-` and `_` stand in for `+` and `/`, and a payload carrying them must not
+     come back as a different id than the one that was signed. */
+  const sub = "a?b>c~d";
+  const decoded = unverifiedSubject(jwt({ sub }));
+  assert.equal(decoded, sub);
 });
