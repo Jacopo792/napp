@@ -1,4 +1,4 @@
-/* Preview fixture. Shaped after the real corpus: long Italian study titles,
+/* Preview fixture. Shaped after the real corpus: long study titles,
    multi-section bodies, a few short scraps. Nothing here is copied from a real
    note — it is authored material with the same dimensions, which is the point:
    density decisions must be judged against 55-character titles, not "Note 1". */
@@ -28,158 +28,157 @@ type Seed = { title: string; body: string; days: number; folder: string | null }
 
 const SEEDS: Seed[] = [
   {
-    title: "MAPPA 5: I CONGLOMERATI COREANI (e perché nessuno li ha copiati)",
+    title: "MAP 5: KOREAN CONGLOMERATES (and why nobody copied them)",
     folder: F_STUDIO,
     days: 0,
-    body: `Il punto non è la dimensione. È **la struttura di controllo incrociato**, che
-permette a una famiglia di governare trenta società con il 3% del capitale.
+    body: `The point is not their size. It is **the cross-ownership structure**, which
+allows one family to control thirty companies with 3% of the capital.
 
-## Come funziona l'anello
+## How the ring works
 
-La holding non possiede direttamente le controllate. Possiede una quota della
-società A, che possiede una quota di B, che a sua volta rientra nel capitale
-della holding. L'anello si chiude e il capitale necessario crolla.
+The holding company does not own its subsidiaries directly. It owns a stake in
+company A, which owns a stake in B, which in turn owns part of the holding
+company. The ring closes and the amount of capital required collapses.
 
-- L'anello regge finché nessun anello interno viene quotato separatamente
-- Le riforme del 1999 hanno vietato i nuovi anelli, non quelli esistenti
-- Il costo reale è la *governance*, non il capitale
+- The ring holds as long as none of its internal links is listed separately
+- The 1999 reforms banned new rings, not existing ones
+- The real cost is *governance*, not capital
 
-## Perché il modello non si esporta
+## Why the model cannot be exported
 
-Serve un sistema bancario disposto a prestare alla struttura invece che al
-progetto. Fuori da un contesto in cui lo Stato garantisce implicitamente il
-debito, l'anello è semplicemente un moltiplicatore di rischio.
+It requires a banking system willing to lend to the structure rather than the
+project. Outside a context in which the state implicitly guarantees the debt,
+the ring is simply a risk multiplier.
 
-> Chi guarda solo il fatturato consolidato non vede la leva. La leva è la cosa.
+> Anyone looking only at consolidated revenue cannot see the leverage. The leverage is the point.
 
 ---
 
-Da riprendere: il confronto con i keiretsu giapponesi, che risolvono lo stesso
-problema con la banca al centro invece che con la famiglia.`,
+To revisit: the comparison with Japanese keiretsu, which solve the same problem
+by placing a bank at the centre instead of a family.`,
   },
   {
-    title: "La filiera dei chip, dal sabbia alla fotolitografia",
+    title: "The Chip Supply Chain, from Sand to Photolithography",
     folder: F_STUDIO,
     days: 0,
-    body: `Cinque stadi, e in ognuno c'è un collo di bottiglia diverso.
+    body: `Five stages, each with a different bottleneck.
 
-### 1. Materia prima
-Silicio metallurgico → silicio policristallino → lingotto → wafer.
-Il collo di bottiglia qui non è tecnico ma energetico.
+### 1. Raw materials
+Metallurgical silicon → polycrystalline silicon → ingot → wafer.
+The bottleneck here is not technical but energetic.
 
-### 2. Progettazione
-Le fonderie non progettano. Chi progetta non produce. La separazione è recente
-e ha creato due industrie con margini opposti.
+### 2. Design
+Foundries do not design. Designers do not manufacture. The separation is recent
+and has created two industries with opposite margins.
 
-### 3. Litografia
-Un solo fornitore al mondo per l'EUV. Tutto il resto della filiera è
-sostituibile; questo no.
+### 3. Lithography
+There is only one EUV supplier in the world. Every other part of the supply
+chain is replaceable; this one is not.
 
 \`\`\`
-wafer 300mm → ~600 die utili → resa 70-90%
+300 mm wafer → ~600 usable dies → 70–90% yield
 \`\`\`
 
-### 4. Packaging e test
-Storicamente la parte noiosa. Da quando lo stacking 3D conta, non più.
+### 4. Packaging and testing
+Historically the boring part. Not since 3D stacking began to matter.
 
-### 5. Integrazione
-Dove il valore torna a chi ha il rapporto col cliente finale.`,
+### 5. Integration
+Where value returns to whoever owns the relationship with the end customer.`,
   },
   {
-    title: "Aforismi",
+    title: "Aphorisms",
     folder: F_APPUNTI,
     days: 1,
-    body: `Raccolta aperta. Nessun ordine.
+    body: `An open collection. No particular order.
 
-- Chi non sa cosa cerca non capisce cosa trova.
-- La semplicità è ciò che resta quando hai finito di togliere, non quando hai
-  smesso di aggiungere.
-- Il piano sopravvive raramente al primo contatto con i fatti; il metodo sì.
+- Those who do not know what they are looking for cannot understand what they find.
+- Simplicity is what remains when you have finished removing, not when you have
+  stopped adding.
+- A plan rarely survives first contact with reality; a method does.
 - *Festina lente.*`,
   },
   {
-    title: "Discord web hooks — payload minimo che funziona",
+    title: "Discord Webhooks — the Smallest Payload That Works",
     folder: F_TECNICA,
     days: 2,
-    body: `Il messaggio più corto che Discord accetta senza lamentarsi:
+    body: `The shortest message Discord accepts without complaint:
 
 \`\`\`json
-{ "content": "ciao", "username": "bot" }
+{ "content": "hello", "username": "bot" }
 \`\`\`
 
-Note pratiche:
+Practical notes:
 
-1. Rate limit: 5 richieste ogni 2 secondi per webhook. Oltre, 429 con
-   \`retry_after\` in millisecondi.
-2. \`embeds\` accetta al massimo 10 elementi, e il totale dei caratteri di tutti
-   gli embed non può superare 6000.
-3. Un webhook cancellato risponde 401, non 404. Vale la pena distinguerli nel
-   codice di retry.
+1. Rate limit: 5 requests every 2 seconds per webhook. Beyond that, Discord
+   returns 429 with \`retry_after\` in milliseconds.
+2. \`embeds\` accepts at most 10 items, and the combined character count of all
+   embeds cannot exceed 6,000.
+3. A deleted webhook returns 401, not 404. It is worth distinguishing the two
+   in retry logic.
 
-Vedi anche [la documentazione ufficiale](https://discord.com/developers/docs).`,
+See also [the official documentation](https://discord.com/developers/docs).`,
   },
   {
-    title: "Parole da memorizzare",
+    title: "Words to Remember",
     folder: F_APPUNTI,
     days: 3,
-    body: `**ancipite** — a due punte, ambiguo
-**cesura** — interruzione netta, in metrica e altrove
-**epigono** — chi segue un maestro senza aggiungere nulla
-**paralogismo** — ragionamento scorretto ma in buona fede
-**tautologia** — proposizione vera per sola forma`,
+    body: `**ambivalent** — having two opposing interpretations or tendencies
+**caesura** — a sharp break, in metre or elsewhere
+**epigone** — a follower who adds nothing to a master's work
+**paralogism** — faulty reasoning made in good faith
+**tautology** — a proposition that is true by virtue of its form alone`,
   },
   {
-    title: "Distillazione del petrolio: perché le frazioni escono in quell'ordine",
+    title: "Petroleum Distillation: Why the Fractions Emerge in That Order",
     folder: F_STUDIO,
     days: 5,
-    body: `La colonna non separa per "tipo" ma per **temperatura di ebollizione**, e
-l'ordine delle frazioni è semplicemente l'ordine crescente della lunghezza
-della catena.
+    body: `The column does not separate by "type" but by **boiling point**, and the
+order of the fractions simply follows increasing chain length.
 
-| Frazione | Catena | °C |
+| Fraction | Chain | °C |
 |---|---|---|
 | Gas | C1–C4 | < 40 |
-| Benzina | C5–C10 | 40–200 |
-| Cherosene | C10–C16 | 200–260 |
-| Gasolio | C14–C20 | 260–340 |
-| Residuo | > C20 | > 340 |
+| Petrol | C5–C10 | 40–200 |
+| Kerosene | C10–C16 | 200–260 |
+| Diesel | C14–C20 | 260–340 |
+| Residue | > C20 | > 340 |
 
-Più la catena è lunga, più forze di dispersione tiene insieme, più energia
-serve per staccare le molecole. Tutto qui.`,
+The longer the chain, the more dispersion forces hold it together and the more
+energy is required to separate the molecules. That is all.`,
   },
   {
-    title: "Elettricità — appunti sparsi da sistemare",
+    title: "Electricity — Scattered Notes to Organise",
     folder: null,
     days: 8,
-    body: `Tensione è differenza di potenziale, non "quantità". La quantità è la carica.
+    body: `Voltage is a difference in electric potential, not a "quantity". Charge is the quantity.
 
-La corrente non "si consuma" attraversando un carico: entra ed esce identica.
-Ciò che si consuma è l'energia, e si vede nella caduta di tensione.
+Current is not "used up" as it passes through a load: the same amount enters and
+leaves. Energy is what is consumed, and the voltage drop reveals it.
 
-Da chiarire: perché il neutro è a potenziale di terra ma non è la terra.`,
+To clarify: why neutral is at ground potential but is not ground.`,
   },
   {
-    title: "Abbozzi",
+    title: "Drafts",
     folder: null,
     days: 14,
-    body: `Cose iniziate e mai finite. Non cancellare.
+    body: `Things started and never finished. Do not delete.
 
-- Un pezzo sul perché le mappe concettuali funzionano solo se le disegni tu
-- La differenza tra capire e ricordare di aver capito`,
+- A piece on why concept maps work only when you draw them yourself
+- The difference between understanding and remembering that you understood`,
   },
   {
-    title: "BHAGAVAD GĪTĀ — il problema del secondo capitolo",
+    title: "BHAGAVAD GĪTĀ — the Problem of the Second Chapter",
     folder: F_STUDIO,
     days: 21,
-    body: `Arjuna non rifiuta di combattere per codardia. Rifiuta perché ha capito
-qualcosa di vero: che la vittoria costa esattamente ciò che vuole difendere.
+    body: `Arjuna does not refuse to fight out of cowardice. He refuses because he has
+understood something true: victory costs exactly what he wants to defend.
 
-La risposta di Kṛṣṇa non nega il costo. Sposta la domanda dal risultato
-all'azione. È una mossa che regge o crolla su un punto solo: se il sé che
-agisce sia lo stesso sé che raccoglie il risultato.`,
+Kṛṣṇa's answer does not deny the cost. It shifts the question from the result
+to the action. The move stands or falls on a single point: whether the self that
+acts is the same self that reaps the result.`,
   },
   {
-    title: "Nota senza titolo di prova",
+    title: "Untitled Test Note",
     folder: null,
     days: 40,
     body: "",
