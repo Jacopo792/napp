@@ -5818,3 +5818,12 @@
     transition: none;
   }
 }
+
+/* Two notes read together. The seam is a hairline and not a resizer: the two
+   share the room equally, because a split you have to adjust before it is
+   usable is a split you stop opening. */
+.split-seam {
+  width: 1px;
+  flex-shrink: 0;
+  background: var(--rule-soft);
+}

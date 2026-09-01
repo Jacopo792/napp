@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   Archive,
   ChevronLeft,
+  Columns2,
   FileText,
   Folder,
   FolderDown,
@@ -18,6 +19,7 @@ import {
   Settings as SettingsIcon,
   SquarePen,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   DndContext,
@@ -256,6 +258,11 @@ function NotesPage() {
      to run without the rail and the list, so this is that state plus a way in
      that is not a small button in a corner, plus a class the stylesheet reads. */
   const [focusMode, setFocusMode] = useState(false);
+  /* The second note, read beside the first. A note id and nothing else: the
+     editor is already a component that takes an entry, and the collaboration
+     hook is already a hook that takes a note id — two of each is the whole
+     feature, on the one socket `collab.ts` holds for the session. */
+  const [splitId, setSplitId] = useState<string | null>(null);
   /* Raised by a keystroke and lowered by the pointer. Deliberately not the
      presence `typing` flag: that one needs a channel, and presence is off by
      default — the page's own chrome must not depend on a socket to get out of
@@ -297,6 +304,7 @@ function NotesPage() {
   const fileTypes = useRef(new Map<string, string>());
   const searchRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const splitTitleRef = useRef<HTMLTextAreaElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
 
@@ -312,6 +320,11 @@ function NotesPage() {
     [session, profile.nickname],
   );
   const collaborative = useCollaborativeNote(selectedId, collaborationIdentity, presenceEnabled);
+  /* The second document never publishes presence. Presence carries one
+     `noteId`, so two publishing editors would spend the session arguing about
+     which note you are on — and the answer the other reader wants is the one
+     your caret is in, which is the primary. */
+  const splitCollaborative = useCollaborativeNote(splitId, collaborationIdentity, false);
   /* Who is on this note, asked of the note's own document rather than of a
      second channel that has to be told which note that is. A peer in this
      list is connected to this note by construction. */
@@ -1982,6 +1995,16 @@ function NotesPage() {
     .filter((note): note is Note => Boolean(note))
     .map((note) => ({ id: note.id, title: note.title }));
 
+  /* Nothing may be beside itself. And nothing in the trash: `canEdit` is
+     computed for the note in the primary column, so a trashed note opened
+     beside a live one would inherit permission to be written — which is the
+     one thing Trash exists to withhold. Excluded here and again where the
+     palette offers the list, so neither route can reach it. */
+  const splitEntry =
+    splitId && splitId !== selectedId && !trashedIds.has(splitId)
+      ? (ownedEntries.find((entry) => entry.note.id === splitId) ?? null)
+      : null;
+
   /* The pinned notes the rail lists. Trash and Archive are left out: a pin is
      a note you are coming back to, and neither of those is that. */
   const pinnedNotes = ownedEntries
@@ -2078,6 +2101,34 @@ function NotesPage() {
         icon: <SquarePen size={15} />,
         run: () => void handleNew(),
       },
+      ...(selectedId
+        ? ownedEntries
+            .filter(
+              (entry) =>
+                entry.note.id !== selectedId &&
+                entry.note.id !== splitId &&
+                !trashedIds.has(entry.note.id),
+            )
+            .map((entry) => ({
+              id: `split:${entry.note.id}`,
+              group: "Open beside",
+              name: entry.note.title || "Untitled",
+              keywords: `split side by side beside ${derivedOf(entry.note).haystack}`,
+              icon: <Columns2 size={15} />,
+              run: () => setSplitId(entry.note.id),
+            }))
+        : []),
+      ...(splitEntry
+        ? [
+            {
+              id: "unsplit",
+              group: "Do",
+              name: "Close the second note",
+              icon: <Columns2 size={15} />,
+              run: () => setSplitId(null),
+            },
+          ]
+        : []),
       {
         id: "focus",
         group: "Do",
@@ -2635,6 +2686,55 @@ function NotesPage() {
               commentAuthors={commentAuthors}
             />
           </Suspense>
+
+          {/* The second note. It closes itself and does nothing else from its
+              own header: one note is the one you are working in, and giving
+              both a full set of page controls would mean two of everything
+              claiming to be the note. */}
+          {splitEntry && (
+            <>
+              <div className="split-seam" />
+              <Suspense fallback={<div className="soft-pane pane-page min-w-0 flex-1" />}>
+                <NoteEditor
+                  key={`split:${splitEntry.note.id}`}
+                  entry={splitEntry}
+                  syncRevision={syncRevision}
+                  canEdit={canEdit}
+                  proofreaderEnabled={proofreaderEnabled}
+                  viewingAsPartner={viewAs === "u2"}
+                  partnerName={partnerName}
+                  titleRef={splitTitleRef}
+                  onEdited={handleEdited}
+                  onNew={handleNew}
+                  onImportMarkdown={() => importRef.current?.click()}
+                  onUploadImage={handleUploadImage}
+                  onUploadFile={handleUploadFile}
+                  resolveImage={resolveImage}
+                  resolveFile={resolveFile}
+                  onUpdatePageProperties={handleUpdatePageProperties}
+                  collaboration={
+                    (splitCollaborative.ready || splitCollaborative.cached) &&
+                    splitCollaborative.doc
+                      ? { document: splitCollaborative.doc, provider: null }
+                      : null
+                  }
+                  synced={splitCollaborative.ready}
+                  session={session}
+                  headerActions={
+                    <button
+                      type="button"
+                      onClick={() => setSplitId(null)}
+                      aria-label="Close the second note"
+                      title="Close the second note"
+                      className="toolbar-button press"
+                    >
+                      <X size={16} />
+                    </button>
+                  }
+                />
+              </Suspense>
+            </>
+          )}
         </div>
 
         <DragOverlay dropAnimation={null}>
