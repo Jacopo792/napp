@@ -12,9 +12,9 @@ a calm place to write, with a few genuinely useful things to do together with th
 person sharing the archive.
 
 The result is deliberately simple when you are writing and collaborative where it
-matters. Each archive is limited to two people: friends, partners, siblings or any
+matters. Each archive holds two people by default: friends, partners, siblings or any
 other pair who want a shared place for their notes. It is not meant to be a workspace
-for teams.
+for teams, and the limit is enforced in the database rather than by the interface.
 
 ## What we can do together
 
@@ -129,6 +129,14 @@ Members can read the archive. Editors can also change notes, folders, files, rol
 invitations. `owner_id` only decides where a note appears in the interface; it is not a
 security boundary.
 
+The seat limit is a database rule. `archives.seat_limit` defaults to `2` (`1`–`8`
+allowed) and a `before insert` trigger on `archive_members`,
+`private.enforce_archive_seats()`, refuses the extra row whichever path it arrives by:
+bootstrap, invitation redemption or a direct write. Issuing an invitation counts
+unclaimed, unexpired invitations against the same limit, so a link that could never be
+redeemed is never created. Settings does the same arithmetic to close the form early;
+that part is a courtesy, not the boundary.
+
 ## Documentation
 
 | File                           | Contents                                   |
@@ -140,6 +148,9 @@ security boundary.
 | [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes |
 
 ## Deployment
+
+The app runs at <https://jacopo792.github.io/note-sharing-app/>. There is no other
+deployment.
 
 The frontend is published through GitHub Pages after the frontend checks, local
 Supabase integration tests, Redis tests and server image build pass. It needs the
