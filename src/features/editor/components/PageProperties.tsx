@@ -208,7 +208,7 @@ export function PageIdentity({
      appeared. The slot is reserved instead: the photo arrives into space it
      already occupied, and nothing below it moves. */
   return (
-    <div className="note-page-identity">
+    <div className={`note-page-identity ${cover ? "has-cover" : ""} ${photo ? "" : "is-empty"}`}>
       {photo && <span className="note-photo is-page">{url && <img src={url} alt="" />}</span>}
     </div>
   );

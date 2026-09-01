@@ -5732,6 +5732,13 @@
   margin-bottom: 7px;
 }
 
+/* A cover already gives the page a visual identity. Keeping the empty photo
+   slot beneath it only pushes the timestamp and title away from the image. */
+.note-page-identity.has-cover.is-empty {
+  height: 0;
+  margin-bottom: 0;
+}
+
 /* Now a control in the toolbar rather than the one thing in the reading column
    that was not the note, so it is sized like its neighbours there and needs no
    optical correction against a text edge. */
