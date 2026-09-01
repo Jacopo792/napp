@@ -210,21 +210,6 @@ export function PageIdentity({
   return (
     <div className="note-page-identity">
       {photo && <span className="note-photo is-page">{url && <img src={url} alt="" />}</span>}
-      {!cover && canEdit && (
-        <button
-          type="button"
-          className="note-add-property"
-          onClick={() =>
-            onChange({
-              photo,
-              cover: { kind: "preset", id: COVER_PRESETS[0].id, position: 0.5 },
-            })
-          }
-        >
-          <ImageIcon size={15} />
-          Add cover
-        </button>
-      )}
     </div>
   );
 }

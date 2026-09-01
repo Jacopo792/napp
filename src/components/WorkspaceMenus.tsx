@@ -1599,14 +1599,6 @@ export function SettingsPanel({
               <dt>Reading</dt>
               <dd>{reading}</dd>
             </dl>
-
-            <div className="settings-aside-block">
-              <p className="settings-aside-label">Sign out</p>
-              <p>
-                Ends this session on this device. Your notes stay where they are, and the account
-                opens them again. The button is at the foot of the list on the left.
-              </p>
-            </div>
           </aside>
         </div>
       </section>

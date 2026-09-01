@@ -1735,6 +1735,24 @@ function NotesPage() {
     writingPreferences,
   ]);
 
+  /* Who may sign a remark: the archive's own roster, with the avatars already
+     resolved for the sidebar. Comments name people, and a comment from "an id"
+     is not a conversation. */
+  const commentAuthors = useMemo(
+    () =>
+      new Map(
+        members.map((member) => [
+          member.userId,
+          {
+            userId: member.userId,
+            name: member.nickname || (member.isSelf ? "You" : "Someone"),
+            avatarUrl: avatarUrls[member.userId] ?? null,
+          },
+        ]),
+      ),
+    [members, avatarUrls],
+  );
+
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, handleLock);
@@ -2157,6 +2175,8 @@ function NotesPage() {
                     headerActions={noteActions}
                     readers={noteReaders}
                     synced={collaborative.ready}
+                    session={session}
+                    commentAuthors={commentAuthors}
                   />
                 </Suspense>
               </section>
@@ -2309,6 +2329,8 @@ function NotesPage() {
               headerActions={noteActions}
               readers={noteReaders}
               synced={collaborative.ready}
+              session={session}
+              commentAuthors={commentAuthors}
             />
           </Suspense>
         </div>

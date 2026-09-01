@@ -1,5 +1,6 @@
 import {
   Extension,
+  Mark,
   Node,
   mergeAttributes,
   type JSONContent,
@@ -100,6 +101,48 @@ export const PrivateFile = Node.create({
   },
 });
 
+/* A passage somebody has remarked on.
+ *
+ * The anchor lives in the document, not in a column: a comment is about words,
+ * and words move. Carried as a mark it converges with the text through Yjs,
+ * survives every edit either person makes above it, and needs no stored offset
+ * that would be wrong the moment a line was typed higher up. The remark itself
+ * — who, when, what — is a row in `note_comments`, joined by this id.
+ *
+ * `inclusive: false` so typing at either end of a commented passage writes
+ * outside it rather than quietly enlarging what was remarked on. It excludes
+ * nothing, so a passage can carry a comment and a colour at once.
+ *
+ * It belongs in the schema rather than in the editor alone, because the
+ * Markdown serializer, the legacy parser, the Yjs conversion and the
+ * collaboration server all read documents that may contain it, and a schema
+ * that does not know a mark drops it. */
+export const CommentAnchor = Mark.create({
+  name: "comment",
+  inclusive: false,
+  excludes: "",
+  addAttributes() {
+    return {
+      threadId: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-comment-thread") ?? "",
+        renderHTML: (attributes) =>
+          attributes.threadId ? { "data-comment-thread": attributes.threadId } : {},
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "span[data-comment-thread]" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { class: "note-comment-anchor" }), 0];
+  },
+  /* A comment is this archive's conversation about the passage, not part of
+     it. Markdown leaves with the words and without the thread — a reader in
+     Obsidian has no comment to open, and `napp-comment:` in their file would
+     be the broken link `demotePrivateMedia` exists to avoid inventing more
+     of. */
+  renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
+});
+
 /** Everything the schema holds except the two private-media nodes, which the
  *  editor supplies in an extended form. */
 export const BASE_EXTENSIONS = [
@@ -123,6 +166,7 @@ export const BASE_EXTENSIONS = [
   TaskItem.configure({ nested: true }),
   Image.configure({ allowBase64: true }),
   LegacyColorMarkdown,
+  CommentAnchor,
 ];
 
 /** The persisted document schema, whole. */

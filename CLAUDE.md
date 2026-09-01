@@ -220,6 +220,25 @@ not the live writer. Do not call saveNote() from the collaborative editor.
 Exports must project the live Yjs document so they include text still being
 typed.
 
+## Remarks on a passage
+
+A comment is anchored by `CommentAnchor`, a mark in the note's own Yjs
+document, and never by a stored offset: the passage keeps its comment through
+every edit made above it and converges like the rest of the text. The remarks
+are rows in `note_comments` joined by `thread_id`, which is that mark's id —
+several rows sharing one are a conversation in `created_at` order.
+
+The mark is in `BASE_EXTENSIONS`, not only in the editor, because the Markdown
+serializer, the legacy parser, the Yjs conversion and the collaboration server
+all read documents that may contain it and a schema that does not know a mark
+drops it. Its `renderMarkdown` emits the words alone — a thread id in somebody
+else's Obsidian is exactly the broken link `demotePrivateMedia` avoids
+inventing. `exchange.test.ts` pins that.
+
+`private.freeze_comment_record()` makes `author_id` and `body` immutable: a
+policy can say who may update a row, not which columns. Resolving is any
+editor's to do, deleting is the author's alone.
+
 ## Members and profiles
 
 `public.profiles` carries a nickname and an avatar object per account.

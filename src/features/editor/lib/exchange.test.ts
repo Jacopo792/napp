@@ -59,3 +59,57 @@ test("two notes with one title do not become one file", () => {
     "Appunti 3.md",
   ]);
 });
+
+/* A comment is this archive's conversation about a passage, not part of it.
+   Markdown has to leave with the words and without the thread — and, because
+   the mark now sits in the schema every serializer reads, a document carrying
+   one must not fail to serialize at all. */
+test("a commented passage leaves as its words, without the thread", () => {
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Una frase " },
+          {
+            type: "text",
+            text: "commentata",
+            marks: [
+              { type: "comment", attrs: { threadId: "11111111-2222-3333-4444-555555555555" } },
+            ],
+          },
+          { type: "text", text: " e una no." },
+        ],
+      },
+    ],
+  });
+  assert.equal(markdown.trim(), "Una frase commentata e una no.");
+  /* The words, and nothing about the thread. Not `/comment/` — "commentata" is
+     one of the words. */
+  assert.doesNotMatch(markdown, /11111111|threadId|data-comment|<span/i);
+});
+
+test("a comment survives beside a colour without swallowing it", () => {
+  /* `excludes: ""` is what allows both marks on one run. If that regressed,
+     one of the two would be dropped and this text would lose its emphasis. */
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "text",
+            text: "forte",
+            marks: [
+              { type: "bold" },
+              { type: "comment", attrs: { threadId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" } },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  assert.match(markdown, /\*\*forte\*\*/);
+});

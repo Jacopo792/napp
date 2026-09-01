@@ -464,6 +464,12 @@
   container-name: editor;
 }
 
+/* The page and the comments column. Positioned so the panel can cover the page
+   rather than crush it when the pane is narrow. */
+.editor-body {
+  position: relative;
+}
+
 .note-title {
   font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
   line-height: 1.14;
@@ -627,6 +633,242 @@
 
 .note-body-waiting .skeleton {
   height: 0.72em;
+}
+
+/* ── Remarks about a passage ─────────────────────────────────────────────────
+   The commented passage is marked in the text itself, so it has to say "there
+   is something to read here" without competing with the words. A dotted rule
+   under the line does that: it is the annotation mark from a proof sheet, it
+   survives a colour and a bold run underneath it, and it never fills the line
+   with a block of ground the way a highlight would. */
+.note-comment-anchor {
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 62%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  cursor: pointer;
+}
+
+.note-comment-anchor:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* The panel is a column beside the page, not a layer over it: reading the
+   remark and reading the passage it is about is one act, and a popover that
+   covers the text makes them two. */
+.note-comments {
+  display: flex;
+  width: 320px;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  border-left: 1px solid var(--rule-soft);
+  background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+}
+
+/* A column beside the page needs a page left to stand beside. Below this the
+   two together leave the note a strip a word wide — "CONGLOMERATI" broken one
+   letter per line — so the panel stops splitting the pane and covers it
+   instead. Measured against the editor itself, not the window: what matters is
+   how much room this pane has, and with both navigation columns open that is
+   nothing like the viewport. */
+@container editor (max-width: 700px) {
+  .note-comments {
+    position: absolute;
+    z-index: 45;
+    inset: 0 0 0 auto;
+    width: min(340px, 100%);
+    box-shadow: -18px 0 40px rgb(0 0 0 / 0.28);
+  }
+}
+
+.note-comments-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink-3);
+}
+
+.note-comments-title {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.note-comments-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.note-comments-empty,
+.note-comments-failure {
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.note-comments-failure {
+  padding: 0 12px;
+  color: var(--danger);
+}
+
+.note-comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--paper);
+}
+
+/* A thread nobody needs to act on any more steps back rather than disappearing:
+   what was said stays readable, and stops asking to be read. */
+.note-comment-thread.is-resolved {
+  opacity: 0.58;
+}
+
+.note-comment-thread.is-pending {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* The quotation is the thread's title, so it is set like one — and clipped,
+   because a comment on three paragraphs must not push the remark off screen. */
+.note-comment-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  padding-left: 8px;
+  color: var(--ink-3);
+  font-family: var(--font-reading);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.note-comment-quote.is-link:hover {
+  color: var(--ink);
+}
+
+.note-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.note-comment-signature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-comment-signature .avatar.is-compact {
+  width: 20px;
+  height: 20px;
+  font-size: 8px;
+}
+
+.note-comment-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
+.note-comment-stamp {
+  color: var(--ink-4);
+}
+
+.note-comment-body {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-comment-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-md);
+  padding: 3px 6px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.note-comment-action:hover {
+  color: var(--ink-2);
+}
+
+.note-comment-thread-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.note-comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.note-comment-composer textarea {
+  width: 100%;
+  min-height: 3.6em;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+  padding: 7px 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.note-comment-composer textarea::placeholder {
+  color: var(--ink-4);
+}
+
+.note-comment-send {
+  border-radius: var(--radius-md);
+  padding: 5px 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.note-comment-send:disabled {
+  background: var(--paper-2);
+  color: var(--ink-4);
+}
+
+/* The phone has no room for a column beside the page, so the panel takes the
+   page's width and sits over it. */
+@media (max-width: 700px) {
+  .note-comments {
+    width: 100%;
+    border-left: none;
+  }
 }
 
 /* The tailpiece under a note: a hairline that fades out at both ends, broken in
@@ -1698,18 +1940,18 @@
   white-space: nowrap;
 }
 
-/* The header is one left edge: the photograph, the date and the title all
-   start where the text below them starts. The date was centred over a
-   left-aligned title, which on a note with a picture read as the picture being
-   out of line rather than the date being — the photo sits directly above it
-   and takes the blame for the stagger. */
+/* Centred, deliberately. Everything else in the column starts on the same left
+   edge, and a timestamp joining that queue made the head of the page read as
+   one thin line of things stacked in single file. Set over the measure it
+   belongs to, it is a caption above a title rather than another item in a
+   list. */
 .note-date {
   margin-bottom: 1.15rem;
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 12px;
   line-height: 1.4;
-  text-align: left;
+  text-align: center;
 }
 
 .note-gallery-grid {
@@ -4952,17 +5194,13 @@
   margin-bottom: 7px;
 }
 
-/* The hover pill needs padding; the glyph inside it still has to start where
-   the date, the title and the first line of text start. Padding alone put it
-   seven pixels to their right — enough to read as the one thing on the page
-   that is not in the column. The negative margin gives the padding back to the
-   margin, so the pill keeps its breathing room and the mark it contains sits on
-   the edge. */
+/* Now a control in the toolbar rather than the one thing in the reading column
+   that was not the note, so it is sized like its neighbours there and needs no
+   optical correction against a text edge. */
 .note-add-property {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: -7px;
   padding: 5px 7px;
   border-radius: var(--radius-md);
   color: var(--ink-4);

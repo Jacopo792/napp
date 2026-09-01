@@ -15,7 +15,7 @@ import {
 import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
-import { Download, ExternalLink, GripVertical, Trash2 } from "lucide-react";
+import { Download, ExternalLink, GripVertical, MessageSquarePlus, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   forwardRef,
@@ -78,6 +78,18 @@ export interface RichTextEditorHandle {
   insertText: (text: string) => void;
   insertImage: (objectId: string, alt: string) => void;
   insertAttachment: (label: string, objectId: string) => void;
+  /** Mark the current selection as a commented passage and hand back its
+   *  thread id, or `null` when there is nothing selected to comment on. */
+  commentSelection: (threadId: string) => { threadId: string; quote: string } | null;
+  /** Put the caret in a commented passage, and scroll it into view. */
+  revealComment: (threadId: string) => boolean;
+  /** The passage each open thread is attached to, read from the live document
+   *  in one pass — a comment without the words it is about is a note nobody
+   *  can place. */
+  commentQuotes: () => Map<string, string>;
+  /** Take the anchor away — used when a thread is deleted, so no passage is
+   *  left underlined with nothing behind it. */
+  removeComment: (threadId: string) => void;
   setSearch: (query: string) => SearchStatus;
   findNext: () => SearchStatus;
   findPrevious: () => SearchStatus;
@@ -96,6 +108,9 @@ interface Props {
   onLocalEdit?: () => void;
   onPasteImage?: (file: File) => Promise<{ objectId: string; alt: string } | null>;
   onOpenLink: () => void;
+  /** Open a comment on whatever is selected. Absent when the note cannot be
+   *  commented on — Trash, or a reader who may not write. */
+  onComment?: () => void;
   mobile?: boolean;
   resolveImage: (objectId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
@@ -534,6 +549,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onLocalEdit,
     onPasteImage,
     onOpenLink,
+    onComment,
     mobile = false,
     resolveImage,
     resolveFile,
@@ -752,6 +768,64 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           .insertContent({ type: "privateFile", attrs: { objectId, label } })
           .run();
       },
+      commentSelection(threadId) {
+        if (!editor || readOnly) return null;
+        const { state } = editor;
+        const { from, to } = state.selection;
+        if (from === to) return null;
+        const quote = state.doc.textBetween(from, to, " ").trim();
+        editor.chain().focus().setMark("comment", { threadId }).run();
+        return { threadId, quote };
+      },
+      revealComment(threadId) {
+        if (!editor) return false;
+        let found: { from: number; to: number } | null = null;
+        editor.state.doc.descendants((node, pos) => {
+          if (found || !node.isText) return true;
+          const mark = node.marks.find(
+            (m) => m.type.name === "comment" && m.attrs.threadId === threadId,
+          );
+          if (mark) found = { from: pos, to: pos + node.nodeSize };
+          return !found;
+        });
+        if (!found) return false;
+        const { from, to } = found as { from: number; to: number };
+        editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
+        return true;
+      },
+      commentQuotes() {
+        const quotes = new Map<string, string>();
+        if (!editor) return quotes;
+        editor.state.doc.descendants((node) => {
+          if (!node.isText) return true;
+          for (const mark of node.marks) {
+            if (mark.type.name !== "comment") continue;
+            const id = mark.attrs.threadId as string;
+            if (!id) continue;
+            /* A passage broken by a colour or a bold run is several text nodes
+               carrying the same thread; they are one quotation. */
+            quotes.set(id, (quotes.get(id) ?? "") + (node.text ?? ""));
+          }
+          return true;
+        });
+        return quotes;
+      },
+      removeComment(threadId) {
+        if (!editor || readOnly) return;
+        const ranges: { from: number; to: number }[] = [];
+        editor.state.doc.descendants((node, pos) => {
+          if (!node.isText) return true;
+          if (node.marks.some((m) => m.type.name === "comment" && m.attrs.threadId === threadId))
+            ranges.push({ from: pos, to: pos + node.nodeSize });
+          return true;
+        });
+        if (ranges.length === 0) return;
+        const chain = editor.chain();
+        /* Back to front: unsetting a range never shifts one that starts before
+           it, and these are collected in document order. */
+        for (const range of ranges.reverse()) chain.setTextSelection(range).unsetMark("comment");
+        chain.run();
+      },
       setSearch(query) {
         if (!editor) return { current: 0, total: 0 };
         editor.commands.setSearchTerm(query);
@@ -848,6 +922,21 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
             >
               ↗
             </button>
+            {onComment && (
+              <button
+                type="button"
+                className="toolbar-button press"
+                aria-label="Comment on this passage"
+                title="Comment on this passage"
+                /* The selection must survive the click that acts on it: a
+                   pressed button takes focus, and taking focus collapses the
+                   very range being commented on. */
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={onComment}
+              >
+                <MessageSquarePlus size={15} />
+              </button>
+            )}
             <span className="menu-separator rich-bubble-separator" />
             {(["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[]).map(
               (color) => (

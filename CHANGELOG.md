@@ -224,6 +224,24 @@ config push` aligned it; the redirect allow-list now holds only that origin
 - A nickname arriving from the profile, or the presence preference being
   toggled, no longer tears the connection down and redoes the handshake. Both
   left the connection effect for one of their own.
+- **Comments on a passage.** Select some text, press the comment button in the
+  selection's own toolbar, and say what you think about it. The passage keeps a
+  dashed underline; the panel beside the page holds the conversation, with
+  replies, resolving, reopening, and deleting your own remarks.
+  What ties a remark to the words is a mark in the note's own Yjs document, not
+  a stored offset — so the passage keeps its comment through every edit either
+  person makes above it, and converges the way the rest of the text does. The
+  remarks themselves are rows in `note_comments`, under the same rule as the
+  notes: members read, editors write, only the author deletes, and the author
+  and the body of a remark cannot be rewritten afterwards. Markdown export
+  carries the words and not the thread — a reader in Obsidian has no comment to
+  open.
+- **Add cover moves into the toolbar**, with the page's other controls. It was
+  the one thing standing in the reading column that was not the note, and it
+  never quite lined up with the column it stood in.
+- **The time above a title is centred again.** On the left it joined the queue
+  of things all starting at the same edge and made the head of the page read as
+  one thin single-file line; over the measure it is a caption.
 - **A note opens from this device, not from Frankfurt.** The editor waited for
   the collaboration server to authorize and sync before it would mount, so on
   the free plan — which sleeps after fifteen idle minutes — opening a note

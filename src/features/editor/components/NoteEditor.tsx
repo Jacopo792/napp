@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Image as ImageIcon, MessageSquare, Search, X } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -16,6 +16,9 @@ import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachm
 import { imageAltFromFilename } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
 import { translateText, type TranslationLanguage } from "@/features/editor/lib/translation";
+import { COVER_PRESETS } from "@/lib/pageProperties";
+import type { AppSession } from "@/lib/session";
+import { NoteComments, type CommentAuthor } from "./NoteComments";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
@@ -37,6 +40,10 @@ interface Props {
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   /** The draft store already holds the words; this only asks for a save. */
   onEdited: () => void;
+  /** Who the archive holds, so a remark can be signed. Absent means comments
+   *  are unavailable, which is how the preview and Trash opt out. */
+  commentAuthors?: Map<string, CommentAuthor>;
+  session?: AppSession;
   /** The server has synced this note, as opposed to it being drawn from the
    *  local store while the socket is still on its way. */
   synced?: boolean;
@@ -92,6 +99,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     partnerName,
     titleRef,
     onEdited,
+    commentAuthors,
+    session,
     synced = false,
     onNew,
     onImportMarkdown,
@@ -114,6 +123,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [linkError, setLinkError] = useState("");
   const [status, setStatus] = useState("");
   const [failure, setFailure] = useState("");
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  /* A passage the bubble menu has just anchored, waiting for its first remark.
+     It exists in the document and not yet in the archive, which is why it is
+     held here rather than being read back with the rest. */
+  const [pendingThread, setPendingThread] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<Map<string, string>>(() => new Map());
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [findStatus, setFindStatus] = useState({ current: 0, total: 0 });
@@ -460,6 +475,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     );
   }
 
+  const canComment = Boolean(session && commentAuthors && canEdit);
+
+  function startComment() {
+    const threadId = crypto.randomUUID();
+    const anchored = editorRef.current?.commentSelection(threadId);
+    if (!anchored) return;
+    setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+    setPendingThread(threadId);
+    setCommentsOpen(true);
+  }
+
   const updatePageProperties = (values: PagePropertyValues) => {
     void onUpdatePageProperties?.(values).catch((reason) =>
       setFailure(reason instanceof Error ? reason.message : "Could not update this page"),
@@ -486,6 +512,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           {!mobile && (
             <span className="label truncate text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
           )}
+          {/* Setting a cover is something you do to the page, so it belongs
+              with the page's own controls rather than standing in the reading
+              column above the title — where it was the one thing in that column
+              that was not the note. It appears only while there is no cover;
+              once there is one, the cover carries its own Change and Remove. */}
+          {canEdit && !entry.note.cover && (
+            <button
+              type="button"
+              className="note-add-property"
+              onClick={() =>
+                updatePageProperties({
+                  photo: entry.note.photo,
+                  cover: { kind: "preset", id: COVER_PRESETS[0].id, position: 0.5 },
+                })
+              }
+            >
+              <ImageIcon size={15} />
+              Add cover
+            </button>
+          )}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the
@@ -504,6 +550,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           className={`flex min-w-0 items-center justify-end gap-1 ${inlineToolbar ? "" : "ml-auto"}`}
         >
           {readers}
+          {session && commentAuthors && (
+            <button
+              type="button"
+              className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
+              aria-label="Comments"
+              aria-pressed={commentsOpen}
+              title="Comments"
+              onClick={() => {
+                setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                setCommentsOpen((open) => !open);
+              }}
+            >
+              <MessageSquare size={16} />
+            </button>
+          )}
           {headerActions}
         </span>
       </div>
@@ -581,102 +642,104 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           an `opacity: 0` on the one element carrying `background: var(--page)`,
           so the first frames of every note switch showed the reader's wallpaper
           through a hole where the page should be. */}
-      <div className="editor-scroll page-in min-h-0 flex-1">
-        <PageCover
-          cover={entry.note.cover}
-          photo={entry.note.photo}
-          canEdit={canEdit}
-          resolveImage={resolveImage}
-          uploadImage={onUploadImage}
-          onChange={updatePageProperties}
-          onError={setFailure}
-        />
+      <div className="editor-body flex min-h-0 flex-1">
+        <div className="editor-scroll page-in min-h-0 flex-1">
+          <PageCover
+            cover={entry.note.cover}
+            photo={entry.note.photo}
+            canEdit={canEdit}
+            resolveImage={resolveImage}
+            uploadImage={onUploadImage}
+            onChange={updatePageProperties}
+            onError={setFailure}
+          />
 
-        <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
-          <div className="measure">
-            <div className="font-sans text-base">
-              <PageIdentity
-                photo={entry.note.photo}
-                cover={entry.note.cover}
-                canEdit={canEdit}
-                resolveImage={resolveImage}
-                onChange={updatePageProperties}
-              />
-              {viewingAsPartner && (
-                <p className="label mb-3 text-ink-3">
-                  {partnerName}&apos;s archive{!canEdit && " · read only"}
-                </p>
-              )}
+          <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
+            <div className="measure">
+              <div className="font-sans text-base">
+                <PageIdentity
+                  photo={entry.note.photo}
+                  cover={entry.note.cover}
+                  canEdit={canEdit}
+                  resolveImage={resolveImage}
+                  onChange={updatePageProperties}
+                />
+                {viewingAsPartner && (
+                  <p className="label mb-3 text-ink-3">
+                    {partnerName}&apos;s archive{!canEdit && " · read only"}
+                  </p>
+                )}
 
-              <p className="note-date">{formatStamp(entry.note.updatedAt)}</p>
+                <p className="note-date">{formatStamp(entry.note.updatedAt)}</p>
 
-              <TitleField
-                mobile={mobile}
-                noteId={entry.note.id}
-                canEdit={canEdit}
-                titleRef={titleRef}
-                onEdited={onEdited}
-                yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
-                synced={synced}
-              />
+                <TitleField
+                  mobile={mobile}
+                  noteId={entry.note.id}
+                  canEdit={canEdit}
+                  titleRef={titleRef}
+                  onEdited={onEdited}
+                  yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
+                  synced={synced}
+                />
 
-              {(status || failure) && (
-                <p
-                  role={failure ? "alert" : "status"}
-                  className={`mt-2 text-[11px] ${failure ? "text-danger" : "text-accent"}`}
-                >
-                  {failure || status}
-                </p>
-              )}
+                {(status || failure) && (
+                  <p
+                    role={failure ? "alert" : "status"}
+                    className={`mt-2 text-[11px] ${failure ? "text-danger" : "text-accent"}`}
+                  >
+                    {failure || status}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* The text itself, and not before the server has said so. Building an
+          {/* The text itself, and not before the server has said so. Building an
             editor from the projection first and rebuilding it against the Yjs
             fragment on `onSynced` painted the note twice, and the second paint
             is the bounce. One document, one instance, mounted once. */}
-        <div className={mobile ? "px-5" : "px-10"}>
-          {collaboration && (
-            <RichTextEditor
-              key={entry.note.id}
-              ref={editorRef}
-              value={readDraft(entry.note.id)?.content ?? entry.note.content}
-              revision={syncRevision}
-              readOnly={!canEdit}
-              placeholder="Start writing…"
-              onChange={(content, body) => {
-                if (!canEdit) return;
-                editBody(entry.note.id, body, content);
-                onEdited();
-              }}
-              /* Typing in the body is what the other reader's caret is about,
+          <div className={mobile ? "px-5" : "px-10"}>
+            {collaboration && (
+              <RichTextEditor
+                key={entry.note.id}
+                ref={editorRef}
+                value={readDraft(entry.note.id)?.content ?? entry.note.content}
+                revision={syncRevision}
+                readOnly={!canEdit}
+                placeholder="Start writing…"
+                onChange={(content, body) => {
+                  if (!canEdit) return;
+                  editBody(entry.note.id, body, content);
+                  onEdited();
+                }}
+                /* Typing in the body is what the other reader's caret is about,
                  and Yjs carries the words, so this is the only thing the page
                  still needs to hear about a keystroke. */
-              onLocalEdit={onEdited}
-              onPasteImage={handlePastedImage}
-              onOpenLink={openLinkForm}
-              mobile={mobile}
-              resolveImage={resolveImage}
-              resolveFile={resolveFile}
-              collaboration={collaboration}
-            />
-          )}
+                onLocalEdit={onEdited}
+                onPasteImage={handlePastedImage}
+                onOpenLink={openLinkForm}
+                onComment={canComment ? startComment : undefined}
+                mobile={mobile}
+                resolveImage={resolveImage}
+                resolveFile={resolveFile}
+                collaboration={collaboration}
+              />
+            )}
 
-          {/* The title paints from the draft store the moment you click, and
+            {/* The title paints from the draft store the moment you click, and
               the body cannot: it waits for the server to authorise and sync.
               That asymmetry is what made the wait read as broken rather than
               slow — a title over nothing at all. Three bars on the measure the
               text is about to use say the same thing honestly, and the
               toolbar's "Connecting" says why. */}
-          {!collaboration && (
-            <div className="note-body-waiting" aria-hidden="true">
-              <div className="skeleton" style={{ width: "92%" }} />
-              <div className="skeleton" style={{ width: "78%" }} />
-              <div className="skeleton" style={{ width: "45%" }} />
-            </div>
-          )}
-          {/* A tailpiece, in the run-out the text already leaves below itself.
+            {!collaboration && (
+              <div className="note-body-waiting" aria-hidden="true">
+                <div className="skeleton" style={{ width: "92%" }} />
+                <div className="skeleton" style={{ width: "78%" }} />
+                <div className="skeleton" style={{ width: "45%" }} />
+              </div>
+            )}
+            {/* A tailpiece, in the run-out the text already leaves below itself.
               A sibling of the editor and never a node inside it: anything in
               the document would be editable, would serialise into Markdown, and
               would sync to the other reader as content.
@@ -685,8 +748,31 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               58px wide at 16% opacity — a smudge that redrew itself petal by
               petal on every note switch. A rule and a lozenge say the same
               thing, "the note ends here", and say it legibly. */}
-          {collaboration && <div className="note-tailpiece" aria-hidden="true" />}
+            {collaboration && <div className="note-tailpiece" aria-hidden="true" />}
+          </div>
         </div>
+
+        {commentsOpen && session && commentAuthors && (
+          <NoteComments
+            key={entry.note.id}
+            session={session}
+            noteId={entry.note.id}
+            canEdit={canEdit}
+            authors={commentAuthors}
+            quotes={quotes}
+            pendingThread={pendingThread}
+            onPendingHandled={() => setPendingThread(null)}
+            onClose={() => {
+              setCommentsOpen(false);
+              setPendingThread(null);
+            }}
+            onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
+            onRemoveAnchor={(threadId) => {
+              editorRef.current?.removeComment(threadId);
+              setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+            }}
+          />
+        )}
       </div>
     </section>
   );
