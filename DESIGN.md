@@ -156,14 +156,19 @@ does on a row.
 - An invitation is a one-time link whose raw 64-hex token is shown once. The database keeps only the SHA-256 digest for seven days; re-inviting an unclaimed address rewrites the same row. The client never resolves an address to a user id and never lists existing addresses as a directory. The finished link is offered two ways in the same place — copied, or handed to a `mailto:` the member's own mail app composes — because the collaboration service has no outbound-mail role and must never receive the token.
 - Roles are binary and visible: every member can read every note and list; only editors can write notes, folders, tags, archive settings and `note-images` objects, or create invites and change roles. A viewer sees the same notes and scopes but the editor is read-only and the write menus and actions are inert. Changing another member's role is done through `set_archive_member_role()`, and the last editor cannot be demoted. Storage mirrors the table boundary.
 - A member is a person. Settings shows who belongs to the archive, by nickname and join date, and every member's avatar appears in the scope switch and in the sidebar while you are present. A picture is _placed_, not cropped for you: a round window over the image, dragged and zoomed, and what the window shows is exactly the square that is uploaded. A centre crop is right for a portrait and wrong for everything else. The rule stays the same: you may read a peer's `profiles` row and avatar when you share an archive; only the account itself may write its own `profiles` row and upload or delete under `avatars/<your user id>/…`. The avatar URL cache (`src/lib/avatarCache.ts`) keeps one object URL per avatar and Realtime keeps the roster live.
-- Presence is off by default and mutual: joining `presence:<archiveId>` with `{ private: true }` happens only while broadcasting `{ userId, onlineAt }`, so there is no listen-only mode in the client and the server enforces the same boundary on `realtime.messages` (`extension = 'presence'`, verified through `private.presence_archive_id()` against `archive_members`). The Settings toggle is per-archive and persisted in `localStorage`. When enabled, online members are indicated on the scope switch and in the member list.
+- Presence is off by default and mutual: joining `presence:<archiveId>` with `{ private: true }` happens only while broadcasting `{ userId, onlineAt, noteId, typing }`, so there is no listen-only mode in the client and the server enforces the same boundary on `realtime.messages` (`extension = 'presence'`, verified through `private.presence_archive_id()` against `archive_members`). The Settings toggle is per-archive and persisted in `localStorage`. When enabled, online members are indicated on the scope switch and in the member list.
+- Who else is on the _note_ is asked of Yjs awareness rather than of the presence channel, and it is answered on the right of the editor toolbar, beside the save readout — state about the note, where the mode label opposite it is about you. The pill carries a portrait and a caret while they type, and no name: sharing that side with the readout and two buttons leaves a name some fifty pixels short of legible, and a name crushed to a sliver is worse than a portrait that never promised one. The name is on the tooltip and in the screen-reader line.
 
 ## Honest persistence
 
 The editor toolbar describes the collaboration connection, not an obsolete
 client-side save queue:
 
-- **Connecting** until the server has authorized and synchronized the document;
+- **Connecting** until the server has authorized and synchronized the document,
+  with the body carrying three pulsing bars on the measure the text is about to
+  use. The title paints from the draft store the moment a note is clicked and
+  the body cannot, and a title standing over nothing reads as broken rather
+  than busy;
 - **Live** while the Hocuspocus connection is current;
 - **Offline** after an authorized editor loses the connection, with a tooltip
   saying changes remain on this device and synchronize on reconnect;

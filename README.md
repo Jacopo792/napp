@@ -68,9 +68,10 @@ separate composition for the phone.
 - **Live presence**, off by default and mutual: the client joins the channel only
   while broadcasting its own, and the server allows presence only to members of
   that archive on a private Realtime channel. What it carries is the note you
-  have open and whether you are typing, so the other member appears in that
-  note's header with their picture, their nickname and a caret while they
-  write.
+  have open and whether you are typing, so the other member appears on the
+  right of that note's header with their picture, and a caret while they write.
+  Their name is on the tooltip: beside the save readout there is no room to set
+  it without crushing it.
 - **Markdown in and out.** Copy a note as Markdown, export one as a `.md` file,
   or export the whole list — a folder of files where the browser can write one,
   one combined file where it cannot. `.md` files import back. That is the

@@ -67,8 +67,11 @@ changes. The commit history remains the detailed engineering record.
   and comes back here is whole, and the same file in Obsidian shows a broken
   link where the picture was.
 - **Who else is in the note you are writing.** With live presence on, the other
-  member appears in the note's own header as a pill carrying their picture and
-  their nickname, and a caret while they are actually typing. It is filtered to
+  member appears on the right of the note's own header — beside the save
+  readout, which is the other thing there that describes the note rather than
+  you — as a pill carrying their picture and a caret while they are actually
+  typing. Their name is on the tooltip: that side of the toolbar also holds two
+  buttons, and a name set there is squeezed past legibility. It is filtered to
   the note that is open, so the roster in Settings still answers "who is
   online" and the header answers the narrower question you have while writing.
   The presence payload gained `noteId` and a `typing` flag; the channel, its
@@ -98,6 +101,14 @@ changes. The commit history remains the detailed engineering record.
   `background` shorthand was written beside `background-position`, and only the
   properties that changed are rewritten, so the shorthand quietly reset what
   the drag had set.
+- **Giving a note a picture pushed the note down.** The row the photograph sits
+  in was removed whenever it had nothing to show — no picture, and either a
+  cover already set or no right to add one — so it stood at nothing, 41 or 47
+  pixels deep depending on the note, and the date, the title and the whole body
+  moved with it. The row is always drawn now, at the photograph's own 40
+  pixels, so the picture arrives into space that was already reserved for it
+  and the title sits at the same height in every combination of picture and
+  cover.
 - **An undone edit still said it had been edited.** Typing and returning a note
   exactly to its previous contents now cancels the queued save. If an autosave
   landed in the middle, restoring the old contents restores the prior edit time
@@ -196,6 +207,30 @@ config push` aligned it; the redirect allow-list now holds only that origin
   per frame each, and no darker strip across the top of the column.
 - The wallpaper layer declares `filter: none` at blur 0 rather than `blur(0)`,
   which was still promoting a viewport-sized fixed layer and running a pass.
+- **Opening a note no longer builds a WebSocket to open it.** Each note was
+  given a provider constructed from a URL, so it built and destroyed a
+  connection of its own: a TCP handshake, a TLS handshake and a token round
+  trip stood between the click and the first character, every time. One
+  `HocuspocusProviderWebsocket` now serves the session and every note is
+  multiplexed over it by document name, which is what the transport was always
+  able to do. Measured against a live server, five notes cost five connections
+  before and share one now: the count stops tracking the number of notes and
+  moves only when the server itself closes the connection. Holding it open
+  earns as much again: the collaboration instance sleeps when idle and takes
+  about fifty seconds to wake, and an open socket is never idle, so that wait
+  is paid once at sign-in instead of at whichever note switch happens to follow
+  a quarter hour of reading.
+  Authorization is unchanged — it was always per document, never per socket.
+- A nickname arriving from the profile, or the presence preference being
+  toggled, no longer tears the connection down and redoes the handshake. Both
+  left the connection effect for one of their own.
+- **The tailpiece under a note is a rule and a lozenge.** It was a botanical
+  plate drawn at 200x260 and asked to be 58 pixels wide at 16% opacity, which
+  is a smudge, and it restaged its petal-by-petal draw on every note switch —
+  motion that arrives each time you change page is motion you end up watching
+  instead of reading. A hairline that fades at both ends, broken for a small
+  lozenge, says "the note ends here" and says it legibly. The drawings stay on
+  the sign-in screen, where they are given room.
 
 ### Removed
 

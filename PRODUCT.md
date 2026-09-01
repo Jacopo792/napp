@@ -125,9 +125,12 @@ goes through the toolbar's explicit text and URL fields rather than through the 
 Technical constraints that outlive any design:
 
 - React 19 + TanStack Router + Vite + Tailwind v4 remain unchanged.
-- Hocuspocus 4 owns live title/body documents. The client authenticates with its
-  current Supabase access token, the server reauthorizes long-lived sockets, and
-  Redis/Valkey is the multi-instance bus rather than durable storage.
+- Hocuspocus 4 owns live title/body documents. The client holds one WebSocket
+  for the session and multiplexes every note over it, so opening a note costs
+  an auth and a sync message rather than a fresh connection. It authenticates
+  with its current Supabase access token, the server reauthorizes long-lived
+  sockets per document, and Redis/Valkey is the multi-instance bus rather than
+  durable storage.
 - Supabase Auth public signup is enabled and email confirmation is off (see
   `SECURITY.md` for what that costs). A new account reaches the archive either by
   bootstrapping its own personal archive atomically or by claiming a seven-day

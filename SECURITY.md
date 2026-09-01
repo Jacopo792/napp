@@ -71,9 +71,14 @@ guarantee means configuring `[auth.email.smtp]`, setting
 `enable_confirmations = true`, and putting the `email_confirmed_at` check back
 into `private.redeem_archive_invite()`.
 
-Live documents pass through the Hocuspocus service. It authorizes a socket with
-the caller's Supabase token and repeats that check while the connection stays
-open; membership, editor role, Trash state and archived-note visibility remain
+Live documents pass through the Hocuspocus service. One WebSocket carries the
+whole session and every note opened in it, so the unit of authorization is the
+document, not the connection: `onAuthenticate`, `onTokenSync` and
+`beforeHandleMessage` each resolve the note from the document name and
+authorize that note with the caller's Supabase token, and the check is repeated
+while the connection stays open. Sharing a socket therefore grants nothing —
+a second note on an open connection is authorized exactly as the first was.
+Membership, editor role, Trash state and archived-note visibility remain
 Supabase decisions. Awareness identity is overwritten by the server, so a
 browser cannot choose another member's name or id. `note_documents` has RLS
 enabled and grants no browser policy: only the service role persists its binary.
