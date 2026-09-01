@@ -27,11 +27,22 @@ for teams.
 - Import and export Markdown, or bring the text of a PDF into a note.
 - Use local translation and proofreading tools without sending the text to an AI
   service.
-- Personalise the app with profiles, themes, wallpapers and reading controls.
 
 The editor is made for long notes as well as quick ones. It uses Tiptap for rich text
 and Yjs/Hocuspocus for live editing. Supabase handles accounts, the shared database and
 private files.
+
+## Make it yours
+
+The app is highly customisable, and each person can set it up independently. You can
+start from a ready-made palette or choose the accent, background and text colours
+yourself; switch between light, dark and system themes; adjust contrast and sidebar
+transparency; or use your own wallpaper with separate dim, blur and fit controls.
+
+Reading has its own presets and controls for text size, line width, font weight and
+line spacing. Profiles, avatars, note pictures, covers and live-caret colours add the
+last personal touches. Most interface and reading settings stay on your device, so the
+other person does not have to use the same setup.
 
 ## Running it locally
 
