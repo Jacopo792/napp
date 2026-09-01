@@ -123,9 +123,9 @@ function Row({
    stopped saying where they sit. */
 
 /** How far from the pointer the bulge reaches, in px — about three buttons. */
-const DOCK_REACH = 96;
+const DOCK_REACH = 88;
 /** How much the icon directly under the pointer grows. */
-const DOCK_LIFT = 0.42;
+const DOCK_LIFT = 0.34;
 
 /** Smooth, and genuinely zero at the edge of the reach, so the outermost icon
  *  settles rather than stopping mid-move. */
@@ -186,6 +186,13 @@ export function EditorToolbar({
     // Half the total growth, taken off every button, is what centres the bulge
     // on the cluster instead of letting the row grow to the right only.
     const drift = (grownEdge - restingEdge) / 2;
+    /* Tracking is instantaneous, and this class is what makes it so. A
+       transition on `transform` while the pointer is moving means the row is
+       permanently chasing a target it never reaches — the icons lag behind the
+       cursor and rubber-band when it stops, which is not magnification, it is
+       latency. The dock follows the pointer exactly, and animates only on the
+       way out. */
+    root.current?.classList.add("is-docked");
     items.forEach((item, index) => {
       item.button.style.setProperty("--mag", String(1 + growth[index]));
       item.button.style.setProperty("--dock-shift", `${offsets[index] - drift}px`);
@@ -193,6 +200,10 @@ export function EditorToolbar({
   }
 
   function settleDock() {
+    /* The class comes off in the same tick the properties do, so the
+       transition it restores is the one that animates them back: a transition
+       is read from the style *after* the change. */
+    root.current?.classList.remove("is-docked");
     for (const item of dock.current) {
       item.button.style.removeProperty("--mag");
       item.button.style.removeProperty("--dock-shift");

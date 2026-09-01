@@ -37,22 +37,25 @@ function score(command: Command, query: string): number {
 export function CommandPalette({
   open,
   commands,
+  initialQuery = "",
   onClose,
 }: {
   open: boolean;
   commands: Command[];
+  /** What the field already holds when it opens. A menu item that means one
+   *  group of the palette opens it standing in that group, rather than opening
+   *  the whole thing and leaving the reader to guess the word. */
+  initialQuery?: string;
   onClose: () => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [cursor, setCursor] = useState(0);
   const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setCursor(0);
-    }
-  }, [open]);
+    setQuery(open ? initialQuery : "");
+    setCursor(0);
+  }, [open, initialQuery]);
 
   /* Ranked, then grouped in the order the groups were handed over — so the
      order of a resting palette is the caller's editorial decision and not

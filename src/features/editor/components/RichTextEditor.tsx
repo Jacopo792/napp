@@ -108,6 +108,10 @@ interface Props {
   onLocalEdit?: () => void;
   onPasteImage?: (file: File) => Promise<{ objectId: string; alt: string } | null>;
   onOpenLink: () => void;
+  /** Every note `[[` can reach, and what to do when one is clicked. Absent in
+   *  the preview and anywhere else without an archive behind it. */
+  notes?: { id: string; title: string }[];
+  onOpenNote?: (noteId: string) => void;
   /** Open a comment on whatever is selected. Absent when the note cannot be
    *  commented on — Trash, or a reader who may not write. */
   onComment?: () => void;
@@ -215,6 +219,123 @@ function autocorrectExtension() {
               );
               return true;
             },
+          },
+        }),
+      ];
+    },
+  });
+}
+
+/* `[[` opens the archive, the way `/` opens the commands — the same Suggestion
+   plugin, the same popover, the same keys. The list of notes is read through a
+   ref rather than closed over, so a note written a moment ago is offered
+   without the editor being rebuilt: rebuilding it would destroy the ProseMirror
+   instance the whole collaborative path exists to mount exactly once. */
+function noteLinkExtension(notes: React.RefObject<{ id: string; title: string }[]>, limit = 8) {
+  return Extension.create({
+    name: "noteLink",
+    addProseMirrorPlugins() {
+      return [
+        Suggestion<{ id: string; title: string }>({
+          editor: this.editor,
+          /* Its own key. ProseMirror refuses two plugins that share one, and
+             `Suggestion` defaults every instance to `suggestion$` — so the
+             slash menu and this one cannot both be nameless. */
+          pluginKey: new PluginKey("noteLinkSuggestion"),
+          char: "[[",
+          allowedPrefixes: null,
+          items: ({ query }) => {
+            const q = query.toLowerCase();
+            return notes.current
+              .filter((note) => (note.title || "Untitled").toLowerCase().includes(q))
+              .slice(0, limit);
+          },
+          command: ({ editor, range, props }) => {
+            const title = props.title || "Untitled";
+            editor
+              .chain()
+              .focus()
+              .deleteRange(range)
+              .insertContent([
+                {
+                  type: "text",
+                  marks: [{ type: "noteLink", attrs: { noteId: props.id } }],
+                  text: title,
+                },
+                /* A space outside the mark, so the sentence carries on next to
+                   the link instead of inside it. `inclusive: false` is what
+                   makes the space land outside. */
+                { type: "text", text: " " },
+              ])
+              .run();
+          },
+          render: () => {
+            let element: HTMLDivElement | null = null;
+            let selected = 0;
+            let props: SuggestionProps<{ id: string; title: string }> | null = null;
+            let unmount: (() => void) | undefined;
+            const render = () => {
+              if (!element || !props) return;
+              selected = Math.min(selected, Math.max(0, props.items.length - 1));
+              element.replaceChildren(
+                ...(props.items.length
+                  ? props.items.map((item, index) => {
+                      const button = document.createElement("button");
+                      button.type = "button";
+                      button.className = `menu-row text-ink-2 ${index === selected ? "is-selected" : ""}`;
+                      button.textContent = item.title || "Untitled";
+                      button.addEventListener("mousedown", (event) => event.preventDefault());
+                      button.addEventListener("click", () => props?.command(item));
+                      return button;
+                    })
+                  : [
+                      (() => {
+                        const empty = document.createElement("p");
+                        empty.className = "menu-note";
+                        empty.textContent = "No note by that name.";
+                        return empty;
+                      })(),
+                    ]),
+              );
+            };
+            return {
+              onStart(next) {
+                props = next;
+                selected = 0;
+                element = document.createElement("div");
+                element.className = "popover menu-popover slash-menu p-1.5";
+                element.setAttribute("role", "menu");
+                unmount = next.mount(element);
+                render();
+              },
+              onUpdate(next) {
+                props = next;
+                render();
+              },
+              onKeyDown({ event }) {
+                if (!props || !props.items.length) return event.key === "Escape";
+                if (event.key === "ArrowDown") {
+                  selected = (selected + 1) % props.items.length;
+                  render();
+                  return true;
+                }
+                if (event.key === "ArrowUp") {
+                  selected = (selected - 1 + props.items.length) % props.items.length;
+                  render();
+                  return true;
+                }
+                if (event.key === "Enter") {
+                  props.command(props.items[selected]);
+                  return true;
+                }
+                return event.key === "Escape";
+              },
+              onExit() {
+                unmount?.();
+                element = null;
+                props = null;
+              },
+            };
           },
         }),
       ];
@@ -550,6 +671,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onPasteImage,
     onOpenLink,
     onComment,
+    notes,
+    onOpenNote,
     mobile = false,
     resolveImage,
     resolveFile,
@@ -584,6 +707,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     [onOpenLink],
   );
 
+  /* Through a ref, never a dependency: the extension list is built once and a
+     note added to the archive must not rebuild the editor. */
+  const notesRef = useRef<{ id: string; title: string }[]>([]);
+  notesRef.current = notes ?? [];
+  const onOpenNoteRef = useRef(onOpenNote);
+  onOpenNoteRef.current = onOpenNote;
+  const noteLinks = useMemo(() => noteLinkExtension(notesRef), []);
+
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
   const autocorrect = useMemo(() => autocorrectExtension(), []);
 
@@ -617,6 +748,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           superscriptThree: false,
         }),
         slashMenu,
+        noteLinks,
         sentenceCapitalize,
         autocorrect,
       ],
@@ -634,6 +766,19 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         },
         transformPastedText(text) {
           return capitalizeSentences(text);
+        },
+        /* A note link opens the note. Handled here rather than as an `href`,
+           because there is no URL for a note: the window is one route and the
+           note is state within it. Read through a ref for the same reason the
+           list of notes is — the handler must never be a reason to rebuild the
+           editor. */
+        handleClickOn(_view, _pos, _node, _nodePos, event) {
+          const anchor = (event.target as HTMLElement | null)?.closest?.("a[data-note]");
+          const noteId = anchor?.getAttribute("data-note");
+          if (!noteId || !onOpenNoteRef.current) return false;
+          event.preventDefault();
+          onOpenNoteRef.current(noteId);
+          return true;
         },
         handlePaste(view, event) {
           const clipboard = event.clipboardData;

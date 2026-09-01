@@ -1,5 +1,9 @@
-import { countWords, previewOf } from "./format";
-import type { Note, Folder, Meta, NoteMeta, Tag } from "./types";
+/* With the extension, and for the reason `exchange.ts` carries one: `pnpm test`
+   runs under `node --experimental-strip-types`, which does not resolve an
+   extensionless relative import. `allowImportingTsExtensions` is already on, so
+   the extension costs nothing and is what makes this file testable. */
+import { countWords, previewOf } from "./format.ts";
+import type { Note, Folder, Meta, NoteMeta, Tag } from "./types.ts";
 
 /* ── Derived reading, computed once ──────────────────────────────────────────
    Building a preview and counting words are both full passes over
@@ -62,4 +66,22 @@ export function indexOf(meta: Meta): MetaIndex {
     metas.set(meta, index);
   }
   return index;
+}
+
+/** Does this document link to that note?
+ *
+ * A link is a `noteLink` mark inside the Tiptap JSON, so the question is
+ * answered by walking the document the archive already handed over — there is
+ * no column to index and no query to write. Depth-first and short-circuiting,
+ * because most notes link to nothing and the answer is usually no.
+ */
+export function linksTo(document: unknown, noteId: string): boolean {
+  if (!document || typeof document !== "object") return false;
+  const node = document as {
+    marks?: { type?: string; attrs?: { noteId?: string } }[];
+    content?: unknown[];
+  };
+  if (node.marks?.some((mark) => mark.type === "noteLink" && mark.attrs?.noteId === noteId))
+    return true;
+  return Array.isArray(node.content) && node.content.some((child) => linksTo(child, noteId));
 }

@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ChevronUp,
   Image as ImageIcon,
+  Link2,
   ListTree,
   MessageSquare,
   Search,
@@ -71,6 +72,11 @@ interface Props {
   onContextMenu?: (event: MouseEvent) => void;
   onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
   collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
+  /** Every note `[[` can reach from this one, and the notes that reach this
+   *  one. Both absent where there is no archive behind the page. */
+  linkable?: { id: string; title: string }[];
+  backlinks?: { id: string; title: string }[];
+  onOpenNote?: (noteId: string) => void;
 }
 
 /* The toolbar's three groups — the mode label, the format cluster, the save
@@ -150,6 +156,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onContextMenu,
     onUpdatePageProperties,
     collaboration = null,
+    linkable,
+    backlinks,
+    onOpenNote,
   },
   ref,
 ) {
@@ -765,6 +774,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 resolveImage={resolveImage}
                 resolveFile={resolveFile}
                 collaboration={collaboration}
+                notes={linkable}
+                onOpenNote={onOpenNote}
               />
             )}
 
@@ -781,6 +792,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <div className="skeleton" style={{ width: "45%" }} />
               </div>
             )}
+            {/* What points here. A note is not only what it says; the notes
+                that reached for it are part of what it is, and they are the
+                one thing about a note it cannot state itself. Only when there
+                are some — an empty "Linked from" under every note teaches the
+                reader to stop looking at the foot of the page. */}
+            {backlinks && backlinks.length > 0 && (
+              <div className={`note-backlinks ${mobile ? "px-0" : ""}`}>
+                <p className="note-backlinks-label">Linked from</p>
+                <div className="note-backlinks-list">
+                  {backlinks.map((note) => (
+                    <button
+                      key={note.id}
+                      type="button"
+                      className="note-backlink press"
+                      onClick={() => onOpenNote?.(note.id)}
+                    >
+                      <Link2 size={13} />
+                      {note.title || "Untitled"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {collaboration && <NoteTailpiece noteId={entry.note.id} />}
           </div>
         </div>

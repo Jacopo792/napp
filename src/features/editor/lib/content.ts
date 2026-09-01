@@ -143,6 +143,50 @@ export const CommentAnchor = Mark.create({
   renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
 });
 
+/** A link from one note in this archive to another.
+ *
+ * A mark and not a node, so the words stay words: the title reads in the
+ * sentence, is found by search, and leaves in the export as text rather than
+ * as a placeholder the reader has to decode.
+ *
+ * `inclusive: false` for the same reason the comment anchor is — typing at
+ * either end of a link writes outside it rather than quietly swallowing the
+ * next word into the link's text.
+ *
+ * It belongs in the schema and not in the editor alone: the Markdown
+ * serializer, the legacy parser, the Yjs conversion and the collaboration
+ * server all read documents that may contain it, and a schema that does not
+ * know a mark drops it. */
+export const NoteLink = Mark.create({
+  name: "noteLink",
+  inclusive: false,
+  excludes: "",
+  addAttributes() {
+    return {
+      noteId: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-note") ?? "",
+        renderHTML: (attributes) => (attributes.noteId ? { "data-note": attributes.noteId } : {}),
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "a[data-note]" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["a", mergeAttributes(HTMLAttributes, { class: "note-link" }), 0];
+  },
+  /* `[[Title]]`, which is Obsidian's own syntax and not an invention of this
+     app — so a link exported with the archive around it resolves in the vault
+     it lands in. That is the one difference from the comment anchor, which
+     leaves its id behind because a thread id in somebody else's Obsidian is
+     the broken link `demotePrivateMedia` exists to avoid making more of.
+
+     One-way, and deliberately. Reading `[[Title]]` back would mean resolving a
+     title to a note id, which needs the archive; this file has no archive and
+     is not going to grow one. An imported file keeps the words and loses the
+     link, which is the honest half to lose. */
+  renderMarkdown: (mark, helpers) => `[[${helpers.renderChildren(mark)}]]`,
+});
+
 /** Everything the schema holds except the two private-media nodes, which the
  *  editor supplies in an extended form. */
 export const BASE_EXTENSIONS = [
@@ -167,6 +211,7 @@ export const BASE_EXTENSIONS = [
   Image.configure({ allowBase64: true }),
   LegacyColorMarkdown,
   CommentAnchor,
+  NoteLink,
 ];
 
 /** The persisted document schema, whole. */

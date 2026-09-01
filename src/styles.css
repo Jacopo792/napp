@@ -2134,10 +2134,7 @@
    so the button is a plain button until something says otherwise.
 
    It grows from its own foot, so the icon rises out of the bar the way a dock
-   icon does rather than pushing down through it. The transition is short
-   because it is doing two jobs at once: smoothing the tracking, and animating
-   the settle when the pointer leaves. Long enough to see is long enough to
-   lag. */
+   icon does rather than pushing down through it. */
 .editor-tool-button {
   display: inline-flex;
   width: 2rem;
@@ -2190,8 +2187,8 @@
 .settings-panel {
   position: relative;
   display: flex;
-  width: min(64rem, 100%);
-  height: min(46rem, calc(100dvh - 2.5rem));
+  width: min(54rem, 100%);
+  height: min(43rem, calc(100dvh - 2.5rem));
   flex-direction: column;
   overflow: hidden;
 }
@@ -2584,6 +2581,13 @@
    between them is a second thing saying it. */
 .settings-scroll > section {
   max-width: 37rem;
+  /* Centred in its column, not left-aligned in it. The measure is capped so a
+     label and its control do not end up a hand's width apart — but a capped
+     measure pinned to the left edge of a wider column is just the same
+     imbalance moved to the other side, which is what a 64rem panel with a
+     218px rail produced: the form on the left, and a hand of nothing on the
+     right. */
+  margin-inline: auto;
   padding: 18px 0 22px;
 }
 
@@ -4174,6 +4178,23 @@
    that lost `--dock-shift` would jump sideways as well. */
 .editor-tool-button:active {
   transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
+}
+
+/* While the pointer is over the cluster the dock follows it exactly. A
+   transition here would mean the row is permanently chasing a target it never
+   reaches: the icons lag the cursor and rubber-band when it stops, which reads
+   as latency rather than as magnification. The transition is for the way out
+   only, which is why it lives on the resting rule and this one takes it off. */
+.editor-tool-cluster.is-docked .editor-tool-button {
+  transition:
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-press);
+}
+
+/* The pill keeps its own height while the icons rise out of it. */
+.editor-tool-cluster {
+  align-items: flex-end;
+  padding-bottom: 0.28rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5826,4 +5847,90 @@
   width: 1px;
   flex-shrink: 0;
   background: var(--rule-soft);
+}
+
+/* ── A link to another note ──────────────────────────────────────────────────
+   Not a web link and not styled as one. A web link leaves; this one moves
+   inside the same archive, so it reads as a word in the sentence with a hint
+   under it rather than as an address. */
+.rich-text-content a.note-link {
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-strong) 45%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 560;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press);
+}
+
+.rich-text-content a.note-link:hover {
+  border-bottom-color: var(--accent-strong);
+  background: var(--accent-wash);
+}
+
+/* ── What points here ────────────────────────────────────────────────────────
+   On the measure the text uses, under the last line and above the plate. */
+.note-backlinks {
+  max-width: var(--read-measure);
+  margin: 0 auto;
+  padding: 4px 0 8px;
+}
+
+.note-backlinks-label {
+  margin-bottom: 8px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.note-backlinks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.note-backlink {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.6rem;
+  padding: 5px 10px;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-backlink:hover {
+  border-color: var(--rule);
+  background: var(--glass);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rich-text-content a.note-link {
+    transition: none;
+  }
+}
+
+/* The key a menu item answers to, said in the item. A shortcut nobody is told
+   about is a shortcut nobody has. */
+.menu-key {
+  margin-left: auto;
+  border: 1px solid var(--rule);
+  border-radius: 0.32rem;
+  padding: 1px 5px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
 }

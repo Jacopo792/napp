@@ -113,3 +113,55 @@ test("a comment survives beside a colour without swallowing it", () => {
   });
   assert.match(markdown, /\*\*forte\*\*/);
 });
+
+/* A note link is the one mark that keeps something of itself in Markdown, and
+   for a reason the comment anchor does not have: `[[Title]]` is Obsidian's own
+   syntax, so a link exported with the archive around it resolves in the vault
+   it lands in. What must not leak is the id — a uuid in somebody else's file
+   is the broken link `demotePrivateMedia` exists to avoid making more of. */
+test("a note link leaves as [[Title]] and never as an id", () => {
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Vedi " },
+          {
+            type: "text",
+            text: "Aforismi",
+            marks: [
+              { type: "noteLink", attrs: { noteId: "99999999-8888-7777-6666-555555555555" } },
+            ],
+          },
+          { type: "text", text: " per il resto." },
+        ],
+      },
+    ],
+  });
+  assert.equal(markdown.trim(), "Vedi [[Aforismi]] per il resto.");
+  assert.doesNotMatch(markdown, /99999999|noteId|data-note|<a /i);
+});
+
+test("a note link survives beside emphasis without swallowing it", () => {
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "text",
+            text: "Aforismi",
+            marks: [
+              { type: "bold" },
+              { type: "noteLink", attrs: { noteId: "12121212-3434-5656-7878-909090909090" } },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  assert.match(markdown, /\[\[/);
+  assert.match(markdown, /\*\*/);
+});

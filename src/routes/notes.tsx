@@ -76,7 +76,7 @@ import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image
 import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
-import { derivedOf, indexOf } from "@/lib/derived";
+import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
   clearDrafts,
   dropDraft,
@@ -252,6 +252,7 @@ function NotesPage() {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /* Focus is the two panes put away and the page's own controls stepping back
      while you write. It is not a third layout: the workspace already knows how
@@ -1587,6 +1588,7 @@ function NotesPage() {
           noteEditorRef.current?.openLink();
           return;
         }
+        setPaletteQuery("");
         setPaletteOpen(true);
         return;
       }
@@ -1995,6 +1997,28 @@ function NotesPage() {
     .filter((note): note is Note => Boolean(note))
     .map((note) => ({ id: note.id, title: note.title }));
 
+  /* Which notes `[[` can reach, and which notes reached this one.
+     The backlinks are found by walking the Tiptap JSON of the notes already in
+     memory rather than by asking Postgres: a link is a mark inside the
+     document, so there is no column to index and no query to write, and the
+     documents are here anyway because the list is drawn from them. It is a
+     scan over one archive's notes on the render that opens one — not per
+     keystroke, since the projection only changes when a save lands. */
+  const linkableNotes = ownedEntries
+    .filter((entry) => !trashedIds.has(entry.note.id))
+    .map((entry) => ({ id: entry.note.id, title: entry.note.title }));
+
+  const backlinks = selectedId
+    ? ownedEntries
+        .filter(
+          (entry) =>
+            entry.note.id !== selectedId &&
+            !trashedIds.has(entry.note.id) &&
+            linksTo(entry.note.content, selectedId),
+        )
+        .map((entry) => ({ id: entry.note.id, title: entry.note.title }))
+    : [];
+
   /* Nothing may be beside itself. And nothing in the trash: `canEdit` is
      computed for the note in the primary column, so a trashed note opened
      beside a live one would inherit permission to be written — which is the
@@ -2175,6 +2199,11 @@ function NotesPage() {
       preferences={activeListPreferences}
       onChange={handleListPreferencesChange}
       onExportAll={() => void handleExportAll()}
+      onOpenPalette={() => {
+        setPaletteQuery("");
+        setPaletteOpen(true);
+      }}
+      onOpenShortcuts={() => setShortcutsOpen(true)}
       bulk={
         !canWriteArchive
           ? undefined
@@ -2294,6 +2323,7 @@ function NotesPage() {
       <CommandPalette
         open={paletteOpen}
         commands={paletteCommands}
+        initialQuery={paletteQuery}
         onClose={() => setPaletteOpen(false)}
       />
       <ShortcutSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
@@ -2369,6 +2399,12 @@ function NotesPage() {
           pinned={pinned}
           folders={activeMeta.folders}
           recent={recentNotes}
+          focusMode={focusMode}
+          onToggleFocus={toggleFocus}
+          onOpenBeside={() => {
+            setPaletteQuery("beside ");
+            setPaletteOpen(true);
+          }}
           onCopyMarkdown={() => void handleCopyMarkdown(selected)}
           onExportMarkdown={() => handleExportMarkdown(selected)}
           onTogglePin={() => handleTogglePin(selected.note.id)}
@@ -2391,6 +2427,12 @@ function NotesPage() {
         pinned={pinned}
         folders={activeMeta.folders}
         recent={recentNotes}
+        focusMode={focusMode}
+        onToggleFocus={toggleFocus}
+        onOpenBeside={() => {
+          setPaletteQuery("beside ");
+          setPaletteOpen(true);
+        }}
         onCopyMarkdown={() => void handleCopyMarkdown(selected)}
         onExportMarkdown={() => handleExportMarkdown(selected)}
         onTogglePin={() => handleTogglePin(selected.note.id)}
@@ -2526,6 +2568,9 @@ function NotesPage() {
                     synced={collaborative.ready}
                     session={session}
                     commentAuthors={commentAuthors}
+                    linkable={linkableNotes}
+                    backlinks={backlinks}
+                    onOpenNote={handleOpenRecent}
                   />
                 </Suspense>
               </section>
@@ -2684,6 +2729,9 @@ function NotesPage() {
               synced={collaborative.ready}
               session={session}
               commentAuthors={commentAuthors}
+              linkable={linkableNotes}
+              backlinks={backlinks}
+              onOpenNote={handleOpenRecent}
             />
           </Suspense>
 
@@ -2720,6 +2768,8 @@ function NotesPage() {
                   }
                   synced={splitCollaborative.ready}
                   session={session}
+                  linkable={linkableNotes}
+                  onOpenNote={handleOpenRecent}
                   headerActions={
                     <button
                       type="button"

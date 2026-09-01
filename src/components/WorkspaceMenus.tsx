@@ -2,6 +2,10 @@ import {
   Archive,
   ArchiveRestore,
   ClipboardCopy,
+  Columns2,
+  Keyboard,
+  Maximize2,
+  Minimize2,
   FileDown,
   FolderDown,
   AtSign,
@@ -91,11 +95,17 @@ export function CollectionMenu({
   preferences,
   onChange,
   onExportAll,
+  onOpenPalette,
+  onOpenShortcuts,
   bulk,
 }: {
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
   onExportAll: () => void;
+  /** The two keyboard surfaces, offered by name. A shortcut nobody is told
+   *  about is a shortcut nobody has. */
+  onOpenPalette: () => void;
+  onOpenShortcuts: () => void;
   /** The one act this scope can perform on everything in it at once, or
    *  nothing at all — most scopes have none. */
   bulk?: { label: string; confirm: string; danger: boolean; count: number; run: () => void };
@@ -125,6 +135,27 @@ export function CollectionMenu({
           role="menu"
           className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
         >
+          <MenuButton
+            onClick={() => {
+              onOpenPalette();
+              close();
+            }}
+          >
+            <Search size={16} />
+            Find anything
+            <kbd className="menu-key">⌘K</kbd>
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              onOpenShortcuts();
+              close();
+            }}
+          >
+            <Keyboard size={16} />
+            Keyboard shortcuts
+            <kbd className="menu-key">?</kbd>
+          </MenuButton>
+          <div className="menu-separator" />
           <p className="menu-label">Sort by</p>
           {(["updated", "created", "title"] as const).map((criterion) => (
             <MenuButton
@@ -209,6 +240,9 @@ function NoteMenuContent({
   recent,
   onTogglePin,
   onFind,
+  onToggleFocus,
+  focusMode,
+  onOpenBeside,
   onMove,
   onRecent,
   onCopyMarkdown,
@@ -221,6 +255,9 @@ function NoteMenuContent({
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
   onFind: () => void;
+  onToggleFocus: () => void;
+  focusMode: boolean;
+  onOpenBeside: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
@@ -257,6 +294,26 @@ function NoteMenuContent({
           >
             <Search size={16} />
             Find in note
+          </MenuButton>
+          <MenuButton
+            active={focusMode}
+            onClick={() => {
+              onToggleFocus();
+              close();
+            }}
+          >
+            {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            {focusMode ? "Leave focus" : "Focus mode"}
+            {focusMode && <kbd className="menu-key">esc</kbd>}
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              onOpenBeside();
+              close();
+            }}
+          >
+            <Columns2 size={16} />
+            Open a note beside this
           </MenuButton>
           <div className="menu-separator" />
           <MenuButton onClick={() => setSection("move")}>
@@ -361,6 +418,9 @@ export function NoteMenu(props: {
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
   onFind: () => void;
+  onToggleFocus: () => void;
+  focusMode: boolean;
+  onOpenBeside: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
@@ -406,6 +466,9 @@ export function NoteContextMenu({
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
   onFind: () => void;
+  onToggleFocus: () => void;
+  focusMode: boolean;
+  onOpenBeside: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
