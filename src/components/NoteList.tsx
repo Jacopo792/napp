@@ -11,7 +11,6 @@ import { useDraggable } from "@dnd-kit/core";
 import {
   Archive,
   ArchiveRestore,
-  Check,
   ChevronRight,
   FileText,
   FolderInput,
@@ -37,8 +36,6 @@ import { derivedOf, indexOf } from "@/lib/derived";
 import { documentGlyph } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
-import type { SwipeAction } from "@/lib/writingPreferences";
-import { nextSwipeOffset } from "@/lib/swipe";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuButton } from "./WorkspaceMenus";
@@ -83,7 +80,6 @@ interface Props {
   /** A picture for the note itself. A null file takes the current one off. */
   onSetPhoto: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
-  swipeLeftAction: SwipeAction;
 }
 
 /* ── What a note is, at a glance ─────────────────────────────────────────────
@@ -133,7 +129,6 @@ const Row = memo(function Row({
   onTogglePin,
   onContextMenu,
   resolveImage,
-  swipeLeftAction,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -153,7 +148,6 @@ const Row = memo(function Row({
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
-  swipeLeftAction: SwipeAction;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -161,11 +155,6 @@ const Row = memo(function Row({
   });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [swipeX, setSwipeX] = useState(0);
-  const [swipeDragging, setSwipeDragging] = useState(false);
-  const [swipeConfirm, setSwipeConfirm] = useState(false);
-  const swipeXRef = useRef(0);
-  const swipeResetRef = useRef<number | undefined>(undefined);
 
   const noteMeta = indexOf(meta).byNote.get(entry.note.id);
 
@@ -179,255 +168,176 @@ const Row = memo(function Row({
     return () => window.clearTimeout(timer);
   }, [confirmDelete]);
 
-  useEffect(() => {
-    return () => window.clearTimeout(swipeResetRef.current);
-  }, []);
-
   const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
   const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
   const photoUrl = useStoredImage(entry.note.photo?.objectId ?? null, resolveImage);
-  const canSwipe = !mobile && canWrite && !trashMode && !archiveMode && swipeLeftAction !== "off";
-  const swipeLabel = swipeLeftAction === "archive" ? "Archive" : "Move to Trash";
-
-  function settleSwipe() {
-    window.clearTimeout(swipeResetRef.current);
-    swipeResetRef.current = window.setTimeout(() => {
-      const revealed = swipeXRef.current <= -32;
-      setSwipeDragging(false);
-      setSwipeConfirm(false);
-      swipeXRef.current = revealed ? -112 : 0;
-      setSwipeX(swipeXRef.current);
-    }, 110);
-  }
-
-  function handleSwipe(event: React.WheelEvent<HTMLDivElement>) {
-    if (!canSwipe || Math.abs(event.deltaX) < 3) return;
-    event.preventDefault();
-    window.clearTimeout(swipeResetRef.current);
-    setSwipeDragging(true);
-    const next = nextSwipeOffset(swipeXRef.current, event.deltaX);
-    swipeXRef.current = next;
-    setSwipeX(next);
-    settleSwipe();
-  }
-
-  function confirmSwipeAction(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    if (!swipeConfirm) {
-      setSwipeConfirm(true);
-      setSwipeDragging(false);
-      swipeXRef.current = -148;
-      setSwipeX(-148);
-      return;
-    }
-    if (swipeLeftAction === "archive") onArchiveChange(entry, true);
-    else onMoveToTrash(entry);
-  }
-
   return (
     <div
-      className="note-swipe-shell"
-      style={
-        {
-          "--swipe-action-color": swipeLeftAction === "archive" ? "#6877f5" : "#ef5b63",
-        } as React.CSSProperties
-      }
+      ref={(el) => {
+        setNodeRef(el);
+        rowRef.current = el;
+      }}
+      {...(!mobile && canWrite ? listeners : {})}
+      {...(!mobile && canWrite ? attributes : {})}
+      role="option"
+      aria-selected={selected}
+      onClick={() => onSelect(entry)}
+      onContextMenu={(event) => onContextMenu(event, entry)}
+      style={{ opacity: isDragging ? 0.4 : 1 }}
+      className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
+        mobile && !gallery
+          ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
+          : gallery
+            ? "touch-pan-y border border-rule-soft p-4"
+            : "mx-2 mb-1 touch-none border-b border-rule-soft px-3 py-3"
+      } ${
+        selected
+          ? mobile
+            ? "bg-accent-wash"
+            : "bg-accent-wash"
+          : mobile
+            ? "hover:bg-page"
+            : "hover:bg-page"
+      }`}
     >
-      {canSwipe && (
-        <button
-          type="button"
-          className={`note-swipe-action ${swipeConfirm ? "is-confirming" : ""}`}
-          aria-label={swipeConfirm ? `Confirm ${swipeLabel.toLowerCase()}` : swipeLabel}
-          title={swipeConfirm ? `Confirm ${swipeLabel.toLowerCase()}` : swipeLabel}
-          onClick={confirmSwipeAction}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {swipeConfirm ? (
-            <>
-              <Check size={17} /> Confirm
-            </>
-          ) : (
-            <>
-              {swipeLeftAction === "archive" ? <Archive size={17} /> : <Trash2 size={17} />}
-              {swipeLabel}
-            </>
-          )}
-        </button>
-      )}
-      <div
-        ref={(el) => {
-          setNodeRef(el);
-          rowRef.current = el;
-        }}
-        {...(!mobile && canWrite ? listeners : {})}
-        {...(!mobile && canWrite ? attributes : {})}
-        role="option"
-        aria-selected={selected}
-        onClick={() => onSelect(entry)}
-        onContextMenu={(event) => onContextMenu(event, entry)}
-        onWheel={handleSwipe}
-        style={
-          {
-            opacity: isDragging ? 0.4 : 1,
-            "--swipe-x": `${swipeX}px`,
-            "--swipe-progress": Math.min(1, Math.abs(swipeX) / 70),
-          } as React.CSSProperties
-        }
-        className={`note-swipe-row ${swipeDragging ? "is-swiping" : ""} group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
-          mobile && !gallery
-            ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
-            : gallery
-              ? "touch-pan-y border border-rule-soft p-4"
-              : "mx-2 mb-1 touch-none border-b border-rule-soft px-3 py-3"
-        } ${
-          selected
-            ? mobile
-              ? "bg-accent-wash"
-              : "bg-accent-wash"
-            : mobile
-              ? "hover:bg-page"
-              : "hover:bg-page"
-        }`}
-      >
-        {/* The note's own picture stands where its kind-of-document glyph
+      {/* The note's own picture stands where its kind-of-document glyph
           stands: one place in the row says what you are about to open. */}
-        {entry.note.photo ? (
-          <span className={`note-photo is-row ${gallery ? "is-gallery" : ""}`}>
-            {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
-          </span>
-        ) : (
-          <span
-            title={glyph.label}
-            aria-label={glyph.label}
-            role="img"
-            className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
-              selected ? "is-selected" : ""
-            } ${pinned ? "is-pinned" : ""}`}
-          >
-            <Glyph size={mobile && !gallery ? 16 : 14} />
-          </span>
-        )}
+      {entry.note.photo ? (
+        <span className={`note-photo is-row ${gallery ? "is-gallery" : ""}`}>
+          {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
+        </span>
+      ) : (
+        <span
+          title={glyph.label}
+          aria-label={glyph.label}
+          role="img"
+          className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
+            selected ? "is-selected" : ""
+          } ${pinned ? "is-pinned" : ""}`}
+        >
+          <Glyph size={mobile && !gallery ? 16 : 14} />
+        </span>
+      )}
 
-        <div className="min-w-0 flex-1">
-          <p
-            /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+      <div className="min-w-0 flex-1">
+        <p
+          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
-              entry.note.title ? "text-ink" : "text-ink-4 italic"
-            }`}
-            style={{
-              fontWeight: 520,
-              display: "-webkit-box",
-              WebkitLineClamp: gallery ? 4 : 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {entry.note.title || "Untitled"}
-          </p>
+          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
+            entry.note.title ? "text-ink" : "text-ink-4 italic"
+          }`}
+          style={{
+            fontWeight: 520,
+            display: "-webkit-box",
+            WebkitLineClamp: gallery ? 4 : 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {entry.note.title || "Untitled"}
+        </p>
 
-          <p className="note-row-summary mt-1 truncate">
-            <span>{formatStamp(entry.note.updatedAt)}</span>
-            {preview && <span className="note-row-preview">{preview}</span>}
-          </p>
-        </div>
+        <p className="note-row-summary mt-1 truncate">
+          <span>{formatStamp(entry.note.updatedAt)}</span>
+          {preview && <span className="note-row-preview">{preview}</span>}
+        </p>
+      </div>
 
-        {canWrite && (
-          <div className="note-row-actions flex shrink-0 items-center gap-0.5">
-            {!trashMode && !archiveMode && (
-              <button
-                aria-label={
-                  pinned
-                    ? `Unpin ${entry.note.title || "Untitled"}`
-                    : `Pin ${entry.note.title || "Untitled"}`
-                }
-                title={pinned ? "Unpin note" : "Pin note to top"}
-                aria-pressed={pinned}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onTogglePin(entry);
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                className={`icon-button h-7 w-7 shrink-0 transition-all ${
-                  pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
-                }`}
-              >
-                <Pin size={14} fill={pinned ? "currentColor" : "none"} />
-              </button>
-            )}
-            {trashMode && (
-              <button
-                aria-label={`Restore ${entry.note.title || "Untitled"}`}
-                title="Restore note"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRestore(entry);
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                className="icon-button h-7 w-7 shrink-0 text-accent"
-              >
-                <RotateCcw size={14} />
-              </button>
-            )}
-            {archiveMode && (
-              <button
-                aria-label={`Move ${entry.note.title || "Untitled"} out of Archive`}
-                title="Move out of Archive"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onArchiveChange(entry, false);
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                className="icon-button h-7 w-7 shrink-0 text-accent"
-              >
-                <ArchiveRestore size={14} />
-              </button>
-            )}
-
+      {canWrite && (
+        <div className="note-row-actions flex shrink-0 items-center gap-0.5">
+          {!trashMode && !archiveMode && (
             <button
               aria-label={
-                confirmDelete
-                  ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
-                  : trashMode
-                    ? `Delete ${entry.note.title || "Untitled"} forever`
-                    : `Move ${entry.note.title || "Untitled"} to Trash`
+                pinned
+                  ? `Unpin ${entry.note.title || "Untitled"}`
+                  : `Pin ${entry.note.title || "Untitled"}`
               }
-              title={
-                confirmDelete
-                  ? trashMode
-                    ? "Click again to permanently delete"
-                    : "Click again to move to Trash"
-                  : trashMode
-                    ? `Delete "${entry.note.title || "Untitled"}" forever`
-                    : `Move "${entry.note.title || "Untitled"}" to Trash`
-              }
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirmDelete) {
-                  if (trashMode) onDeleteForever(entry);
-                  else onMoveToTrash(entry);
-                } else setConfirmDelete(true);
+              title={pinned ? "Unpin note" : "Pin note to top"}
+              aria-pressed={pinned}
+              onClick={(event) => {
+                event.stopPropagation();
+                onTogglePin(entry);
               }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
-                confirmDelete
-                  ? "bg-danger-fill text-on-danger opacity-100"
-                  : "text-ink-3 hover:text-danger"
+              onPointerDown={(event) => event.stopPropagation()}
+              className={`icon-button h-7 w-7 shrink-0 transition-all ${
+                pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
               }`}
             >
-              {confirmDelete ? (
-                <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
-              ) : (
-                <Trash2 size={14} />
-              )}
+              <Pin size={14} fill={pinned ? "currentColor" : "none"} />
             </button>
-          </div>
-        )}
-      </div>
+          )}
+          {trashMode && (
+            <button
+              aria-label={`Restore ${entry.note.title || "Untitled"}`}
+              title="Restore note"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRestore(entry);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="icon-button h-7 w-7 shrink-0 text-accent"
+            >
+              <RotateCcw size={14} />
+            </button>
+          )}
+          {archiveMode && (
+            <button
+              aria-label={`Move ${entry.note.title || "Untitled"} out of Archive`}
+              title="Move out of Archive"
+              onClick={(event) => {
+                event.stopPropagation();
+                onArchiveChange(entry, false);
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="icon-button h-7 w-7 shrink-0 text-accent"
+            >
+              <ArchiveRestore size={14} />
+            </button>
+          )}
+
+          <button
+            aria-label={
+              confirmDelete
+                ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
+                : trashMode
+                  ? `Delete ${entry.note.title || "Untitled"} forever`
+                  : `Move ${entry.note.title || "Untitled"} to Trash`
+            }
+            title={
+              confirmDelete
+                ? trashMode
+                  ? "Click again to permanently delete"
+                  : "Click again to move to Trash"
+                : trashMode
+                  ? `Delete "${entry.note.title || "Untitled"}" forever`
+                  : `Move "${entry.note.title || "Untitled"}" to Trash`
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirmDelete) {
+                if (trashMode) onDeleteForever(entry);
+                else onMoveToTrash(entry);
+              } else setConfirmDelete(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
+              confirmDelete
+                ? "bg-danger-fill text-on-danger opacity-100"
+                : "text-ink-3 hover:text-danger"
+            }`}
+          >
+            {confirmDelete ? (
+              <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
+            ) : (
+              <Trash2 size={14} />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 });
@@ -478,7 +388,6 @@ export function NoteList({
   onMoveToFolder,
   onSetPhoto,
   resolveImage,
-  swipeLeftAction,
 }: Props) {
   const hasQuery = query.trim().length > 0;
   /* The page speaks in note ids; the rows hand back the whole entry. One stable
@@ -790,7 +699,6 @@ export function NoteList({
                 onTogglePin={togglePinEntry}
                 onContextMenu={openRowMenu}
                 resolveImage={resolveImage}
-                swipeLeftAction={swipeLeftAction}
               />
             ))}
           </div>

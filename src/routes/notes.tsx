@@ -2092,7 +2092,6 @@ function NotesPage() {
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
-                  swipeLeftAction={writingPreferences.swipeLeftAction}
                 />
               </section>
             )}
@@ -2216,7 +2215,6 @@ function NotesPage() {
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
-                  swipeLeftAction={writingPreferences.swipeLeftAction}
                 />
               </div>
               <PaneResizer

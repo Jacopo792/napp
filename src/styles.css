@@ -2492,58 +2492,6 @@
   opacity: 0.46;
 }
 
-/* The action sits below the row, so a horizontal trackpad gesture reveals a
-   stable destination rather than stretching the row itself. The foreground
-   follows the fingers through a spring-like curve; reduced-motion users still
-   get the action without the travel. */
-.note-swipe-shell {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.78rem;
-}
-
-.note-swipe-action {
-  position: absolute;
-  inset: 0 0 0 auto;
-  display: flex;
-  width: 112px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  background: var(--swipe-action-color, #6d77f5);
-  color: white;
-  font-size: 11px;
-  font-weight: 650;
-  border-radius: 0.78rem 0 0 0.78rem;
-  opacity: 1;
-  transition:
-    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 180ms var(--ease);
-}
-
-.note-swipe-action.is-confirming {
-  width: 148px;
-  background: color-mix(in srgb, var(--swipe-action-color, #6d77f5) 82%, #111);
-}
-
-.note-swipe-row {
-  position: relative;
-  background: var(--paper);
-  transform: translate3d(var(--swipe-x, 0px), 0, 0);
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-}
-
-.note-swipe-row.is-swiping {
-  transition-duration: 0ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-swipe-row {
-    transition-duration: 0ms;
-  }
-}
-
 .compact-segment {
   display: flex;
   gap: 2px;

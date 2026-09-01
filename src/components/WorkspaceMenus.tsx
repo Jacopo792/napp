@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   Timer,
   Type,
-  MousePointer2,
   ArrowDownAZ,
   ArrowDownUp,
   CalendarDays,
@@ -67,11 +66,7 @@ import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { MenuButton } from "./MenuPrimitives";
 import { useDismiss } from "./useDismiss";
-import {
-  PRESENCE_PALETTES,
-  type SwipeAction,
-  type WritingPreferences,
-} from "@/lib/writingPreferences";
+import { PRESENCE_PALETTES, type WritingPreferences } from "@/lib/writingPreferences";
 
 export { MenuButton } from "./MenuPrimitives";
 
@@ -1284,31 +1279,6 @@ export function SettingsPanel({
                       {palette.name}
                     </button>
                   ))}
-                </div>
-
-                <h3>Trackpad gestures</h3>
-                <div className="appearance-controls">
-                  <div className="appearance-row writing-choice-row">
-                    <RowLead
-                      icon={<MousePointer2 size={17} />}
-                      label="Two-finger swipe left"
-                      hint="Reveal the action and complete it with a longer swipe"
-                    />
-                    <select
-                      aria-label="Two-finger swipe left action"
-                      value={writingPreferences.swipeLeftAction}
-                      onChange={(event) =>
-                        onWritingPreferencesChange({
-                          ...writingPreferences,
-                          swipeLeftAction: event.target.value as SwipeAction,
-                        })
-                      }
-                    >
-                      <option value="archive">Archive note</option>
-                      <option value="trash">Move to Trash</option>
-                      <option value="off">Off</option>
-                    </select>
-                  </div>
                 </div>
               </section>
             )}

@@ -8,16 +8,13 @@ export const PRESENCE_PALETTES = [
 ] as const;
 
 export type PresencePalette = (typeof PRESENCE_PALETTES)[number]["id"];
-export type SwipeAction = "archive" | "trash" | "off";
 
 export interface WritingPreferences {
   presencePalette: PresencePalette;
-  swipeLeftAction: SwipeAction;
 }
 
 export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   presencePalette: "amber",
-  swipeLeftAction: "archive",
 };
 
 const KEY = "napp:writing-preferences:v1";
@@ -33,12 +30,6 @@ function read(): WritingPreferences {
       presencePalette: PRESENCE_PALETTES.some((palette) => palette.id === value.presencePalette)
         ? value.presencePalette!
         : DEFAULT_WRITING_PREFERENCES.presencePalette,
-      swipeLeftAction:
-        value.swipeLeftAction === "archive" ||
-        value.swipeLeftAction === "trash" ||
-        value.swipeLeftAction === "off"
-          ? value.swipeLeftAction
-          : DEFAULT_WRITING_PREFERENCES.swipeLeftAction,
     };
   } catch {
     return { ...DEFAULT_WRITING_PREFERENCES };
