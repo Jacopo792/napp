@@ -1073,11 +1073,13 @@ function NotesPage() {
      only has to decide when they reach Postgres. */
 
   const handleMetaChange = useCallback(
-    (m: Meta) => {
+    (next: Meta | ((prev: Meta) => Meta)) => {
       if (!canWriteArchive) return;
       const pending = pendingMetaRef.current.get(viewAs);
+      const base = pending?.after ?? metasRef.current[viewAs] ?? activeMeta ?? EMPTY_META;
+      const m = typeof next === "function" ? (next as (prev: Meta) => Meta)(base) : next;
       pendingMetaRef.current.set(viewAs, {
-        before: pending?.before ?? activeMeta,
+        before: pending?.before ?? base,
         after: m,
       });
       setActiveMeta(m);
@@ -1088,15 +1090,17 @@ function NotesPage() {
 
   const handleTogglePin = useCallback(
     (noteId: string) => {
-      const existing = indexOf(activeMeta).byNote.get(noteId);
-      const notes: NoteMeta[] = existing
-        ? activeMeta.notes.map((note) =>
-            note.id === noteId ? { ...note, pinned: !note.pinned } : note,
-          )
-        : [...activeMeta.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
-      handleMetaChange({ ...activeMeta, notes });
+      handleMetaChange((prev) => {
+        const existing = indexOf(prev).byNote.get(noteId);
+        const notes: NoteMeta[] = existing
+          ? prev.notes.map((note) =>
+              note.id === noteId ? { ...note, pinned: !note.pinned } : note,
+            )
+          : [...prev.notes, { id: noteId, folderId: null, tagIds: [], pinned: true }];
+        return { ...prev, notes };
+      });
     },
-    [activeMeta, handleMetaChange],
+    [handleMetaChange],
   );
 
   // ── Create / delete ─────────────────────────────────────────────────────
@@ -1198,7 +1202,10 @@ function NotesPage() {
           added.push(metadata);
         }
         setEntries(entriesRef.current);
-        setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, ...added] });
+        setMetas((current) => {
+          const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
+          return { ...current, [viewAs]: { ...base, notes: [...base.notes, ...added] } };
+        });
         if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
         setStatusFlash(`Imported ${added.length} note${added.length === 1 ? "" : "s"}`);
       } catch (e) {
@@ -1207,7 +1214,7 @@ function NotesPage() {
         setSaving(false);
       }
     },
-    [canWriteArchive, viewAs, activeMeta, setActiveMeta, selectedFolderId],
+    [canWriteArchive, viewAs, selectedFolderId],
   );
 
   const handleNew = useCallback(async () => {
@@ -1239,12 +1246,46 @@ function NotesPage() {
     setSaving(true);
     setError("");
     try {
+      // A note filed in a folder that has just been created still lives only
+      // in the pending Meta: Postgres has not seen the folder row yet, so
+      // inserting the note with that folder_id would violate the
+      // notes_folder_owner_id_fkey. Flush the pending folder first.
+      if (folderId !== null) {
+        const pending = pendingMetaRef.current.get(viewAs);
+        const needsFlush = pending?.after.folders.some((folder) => folder.id === folderId) ?? false;
+        if (needsFlush) {
+          window.clearTimeout(timerRef.current);
+          window.clearTimeout(retryRef.current);
+          while (inFlightRef.current) {
+            await new Promise((resolve) => setTimeout(resolve, 30));
+          }
+          const currentPending = pendingMetaRef.current.get(viewAs);
+          if (currentPending) {
+            pendingMetaRef.current.delete(viewAs);
+            try {
+              await persistMetaDiff(s, viewAs, currentPending.before, currentPending.after);
+              setDirty(pendingMetaRef.current.size > 0 || hasPending());
+            } catch (err) {
+              const newer = pendingMetaRef.current.get(viewAs);
+              pendingMetaRef.current.set(viewAs, {
+                before: currentPending.before,
+                after: newer?.after ?? currentPending.after,
+              });
+              throw err;
+            }
+          }
+        }
+      }
+
       const metadata: NoteMeta = { id: note.id, folderId, tagIds: [] };
       const entry = await createNote(s, note, metadata);
       entriesRef.current = [entry, ...entriesRef.current];
       setEntries(entriesRef.current);
 
-      setActiveMeta({ ...activeMeta, notes: [...activeMeta.notes, metadata] });
+      setMetas((current) => {
+        const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
+        return { ...current, [viewAs]: { ...base, notes: [...base.notes, metadata] } };
+      });
 
       setQuery("");
       if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
@@ -1270,25 +1311,27 @@ function NotesPage() {
       setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewAs, selectedFolderId, activeMeta, canWriteArchive]);
+  }, [viewAs, selectedFolderId, canWriteArchive]);
 
   const handleMoveToTrash = useCallback(
     (entry: NoteEntry) => {
-      const existing = activeMeta.notes.find((note) => note.id === entry.note.id);
-      const notes: NoteMeta[] = existing
-        ? activeMeta.notes.map((note) =>
-            note.id === entry.note.id ? { ...note, trashedAt: new Date().toISOString() } : note,
-          )
-        : [
-            ...activeMeta.notes,
-            {
-              id: entry.note.id,
-              folderId: null,
-              tagIds: [],
-              trashedAt: new Date().toISOString(),
-            },
-          ];
-      handleMetaChange({ ...activeMeta, notes });
+      handleMetaChange((prev) => {
+        const existing = prev.notes.find((note) => note.id === entry.note.id);
+        const notes: NoteMeta[] = existing
+          ? prev.notes.map((note) =>
+              note.id === entry.note.id ? { ...note, trashedAt: new Date().toISOString() } : note,
+            )
+          : [
+              ...prev.notes,
+              {
+                id: entry.note.id,
+                folderId: null,
+                tagIds: [],
+                trashedAt: new Date().toISOString(),
+              },
+            ];
+        return { ...prev, notes };
+      });
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
@@ -1296,7 +1339,7 @@ function NotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta],
+    [selectedId, handleMetaChange],
   );
 
   /* Onto the shelf and back off it. One handler rather than two: the halves
@@ -1304,13 +1347,13 @@ function NotesPage() {
   const handleArchiveChange = useCallback(
     (entry: NoteEntry, archived: boolean) => {
       const archivedAt = archived ? new Date().toISOString() : undefined;
-      const existing = activeMeta.notes.find((note) => note.id === entry.note.id);
-      const notes: NoteMeta[] = existing
-        ? activeMeta.notes.map((note) =>
-            note.id === entry.note.id ? { ...note, archivedAt } : note,
-          )
-        : [...activeMeta.notes, { id: entry.note.id, folderId: null, tagIds: [], archivedAt }];
-      handleMetaChange({ ...activeMeta, notes });
+      handleMetaChange((prev) => {
+        const existing = prev.notes.find((note) => note.id === entry.note.id);
+        const notes: NoteMeta[] = existing
+          ? prev.notes.map((note) => (note.id === entry.note.id ? { ...note, archivedAt } : note))
+          : [...prev.notes, { id: entry.note.id, folderId: null, tagIds: [], archivedAt }];
+        return { ...prev, notes };
+      });
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
@@ -1318,23 +1361,23 @@ function NotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta],
+    [selectedId, handleMetaChange],
   );
 
   const handleRestore = useCallback(
     (entry: NoteEntry) => {
-      handleMetaChange({
-        ...activeMeta,
-        notes: activeMeta.notes.map((note) =>
+      handleMetaChange((prev) => ({
+        ...prev,
+        notes: prev.notes.map((note) =>
           note.id === entry.note.id ? { ...note, trashedAt: undefined } : note,
         ),
-      });
+      }));
       if (selectedId === entry.note.id) {
         setSelectedId(null);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta],
+
+    [selectedId, handleMetaChange],
   );
 
   const handleDeleteForever = useCallback(
@@ -1351,9 +1394,12 @@ function NotesPage() {
         entriesRef.current = entriesRef.current.filter((e) => e.note.id !== entry.note.id);
         setEntries(entriesRef.current);
 
-        setActiveMeta({
-          ...activeMeta,
-          notes: activeMeta.notes.filter((note) => note.id !== entry.note.id),
+        setMetas((current) => {
+          const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
+          return {
+            ...current,
+            [viewAs]: { ...base, notes: base.notes.filter((note) => note.id !== entry.note.id) },
+          };
         });
 
         if (selectedId === entry.note.id) {
@@ -1367,7 +1413,7 @@ function NotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedId, activeMeta, canWriteArchive],
+    [selectedId, viewAs, canWriteArchive],
   );
 
   // ── Keyboard ────────────────────────────────────────────────────────────
@@ -1457,12 +1503,14 @@ function NotesPage() {
     if (!over) return;
     const noteId = e.active.id as string;
     const folderId = over === UNFILED ? null : over;
-    const existing = activeMeta.notes.find((n) => n.id === noteId);
-    handleMetaChange({
-      ...activeMeta,
-      notes: existing
-        ? activeMeta.notes.map((n) => (n.id === noteId ? { ...n, folderId } : n))
-        : [...activeMeta.notes, { id: noteId, folderId, tagIds: [] }],
+    handleMetaChange((prev) => {
+      const existing = prev.notes.find((n) => n.id === noteId);
+      return {
+        ...prev,
+        notes: existing
+          ? prev.notes.map((n) => (n.id === noteId ? { ...n, folderId } : n))
+          : [...prev.notes, { id: noteId, folderId, tagIds: [] }],
+      };
     });
   }
 
@@ -1472,29 +1520,29 @@ function NotesPage() {
      become unfiled, which is the only behaviour that makes a folder safe to
      throw away. ───────────────────────────────────────────────────────────── */
   function handleCreateFolder(name: string, parentId: string | null) {
-    handleMetaChange({
-      ...activeMeta,
-      folders: [...activeMeta.folders, { id: crypto.randomUUID(), name, parentId }],
-    });
+    handleMetaChange((prev) => ({
+      ...prev,
+      folders: [...prev.folders, { id: crypto.randomUUID(), name, parentId }],
+    }));
   }
 
   function handleRenameFolder(id: string, name: string) {
-    handleMetaChange({
-      ...activeMeta,
-      folders: activeMeta.folders.map((folder) =>
-        folder.id === id ? { ...folder, name } : folder,
-      ),
-    });
+    handleMetaChange((prev) => ({
+      ...prev,
+      folders: prev.folders.map((folder) => (folder.id === id ? { ...folder, name } : folder)),
+    }));
   }
 
   /* Deleting a folder deletes the branch under it. Nothing loses a note: every
      note anywhere in that branch becomes unfiled, and an unfiled note is in All
      notes — which is the only reason throwing a folder away is safe. */
   function handleDeleteFolder(id: string) {
+    const latest =
+      pendingMetaRef.current.get(viewAs)?.after ?? metasRef.current[viewAs] ?? activeMeta;
     const doomed = new Set([id]);
     for (let added = true; added; ) {
       added = false;
-      for (const folder of activeMeta.folders) {
+      for (const folder of latest.folders) {
         const parentId = folder.parentId ?? null;
         if (parentId && doomed.has(parentId) && !doomed.has(folder.id)) {
           doomed.add(folder.id);
@@ -1502,24 +1550,25 @@ function NotesPage() {
         }
       }
     }
-
-    handleMetaChange({
-      ...activeMeta,
-      folders: activeMeta.folders.filter((folder) => !doomed.has(folder.id)),
-      notes: activeMeta.notes.map((note) =>
+    handleMetaChange((prev) => ({
+      ...prev,
+      folders: prev.folders.filter((folder) => !doomed.has(folder.id)),
+      notes: prev.notes.map((note) =>
         note.folderId && doomed.has(note.folderId) ? { ...note, folderId: null } : note,
       ),
-    });
+    }));
     if (doomed.has(selectedFolderId)) handleSelectFolder(ALL);
   }
 
   function handleMoveNote(noteId: string, folderId: string | null) {
-    const existing = activeMeta.notes.find((note) => note.id === noteId);
-    handleMetaChange({
-      ...activeMeta,
-      notes: existing
-        ? activeMeta.notes.map((note) => (note.id === noteId ? { ...note, folderId } : note))
-        : [...activeMeta.notes, { id: noteId, folderId, tagIds: [] }],
+    handleMetaChange((prev) => {
+      const existing = prev.notes.find((note) => note.id === noteId);
+      return {
+        ...prev,
+        notes: existing
+          ? prev.notes.map((note) => (note.id === noteId ? { ...note, folderId } : note))
+          : [...prev.notes, { id: noteId, folderId, tagIds: [] }],
+      };
     });
     if (selectedFolderId !== ALL) setSelectedFolderId(folderId ?? ALL);
   }
