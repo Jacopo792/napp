@@ -51,6 +51,10 @@ separate composition for the phone.
 - **Roles.** Both members read everything; only editors write notes, folders,
   tags and files, rename the archive, invite, or change a role. The last editor
   cannot be demoted.
+- **Leaving a shared archive.** Settings → Members lets a member remove only
+  themselves after confirmation. The last member and last editor cannot leave;
+  once a member leaves, their seat is available to the remaining editor’s
+  invitation flow and the archive’s notes stay in place.
 - **Accounts.** Sign in and create-account are separate modes with their own
   copy, both with a show/hide password control. The first archive is created for
   you atomically on first sign-in. An account in several archives picks one at

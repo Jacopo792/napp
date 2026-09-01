@@ -9,11 +9,13 @@ import {
   Copy,
   Image,
   Layers,
+  LogOut,
   Mail,
   Palette,
   ShieldCheck,
   Timer,
   Type,
+  MousePointer2,
   ArrowDownAZ,
   ArrowDownUp,
   CalendarDays,
@@ -65,6 +67,11 @@ import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { MenuButton } from "./MenuPrimitives";
 import { useDismiss } from "./useDismiss";
+import {
+  PRESENCE_PALETTES,
+  type SwipeAction,
+  type WritingPreferences,
+} from "@/lib/writingPreferences";
 
 export { MenuButton } from "./MenuPrimitives";
 
@@ -592,6 +599,7 @@ const SETTINGS_SECTIONS = [
     items: [
       { id: "appearance", name: "Appearance", icon: <Palette size={15} /> },
       { id: "reading", name: "Reading", icon: <BookOpen size={15} /> },
+      { id: "writing", name: "Writing", icon: <Type size={15} /> },
     ],
   },
 ] as const;
@@ -613,6 +621,7 @@ export function SettingsPanel({
   canManageMembers,
   presenceEnabled,
   proofreaderEnabled,
+  writingPreferences,
   profileBusy,
   profileError,
   onNicknameSave,
@@ -621,8 +630,10 @@ export function SettingsPanel({
   onCreateInvite,
   onRevokeInvite,
   onMemberRoleChange,
+  onLeaveArchive,
   onPresenceEnabledChange,
   onProofreaderEnabledChange,
+  onWritingPreferencesChange,
   onHideArchivedChange,
   onAutoLockChange,
   onClose,
@@ -652,6 +663,7 @@ export function SettingsPanel({
   canManageMembers: boolean;
   presenceEnabled: boolean;
   proofreaderEnabled: boolean;
+  writingPreferences: WritingPreferences;
   profileBusy: boolean;
   profileError: string;
   onNicknameSave: (nickname: string) => void;
@@ -660,8 +672,10 @@ export function SettingsPanel({
   onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
   onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
+  onLeaveArchive: () => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
+  onWritingPreferencesChange: (next: WritingPreferences) => void;
   onHideArchivedChange: (hideArchived: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
@@ -683,6 +697,9 @@ export function SettingsPanel({
   const [cropping, setCropping] = useState<File | null>(null);
   const [memberBusy, setMemberBusy] = useState("");
   const [memberStatus, setMemberStatus] = useState("");
+  const [leaveConfirm, setLeaveConfirm] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveStatus, setLeaveStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
 
@@ -695,6 +712,9 @@ export function SettingsPanel({
       setInviteStatus("");
       setInviteRole("editor");
       setMemberStatus("");
+      setLeaveConfirm(false);
+      setLeaveBusy(false);
+      setLeaveStatus("");
       setCropping(null);
     }
   }, [open]);
@@ -756,6 +776,26 @@ export function SettingsPanel({
       setMemberStatus(reason instanceof Error ? reason.message : "Role change failed");
     } finally {
       setMemberBusy("");
+    }
+  }
+
+  async function leaveArchive() {
+    if (!leaveConfirm) {
+      setLeaveConfirm(true);
+      setLeaveStatus(
+        "Confirm to leave. Your access ends immediately; notes stay with the archive.",
+      );
+      return;
+    }
+    setLeaveBusy(true);
+    setLeaveStatus("");
+    try {
+      await onLeaveArchive();
+    } catch (reason) {
+      setLeaveConfirm(false);
+      setLeaveStatus(reason instanceof Error ? reason.message : "Could not leave this archive");
+    } finally {
+      setLeaveBusy(false);
     }
   }
 
@@ -1164,6 +1204,84 @@ export function SettingsPanel({
               </section>
             )}
 
+            {section === "writing" && (
+              <section>
+                <h3>Writing</h3>
+                <div className="appearance-controls">
+                  <label className="appearance-row">
+                    <RowLead
+                      icon={<SpellCheck size={17} />}
+                      label="Proofreading"
+                      hint="Offer spelling and grammar corrections on this device"
+                    />
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={proofreaderEnabled}
+                      onChange={(event) => onProofreaderEnabledChange(event.target.checked)}
+                    />
+                  </label>
+                </div>
+
+                <h3>Live presence</h3>
+                <p className="writing-help">
+                  Choose the colour used for collaborators’ names while they are in the note with
+                  you.
+                </p>
+                <div
+                  className="presence-palette-picker"
+                  role="radiogroup"
+                  aria-label="Live presence palette"
+                >
+                  {PRESENCE_PALETTES.map((palette) => (
+                    <button
+                      key={palette.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={writingPreferences.presencePalette === palette.id}
+                      className={
+                        writingPreferences.presencePalette === palette.id ? "is-active" : ""
+                      }
+                      onClick={() =>
+                        onWritingPreferencesChange({
+                          ...writingPreferences,
+                          presencePalette: palette.id,
+                        })
+                      }
+                    >
+                      <i style={{ background: palette.color }} aria-hidden="true" />
+                      {palette.name}
+                    </button>
+                  ))}
+                </div>
+
+                <h3>Trackpad gestures</h3>
+                <div className="appearance-controls">
+                  <div className="appearance-row writing-choice-row">
+                    <RowLead
+                      icon={<MousePointer2 size={17} />}
+                      label="Two-finger swipe left"
+                      hint="Reveal the action and complete it with a longer swipe"
+                    />
+                    <select
+                      aria-label="Two-finger swipe left action"
+                      value={writingPreferences.swipeLeftAction}
+                      onChange={(event) =>
+                        onWritingPreferencesChange({
+                          ...writingPreferences,
+                          swipeLeftAction: event.target.value as SwipeAction,
+                        })
+                      }
+                    >
+                      <option value="archive">Archive note</option>
+                      <option value="trash">Move to Trash</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {section === "security" && (
               <section>
                 <h3>Security</h3>
@@ -1235,20 +1353,6 @@ export function SettingsPanel({
                     role="switch"
                     checked={profile.hideArchived}
                     onChange={(event) => onHideArchivedChange(event.target.checked)}
-                  />
-                </label>
-
-                <label className="appearance-row is-bare">
-                  <RowLead
-                    icon={<SpellCheck size={17} />}
-                    label="Proofreading"
-                    hint="Offer to fix spelling and grammar, on this device"
-                  />
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={proofreaderEnabled}
-                    onChange={(event) => onProofreaderEnabledChange(event.target.checked)}
                   />
                 </label>
               </section>
@@ -1445,6 +1549,37 @@ export function SettingsPanel({
                   roles; viewers cannot. Somebody who should not read these needs an archive of
                   their own.
                 </p>
+
+                <h3>Leave shared archive</h3>
+                <div className="leave-archive-card">
+                  <RowLead
+                    icon={<LogOut size={17} />}
+                    label="Leave this archive"
+                    hint="Your access ends, but the notes stay for the other members"
+                  />
+                  <button
+                    type="button"
+                    className={leaveConfirm ? "is-danger-confirm" : ""}
+                    disabled={leaveBusy || members.length <= 1}
+                    onClick={() => void leaveArchive()}
+                  >
+                    <LogOut size={15} />
+                    {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
+                  </button>
+                </div>
+                {members.length <= 1 ? (
+                  <p className="profile-note">Invite an editor before leaving the last seat.</p>
+                ) : (
+                  <p className="profile-note">
+                    If you are the only editor, promote another member first. Leaving frees your
+                    seat so an editor can invite someone else.
+                  </p>
+                )}
+                {leaveStatus && (
+                  <p className="profile-note" role="status">
+                    {leaveStatus}
+                  </p>
+                )}
               </section>
             )}
           </div>

@@ -165,3 +165,10 @@ export async function setArchiveMemberRole(
   });
   fail(result.error);
 }
+
+/** Ends only the caller's membership. The database keeps at least one editor,
+ * so this cannot orphan an archive or leave the remaining people read-only. */
+export async function leaveArchive(session: AppSession): Promise<void> {
+  const result = await supabase.rpc("leave_shared_archive", { archive_id: session.archiveId });
+  fail(result.error);
+}

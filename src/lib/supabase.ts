@@ -18,6 +18,7 @@ export {
   downloadObject,
   loadPendingInvites,
   loadProfile,
+  leaveArchive,
   revokeArchiveInvite,
   saveProfile,
   setArchiveMemberRole,

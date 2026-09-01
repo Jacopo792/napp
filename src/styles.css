@@ -1255,10 +1255,16 @@
   max-width: 8rem;
 }
 
+.note-reader.has-custom-presence {
+  border-color: color-mix(in srgb, var(--presence-color) 46%, transparent);
+  background: var(--presence-wash);
+  color: var(--presence-color);
+}
+
 .note-reader.is-typing {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: var(--accent-wash);
-  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--presence-color, var(--accent)) 60%, transparent);
+  background: var(--presence-wash, var(--accent-wash));
+  color: var(--presence-color, var(--accent-strong));
 }
 
 /* A caret, not three bouncing dots: this interface already tells you something
@@ -2382,6 +2388,151 @@
   font-family: var(--font-mono);
   font-size: 11px;
   text-align: right;
+}
+
+.writing-help {
+  margin: -8px 0 12px;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.presence-palette-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.presence-palette-picker button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0.65rem;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 560;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.presence-palette-picker button:hover {
+  border-color: var(--rule);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.presence-palette-picker button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.presence-palette-picker i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.writing-choice-row select {
+  max-width: 10.5rem;
+  margin-left: auto;
+  border: 1px solid var(--rule);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  padding: 7px 28px 7px 10px;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.leave-archive-card {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--rule-soft));
+  border-radius: 0.75rem;
+  padding: 12px 14px;
+}
+
+.leave-archive-card button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--rule));
+  border-radius: 0.55rem;
+  padding: 7px 9px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 620;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.leave-archive-card button:hover:not(:disabled),
+.leave-archive-card button.is-danger-confirm {
+  border-color: var(--danger);
+  background: var(--danger-fill);
+  color: var(--on-danger);
+}
+
+.leave-archive-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+/* The action sits below the row, so a horizontal trackpad gesture reveals a
+   stable destination rather than stretching the row itself. The foreground
+   follows the fingers through a spring-like curve; reduced-motion users still
+   get the action without the travel. */
+.note-swipe-shell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.78rem;
+}
+
+.note-swipe-action {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  width: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--swipe-action-color, #6d77f5);
+  color: white;
+  font-size: 11px;
+  font-weight: 650;
+  opacity: var(--swipe-progress, 0);
+}
+
+.note-swipe-row {
+  position: relative;
+  background: var(--paper);
+  transform: translate3d(var(--swipe-x, 0px), 0, 0);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.note-swipe-row.is-swiping {
+  transition-duration: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-swipe-row {
+    transition-duration: 0ms;
+  }
 }
 
 .compact-segment {

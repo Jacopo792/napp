@@ -23,6 +23,7 @@ import {
   createArchiveInvite,
   deleteAvatar,
   deleteNote,
+  leaveArchive,
   downloadImage,
   downloadObject,
   loadArchive,
@@ -119,6 +120,11 @@ import {
   type ListPreferences,
   type ListPreferencesV1,
 } from "@/lib/listPreferences";
+import {
+  presencePaletteFor,
+  setWritingPreferences,
+  useWritingPreferences,
+} from "@/lib/writingPreferences";
 
 const NoteEditor = lazy(() =>
   import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
@@ -242,6 +248,7 @@ function NotesPage() {
   const [profileError, setProfileError] = useState("");
   const [presenceEnabled, setPresenceEnabled] = useState(false);
   const [proofreaderEnabled, setProofreaderEnabled] = useState(loadProofreaderPreference);
+  const writingPreferences = useWritingPreferences();
   const [presenceReady, setPresenceReady] = useState(false);
   const [presentMembers, setPresentMembers] = useState<Map<string, PresenceMember>>(
     () => new Map(),
@@ -1381,7 +1388,6 @@ function NotesPage() {
           el.tagName === "SELECT" ||
           el.isContentEditable);
       const mod = e.metaKey || e.ctrlKey;
-
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
         saveNow();
@@ -1649,6 +1655,24 @@ function NotesPage() {
     navigate({ to: "/" });
   }
 
+  const handleLeaveArchive = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) throw new Error("Sign in again before leaving this archive");
+
+    /* Membership removal revokes the right to finish a write, so flush first
+       and fail closed if any note or metadata is still waiting locally. */
+    await drain();
+    if (hasPending() || pendingMetaRef.current.size > 0) {
+      throw new Error("Your latest changes could not be saved. Try again before leaving.");
+    }
+
+    await leaveArchive(current);
+    clearDrafts();
+    await clearSession();
+    setSession(null);
+    navigate({ to: "/" });
+  }, [drain, navigate]);
+
   /* Who else is on this page right now. Filtered to the note that is open, so
      the other person appears when they arrive and goes when they leave — the
      roster in Settings answers "who is online", and this answers the narrower
@@ -1669,7 +1693,13 @@ function NotesPage() {
           return (
             <span
               key={peer.userId}
-              className={`note-reader ${typing ? "is-typing" : ""}`}
+              className={`note-reader has-custom-presence ${typing ? "is-typing" : ""}`}
+              style={
+                {
+                  "--presence-color": presencePaletteFor(writingPreferences.presencePalette).color,
+                  "--presence-wash": presencePaletteFor(writingPreferences.presencePalette).wash,
+                } as React.CSSProperties
+              }
               title={typing ? `${name} is writing` : `${name} has this note open`}
             >
               <Avatar url={avatarUrls[peer.userId] ?? null} name={name} email="" compact />
@@ -1681,7 +1711,15 @@ function NotesPage() {
         })}
       </span>
     );
-  }, [presenceEnabled, selectedId, notePeers, members, presentMembers, avatarUrls]);
+  }, [
+    presenceEnabled,
+    selectedId,
+    notePeers,
+    members,
+    presentMembers,
+    avatarUrls,
+    writingPreferences,
+  ]);
 
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
@@ -1916,9 +1954,12 @@ function NotesPage() {
         await setArchiveMemberRole(session, userId, role);
         await refreshRemote();
       }}
+      onLeaveArchive={handleLeaveArchive}
       onPresenceEnabledChange={handlePresenceChange}
       proofreaderEnabled={proofreaderEnabled}
+      writingPreferences={writingPreferences}
       onProofreaderEnabledChange={handleProofreaderChange}
+      onWritingPreferencesChange={setWritingPreferences}
       /* Straight through the one profile writer: this is a column on the row,
          and Postgres reads it back to decide what the other member may fetch. */
       onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
@@ -2051,6 +2092,7 @@ function NotesPage() {
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
+                  swipeLeftAction={writingPreferences.swipeLeftAction}
                 />
               </section>
             )}
@@ -2174,6 +2216,7 @@ function NotesPage() {
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
+                  swipeLeftAction={writingPreferences.swipeLeftAction}
                 />
               </div>
               <PaneResizer
