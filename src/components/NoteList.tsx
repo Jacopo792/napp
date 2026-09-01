@@ -11,6 +11,7 @@ import { useDraggable } from "@dnd-kit/core";
 import {
   Archive,
   ArchiveRestore,
+  Check,
   ChevronRight,
   FileText,
   FolderInput,
@@ -37,7 +38,7 @@ import { documentGlyph } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
 import type { SwipeAction } from "@/lib/writingPreferences";
-import { nextSwipeOffset, SWIPE_ACTION_OFFSET } from "@/lib/swipe";
+import { nextSwipeOffset } from "@/lib/swipe";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuButton } from "./WorkspaceMenus";
@@ -161,9 +162,10 @@ const Row = memo(function Row({
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [swipeX, setSwipeX] = useState(0);
+  const [swipeDragging, setSwipeDragging] = useState(false);
+  const [swipeConfirm, setSwipeConfirm] = useState(false);
   const swipeXRef = useRef(0);
   const swipeResetRef = useRef<number | undefined>(undefined);
-  const swipeActionRef = useRef(false);
 
   const noteMeta = indexOf(meta).byNote.get(entry.note.id);
 
@@ -189,29 +191,39 @@ const Row = memo(function Row({
   const canSwipe = !mobile && canWrite && !trashMode && !archiveMode && swipeLeftAction !== "off";
   const swipeLabel = swipeLeftAction === "archive" ? "Archive" : "Move to Trash";
 
-  function resetSwipe() {
+  function settleSwipe() {
     window.clearTimeout(swipeResetRef.current);
     swipeResetRef.current = window.setTimeout(() => {
-      swipeXRef.current = 0;
-      setSwipeX(0);
-    }, 130);
+      const revealed = swipeXRef.current <= -32;
+      setSwipeDragging(false);
+      setSwipeConfirm(false);
+      swipeXRef.current = revealed ? -112 : 0;
+      setSwipeX(swipeXRef.current);
+    }, 110);
   }
 
   function handleSwipe(event: React.WheelEvent<HTMLDivElement>) {
     if (!canSwipe || Math.abs(event.deltaX) < 3) return;
     event.preventDefault();
     window.clearTimeout(swipeResetRef.current);
+    setSwipeDragging(true);
     const next = nextSwipeOffset(swipeXRef.current, event.deltaX);
     swipeXRef.current = next;
     setSwipeX(next);
+    settleSwipe();
+  }
 
-    if (next <= SWIPE_ACTION_OFFSET && !swipeActionRef.current) {
-      swipeActionRef.current = true;
-      if (swipeLeftAction === "archive") onArchiveChange(entry, true);
-      else onMoveToTrash(entry);
+  function confirmSwipeAction(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (!swipeConfirm) {
+      setSwipeConfirm(true);
+      setSwipeDragging(false);
+      swipeXRef.current = -148;
+      setSwipeX(-148);
       return;
     }
-    resetSwipe();
+    if (swipeLeftAction === "archive") onArchiveChange(entry, true);
+    else onMoveToTrash(entry);
   }
 
   return (
@@ -224,10 +236,25 @@ const Row = memo(function Row({
       }
     >
       {canSwipe && (
-        <span className="note-swipe-action" aria-hidden="true">
-          {swipeLeftAction === "archive" ? <Archive size={17} /> : <Trash2 size={17} />}
-          {swipeLabel}
-        </span>
+        <button
+          type="button"
+          className={`note-swipe-action ${swipeConfirm ? "is-confirming" : ""}`}
+          aria-label={swipeConfirm ? `Confirm ${swipeLabel.toLowerCase()}` : swipeLabel}
+          title={swipeConfirm ? `Confirm ${swipeLabel.toLowerCase()}` : swipeLabel}
+          onClick={confirmSwipeAction}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {swipeConfirm ? (
+            <>
+              <Check size={17} /> Confirm
+            </>
+          ) : (
+            <>
+              {swipeLeftAction === "archive" ? <Archive size={17} /> : <Trash2 size={17} />}
+              {swipeLabel}
+            </>
+          )}
+        </button>
       )}
       <div
         ref={(el) => {
@@ -248,7 +275,7 @@ const Row = memo(function Row({
             "--swipe-progress": Math.min(1, Math.abs(swipeX) / 70),
           } as React.CSSProperties
         }
-        className={`note-swipe-row ${swipeX ? "is-swiping" : ""} group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
+        className={`note-swipe-row ${swipeDragging ? "is-swiping" : ""} group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
           mobile && !gallery
             ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
             : gallery

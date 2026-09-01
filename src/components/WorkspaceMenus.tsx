@@ -955,6 +955,37 @@ export function SettingsPanel({
                   Your nickname and picture are the only things about you the others can see. Nobody
                   but this account can change them.
                 </p>
+
+                <h3>Leave shared archive</h3>
+                <div className="leave-archive-card">
+                  <RowLead
+                    icon={<LogOut size={17} />}
+                    label="Leave this archive"
+                    hint="Your access ends, but the notes stay for the other members"
+                  />
+                  <button
+                    type="button"
+                    className={leaveConfirm ? "is-danger-confirm" : ""}
+                    disabled={leaveBusy || members.length <= 1}
+                    onClick={() => void leaveArchive()}
+                  >
+                    <LogOut size={15} />
+                    {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
+                  </button>
+                </div>
+                {members.length <= 1 ? (
+                  <p className="profile-note">Invite an editor before leaving the last seat.</p>
+                ) : (
+                  <p className="profile-note">
+                    If you are the only editor, promote another member first. Leaving frees your
+                    seat so an editor can invite someone else.
+                  </p>
+                )}
+                {leaveStatus && (
+                  <p className="profile-note" role="status">
+                    {leaveStatus}
+                  </p>
+                )}
               </section>
             )}
 
@@ -1549,37 +1580,6 @@ export function SettingsPanel({
                   roles; viewers cannot. Somebody who should not read these needs an archive of
                   their own.
                 </p>
-
-                <h3>Leave shared archive</h3>
-                <div className="leave-archive-card">
-                  <RowLead
-                    icon={<LogOut size={17} />}
-                    label="Leave this archive"
-                    hint="Your access ends, but the notes stay for the other members"
-                  />
-                  <button
-                    type="button"
-                    className={leaveConfirm ? "is-danger-confirm" : ""}
-                    disabled={leaveBusy || members.length <= 1}
-                    onClick={() => void leaveArchive()}
-                  >
-                    <LogOut size={15} />
-                    {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
-                  </button>
-                </div>
-                {members.length <= 1 ? (
-                  <p className="profile-note">Invite an editor before leaving the last seat.</p>
-                ) : (
-                  <p className="profile-note">
-                    If you are the only editor, promote another member first. Leaving frees your
-                    seat so an editor can invite someone else.
-                  </p>
-                )}
-                {leaveStatus && (
-                  <p className="profile-note" role="status">
-                    {leaveStatus}
-                  </p>
-                )}
               </section>
             )}
           </div>
