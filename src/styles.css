@@ -2471,6 +2471,12 @@
    difference is whether the eye is told the selection moved or has to work out
    that it did — and it is the same device the archive switch already uses for
    its thumb. Behind the buttons, never over them. */
+/* Placed rather than travelling: a re-measurement is not the selection moving.
+   See the effect in `WorkspaceMenus.tsx`. */
+.settings-nav-marker.is-placed {
+  transition: none;
+}
+
 .settings-nav-marker {
   position: absolute;
   z-index: 0;

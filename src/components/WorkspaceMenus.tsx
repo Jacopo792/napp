@@ -801,17 +801,28 @@ export function SettingsPanel({
      headings between the buttons mean no arithmetic on the index gives the
      right offset. */
   const [marker, setMarker] = useState<{ top: number; height: number } | null>(null);
+  /* The marker travels between sections, and must not travel when it is merely
+     being corrected. Which of the two this is, is exactly "did the section
+     change since the last time it was placed". */
+  const placedFor = useRef(section);
+  const [travelling, setTravelling] = useState(false);
 
   /* Re-measured whenever anything in the rail changes size, not only when the
      section changes. Measuring once on open was wrong by ten pixels every
      first open: the effect runs before the rail has settled — the group
      headings restyle when the sans face swaps in, the identity block above
-     resizes when the avatar and the nickname arrive — and the marker then sat
-     ten pixels above the button it was supposed to be behind until the first
-     click on another section re-ran this. A ResizeObserver over the list and
-     its children answers "did anything move?" without having to name which of
-     those three it was, and covers the window resize the deps never mentioned
-     either. */
+     resizes when the avatar and the nickname arrive. A ResizeObserver over the
+     list and its children answers "did anything move?" without having to name
+     which of those three it was, and covers the window resize the deps never
+     mentioned either.
+
+     And the correction is applied *without* the transition, which is the other
+     half and is what was still visible. The marker animates so the eye is told
+     the selection moved; a re-measurement is not the selection moving, it is
+     the marker admitting it was in the wrong place. Left animated, the first
+     open showed the wash sliding ten pixels down into position under "Profile"
+     — the fill that looked wrong until you clicked something else. It travels
+     when the section changes and is placed instantly the rest of the time. */
   useEffect(() => {
     if (!open) return;
     const list = navList.current;
@@ -819,6 +830,8 @@ export function SettingsPanel({
 
     const measure = () => {
       const active = list.querySelector<HTMLElement>("button.is-active");
+      setTravelling(placedFor.current !== section);
+      placedFor.current = section;
       setMarker(active ? { top: active.offsetTop, height: active.offsetHeight } : null);
     };
     measure();
@@ -980,7 +993,7 @@ export function SettingsPanel({
               {marker && (
                 <span
                   aria-hidden="true"
-                  className="settings-nav-marker"
+                  className={`settings-nav-marker ${travelling ? "" : "is-placed"}`}
                   style={{ transform: `translateY(${marker.top}px)`, height: marker.height }}
                 />
               )}

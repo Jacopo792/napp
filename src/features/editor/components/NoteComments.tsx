@@ -370,6 +370,21 @@ export function NoteComments({
 
   const body = (
     <>
+      {loading && <p className="note-comments-empty">Loading…</p>}
+
+      {!loading && shown.length === 0 && !pendingIsNew && (
+        <p className="note-comments-empty">
+          Nothing here yet. Select a passage and use the comment button to say something about it.
+        </p>
+      )}
+
+      {shown.map(card)}
+
+      {/* The one being written goes last, where it is about to land.
+          Rendered first, it appeared above every existing thread while you
+          typed and then jumped to the foot of the column the moment you sent
+          it — so the newest remark was at the top for exactly as long as it
+          was unsent, which is the opposite of what the column says it does. */}
       {pendingIsNew && (
         <article
           data-thread={pendingThread}
@@ -382,16 +397,6 @@ export function NoteComments({
           {composer(pendingThread, "What about this passage?", true)}
         </article>
       )}
-
-      {loading && <p className="note-comments-empty">Loading…</p>}
-
-      {!loading && shown.length === 0 && !pendingIsNew && (
-        <p className="note-comments-empty">
-          Nothing here yet. Select a passage and use the comment button to say something about it.
-        </p>
-      )}
-
-      {shown.map(card)}
     </>
   );
 
