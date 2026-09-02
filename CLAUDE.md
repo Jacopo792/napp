@@ -76,7 +76,7 @@ the boundary is the one place every update passes through:
   out of y-prosemirror's overlapping-mark encoding, where a mark that may
   coexist with itself is stored under a key that changes per instance. A lock
   read by key would then be read by a name that moves. `CommentAnchor` sets
-  `excludes: ""` and *is* encoded that way; do not copy it here.
+  `excludes: ""` and _is_ encoded that way; do not copy it here.
 - The editor's `filterTransaction` is a **courtesy**, not the rule, and it must
   let transactions carrying `ySyncPluginKey` through: those are the other member
   writing their own locked passage, and refusing one leaves the editor
@@ -99,7 +99,7 @@ to keep in step. It holds every note carrying a thread nobody has resolved, and
 a note leaves it the moment its last thread is dealt with. Opening a note from
 there opens its conversation with it.
 
-The badge counts remarks *somebody else* wrote, in an open thread, since this
+The badge counts remarks _somebody else_ wrote, in an open thread, since this
 browser last looked. The line it compares against is a timestamp in
 `localStorage`, not a column: it is a fact about a device looking rather than
 about the archive, and a set of read ids is a thing nobody ever finishes
