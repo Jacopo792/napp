@@ -12,12 +12,19 @@
   `VITE_COLLAB_URL`. The service role key belongs only to the server.
 
 Access control is Supabase Auth plus one table. A row in `archive_members` lets
-you read the archive; a row with `role = 'editor'` lets you write it, enforced
-by `private.can_write_archive()` and by direct writes to `archive_members`
-being revoked entirely. `owner_id` names which member's scope a row sits in, and
-a policy reads it in exactly one place: `private.archived_note_visible()`, which
-withholds an archived note from the other members when its owner has set
-`profiles.hide_archived`. Everywhere else it stays a label, not a permission.
+you read the archive and write it, enforced by `private.can_write_archive()`
+and by direct writes to `archive_members` being revoked entirely. `owner_id`
+names which member's scope a row sits in, and a policy reads it in exactly one
+place: `private.archived_note_visible()`, which withholds an archived note from
+the other members when its owner has set `profiles.hide_archived`. Everywhere
+else it stays a label, not a permission.
+
+**There is no viewer.** `archive_members.role` still exists, defaults to
+`editor`, and `set_archive_member_role()` still works — but the interface no
+longer asks, because in an archive built for two writers the only honest answer
+to "which of us is the reader" was neither. Do not re-propose the role picker.
+What one member takes back from another is a note, or a passage of one; see
+_Taking a note back_ below.
 
 Notes, folder names and files are ordinary columns and Storage objects. Nothing
 is encrypted; see _The retired encrypted format_ below — including the archived
@@ -37,6 +44,67 @@ All of that is gone from `src/`. **The Postgres side is untouched**: `tags`,
 `note_tags`, their policies and their rows all still stand, which is what makes
 this a deletion and not a migration. Re-adding the feature means re-adding the
 reads. Do not re-propose the tag _interface_ — it was removed on purpose.
+
+## Taking a note back
+
+Two sizes, and they are held in two different places because they have to be.
+
+`notes.locked_by` names the one account that may write a note. It is a column,
+so Postgres holds it: `notes_editor_update`'s `using` keeps everybody else out
+of the row, and its `with check` stops anybody locking a note in somebody
+else's name or lifting a lock that is not theirs. `decideAccess` in the
+collaboration server asks the same question of the document, which the service
+role writes and row level security therefore never sees. Comments are outside
+it on purpose — a remark is about the passage, not part of it, which is the
+whole use of locking one.
+
+A **passage** cannot be held that way. The `WriteLock` mark lives inside a Yjs
+document both members are entitled to write, and no policy will ever see it, so
+the boundary is the one place every update passes through:
+`writeLocks.ts`, called from `beforeHandleMessage` and `afterHandleMessage`.
+
+- It reads the **Yjs delta**, not the ProseMirror projection. Converting a whole
+  note per keystroke to discover that nothing is locked is the expensive half;
+  a note with no foreign lock pays one walk of the fragment and stores nothing.
+- It **puts back** rather than refuses. Throwing from `beforeHandleMessage`
+  closes the connection, and the client resends the same rejected update on
+  reconnect, for ever. Yjs has no undo without a history to walk, so the way
+  back is the way in: the remembered projection is diffed into the fragment
+  with `updateYFragment`, which is what the editor's own binding does with every
+  keystroke. Coarse on purpose — a broken update is reverted whole.
+- The mark **excludes itself**. One passage, one holder — and that also keeps it
+  out of y-prosemirror's overlapping-mark encoding, where a mark that may
+  coexist with itself is stored under a key that changes per instance. A lock
+  read by key would then be read by a name that moves. `CommentAnchor` sets
+  `excludes: ""` and *is* encoded that way; do not copy it here.
+- The editor's `filterTransaction` is a **courtesy**, not the rule, and it must
+  let transactions carrying `ySyncPluginKey` through: those are the other member
+  writing their own locked passage, and refusing one leaves the editor
+  disagreeing with the document it is bound to.
+
+`handleMetaChange` in `notes.tsx` is the one place every per-note metadata
+change passes through, so the lock is honoured there once rather than in each
+of pinning, filing, trashing and shelving.
+
+## A drawing in the note
+
+A `drawing` node whose strokes are its own attribute: no Storage object, no
+upload, nothing that can be missing when the note is read. It travels with the
+document the way a paragraph does, and leaves in an export as inline SVG —
+which, unlike `napp-image:`, carries its own bytes and renders in the vault it
+lands in.
+
+The strokes are a JSON **string**, not an array, and that is load-bearing
+twice: y-prosemirror diffs node attributes with `!==`, so an array would be a
+different object every comparison and would be rewritten into the document on
+every keystroke anywhere in the note — and a string is something Yjs stores and
+compares without knowing what is in it. `drawingStrokes()` reads rather than
+trusts what comes back out, because it goes into an SVG attribute and it
+arrives from the other member, an import, or whatever was on disk.
+
+One stroke is one write, on pointer release, and the pointer is followed with
+`window` listeners — never `setPointerCapture`, for the reason the cover
+learned.
 
 ## The shelf and the waiting room
 
