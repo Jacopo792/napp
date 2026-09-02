@@ -21,6 +21,12 @@ import { Redis } from "@hocuspocus/extension-redis";
 import { Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
 import IORedis from "ioredis";
+import {
+  broken as lockBroken,
+  guard as lockGuard,
+  restore as restoreLocked,
+  type Guard,
+} from "../../src/features/editor/lib/writeLocks.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";
@@ -88,6 +94,19 @@ export interface Context {
    *  same time rather than the moment their own tab happened to notice. */
   since: string;
 }
+
+/* What one connection has to have remembered for the message being applied.
+ *
+ * A note nobody has locked a passage of stores nothing: `lockGuard` walks the
+ * document once, finds no foreign lock, and answers null, which is the cost of
+ * this whole feature on every note that does not use it. Only a note somebody
+ * has taken a passage of pays for the projection that makes putting it back
+ * possible.
+ *
+ * Keyed by connection rather than kept on the context, because it is about the
+ * message in flight and nothing else — and a WeakMap forgets it when the
+ * socket goes, without anybody having to. */
+const guards = new WeakMap<object, Guard | null>();
 
 function redisExtension(config: CollaborationConfig): Extension[] {
   if (!config.redisUrl) return [];
@@ -242,7 +261,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        so this is a map lookup for all but one keystroke in a few seconds —
        and the flag it sets is read by the receiver on this very message, so a
        demotion takes effect on the update that arrives after it. */
-    async beforeHandleMessage({ connection, context, documentName }) {
+    async beforeHandleMessage({ connection, context, documentName, document }) {
       const noteId = noteIdOf(documentName);
       if (!noteId || !context?.token) return;
 
@@ -252,6 +271,23 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         throw new Error(answer.reason);
       }
       connection.readOnly = answer.readOnly;
+
+      /* A passage the other member has taken back is the one boundary Postgres
+         cannot hold: the mark lives inside a document both of them are
+         entitled to write, so no policy will ever see it. It is held here
+         instead, and held the only way a CRDT allows — by remembering what the
+         locked passages said before this message and putting them back
+         afterwards if they no longer say it. */
+      guards.set(connection, answer.readOnly ? null : lockGuard(document, context.userId));
+    },
+
+    /* The message has been applied and broadcast is next. Nothing but a
+       document somebody else holds a passage of gets this far with a guard. */
+    async afterHandleMessage({ connection, document }) {
+      const before = guards.get(connection);
+      guards.delete(connection);
+      if (!before || !lockBroken(document, before)) return;
+      restoreLocked(document, before);
     },
 
     /* Nothing a browser says about who it is, is believed. The identity that

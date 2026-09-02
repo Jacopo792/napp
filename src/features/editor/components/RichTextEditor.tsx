@@ -5,6 +5,8 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Typography from "@tiptap/extension-typography";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
 import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import {
   EditorContent,
   NodeViewWrapper,
@@ -15,7 +17,14 @@ import {
 import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
-import { Download, ExternalLink, GripVertical, MessageSquarePlus, Trash2 } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  GripVertical,
+  Lock,
+  MessageSquarePlus,
+  Trash2,
+} from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   forwardRef,
@@ -31,6 +40,7 @@ import {
   PrivateFile,
   PrivateImage,
   TEXT_COLOR_VALUE,
+  WRITE_LOCK_MARK,
   type TextColor,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
@@ -124,6 +134,10 @@ interface Props {
   /** Open a comment on whatever is selected. Absent when the note cannot be
    *  commented on — Trash, or a reader who may not write. */
   onComment?: () => void;
+  /** The account a passage lock is stamped with, and the one it is judged
+   *  against. Null where locking is not on offer — Trash, the preview, a note
+   *  somebody else has taken back whole. */
+  writeLockOwner?: string | null;
   mobile?: boolean;
   resolveImage: (objectId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
@@ -174,6 +188,81 @@ const SLASH_COMMANDS: SlashCommand[] = [
 
 function capitalizeSentences(text: string): string {
   return text.replace(/(^\s*[a-zà-ÿ])|([.!?]\s+[a-zà-ÿ])/g, (m) => m.toUpperCase());
+}
+
+/* Keeps this browser from writing a passage the other member has taken back.
+ *
+ * A courtesy, not the rule. The rule is `writeLocks.ts` on the collaboration
+ * server, which sees every update from every client and puts back anything a
+ * foreign lock covers; this only means the caret does not appear to work and
+ * then bounce a moment later.
+ *
+ * A remote change arrives as a transaction too, carrying `ySyncPluginKey`, and
+ * has to pass: it is the other member writing their own locked passage, and
+ * refusing it would leave this editor disagreeing with the document it is
+ * bound to — which is the one failure worse than an edit that does not stick.
+ *
+ * Read through a ref because the owner changes with the note and the extension
+ * list is built once. */
+function writeLockGuardExtension(owner: { current: string | null }) {
+  /* The same walk answers both halves, so it is done once per document rather
+     than once per draw: the caret refuses these ranges, and they are the ones
+     that have to look refusable. A lock of your own is tinted by the mark's own
+     stylesheet and stays perfectly writable. */
+  let seen: ProseMirrorNode | null = null;
+  let decorations = DecorationSet.empty;
+
+  return Extension.create({
+    name: "writeLockGuard",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          key: new PluginKey("writeLockGuard"),
+          props: {
+            decorations(state) {
+              if (state.doc === seen) return decorations;
+              const lock = state.schema.marks[WRITE_LOCK_MARK];
+              const mine = owner.current;
+              const found: Decoration[] = [];
+              if (lock) {
+                state.doc.descendants((node, pos) => {
+                  if (!node.isText) return true;
+                  const held = node.marks.find((mark) => mark.type === lock);
+                  if (held && held.attrs.owner !== mine) {
+                    found.push(
+                      Decoration.inline(pos, pos + node.nodeSize, {
+                        class: "is-held-by-them",
+                      }),
+                    );
+                  }
+                  return true;
+                });
+              }
+              seen = state.doc;
+              decorations = DecorationSet.create(state.doc, found);
+              return decorations;
+            },
+          },
+          filterTransaction(transaction, state) {
+            if (!transaction.docChanged || transaction.getMeta(ySyncPluginKey)) return true;
+            const lock = state.schema.marks[WRITE_LOCK_MARK];
+            if (!lock) return true;
+            const mine = owner.current;
+            return !transaction.steps.some((step) => {
+              const range = step as unknown as { from?: number; to?: number };
+              if (typeof range.from !== "number" || typeof range.to !== "number") return false;
+              let held = false;
+              state.doc.nodesBetween(range.from, Math.max(range.from, range.to), (node) => {
+                const found = node.marks.find((mark) => mark.type === lock);
+                if (found && found.attrs.owner !== mine) held = true;
+              });
+              return held;
+            });
+          },
+        }),
+      ];
+    },
+  });
 }
 
 function sentenceCapitalizeExtension() {
@@ -680,6 +769,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onPasteImage,
     onOpenLink,
     onComment,
+    writeLockOwner = null,
     notes,
     onOpenNote,
     onOpenComment,
@@ -727,6 +817,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   onOpenCommentRef.current = onOpenComment;
   const noteLinks = useMemo(() => noteLinkExtension(notesRef), []);
 
+  const writeLockOwnerRef = useRef<string | null>(writeLockOwner);
+  writeLockOwnerRef.current = writeLockOwner;
+  const writeLockGuard = useMemo(() => writeLockGuardExtension(writeLockOwnerRef), []);
+
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
   const autocorrect = useMemo(() => autocorrectExtension(), []);
 
@@ -761,6 +855,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         }),
         slashMenu,
         noteLinks,
+        writeLockGuard,
         sentenceCapitalize,
         autocorrect,
       ],
@@ -1127,6 +1222,31 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                 onClick={onComment}
               >
                 <MessageSquarePlus size={15} />
+              </button>
+            )}
+            {writeLockOwner && (
+              <button
+                type="button"
+                className="toolbar-button press"
+                aria-label="Only I may write this passage"
+                title="Only I may write this passage"
+                onMouseDown={(event) => event.preventDefault()}
+                /* Decided here rather than at render: the editor deliberately
+                   does not re-render per transaction, so nothing drawn above
+                   knows what the selection carries. A locked passage is tinted,
+                   which is what says the state; this says what the press does
+                   to it, and leaves the other member's lock alone. */
+                onClick={() => {
+                  if (!editor) return;
+                  const chain = editor.chain().focus();
+                  if (editor.isActive(WRITE_LOCK_MARK, { owner: writeLockOwner })) {
+                    chain.unsetMark(WRITE_LOCK_MARK).run();
+                  } else if (!editor.isActive(WRITE_LOCK_MARK)) {
+                    chain.setMark(WRITE_LOCK_MARK, { owner: writeLockOwner }).run();
+                  }
+                }}
+              >
+                <Lock size={15} />
               </button>
             )}
             <span className="menu-separator rich-bubble-separator" />

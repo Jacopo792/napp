@@ -90,6 +90,38 @@ test("a commented passage leaves as its words, without the thread", () => {
   assert.doesNotMatch(markdown, /11111111|threadId|data-comment|<span/i);
 });
 
+/* A passage lock says who in this archive may write a sentence, which means
+   nothing at all in somebody else's vault — and an account id in their file
+   would be exactly the broken link `demotePrivateMedia` avoids inventing. It
+   leaves as its words, and it leaves in one piece: the mark is in the schema
+   every serializer reads, so a note carrying one must not fail to serialize. */
+test("a locked passage leaves as its words, without the account that holds it", () => {
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Una frase " },
+          {
+            type: "text",
+            text: "bloccata",
+            marks: [
+              {
+                type: "writeLock",
+                attrs: { owner: "99999999-8888-7777-6666-555555555555" },
+              },
+            ],
+          },
+          { type: "text", text: " e una no." },
+        ],
+      },
+    ],
+  });
+  assert.equal(markdown.trim(), "Una frase bloccata e una no.");
+  assert.doesNotMatch(markdown, /99999999|writeLock|data-write-lock|<span/i);
+});
+
 test("a comment survives beside a colour without swallowing it", () => {
   /* `excludes: ""` is what allows both marks on one run. If that regressed,
      one of the two would be dropped and this text would lose its emphasis. */

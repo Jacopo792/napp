@@ -6256,3 +6256,26 @@
   flex: 1;
   min-width: 0;
 }
+
+/* A passage one member has taken back. Read as a held thing rather than as a
+   warning: a hairline down the leading edge and the faintest wash, the way a
+   blockquote says "this is set apart" — the note is still shared and the words
+   are still the note's, so it must not read as damage. The lock the *other*
+   member holds is the one that has to be unmistakable, and it is the one the
+   caret refuses to enter. */
+.note-write-lock {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  padding: 0 3px 0 4px;
+  border-radius: 3px;
+}
+
+/* And the one somebody else holds. The same shape, said louder, plus the
+   cursor — because the first thing a reader does with a passage they cannot
+   write is try to write it, and a caret that lands and then refuses every key
+   is worse than no caret at all. */
+.note-write-lock.is-held-by-them {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  cursor: not-allowed;
+}

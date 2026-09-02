@@ -858,6 +858,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onPasteImage={handlePastedImage}
                 onOpenLink={openLinkForm}
                 onComment={canComment ? startComment : undefined}
+                /* Locking a passage is the smaller half of locking the note,
+                   and it is offered on the same terms: only where this account
+                   may write at all. */
+                writeLockOwner={canEdit && session ? session.userId : null}
                 mobile={mobile}
                 resolveImage={resolveImage}
                 resolveFile={resolveFile}

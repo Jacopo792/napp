@@ -149,6 +149,57 @@ export const CommentAnchor = Mark.create({
   renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
 });
 
+/** The name of the mark below, needed by anything that reads a document
+ *  looking for one rather than building a schema. */
+export const WRITE_LOCK_MARK = "writeLock";
+
+/* A passage one member has taken back.
+ *
+ * The archive is shared and both members write every note, so this is the
+ * smaller half of `notes.locked_by`: the note stays everybody's and one
+ * passage of it stops being. Like the comment anchor it is a mark and not a
+ * stored offset, because a lock is about words and words move — carried in
+ * the document it converges with the text through Yjs and survives every edit
+ * made above it.
+ *
+ * Unlike `notes.locked_by` there is no column for Postgres to refuse, because
+ * a passage is inside a document both members may write. The boundary is the
+ * collaboration server, which reads this mark on every message and puts back
+ * anything a foreign lock covers — see `writeLocks.ts`. The editor refuses the
+ * edit first, which is a courtesy; the server is what makes it true.
+ *
+ * `inclusive: false` so typing at either end writes outside the lock rather
+ * than quietly enlarging what somebody took back. */
+export const WriteLock = Mark.create({
+  name: WRITE_LOCK_MARK,
+  inclusive: false,
+  /* It excludes itself, which is ProseMirror's default and the only sensible
+     reading: one passage, one holder. That also keeps it out of y-prosemirror's
+     overlapping-mark encoding, where a mark that may coexist with itself is
+     stored under a per-instance key — a lock read by key would then be read by
+     a name that changes. It still sits happily under a comment or a colour;
+     `excludes` is only ever about its own type. */
+  addAttributes() {
+    return {
+      owner: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-write-lock") ?? "",
+        renderHTML: (attributes) =>
+          attributes.owner ? { "data-write-lock": attributes.owner } : {},
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "span[data-write-lock]" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { class: "note-write-lock" }), 0];
+  },
+  /* The words alone. Who may write a passage is a fact about this archive and
+     means nothing in somebody else's Obsidian — and an account id in their
+     file would be exactly the broken link `demotePrivateMedia` exists to
+     avoid inventing more of. */
+  renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
+});
+
 /** A link from one note in this archive to another.
  *
  * A mark and not a node, so the words stay words: the title reads in the
@@ -217,6 +268,7 @@ export const BASE_EXTENSIONS = [
   Image.configure({ allowBase64: true }),
   LegacyColorMarkdown,
   CommentAnchor,
+  WriteLock,
   NoteLink,
 ];
 
