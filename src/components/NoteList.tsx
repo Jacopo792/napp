@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -35,7 +36,12 @@ import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
-import { documentGlyph } from "@/features/editor/lib/content";
+import {
+  checklistProgress,
+  documentGlyph,
+  drawingBox,
+  firstDrawing,
+} from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
@@ -159,6 +165,7 @@ const Row = memo(function Row({
   });
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [slid, setSlid] = useState(0);
 
   const noteMeta = indexOf(meta).byNote.get(entry.note.id);
 
@@ -172,10 +179,64 @@ const Row = memo(function Row({
     return () => window.clearTimeout(timer);
   }, [confirmDelete]);
 
+  /* ── The swipe ──────────────────────────────────────────────────────────
+     A finger has no right-click and no hover, so the two acts a row is for
+     are the two directions it can be pushed: left files it away, right sends
+     it to the Trash. The row follows the finger and springs back if it was
+     not pushed far enough, which is the whole of the feedback — a row that
+     jumps at the end of a gesture nobody committed to is a row that acts on
+     its own.
+
+     Only where there is something to act on: in the Trash and the Archive the
+     acts are different ones and the buttons are still there. */
+  const swipeable = mobile && canWrite && !trashMode && !archiveMode;
+  const swipe = useRef<{ x: number; y: number; live: boolean } | null>(null);
+  const SWIPE_COMMIT = 96;
+
+  function swipeStart(event: React.PointerEvent) {
+    if (!swipeable || event.pointerType === "mouse") return;
+    swipe.current = { x: event.clientX, y: event.clientY, live: false };
+  }
+
+  function swipeMove(event: React.PointerEvent) {
+    const from = swipe.current;
+    if (!from) return;
+    const dx = event.clientX - from.x;
+    const dy = event.clientY - from.y;
+    /* The list scrolls up and down; this only ever answers to sideways. Once
+       a gesture has been read as one it stays that one. */
+    if (!from.live) {
+      if (Math.abs(dy) > Math.abs(dx)) {
+        swipe.current = null;
+        return;
+      }
+      if (Math.abs(dx) < 12) return;
+      from.live = true;
+    }
+    setSlid(dx);
+  }
+
+  function swipeEnd() {
+    const from = swipe.current;
+    swipe.current = null;
+    if (from?.live) {
+      if (slid <= -SWIPE_COMMIT) onArchiveChange(entry, true);
+      else if (slid >= SWIPE_COMMIT) onMoveToTrash(entry);
+    }
+    setSlid(0);
+  }
+
   const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
   const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
+  /* A note with a sketch in it shows the sketch where the glyph goes — the
+     same slot the note's own picture takes, and for the same reason: one place
+     in the row says what you are about to open. It costs a walk of a document
+     already in memory and no Storage object at all, because the strokes are
+     in the note. */
+  const sketch = useMemo(() => firstDrawing(entry.note.content), [entry.note.content]);
+  const checklist = useMemo(() => checklistProgress(entry.note.content), [entry.note.content]);
   const photoUrl = useStoredImage(entry.note.photo?.objectId ?? null, resolveImage);
   return (
     <div
@@ -187,9 +248,21 @@ const Row = memo(function Row({
       {...(!mobile && canWrite ? attributes : {})}
       role="option"
       aria-selected={selected}
-      onClick={() => onSelect(entry)}
+      /* A finished swipe must not also open the note underneath it. */
+      onClick={() => slid === 0 && onSelect(entry)}
       onContextMenu={(event) => onContextMenu(event, entry)}
-      style={{ opacity: isDragging ? 0.4 : 1 }}
+      onPointerDown={swipeStart}
+      onPointerMove={swipeMove}
+      onPointerUp={swipeEnd}
+      onPointerCancel={swipeEnd}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        /* Written even when it is nothing: a row that comes back from a swipe
+           and simply stops carrying the property keeps the last one it was
+           given. */
+        transform: slid === 0 ? "" : `translateX(${Math.max(-140, Math.min(140, slid))}px)`,
+        transition: slid === 0 ? "transform var(--dur-base) var(--ease-spring)" : "none",
+      }}
       className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
@@ -211,6 +284,35 @@ const Row = memo(function Row({
       {entry.note.photo ? (
         <span className={`note-photo is-row ${gallery ? "is-gallery" : ""}`}>
           {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
+        </span>
+      ) : sketch ? (
+        <span
+          title="Has a drawing"
+          aria-label="Has a drawing"
+          role="img"
+          className={`note-row-glyph is-sketch ${gallery ? "is-gallery" : ""} ${
+            selected ? "is-selected" : ""
+          }`}
+        >
+          <svg
+            viewBox={`0 0 ${drawingBox(sketch.strokes, sketch.surface).width} ${
+              drawingBox(sketch.strokes, sketch.surface).height
+            }`}
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden
+          >
+            {sketch.strokes.slice(0, 40).map((stroke, index) => (
+              <path
+                key={index}
+                d={stroke.d}
+                fill="none"
+                stroke={stroke.color}
+                strokeWidth={stroke.width * 3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+          </svg>
         </span>
       ) : (
         <span
@@ -247,11 +349,31 @@ const Row = memo(function Row({
 
         <p className="note-row-summary mt-1 truncate">
           <span>{formatStamp(entry.note.updatedAt)}</span>
+          {/* What is left, where the list already says when. A checklist is
+              the one kind of note whose state is the reason you open it. */}
+          {checklist && (
+            <span
+              className={`note-row-tally ${checklist.done === checklist.total ? "is-done" : ""}`}
+            >
+              {checklist.done}/{checklist.total}
+            </span>
+          )}
           {preview && <span className="note-row-preview">{preview}</span>}
         </p>
       </div>
 
-      {canWrite && (
+      {swipeable && slid !== 0 && (
+        <span className={`note-row-swipe ${slid < 0 ? "is-archive" : "is-trash"}`} aria-hidden>
+          {slid < 0 ? <Archive size={16} /> : <Trash2 size={16} />}
+        </span>
+      )}
+
+      {/* Touch keeps the acts a swipe does not do: pinning, which has no
+          direction to it, and restoring or deleting for good, which are what
+          Trash and Archive are rather than what a note in them is filed as. A
+          pointer keeps none of them — it has the row's right-click menu, and a
+          pin and a bin standing in every row said the same things twice. */}
+      {canWrite && mobile && (
         <div className="note-row-actions flex shrink-0 items-center gap-0.5">
           {!trashMode && !archiveMode && (
             <button
@@ -303,43 +425,45 @@ const Row = memo(function Row({
             </button>
           )}
 
-          <button
-            aria-label={
-              confirmDelete
-                ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
-                : trashMode
-                  ? `Delete ${entry.note.title || "Untitled"} forever`
-                  : `Move ${entry.note.title || "Untitled"} to Trash`
-            }
-            title={
-              confirmDelete
-                ? trashMode
-                  ? "Click again to permanently delete"
-                  : "Click again to move to Trash"
-                : trashMode
-                  ? `Delete "${entry.note.title || "Untitled"}" forever`
-                  : `Move "${entry.note.title || "Untitled"}" to Trash`
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirmDelete) {
-                if (trashMode) onDeleteForever(entry);
-                else onMoveToTrash(entry);
-              } else setConfirmDelete(true);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
-              confirmDelete
-                ? "bg-danger-fill text-on-danger opacity-100"
-                : "text-ink-3 hover:text-danger"
-            }`}
-          >
-            {confirmDelete ? (
-              <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
-            ) : (
-              <Trash2 size={14} />
-            )}
-          </button>
+          {!swipeable && (
+            <button
+              aria-label={
+                confirmDelete
+                  ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
+                  : trashMode
+                    ? `Delete ${entry.note.title || "Untitled"} forever`
+                    : `Move ${entry.note.title || "Untitled"} to Trash`
+              }
+              title={
+                confirmDelete
+                  ? trashMode
+                    ? "Click again to permanently delete"
+                    : "Click again to move to Trash"
+                  : trashMode
+                    ? `Delete "${entry.note.title || "Untitled"}" forever`
+                    : `Move "${entry.note.title || "Untitled"}" to Trash`
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirmDelete) {
+                  if (trashMode) onDeleteForever(entry);
+                  else onMoveToTrash(entry);
+                } else setConfirmDelete(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`icon-button h-7 shrink-0 px-1.5 transition-all ${
+                confirmDelete
+                  ? "bg-danger-fill text-on-danger opacity-100"
+                  : "text-ink-3 hover:text-danger"
+              }`}
+            >
+              {confirmDelete ? (
+                <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
+              ) : (
+                <Trash2 size={14} />
+              )}
+            </button>
+          )}
         </div>
       )}
     </div>

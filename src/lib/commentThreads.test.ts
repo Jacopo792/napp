@@ -85,7 +85,7 @@ test("one unresolved row does not reopen a settled thread", () => {
     remark({ id: "2", threadId: "t1" }),
   ];
   assert.equal(notesWithOpenRemarks(rows).size, 0);
-  assert.equal(unreadRemarks(rows, ME, "").length, 0);
+  assert.equal(unreadRemarks(rows, ME, {}).length, 0);
 });
 
 test("what is new is what somebody else said since you last looked", () => {
@@ -95,12 +95,25 @@ test("what is new is what somebody else said since you last looked", () => {
     remark({ id: "new", createdAt: "2026-09-03T09:00:00Z" }),
   ];
   assert.deepEqual(
-    unreadRemarks(rows, ME, "2026-09-02T00:00:00Z").map((r) => r.id),
+    unreadRemarks(rows, ME, { n1: "2026-09-02T00:00:00Z" }).map((r) => r.id),
     ["new"],
   );
   // A browser that has never looked has everything of theirs still to read.
   assert.deepEqual(
-    unreadRemarks(rows, ME, "").map((r) => r.id),
+    unreadRemarks(rows, ME, {}).map((r) => r.id),
     ["old", "new"],
+  );
+});
+
+/* The line is per note, so reading one conversation cannot mark the other
+   member's remarks on every other note read along with it. */
+test("having read one note's remarks leaves the others unread", () => {
+  const rows = [
+    remark({ id: "read", noteId: "n1", threadId: "t1" }),
+    remark({ id: "unread", noteId: "n2", threadId: "t2" }),
+  ];
+  assert.deepEqual(
+    unreadRemarks(rows, ME, { n1: "2026-09-02T00:00:00Z" }).map((r) => r.id),
+    ["unread"],
   );
 });

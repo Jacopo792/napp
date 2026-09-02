@@ -63,6 +63,7 @@ import {
   loadArchiveComments,
   notesWithOpenRemarks,
   unreadRemarks,
+  type RemarksSeen,
   type ArchiveComment,
 } from "@/lib/comments";
 import {
@@ -671,23 +672,46 @@ function NotesPage() {
      you sign in — has the other member said anything, anywhere, since you last
      looked.
 
-     `seenAt` is a timestamp in this browser rather than a column, and
-     deliberately: it is a fact about a device looking, not about the archive,
-     and a set of read ids is a thing nobody ever finishes pruning. A new
-     device therefore starts with everything unread, which is the right answer
-     for it. */
+     The line is a timestamp per note, held in this browser rather than in a
+     column, and deliberately: it is a fact about a device looking, not about
+     the archive, and a set of read ids is a thing nobody ever finishes
+     pruning. A new device therefore starts with everything unread, which is
+     the right answer for it. Per note rather than archive-wide because opening
+     a note is the act of having read what was said on it — one line for the
+     whole archive could only be moved by looking at the list, which left the
+     dot up after you had read the one remark under it. */
   const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
   const remarksSeenKey = session ? `napp:remarks-seen:${session.archiveId}:${session.userId}` : "";
-  const [remarksSeenAt, setRemarksSeenAt] = useState("");
+  const [remarksSeen, setRemarksSeen] = useState<RemarksSeen>({});
 
   useEffect(() => {
     if (!remarksSeenKey) return;
     try {
-      setRemarksSeenAt(localStorage.getItem(remarksSeenKey) ?? "");
+      const stored: unknown = JSON.parse(localStorage.getItem(remarksSeenKey) ?? "{}");
+      /* Anything else is the archive-wide string this used to hold. Either
+         way the notes are unread until they are opened. */
+      setRemarksSeen(stored && typeof stored === "object" ? (stored as RemarksSeen) : {});
     } catch {
-      setRemarksSeenAt("");
+      setRemarksSeen({});
     }
   }, [remarksSeenKey]);
+
+  /* Reading a note is having read its remarks. */
+  const markRemarksSeen = useCallback(
+    (noteId: string) => {
+      if (!remarksSeenKey) return;
+      setRemarksSeen((current) => {
+        const next = { ...current, [noteId]: new Date().toISOString() };
+        try {
+          localStorage.setItem(remarksSeenKey, JSON.stringify(next));
+        } catch {
+          /* A browser refusing storage costs the dot, not the remarks. */
+        }
+        return next;
+      });
+    },
+    [remarksSeenKey],
+  );
 
   const refreshRemarks = useCallback(() => {
     const current = sessionRef.current;
@@ -708,8 +732,8 @@ function NotesPage() {
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
   const unreadRemarkCount = useMemo(
-    () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeenAt).length : 0),
-    [archiveComments, selfId, remarksSeenAt],
+    () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
+    [archiveComments, selfId, remarksSeen],
   );
 
   /* Who has taken a note back, keyed by note. A lock is metadata on the row
@@ -1691,19 +1715,46 @@ function NotesPage() {
   }, [archivedEntries, handleMetaChange]);
 
   // ── Keyboard ────────────────────────────────────────────────────────────
-  const moveSelection = useCallback(
-    (delta: number) => {
-      if (orderedVisible.length === 0) return;
-      const i = orderedVisible.findIndex((e) => e.note.id === selectedId);
-      const next = i === -1 ? 0 : Math.min(orderedVisible.length - 1, Math.max(0, i + delta));
-      const id = orderedVisible[next].note.id;
+  const selectAt = useCallback(
+    (id: string) => {
       setSelectedId(id);
+      markRemarksSeen(id);
       setListPreferences((current) => ({
         ...current,
         [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), id),
       }));
     },
-    [orderedVisible, selectedId, viewAs],
+    [markRemarksSeen, viewAs],
+  );
+
+  const moveSelection = useCallback(
+    (delta: number) => {
+      if (orderedVisible.length === 0) return;
+      const i = orderedVisible.findIndex((e) => e.note.id === selectedId);
+      const next = i === -1 ? 0 : Math.min(orderedVisible.length - 1, Math.max(0, i + delta));
+      selectAt(orderedVisible[next].note.id);
+    },
+    [orderedVisible, selectedId, selectAt],
+  );
+
+  /* Down the headings rather than down the rows. The list is grouped — Today,
+     Yesterday, last week — and in an archive of a few hundred notes those
+     headings are the only landmarks in it, so they are what a key should be
+     able to reach. It steps by the same groups the list draws, because it asks
+     the same list. */
+  const moveByGroup = useCallback(
+    (delta: number) => {
+      if (noteGroups.length === 0) return;
+      const current = noteGroups.findIndex((group) =>
+        group.entries.some((entry) => entry.note.id === selectedId),
+      );
+      const next = Math.min(
+        noteGroups.length - 1,
+        Math.max(0, (current === -1 ? 0 : current) + (current === -1 ? 0 : delta)),
+      );
+      selectAt(noteGroups[next].entries[0].note.id);
+    },
+    [noteGroups, selectedId, selectAt],
   );
 
   useEffect(() => {
@@ -1769,10 +1820,12 @@ function NotesPage() {
         searchRef.current?.focus();
       } else if (e.key === "ArrowDown" || e.key === "j") {
         e.preventDefault();
-        moveSelection(1);
+        if (e.altKey) moveByGroup(1);
+        else moveSelection(1);
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault();
-        moveSelection(-1);
+        if (e.altKey) moveByGroup(-1);
+        else moveSelection(-1);
       } else if (e.key === "Enter" && selectedId) {
         e.preventDefault();
         titleRef.current?.focus();
@@ -1780,7 +1833,17 @@ function NotesPage() {
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [moveSelection, handleNew, saveNow, selectedId, selected, canEdit, focusMode, toggleFocus]);
+  }, [
+    moveSelection,
+    moveByGroup,
+    handleNew,
+    saveNow,
+    selectedId,
+    selected,
+    canEdit,
+    focusMode,
+    toggleFocus,
+  ]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -1887,29 +1950,21 @@ function NotesPage() {
     setSelectedFolderId(id);
     setSelectedId(null);
     if (compact) setMobileScreen("collection");
-    /* Looking at the list *is* having looked. The line moves to now, so a
-       remark written while it is open is still news the next time. */
-    if (id === REMARKS && remarksSeenKey) {
-      const now = new Date().toISOString();
-      setRemarksSeenAt(now);
-      try {
-        localStorage.setItem(remarksSeenKey, now);
-      } catch {
-        /* A browser refusing storage costs the count, not the remarks. */
-      }
-    }
   }
 
   const handleSelectNote = useCallback(
     (id: string) => {
       setSelectedId(id);
+      /* Opening the note *is* having read what was said on it — a remark
+         written on it while it is open is still news the next time. */
+      markRemarksSeen(id);
       setListPreferences((current) => ({
         ...current,
         [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), id),
       }));
       if (compact) setMobileScreen("note");
     },
-    [compact, viewAs],
+    [compact, markRemarksSeen, viewAs],
   );
 
   function handleOpenRecent(id: string) {
@@ -2295,6 +2350,31 @@ function NotesPage() {
         icon: <FileText size={15} />,
         run: open(entry.note.id),
       })),
+      /* What was said, searchable with everything else. A remark is the one
+         thing in this archive that was not reachable from here — and it is
+         the kind of thing you go looking for by its words rather than by the
+         note it is on. Opening one is opening its note in the scope that
+         opens conversations with it, which is the path that already exists. */
+      ...archiveComments.flatMap((remark) => {
+        const entry = ownedEntries.find((candidate) => candidate.note.id === remark.noteId);
+        if (!entry) return [];
+        const title = entry.note.title || "Untitled";
+        return [
+          {
+            id: `remark:${remark.id}`,
+            group: "Remarks",
+            name: remark.body,
+            hint: title,
+            keywords: `${remark.body} ${title}`.toLowerCase(),
+            icon: <MessageSquare size={15} />,
+            run: () => {
+              setQuery("");
+              setSelectedFolderId(REMARKS);
+              handleSelectNote(remark.noteId);
+            },
+          },
+        ];
+      }),
       {
         id: "new",
         group: "Do",
@@ -2589,6 +2669,7 @@ function NotesPage() {
           }}
           onCopyMarkdown={() => void handleCopyMarkdown(selected)}
           onExportMarkdown={() => handleExportMarkdown(selected)}
+          onPrint={() => window.print()}
           onTogglePin={() => handleTogglePin(selected.note.id)}
           onFind={() => noteEditorRef.current?.openFind()}
           onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
@@ -2618,6 +2699,7 @@ function NotesPage() {
         }}
         onCopyMarkdown={() => void handleCopyMarkdown(selected)}
         onExportMarkdown={() => handleExportMarkdown(selected)}
+        onPrint={() => window.print()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}

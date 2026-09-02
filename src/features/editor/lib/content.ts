@@ -181,7 +181,13 @@ export const DRAWING_INKS = [
 ] as const;
 
 /** The coordinate space every stroke is stored in, so a drawing scales with
- *  the column it is read in rather than with the window it was made in. */
+ *  the column it is read in rather than with the window it was made in.
+ *
+ *  Both surfaces measure x across the width they are drawn on, and a board is
+ *  this tall. A page has no height of its own — it is as tall as the note — so
+ *  its strokes measure y on the *same* scale as x and simply run past 560.
+ *  That keeps one number in the file and one shape on the screen: a drawing
+ *  scales with the column and never stretches. */
 export const DRAWING_BOX = { width: 1000, height: 560 };
 
 export interface DrawingStroke {
@@ -223,14 +229,42 @@ export function drawingStrokes(value: unknown): DrawingStroke[] {
  *  own bytes, so it is a picture in somebody else's vault rather than a broken
  *  link. One-way, like `[[Title]]` — reading it back would mean parsing
  *  somebody's arbitrary SVG, and this file is not going to grow a parser. */
-export function drawingSvg(strokes: DrawingStroke[]): string {
+export function drawingSvg(strokes: DrawingStroke[], surface: DrawingSurface = "board"): string {
+  const { width, height } = drawingBox(strokes, surface);
   const paths = strokes
     .map(
       (stroke) =>
         `<path d="${stroke.d}" fill="none" stroke="${stroke.color}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
     )
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${DRAWING_BOX.width} ${DRAWING_BOX.height}" width="${DRAWING_BOX.width}" height="${DRAWING_BOX.height}" role="img" aria-label="Drawing">${paths}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Drawing">${paths}</svg>`;
+}
+
+/** Where the ink sits: on a sheet of its own, or over the page itself. */
+export type DrawingSurface = "board" | "page";
+
+export const drawingSurface = (value: unknown): DrawingSurface =>
+  value === "page" ? "page" : "board";
+
+/** The box a set of strokes needs. A board is always the same one; a page is
+ *  as tall as the lowest stroke on it, because the note it was drawn over has
+ *  no height until it is read. */
+export function drawingBox(
+  strokes: DrawingStroke[],
+  surface: DrawingSurface,
+): { width: number; height: number } {
+  if (surface === "board") return DRAWING_BOX;
+  let lowest = 0;
+  for (const stroke of strokes) {
+    /* Every second number in the path is a y. The path data has already been
+       through `drawingStrokes`, so these are numbers or the stroke is gone. */
+    const points = stroke.d.slice(1).split(/[ML]/);
+    for (const point of points) {
+      const y = Number(point.split(",")[1]);
+      if (Number.isFinite(y)) lowest = Math.max(lowest, y + stroke.width);
+    }
+  }
+  return { width: DRAWING_BOX.width, height: Math.max(Math.ceil(lowest), 1) };
 }
 
 export const Drawing = Node.create({
@@ -245,13 +279,23 @@ export const Drawing = Node.create({
         parseHTML: (element) => element.getAttribute("strokes") ?? "[]",
         renderHTML: (attributes) => ({ strokes: attributes.strokes }),
       },
+      /* Where the ink sits: on a sheet of its own, or on the page itself. It
+         is the same node and the same strokes either way — a board is a card
+         drawn under them, and nothing else, which is why this is one string
+         and not a second node type. */
+      surface: {
+        default: "board",
+        parseHTML: (element) => drawingSurface(element.getAttribute("surface")),
+        renderHTML: (attributes) => ({ surface: attributes.surface }),
+      },
     };
   },
   parseHTML: () => [{ tag: "napp-drawing" }],
   renderHTML({ HTMLAttributes }) {
     return ["napp-drawing", mergeAttributes(HTMLAttributes)];
   },
-  renderMarkdown: (node) => `${drawingSvg(drawingStrokes(node.attrs?.strokes))}\n\n`,
+  renderMarkdown: (node) =>
+    `${drawingSvg(drawingStrokes(node.attrs?.strokes), drawingSurface(node.attrs?.surface))}\n\n`,
 });
 
 /** The name of the mark below, needed by anything that reads a document
@@ -548,6 +592,46 @@ export function documentGlyph(document: JSONContent): DocumentGlyph {
   };
   visit(document);
   return result;
+}
+
+/** The first drawing in a note, as the strokes it is made of — for a list
+ *  that wants to show the sketch rather than a glyph standing in for one.
+ *  Reading the document that is already in memory, not a column: a drawing is
+ *  a node, so there is nothing to index. */
+export function firstDrawing(
+  document: JSONContent,
+): { strokes: DrawingStroke[]; surface: DrawingSurface } | null {
+  let found: { strokes: DrawingStroke[]; surface: DrawingSurface } | null = null;
+  const visit = (node: JSONContent) => {
+    if (found) return;
+    if (node.type === "drawing") {
+      const strokes = drawingStrokes(node.attrs?.strokes);
+      if (strokes.length > 0) {
+        found = { strokes, surface: drawingSurface(node.attrs?.surface) };
+        return;
+      }
+    }
+    node.content?.forEach(visit);
+  };
+  visit(document);
+  return found;
+}
+
+/** How much of a note's checklists is done, or null when it has none. Every
+ *  list in the note counted as one, because the row has space for one answer
+ *  and "what is left" is the question it answers. */
+export function checklistProgress(document: JSONContent): { done: number; total: number } | null {
+  let done = 0;
+  let total = 0;
+  const visit = (node: JSONContent) => {
+    if (node.type === "taskItem") {
+      total += 1;
+      if (node.attrs?.checked) done += 1;
+    }
+    node.content?.forEach(visit);
+  };
+  visit(document);
+  return total > 0 ? { done, total } : null;
 }
 
 /* ── What the editor leaves behind ───────────────────────────────────────────

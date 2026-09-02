@@ -22,7 +22,7 @@ import { BotanicalFlower, FLOWER_HEAD_BOX } from "@/components/BotanicalFlowers"
 import { flowerFor } from "@/lib/botanical";
 import type { NoteEntry } from "@/lib/entries";
 import type { NoteLock } from "@/lib/types";
-import { formatStamp } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
@@ -661,17 +661,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             inlineToolbar ? "" : "ml-auto"
           }`}
         >
-          {/* The readout and the faces get a pill of their own rather than a
-              seat in the dock: they are what the header says, not what it
-              does, and a dock that carried them would be moving its icons
-              around two things that never move. */}
-          <span
-            className={`flex min-w-0 items-center gap-2 ${
-              mobile ? "" : "editor-tool-group glass-toolbar"
-            }`}
-          >
-            {headerStatus}
-          </span>
+          {/* No pill. The readout and the faces are what the header says, not
+              what it does — the same kind of thing as "Editing" opposite them,
+              which stands on the bar in plain text. A pill around something
+              that never moves and cannot be pressed only offers to be pressed.
+              They stay out of the dock beside them for the same reason: a dock
+              that carried them would be moving its icons around two things
+              that are not icons. */}
+          <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
           <span
             ref={rightDock.ref}
             {...rightDock.handlers}
@@ -801,6 +798,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
             <div className="measure note-frontispiece-measure">
               <div className="font-sans text-base">
+                {/* Above everything the page carries, not tucked in over the
+                    title: it is the caption of the page rather than a line of
+                    the note, and read where the eye lands first it is out of
+                    the way of both. */}
+                <p className="note-date">{formatDateTime(entry.note.updatedAt)}</p>
+
                 <PageIdentity
                   photo={entry.note.photo}
                   cover={entry.note.cover}
@@ -813,8 +816,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                     {partnerName}&apos;s archive{!canEdit && " · read only"}
                   </p>
                 )}
-
-                <p className="note-date">{formatStamp(entry.note.updatedAt)}</p>
 
                 <TitleField
                   mobile={mobile}

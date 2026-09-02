@@ -82,12 +82,19 @@ the boundary is the one place every update passes through:
   writing their own locked passage, and refusing one leaves the editor
   disagreeing with the document it is bound to.
 
+A note row carries no buttons on a pointer machine — everything they did is in
+the row's right-click menu. On a phone the acts are gestures instead: push a
+card left to file it, right to trash it. Pinning has no direction, so it keeps
+its button there, and Trash and Archive keep theirs.
+
 `handleMetaChange` in `notes.tsx` is the one place every per-note metadata
 change passes through, so the lock is honoured there once rather than in each
 of pinning, filing, trashing and shelving.
 
 Both locks are offered from the ⋯ menu and the row's own right-click, and from
-nowhere else. The strip above the note says which state it is in and carries no
+nowhere else — as are pinning and trashing, which is why a note row carries no
+buttons of its own on a pointer machine. It keeps them under a finger, which
+has no right-click to reach the menu with. The strip above the note says which state it is in and carries no
 button for it: a second control up there was only a second thing to keep
 agreeing with that line.
 
@@ -100,11 +107,19 @@ a note leaves it the moment its last thread is dealt with. Opening a note from
 there opens its conversation with it.
 
 The badge counts remarks _somebody else_ wrote, in an open thread, since this
-browser last looked. The line it compares against is a timestamp in
-`localStorage`, not a column: it is a fact about a device looking rather than
-about the archive, and a set of read ids is a thing nobody ever finishes
-pruning. A new device therefore starts with everything unread, which is the
-right answer for it.
+browser last opened their note. The line it compares against is a timestamp
+**per note** in `localStorage`, not a column: it is a fact about a device
+looking rather than about the archive, and a set of read ids is a thing nobody
+ever finishes pruning. A new device therefore starts with everything unread,
+which is the right answer for it.
+
+Opening the note is what moves that note's line — not looking at the list,
+which is what moved the single archive-wide line this used to keep. One line
+for the archive could not say "I have read this one", so the badge stayed up
+after you had read the only thing under it, and the sidebar row's tally of
+notes-being-talked-about — which clears only when the last thread is resolved —
+took the badge's place in the same slot and read as a stuck count. The Remarks
+row now carries the dot and no tally.
 
 `subscribeToComments` is a channel of its own and deliberately not another
 table in `subscribeToArchive`'s list: that subscription's caller reloads the
@@ -129,6 +144,32 @@ arrives from the other member, an import, or whatever was on disk.
 One stroke is one write, on pointer release, and the pointer is followed with
 `window` listeners — never `setPointerCapture`, for the reason the cover
 learned.
+
+Two surfaces, one node. `surface: "board"` is a sheet in the flow of the note.
+`surface: "page"` is the note marked up the way a screenshot is: the node view
+is `position: absolute; inset: 0` against `.rich-text-content` — which is why
+that rule is `position: relative` — so the layer covers the whole writing
+column, run-out included, and is `pointer-events: none` until the pen is picked
+up. The words underneath stay words.
+
+- **One layer to a note.** A second is a second transparent sheet over the same
+  words, and the only way to tell which you were drawing on is to draw on it.
+  Asking again dispatches `napp:take-up-the-pen`; the pen is a fact about the
+  hand, so it is announced, never written to the document.
+- A board measures y against its own height; a page measures **both axes
+  against the width**, so it keeps its shape in a narrower column and simply
+  runs past 560. `drawingBox()` gives the export the height its lowest stroke
+  needs.
+- The tools are `position: sticky; bottom` inside a layer as tall as the note,
+  which keeps them in reach at every scroll position — a `position: fixed`
+  toolbar would not know which of two open notes it belonged to.
+- Six inks are one press each; every other colour is an `<input type="color">`
+  **inside a label**, invisible, with the label as the swatch. Styling the
+  input itself means three vendor pseudo-elements that disagree, one of which
+  draws a blue halo. The ink and the nib are module-level, so a colour chosen
+  once is still chosen on the next drawing and on the other surface.
+- The eraser takes whole strokes, not pixels of them: half a line left behind
+  is a line somebody has to go back for.
 
 ## The shelf and the waiting room
 
@@ -576,6 +617,16 @@ it on sign-out, and that one import was the whole rope. Keep it there.
 - **A `1fr` grid track is floored at its content's min-content width.** Use
   `minmax(0, 1fr)`. The phone's Settings column ran off the side of the panel
   and took every control with it for exactly this reason.
+- **Printing is the PDF export.** Every browser prints to PDF, so the whole of
+  it is one `@media print` block deciding what is *not* the note — and giving
+  the scroll box back its height and overflow, or the printer is handed one
+  screenful and told the rest is off-page.
+- **A dock stops at its own box.** A menu opened from a docked button is a
+  _descendant_ of the row, so walking down into it never fires `pointerleave`
+  and the row went on magnifying to the pointer's x with the cursor two hundred
+  pixels below it. `useDock` settles when the pointer leaves its bounding rect,
+  and again when `suspended` is raised — standing the dock down has to put it
+  back down, or it freezes at whatever magnification it had.
 - **Nothing that tracks the pointer may have a transition on `transform`.** The
   toolbar's dock magnification chases a target it never reaches otherwise: the
   icons lag the cursor and rubber-band when it stops, which reads as latency

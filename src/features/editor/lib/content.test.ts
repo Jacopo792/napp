@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { JSONContent } from "@tiptap/react";
 import {
+  DRAWING_BOX,
+  checklistProgress,
   documentGlyph,
+  drawingBox,
+  drawingStrokes,
+  drawingSvg,
+  firstDrawing,
   legacyMarkdownToRichText,
   richTextToPlainText,
   withoutInvisibleDocumentEnding,
@@ -70,4 +77,42 @@ test("an invisible document ending is not a change, and deleted words are", () =
     type: "doc",
     content: [paragraph("")],
   });
+});
+
+test("a note's first drawing and its checklist are read from the document", () => {
+  const document: JSONContent = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "before" }] },
+      { type: "drawing", attrs: { strokes: "[]", surface: "board" } },
+      {
+        type: "drawing",
+        attrs: { strokes: JSON.stringify([{ d: "M0,0L10,10", color: "#5B9BFF", width: 5 }]) },
+      },
+      {
+        type: "taskList",
+        content: [
+          { type: "taskItem", attrs: { checked: true }, content: [] },
+          { type: "taskItem", attrs: { checked: false }, content: [] },
+          { type: "taskItem", attrs: { checked: true }, content: [] },
+        ],
+      },
+    ],
+  };
+  // An empty drawing is not a picture of anything, so the first *drawn* one wins.
+  assert.equal(firstDrawing(document)?.strokes.length, 1);
+  assert.deepEqual(checklistProgress(document), { done: 2, total: 3 });
+  assert.equal(firstDrawing({ type: "doc", content: [] }), null);
+  assert.equal(checklistProgress({ type: "doc", content: [] }), null);
+});
+
+/* A page drawing is as tall as the note it was drawn over, so its exported
+   picture cannot be the board's box. */
+test("a page drawing exports a box as tall as its lowest stroke", () => {
+  const strokes = drawingStrokes(
+    JSON.stringify([{ d: "M10,10L20,900", color: "#5B9BFF", width: 6 }]),
+  );
+  assert.deepEqual(drawingBox(strokes, "board"), DRAWING_BOX);
+  assert.deepEqual(drawingBox(strokes, "page"), { width: 1000, height: 906 });
+  assert.match(drawingSvg(strokes, "page"), /viewBox="0 0 1000 906"/);
 });

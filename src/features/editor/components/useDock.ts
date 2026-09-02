@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent } from "react";
+import { useEffect, useRef, type PointerEvent } from "react";
 
 /* ── The dock ────────────────────────────────────────────────────────────────
    A row of equal icons in a pill is a dock, so it behaves like one: the icon
@@ -106,6 +106,22 @@ export function useDock<T extends HTMLElement>(suspended = false) {
     });
   }
 
+  /* Is the pointer over the row itself? A menu opened from a docked button is
+     a *descendant* of the cluster, so walking down into it never fires
+     `pointerleave` and the row went on magnifying to the pointer's x while the
+     cursor was two hundred pixels below it, over a menu. The row's own box is
+     the only honest answer to "is this pointer on the dock". */
+  function over(event: PointerEvent) {
+    const box = root.current?.getBoundingClientRect();
+    return (
+      !!box &&
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom
+    );
+  }
+
   function settle() {
     /* The class comes off in the same tick the properties do, so the
        transition it restores is the one that animates them back: a transition
@@ -116,6 +132,13 @@ export function useDock<T extends HTMLElement>(suspended = false) {
       item.button.style.removeProperty("--dock-shift");
     }
   }
+
+  /* Standing the dock down has to put it back down: `suspended` only stops the
+     handlers, so a row that was magnified when the menu opened stayed
+     magnified underneath it. */
+  useEffect(() => {
+    if (suspended) settle();
+  }, [suspended]);
 
   return {
     ref: root,
@@ -130,6 +153,10 @@ export function useDock<T extends HTMLElement>(suspended = false) {
       },
       onPointerMove(event: PointerEvent) {
         if (event.pointerType !== "mouse" || suspended || dock.current.length === 0) return;
+        if (!over(event)) {
+          settle();
+          return;
+        }
         magnify(event.clientX);
       },
       onPointerLeave: settle,

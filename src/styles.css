@@ -2302,6 +2302,55 @@
   text-align: center;
 }
 
+/* The sketch stands in the glyph's slot, so it takes the glyph's box and its
+   ink is the drawing's own. Strokes are widened threefold on the way in: a
+   6-unit line in a 1000-unit box is a quarter of a pixel at this size, which
+   is not a drawing, it is a smudge. */
+.note-row-glyph.is-sketch {
+  padding: 0.15rem;
+}
+
+.note-row-glyph.is-sketch svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* The sign on a row being pushed. It rides with the row rather than sitting in
+   the slot behind it: on the phone the list is a grid of cards, and a sign left
+   behind in the slot would be a sign over the card next to it. */
+.note-row-swipe {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Pushed left to file it away, right to throw it away — so the sign stands on
+   the edge the push is heading for. */
+.note-row-swipe.is-archive {
+  right: auto;
+  left: 0.9rem;
+  color: var(--accent);
+}
+
+.note-row-swipe.is-trash {
+  color: var(--danger);
+}
+
+/* What is left of a checklist, in the line that already says when. */
+.note-row-tally {
+  margin-left: 0.5rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-row-tally.is-done {
+  color: var(--ok);
+}
+
 .note-gallery-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5491,6 +5540,19 @@
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+/* A drawing's ring goes on the sheet, for the reason a picture's does: the
+   wrapper also holds the row of tools, and a ring round the wrapper drew a
+   blue halo round the palette — which reads as the colour you had just
+   chosen. A layer over the page gets no ring at all: it has no edges. */
+.rich-text-content .rich-media-drawing.ProseMirror-selectednode,
+.rich-text-content .drawing-overlay.ProseMirror-selectednode {
+  box-shadow: none;
+}
+
+.rich-text-content .rich-media-drawing.ProseMirror-selectednode .rich-media-drawing-sheet {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
 .rich-text-content .find-and-replace-result {
   border-radius: 0.15em;
   background: color-mix(in srgb, var(--tint-yellow) 32%, transparent);
@@ -6327,6 +6389,134 @@
   margin-left: 0.35rem;
 }
 
+/* Any colour at all, from the machine's own picker. The input is the control
+   and is invisible: a `color` input styles through three vendor
+   pseudo-elements that disagree between browsers, and the one thing they
+   agreed on was a blue halo round the swatch. The label is the swatch — the
+   wheel until a colour is chosen, then the colour. */
+.drawing-ink.is-any {
+  position: relative;
+  overflow: hidden;
+  background: conic-gradient(#f27fa5, #f5884e, #f4c550, #69cfa1, #5b9bff, #bf8cf2, #f27fa5);
+  cursor: pointer;
+}
+
+.drawing-ink.is-any input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Three nibs, drawn at the width they draw. */
+.drawing-nib {
+  display: flex;
+  width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--ink-3);
+}
+
+.drawing-nib span {
+  border-radius: 999px;
+  background: currentcolor;
+}
+
+.drawing-nib:hover {
+  background: var(--surface);
+}
+
+.drawing-nib.is-chosen {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.drawing-tools-rule {
+  width: 1px;
+  height: 1rem;
+  margin: 0 0.35rem;
+  background: var(--rule);
+}
+
+.rich-media-drawing-surface.is-erasing {
+  cursor: cell;
+}
+
+/* ── Ink over the page ───────────────────────────────────────────────────────
+   The note marked up the way a screenshot is. The layer covers the whole
+   writing column — the run-out at the foot included — and is transparent to
+   the pointer until the pen is picked up, so the words underneath stay words
+   and stay selectable. Its own box is zero: it is `inset: 0` against
+   `.rich-text-content`, which is the column and is as tall as the note. */
+.rich-text-content {
+  position: relative;
+}
+
+.drawing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.drawing-overlay-surface {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.drawing-overlay-surface.is-drawing {
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.drawing-overlay-surface.is-erasing {
+  cursor: cell;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* The tools ride the bottom of whatever is on screen: sticky inside a layer as
+   tall as the note keeps them in reach at every scroll position, without a
+   `position: fixed` that would not know which of two open notes it belonged
+   to. */
+.drawing-overlay-tools {
+  position: sticky;
+  bottom: 1.1rem;
+  z-index: 1;
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  pointer-events: auto;
+}
+
+.drawing-overlay-tools.is-put-away {
+  padding: 0.25rem;
+  opacity: 0.82;
+}
+
+.drawing-overlay-tools.is-put-away:hover {
+  opacity: 1;
+}
+
+
 /* Remarks nobody here has read. The one badge in this interface, so it is the
    accent and nothing else is: a count set on the accent wash, at the size the
    quiet tallies beside it already use, so the row reads as the same row with
@@ -6341,4 +6531,72 @@
   font-weight: 600;
   line-height: 1.15rem;
   text-align: center;
+}
+
+/* ── On paper ────────────────────────────────────────────────────────────────
+   Every browser prints to PDF, so the whole of "export this note as a PDF" is
+   deciding what is not the note. What is left is the page: the cover, the
+   title, the text and any ink over it — laid out down the sheet instead of
+   inside a scrolling pane, on white, in black.
+
+   The scroll box has to give up both its height and its overflow, or the
+   printer is handed one screenful and told the rest is off-page. */
+@media print {
+  .sidebar-column,
+  .collection-column,
+  .editor-toolbar,
+  .editor-format-bar,
+  .find-bar,
+  .drawing-overlay-tools,
+  .rich-media-drawing-tools,
+  .note-comments,
+  .pane-resizer,
+  .note-cover-actions,
+  #root::before,
+  #root::after {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto;
+    background: #fff;
+    color: #000;
+  }
+
+  .editor-shell,
+  .editor-body,
+  .editor-scroll,
+  .rich-text-editor {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .rich-text-content {
+    max-width: none;
+    padding-bottom: 0;
+  }
+
+  .rich-text-content,
+  .note-title,
+  .note-date {
+    color: #000 !important;
+  }
+
+  /* A page break through the middle of a drawing loses half of it, and a
+     picture split across two sheets is a picture nobody kept. */
+  .rich-media-drawing,
+  .rich-media-image,
+  .note-page-cover {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }

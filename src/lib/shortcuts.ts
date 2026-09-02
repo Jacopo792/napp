@@ -21,6 +21,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "The list", keys: "N", what: "New note" },
   { group: "The list", keys: "\u2191 \u2193", what: "Move between notes" },
   { group: "The list", keys: "J K", what: "Move between notes" },
+  { group: "The list", keys: "\u2325 \u2191 \u2193", what: "Move between days" },
   { group: "The list", keys: "\u21b5", what: "Open the title of the selected note" },
   { group: "In a note", keys: "\u2318F", what: "Find in this note" },
   { group: "In a note", keys: "\u2318K", what: "Link the selected words" },

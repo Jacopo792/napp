@@ -87,17 +87,27 @@ export function notesWithOpenRemarks(comments: ArchiveComment[]): Set<string> {
   return notes;
 }
 
-/** Remarks somebody else wrote since `seenAt`, in an open thread.
+/** When this browser last read each note's remarks, keyed by note. */
+export type RemarksSeen = Record<string, string>;
+
+/** Remarks somebody else wrote since this browser last opened their note, in
+ *  an open thread.
  *
  *  Your own are never news, and a thread already dealt with is not waiting for
- *  you. `seenAt` empty means this browser has never looked, so everything the
- *  other member has said still counts as unread — which is the right answer on
- *  a device signing in for the first time, and the reason it is a timestamp
- *  rather than a set of ids nobody would ever finish pruning. */
+ *  you. The line is drawn per note rather than across the archive because that
+ *  is the granularity of having read one: opening a note is the act, and a
+ *  single archive-wide line meant reading one conversation marked every other
+ *  member's remark read along with it — or, when nothing moved the line, meant
+ *  a badge that stayed up after you had read the only thing under it.
+ *
+ *  A note with no line has never been looked at on this device, so everything
+ *  the other member said on it is still unread — the right answer for a device
+ *  signing in for the first time, and the reason these are timestamps rather
+ *  than a set of ids nobody would ever finish pruning. */
 export function unreadRemarks(
   comments: ArchiveComment[],
   selfId: string,
-  seenAt: string,
+  seen: RemarksSeen,
 ): ArchiveComment[] {
   const resolvedThreads = new Set<string>();
   for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
@@ -105,6 +115,6 @@ export function unreadRemarks(
     (comment) =>
       comment.authorId !== selfId &&
       !resolvedThreads.has(comment.threadId) &&
-      comment.createdAt > seenAt,
+      comment.createdAt > (seen[comment.noteId] ?? ""),
   );
 }

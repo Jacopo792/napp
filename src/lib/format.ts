@@ -22,6 +22,22 @@ export function formatStamp(iso: string): string {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" });
 }
 
+/** The whole stamp, always the same shape. `formatStamp` is shorthand for a
+ *  list, where every row is the same kind of thing and today's rows only have
+ *  to be told apart from each other; the head of a note is the one place the
+ *  date is read on its own, so it says the date. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "long",
+    ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function countWords(s: string): number {
   const t = s.trim();
   return t ? t.split(/\s+/).length : 0;

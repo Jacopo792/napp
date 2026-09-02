@@ -635,11 +635,15 @@ export function Sidebar({
           {/* What has been said, above what has been filed and what has been
               thrown away. It is the one row here you can arrive at with
               something waiting in it, so it is the one row that can carry a
-              dot — the count beside it says how many notes are being talked
-              about, the dot says some of it is new to you. */}
+              dot, and the dot is all it carries. */}
           {remarks && (remarks.count > 0 || (remarks.unread ?? 0) > 0) && (
             <Row
-              scope={remarks}
+              /* The row carries the dot and nothing else. A tally of notes
+                 being talked about sits in the same slot the dot does and
+                 clears only when the last thread is resolved — so once the dot
+                 goes the number that replaces it reads as an unread count
+                 stuck at one, which is the one thing a badge must never do. */
+              scope={{ ...remarks, count: 0 }}
               glyph={<MessageSquare size={16} />}
               active={selectedId === REMARKS}
               droppable={false}

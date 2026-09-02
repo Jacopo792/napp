@@ -26,6 +26,7 @@ import {
   Quote,
   Rows3,
   SpellCheck,
+  SquarePen,
   Strikethrough,
   Table2,
   Trash2,
@@ -321,7 +322,12 @@ export function EditorToolbar({
                 among them. */}
             <div className="menu-separator" />
             <p className="menu-label">Draw</p>
-            <Row icon={<Pencil size={16} />} label="Drawing" onClick={() => run("drawing")} />
+            <Row
+              icon={<Pencil size={16} />}
+              label="On the page"
+              onClick={() => run("drawing-page")}
+            />
+            <Row icon={<SquarePen size={16} />} label="On a board" onClick={() => run("drawing")} />
           </>,
         )}
       </div>

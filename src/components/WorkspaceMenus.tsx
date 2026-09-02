@@ -33,6 +33,7 @@ import {
   MoreHorizontal,
   Moon,
   Pin,
+  Printer,
   Search,
   Settings,
   SpellCheck,
@@ -250,6 +251,7 @@ function NoteMenuContent({
   onRecent,
   onCopyMarkdown,
   onExportMarkdown,
+  onPrint,
   onDelete,
   close,
 }: {
@@ -267,6 +269,7 @@ function NoteMenuContent({
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
   onExportMarkdown: () => void;
+  onPrint: () => void;
   onDelete: () => void;
   close: () => void;
 }) {
@@ -368,6 +371,18 @@ function NoteMenuContent({
             <FileDown size={16} />
             Export as Markdown
           </MenuButton>
+          {/* The third door, and the one that keeps the cover and the
+              typesetting: every browser prints to PDF, so a paged copy of the
+              note costs a stylesheet rather than a PDF writer in the bundle. */}
+          <MenuButton
+            onClick={() => {
+              close();
+              onPrint();
+            }}
+          >
+            <Printer size={16} />
+            Print or save as PDF
+          </MenuButton>
           <div className="menu-separator" />
           <MenuButton
             danger
@@ -447,6 +462,7 @@ export function NoteMenu(props: {
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
   onExportMarkdown: () => void;
+  onPrint: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -497,6 +513,7 @@ export function NoteContextMenu({
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
   onExportMarkdown: () => void;
+  onPrint: () => void;
   onDelete: () => void;
 }) {
   return (
