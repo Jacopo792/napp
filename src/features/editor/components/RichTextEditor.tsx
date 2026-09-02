@@ -867,13 +867,26 @@ function useInk({
   const [nib, setNib] = useState<number>(lastNib);
   const [marker, setMarker] = useState<boolean>(lastMarker);
   const [erasing, setErasing] = useState(false);
-  const [drawing, setDrawing] = useState<string>("");
   const surface = useRef<SVGSVGElement>(null);
+  /* The line being drawn right now is written straight onto its own element.
+     It was a piece of React state, which meant a render of the whole layer for
+     every pointer event of a gesture — sixty a second, each one rebuilding
+     every stroke already on the surface. Nothing else on the page depends on a
+     line nobody has finished, so nothing else needs to hear about it. */
+  const livePath = useRef<SVGPathElement>(null);
+  const paint = (d: string) => livePath.current?.setAttribute("d", d);
   const path = useRef<string>("");
   const trail = useRef<{ x: number; y: number }[]>([]);
   const snapped = useRef<string | null>(null);
   const live = useRef(strokes);
   live.current = strokes;
+
+  /* Cleared once the committed stroke is on screen, never before it: clearing
+     it in the same breath as the write leaves a frame with neither, and a line
+     that blinks out at the end of every gesture. */
+  useEffect(() => {
+    paint("");
+  }, [strokes]);
 
   const width = marker ? MARKER_NIB : nib;
   const laid = marker ? `${ink}${MARKER_ALPHA}` : ink;
@@ -971,7 +984,7 @@ function useInk({
     path.current = `M${point.at}`;
     trail.current = [point];
     snapped.current = null;
-    setDrawing(path.current);
+    paint(path.current);
 
     /* Hold still at the end of a stroke and it becomes the shape it was aiming
        at. The timer is restarted by every movement, so what it measures is a
@@ -984,7 +997,7 @@ function useInk({
         const shape = straightenStroke(trail.current);
         if (!shape) return;
         snapped.current = shape;
-        setDrawing(shape);
+        paint(shape);
       }, STRAIGHTEN_AFTER_MS);
     };
     rearm();
@@ -999,7 +1012,7 @@ function useInk({
       }
       trail.current.push(step);
       path.current = `${path.current}L${step.at}`;
-      setDrawing(path.current);
+      paint(path.current);
       rearm();
     };
     const finish = () => {
@@ -1012,7 +1025,6 @@ function useInk({
       const committed =
         snapped.current ??
         (path.current.includes("L") ? path.current : `${path.current}L${path.current.slice(1)}`);
-      setDrawing("");
       path.current = "";
       trail.current = [];
       snapped.current = null;
@@ -1036,16 +1048,15 @@ function useInk({
           strokeLinejoin="round"
         />
       ))}
-      {drawing && (
-        <path
-          d={drawing}
-          fill="none"
-          stroke={laid}
-          strokeWidth={width}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      )}
+      <path
+        ref={livePath}
+        d=""
+        fill="none"
+        stroke={laid}
+        strokeWidth={width}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </>
   );
 

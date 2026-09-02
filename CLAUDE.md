@@ -121,6 +121,11 @@ notes-being-talked-about — which clears only when the last thread is resolved 
 took the badge's place in the same slot and read as a stuck count. The Remarks
 row now carries the dot and no tally.
 
+`refreshRemarks` is debounced by 400 ms. Realtime announces every insert,
+update and delete on `note_comments` separately, so resolving a thread of six
+remarks is six announcements — each one re-reading every comment in the
+archive. They arrive together and are answered together.
+
 `subscribeToComments` is a channel of its own and deliberately not another
 table in `subscribeToArchive`'s list: that subscription's caller reloads the
 whole archive snapshot and already fires on every save either member makes.
@@ -192,6 +197,12 @@ up. The words underneath stay words.
   box the strokes are measured in. A picture keeps its strokes in
   `privateImage.strokes` and they do not leave in an export, because the
   picture does not either.
+- **The line being drawn is written straight onto its own element.** As React
+  state it was a render of the whole layer per pointer event — sixty a second,
+  each rebuilding every stroke already on the surface — and nothing outside the
+  gesture depends on a line nobody has finished. It is cleared by an effect on
+  `strokes`, never in the same breath as the write: clearing it there leaves a
+  frame with neither, and a line that blinks out at the end of every gesture.
 - **Measure the parent, not the `<svg>`.** Chrome fires no `ResizeObserver`
   callback at all — not even the first — for an SVG sized entirely by its
   parent, so a layer that measured itself stayed the shape of a board and the
@@ -626,12 +637,26 @@ form was downloading 224 kB gzipped of rich-text editor before you could type a
 password. It is 59 kB now, and the editor moved into the lazy `/notes` chunk
 where it belongs.
 
+`SettingsPanel` is in a file of its own and imported with `lazy()`, mounted
+only while it is open — rendered always with `open` false, it would fetch its
+chunk on the way to the first note. It is one panel behind one button nobody
+presses on the way to a note, and it was riding in the chunk the archive is in.
+Splitting it moved 23 kB (7 kB gzipped) off the first load of `/notes`. It
+still imports `Avatar` from `WorkspaceMenus`, which the rest of the interface
+needs anyway.
+
 The in-memory note cache (`noteCache`, `resetArchiveCache`, `adoptArchiveCache`)
 lives in `noteStore.ts` for that reason and no other — `session.ts` has to clear
 it on sign-out, and that one import was the whole rope. Keep it there.
 
 ## Interface notes worth knowing
 
+- **The sign-in page does not scroll.** It carries no wordmark and no tagline —
+  the card says what it is — and the botanical plates are clipped to
+  `.login-garden` rather than to `.login-shell`: a stem hanging below the fold
+  made the door scrollable, and what was under it was the wallpaper of an app
+  nobody has signed into yet. The shell itself must stay unclipped vertically,
+  because on a short window the sign-up card is taller than the viewport.
 - **No nested `backdrop-filter`.** A toolbar inside a pane that is already
   translucent and already blurred takes neither again: the second coat darkens
   the strip, and the second filter is a full compositing pass per frame for

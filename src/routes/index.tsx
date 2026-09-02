@@ -317,11 +317,6 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
         <BotanicalFlower flower={plant} className="is-far" />
       </div>
 
-      <header className="login-head">
-        <span className="login-wordmark">Notes</span>
-        <span className="login-tagline">A quiet place for long notes</span>
-      </header>
-
       <main className="login-main">
         <div className="login-card">{children}</div>
       </main>

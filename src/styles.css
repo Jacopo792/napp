@@ -563,9 +563,16 @@
   background: var(--surface);
 }
 
+/* Clipped to the shell it decorates. The plates are drawn past their own box
+   on purpose — that is what makes them bleed off the edges — but a stem
+   hanging below the fold made the door scrollable, and what was under it was
+   the wallpaper of an app nobody has signed into yet. Clipping the garden
+   rather than the shell leaves the shell free to grow past the window when the
+   card is taller than it, which is the one thing it must still do. */
 .login-garden {
   position: absolute;
   inset: 0;
+  overflow: clip;
   pointer-events: none;
 }
 
@@ -1161,35 +1168,6 @@
 @keyframes plate-draw {
   to {
     stroke-dashoffset: 0;
-  }
-}
-
-.login-head {
-  position: relative;
-  display: flex;
-  height: 4.5rem;
-  flex-shrink: 0;
-  align-items: baseline;
-  gap: 0.75rem;
-  padding: 0 clamp(1.25rem, 4vw, 2.5rem);
-}
-
-.login-wordmark {
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.login-tagline {
-  color: var(--ink-4);
-  font-size: 12px;
-}
-
-@media (max-width: 520px) {
-  .login-tagline {
-    display: none;
   }
 }
 

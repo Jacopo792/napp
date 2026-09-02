@@ -120,13 +120,13 @@ import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact } from "@/lib/media";
 import { useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
 import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
-import {
-  CollectionMenu,
-  Avatar,
-  NoteContextMenu,
-  NoteMenu,
-  SettingsPanel,
-} from "@/components/WorkspaceMenus";
+import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
+/* Lazily, and only once it is opened. Settings is one panel behind one button
+   that nobody presses on the way to a note, and it was riding in the same
+   chunk as the archive. */
+const SettingsPanel = lazy(() =>
+  import("@/components/SettingsPanel").then((module) => ({ default: module.SettingsPanel })),
+);
 import type { MenuPoint } from "@/lib/contextMenu";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
@@ -713,15 +713,25 @@ function NotesPage() {
     [remarksSeenKey],
   );
 
+  /* One read per burst, not one per row. Realtime announces every insert,
+     update and delete on `note_comments` separately, and a resolved thread of
+     six remarks is six announcements — each one re-reading every comment in
+     the archive. They arrive together, so they are answered together. */
+  const remarkTimer = useRef(0);
   const refreshRemarks = useCallback(() => {
-    const current = sessionRef.current;
-    if (!current) return;
-    void loadArchiveComments(current)
-      .then(setArchiveComments)
-      /* A remark that will not load is not a reason to fail to open the
-         archive: the count simply stays where it was. */
-      .catch(() => undefined);
+    window.clearTimeout(remarkTimer.current);
+    remarkTimer.current = window.setTimeout(() => {
+      const current = sessionRef.current;
+      if (!current) return;
+      void loadArchiveComments(current)
+        .then(setArchiveComments)
+        /* A remark that will not load is not a reason to fail to open the
+           archive: the count simply stays where it was. */
+        .catch(() => undefined);
+    }, 400);
   }, []);
+
+  useEffect(() => () => window.clearTimeout(remarkTimer.current), []);
 
   useEffect(() => {
     if (!session) return;
@@ -2624,50 +2634,56 @@ function NotesPage() {
     </>
   );
 
-  const settingsPanel = (
-    <SettingsPanel
-      open={settingsOpen}
-      email={session.email}
-      reading={readingLabel}
-      autoLock={autoLock}
-      profile={profile}
-      avatarUrl={avatarUrls[session.userId] ?? null}
-      joinedAt={members.find((member) => member.isSelf)?.joinedAt}
-      memberCount={members.length}
-      members={members}
-      seatLimit={seatLimit}
-      invites={invites}
-      canManageMembers={canWriteArchive}
-      presenceEnabled={presenceEnabled}
-      profileBusy={profileBusy}
-      profileError={profileError}
-      onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
-      onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
-      onAvatarRemove={() => void handleAvatarRemove()}
-      onCreateInvite={async (email) => {
-        const token = await createArchiveInvite(session, email);
-        const link = new URL(import.meta.env.BASE_URL, window.location.origin);
-        link.searchParams.set("invite", token);
-        await refreshInvites();
-        return link.toString();
-      }}
-      onRevokeInvite={async (inviteId) => {
-        await revokeArchiveInvite(inviteId);
-        await refreshInvites();
-      }}
-      onLeaveArchive={handleLeaveArchive}
-      onPresenceEnabledChange={handlePresenceChange}
-      proofreaderEnabled={proofreaderEnabled}
-      writingPreferences={writingPreferences}
-      onProofreaderEnabledChange={handleProofreaderChange}
-      onWritingPreferencesChange={setWritingPreferences}
-      /* Straight through the one profile writer: this is a column on the row,
+  /* Mounted only while it is open, which is what makes the lazy import above
+     worth anything: rendered always, with `open` false, it would fetch its
+     chunk on the way to the first note. The panel drew nothing when closed
+     anyway. */
+  const settingsPanel = settingsOpen && (
+    <Suspense fallback={null}>
+      <SettingsPanel
+        open={settingsOpen}
+        email={session.email}
+        reading={readingLabel}
+        autoLock={autoLock}
+        profile={profile}
+        avatarUrl={avatarUrls[session.userId] ?? null}
+        joinedAt={members.find((member) => member.isSelf)?.joinedAt}
+        memberCount={members.length}
+        members={members}
+        seatLimit={seatLimit}
+        invites={invites}
+        canManageMembers={canWriteArchive}
+        presenceEnabled={presenceEnabled}
+        profileBusy={profileBusy}
+        profileError={profileError}
+        onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
+        onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
+        onAvatarRemove={() => void handleAvatarRemove()}
+        onCreateInvite={async (email) => {
+          const token = await createArchiveInvite(session, email);
+          const link = new URL(import.meta.env.BASE_URL, window.location.origin);
+          link.searchParams.set("invite", token);
+          await refreshInvites();
+          return link.toString();
+        }}
+        onRevokeInvite={async (inviteId) => {
+          await revokeArchiveInvite(inviteId);
+          await refreshInvites();
+        }}
+        onLeaveArchive={handleLeaveArchive}
+        onPresenceEnabledChange={handlePresenceChange}
+        proofreaderEnabled={proofreaderEnabled}
+        writingPreferences={writingPreferences}
+        onProofreaderEnabledChange={handleProofreaderChange}
+        onWritingPreferencesChange={setWritingPreferences}
+        /* Straight through the one profile writer: this is a column on the row,
          and Postgres reads it back to decide what the other member may fetch. */
-      onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
-      onAutoLockChange={handleAutoLockChange}
-      onClose={() => setSettingsOpen(false)}
-      onLock={handleLock}
-    />
+        onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
+        onAutoLockChange={handleAutoLockChange}
+        onClose={() => setSettingsOpen(false)}
+        onLock={handleLock}
+      />
+    </Suspense>
   );
 
   /* What the header says about the note, beside the pill of things it can do:
