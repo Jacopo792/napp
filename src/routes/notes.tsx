@@ -3006,8 +3006,34 @@ function NotesPage() {
         onDragEnd={handleDragEnd}
       >
         <div className="workspace-grid flex h-full min-h-0">
-          {navigationOpen && (
-            <>
+          {/* Held open and closed, never thrown away.
+              `⌘\` used to mount and unmount these two columns, so the whole
+              left side of the window appeared and vanished between one frame
+              and the next — and because there is nothing to animate on the way
+              out of a component that no longer exists, no amount of easing
+              could have softened it. Mounted always, the pair slides as one
+              piece: the slot's width carries the note page across, and the
+              track inside it travels the same distance in the same time so the
+              columns leave to the left rather than being squeezed flat. The
+              inner width never changes, which is what stops every folder name
+              and every note title reflowing while it goes.
+
+              Clipped only while it is away. The sidebar's own menu is wider
+              than the column it hangs in — 14.5rem against a 210px minimum —
+              so a clip that was always on would cut it in half whenever
+              somebody narrowed the pane. Closing, there is nothing left to
+              cut; opening, the track is off to the left of the window and the
+              window clips it for us. */}
+          <div
+            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
+            style={{ width: navigationOpen ? sidebarWidth + listWidth + 20 : 0 }}
+            aria-hidden={!navigationOpen}
+            inert={!navigationOpen}
+          >
+            <div
+              className="pane-slide-track flex h-full min-h-0"
+              style={{ width: sidebarWidth + listWidth + 20 }}
+            >
               <div className="pane-frame" style={{ width: sidebarWidth }}>
                 {sidebar}
               </div>
@@ -3058,8 +3084,8 @@ function NotesPage() {
                 defaultValue={LIST_DEFAULT}
                 onChange={setListWidth}
               />
-            </>
-          )}
+            </div>
+          </div>
 
           <Suspense
             fallback={

@@ -261,7 +261,18 @@ const Row = memo(function Row({
            and simply stops carrying the property keeps the last one it was
            given. */
         transform: slid === 0 ? "" : `translateX(${Math.max(-140, Math.min(140, slid))}px)`,
-        transition: slid === 0 ? "transform var(--dur-base) var(--ease-spring)" : "none",
+        /* Two motions on one row, so they are kept on two properties and given
+           two curves. `transform` is the swipe letting go, which wants the
+           spring: a card thrown at the edge should come back with some weight
+           in it. `translate` — the standalone property, not the function — is
+           the pointer arriving, which wants none of that: a row that overshoots
+           under the cursor reads as the list twitching. Sharing one property
+           would mean sharing one curve, and the inline value here wins over any
+           stylesheet, so the hover could not have had its own. */
+        transition:
+          slid === 0
+            ? "transform var(--dur-base) var(--ease-spring), translate var(--dur-base) var(--ease)"
+            : "none",
       }}
       className={`note-row group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery

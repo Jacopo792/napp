@@ -1629,6 +1629,44 @@
   flex: 0 0 auto;
 }
 
+/* ── The navigation, going away and coming back ──────────────────────────────
+   The slot carries the width; the track inside it carries the travel. Both on
+   `--ease` — the curve this file already keeps for anything that slides — and
+   deliberately not on the spring: a whole side of the window that overshoots
+   is the entire interface wobbling, which is exactly what it looked like.
+
+   The track keeps its full width throughout, so nothing inside reflows on the
+   way out: the columns leave, they do not collapse. */
+.pane-slide {
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+  transition: width var(--dur-base) var(--ease);
+}
+
+.pane-slide-track {
+  flex: 0 0 auto;
+  transition: transform var(--dur-base) var(--ease);
+}
+
+/* Only while it is away — see the note at the call site: the sidebar's own
+   menu is wider than the column it hangs in, and a permanent clip would cut
+   it. */
+.pane-slide.is-collapsed {
+  overflow: hidden;
+}
+
+.pane-slide.is-collapsed > .pane-slide-track {
+  transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-slide,
+  .pane-slide-track {
+    transition: none;
+  }
+}
+
 .pane-resizer {
   position: relative;
   z-index: 35;
@@ -6684,10 +6722,16 @@
 
 /* ── Answering the pointer ───────────────────────────────────────────────────
    Hover states here used to change colour and nothing else, which is a light
-   coming on rather than a thing responding. These give the pointer something
-   with a little mass behind it: a step, or a lift, that goes slightly past
-   where it is going and settles — `--ease-spring`, the overshoot curve that
-   was already in the file for the swipe gesture.
+   coming on rather than a thing responding. These give the pointer a step, or
+   a lift.
+
+   **On `--ease`, and never on the spring.** The first cut of this used
+   `--ease-spring`, and an overshoot that is right for a card thrown at the
+   edge of the screen is wrong for a row you are merely passing over: forty
+   rows each springing past themselves as the cursor travels down the column
+   reads as the list twitching, not as the list answering. `--ease` is the
+   curve this file already keeps for anything that slides, and sliding is what
+   this is.
 
    **The transitions are restated rather than added to, and this block is last
    in the file on purpose.** `transition` is a shorthand: it replaces the whole
@@ -6713,7 +6757,7 @@
     transition:
       color var(--dur-fast) var(--ease),
       background-color var(--dur-fast) var(--ease-press),
-      transform var(--dur-base) var(--ease-spring);
+      transform var(--dur-base) var(--ease);
   }
 
   .icon-button,
@@ -6723,7 +6767,7 @@
       color 180ms var(--ease),
       background-color 180ms var(--ease),
       border-color 180ms var(--ease),
-      transform var(--dur-base) var(--ease-spring);
+      transform var(--dur-base) var(--ease);
   }
 
   /* A step toward the pointer rather than a swell. A wide row scaled up reads
@@ -6732,7 +6776,7 @@
      carries the spring on its transform — the swipe gesture puts it there
      inline — so this only has to say where to go. */
   .note-row:hover {
-    transform: translateX(4px);
+    translate: 4px;
   }
 
   .sidebar-target:hover,
@@ -6744,7 +6788,7 @@
   /* Small, round and isolated: these can afford to grow, which a row cannot. */
   .icon-button:hover:not(:disabled),
   .toolbar-button:not(.editor-tool-button):hover:not(:disabled) {
-    transform: scale(1.08);
+    transform: scale(1.06);
   }
 
   .new-note-button:hover:not(:disabled) {
@@ -6775,5 +6819,6 @@
   .toolbar-button:hover,
   .new-note-button:hover {
     transform: none;
+    translate: none;
   }
 }
