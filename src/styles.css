@@ -1236,11 +1236,16 @@
 
 .login-brand {
   display: block;
+  box-sizing: border-box;
   width: 96px;
   height: 96px;
   margin: -0.35rem auto 1.45rem;
-  object-fit: cover;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.24));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--rule));
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+  padding: 6px;
+  object-fit: contain;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 @keyframes login-settle {
