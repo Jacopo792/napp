@@ -2,7 +2,7 @@
 
 A private notes app built around one shared archive.
 
-![App preview](docs/app-preview-v2.png)
+![App preview](docs/app-preview-v3.png)
 
 ## Why I built it
 
@@ -34,7 +34,7 @@ private files.
 
 ## Make it yours
 
-![Appearance settings](docs/customisation-preview.png)
+![Appearance settings](docs/customisation-preview-v2.png)
 
 The app is highly customisable, and each person can set it up independently. You can
 start from a ready-made palette or choose the accent, background and text colours
