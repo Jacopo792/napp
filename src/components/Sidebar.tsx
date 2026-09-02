@@ -232,7 +232,6 @@ function FolderMenu({
             <Trash2 size={16} />
             {confirm ? "Delete — click to confirm" : "Delete folder"}
           </button>
-          <p className="menu-note">Deleting a folder never deletes its notes; they go unfiled.</p>
         </div>
       )}
     </div>
@@ -707,7 +706,6 @@ export function Sidebar({
             <Trash2 size={16} />
             {confirmDelete ? "Delete — click to confirm" : "Delete folder"}
           </MenuButton>
-          <p className="menu-note">Deleting a folder never deletes its notes; they go unfiled.</p>
         </ContextMenu>
       )}
     </nav>

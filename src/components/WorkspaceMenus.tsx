@@ -1156,17 +1156,16 @@ export function SettingsPanel({
                     {profileError}
                   </p>
                 )}
-                <p className="profile-note">
-                  Your nickname and picture are the only things about you the others can see. Nobody
-                  but this account can change them.
-                </p>
-
                 <h3>Leave shared archive</h3>
                 <div className="leave-archive-card">
                   <RowLead
                     icon={<LogOut size={17} />}
                     label="Leave this archive"
-                    hint="Your access ends, but the notes stay for the other members"
+                    hint={
+                      members.length <= 1
+                        ? "Nobody to leave it to — you are the only member"
+                        : "Your access ends, but the notes stay for the other members"
+                    }
                   />
                   <button
                     type="button"
@@ -1178,14 +1177,6 @@ export function SettingsPanel({
                     {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
                   </button>
                 </div>
-                {members.length <= 1 ? (
-                  <p className="profile-note">Invite an editor before leaving the last seat.</p>
-                ) : (
-                  <p className="profile-note">
-                    If you are the only editor, promote another member first. Leaving frees your
-                    seat so an editor can invite someone else.
-                  </p>
-                )}
                 {leaveStatus && (
                   <p className="profile-note" role="status">
                     {leaveStatus}
@@ -1513,10 +1504,6 @@ export function SettingsPanel({
                     </div>
                   </Fragment>
                 ))}
-                <p className="profile-note">
-                  Nothing here is a preference — these are the keys the window already answers to.
-                  ⌘K also opens a list of everything it can do, by name.
-                </p>
               </section>
             )}
 
@@ -1740,11 +1727,6 @@ export function SettingsPanel({
                       <Mail size={15} />
                       Send it by email
                     </a>
-                    <p className="profile-note">
-                      The link is the whole invitation. It works once, only for {inviteEmail} after
-                      that address is confirmed, and only for seven days. Sending it opens your own
-                      mail app with the message already written.
-                    </p>
                   </div>
                 )}
                 {inviteStatus && (
@@ -1752,11 +1734,6 @@ export function SettingsPanel({
                     {inviteStatus}
                   </p>
                 )}
-                <p className="profile-note">
-                  A member reads and writes the whole archive; there is no lesser kind. What one
-                  member can take back from another is a note, or a passage of one, from the note
-                  itself. Somebody who should not read these needs an archive of their own.
-                </p>
               </section>
             )}
           </div>

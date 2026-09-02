@@ -274,9 +274,6 @@ export function EditorToolbar({
               }}
             />
             <Row icon={<Minus size={16} />} label="Divider" onClick={() => run("divider")} />
-            <p className="menu-note">
-              Every style is a switch: choosing the one a paragraph already has takes it off.
-            </p>
           </>,
         )}
         {linkOpen && linkForm}
@@ -318,8 +315,6 @@ export function EditorToolbar({
               </span>
               <span>Back to normal</span>
             </button>
-            <p className="menu-note">Select the words first — colour applies to a selection.</p>
-
             {/* A drawing is the other way of putting colour on a page, and the
                 only one that does not need words underneath it first — so it
                 sits below the swatches with a rule of its own rather than
@@ -327,9 +322,6 @@ export function EditorToolbar({
             <div className="menu-separator" />
             <p className="menu-label">Draw</p>
             <Row icon={<Pencil size={16} />} label="Drawing" onClick={() => run("drawing")} />
-            <p className="menu-note">
-              A sheet in the note, drawn by hand. Six inks; it leaves with the note.
-            </p>
           </>,
         )}
       </div>
@@ -357,10 +349,6 @@ export function EditorToolbar({
               label="Numbered list"
               onClick={() => run("ordered-list")}
             />
-            <p className="menu-note">
-              The lines you selected become the list — or the line you are on, if you selected
-              nothing. Return starts the next item; Return on an empty item ends the list.
-            </p>
           </>,
         )}
       </div>
@@ -394,7 +382,6 @@ export function EditorToolbar({
               label="Delete table"
               onClick={() => run("table-delete")}
             />
-            <p className="menu-note">Click inside a cell before changing its row or column.</p>
           </>,
         )}
       </div>
@@ -434,7 +421,6 @@ export function EditorToolbar({
               label="English"
               onClick={() => (setOpen(null), onTranslate("en"))}
             />
-            <p className="menu-note">These run on this device in supported desktop browsers.</p>
           </>,
         )}
       </div>

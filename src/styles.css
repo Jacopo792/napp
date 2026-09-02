@@ -5184,15 +5184,6 @@
   opacity: 1;
 }
 
-/* One sentence saying what a menu will actually do, where a menu of verbs is
-   otherwise ambiguous about its target. */
-.menu-note {
-  padding: 0.35rem 0.7rem 0.5rem;
-  color: var(--ink-4);
-  font-size: 10.5px;
-  line-height: 1.5;
-}
-
 /* ══ Structured rich text (Tiptap) ═══════════════════════════════════════════
    The document now contains real paragraphs, marks and nodes. These rules keep
    the reading page visually unchanged without exposing storage syntax. */

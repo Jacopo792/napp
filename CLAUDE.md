@@ -591,6 +591,15 @@ it on sign-out, and that one import was the whole rope. Keep it there.
   thing that moves each time you change page is a thing you end up watching
   instead of reading. A module-level flag is the whole of what makes putting it
   back safe.
+- **No explanatory paragraphs under controls.** Not in a menu, not in a
+  settings section, not under a card. A control that needs a sentence beneath
+  it saying what it does is a control named wrongly — rename it, or accept that
+  the reader will find out by pressing it, which they will. This was a standing
+  habit and it is banned: `.menu-note` is gone from the stylesheet so there is
+  nothing to reach for. What may stay is a **status** or **error** line, which
+  is the interface answering rather than lecturing, and the one line of a
+  settings row's own anatomy, which names the row rather than explaining it —
+  and which is where the reason a disabled control is disabled belongs.
 - A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `?` and Focus
   mode are all named in the ⋯ menus that already open, and `src/lib/shortcuts.ts`
   is the single list both the `?` sheet and the Settings section read.
