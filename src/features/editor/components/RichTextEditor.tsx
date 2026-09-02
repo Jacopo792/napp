@@ -720,13 +720,24 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
  * that is a mark is a different feature.
  */
 
+/** Asking for the pen again on a note that already has a drawing layer. */
+const TAKE_UP_THE_PEN = "napp:take-up-the-pen";
+
+/** Set for the one layer being created right now, and read once by the view
+ *  that mounts for it.
+ *
+ *  The pen is in hand because it was just asked for, and that is a fact about
+ *  the moment rather than about the note — which is exactly what the layer's
+ *  own mount cannot tell. A view that picked the pen up whenever it mounted
+ *  picked it up again on every return to the note, so somebody who came back
+ *  to write drew instead. It cannot be an attribute either: an attribute is
+ *  the document, and the document is the other member's too. */
+let penWanted = false;
+
 /** The ink and the nib outlive the drawing they were chosen on: picking red
  *  once should not have to be done again on the next sketch, or on the other
  *  surface. Module-level because it is a fact about the hand, not about any
  *  document — nothing here is ever written to a note. */
-/** Asking for the pen again on a note that already has a drawing layer. */
-const TAKE_UP_THE_PEN = "napp:take-up-the-pen";
-
 let lastInk: string = DRAWING_INKS[0];
 let lastNib = 5;
 
@@ -751,10 +762,16 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
   const [erasing, setErasing] = useState(false);
-  /* A page layer arrives with the pen already in hand — it was asked for from
-     a menu — and gives it back the moment the writer is done. A board is a
-     sheet: there is nothing on it to protect from the pointer. */
-  const [pen, setPen] = useState(onPage);
+  /* The pen is in hand only if this layer is the one that was just asked for.
+     Coming back to a note is coming back to read or to write it; drawing on it
+     again is a thing you ask for, from the ⋯ palette or from the pen in the
+     corner. A board has no pen state at all: it is a sheet, and there is
+     nothing on it to protect from the pointer. */
+  const [pen, setPen] = useState(() => {
+    if (!onPage || !penWanted) return false;
+    penWanted = false;
+    return true;
+  });
   useEffect(() => {
     if (!onPage) return;
     const take = () => setPen(true);
@@ -1383,10 +1400,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           return !existing;
         });
         if (existing) window.dispatchEvent(new Event(TAKE_UP_THE_PEN));
-        else
+        else {
+          /* The view for this layer has not mounted yet, so there is nothing
+             to announce it to. It reads this instead, once. */
+          penWanted = true;
           chain
             .insertContentAt(0, { type: "drawing", attrs: { strokes: "[]", surface: "page" } })
             .run();
+        }
       } else if (action === "color-clear") {
         chain.unsetColor().removeEmptyTextStyle().run();
       } else if (action.startsWith("color-")) {

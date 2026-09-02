@@ -156,6 +156,13 @@ up. The words underneath stay words.
   words, and the only way to tell which you were drawing on is to draw on it.
   Asking again dispatches `napp:take-up-the-pen`; the pen is a fact about the
   hand, so it is announced, never written to the document.
+- **The pen is down unless it was just asked for.** A view that picked it up
+  whenever it mounted picked it up again on every return to the note, so
+  somebody coming back to write drew instead. The module-level `penWanted` is
+  set by the insert and read once by the view that mounts for it — a mount
+  cannot tell the difference between being made and being come back to, and an
+  attribute could not carry it either, because an attribute is the document and
+  the document is the other member's too.
 - A board measures y against its own height; a page measures **both axes
   against the width**, so it keeps its shape in a narrower column and simply
   runs past 560. `drawingBox()` gives the export the height its lowest stroke

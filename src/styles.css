@@ -6507,9 +6507,12 @@
   pointer-events: auto;
 }
 
+/* Put away, it steps out of the column: a pill in the middle of the foot of
+   the page is a pill over the sentence somebody is reading. */
 .drawing-overlay-tools.is-put-away {
+  align-self: flex-end;
   padding: 0.25rem;
-  opacity: 0.82;
+  opacity: 0.72;
 }
 
 .drawing-overlay-tools.is-put-away:hover {
