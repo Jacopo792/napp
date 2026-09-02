@@ -618,7 +618,7 @@ it on sign-out, and that one import was the whole rope. Keep it there.
   `minmax(0, 1fr)`. The phone's Settings column ran off the side of the panel
   and took every control with it for exactly this reason.
 - **Printing is the PDF export.** Every browser prints to PDF, so the whole of
-  it is one `@media print` block deciding what is *not* the note — and giving
+  it is one `@media print` block deciding what is _not_ the note — and giving
   the scroll box back its height and overflow, or the printer is handed one
   screenful and told the rest is off-page.
 - **A dock stops at its own box.** A menu opened from a docked button is a
