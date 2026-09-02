@@ -18,16 +18,45 @@ export async function uploadObject(
   fail(result.error);
 }
 
+/**
+ * Storage is asked for these bytes the moment a note opens — which, on a page
+ * refresh, is the same moment the auth token is still being restored from
+ * session storage. A request that arrives without one is refused rather than
+ * delayed, and that refusal used to be final: the picture printed "could not
+ * be displayed" and sat there waiting for somebody to notice the small "Try
+ * again" underneath it. Every image in the note fails together, so what it
+ * looks like is a note whose pictures have gone.
+ *
+ * It is a transient failure and it is retried like one. `getSession()` between
+ * attempts is what makes each retry different from the one before rather than
+ * merely later: it resolves or refreshes the token instead of waiting for
+ * somebody else to. Three attempts, a fifth of a second apart and growing,
+ * which is under a second in the worst case and invisible in the common one.
+ *
+ * Here rather than in the image's own node view, because the note's
+ * attachments and the account's wallpaper come through the same door and are
+ * refused for exactly the same reason.
+ */
+async function downloadWithRetries(path: string, attempts = 3): Promise<Blob> {
+  let refusal: { message: string } | null = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = await supabase.storage.from(OBJECT_BUCKET).download(path);
+    if (!result.error) return result.data!;
+    refusal = result.error;
+    if (attempt === attempts) break;
+    await supabase.auth.getSession();
+    await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+  }
+  fail(refusal);
+  throw new Error("The archive did not return this file");
+}
+
 export async function downloadObject(
   session: AppSession,
   objectId: string,
   type: string,
 ): Promise<Blob> {
-  const result = await supabase.storage
-    .from(OBJECT_BUCKET)
-    .download(`${session.archiveId}/${objectId}`);
-  fail(result.error);
-  const stored = result.data!;
+  const stored = await downloadWithRetries(`${session.archiveId}/${objectId}`);
   if (stored.type && stored.type !== "application/octet-stream") return stored;
   return new Blob([await stored.arrayBuffer()], { type });
 }

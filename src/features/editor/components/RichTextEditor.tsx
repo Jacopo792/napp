@@ -630,7 +630,9 @@ function PrivateImageView({
             pen && ink.erasing ? "is-erasing" : ""
           }`}
           viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
-          preserveAspectRatio="none"
+          /* See the page layer below: a surface measured against its width
+             must never let its height stretch the ink. */
+          preserveAspectRatio="xMinYMin meet"
           onPointerDown={ink.start}
         >
           {ink.inked}
@@ -1204,7 +1206,24 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
             pen && erasing ? "is-erasing" : ""
           }`}
           viewBox={`0 0 ${box.width} ${box.height}`}
-          preserveAspectRatio="none"
+          /* **`meet`, never `none`.** A page measures both axes against its
+             width — that is the whole of the stored model — and `none` throws
+             that away: it stretches the viewBox to whatever height the element
+             happens to have, so the ink is only in the right place while the
+             measured height is exactly right.
+             It is not. The height is read by a `ResizeObserver` and the note
+             it lies over grows every time somebody presses Return, so there is
+             always a moment where a taller column is being filled by a shorter
+             viewBox — and in that moment every stroke slides down the page and
+             stretches, which is how ink drawn beside a paragraph ends up lying
+             across it.
+             `meet` scales by the smaller of the two ratios. When the measured
+             height lags behind — which is the direction it always lags, since
+             notes grow downwards — that is the width, which is the axis the
+             strokes were stored against in the first place. The ink stays
+             where it was put and keeps its shape, and the observer's answer
+             only decides how far down the surface takes a pen. */
+          preserveAspectRatio="xMinYMin meet"
           onPointerDown={start}
         >
           {inked}

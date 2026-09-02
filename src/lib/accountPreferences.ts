@@ -119,7 +119,24 @@ function holdWallpaper(objectId: string | null): void {
 
 /* ponytail: the old object is left in the bucket when a wallpaper is replaced.
    Sweep it if wallpapers ever stop being one small picture per account. */
+/* One at a time. The id that says "this picture has been shared" is only
+   written once the upload finishes, so two writes overlapping that window both
+   read a null and both upload — which is exactly what the bucket shows: the
+   same picture twice, four seconds apart. */
+let sharingWallpaper = false;
+
 async function shareWallpaper(session: AppSession): Promise<void> {
+  const appearance = currentAppearance();
+  if (!appearance.wallpaper || appearance.wallpaperObject || sharingWallpaper) return;
+  sharingWallpaper = true;
+  try {
+    await uploadWallpaper(session);
+  } finally {
+    sharingWallpaper = false;
+  }
+}
+
+async function uploadWallpaper(session: AppSession): Promise<void> {
   const appearance = currentAppearance();
   if (!appearance.wallpaper || appearance.wallpaperObject) return;
   const blob = await wallpaperBlob();
