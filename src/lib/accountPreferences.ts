@@ -39,8 +39,11 @@ import { prepareImageForNote } from "./image";
 import { loadAutoLock, saveAutoLock } from "./autoLock";
 import { currentAxes, setAxes, subscribeToAxes } from "./axes";
 import {
+  accountPreferences,
   DEFAULT_FLAGS,
+  flagsOf,
   mergeAccountPreferences,
+  type AccountFlags,
   type AccountPreferences,
 } from "./preferenceShape.ts";
 import type { AppSession } from "./session";
@@ -51,26 +54,26 @@ import {
   subscribeToWritingPreferences,
 } from "./writingPreferences";
 
-export { DEFAULT_FLAGS };
+export { DEFAULT_FLAGS, flagsOf };
 export type { AccountFlags, AccountPreferences } from "./preferenceShape.ts";
 
 /** What this browser holds right now: what a fresh account's first push
  *  writes, and what a field the row does not carry falls back to. */
-/* Written in the order `mergeAccountPreferences` builds its answer in, and
-   that is load-bearing: both sides are compared as `JSON.stringify` output,
-   which keeps insertion order — so the same values in a different order are a
-   different string, the guard never matches, and every mount writes the row it
-   has just read and re-applies its own echo. */
+/** The live stores, plus the flags the caller is holding — assembled through
+ *  the one constructor, so what is written and what was read are the same
+ *  shape as well as the same values. */
+export function preferencesWith(flags: AccountFlags): AccountPreferences {
+  return accountPreferences(currentAppearance(), currentAxes(), currentWritingPreferences(), flags);
+}
+
+/** What this browser holds right now: what a field the row does not carry
+ *  falls back to, and what a fresh account's first change writes. */
 export function localPreferences(): AccountPreferences {
-  return {
-    appearance: currentAppearance(),
-    axes: currentAxes(),
-    writing: currentWritingPreferences(),
-    presence: DEFAULT_FLAGS.presence,
-    collaborators: DEFAULT_FLAGS.collaborators,
+  return preferencesWith({
+    ...DEFAULT_FLAGS,
     proofreader: loadProofreaderPreference(),
     autoLock: loadAutoLock(),
-  };
+  });
 }
 
 /** Hand the stores their values without echoing a write back up. The setters

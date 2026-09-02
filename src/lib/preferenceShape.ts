@@ -38,6 +38,46 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autoLock: 0,
 };
 
+/**
+ * The four switches, and nothing else.
+ *
+ * Load-bearing. `AccountPreferences` extends `AccountFlags`, so handing the
+ * whole object to a `useState<AccountFlags>` type-checks and quietly carries
+ * the appearance, the axes and the palette along inside it — and the push
+ * spreads that state *last*, over a fresh reading of the live stores. The
+ * effect is that changing a colour writes back the colour from the last pull:
+ * the account never hears about a palette anybody chose. Take the four.
+ */
+export function flagsOf(preferences: AccountFlags): AccountFlags {
+  return {
+    presence: preferences.presence,
+    collaborators: preferences.collaborators,
+    proofreader: preferences.proofreader,
+    autoLock: preferences.autoLock,
+  };
+}
+
+/**
+ * The one place the shape is assembled, and therefore the one place its key
+ * order is decided.
+ *
+ * Order is not cosmetic here: both sides of the write guard are compared as
+ * `JSON.stringify` output, which keeps insertion order, so the same values
+ * assembled in a different order are a different string — the guard never
+ * matches, every mount rewrites the row it has just read, and each browser
+ * re-applies the echo of its own write. Assembling both the merge and the
+ * local reading through this function is what makes that impossible rather
+ * than merely unlikely.
+ */
+export function accountPreferences(
+  appearance: Appearance,
+  axes: Axes,
+  writing: WritingPreferences,
+  flags: AccountFlags,
+): AccountPreferences {
+  return { appearance, axes, writing, ...flagsOf(flags) };
+}
+
 function isAutoLock(value: unknown): value is AutoLockMinutes {
   return (AUTO_LOCK_CHOICES as readonly number[]).includes(value as number);
 }
@@ -58,17 +98,20 @@ export function mergeAccountPreferences(
 ): AccountPreferences {
   const row = (stored ?? {}) as Partial<AccountPreferences>;
   const writing = row.writing as Partial<WritingPreferences> | undefined;
-  return {
-    appearance: { ...DEFAULT_APPEARANCE, ...local.appearance, ...(row.appearance ?? {}) },
-    axes: { ...DEFAULT_AXES, ...local.axes, ...(row.axes ?? {}) },
-    writing: {
+  return accountPreferences(
+    { ...DEFAULT_APPEARANCE, ...local.appearance, ...(row.appearance ?? {}) },
+    { ...DEFAULT_AXES, ...local.axes, ...(row.axes ?? {}) },
+    {
       presencePalette: PRESENCE_PALETTES.some((palette) => palette.id === writing?.presencePalette)
         ? writing!.presencePalette!
         : local.writing.presencePalette,
     },
-    presence: typeof row.presence === "boolean" ? row.presence : local.presence,
-    collaborators: typeof row.collaborators === "boolean" ? row.collaborators : local.collaborators,
-    proofreader: typeof row.proofreader === "boolean" ? row.proofreader : local.proofreader,
-    autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
-  };
+    {
+      presence: typeof row.presence === "boolean" ? row.presence : local.presence,
+      collaborators:
+        typeof row.collaborators === "boolean" ? row.collaborators : local.collaborators,
+      proofreader: typeof row.proofreader === "boolean" ? row.proofreader : local.proofreader,
+      autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
+    },
+  );
 }

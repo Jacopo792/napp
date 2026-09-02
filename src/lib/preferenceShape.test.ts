@@ -2,17 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_APPEARANCE } from "./appearance.ts";
 import { DEFAULT_AXES } from "./axes.ts";
-import { DEFAULT_FLAGS, mergeAccountPreferences } from "./preferenceShape.ts";
+import {
+  accountPreferences,
+  DEFAULT_FLAGS,
+  flagsOf,
+  mergeAccountPreferences,
+} from "./preferenceShape.ts";
 import { DEFAULT_WRITING_PREFERENCES } from "./writingPreferences.ts";
 
-const local = {
-  ...DEFAULT_FLAGS,
-  appearance: { ...DEFAULT_APPEARANCE, accent: "#aabbcc" },
-  axes: { ...DEFAULT_AXES, size: 21 },
-  writing: { ...DEFAULT_WRITING_PREFERENCES, presencePalette: "mint" as const },
-  proofreader: false,
-  autoLock: 15 as const,
-};
+/* Assembled the way the app assembles it, through the one constructor. */
+const local = accountPreferences(
+  { ...DEFAULT_APPEARANCE, accent: "#aabbcc" },
+  { ...DEFAULT_AXES, size: 21 },
+  { ...DEFAULT_WRITING_PREFERENCES, presencePalette: "mint" as const },
+  { ...DEFAULT_FLAGS, proofreader: false, autoLock: 15 as const },
+);
 
 test("an empty row leaves this browser exactly as it was", () => {
   const merged = mergeAccountPreferences({}, local);
@@ -55,4 +59,28 @@ test("nonsense in the column is refused, not adopted", () => {
 
 test("a null column is the same as an empty one", () => {
   assert.deepEqual(mergeAccountPreferences(null, local), mergeAccountPreferences({}, local));
+});
+
+test("the four flags come away without the appearance riding along", () => {
+  /* The whole point: what the component holds is spread over a fresh reading
+     of the live stores when the row is written. If the appearance travels
+     inside it, choosing a colour pushes the colour from the previous pull. */
+  const flags = flagsOf(mergeAccountPreferences({ presence: true }, local));
+  assert.deepEqual(Object.keys(flags).sort(), [
+    "autoLock",
+    "collaborators",
+    "presence",
+    "proofreader",
+  ]);
+  assert.equal(flags.presence, true);
+  assert.equal(flags.autoLock, 15);
+});
+
+test("a browser's own values survive being merged and pushed back unchanged", () => {
+  /* Both sides of the write guard are compared as `JSON.stringify` output,
+     which keeps insertion order — so the same values in a different order are
+     a different string and every mount rewrites the row it just read. */
+  const pulled = mergeAccountPreferences({}, local);
+  const pushed = accountPreferences(local.appearance, local.axes, local.writing, flagsOf(pulled));
+  assert.equal(JSON.stringify(pushed), JSON.stringify(pulled));
 });

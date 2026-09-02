@@ -69,7 +69,9 @@ import {
 import { subscribeToPresence, unsubscribeFromPresence } from "@/lib/presence";
 import {
   DEFAULT_FLAGS,
+  flagsOf,
   localPreferences,
+  preferencesWith,
   pullAccountPreferences,
   pushAccountPreferences,
   subscribeToAccountPreferences,
@@ -599,11 +601,11 @@ function NotesPage() {
       .catch(() => localPreferences())
       .then((preferences) => {
         if (!live) return;
-        setFlags(preferences);
+        setFlags(flagsOf(preferences));
         setPreferencesReady(true);
       });
     const channel = subscribeToAccountPreferences(session, (preferences) => {
-      if (live) setFlags(preferences);
+      if (live) setFlags(flagsOf(preferences));
     });
     return () => {
       live = false;
@@ -618,7 +620,7 @@ function NotesPage() {
      about to read. */
   useEffect(() => {
     if (!session || !preferencesReady) return;
-    const push = () => pushAccountPreferences(session, { ...localPreferences(), ...flags });
+    const push = () => pushAccountPreferences(session, preferencesWith(flags));
     push();
     return watchLocalStores(push);
   }, [session, preferencesReady, flags]);
