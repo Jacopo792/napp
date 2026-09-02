@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
+import logoUrl from "../../docs/branding/logo-n-botanical.png";
 
 export const Route = createFileRoute("/")({ component: Login });
 
@@ -318,7 +319,10 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
       </div>
 
       <main className="login-main">
-        <div className="login-card">{children}</div>
+        <div className="login-card">
+          <img className="login-brand" src={logoUrl} alt="Notes" width={96} height={96} />
+          {children}
+        </div>
       </main>
     </div>
   );
