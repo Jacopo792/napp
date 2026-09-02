@@ -12,11 +12,19 @@ Everyone holding a row in `archive_members`. The archive is built for two —
 `archives.seat_limit` defaults to `2` and the database refuses the row past it —
 and the column accepts `1`–`8`, so a larger group is a value change rather than
 a rewrite. Each member has a separate Supabase email/password account and a
-confirmed address; membership carries a role, `editor` or `viewer`. Every member can read every note and list in the archive
-and use the `viewAs` switch; only editors can write notes, folders, tags,
-archive settings and `note-images` objects, create invitations, or change
-another member's role. The account is the only access boundary; there is no
-separate archive key or passphrase. The last editor cannot be demoted.
+confirmed address. Every member reads and writes every note and list in the
+archive and uses the `viewAs` switch. `archive_members.role` still exists and
+still defaults to `editor`, and `set_archive_member_role()` still works, but the
+interface no longer offers the choice: in an archive built for two writers the
+only honest answer to which of them is the reader was neither. The account is
+the only access boundary; there is no separate archive key or passphrase.
+
+What one member takes back from another is narrower than the archive.
+`notes.locked_by` names the single account that may write a note, enforced by
+`notes_editor_update` and read again by the collaboration server. A **passage**
+is held by a mark in the note's own Yjs document and cannot be a policy at all,
+so the collaboration server holds it: it remembers what every foreign lock
+covered before an update and restores it if the update changed it.
 
 `owner_id` names the member a note, folder or tag belongs to. It is an
 organisational label and never an authorization boundary: RLS checks membership
@@ -93,9 +101,8 @@ role, a personal-archive bootstrap and multi-archive chooser, per-member nicknam
 and private avatars cached as object URLs, and opt-in live presence that is
 visible only while broadcasting on a private Realtime channel (`private: true`,
 `realtime.messages` extension `presence` restricted to members of
-`presence:<archiveId>`). A viewer reads everything but writes nothing in the
-archive — including Storage and the invitation / role RPCs — while a personal
-avatar remains writable only by its owner. Appearance supports system, light and
+`presence:<archiveId>`). A personal avatar remains writable only by its owner,
+and a note or passage its holder has locked is read-only to everybody else. Appearance supports system, light and
 dark modes, curated palettes, custom colours and an optional device-local
 background image. Opening a note is read-only state selection: it must never
 update `updatedAt` or trigger a database write. Typing and then restoring a
@@ -146,9 +153,11 @@ Technical constraints that outlive any design:
   live unclaimed invitations before issuing. Settings closes the form on the same
   arithmetic as a courtesy, not as the boundary.
 - RLS authorizes every archive row through `archive_members`; `owner` is never a
-  security boundary. Members may select; only editors may insert, update or
-  delete `archives`, `notes`, `folders`, `tags`, `note_tags` and `note-images`
-  objects via `private.can_write_archive(archive_id)` — direct writes to
+  security boundary. Members may select, insert, update and delete `archives`,
+  `notes`, `folders`, `tags`, `note_tags` and `note-images` objects via
+  `private.can_write_archive(archive_id)`, and `notes` additionally through
+  `private.note_lock_open(locked_by)`, which keeps a locked note to its holder
+  and stops anybody locking one in somebody else's name — direct writes to
   `archive_members` are revoked entirely and go through `create_archive_invite`
   / `claim_archive_invite` / `set_archive_member_role`. Storage policies derive
   the archive id from the object path and apply the same membership check; the

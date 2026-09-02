@@ -121,13 +121,21 @@ Each person signs in with a separate account. Membership in `archive_members` is
 access boundary: being a Supabase user by itself does not grant access to somebody
 else's archive.
 
-New users receive a personal archive on first sign-in. To share an existing archive,
-an editor creates a one-time invitation from **Settings → Members**. Invitations expire
+New users receive a personal archive on first sign-in. To share an existing archive, a
+member creates a one-time invitation from **Settings → Members**. Invitations expire
 after seven days and can only be claimed by the invited address.
 
-Members can read the archive. Editors can also change notes, folders, files, roles and
-invitations. `owner_id` only decides where a note appears in the interface; it is not a
-security boundary.
+A member reads and writes the whole archive; there is no lesser kind, and the interface
+asks for no role when it invites somebody. `owner_id` only decides where a note appears
+in the interface; it is not a security boundary.
+
+What one member can take back from another is a note, or a passage of one. **Only I may
+write this** in a note's ⋯ menu sets `notes.locked_by`, and `notes_editor_update`
+refuses the row to everybody else — the lock, the trash stamp and the words alike. A
+passage locked from the selection toolbar is held by the collaboration server instead,
+which is the only place that can hold it: the mark lives inside a document both members
+are entitled to write, and anything written under somebody else's lock is put back
+before it reaches them.
 
 The seat limit is a database rule. `archives.seat_limit` defaults to `2` (`1`–`8`
 allowed) and a `before insert` trigger on `archive_members`,

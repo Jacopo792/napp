@@ -78,8 +78,20 @@ document, not the connection: `onAuthenticate`, `onTokenSync` and
 authorize that note with the caller's Supabase token, and the check is repeated
 while the connection stays open. Sharing a socket therefore grants nothing —
 a second note on an open connection is authorized exactly as the first was.
-Membership, editor role, Trash state and archived-note visibility remain
-Supabase decisions. Awareness identity is overwritten by the server, so a
+Membership, Trash state, archived-note visibility and `notes.locked_by` remain
+Supabase decisions, read through the caller's own token.
+
+A **passage** lock is the one boundary here that Postgres cannot hold, and it is
+worth being exact about what it is worth. The mark lives inside a Yjs document
+both members are entitled to write, so no policy will ever see it; the
+collaboration server holds it instead, by remembering what every foreign lock
+covered before an update and restoring it afterwards if it changed. What that
+buys: a client cannot make a change to somebody else's locked passage stick —
+it reaches neither the holder's tab nor Postgres. What it does not buy: nothing
+is encrypted, both members already read every word of the note, and a member who
+runs their own client can still see the passage and still know it is locked. It
+is a boundary against writing, not against reading, and it ends where the
+collaboration server's authority ends. Awareness identity is overwritten by the server, so a
 browser cannot choose another member's name or id. `note_documents` has RLS
 enabled and grants no browser policy: only the service role persists its binary.
 Redis/Valkey distributes updates between instances and is not durable storage.

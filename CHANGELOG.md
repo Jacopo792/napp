@@ -77,9 +77,54 @@ changes. The commit history remains the detailed engineering record.
   The presence payload gained `noteId` and a `typing` flag; the channel, its
   RLS and its mutuality are unchanged, so nothing renders unless both sides
   have presence on.
+- **Taking a note back.** **Only I may write this**, in the ⋯ menu a note's
+  other actions live in and on its row in the list, sets `notes.locked_by` — the
+  one account that may write the note. It is a database rule, not a disabled
+  button: `notes_editor_update` refuses the other member the row, the trash
+  stamp and the lock itself, and the collaboration server asks the same question
+  of the live document, which the service role writes and row level security
+  therefore never sees. Remarks are deliberately outside it, because a remark
+  about a passage is the use of locking one. Requires migration
+  `20260902020000_note_write_lock`.
+- **Taking a passage back.** The lock in the selection toolbar holds a sentence
+  rather than a note. It is a mark in the note's own Yjs document, so it moves
+  with the words the way a comment anchor does — and, living inside a document
+  both members may write, it is the one boundary here no policy can hold. The
+  collaboration server holds it: it remembers what every foreign lock covered
+  before an update and puts it back if the update changed it, so a write under
+  somebody else's lock reaches neither their tab nor Postgres. A passage
+  somebody else holds is tinted and refuses the caret. What this is and is not
+  worth is recorded in `SECURITY.md`.
+- **A drawing in the note.** A sheet you draw on by hand, from the palette menu
+  or `/drawing`, with six inks, undo and clear. The strokes are the block's own
+  attribute — no upload, no Storage object, nothing that can be missing when the
+  note is read — so a drawing travels with the document the way a paragraph
+  does, and leaves in an exported file as inline SVG that renders in the vault
+  it lands in.
+- **Remarks.** A place in the sidebar, above Archive, holding the notes with a
+  conversation nobody has resolved; a note leaves it the moment its last thread
+  is dealt with, and opening one from there opens its conversation with it. The
+  badge counts what the other member has said, in an open thread, since this
+  browser last looked — a timestamp in `localStorage`, because it is a fact
+  about a device looking rather than about the archive, so a new device starts
+  with everything unread.
 
 ### Removed
 
+- **The viewer role, from the interface.** An archive built for two writers has
+  no honest answer to which of them is the reader, and the choice was offered at
+  every invitation and on every roster row. It is gone from Settings, everybody
+  who joins joins able to write, and every member the archive already held was
+  promoted to `editor` by the migration. `archive_members.role`, its policies
+  and `set_archive_member_role()` all still stand in Postgres, so an archive
+  that ever wants a reader can still have one; the interface simply stops
+  asking. What one member takes back from another is now a note or a passage.
+- **Fourteen paragraphs of helper prose.** Explanations under menus, cards and
+  settings sections, saying what the control above them already said — and
+  ageing worse than it: three were still describing the viewer role. Status and
+  error lines stay, being the interface answering rather than lecturing, and the
+  reason a disabled control is disabled moved into the naming line the settings
+  row already has.
 - **The page icon.** An emoji or line symbol above the title said less about a
   note than a picture of it does, and the picker was a grid nobody returned to.
   The photograph above replaces it. Icons already chosen stop being displayed;
