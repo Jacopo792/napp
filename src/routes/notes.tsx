@@ -243,6 +243,15 @@ function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
+  /* True only while the navigation is actually opening or closing.
+     The slide has to be a state and not a property of the pane, because the
+     pane's width is *also* driven by `PaneResizer` — which writes a new width
+     on every `pointermove`. A transition sitting permanently on that width
+     made dragging a divider lag a quarter of a second behind the pointer and
+     arrive on an easing curve, which is the one thing a drag handle must never
+     do. Raised beside every change to `navigationOpen`, lowered by the pane's
+     own `transitionend`. */
+  const [navigationSliding, setNavigationSliding] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(() => {
     try {
       return localStorage.getItem("napp:navigation") !== "closed";
@@ -1179,17 +1188,33 @@ function NotesPage() {
      rail's own open state is remembered across the trip, because whether you
      had it open is a different question from whether you are focusing. */
   const restoreNavigation = useRef(true);
+  const changeNavigation = useCallback((next: boolean | ((current: boolean) => boolean)) => {
+    setNavigationSliding(true);
+    setNavigationOpen(next);
+  }, []);
+
+  /* The backstop under `transitionend`. A pane in a background tab never runs
+     its transition, so the event that lowers this flag never arrives — and a
+     flag left raised puts the lag back on the resize handle, which is the
+     whole thing this state exists to prevent. Longer than the slide, so it
+     never cuts one short. */
+  useEffect(() => {
+    if (!navigationSliding) return;
+    const timer = window.setTimeout(() => setNavigationSliding(false), 700);
+    return () => window.clearTimeout(timer);
+  }, [navigationSliding]);
+
   const toggleFocus = useCallback(() => {
     setFocusMode((current) => {
       if (current) {
-        setNavigationOpen(restoreNavigation.current);
+        changeNavigation(restoreNavigation.current);
         return false;
       }
       restoreNavigation.current = navigationOpen;
-      setNavigationOpen(false);
+      changeNavigation(false);
       return true;
     });
-  }, [navigationOpen]);
+  }, [navigationOpen, changeNavigation]);
 
   useEffect(
     () => () => {
@@ -1908,7 +1933,7 @@ function NotesPage() {
       }
       if (mod && e.key === "\\") {
         e.preventDefault();
-        setNavigationOpen((current) => !current);
+        changeNavigation((current) => !current);
         return;
       }
       if (typing) return;
@@ -1956,6 +1981,7 @@ function NotesPage() {
     canEdit,
     focusMode,
     toggleFocus,
+    changeNavigation,
   ]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
@@ -2671,7 +2697,7 @@ function NotesPage() {
       onCreateFolder={handleCreateFolder}
       onRenameFolder={handleRenameFolder}
       onDeleteFolder={handleDeleteFolder}
-      onClose={() => (compact ? setFoldersOpen(false) : setNavigationOpen(false))}
+      onClose={() => (compact ? setFoldersOpen(false) : changeNavigation(false))}
       onSettings={() => {
         setFoldersOpen(false);
         setSettingsOpen(true);
@@ -3025,10 +3051,15 @@ function NotesPage() {
               cut; opening, the track is off to the left of the window and the
               window clips it for us. */}
           <div
-            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
+            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"} ${
+              navigationSliding ? "is-sliding" : ""
+            }`}
             style={{ width: navigationOpen ? sidebarWidth + listWidth + 20 : 0 }}
             aria-hidden={!navigationOpen}
             inert={!navigationOpen}
+            onTransitionEnd={(event) => {
+              if (event.propertyName === "width") setNavigationSliding(false);
+            }}
           >
             <div
               className="pane-slide-track flex h-full min-h-0"
@@ -3135,7 +3166,7 @@ function NotesPage() {
                   <>
                     <button
                       type="button"
-                      onClick={() => setNavigationOpen(true)}
+                      onClick={() => changeNavigation(true)}
                       aria-label="Show the notes list"
                       className="toolbar-button press"
                     >

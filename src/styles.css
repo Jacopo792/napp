@@ -1641,12 +1641,30 @@
   min-width: 0;
   min-height: 0;
   flex: 0 0 auto;
-  transition: width var(--dur-base) var(--ease);
 }
 
 .pane-slide-track {
   flex: 0 0 auto;
-  transition: transform var(--dur-base) var(--ease);
+}
+
+/* **Only while it is actually moving**, and never otherwise. This same width
+   is written by `PaneResizer` on every `pointermove`, so a transition living
+   permanently on it made dragging a divider lag a quarter-second behind the
+   pointer and land on an easing curve — a drag handle that argues with the
+   hand holding it. `notes.tsx` raises this class beside every change to
+   `navigationOpen` and drops it on the pane's own `transitionend`.
+
+   Slower than `--dur-base`, because this is most of the width of the window
+   rather than a button: the same curve over a longer distance needs longer to
+   read as gliding rather than as snapping. */
+.pane-slide.is-sliding {
+  transition: width var(--dur-slow) var(--ease);
+  will-change: width;
+}
+
+.pane-slide.is-sliding > .pane-slide-track {
+  transition: transform var(--dur-slow) var(--ease);
+  will-change: transform;
 }
 
 /* Only while it is away — see the note at the call site: the sidebar's own
@@ -1661,8 +1679,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pane-slide,
-  .pane-slide-track {
+  .pane-slide.is-sliding,
+  .pane-slide.is-sliding > .pane-slide-track {
     transition: none;
   }
 }
