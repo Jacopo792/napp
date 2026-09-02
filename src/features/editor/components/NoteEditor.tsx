@@ -3,6 +3,8 @@ import {
   ChevronUp,
   Image as ImageIcon,
   Link2,
+  Lock,
+  LockOpen,
   ListTree,
   MessageSquare,
   Search,
@@ -21,6 +23,7 @@ import {
 import { BotanicalFlower, FLOWER_HEAD_BOX } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import type { NoteEntry } from "@/lib/entries";
+import type { NoteLock } from "@/lib/types";
 import { formatStamp } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
@@ -47,6 +50,12 @@ interface Props {
   /** Raised when the draft store carries text pulled from the other device. */
   syncRevision: number;
   canEdit: boolean;
+  /** Who has taken this note back, and whether it was you.
+   *
+   *  `holderName` empty means nobody has: the note is the archive's, the way
+   *  every note is by default. Absent altogether means locking is not on offer
+   *  here at all — Trash, the preview, a reader who may not write. */
+  lock?: NoteLock;
   /** Whether this browser offers the on-device proofreader at all. */
   proofreaderEnabled: boolean;
   viewingAsPartner: boolean;
@@ -143,6 +152,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     entry,
     syncRevision,
     canEdit,
+    lock,
     proofreaderEnabled,
     viewingAsPartner,
     partnerName,
@@ -594,13 +604,29 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
           {!mobile && (
-            <span className="label truncate text-ink-4">{canEdit ? "Editing" : "Read only"}</span>
+            <span className="label truncate text-ink-4">
+              {canEdit
+                ? "Editing"
+                : lock?.holderName
+                  ? `Locked by ${lock.holderName}`
+                  : "Read only"}
+            </span>
           )}
           {/* Setting a cover is something you do to the page, so it belongs
               with the page's own controls rather than standing in the reading
               column above the title — where it was the one thing in that column
               that was not the note. It appears only while there is no cover;
               once there is one, the cover carries its own Change and Remove. */}
+          {/* Locking is a thing you do to this note, so it lives where the
+              note's other controls do — and it is offered only to somebody
+              who could lift it again: while the other member holds it there
+              is nothing here to press, only the readout above saying so. */}
+          {lock && (lock.mine || !lock.holderName) && (
+            <button type="button" className="note-add-property" onClick={lock.onToggle}>
+              {lock.mine ? <LockOpen size={15} /> : <Lock size={15} />}
+              {lock.mine ? "Unlock" : "Lock"}
+            </button>
+          )}
           {canEdit && !entry.note.cover && (
             <button
               type="button"

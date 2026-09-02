@@ -28,6 +28,7 @@ import {
   FolderInput,
   ImagePlus,
   Lock,
+  LockOpen,
   Monitor,
   MoreHorizontal,
   Moon,
@@ -66,7 +67,7 @@ import {
   useAppearance,
   type ThemeMode,
 } from "@/lib/appearance";
-import type { Folder } from "@/lib/types";
+import type { Folder, NoteLock } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
@@ -237,6 +238,7 @@ export function CollectionMenu({
    editor toolbar, and from a right-click on the page. One list, two doors. */
 function NoteMenuContent({
   pinned,
+  lock,
   folders,
   recent,
   onTogglePin,
@@ -252,6 +254,8 @@ function NoteMenuContent({
   close,
 }: {
   pinned: boolean;
+  /** Absent where locking is not on offer: Trash, the preview, a reader. */
+  lock?: NoteLock;
   folders: Folder[];
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
@@ -287,6 +291,21 @@ function NoteMenuContent({
             <Pin size={16} />
             {pinned ? "Unpin note" : "Pin note"}
           </MenuButton>
+          {lock &&
+            (lock.mine || !lock.holderName ? (
+              <MenuButton
+                active={lock.mine}
+                onClick={() => {
+                  lock.onToggle();
+                  close();
+                }}
+              >
+                {lock.mine ? <LockOpen size={16} /> : <Lock size={16} />}
+                {lock.mine ? "Let them write again" : "Only I may write this"}
+              </MenuButton>
+            ) : (
+              <p className="menu-label">Locked by {lock.holderName}</p>
+            ))}
           <MenuButton
             onClick={() => {
               onFind();
@@ -415,6 +434,8 @@ function NoteMenuContent({
 
 export function NoteMenu(props: {
   pinned: boolean;
+  /** Absent where locking is not on offer: Trash, the preview, a reader. */
+  lock?: NoteLock;
   folders: Folder[];
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
@@ -463,6 +484,8 @@ export function NoteContextMenu({
   point: MenuPoint;
   onClose: () => void;
   pinned: boolean;
+  /** Absent where locking is not on offer: Trash, the preview, a reader. */
+  lock?: NoteLock;
   folders: Folder[];
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
@@ -720,7 +743,6 @@ export function SettingsPanel({
   onAvatarRemove,
   onCreateInvite,
   onRevokeInvite,
-  onMemberRoleChange,
   onLeaveArchive,
   onPresenceEnabledChange,
   onProofreaderEnabledChange,
@@ -745,12 +767,11 @@ export function SettingsPanel({
     userId: string;
     nickname: string;
     isSelf: boolean;
-    role: "editor" | "viewer";
   }[];
   /** How many members the archive holds room for. Two, by design. */
   seatLimit: number;
   /** Invitations nobody has claimed yet; each one is holding a seat. */
-  invites: { id: string; email: string; role: "editor" | "viewer"; expiresAt: string }[];
+  invites: { id: string; email: string; expiresAt: string }[];
   canManageMembers: boolean;
   presenceEnabled: boolean;
   proofreaderEnabled: boolean;
@@ -760,9 +781,8 @@ export function SettingsPanel({
   onNicknameSave: (nickname: string) => void;
   onAvatarPick: (file: File, crop: AvatarCrop) => void;
   onAvatarRemove: () => void;
-  onCreateInvite: (email: string, role: "editor" | "viewer") => Promise<string>;
+  onCreateInvite: (email: string) => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
-  onMemberRoleChange: (userId: string, role: "editor" | "viewer") => Promise<void>;
   onLeaveArchive: () => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
@@ -779,15 +799,12 @@ export function SettingsPanel({
   const [section, setSection] = useState<SettingsSection>("profile");
   const [nickname, setNickname] = useState(profile.nickname);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("editor");
   const [inviteLink, setInviteLink] = useState("");
   const [inviteStatus, setInviteStatus] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   /** The file waits here while its square is chosen; nothing is uploaded until
    *  the cropper is confirmed. */
   const [cropping, setCropping] = useState<File | null>(null);
-  const [memberBusy, setMemberBusy] = useState("");
-  const [memberStatus, setMemberStatus] = useState("");
   const [leaveConfirm, setLeaveConfirm] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveStatus, setLeaveStatus] = useState("");
@@ -853,8 +870,6 @@ export function SettingsPanel({
       setInviteEmail("");
       setInviteLink("");
       setInviteStatus("");
-      setInviteRole("editor");
-      setMemberStatus("");
       setLeaveConfirm(false);
       setLeaveBusy(false);
       setLeaveStatus("");
@@ -880,7 +895,7 @@ export function SettingsPanel({
     setInviteBusy(true);
     setInviteStatus("");
     try {
-      setInviteLink(await onCreateInvite(target, inviteRole));
+      setInviteLink(await onCreateInvite(target));
       setInviteStatus("Invitation ready. Copy the link or send it by email.");
     } catch (reason) {
       setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
@@ -908,19 +923,6 @@ export function SettingsPanel({
      write is refused rather than after. */
   const seatsTaken = members.length + invites.length;
   const seatsFull = seatsTaken >= seatLimit;
-
-  async function changeMemberRole(userId: string, role: "editor" | "viewer") {
-    setMemberBusy(userId);
-    setMemberStatus("");
-    try {
-      await onMemberRoleChange(userId, role);
-      setMemberStatus("Role updated.");
-    } catch (reason) {
-      setMemberStatus(reason instanceof Error ? reason.message : "Role change failed");
-    } finally {
-      setMemberBusy("");
-    }
-  }
 
   async function leaveArchive() {
     if (!leaveConfirm) {
@@ -1624,32 +1626,14 @@ export function SettingsPanel({
                     <div key={member.userId}>
                       <span>
                         <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
-                        <small>
-                          {member.role === "editor" ? "Can read and write" : "Can read"}
-                        </small>
+                        <small>Can read and write every note</small>
                       </span>
-                      <select
-                        aria-label={`Role for ${member.isSelf ? "you" : member.nickname || "member"}`}
-                        value={member.role}
-                        disabled={!canManageMembers || Boolean(memberBusy)}
-                        onChange={(event) =>
-                          void changeMemberRole(
-                            member.userId,
-                            event.target.value as "editor" | "viewer",
-                          )
-                        }
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
                     </div>
                   ))}
                 </div>
-                {memberStatus && (
-                  <p className="profile-note" role="status">
-                    {memberStatus}
-                  </p>
-                )}
+                {/* Sharing the archive is the decision; there is no reader
+                    role to pick afterwards. What one member takes back from
+                    another is a note or a passage, from the note itself. */}
 
                 {invites.length > 0 && (
                   <>
@@ -1659,9 +1643,7 @@ export function SettingsPanel({
                         <div key={invite.id}>
                           <span>
                             <b>{invite.email}</b>
-                            <small>
-                              Joins as {invite.role} · {expiresIn(invite.expiresAt)}
-                            </small>
+                            <small>{expiresIn(invite.expiresAt)}</small>
                           </span>
                           {canManageMembers && (
                             <button
@@ -1707,22 +1689,6 @@ export function SettingsPanel({
                   </dl>
                 ) : (
                   <>
-                    <div className="invite-role" role="group" aria-label="Invitation role">
-                      <button
-                        type="button"
-                        aria-pressed={inviteRole === "editor"}
-                        onClick={() => setInviteRole("editor")}
-                      >
-                        Editor
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={inviteRole === "viewer"}
-                        onClick={() => setInviteRole("viewer")}
-                      >
-                        Viewer
-                      </button>
-                    </div>
                     <div className="invite-form">
                       <label>
                         <span>Email address</span>

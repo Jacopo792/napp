@@ -28,7 +28,6 @@ export {
   leaveArchive,
   revokeArchiveInvite,
   saveProfile,
-  setArchiveMemberRole,
   uploadAvatar,
   uploadImage,
   uploadObject,
@@ -44,6 +43,7 @@ interface NoteRow {
   updated_at: string;
   trashed_at: string | null;
   archived_at: string | null;
+  locked_by: string | null;
   pinned: boolean;
   folder_id: string | null;
   version: number;
@@ -102,7 +102,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase
       .from("notes")
       .select(
-        "id, owner_id, created_at, updated_at, trashed_at, archived_at, pinned, folder_id, version, content_version, page_icon, cover",
+        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, folder_id, version, content_version, page_icon, cover",
       )
       .eq("archive_id", archiveId),
     supabase
@@ -284,6 +284,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       pinned: row.pinned || undefined,
       trashedAt: row.trashed_at ?? undefined,
       archivedAt: row.archived_at ?? undefined,
+      lockedBy: row.locked_by ?? undefined,
     });
   }
 
@@ -337,6 +338,7 @@ export async function createNote(
       updated_at: note.updatedAt,
       trashed_at: metadata.trashedAt ?? null,
       archived_at: metadata.archivedAt ?? null,
+      locked_by: metadata.lockedBy ?? null,
       pinned: metadata.pinned ?? false,
       folder_id: metadata.folderId,
     })
@@ -540,7 +542,8 @@ export async function persistMetaDiff(
       previous.folderId !== metadata.folderId ||
       previous.pinned !== metadata.pinned ||
       previous.trashedAt !== metadata.trashedAt ||
-      previous.archivedAt !== metadata.archivedAt
+      previous.archivedAt !== metadata.archivedAt ||
+      previous.lockedBy !== metadata.lockedBy
     );
   });
   await all([
@@ -554,6 +557,7 @@ export async function persistMetaDiff(
           pinned: metadata.pinned ?? false,
           trashed_at: metadata.trashedAt ?? null,
           archived_at: metadata.archivedAt ?? null,
+          locked_by: metadata.lockedBy ?? null,
         })
         .eq("archive_id", archiveId)
         .eq("id", metadata.id),

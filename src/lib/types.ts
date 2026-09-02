@@ -66,6 +66,24 @@ export interface NoteMeta {
    * the owner's `profiles.hide_archived`, not here.
    */
   archivedAt?: string;
+  /**
+   * The one account that may write this note while it is set. Unlike
+   * `ownerId`, which is a label saying whose scope a note sits in, this is a
+   * permission and Postgres reads it as one: `notes_editor_update` refuses the
+   * row to everybody else. Undefined is the ordinary state — the archive is
+   * shared, and every member writes every note.
+   */
+  lockedBy?: string;
+}
+
+/** What the interface needs to say about a note's lock: who holds it, whether
+ *  that is you, and how to change it. Absent wherever locking is not on offer
+ *  — Trash, the preview, a reader. */
+export interface NoteLock {
+  /** Empty while nobody holds it. */
+  holderName: string;
+  mine: boolean;
+  onToggle: () => void;
 }
 
 export interface Meta {

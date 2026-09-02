@@ -3664,27 +3664,6 @@
   gap: 8px;
 }
 
-.invite-role {
-  display: inline-flex;
-  margin-bottom: 8px;
-  border: 1px solid var(--rule);
-  border-radius: 0.65rem;
-  padding: 2px;
-  background: var(--surface);
-}
-
-.invite-role button {
-  border-radius: 0.5rem;
-  padding: 6px 12px;
-  color: var(--ink-3);
-  font-size: 12.5px;
-}
-
-.invite-role button[aria-pressed="true"] {
-  background: var(--accent-wash);
-  color: var(--accent-strong);
-}
-
 .member-role-list {
   display: grid;
   gap: 1px;

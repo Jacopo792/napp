@@ -48,7 +48,6 @@ import {
   saveNote,
   updateNoteProperties,
   saveProfile,
-  setArchiveMemberRole,
   uploadAvatar,
   uploadImage,
   uploadObject,
@@ -72,7 +71,7 @@ import {
   saveProofreaderPreference,
 } from "@/features/editor/lib/proofread";
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
-import { type Meta, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
+import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
@@ -658,6 +657,22 @@ function NotesPage() {
     [activeMeta],
   );
 
+  const selfId = session?.userId ?? null;
+
+  /* Who has taken a note back, keyed by note. A lock is metadata on the row
+     like the trash stamp beside it, and it is read from the same place — but
+     unlike `owner_id` it is a permission, and `notes_editor_update` refuses
+     the row to everybody it does not name. */
+  const lockHolders = useMemo(
+    () =>
+      new Map(
+        activeMeta.notes
+          .filter((note) => note.lockedBy)
+          .map((note) => [note.id, note.lockedBy as string]),
+      ),
+    [activeMeta],
+  );
+
   // ── The visible slice: folder → search, newest first ────────────────────
   const visible = useMemo(() => {
     const meta = activeMeta;
@@ -718,7 +733,12 @@ function NotesPage() {
      decides nothing: what is drawn is a note in `entries`, and `entries` is
      the catalogue Postgres returned under row level security a moment ago, so
      somebody who has lost access is handed no row to draw. */
-  const canEdit = selected ? selectedFolderId !== TRASH && canWriteArchive : false;
+  const lockHolder = selected ? (lockHolders.get(selected.note.id) ?? null) : null;
+  const canEdit = selected
+    ? selectedFolderId !== TRASH &&
+      canWriteArchive &&
+      (lockHolder === null || lockHolder === selfId)
+    : false;
 
   const folderLabel =
     selectedFolderId === ALL
@@ -1159,7 +1179,29 @@ function NotesPage() {
       if (!canWriteArchive) return;
       const pending = pendingMetaRef.current.get(viewAs);
       const base = pending?.after ?? metasRef.current[viewAs] ?? activeMeta ?? EMPTY_META;
-      const m = typeof next === "function" ? (next as (prev: Meta) => Meta)(base) : next;
+      const proposed = typeof next === "function" ? (next as (prev: Meta) => Meta)(base) : next;
+      /* A note somebody else has locked keeps the metadata it had. Every
+         per-note change in this page — pinning, filing, trashing, shelving —
+         is one call to this function, so the lock is honoured once here
+         rather than in each of them. Postgres refuses the write either way;
+         what this saves is a list that shows a move the archive rejected. */
+      const held = new Map(
+        base.notes
+          .filter((note) => note.lockedBy && note.lockedBy !== selfId)
+          .map((note) => [note.id, note]),
+      );
+      const m: Meta =
+        held.size === 0
+          ? proposed
+          : {
+              ...proposed,
+              notes: [
+                ...proposed.notes.map((note) => held.get(note.id) ?? note),
+                ...[...held.values()].filter(
+                  (note) => !proposed.notes.some((kept) => kept.id === note.id),
+                ),
+              ],
+            };
       pendingMetaRef.current.set(viewAs, {
         before: pending?.before ?? base,
         after: m,
@@ -1167,7 +1209,7 @@ function NotesPage() {
       setActiveMeta(m);
       schedule();
     },
-    [viewAs, activeMeta, setActiveMeta, schedule, canWriteArchive],
+    [viewAs, activeMeta, setActiveMeta, schedule, canWriteArchive, selfId],
   );
 
   const handleTogglePin = useCallback(
@@ -1183,6 +1225,57 @@ function NotesPage() {
       });
     },
     [handleMetaChange],
+  );
+
+  /* Locking names one account on the row; unlocking clears it. Nobody can do
+     either on somebody else's lock — `handleMetaChange` above puts the row
+     back, and `notes_editor_update` refuses it regardless. */
+  const handleToggleLock = useCallback(
+    (noteId: string) => {
+      handleMetaChange((prev) => {
+        const existing = indexOf(prev).byNote.get(noteId);
+        const lockedBy = existing?.lockedBy === selfId ? undefined : (selfId ?? undefined);
+        const notes: NoteMeta[] = existing
+          ? prev.notes.map((note) => (note.id === noteId ? { ...note, lockedBy } : note))
+          : [...prev.notes, { id: noteId, folderId: null, lockedBy }];
+        return { ...prev, notes };
+      });
+    },
+    [handleMetaChange, selfId],
+  );
+
+  /* What the menus and the editor header say about one note's lock. Trash is
+     left out because a note on its way out is already nobody's to write, and
+     a second answer to that question would only be a second thing to keep
+     agreeing with the first. */
+  /* The pane beside holds a different note, so it gets a different answer.
+     It used to be handed the selected note's, which was harmless while the
+     only thing that answer knew was the archive — and stops being harmless
+     the moment one note can be locked and the one beside it not. */
+  const splitCanEdit = useCallback(
+    (noteId: string) => {
+      const holder = lockHolders.get(noteId) ?? null;
+      return (
+        canWriteArchive && selectedFolderId !== TRASH && (holder === null || holder === selfId)
+      );
+    },
+    [canWriteArchive, selectedFolderId, lockHolders, selfId],
+  );
+
+  const lockFor = useCallback(
+    (noteId: string): NoteLock | undefined => {
+      if (!canWriteArchive || selectedFolderId === TRASH) return undefined;
+      const holder = lockHolders.get(noteId) ?? null;
+      const mine = holder !== null && holder === selfId;
+      return {
+        holderName: holder
+          ? (members.find((member) => member.userId === holder)?.nickname ?? "the other member")
+          : "",
+        mine,
+        onToggle: () => handleToggleLock(noteId),
+      };
+    },
+    [canWriteArchive, selectedFolderId, lockHolders, selfId, members, handleToggleLock],
   );
 
   // ── Create / delete ─────────────────────────────────────────────────────
@@ -2356,8 +2449,8 @@ function NotesPage() {
       onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
       onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
       onAvatarRemove={() => void handleAvatarRemove()}
-      onCreateInvite={async (email, role) => {
-        const token = await createArchiveInvite(session, email, role);
+      onCreateInvite={async (email) => {
+        const token = await createArchiveInvite(session, email);
         const link = new URL(import.meta.env.BASE_URL, window.location.origin);
         link.searchParams.set("invite", token);
         await refreshInvites();
@@ -2366,10 +2459,6 @@ function NotesPage() {
       onRevokeInvite={async (inviteId) => {
         await revokeArchiveInvite(inviteId);
         await refreshInvites();
-      }}
-      onMemberRoleChange={async (userId, role) => {
-        await setArchiveMemberRole(session, userId, role);
-        await refreshRemote();
       }}
       onLeaveArchive={handleLeaveArchive}
       onPresenceEnabledChange={handlePresenceChange}
@@ -2409,6 +2498,7 @@ function NotesPage() {
       </button>
       {canWriteArchive && (
         <NoteMenu
+          lock={lockFor(selected.note.id)}
           pinned={pinned}
           folders={activeMeta.folders}
           recent={recentNotes}
@@ -2435,6 +2525,7 @@ function NotesPage() {
   const editorMenu =
     selected && editorMenuPoint && canWriteArchive ? (
       <NoteContextMenu
+        lock={lockFor(selected.note.id)}
         point={editorMenuPoint}
         onClose={() => setEditorMenuPoint(null)}
         pinned={pinned}
@@ -2526,6 +2617,7 @@ function NotesPage() {
                   onArchiveChange={handleArchiveChange}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  lockOf={lockFor}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -2546,6 +2638,7 @@ function NotesPage() {
                     entry={selected}
                     syncRevision={syncRevision}
                     canEdit={canEdit}
+                    lock={selected ? lockFor(selected.note.id) : undefined}
                     proofreaderEnabled={proofreaderEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
@@ -2660,6 +2753,7 @@ function NotesPage() {
                   onArchiveChange={handleArchiveChange}
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
+                  lockOf={lockFor}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -2692,6 +2786,7 @@ function NotesPage() {
               entry={selected}
               syncRevision={syncRevision}
               canEdit={canEdit}
+              lock={selected ? lockFor(selected.note.id) : undefined}
               proofreaderEnabled={proofreaderEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
@@ -2762,7 +2857,8 @@ function NotesPage() {
                   key={`split:${splitEntry.note.id}`}
                   entry={splitEntry}
                   syncRevision={syncRevision}
-                  canEdit={canEdit}
+                  canEdit={splitCanEdit(splitEntry.note.id)}
+                  lock={lockFor(splitEntry.note.id)}
                   proofreaderEnabled={proofreaderEnabled}
                   viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}

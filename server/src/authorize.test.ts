@@ -3,7 +3,12 @@ import test from "node:test";
 import type { NoteRow } from "./access.ts";
 import { createAuthorizer, unverifiedSubject, type Lookup } from "./authorize.ts";
 
-const NOTE: NoteRow = { id: "note", archive_id: "archive", trashed_at: null };
+const NOTE: NoteRow = {
+  id: "note",
+  archive_id: "archive",
+  trashed_at: null,
+  locked_by: null,
+};
 
 function archive(initial: { role: string | null; note?: NoteRow | null }) {
   const state = { role: initial.role, note: initial.note === undefined ? NOTE : initial.note };

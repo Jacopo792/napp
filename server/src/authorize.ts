@@ -72,7 +72,7 @@ export function createAuthorizer(
       if (!found) {
         answer = { allowed: false, reason: "Sign in again" };
       } else {
-        const access = decideAccess(found.note, found.role);
+        const access = decideAccess(found.note, found.role, found.userId);
         answer = access.allowed
           ? {
               allowed: true,
@@ -140,7 +140,11 @@ export function supabaseLookup(asCaller: (token: string) => SupabaseClient): Loo
 
     const [identity, note, claimedProfile] = await Promise.all([
       caller.auth.getUser(token),
-      caller.from("notes").select("id, archive_id, trashed_at").eq("id", noteId).maybeSingle(),
+      caller
+        .from("notes")
+        .select("id, archive_id, trashed_at, locked_by")
+        .eq("id", noteId)
+        .maybeSingle(),
       claimed
         ? caller.from("profiles").select("nickname").eq("user_id", claimed).maybeSingle()
         : Promise.resolve({ data: null, error: null }),

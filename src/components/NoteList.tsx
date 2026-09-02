@@ -17,6 +17,8 @@ import {
   Image as ImageIcon,
   ImageOff,
   ListChecks,
+  Lock,
+  LockOpen,
   Paperclip,
   Pin,
   RotateCcw,
@@ -27,7 +29,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { Meta } from "@/lib/types";
+import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
@@ -76,6 +78,8 @@ interface Props {
   onArchiveChange: (entry: NoteEntry, archived: boolean) => void;
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (noteId: string) => void;
+  /** Absent where locking is not on offer. */
+  lockOf?: (noteId: string) => NoteLock | undefined;
   onMoveToFolder: (noteId: string, folderId: string | null) => void;
   /** A picture for the note itself. A null file takes the current one off. */
   onSetPhoto: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
@@ -385,6 +389,7 @@ export function NoteList({
   onArchiveChange,
   onDeleteForever,
   onTogglePin,
+  lockOf,
   onMoveToFolder,
   onSetPhoto,
   resolveImage,
@@ -571,6 +576,27 @@ export function NoteList({
               <Pin size={16} />
               {menuPinned ? "Unpin note" : "Pin note"}
             </MenuButton>
+            {(() => {
+              /* Taking the note back from the other member, from the row it
+                 is named on. A lock they hold is a line rather than a button:
+                 lifting it is theirs to do, here and in Postgres. */
+              const lock = lockOf?.(menuEntry.note.id);
+              if (!lock) return null;
+              return lock.mine || !lock.holderName ? (
+                <MenuButton
+                  active={lock.mine}
+                  onClick={() => {
+                    lock.onToggle();
+                    closeRowMenu();
+                  }}
+                >
+                  {lock.mine ? <LockOpen size={16} /> : <Lock size={16} />}
+                  {lock.mine ? "Let them write again" : "Only I may write this"}
+                </MenuButton>
+              ) : (
+                <p className="menu-label">Locked by {lock.holderName}</p>
+              );
+            })()}
             <MenuButton
               onClick={() => {
                 photoNoteRef.current = menuEntry.note.id;

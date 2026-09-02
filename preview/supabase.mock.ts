@@ -35,7 +35,6 @@ export interface ArchiveSnapshot {
 export interface PendingInvite {
   id: string;
   email: string;
-  role: "editor" | "viewer";
   expiresAt: string;
 }
 
@@ -254,18 +253,13 @@ export async function deleteAvatar(_session: AppSession, objectId: string): Prom
 
 let invites: PendingInvite[] = [];
 
-export async function createArchiveInvite(
-  _session: AppSession,
-  email: string,
-  role: "editor" | "viewer",
-): Promise<string> {
+export async function createArchiveInvite(_session: AppSession, email: string): Promise<string> {
   await sleep(180);
   invites = [
     ...invites.filter((invite) => invite.email !== email),
     {
       id: `preview-invite-${invites.length + 1}`,
       email,
-      role,
       expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     },
   ];
@@ -280,16 +274,6 @@ export async function loadPendingInvites(_session: AppSession): Promise<PendingI
 export async function revokeArchiveInvite(inviteId: string): Promise<void> {
   await sleep(120);
   invites = invites.filter((invite) => invite.id !== inviteId);
-}
-
-export async function setArchiveMemberRole(
-  _session: AppSession,
-  userId: string,
-  role: "editor" | "viewer",
-): Promise<void> {
-  await sleep(160);
-  const member = MEMBERS.find((item) => item.userId === userId);
-  if (member) member.role = role;
 }
 
 /** The fixture archive is the only one there is, so leaving it is a no-op that
