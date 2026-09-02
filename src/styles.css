@@ -649,15 +649,6 @@
   pointer-events: none;
 }
 
-/* It does not draw itself in. This surface is arrived at every time a note is
-   closed, and a drawing that restages on every Esc is a drawing you end up
-   watching instead of a ground you write on. */
-.botanical-plate.is-empty-page .stem,
-.botanical-plate.is-empty-page .sprig {
-  animation: none;
-  stroke-dashoffset: 0;
-}
-
 /* The invitation is the command, so it is set in the display face and lit by
    the pointer rather than fenced in a pill. */
 .editor-empty-invite {
@@ -1170,9 +1161,15 @@
   pointer-events: none;
 }
 
+/* The whole plant and not a crop of its head. A box that stops just under the
+   flower cuts the stem mid-line and leaves a leaf hanging in the air, which
+   reads as a drawing that failed to finish rather than as a plate — and the
+   heads sit at four different heights, so one crop could never hold all four
+   anyway. At this height the full plate is a plant, not the stick it was at
+   150. */
 .botanical-plate.note-tailpiece-plate {
   position: static;
-  height: 118px;
+  height: 190px;
   opacity: 0.14;
 }
 
@@ -1191,7 +1188,7 @@
   }
 
   .botanical-plate.note-tailpiece-plate {
-    height: 84px;
+    height: 138px;
   }
 }
 

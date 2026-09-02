@@ -18,7 +18,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { BotanicalFlower, FLOWER_HEAD_BOX } from "@/components/BotanicalFlowers";
+import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import type { NoteEntry } from "@/lib/entries";
 import type { NoteLock } from "@/lib/types";
@@ -141,7 +141,6 @@ function NoteTailpiece({ noteId }: { noteId: string }) {
     <div className="note-tailpiece" aria-hidden="true">
       <BotanicalFlower
         flower={flowerFor(noteId)}
-        viewBox={FLOWER_HEAD_BOX}
         className={`note-tailpiece-plate ${drawing ? "" : "is-drawn"}`}
       />
     </div>
@@ -570,6 +569,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             nothing else to say. Behind the line and never over it, and turning
             with the day rather than with the note, so a page arrived at twice
             in a minute is the same page.
+
+            It draws itself in every time, exactly as it does on the door —
+            unlike the tailpiece, which is a mark at the end of something you
+            were reading and would restage under your eyes. Here there is
+            nothing to read, so the drawing is what there is to watch.
 
             The line is the command. A coloured button in the middle of an
             empty page reads as a form; a line reads as an invitation. */}

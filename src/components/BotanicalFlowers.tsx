@@ -28,11 +28,6 @@ import type { PlateFlower } from "@/lib/botanical";
 /** Every flower is drawn in this box, so one class can size all four. */
 const BOX = "0 0 200 420";
 
-/** Just the head, with a hand of stem under it. The full plate is a tall
- *  column and reads as one at 116vh; asked to be 150px in the corner of a note
- *  it is mostly stem, which is a stick. All four heads fit inside this crop. */
-export const FLOWER_HEAD_BOX = "22 26 156 150";
-
 const order = (i: number) => ({ "--i": i }) as CSSProperties;
 
 /** A rank of petals around one point: same shape, same veins, fanned. The
@@ -410,18 +405,15 @@ const FLOWERS: Record<PlateFlower, () => React.JSX.Element> = {
 export function BotanicalFlower({
   flower,
   className = "",
-  viewBox = BOX,
 }: {
   flower: PlateFlower;
   className?: string;
-  /** `FLOWER_HEAD_BOX` to show the head alone. */
-  viewBox?: string;
 }) {
   const Drawing = FLOWERS[flower];
   return (
     <svg
       className={`botanical-plate ${className}`}
-      viewBox={viewBox}
+      viewBox={BOX}
       fill="none"
       aria-hidden="true"
       focusable="false"
