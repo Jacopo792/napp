@@ -505,25 +505,79 @@ Three traps, all found by the covers being unusable rather than by reading:
    writes only the properties that changed, so a shorthand rewritten for a new
    picture resets the position the drag had set. Longhands only.
 
-## Presence
+## Presence, and the two questions it is not one of
 
-Off by default and mutual: the client joins `presence:<archiveId>` with
-`config.private = true` only while broadcasting its own
-`{ userId, onlineAt, noteId, typing }`, so there is no listen-only mode.
+**Being in the archive and being in the note are different questions and they
+are asked of different things.** They were once asked of one channel, and every
+bug in this area came out of that.
 
-`noteId` and `typing` are what the note header reads to show who else is on
-this page. `typing` is a **flag the writer raises and lowers**, not a
-timestamp: a timestamp would need a clock, an expiry and a re-render tick in
-every reader to notice it lapse, for something the writer already knows.
-`markTyping()` in `notes.tsx` announces once when a burst starts and once
-`TYPING_IDLE_MS` after it ends — two packets per burst, not one per keystroke.
-Changing note re-announces with `typing: false`, so a raised flag can never be
-left behind on a page nobody is on.
+The **archive** question is `presence.ts`: the client joins
+`presence:<archiveId>` with `config.private = true` only while broadcasting its
+own `{ userId, onlineAt }`, so there is no listen-only mode. It is off by
+default and it draws exactly one thing — the ring on a face in the scope
+switch. Nothing else may depend on it.
+
+The **note** question is Yjs awareness, in `collab.ts`. A peer in
+`useCollaborationPeers` is connected to this note's document by construction,
+so there is no note filter to get wrong and no second source to be out of step
+with. Awareness identity is now published **unconditionally**: gating it on the
+archive-wide preference made a member vanish from the note she was typing into,
+and because the gate was on the sender the other member could do nothing about
+it from where she was sitting.
+
+`typing` moved into awareness for the same reason. It is still a **flag the
+writer raises and lowers**, not a timestamp — a timestamp needs a clock, an
+expiry and a re-render tick in every reader to notice it lapse, for something
+the writer already knows — but it now travels beside the identity it describes,
+so a reader who can see the face can always see the flag. `markTyping()` in
+`notes.tsx` announces once when a burst starts and once `TYPING_IDLE_MS` after
+it ends; changing note lowers it first, so it is never left raised on a page
+nobody is on.
+
+What a reader is *shown* is `flags.collaborators` — "Collaborators in notes",
+the second switch in Privacy. It is one reader's own answer about their own
+screen and it gates the pill and the caret extension, never the broadcast. Do
+not re-gate the broadcast; that is the bug this arrangement exists to end.
+
 `20260829250000_private_archive_presence.sql` restricts `realtime.messages` for
 `extension = 'presence'` to members of the archive derived from
 `realtime.topic()` via `private.presence_archive_id()` — `SELECT` to receive,
 `INSERT` to publish. Postgres Changes subscriptions stay public channels
 filtered by table RLS; `private_only` is not on globally, so they are undisturbed.
+
+## Preferences belong to the account
+
+`profiles.preferences` is one jsonb column, and `accountPreferences.ts` is the
+only thing that reads or writes it. Appearance, the reading axes, the presence
+palette and the four Privacy/Security switches all used to live in
+localStorage alone, so two browsers signed into the same account disagreed
+about every one of them — silently, which is what made it worth fixing: nothing
+looked broken, the copies simply drifted.
+
+Three moves and no more: **pull on sign-in** (the row wins, localStorage stays
+as a cache so the first paint is not a round trip), **push on change**
+(debounced, the whole blob — a per-field merge is a conflict resolver nobody
+asked for), and **follow the row** (`profiles` is already published to
+Realtime, and our own echo is recognised by its payload rather than by a flag,
+which is what stops a loop).
+
+The wallpaper is the one preference with bytes. The row carries only
+`appearance.wallpaperObject`; the picture goes into `note-images`, the same
+private per-archive bucket a photograph pasted into a note lands in, so nothing
+new is granted. IndexedDB stays the device's copy and `napp:wallpaper-object`
+says which shared picture that copy is. `setWallpaper()` clears the object id,
+which is how the push path knows there are bytes the account has not been given.
+
+`mergeAccountPreferences` in `preferenceShape.ts` is deliberately in a file of
+its own: `accountPreferences.ts` reaches the Supabase client, and a module that
+reaches the Supabase client cannot be imported by
+`node --experimental-strip-types`. The pure half is the half worth a test, and
+the middle term is the subtlety — a field the row does not carry keeps the
+**local** value, never the default, or signing in on the browser you have used
+for a year would undo a year of choices on the strength of an empty column.
+
+What stays local, deliberately: pane widths, collapsed groups, expanded folders
+and the per-note remarks-seen stamps. Those are facts about a device looking.
 
 ## Migrations
 

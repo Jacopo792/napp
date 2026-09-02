@@ -67,7 +67,7 @@ export function MemberPresenceCard({
         title={typing ? `${name} is writing` : `${name} has this note open`}
         onClick={() => setOpen((current) => !current)}
       >
-        <Avatar url={avatarUrl} name={name} email="" compact online />
+        <Avatar url={avatarUrl} name={name} email="" compact />
         {typing && <i className="note-reader-caret" aria-hidden="true" />}
       </button>
 
@@ -78,7 +78,7 @@ export function MemberPresenceCard({
           aria-label={`${name} profile`}
         >
           <span className="member-presence-heading">
-            <Avatar url={avatarUrl} name={name} email="" large online />
+            <Avatar url={avatarUrl} name={name} email="" large />
             <span>
               <strong>{name}</strong>
               <small className="is-active">

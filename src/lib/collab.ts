@@ -44,6 +44,9 @@ export interface Peer {
    *  this browser first saw them, which is what it always used to be and is
    *  wrong by however long they were already here. */
   joinedAt: string;
+  /** Writing at this moment. Read from awareness — the same source as the face
+   *  beside it, so the two can never disagree about whether she is here. */
+  typing: boolean;
 }
 
 export interface CollaborativeNote {
@@ -95,7 +98,6 @@ function sharedSocket(): HocuspocusProviderWebsocket {
 export function useCollaborativeNote(
   noteId: string | null,
   identity: CollaborationIdentity | null,
-  publishPresence = false,
 ): CollaborativeNote {
   const [state, setState] = useState<CollaborativeNote>(CLOSED);
   const userId = identity?.userId ?? null;
@@ -168,22 +170,24 @@ export function useCollaborativeNote(
   const provider = state.provider;
   useEffect(() => {
     const awareness = provider?.awareness;
-    if (!awareness) return;
+    if (!awareness || !userId) return;
     /* The local caret only. What other people see is written by the server in
        `beforeHandleAwareness`, from the identity it read for itself — nothing a
-       browser sends about who it is, is believed. */
-    if (publishPresence && userId) {
-      awareness.setLocalStateField("user", {
-        userId,
-        name: name || "Someone",
-        color: collaborationColor(userId),
-      });
-    } else {
-      /* Presence is mutual. Do not leave a listen-only local awareness state
-         that Tiptap can serialise as a cursor after the preference is off. */
-      awareness.setLocalState(null);
-    }
-  }, [provider, publishPresence, userId, name]);
+       browser sends about who it is, is believed.
+
+       Unconditional, and that is the fix rather than an oversight. This used to
+       be gated on the archive-wide "live presence" preference, so a member who
+       had that off vanished from the note she was typing into — and because the
+       gate was on the *sender*, the other member had no way to bring her back.
+       Being on a note you are both entitled to write is not a disclosure; the
+       preference now decides what you *draw*, in `notes.tsx`, which is a
+       question each reader can answer for themselves. */
+    awareness.setLocalStateField("user", {
+      userId,
+      name: name || "Someone",
+      color: collaborationColor(userId),
+    });
+  }, [provider, userId, name]);
 
   return state;
 }
@@ -218,6 +222,7 @@ export function useCollaborationPeers(
           name: user.name || "Someone",
           color: user.color || collaborationColor(user.userId),
           joinedAt: user.since ?? peerJoinedAt.get(user.userId)!,
+          typing: (state as { typing?: unknown }).typing === true,
         });
       }
       for (const userId of peerJoinedAt.keys()) {
@@ -234,4 +239,15 @@ export function useCollaborationPeers(
   }, [provider, selfId]);
 
   return peers;
+}
+
+/** Raise and lower the writing flag on the note's own document.
+ *
+ *  A flag, not a timestamp: a timestamp needs a clock, an expiry and a
+ *  re-render tick in every reader to notice it lapse, for something the writer
+ *  already knows. Awareness carries it beside the identity, so a reader who can
+ *  see the face can always see the flag — which was not true while the two came
+ *  from different channels. */
+export function announceTyping(provider: HocuspocusProvider | null, typing: boolean): void {
+  provider?.awareness?.setLocalStateField("typing", typing);
 }

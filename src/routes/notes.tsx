@@ -66,18 +66,17 @@ import {
   type RemarksSeen,
   type ArchiveComment,
 } from "@/lib/comments";
+import { subscribeToPresence, unsubscribeFromPresence } from "@/lib/presence";
 import {
-  loadPresencePreference,
-  publishPresence,
-  savePresencePreference,
-  subscribeToPresence,
-  unsubscribeFromPresence,
-  type PresenceMember,
-} from "@/lib/presence";
-import {
-  loadProofreaderPreference,
-  saveProofreaderPreference,
-} from "@/features/editor/lib/proofread";
+  DEFAULT_FLAGS,
+  localPreferences,
+  pullAccountPreferences,
+  pushAccountPreferences,
+  subscribeToAccountPreferences,
+  unsubscribeFromAccountPreferences,
+  watchLocalStores,
+  type AccountFlags,
+} from "@/lib/accountPreferences";
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
@@ -118,8 +117,8 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact } from "@/lib/media";
-import { useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
-import { loadAutoLock, saveAutoLock, useAutoLock, type AutoLockMinutes } from "@/lib/autoLock";
+import { announceTyping, useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
+import { useAutoLock } from "@/lib/autoLock";
 import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
 /* Lazily, and only once it is opened. Settings is one panel behind one button
    that nobody presses on the way to a note, and it was riding in the same
@@ -285,13 +284,15 @@ function NotesPage() {
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string | null>>({});
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
-  const [presenceEnabled, setPresenceEnabled] = useState(false);
-  const [proofreaderEnabled, setProofreaderEnabled] = useState(loadProofreaderPreference);
+  /* The four switches that are the account's rather than this browser's, held
+     together because they travel together: they are pulled from the profile
+     row on sign-in, pushed back when any of them moves, and re-applied when
+     the other browser moves one. `writingPreferences`, the appearance and the
+     axes ride along in `accountPreferences.ts`, which watches their stores. */
+  const [flags, setFlags] = useState<AccountFlags>(DEFAULT_FLAGS);
   const writingPreferences = useWritingPreferences();
-  const [presenceReady, setPresenceReady] = useState(false);
-  const [presentMembers, setPresentMembers] = useState<Map<string, PresenceMember>>(
-    () => new Map(),
-  );
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const typingOffRef = useRef<number | undefined>(undefined);
   const typingRef = useRef(false);
@@ -303,7 +304,8 @@ function NotesPage() {
   const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
   const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
-  const [autoLock, setAutoLock] = useState<AutoLockMinutes>(loadAutoLock);
+  const autoLock = flags.autoLock;
+  const proofreaderEnabled = flags.proofreader;
 
   /* Uploaded this session, so the tab that just attached a file knows its type
      without a round trip. Anything else opens as the PDF it almost always is. */
@@ -325,12 +327,12 @@ function NotesPage() {
         : null,
     [session, profile.nickname],
   );
-  const collaborative = useCollaborativeNote(selectedId, collaborationIdentity, presenceEnabled);
-  /* The second document never publishes presence. Presence carries one
-     `noteId`, so two publishing editors would spend the session arguing about
-     which note you are on — and the answer the other reader wants is the one
-     your caret is in, which is the primary. */
-  const splitCollaborative = useCollaborativeNote(splitId, collaborationIdentity, false);
+  const collaborative = useCollaborativeNote(selectedId, collaborationIdentity);
+  /* Awareness is per document, so the second note announces you on the second
+     note and nowhere else. It used to be told not to announce at all, back when
+     presence was one archive-wide channel carrying a single `noteId` that two
+     open editors would have spent the session arguing over. */
+  const splitCollaborative = useCollaborativeNote(splitId, collaborationIdentity);
   /* Who is on this note, asked of the note's own document rather than of a
      second channel that has to be told which note that is. A peer in this
      list is connected to this note by construction. */
@@ -585,58 +587,86 @@ function NotesPage() {
     return () => void unsubscribeFromArchive(channel);
   }, [session, refreshRemote]);
 
+  /* The account's preferences, in three moves: read the row over whatever this
+     browser had, follow the row while another browser is open on it, and push
+     whatever moves here back up. `pullAccountPreferences` applies the
+     appearance, the axes and the writing palette itself — they live in stores
+     of their own — and hands back the four flags this component holds. */
   useEffect(() => {
     if (!session) return;
-    setPresenceEnabled(loadPresencePreference(session));
-    setPresenceReady(true);
-    return () => setPresenceReady(false);
+    let live = true;
+    void pullAccountPreferences(session)
+      .catch(() => localPreferences())
+      .then((preferences) => {
+        if (!live) return;
+        setFlags(preferences);
+        setPreferencesReady(true);
+      });
+    const channel = subscribeToAccountPreferences(session, (preferences) => {
+      if (live) setFlags(preferences);
+    });
+    return () => {
+      live = false;
+      setPreferencesReady(false);
+      void unsubscribeFromAccountPreferences(channel);
+    };
   }, [session]);
 
+  /* Anything that moves — a slider dragged in Settings, a switch here — is one
+     debounced write of the whole blob. Held back until the pull has landed, or
+     the first render would push this browser's stale copy over the row it is
+     about to read. */
   useEffect(() => {
-    if (!session || !presenceReady || !presenceEnabled) {
-      setPresentMembers(new Map());
+    if (!session || !preferencesReady) return;
+    const push = () => pushAccountPreferences(session, { ...localPreferences(), ...flags });
+    push();
+    return watchLocalStores(push);
+  }, [session, preferencesReady, flags]);
+
+  useEffect(() => {
+    if (!session || !preferencesReady || !flags.presence) {
+      setOnlineMemberIds(new Set());
       return;
     }
-    const channel = subscribeToPresence(session, setPresentMembers);
+    const channel = subscribeToPresence(session, setOnlineMemberIds);
     presenceChannelRef.current = channel;
     return () => {
       presenceChannelRef.current = null;
-      window.clearTimeout(typingOffRef.current);
-      typingRef.current = false;
       void unsubscribeFromPresence(channel);
     };
-  }, [session, presenceReady, presenceEnabled]);
+  }, [session, preferencesReady, flags.presence]);
 
-  const onlineMemberIds = useMemo(() => new Set(presentMembers.keys()), [presentMembers]);
-
-  /* Opening a note is an announcement; closing one is the same announcement
-     with a null. Typing stops when you do, so leaving a note cancels the flag
-     rather than leaving it raised on a page nobody is on. */
+  /* Writing is a fact about the note, so it is announced on the note's own
+     document rather than on the archive's presence channel — the same place
+     the face beside the title comes from, which is what stops the two
+     disagreeing. Changing note lowers the flag first, so it can never be left
+     raised on a page nobody is on. */
+  const typingProvider = collaborative.provider;
   useEffect(() => {
-    const channel = presenceChannelRef.current;
-    if (!channel || !session) return;
     window.clearTimeout(typingOffRef.current);
     typingRef.current = false;
-    publishPresence(channel, session, { noteId: selectedId, typing: false });
-  }, [selectedId, session, presenceEnabled]);
+    return () => {
+      window.clearTimeout(typingOffRef.current);
+      typingRef.current = false;
+      announceTyping(typingProvider, false);
+    };
+  }, [typingProvider]);
 
   /* One announcement when the burst starts and one when it ends, rather than a
      packet per keystroke. TYPING_IDLE_MS is how long a pause has to be before
      the other person is told you stopped. */
   const markTyping = useCallback(() => {
-    const channel = presenceChannelRef.current;
-    if (!channel || !session) return;
+    if (!typingProvider) return;
     window.clearTimeout(typingOffRef.current);
     if (!typingRef.current) {
       typingRef.current = true;
-      publishPresence(channel, session, { noteId: selectedIdRef.current, typing: true });
+      announceTyping(typingProvider, true);
     }
     typingOffRef.current = window.setTimeout(() => {
       typingRef.current = false;
-      const live = presenceChannelRef.current;
-      if (live) publishPresence(live, session, { noteId: selectedIdRef.current, typing: false });
+      announceTyping(typingProvider, false);
     }, TYPING_IDLE_MS);
-  }, [session]);
+  }, [typingProvider]);
 
   /** The owner's whole catalogue, unfiltered — what the rail and the scope
    *  strip count against. Memoised so their counts are not recomputed for an
@@ -2089,20 +2119,12 @@ function NotesPage() {
     if (removed) invalidateAvatarUrl(removed);
   }
 
-  function handleAutoLockChange(minutes: AutoLockMinutes) {
-    setAutoLock(minutes);
-    saveAutoLock(minutes);
-  }
-
-  function handlePresenceChange(enabled: boolean) {
-    if (!session) return;
-    savePresencePreference(session, enabled);
-    setPresenceEnabled(enabled);
-  }
-
-  function handleProofreaderChange(enabled: boolean) {
-    saveProofreaderPreference(enabled);
-    setProofreaderEnabled(enabled);
+  /* One setter for all four, because they are one row. The local mirrors
+     (`saveAutoLock`, `saveProofreaderPreference`) are still written, by the
+     push effect above, so a browser opened offline still opens to what you
+     chose here. */
+  function changeFlags(patch: Partial<AccountFlags>) {
+    setFlags((current) => ({ ...current, ...patch }));
   }
 
   function handleLock() {
@@ -2130,13 +2152,19 @@ function NotesPage() {
     navigate({ to: "/" });
   }, [drain, navigate]);
 
-  /* Who else is on this page right now. Filtered to the note that is open, so
-     the other person appears when they arrive and goes when they leave — the
-     roster in Settings answers "who is online", and this answers the narrower
-     question you actually have while writing. Nothing renders while presence
-     is off, on either side: the channel is mutual and so is this. */
+  /* Who else is on this page right now, asked of the note's own document: a
+     peer in this list is connected to it by construction, so there is no note
+     filter to get wrong and no second channel to be out of step with.
+     The roster in Settings answers "who is online"; this answers the narrower
+     question you actually have while writing.
+
+     The only switch over it is `flags.collaborators`, which is what *this*
+     reader chose to be shown. It used to be gated on the archive-wide presence
+     preference instead, on the sending side — so a member with that off was
+     invisible in the note she was typing into and neither of you could do
+     anything about it from where you were sitting. */
   const noteReaders = useMemo(() => {
-    if (!presenceEnabled || !selectedId || notePeers.length === 0) return null;
+    if (!flags.collaborators || !selectedId || notePeers.length === 0) return null;
     return (
       <span className="note-readers" aria-live="polite">
         {notePeers.map((peer) => {
@@ -2146,14 +2174,13 @@ function NotesPage() {
              appears, under the name the server stamped. */
           const member = members.find((candidate) => candidate.userId === peer.userId);
           const name = member?.nickname || peer.name;
-          const typing = presentMembers.get(peer.userId)?.typing === true;
           const palette = presencePaletteFor(writingPreferences.presencePalette);
           return (
             <MemberPresenceCard
               key={peer.userId}
               avatarUrl={avatarUrls[peer.userId] ?? null}
               name={name}
-              typing={typing}
+              typing={peer.typing}
               noteJoinedAt={peer.joinedAt}
               archiveJoinedAt={member?.joinedAt}
               role={member?.role}
@@ -2164,15 +2191,7 @@ function NotesPage() {
         })}
       </span>
     );
-  }, [
-    presenceEnabled,
-    selectedId,
-    notePeers,
-    members,
-    presentMembers,
-    avatarUrls,
-    writingPreferences,
-  ]);
+  }, [flags.collaborators, selectedId, notePeers, members, avatarUrls, writingPreferences]);
 
   /* Who may sign a remark: the archive's own roster, with the avatars already
      resolved for the sidebar. Comments name people, and a comment from "an id"
@@ -2570,7 +2589,7 @@ function NotesPage() {
             name={member.nickname}
             email=""
             compact
-            online={presenceEnabled && onlineMemberIds.has(member.userId)}
+            online={flags.presence && onlineMemberIds.has(member.userId)}
           />
           <span className="truncate">
             {member.isSelf ? (compact ? "Mine" : "My notes") : member.nickname || "Member"}
@@ -2605,7 +2624,7 @@ function NotesPage() {
       selfAvatarUrl={avatarUrls[session.userId] ?? null}
       selfName={selfMember?.nickname || profile.nickname}
       selfEmail={session.email}
-      selfOnline={presenceEnabled && onlineMemberIds.has(session.userId)}
+      selfOnline={flags.presence && onlineMemberIds.has(session.userId)}
       archiveSwitch={archiveSwitch}
     />
   );
@@ -2653,7 +2672,8 @@ function NotesPage() {
         seatLimit={seatLimit}
         invites={invites}
         canManageMembers={canWriteArchive}
-        presenceEnabled={presenceEnabled}
+        presenceEnabled={flags.presence}
+        collaboratorsVisible={flags.collaborators}
         profileBusy={profileBusy}
         profileError={profileError}
         onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
@@ -2671,15 +2691,16 @@ function NotesPage() {
           await refreshInvites();
         }}
         onLeaveArchive={handleLeaveArchive}
-        onPresenceEnabledChange={handlePresenceChange}
+        onPresenceEnabledChange={(presence) => changeFlags({ presence })}
+        onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
         proofreaderEnabled={proofreaderEnabled}
         writingPreferences={writingPreferences}
-        onProofreaderEnabledChange={handleProofreaderChange}
+        onProofreaderEnabledChange={(proofreader) => changeFlags({ proofreader })}
         onWritingPreferencesChange={setWritingPreferences}
         /* Straight through the one profile writer: this is a column on the row,
          and Postgres reads it back to decide what the other member may fetch. */
         onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
-        onAutoLockChange={handleAutoLockChange}
+        onAutoLockChange={(autoLock) => changeFlags({ autoLock })}
         onClose={() => setSettingsOpen(false)}
         onLock={handleLock}
       />
@@ -2869,7 +2890,7 @@ function NotesPage() {
                       (collaborative.ready || collaborative.cached) && collaborative.doc
                         ? {
                             document: collaborative.doc,
-                            provider: presenceEnabled ? collaborative.provider : null,
+                            provider: flags.collaborators ? collaborative.provider : null,
                           }
                         : null
                     }
@@ -3018,7 +3039,7 @@ function NotesPage() {
                 (collaborative.ready || collaborative.cached) && collaborative.doc
                   ? {
                       document: collaborative.doc,
-                      provider: presenceEnabled ? collaborative.provider : null,
+                      provider: flags.collaborators ? collaborative.provider : null,
                     }
                   : null
               }

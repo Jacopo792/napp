@@ -42,6 +42,7 @@ import {
   Undo2,
   UserRound,
   UserPlus,
+  MousePointer2,
   Users,
   X,
 } from "lucide-react";
@@ -262,6 +263,7 @@ export function SettingsPanel({
   invites,
   canManageMembers,
   presenceEnabled,
+  collaboratorsVisible,
   proofreaderEnabled,
   writingPreferences,
   profileBusy,
@@ -273,6 +275,7 @@ export function SettingsPanel({
   onRevokeInvite,
   onLeaveArchive,
   onPresenceEnabledChange,
+  onCollaboratorsVisibleChange,
   onProofreaderEnabledChange,
   onWritingPreferencesChange,
   onHideArchivedChange,
@@ -302,6 +305,7 @@ export function SettingsPanel({
   invites: { id: string; email: string; expiresAt: string }[];
   canManageMembers: boolean;
   presenceEnabled: boolean;
+  collaboratorsVisible: boolean;
   proofreaderEnabled: boolean;
   writingPreferences: WritingPreferences;
   profileBusy: boolean;
@@ -313,6 +317,7 @@ export function SettingsPanel({
   onRevokeInvite: (inviteId: string) => Promise<void>;
   onLeaveArchive: () => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
+  onCollaboratorsVisibleChange: (visible: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
   onWritingPreferencesChange: (next: WritingPreferences) => void;
   onHideArchivedChange: (hideArchived: boolean) => void;
@@ -496,7 +501,7 @@ export function SettingsPanel({
         <header className="settings-header">
           <div>
             <h2 id="settings-title">Settings</h2>
-            <p>Kept in this browser, on this device</p>
+            <p>Kept with your account, on every browser you sign in from</p>
           </div>
           <button
             type="button"
@@ -839,7 +844,7 @@ export function SettingsPanel({
                     <RowLead
                       icon={<Image size={17} />}
                       label="Background image"
-                      hint="Stored only on this device, never uploaded"
+                      hint="Kept with your account, so every browser opens to it"
                     />
                     <input
                       ref={wallpaperRef}
@@ -1082,17 +1087,39 @@ export function SettingsPanel({
 
                 <h3>Privacy</h3>
                 <div className="appearance-controls">
+                  {/* Two switches, and they are not two halves of one thing.
+                      This one is the archive-wide roster: the mark on a face
+                      that says somebody is here at all. It is mutual, because
+                      the channel is joined only while publishing. */}
                   <label className="appearance-row">
                     <RowLead
                       icon={<Users size={17} />}
-                      label="Live presence"
-                      hint="Share that you are here to see who else is here"
+                      label="Show me in the roster"
+                      hint="Others see you are here, and you see who else is"
                     />
                     <input
                       type="checkbox"
                       role="switch"
                       checked={presenceEnabled}
                       onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                    />
+                  </label>
+
+                  {/* And this one is the note you have open. Being on a note
+                      both of you may write is not a disclosure, so it is on by
+                      default and it is about what you are shown rather than
+                      about what you give away. */}
+                  <label className="appearance-row">
+                    <RowLead
+                      icon={<MousePointer2 size={17} />}
+                      label="Collaborators in notes"
+                      hint="Show who else has this note open, and their cursor"
+                    />
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={collaboratorsVisible}
+                      onChange={(event) => onCollaboratorsVisibleChange(event.target.checked)}
                     />
                   </label>
 

@@ -15,8 +15,11 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
 
 /**
  * Downscales local images before their bytes are uploaded.
+ *
+ * A `Blob`, not a `File`: nothing here reads a name or a modified date, and
+ * the wallpaper arrives from IndexedDB rather than from a file input.
  */
-export async function prepareImageForNote(file: File): Promise<Blob> {
+export async function prepareImageForNote(file: Blob): Promise<Blob> {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Use a JPG, PNG or WebP image");
   }

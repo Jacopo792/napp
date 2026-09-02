@@ -568,7 +568,6 @@ export function Avatar({
       title={online ? "Online now" : undefined}
     >
       {url ? <img src={url} alt="" /> : initialsOf(name, email)}
-      {online && <i className="avatar-presence" aria-hidden="true" />}
     </span>
   );
 }

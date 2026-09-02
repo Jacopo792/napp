@@ -44,6 +44,14 @@ export function useCollaborativeNote(
    awareness, not from the presence channel, so with no peer here it could
    never appear. One peer, on whatever note is open. */
 export function useCollaborationPeers(_provider: unknown, selfId: string | null): Peer[] {
+  /* Typing is read from awareness now rather than from the presence channel,
+     so the burst that makes the caret worth looking at is pretended here. */
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTyping((current) => !current), 2600);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return useMemo(
     () =>
       selfId === PREVIEW_U2
@@ -55,8 +63,13 @@ export function useCollaborationPeers(_provider: unknown, selfId: string | null)
               name: "Partner",
               color: collaborationColor(PREVIEW_U2),
               joinedAt: "2026-09-01T09:30:00.000Z",
+              typing,
             },
           ],
-    [selfId],
+    [selfId, typing],
   );
+}
+
+export function announceTyping(): void {
+  /* One participant: there is nobody to tell. */
 }

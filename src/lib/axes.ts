@@ -117,6 +117,15 @@ export function setAxis<K extends keyof Axes>(key: K, value: Axes[K]): void {
   setAxes({ ...current, [key]: value });
 }
 
+export function currentAxes(): Axes {
+  return current;
+}
+
+export function subscribeToAxes(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 /** The preset whose numbers the current axes match exactly, if any. */
 export function matchingPreset(a: Axes): Preset | null {
   return (

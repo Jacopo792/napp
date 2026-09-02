@@ -2,64 +2,39 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AppSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 
-const KEY_PREFIX = "napp:presence";
-
-function preferenceKey(session: AppSession): string {
-  return `${KEY_PREFIX}:${session.userId}:${session.archiveId}`;
-}
-
-export function loadPresencePreference(session: AppSession): boolean {
-  try {
-    return localStorage.getItem(preferenceKey(session)) === "on";
-  } catch {
-    return false;
-  }
-}
-
-export function savePresencePreference(session: AppSession, enabled: boolean): void {
-  try {
-    localStorage.setItem(preferenceKey(session), enabled ? "on" : "off");
-  } catch {
-    /* Presence is optional and stays off when local preferences are unavailable. */
-  }
-}
-
-/** What one member is doing, as far as the channel knows. `noteId` is the note
- *  they have open; `typing` is a flag they raise and lower themselves.
+/* This channel answers one question: who is in the archive right now. It is
+ * the dot on a face in the roster and nothing else.
  *
- *  A flag rather than a timestamp, deliberately. A timestamp means every
- *  reader needs a clock, an expiry and a re-render tick to notice it lapse —
- *  three moving parts for something the writer already knows. The writer sends
- *  `true` on the first keystroke and `false` when they stop, and a reader only
- *  ever reads what it was told. */
-export interface PresenceMember {
-  noteId: string | null;
-  typing: boolean;
-}
-
-interface PresencePayload extends Partial<PresenceMember> {
-  userId?: string;
-}
+ * It used to answer two more — which note somebody had open, and whether they
+ * were typing in it — and that was the whole of the trouble. Both of those are
+ * facts about a *document*, and the document already has a place to keep them:
+ * Yjs awareness, which every peer on the note is connected to by construction.
+ * Asking a second, opt-in, archive-wide channel meant the face beside the title
+ * and the "is she writing" glow came from different sources that were free to
+ * disagree — and did, every time either member had this switch off.
+ *
+ * So `noteId` is gone (nothing ever read it back) and `typing` moved into
+ * awareness beside the identity it belongs to. What is left is a set of ids.
+ *
+ * The preference that gates it is no longer kept here either: it is one field
+ * in the account's profile row, in `accountPreferences.ts`, because a browser
+ * is not who you are. */
 
 /** A caller only joins this channel while broadcasting its own presence. That
  *  makes visibility symmetric: there is no listen-only mode in the client. */
 export function subscribeToPresence(
   session: AppSession,
-  onChange: (members: Map<string, PresenceMember>) => void,
+  onChange: (online: Set<string>) => void,
 ): RealtimeChannel {
   const channel = supabase.channel(`presence:${session.archiveId}`, {
     config: { presence: { key: session.userId }, private: true },
   });
 
   channel.on("presence", { event: "sync" }, () => {
-    const online = new Map<string, PresenceMember>();
-    for (const presences of Object.values(channel.presenceState<PresencePayload>())) {
+    const online = new Set<string>();
+    for (const presences of Object.values(channel.presenceState<{ userId?: string }>())) {
       for (const presence of presences) {
-        if (typeof presence.userId !== "string") continue;
-        online.set(presence.userId, {
-          noteId: typeof presence.noteId === "string" ? presence.noteId : null,
-          typing: presence.typing === true,
-        });
+        if (typeof presence.userId === "string") online.add(presence.userId);
       }
     }
     onChange(online);
@@ -67,27 +42,9 @@ export function subscribeToPresence(
 
   channel.subscribe((status) => {
     if (status !== "SUBSCRIBED") return;
-    void channel.track(payload(session, { noteId: null, typing: false }));
+    void channel.track({ userId: session.userId, onlineAt: new Date().toISOString() });
   });
   return channel;
-}
-
-/** Presence is one payload, not a set of fields, so the note and the typing
- *  flag are re-announced together every time either of them moves. */
-export function publishPresence(
-  channel: RealtimeChannel,
-  session: AppSession,
-  activity: PresenceMember,
-): void {
-  void channel.track(payload(session, activity));
-}
-
-function payload(session: AppSession, activity: PresenceMember): PresencePayload {
-  return {
-    userId: session.userId,
-    onlineAt: new Date().toISOString(),
-    ...activity,
-  } as PresencePayload;
 }
 
 export async function unsubscribeFromPresence(channel: RealtimeChannel): Promise<void> {

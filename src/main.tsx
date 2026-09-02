@@ -4,10 +4,12 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { initAxes } from "./lib/axes";
 import { initAppearance } from "./lib/appearance";
+import { initWritingPreferences } from "./lib/writingPreferences";
 import "./styles.css";
 
 initAppearance();
 initAxes();
+initWritingPreferences();
 
 const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
 

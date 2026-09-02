@@ -36,18 +36,42 @@ function read(): WritingPreferences {
   }
 }
 
+/* The chosen colour on the root, so everything that marks a person with it —
+   the pill on the note, the mark on a face in the roster — reads it from one
+   place instead of each being handed it. */
+function applyWritingPreferences(next: WritingPreferences): void {
+  const palette = presencePaletteFor(next.presencePalette);
+  const root = document.documentElement.style;
+  root.setProperty("--presence", palette.color);
+  root.setProperty("--presence-soft", palette.wash);
+}
+
+export function initWritingPreferences(): void {
+  applyWritingPreferences(current);
+}
+
 export function useWritingPreferences(): WritingPreferences {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 export function setWritingPreferences(next: WritingPreferences): void {
   current = next;
+  applyWritingPreferences(next);
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     /* Writing controls remain usable when browser storage is unavailable. */
   }
   listeners.forEach((listener) => listener());
+}
+
+export function currentWritingPreferences(): WritingPreferences {
+  return current;
+}
+
+export function subscribeToWritingPreferences(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function presencePaletteFor(id: PresencePalette) {

@@ -10,6 +10,11 @@ export interface Appearance {
   contrast: number;
   translucentSidebar: boolean;
   wallpaper: boolean;
+  /** The archive object holding the picture's bytes, once it has been shared
+   *  with the account. Null while the picture is only on this device — which
+   *  is what `setWallpaper` leaves behind, and what `accountPreferences` reads
+   *  as "upload this". */
+  wallpaperObject: string | null;
   wallpaperDim: number;
   wallpaperBlur: number;
   wallpaperFit: "cover" | "contain";
@@ -28,6 +33,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   contrast: 50,
   translucentSidebar: false,
   wallpaper: false,
+  wallpaperObject: null,
   wallpaperDim: 42,
   wallpaperBlur: 0,
   wallpaperFit: "cover",
@@ -155,6 +161,7 @@ function read(): Appearance {
       contrast: clamp(parsed.contrast, 20, 80, DEFAULT_APPEARANCE.contrast),
       translucentSidebar: Boolean(parsed.translucentSidebar),
       wallpaper: Boolean(parsed.wallpaper),
+      wallpaperObject: typeof parsed.wallpaperObject === "string" ? parsed.wallpaperObject : null,
       wallpaperDim: clamp(parsed.wallpaperDim, 0, 80, DEFAULT_APPEARANCE.wallpaperDim),
       wallpaperBlur: clamp(parsed.wallpaperBlur, 0, 20, DEFAULT_APPEARANCE.wallpaperBlur),
       wallpaperFit: parsed.wallpaperFit === "contain" ? "contain" : "cover",
@@ -418,10 +425,36 @@ export function setTheme(theme: ThemeMode): void {
   setAppearance({ ...current, theme, ...defaults });
 }
 
+/** A picture chosen here lands on this device first and is shared afterwards:
+ *  `wallpaperObject` is cleared so `accountPreferences` knows there are bytes
+ *  the account has not been given yet. */
 export async function setWallpaper(blob: Blob | null): Promise<void> {
   await writeWallpaper(blob);
   replaceWallpaperUrl(blob);
-  setAppearance({ ...current, wallpaper: Boolean(blob) });
+  setAppearance({ ...current, wallpaper: Boolean(blob), wallpaperObject: null });
+}
+
+/** The bytes this device holds, for the one caller that uploads them. */
+export function wallpaperBlob(): Promise<Blob | null> {
+  return readWallpaper();
+}
+
+/** The bytes another browser chose, arriving. */
+export async function adoptWallpaper(blob: Blob): Promise<void> {
+  await writeWallpaper(blob);
+  replaceWallpaperUrl(blob);
+}
+
+/** The current values, and a way to be told when they move. `accountPreferences`
+ *  is the only caller that is not a component: it pushes what changes here up
+ *  to the profile row so the next browser opens to the same archive. */
+export function currentAppearance(): Appearance {
+  return current;
+}
+
+export function subscribeToAppearance(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function useAppearance(): Appearance {

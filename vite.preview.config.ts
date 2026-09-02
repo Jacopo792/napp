@@ -19,6 +19,10 @@ export default defineConfig({
       { find: /^@\/lib\/session$/, replacement: here("./preview/session.mock.ts") },
       { find: /^@\/lib\/sync$/, replacement: here("./preview/sync.mock.ts") },
       { find: /^@\/lib\/presence$/, replacement: here("./preview/presence.mock.ts") },
+      {
+        find: /^@\/lib\/accountPreferences$/,
+        replacement: here("./preview/accountPreferences.mock.ts"),
+      },
       { find: /^@\/lib\/collab$/, replacement: here("./preview/collab.mock.ts") },
       { find: /^@\/lib\/comments$/, replacement: here("./preview/comments.mock.ts") },
     ],

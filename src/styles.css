@@ -1906,7 +1906,7 @@
 }
 
 .member-presence-heading small.is-active {
-  color: var(--ok);
+  color: var(--presence-color, var(--presence, var(--accent-strong)));
 }
 
 .member-presence-heading small.is-active i {
@@ -2749,19 +2749,28 @@
   border-radius: inherit;
 }
 
-.avatar.is-online {
-  overflow: visible;
+.archive-switch .avatar.is-compact:not(.is-online) {
+  box-shadow: inset 0 0 0 1px var(--glass-highlight);
 }
 
-.avatar-presence {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--surface);
-  border-radius: 50%;
-  background: var(--ok);
+/* Being here is drawn as a ring around the face, not as a green bead stuck to
+   the corner of it. The bead was a badge on a photograph — a second object,
+   with its own edge, competing with the picture it was pinned to — and it was
+   green, which is the one colour in this interface that means nothing else.
+   The ring is the face itself lit, in whatever presence colour the reader
+   chose in Writing, and it costs no layout: two shadows, the inner one the
+   surface behind it so the ring stands off rather than touching. */
+.avatar.is-online {
+  overflow: visible;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px var(--presence, var(--accent-strong));
+}
+
+.avatar.is-online.is-large {
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 4.5px var(--presence, var(--accent-strong));
 }
 
 .avatar.is-large {
@@ -2806,7 +2815,6 @@
   width: 26px;
   height: 26px;
   font-size: 10px;
-  box-shadow: inset 0 0 0 1px var(--glass-highlight);
 }
 
 /* The phone app bar has a bar's worth of room, not a column's. The portrait
