@@ -547,6 +547,13 @@ so a reader who can see the face can always see the flag. `markTyping()` in
 it ends; changing note lowers it first, so it is never left raised on a page
 nobody is on.
 
+The flag is announced on the note in the **primary** column and nowhere else.
+`handleSplitEdited` is `handleEdited` without the announcement, because the
+flag is a fact about a document and the second pane holds a different one —
+typing beside a note used to tell the other member you were writing _in_ it.
+Being in the second note is still visible to her: awareness identity is
+published for both documents.
+
 What a reader is _shown_ is `flags.collaborators` — "Collaborators in notes",
 the second switch in Privacy. It is one reader's own answer about their own
 screen and it gates the pill and the caret extension, never the broadcast. Do
@@ -591,6 +598,16 @@ private per-archive bucket a photograph pasted into a note lands in, so nothing
 new is granted. IndexedDB stays the device's copy and `napp:wallpaper-object`
 says which shared picture that copy is. `setWallpaper()` clears the object id,
 which is how the push path knows there are bytes the account has not been given.
+
+**Never `void` a PostgREST builder.** `supabase.from(...).upsert(...)` is a
+thenable, not a promise: it builds a query and sends nothing until somebody
+calls `.then` on it. Written as `void supabase.from(...).upsert(...)` it makes
+no HTTP request at all — and `void` also throws away the result, so a refusal
+would have been exactly as quiet as sending nothing. That is how every
+preference anybody set survived in React state, looked saved, and was gone on
+reload while `profile_preferences` held zero rows. A fire-and-forget write is
+`void write(...)` around an `async` function that **awaits** the builder and
+reads `result.error`.
 
 `mergeAccountPreferences` in `preferenceShape.ts` is deliberately in a file of
 its own: `accountPreferences.ts` reaches the Supabase client, and a module that

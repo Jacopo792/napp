@@ -1145,6 +1145,19 @@ function NotesPage() {
     setQuiet(true);
   }, [schedule, markTyping]);
 
+  /** The same, from the second pane, minus the announcement.
+   *
+   *  The writing flag lives on a *document*, and the document this page
+   *  announces on is the one in the primary column — so typing in the note
+   *  beside it was telling the other member you were writing in a note you had
+   *  not touched. Being in the second note is still visible to her: awareness
+   *  identity is published for both documents, so she sees you on the note you
+   *  are actually in. It is only the flag that stops at the first pane. */
+  const handleSplitEdited = useCallback(() => {
+    schedule();
+    setQuiet(true);
+  }, [schedule]);
+
   /* The pointer brings the controls back — not a timer. A writer who has
      stopped typing has not necessarily stopped reading, and a toolbar that
      reappears on its own two seconds after the last keystroke arrives in the
@@ -3140,7 +3153,7 @@ function NotesPage() {
                   viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}
                   titleRef={splitTitleRef}
-                  onEdited={handleEdited}
+                  onEdited={handleSplitEdited}
                   onNew={handleNew}
                   onImportMarkdown={() => importRef.current?.click()}
                   onUploadImage={handleUploadImage}

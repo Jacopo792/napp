@@ -56,12 +56,18 @@ export type { AccountFlags, AccountPreferences } from "./preferenceShape.ts";
 
 /** What this browser holds right now: what a fresh account's first push
  *  writes, and what a field the row does not carry falls back to. */
+/* Written in the order `mergeAccountPreferences` builds its answer in, and
+   that is load-bearing: both sides are compared as `JSON.stringify` output,
+   which keeps insertion order — so the same values in a different order are a
+   different string, the guard never matches, and every mount writes the row it
+   has just read and re-applies its own echo. */
 export function localPreferences(): AccountPreferences {
   return {
-    ...DEFAULT_FLAGS,
     appearance: currentAppearance(),
     axes: currentAxes(),
     writing: currentWritingPreferences(),
+    presence: DEFAULT_FLAGS.presence,
+    collaborators: DEFAULT_FLAGS.collaborators,
     proofreader: loadProofreaderPreference(),
     autoLock: loadAutoLock(),
   };
@@ -160,16 +166,32 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   if (blob === settled) return;
   settled = blob;
   window.clearTimeout(pending);
-  pending = window.setTimeout(() => {
-    /* A picture chosen on this device is uploaded before the row that names it
-       is written, so the other browser never reads an id with nothing behind
-       it. The upload sets `wallpaperObject`, which comes back through this
-       function as one more change to push. */
-    void shareWallpaper(session).catch(() => undefined);
-    void supabase
-      .from("profile_preferences")
-      .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
-  }, 500);
+  pending = window.setTimeout(() => void write(session, preferences), 500);
+}
+
+/* **The `await` is the request.** A PostgREST builder is lazy: it is a
+   thenable, and it sends nothing at all until somebody calls `.then` on it.
+   This was written as `void supabase.from(...).upsert(...)`, which builds the
+   query, discards it and makes no HTTP request whatsoever — so every
+   preference anybody set was kept in React state, looked saved, and was gone
+   on the next reload. `profile_preferences` had zero rows.
+   The `void` did the second half of the damage: with no `await` there is no
+   result to inspect, so a refusal from the database would have been just as
+   silent as sending nothing. Errors are reported here now. */
+async function write(session: AppSession, preferences: AccountPreferences): Promise<void> {
+  /* A picture chosen on this device is uploaded before the row that names it
+     is written, so the other browser never reads an id with nothing behind it.
+     Its failure must not take the row with it — a wallpaper that did not
+     upload is not a reason to lose a palette. */
+  await shareWallpaper(session).catch(() => undefined);
+  const result = await supabase
+    .from("profile_preferences")
+    .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
+  if (!result.error) return;
+  /* Nothing landed, so nothing is settled: the next change has to try again
+     rather than be waved through by a guard that believes this was written. */
+  settled = "";
+  console.error("Your preferences could not be saved:", result.error.message);
 }
 
 /** The stores that live outside React: whatever moves in them is pushed with
