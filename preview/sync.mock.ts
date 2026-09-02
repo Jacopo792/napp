@@ -6,6 +6,10 @@ export function subscribeToArchive(archiveId: string, _onChange: () => void): Re
   return { topic: `archive:${archiveId}` };
 }
 
+export function subscribeToComments(archiveId: string, _onChange: () => void): RealtimeChannel {
+  return { topic: `remarks:${archiveId}` };
+}
+
 export async function unsubscribeFromArchive(_channel: RealtimeChannel): Promise<void> {
   /* Nothing was subscribed. */
 }

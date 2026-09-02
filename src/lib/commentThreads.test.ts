@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { threadsOf, type NoteComment } from "./commentThreads.ts";
+import {
+  notesWithOpenRemarks,
+  threadsOf,
+  unreadRemarks,
+  type ArchiveComment,
+  type NoteComment,
+} from "./commentThreads.ts";
 
 const comment = (over: Partial<NoteComment>): NoteComment => ({
   id: "c",
@@ -39,4 +45,62 @@ test("a reply does not reopen a thread somebody already dealt with", () => {
 
 test("no remarks is no conversations", () => {
   assert.deepEqual(threadsOf([]), []);
+});
+
+/* ── Remarks across the archive ─────────────────────────────────────────── */
+
+const ME = "me";
+const THEM = "them";
+const remark = (over: Partial<ArchiveComment>): ArchiveComment => ({
+  id: "c",
+  noteId: "n1",
+  threadId: "t1",
+  authorId: THEM,
+  body: "b",
+  createdAt: "2026-09-01T10:00:00Z",
+  resolvedAt: null,
+  ...over,
+});
+
+test("a note leaves the remarks list when its last thread is dealt with", () => {
+  const open = [
+    remark({ id: "1", noteId: "n1", threadId: "t1" }),
+    remark({ id: "2", noteId: "n2", threadId: "t2" }),
+  ];
+  assert.deepEqual([...notesWithOpenRemarks(open)].sort(), ["n1", "n2"]);
+
+  const settled = [
+    remark({ id: "1", noteId: "n1", threadId: "t1", resolvedAt: "2026-09-02T10:00:00Z" }),
+    remark({ id: "2", noteId: "n2", threadId: "t2" }),
+  ];
+  assert.deepEqual([...notesWithOpenRemarks(settled)], ["n2"]);
+});
+
+/* Resolution is written to every row in a thread, but a reply that arrived
+   before the resolve is still in the list — one unresolved row must not keep
+   a settled conversation alive. */
+test("one unresolved row does not reopen a settled thread", () => {
+  const rows = [
+    remark({ id: "1", threadId: "t1", resolvedAt: "2026-09-02T10:00:00Z" }),
+    remark({ id: "2", threadId: "t1" }),
+  ];
+  assert.equal(notesWithOpenRemarks(rows).size, 0);
+  assert.equal(unreadRemarks(rows, ME, "").length, 0);
+});
+
+test("what is new is what somebody else said since you last looked", () => {
+  const rows = [
+    remark({ id: "mine", authorId: ME, createdAt: "2026-09-03T10:00:00Z" }),
+    remark({ id: "old", createdAt: "2026-09-01T10:00:00Z" }),
+    remark({ id: "new", createdAt: "2026-09-03T09:00:00Z" }),
+  ];
+  assert.deepEqual(
+    unreadRemarks(rows, ME, "2026-09-02T00:00:00Z").map((r) => r.id),
+    ["new"],
+  );
+  // A browser that has never looked has everything of theirs still to read.
+  assert.deepEqual(
+    unreadRemarks(rows, ME, "").map((r) => r.id),
+    ["old", "new"],
+  );
 });

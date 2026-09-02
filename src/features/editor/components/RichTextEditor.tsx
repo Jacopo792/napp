@@ -81,7 +81,8 @@ export type FormatAction =
   | "table-delete-row"
   | "table-delete"
   | `color-${TextColor}`
-  | "color-clear";
+  | "color-clear"
+  | "drawing";
 
 export interface SearchStatus {
   current: number;
@@ -170,7 +171,7 @@ interface PrivateFileOptions {
 interface SlashCommand {
   label: string;
   detail?: string;
-  action: FormatAction | "link" | "drawing";
+  action: FormatAction | "link";
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
@@ -947,7 +948,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const onPasteImageRef = useRef(onPasteImage);
   const appliedRevision = useRef(revision);
   const formatRef = useRef<(action: FormatAction) => void>(() => undefined);
-  const insertDrawingRef = useRef<() => void>(() => undefined);
   onChangeRef.current = onChange;
   onLocalEditRef.current = onLocalEdit;
   onPasteImageRef.current = onPasteImage;
@@ -965,7 +965,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     () =>
       slashMenuExtension((action) => {
         if (action === "link") onOpenLink();
-        else if (action === "drawing") insertDrawingRef.current();
         else formatRef.current(action);
       }),
     [onOpenLink],
@@ -1121,17 +1120,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     [collaboration?.document, collaboration?.provider],
   );
 
-  /* Through a ref, like `format` below it: the slash menu is built once and
-     must not be rebuilt because an editor instance arrived. */
-  insertDrawingRef.current = () => {
-    if (!editor || readOnly) return;
-    editor
-      .chain()
-      .focus()
-      .insertContent({ type: "drawing", attrs: { strokes: "[]" } })
-      .run();
-  };
-
   const format = useCallback(
     (action: FormatAction) => {
       if (!editor || readOnly) return;
@@ -1155,6 +1143,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         else if (action === "table-delete-column") chain.deleteColumn().run();
         else if (action === "table-delete-row") chain.deleteRow().run();
         else if (action === "table-delete") chain.deleteTable().run();
+      } else if (action === "drawing") {
+        chain.insertContent({ type: "drawing", attrs: { strokes: "[]" } }).run();
       } else if (action === "color-clear") {
         chain.unsetColor().removeEmptyTextStyle().run();
       } else if (action.startsWith("color-")) {

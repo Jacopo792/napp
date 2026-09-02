@@ -11,10 +11,15 @@
  * boundary. */
 import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
-import { toComment, type CommentRow, type NoteComment } from "./commentThreads";
+import {
+  toComment,
+  type ArchiveComment,
+  type CommentRow,
+  type NoteComment,
+} from "./commentThreads";
 
-export { threadsOf } from "./commentThreads";
-export type { NoteComment, CommentThread } from "./commentThreads";
+export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
+export type { ArchiveComment, NoteComment, CommentThread } from "./commentThreads";
 
 export async function loadComments(session: AppSession, noteId: string): Promise<NoteComment[]> {
   const result = await supabase
@@ -100,4 +105,22 @@ export async function updateComment(
     .single();
   fail(result.error);
   return toComment(result.data as CommentRow);
+}
+
+/** Every remark in the archive, so the interface can say that one is waiting
+ *  without opening the note it is on. Bounded rather than complete: what this
+ *  answers is "is there anything new", and the note's own panel is where a
+ *  conversation is actually read. */
+export async function loadArchiveComments(session: AppSession): Promise<ArchiveComment[]> {
+  const result = await supabase
+    .from("note_comments")
+    .select("id, note_id, thread_id, author_id, body, created_at, resolved_at")
+    .eq("archive_id", session.archiveId)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  fail(result.error);
+  return ((result.data ?? []) as (CommentRow & { note_id: string })[]).map((row) => ({
+    ...toComment(row),
+    noteId: row.note_id,
+  }));
 }

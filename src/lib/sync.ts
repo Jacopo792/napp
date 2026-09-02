@@ -25,6 +25,28 @@ export function subscribeToArchive(archiveId: string, onChange: () => void): Rea
   return channel.subscribe();
 }
 
+/** Remarks, on a channel of their own.
+ *
+ *  Deliberately not folded into `TABLES` above: that subscription's caller
+ *  reloads the whole archive snapshot, and it already fires on every save
+ *  either member makes. A remark is rarer than a keystroke and needs a much
+ *  cheaper answer, so it wakes the one reader that cares. */
+export function subscribeToComments(archiveId: string, onChange: () => void): RealtimeChannel {
+  return supabase
+    .channel(`remarks:${archiveId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "note_comments",
+        filter: `archive_id=eq.${archiveId}`,
+      },
+      onChange,
+    )
+    .subscribe();
+}
+
 export async function unsubscribeFromArchive(channel: RealtimeChannel): Promise<void> {
   await supabase.removeChannel(channel);
 }

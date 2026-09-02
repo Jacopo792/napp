@@ -60,3 +60,51 @@ export function threadsOf(comments: NoteComment[]): CommentThread[] {
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
+
+/* ── Remarks across the whole archive ────────────────────────────────────────
+   The panel beside a note asks about that note. This asks the other question a
+   shared archive raises: has the other member said anything, anywhere, since I
+   last looked. */
+
+/** A remark, plus the note it is on — which the per-note reader never needs
+ *  and the archive-wide one cannot do without. */
+export interface ArchiveComment extends NoteComment {
+  noteId: string;
+}
+
+/** The notes carrying a conversation still open.
+ *
+ *  Resolved threads are left out on purpose: this is what is waiting, not what
+ *  has ever been said. A note whose every thread is dealt with leaves the list
+ *  the moment the last one is, which is what makes the list worth opening. */
+export function notesWithOpenRemarks(comments: ArchiveComment[]): Set<string> {
+  const resolvedThreads = new Set<string>();
+  for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
+  const notes = new Set<string>();
+  for (const comment of comments) {
+    if (!resolvedThreads.has(comment.threadId)) notes.add(comment.noteId);
+  }
+  return notes;
+}
+
+/** Remarks somebody else wrote since `seenAt`, in an open thread.
+ *
+ *  Your own are never news, and a thread already dealt with is not waiting for
+ *  you. `seenAt` empty means this browser has never looked, so everything the
+ *  other member has said still counts as unread — which is the right answer on
+ *  a device signing in for the first time, and the reason it is a timestamp
+ *  rather than a set of ids nobody would ever finish pruning. */
+export function unreadRemarks(
+  comments: ArchiveComment[],
+  selfId: string,
+  seenAt: string,
+): ArchiveComment[] {
+  const resolvedThreads = new Set<string>();
+  for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
+  return comments.filter(
+    (comment) =>
+      comment.authorId !== selfId &&
+      !resolvedThreads.has(comment.threadId) &&
+      comment.createdAt > seenAt,
+  );
+}

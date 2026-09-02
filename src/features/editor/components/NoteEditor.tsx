@@ -3,8 +3,6 @@ import {
   ChevronUp,
   Image as ImageIcon,
   Link2,
-  Lock,
-  LockOpen,
   ListTree,
   MessageSquare,
   Search,
@@ -56,6 +54,9 @@ interface Props {
    *  every note is by default. Absent altogether means locking is not on offer
    *  here at all — Trash, the preview, a reader who may not write. */
   lock?: NoteLock;
+  /** Open the conversation with the note. True when the note was reached from
+   *  Remarks, where the remark is the reason you are here at all. */
+  startWithComments?: boolean;
   /** Whether this browser offers the on-device proofreader at all. */
   proofreaderEnabled: boolean;
   viewingAsPartner: boolean;
@@ -153,6 +154,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     syncRevision,
     canEdit,
     lock,
+    startWithComments = false,
     proofreaderEnabled,
     viewingAsPartner,
     partnerName,
@@ -185,7 +187,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [linkError, setLinkError] = useState("");
   const [status, setStatus] = useState("");
   const [failure, setFailure] = useState("");
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(startWithComments);
   const [outlineOpen, setOutlineOpen] = useState(false);
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
@@ -521,6 +523,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     editorRef.current?.setCommentResolved(threadId, resolved);
   }, []);
 
+  /* A note opened from Remarks arrives with its conversation showing. This
+     component is not rebuilt per note — only its `section` is keyed — so the
+     initial state above answers for the first note only, and this answers for
+     every one after it. */
+  useEffect(() => {
+    if (startWithComments) setCommentsOpen(true);
+  }, [entry?.note.id, startWithComments]);
+
   const closeComments = useCallback(() => {
     /* A pending thread exists only as a mark in the document. Closing without
        saying anything cancels it, so it must not leave an orphan highlight. */
@@ -603,12 +613,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       >
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
+          {/* The state, not the control: taking a note back is done from the ⋯
+              menu the note's other actions live in, and a second button up
+              here was only a second thing to keep agreeing with this line. */}
           {!mobile && (
             <span className="label truncate text-ink-4">
-              {canEdit
-                ? "Editing"
-                : lock?.holderName
-                  ? `Locked by ${lock.holderName}`
+              {lock?.holderName
+                ? lock.mine
+                  ? "Locked by you"
+                  : `Locked by ${lock.holderName}`
+                : canEdit
+                  ? "Editing"
                   : "Read only"}
             </span>
           )}
@@ -617,16 +632,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               column above the title — where it was the one thing in that column
               that was not the note. It appears only while there is no cover;
               once there is one, the cover carries its own Change and Remove. */}
-          {/* Locking is a thing you do to this note, so it lives where the
-              note's other controls do — and it is offered only to somebody
-              who could lift it again: while the other member holds it there
-              is nothing here to press, only the readout above saying so. */}
-          {lock && (lock.mine || !lock.holderName) && (
-            <button type="button" className="note-add-property" onClick={lock.onToggle}>
-              {lock.mine ? <LockOpen size={15} /> : <Lock size={15} />}
-              {lock.mine ? "Unlock" : "Lock"}
-            </button>
-          )}
           {canEdit && !entry.note.cover && (
             <button
               type="button"

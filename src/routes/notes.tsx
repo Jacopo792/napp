@@ -11,6 +11,7 @@ import {
   Keyboard,
   Lock,
   Maximize2,
+  MessageSquare,
   Minimize2,
   NotebookText,
   PanelLeftOpen,
@@ -57,7 +58,13 @@ import {
   type Profile,
 } from "@/lib/supabase";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
-import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
+import {
+  loadArchiveComments,
+  notesWithOpenRemarks,
+  unreadRemarks,
+  type ArchiveComment,
+} from "@/lib/comments";
 import {
   loadPresencePreference,
   publishPresence,
@@ -105,7 +112,7 @@ import {
   uniqueFileNames,
 } from "@/features/editor/lib/exchange";
 import type { Draft } from "@/features/editor/lib/draft";
-import { ALL, ARCHIVE, TRASH, UNFILED } from "@/lib/scopes";
+import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -659,6 +666,52 @@ function NotesPage() {
 
   const selfId = session?.userId ?? null;
 
+  /* Remarks, archive-wide. The panel beside a note answers "what was said
+     about this"; this answers the question a shared archive raises the moment
+     you sign in — has the other member said anything, anywhere, since you last
+     looked.
+
+     `seenAt` is a timestamp in this browser rather than a column, and
+     deliberately: it is a fact about a device looking, not about the archive,
+     and a set of read ids is a thing nobody ever finishes pruning. A new
+     device therefore starts with everything unread, which is the right answer
+     for it. */
+  const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
+  const remarksSeenKey = session ? `napp:remarks-seen:${session.archiveId}:${session.userId}` : "";
+  const [remarksSeenAt, setRemarksSeenAt] = useState("");
+
+  useEffect(() => {
+    if (!remarksSeenKey) return;
+    try {
+      setRemarksSeenAt(localStorage.getItem(remarksSeenKey) ?? "");
+    } catch {
+      setRemarksSeenAt("");
+    }
+  }, [remarksSeenKey]);
+
+  const refreshRemarks = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    void loadArchiveComments(current)
+      .then(setArchiveComments)
+      /* A remark that will not load is not a reason to fail to open the
+         archive: the count simply stays where it was. */
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    refreshRemarks();
+    const channel = subscribeToComments(session.archiveId, refreshRemarks);
+    return () => void unsubscribeFromArchive(channel);
+  }, [session, refreshRemarks]);
+
+  const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
+  const unreadRemarkCount = useMemo(
+    () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeenAt).length : 0),
+    [archiveComments, selfId, remarksSeenAt],
+  );
+
   /* Who has taken a note back, keyed by note. A lock is metadata on the row
      like the trash stamp beside it, and it is read from the same place — but
      unlike `owner_id` it is a permission, and `notes_editor_update` refuses
@@ -686,6 +739,11 @@ function NotesPage() {
 
     if (selectedFolderId === TRASH) {
       list = list.filter((entry) => trashedIds.has(entry.note.id));
+    } else if (selectedFolderId === REMARKS) {
+      /* Not the trash: a note on its way out is nobody's to discuss. */
+      list = list.filter(
+        (entry) => remarkedIds.has(entry.note.id) && !trashedIds.has(entry.note.id),
+      );
     } else if (selectedFolderId === ARCHIVE) {
       list = list.filter((entry) => archivedIds.has(entry.note.id));
     } else {
@@ -705,7 +763,7 @@ function NotesPage() {
     }
 
     return list;
-  }, [ownedEntries, activeMeta, trashedIds, archivedIds, selectedFolderId, query]);
+  }, [ownedEntries, activeMeta, trashedIds, archivedIds, remarkedIds, selectedFolderId, query]);
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -745,11 +803,13 @@ function NotesPage() {
       ? "All notes"
       : selectedFolderId === UNFILED
         ? "Unfiled"
-        : selectedFolderId === TRASH
-          ? "Trash"
-          : selectedFolderId === ARCHIVE
-            ? "Archive"
-            : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
+        : selectedFolderId === REMARKS
+          ? "Remarks"
+          : selectedFolderId === TRASH
+            ? "Trash"
+            : selectedFolderId === ARCHIVE
+              ? "Archive"
+              : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
 
   // Seed the store from the stored note. `ensureDraft` leaves unsaved work
   // alone, so this is safe to run whenever the selection or the entry changes.
@@ -1827,6 +1887,17 @@ function NotesPage() {
     setSelectedFolderId(id);
     setSelectedId(null);
     if (compact) setMobileScreen("collection");
+    /* Looking at the list *is* having looked. The line moves to now, so a
+       remark written while it is open is still news the next time. */
+    if (id === REMARKS && remarksSeenKey) {
+      const now = new Date().toISOString();
+      setRemarksSeenAt(now);
+      try {
+        localStorage.setItem(remarksSeenKey, now);
+      } catch {
+        /* A browser refusing storage costs the count, not the remarks. */
+      }
+    }
   }
 
   const handleSelectNote = useCallback(
@@ -2167,6 +2238,12 @@ function NotesPage() {
         label: folder.name,
         count: byFolder.get(folder.id) ?? 0,
       })),
+      {
+        id: REMARKS,
+        label: "Remarks",
+        count: [...remarkedIds].filter((id) => !trashedIds.has(id)).length,
+        unread: unreadRemarkCount,
+      },
       { id: ARCHIVE, label: "Archive", count: archived },
       { id: TRASH, label: "Trash", count: trash },
     ];
@@ -2198,6 +2275,8 @@ function NotesPage() {
         icon:
           scope.id === TRASH ? (
             <Trash2 size={15} />
+          ) : scope.id === REMARKS ? (
+            <MessageSquare size={15} />
           ) : scope.id === ARCHIVE ? (
             <Archive size={15} />
           ) : scope.id === ALL ? (
@@ -2639,6 +2718,7 @@ function NotesPage() {
                     syncRevision={syncRevision}
                     canEdit={canEdit}
                     lock={selected ? lockFor(selected.note.id) : undefined}
+                    startWithComments={selectedFolderId === REMARKS}
                     proofreaderEnabled={proofreaderEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
@@ -2787,6 +2867,7 @@ function NotesPage() {
               syncRevision={syncRevision}
               canEdit={canEdit}
               lock={selected ? lockFor(selected.note.id) : undefined}
+              startWithComments={selectedFolderId === REMARKS}
               proofreaderEnabled={proofreaderEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}

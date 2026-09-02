@@ -86,6 +86,30 @@ the boundary is the one place every update passes through:
 change passes through, so the lock is honoured there once rather than in each
 of pinning, filing, trashing and shelving.
 
+Both locks are offered from the ⋯ menu and the row's own right-click, and from
+nowhere else. The strip above the note says which state it is in and carries no
+button for it: a second control up there was only a second thing to keep
+agreeing with that line.
+
+## Remarks, and knowing one is waiting
+
+`REMARKS` is a scope, not a panel, for the same reason Trash is one — the note
+list already knows how to draw notes, and a second list would be a second thing
+to keep in step. It holds every note carrying a thread nobody has resolved, and
+a note leaves it the moment its last thread is dealt with. Opening a note from
+there opens its conversation with it.
+
+The badge counts remarks *somebody else* wrote, in an open thread, since this
+browser last looked. The line it compares against is a timestamp in
+`localStorage`, not a column: it is a fact about a device looking rather than
+about the archive, and a set of read ids is a thing nobody ever finishes
+pruning. A new device therefore starts with everything unread, which is the
+right answer for it.
+
+`subscribeToComments` is a channel of its own and deliberately not another
+table in `subscribeToArchive`'s list: that subscription's caller reloads the
+whole archive snapshot and already fires on every save either member makes.
+
 ## A drawing in the note
 
 A `drawing` node whose strokes are its own attribute: no Storage object, no

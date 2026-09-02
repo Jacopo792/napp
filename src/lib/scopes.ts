@@ -10,3 +10,8 @@ export const TRASH = "__trash";
 /* Filed away rather than thrown away. A note here is still editable and still
    yours; the trash is the waiting room, this is the shelf. */
 export const ARCHIVE = "__archive";
+/* Not a place a note is *in* — a place a note is named, because somebody said
+   something about it and nobody has dealt with it yet. It is a scope and not a
+   panel of its own for the same reason Trash is one: the list already knows how
+   to draw notes, and a second list would be a second thing to keep in step. */
+export const REMARKS = "__remarks";

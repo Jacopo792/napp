@@ -7,6 +7,7 @@ import {
   FolderOpen,
   FolderPlus,
   Lock,
+  MessageSquare,
   MoreHorizontal,
   NotebookText,
   PanelLeftClose,
@@ -15,7 +16,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { ALL, ARCHIVE, TRASH } from "@/lib/scopes";
+import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
@@ -41,6 +42,10 @@ export interface Scope {
   id: string;
   label: string;
   count: number;
+  /** Remarks nobody here has read yet. Only Remarks carries one, and it is
+   *  separate from `count` because the two say different things: how much is
+   *  waiting, and how much of it is new. */
+  unread?: number;
 }
 
 interface Props {
@@ -316,7 +321,16 @@ function Row({
       <button type="button" className="sidebar-target press" onClick={onSelect}>
         <span className="sidebar-glyph">{glyph}</span>
         <span className="sidebar-name">{scope.label}</span>
-        <span className="sidebar-count">{scope.count || ""}</span>
+        {/* The dot replaces the count rather than crowding beside it: while
+            something is new, how much is new is the only number worth
+            reading, and the tally comes back the moment it has been. */}
+        {scope.unread ? (
+          <span className="sidebar-unread" aria-label={`${scope.unread} unread`}>
+            {scope.unread}
+          </span>
+        ) : (
+          <span className="sidebar-count">{scope.count || ""}</span>
+        )}
       </button>
       {actions && <span className="sidebar-actions">{actions}</span>}
     </div>
@@ -369,6 +383,7 @@ export function Sidebar({
   const all = scopes.find((scope) => scope.id === ALL);
   const trash = scopes.find((scope) => scope.id === TRASH);
   const archive = scopes.find((scope) => scope.id === ARCHIVE);
+  const remarks = scopes.find((scope) => scope.id === REMARKS);
 
   function toggle(id: string) {
     setExpanded((current) => {
@@ -616,8 +631,22 @@ export function Sidebar({
 
           Archive shares that block, above Trash: both are places a note leaves
           the folders for, and the one you can come back from belongs first. */}
-      {(archive || trash) && (
+      {(remarks || archive || trash) && (
         <div className="sidebar-tail">
+          {/* What has been said, above what has been filed and what has been
+              thrown away. It is the one row here you can arrive at with
+              something waiting in it, so it is the one row that can carry a
+              dot — the count beside it says how many notes are being talked
+              about, the dot says some of it is new to you. */}
+          {remarks && (remarks.count > 0 || (remarks.unread ?? 0) > 0) && (
+            <Row
+              scope={remarks}
+              glyph={<MessageSquare size={16} />}
+              active={selectedId === REMARKS}
+              droppable={false}
+              onSelect={() => onSelect(REMARKS)}
+            />
+          )}
           {archive && (
             <Row
               scope={archive}

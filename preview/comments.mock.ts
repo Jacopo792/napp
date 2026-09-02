@@ -2,21 +2,20 @@
    in and resolved with no credentials and no network. Threads live for as long
    as the tab, like everything else in the preview. */
 import type { AppSession } from "./session.mock";
-import { PREVIEW_U1, PREVIEW_U2 } from "./fixture";
-import type { NoteComment } from "@/lib/commentThreads";
+import { FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import type { ArchiveComment, NoteComment } from "@/lib/commentThreads";
 
-export { threadsOf } from "@/lib/commentThreads";
-export type { NoteComment, CommentThread } from "@/lib/commentThreads";
+export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "@/lib/commentThreads";
+export type { ArchiveComment, NoteComment, CommentThread } from "@/lib/commentThreads";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const store = new Map<string, NoteComment[]>();
-let seeded = false;
 
-/** One conversation on whichever note is opened first, so the panel has
- *  something in it the first time it is looked at. */
+/** One conversation, on the first note in the fixture and there from the
+ *  start — so both readers of this store have something to show: the panel
+ *  beside that note, and the archive-wide count in the rail. */
 function seed(noteId: string): void {
-  if (seeded) return;
-  seeded = true;
+  if (store.has(noteId)) return;
   const threadId = "seed-thread-0000-0000-000000000000";
   store.set(noteId, [
     {
@@ -38,12 +37,13 @@ function seed(noteId: string): void {
   ]);
 }
 
+seed(FIXTURE_NOTES[0].id);
+
 export async function loadComments(
   _session: AppSession,
   noteId: string,
 ): Promise<NoteComment[]> {
   await sleep(120);
-  seed(noteId);
   return [...(store.get(noteId) ?? [])];
 }
 
@@ -108,4 +108,11 @@ export async function updateComment(
     return saved;
   }
   throw new Error("Only the author may edit this comment");
+}
+
+/** The archive-wide read, from the same in-memory store. The seed lands on
+ *  whichever note is opened first, so this is empty until one has been. */
+export async function loadArchiveComments(_session: AppSession): Promise<ArchiveComment[]> {
+  await sleep(90);
+  return [...store].flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId })));
 }

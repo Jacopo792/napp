@@ -21,6 +21,7 @@ import {
   Minus,
   Palette,
   Paperclip,
+  Pencil,
   Pilcrow,
   Quote,
   Rows3,
@@ -318,6 +319,17 @@ export function EditorToolbar({
               <span>Back to normal</span>
             </button>
             <p className="menu-note">Select the words first — colour applies to a selection.</p>
+
+            {/* A drawing is the other way of putting colour on a page, and the
+                only one that does not need words underneath it first — so it
+                sits below the swatches with a rule of its own rather than
+                among them. */}
+            <div className="menu-separator" />
+            <p className="menu-label">Draw</p>
+            <Row icon={<Pencil size={16} />} label="Drawing" onClick={() => run("drawing")} />
+            <p className="menu-note">
+              A sheet in the note, drawn by hand. Six inks; it leaves with the note.
+            </p>
           </>,
         )}
       </div>

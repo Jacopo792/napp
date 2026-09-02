@@ -6335,3 +6335,19 @@
 .rich-media-drawing-tools .rich-media-file-action:first-of-type {
   margin-left: 0.35rem;
 }
+
+/* Remarks nobody here has read. The one badge in this interface, so it is the
+   accent and nothing else is: a count set on the accent wash, at the size the
+   quiet tallies beside it already use, so the row reads as the same row with
+   one thing said louder. */
+.sidebar-unread {
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--page);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.15rem;
+  text-align: center;
+}
