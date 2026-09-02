@@ -534,7 +534,7 @@ so a reader who can see the face can always see the flag. `markTyping()` in
 it ends; changing note lowers it first, so it is never left raised on a page
 nobody is on.
 
-What a reader is *shown* is `flags.collaborators` — "Collaborators in notes",
+What a reader is _shown_ is `flags.collaborators` — "Collaborators in notes",
 the second switch in Privacy. It is one reader's own answer about their own
 screen and it gates the pill and the caret extension, never the broadcast. Do
 not re-gate the broadcast; that is the bug this arrangement exists to end.
