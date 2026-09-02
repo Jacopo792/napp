@@ -565,22 +565,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </span>
           </header>
         )}
-        <div className="flex flex-1 items-center justify-center px-8">
-          <div className="measure px-8 py-12 text-center font-sans">
-            <p
-              className="font-display text-ink-4"
-              style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 300 }}
-            >
-              Aa
-            </p>
-            <p className="mt-4 text-sm font-medium text-ink-2">No note open</p>
-            <button
-              onClick={onNew}
-              className="label press mt-4 rounded-lg bg-accent px-4 py-2 text-on-accent transition-opacity hover:opacity-90"
-            >
-              Write a new one · N
-            </button>
-          </div>
+        {/* The plant off the door, grown to the height of the pane: the one
+            authored drawing this app has, spent on the one surface that has
+            nothing else to say. Behind the line and never over it, and turning
+            with the day rather than with the note, so a page arrived at twice
+            in a minute is the same page.
+
+            The line is the command. A coloured button in the middle of an
+            empty page reads as a form; a line reads as an invitation. */}
+        <div className="editor-empty flex flex-1 items-center justify-center px-8">
+          <BotanicalFlower
+            flower={flowerFor(new Date().toDateString())}
+            className="is-empty-page"
+          />
+          <button onClick={onNew} className="editor-empty-invite font-display">
+            Write a new one · N
+          </button>
         </div>
       </section>
     );

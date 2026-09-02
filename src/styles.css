@@ -632,6 +632,47 @@
   }
 }
 
+/* The editor with no note in it. The same plate as the door, at the height of
+   the pane, running off the bottom right corner — clipped there for the reason
+   `.login-garden` is clipped: a stem hanging below the fold is a scrollbar on a
+   page that has nothing to scroll. */
+.editor-empty {
+  position: relative;
+  overflow: clip;
+}
+
+.botanical-plate.is-empty-page {
+  right: -11vh;
+  bottom: -16vh;
+  height: 114vh;
+  opacity: 0.09;
+  pointer-events: none;
+}
+
+/* It does not draw itself in. This surface is arrived at every time a note is
+   closed, and a drawing that restages on every Esc is a drawing you end up
+   watching instead of a ground you write on. */
+.botanical-plate.is-empty-page .stem,
+.botanical-plate.is-empty-page .sprig {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
+/* The invitation is the command, so it is set in the display face and lit by
+   the pointer rather than fenced in a pill. */
+.editor-empty-invite {
+  position: relative;
+  color: var(--ink-3);
+  font-size: clamp(1.3rem, 3.2vw, 1.85rem);
+  font-weight: 300;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.editor-empty-invite:hover,
+.editor-empty-invite:focus-visible {
+  color: var(--ink);
+}
+
 /* The body's placeholder while the note is still syncing. Laid out on the same
    measure and the same line rhythm as the text that replaces it, so nothing
    shifts sideways or jumps a line when the words arrive. */
@@ -1194,6 +1235,15 @@
     var(--shadow-soft);
   padding: clamp(1.75rem, 4vw, 2.4rem);
   animation: login-settle var(--dur-slow) var(--ease-out) both;
+}
+
+.login-brand {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin: -0.35rem auto 1.45rem;
+  border-radius: 1.25rem;
+  object-fit: cover;
 }
 
 @keyframes login-settle {
