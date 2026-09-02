@@ -4,7 +4,7 @@ import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
-import logoUrl from "../../docs/branding/logo-n-botanical.png";
+import logoUrl from "../../docs/branding/logo-n-botanical-transparent.png";
 
 export const Route = createFileRoute("/")({ component: Login });
 
