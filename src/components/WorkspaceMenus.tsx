@@ -1115,7 +1115,7 @@ export function SettingsPanel({
                     <RowLead
                       icon={<Users size={17} />}
                       label="Archive"
-                      hint="Members read everything; editors can make changes"
+                      hint="Everybody here reads and writes every note"
                     />
                     <span className="profile-static">
                       {memberCount} {memberCount === 1 ? "member" : "members"}
@@ -1753,9 +1753,9 @@ export function SettingsPanel({
                   </p>
                 )}
                 <p className="profile-note">
-                  Membership permits reading the whole archive. Editors can change notes, files and
-                  roles; viewers cannot. Somebody who should not read these needs an archive of
-                  their own.
+                  A member reads and writes the whole archive; there is no lesser kind. What one
+                  member can take back from another is a note, or a passage of one, from the note
+                  itself. Somebody who should not read these needs an archive of their own.
                 </p>
               </section>
             )}

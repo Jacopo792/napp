@@ -19,11 +19,13 @@ import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import {
   Download,
+  Eraser,
   ExternalLink,
   GripVertical,
   Lock,
   MessageSquarePlus,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -37,11 +39,16 @@ import {
 } from "react";
 import {
   BASE_EXTENSIONS,
+  DRAWING_BOX,
+  DRAWING_INKS,
+  Drawing,
   PrivateFile,
   PrivateImage,
   TEXT_COLOR_VALUE,
   WRITE_LOCK_MARK,
+  type DrawingStroke,
   type TextColor,
+  drawingStrokes,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
@@ -163,7 +170,7 @@ interface PrivateFileOptions {
 interface SlashCommand {
   label: string;
   detail?: string;
-  action: FormatAction | "link";
+  action: FormatAction | "link" | "drawing";
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
@@ -180,6 +187,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { label: "Table · 3 columns", action: "table-3" },
   { label: "Table · 4 columns", action: "table-4" },
   { label: "Link", action: "link" },
+  { label: "Drawing", detail: "Sketch by hand", action: "drawing" },
   ...(["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[]).map((color) => ({
     label: `${color[0].toUpperCase()}${color.slice(1)} text`,
     action: `color-${color}` as FormatAction,
@@ -680,6 +688,151 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
   );
 }
 
+/* A drawing surface, and what a browser can do that the schema cannot.
+ *
+ * A stroke is gathered in local state while the pointer is down and written to
+ * the document once, on release. Writing per pointer event would be a Yjs
+ * update per pixel of a gesture, sent to the other member and persisted, for a
+ * line nobody has finished drawing yet.
+ *
+ * The pointer is followed with `window` listeners rather than
+ * `setPointerCapture`, for the reason the cover learned the hard way: a
+ * captured pointer retargets the click that follows to the capturing element,
+ * and every control sitting on this surface would go dead the moment somebody
+ * drew on it. */
+function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
+  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
+  const [ink, setInk] = useState<string>(DRAWING_INKS[0]);
+  const [drawing, setDrawing] = useState<string>("");
+  const surface = useRef<SVGSVGElement>(null);
+  const path = useRef<string>("");
+
+  const write = useCallback(
+    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
+    [updateAttributes],
+  );
+
+  const at = useCallback((event: { clientX: number; clientY: number }) => {
+    const box = surface.current?.getBoundingClientRect();
+    if (!box || box.width === 0) return null;
+    const x = Math.round(((event.clientX - box.left) / box.width) * DRAWING_BOX.width);
+    const y = Math.round(((event.clientY - box.top) / box.height) * DRAWING_BOX.height);
+    return `${x},${y}`;
+  }, []);
+
+  function start(event: React.PointerEvent) {
+    if (!editor.isEditable || event.button !== 0) return;
+    const point = at(event);
+    if (!point) return;
+    event.preventDefault();
+    path.current = `M${point}`;
+    setDrawing(path.current);
+
+    const move = (next: PointerEvent) => {
+      const step = at(next);
+      if (!step) return;
+      path.current = `${path.current}L${step}`;
+      setDrawing(path.current);
+    };
+    const finish = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      /* A tap that never moved is a dot, and a dot is a stroke of one point —
+         which draws nothing without a second. Give it one. */
+      const committed = path.current.includes("L")
+        ? path.current
+        : `${path.current}L${path.current.slice(1)}`;
+      setDrawing("");
+      path.current = "";
+      void write([...strokes, { d: committed, color: ink, width: 5 }]);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  }
+
+  return (
+    <NodeViewWrapper className="rich-media-drawing">
+      <span className="rich-media-drawing-sheet" contentEditable={false}>
+        <svg
+          ref={surface}
+          className="rich-media-drawing-surface"
+          viewBox={`0 0 ${DRAWING_BOX.width} ${DRAWING_BOX.height}`}
+          preserveAspectRatio="none"
+          onPointerDown={start}
+        >
+          {strokes.map((stroke, index) => (
+            <path
+              key={index}
+              d={stroke.d}
+              fill="none"
+              stroke={stroke.color}
+              strokeWidth={stroke.width}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          {drawing && (
+            <path
+              d={drawing}
+              fill="none"
+              stroke={ink}
+              strokeWidth={5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+        </svg>
+      </span>
+      {editor.isEditable && (
+        <span className="rich-media-drawing-tools" contentEditable={false}>
+          {DRAWING_INKS.map((colour) => (
+            <button
+              key={colour}
+              type="button"
+              className={`drawing-ink ${colour === ink ? "is-chosen" : ""}`}
+              style={{ background: colour }}
+              aria-label={`Draw in ${colour}`}
+              aria-pressed={colour === ink}
+              onClick={() => setInk(colour)}
+            />
+          ))}
+          <button
+            type="button"
+            className="rich-media-file-action"
+            aria-label="Undo the last stroke"
+            title="Undo the last stroke"
+            disabled={strokes.length === 0}
+            onClick={() => void write(strokes.slice(0, -1))}
+          >
+            <Undo2 size={15} />
+          </button>
+          <button
+            type="button"
+            className="rich-media-file-action"
+            aria-label="Clear the drawing"
+            title="Clear the drawing"
+            disabled={strokes.length === 0}
+            onClick={() => void write([])}
+          >
+            <Eraser size={15} />
+          </button>
+          <button
+            type="button"
+            className="rich-media-file-action is-danger"
+            aria-label="Remove drawing"
+            title="Remove drawing"
+            onClick={deleteNode}
+          >
+            <Trash2 size={15} />
+          </button>
+        </span>
+      )}
+    </NodeViewWrapper>
+  );
+}
+
 /* The schema lives in `content.ts`, where the collaboration server can read it
    without React. What is added here is only what a browser can do with it. */
 function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["open"]) {
@@ -687,6 +840,14 @@ function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["ope
     addOptions: () => ({ resolve, open }),
     addNodeView() {
       return ReactNodeViewRenderer(PrivateImageView);
+    },
+  });
+}
+
+function drawingExtension() {
+  return Drawing.extend({
+    addNodeView() {
+      return ReactNodeViewRenderer(DrawingView);
     },
   });
 }
@@ -786,6 +947,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const onPasteImageRef = useRef(onPasteImage);
   const appliedRevision = useRef(revision);
   const formatRef = useRef<(action: FormatAction) => void>(() => undefined);
+  const insertDrawingRef = useRef<() => void>(() => undefined);
   onChangeRef.current = onChange;
   onLocalEditRef.current = onLocalEdit;
   onPasteImageRef.current = onPasteImage;
@@ -794,6 +956,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     () => [
       privateImageExtension(resolveImage, (src, alt) => setPreview({ src, alt })),
       privateFileExtension(resolveFile),
+      drawingExtension(),
     ],
     [resolveFile, resolveImage],
   );
@@ -802,6 +965,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     () =>
       slashMenuExtension((action) => {
         if (action === "link") onOpenLink();
+        else if (action === "drawing") insertDrawingRef.current();
         else formatRef.current(action);
       }),
     [onOpenLink],
@@ -956,6 +1120,17 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     },
     [collaboration?.document, collaboration?.provider],
   );
+
+  /* Through a ref, like `format` below it: the slash menu is built once and
+     must not be rebuilt because an editor instance arrived. */
+  insertDrawingRef.current = () => {
+    if (!editor || readOnly) return;
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: "drawing", attrs: { strokes: "[]" } })
+      .run();
+  };
 
   const format = useCallback(
     (action: FormatAction) => {

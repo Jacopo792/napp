@@ -22,7 +22,12 @@ import {
   type Account,
   type LocalStack,
 } from "./fixture.ts";
-import { TITLE_TEXT as TITLE } from "../../src/features/editor/lib/ydoc.ts";
+import { updateYFragment } from "y-prosemirror";
+import {
+  BODY_FRAGMENT as BODY,
+  TITLE_TEXT as TITLE,
+  noteSchema,
+} from "../../src/features/editor/lib/ydoc.ts";
 import { createCollaborationServer, type Context } from "./server.ts";
 
 const ORIGIN = "http://localhost:5173";
@@ -632,6 +637,117 @@ describe("the collaboration server", { skip }, () => {
       "a trashed note was still being written to",
     );
     assert.ok(!(await titleOf(noteId)).includes("in the trash"));
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  /* `notes.locked_by` is the note-sized half of this, and Postgres holds it:
+     the row is refused to everybody the column does not name, which the
+     collaboration server reads through the caller's own token like every other
+     answer. */
+  it("hands a locked note back to nobody but the member holding it", async () => {
+    const noteId = await newNote("Taken back", "one of us at a time");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+
+    const locked = await editor.client
+      .from("notes")
+      .update({ locked_by: editor.userId })
+      .eq("id", noteId)
+      .select("locked_by");
+    assert.equal(locked.error, null, locked.error?.message);
+    assert.equal((locked.data ?? []).length, 1, "the lock did not land");
+    await sleep(400);
+
+    append(theirs.doc, " [not theirs to write]");
+    await sleep(1500);
+    assert.ok(!(await titleOf(noteId)).includes("not theirs to write"));
+
+    // Nor may they write the row, lift the lock, or take it for themselves.
+    for (const patch of [
+      { title: "Renamed by the other member" },
+      { locked_by: null },
+      { locked_by: mate.userId },
+      { trashed_at: new Date().toISOString() },
+    ]) {
+      const write = await mate.client.from("notes").update(patch).eq("id", noteId).select("id");
+      assert.equal(
+        (write.data ?? []).length,
+        0,
+        `the other member wrote ${JSON.stringify(patch)} to a locked note`,
+      );
+    }
+
+    // The holder still writes it, and can give it back.
+    append(mine.doc, " [still mine]");
+    await sleep(1500);
+    assert.ok((await titleOf(noteId)).includes("still mine"));
+
+    const lifted = await editor.client
+      .from("notes")
+      .update({ locked_by: null })
+      .eq("id", noteId)
+      .select("id");
+    assert.equal((lifted.data ?? []).length, 1, "the holder could not lift their own lock");
+
+    mine.provider.destroy();
+    theirs.provider.destroy();
+  });
+
+  /* And the passage-sized half, which no policy can hold: the mark lives
+     inside a document both members are entitled to write. The server puts it
+     back — so the words the other member typed never reach the holder's tab
+     and never reach Postgres. */
+  it("puts back a passage the other member had no business writing", async () => {
+    const noteId = await newNote("Held passage", "placeholder");
+    const mine = connect(noteId, editor.token);
+    await until(() => mine.provider.isSynced);
+
+    const passage = (text: string, owner?: string) => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text,
+              ...(owner ? { marks: [{ type: "writeLock", attrs: { owner } }] } : {}),
+            },
+          ],
+        },
+      ],
+    });
+    const write = (doc: Y.Doc, content: ReturnType<typeof passage>) =>
+      doc.transact(() => {
+        updateYFragment(doc, doc.getXmlFragment(BODY), noteSchema().nodeFromJSON(content), {
+          mapping: new Map(),
+          isOMark: new Map(),
+        });
+      });
+
+    write(mine.doc, passage("Mine to write.", editor.userId));
+    await sleep(1500);
+
+    const theirs = connect(noteId, mate.token);
+    await until(() => theirs.provider.isSynced);
+    assert.match(JSON.stringify(theirs.doc.getXmlFragment(BODY).toJSON()), /Mine to write/);
+
+    write(theirs.doc, passage("Theirs to write.", editor.userId));
+    await sleep(2000);
+
+    const body = () => JSON.stringify(mine.doc.getXmlFragment(BODY).toJSON());
+    assert.ok(!body().includes("Theirs to write"), `the lock did not hold: ${body()}`);
+    assert.match(body(), /Mine to write/);
+
+    const stored = await asService(local).from("notes").select("body").eq("id", noteId).single();
+    assert.ok(
+      !((stored.data as { body: string }).body ?? "").includes("Theirs to write"),
+      "a passage nobody was allowed to write reached Postgres",
+    );
 
     mine.provider.destroy();
     theirs.provider.destroy();

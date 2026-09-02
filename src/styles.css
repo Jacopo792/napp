@@ -6279,3 +6279,59 @@
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   cursor: not-allowed;
 }
+
+/* ── A drawing in the note ───────────────────────────────────────────────────
+   A sheet, and the hand's tools under it. The block reads as a piece of paper
+   laid into the column: the same paper the rest of the page is on, with the
+   hairline that says where it ends and a ruled feel from nothing but that.
+
+   The tools sit below rather than over the sheet, because a drawing surface
+   with buttons floating on it is a surface you cannot draw in the corner of. */
+.rich-media-drawing {
+  margin: 1.1rem 0;
+}
+
+.rich-media-drawing-sheet {
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 0.7rem;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.rich-media-drawing-surface {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1000 / 560;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.rich-media-drawing-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-top: 0.4rem;
+}
+
+.drawing-ink {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--rule) inset;
+}
+
+.drawing-ink.is-chosen {
+  border-color: var(--ink-3);
+}
+
+.rich-media-drawing-tools .rich-media-file-action:disabled {
+  opacity: 0.35;
+}
+
+/* The last two tools sit apart from the six inks: choosing a colour and
+   throwing the drawing away are not the same kind of act. */
+.rich-media-drawing-tools .rich-media-file-action:first-of-type {
+  margin-left: 0.35rem;
+}

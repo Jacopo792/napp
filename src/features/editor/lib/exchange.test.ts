@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { richTextToMarkdown } from "./content.ts";
+import { drawingStrokes, richTextToMarkdown } from "./content.ts";
 import { exportFileName, markdownToNote, noteToMarkdown, uniqueFileNames } from "./exchange.ts";
 
 test("a note leaves as Markdown and comes back as the same note", () => {
@@ -196,4 +196,45 @@ test("a note link survives beside emphasis without swallowing it", () => {
   });
   assert.match(markdown, /\[\[/);
   assert.match(markdown, /\*\*/);
+});
+
+/* A drawing carries its own bytes, which is the whole difference between it and
+   `napp-image:`: what leaves is a picture that renders in the vault it lands
+   in rather than a reference only this archive can resolve. */
+test("a drawing leaves as a picture, not as a reference", () => {
+  const markdown = richTextToMarkdown({
+    type: "doc",
+    content: [
+      {
+        type: "drawing",
+        attrs: {
+          strokes: JSON.stringify([{ d: "M10,10L500,300", color: "#5B9BFF", width: 5 }]),
+        },
+      },
+    ],
+  });
+  assert.match(markdown, /<svg[^>]+viewBox="0 0 1000 560"/);
+  assert.match(markdown, /d="M10,10L500,300"/);
+  assert.match(markdown, /stroke="#5B9BFF"/);
+  assert.doesNotMatch(markdown, /napp-|strokes=/);
+});
+
+/* Strokes reach this app from the other member, from an imported file and from
+   whatever was on disk, so they go into an SVG attribute only after being read
+   rather than trusted. */
+test("a stroke that is not a stroke is dropped rather than repaired", () => {
+  /* Valid JSON carrying an invalid path: what would close the `d` attribute
+     and start another one has to be refused by the reader, not by the parser
+     happening to choke on it first. */
+  const hostile = JSON.stringify([{ d: 'M1,1L2,2" onload="alert(1)', color: "#5B9BFF" }]);
+  assert.deepEqual(drawingStrokes(hostile), []);
+  assert.deepEqual(drawingStrokes('[{"d":"M1,1L2,2","color":"javascript:alert(1)"}]'), [
+    { d: "M1,1L2,2", color: "#5B9BFF", width: 5 },
+  ]);
+  assert.deepEqual(drawingStrokes("not json"), []);
+  assert.deepEqual(drawingStrokes('{"d":"M1,1"}'), []);
+  assert.deepEqual(drawingStrokes(undefined), []);
+  assert.deepEqual(drawingStrokes('[{"d":"M1,1L9,9","color":"#F4C550","width":900}]'), [
+    { d: "M1,1L9,9", color: "#F4C550", width: 5 },
+  ]);
 });

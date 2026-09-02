@@ -149,6 +149,111 @@ export const CommentAnchor = Mark.create({
   renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
 });
 
+/* A drawing made by hand, in the note.
+ *
+ * The strokes are the node's own attribute and nothing else: no Storage
+ * object, no upload, no second thing that can be missing when the note is
+ * read. A drawing therefore travels with the document — through Yjs to the
+ * other member, into the Postgres projection, out into an exported file — the
+ * way a paragraph does.
+ *
+ * They are held as a JSON *string* rather than an array, and that is
+ * load-bearing twice. y-prosemirror diffs node attributes with `!==`, so an
+ * array would be a different object on every comparison and would be rewritten
+ * into the document on every keystroke anywhere in the note. And an attribute
+ * Yjs holds as a string is one it stores and compares without knowing anything
+ * about what is in it.
+ *
+ * ponytail: one attribute for the whole drawing, so two people drawing on the
+ * same sketch in the same second keep the later of the two sets of strokes
+ * rather than both. Split it into a child node per stroke if that ever
+ * happens to anybody. */
+
+/** Six inks, saturated enough to read on both grounds — no black, no white,
+ *  because a drawing has to survive the theme being switched under it. */
+export const DRAWING_INKS = [
+  "#5B9BFF",
+  "#F4C550",
+  "#F27FA5",
+  "#69CFA1",
+  "#BF8CF2",
+  "#F5884E",
+] as const;
+
+/** The coordinate space every stroke is stored in, so a drawing scales with
+ *  the column it is read in rather than with the window it was made in. */
+export const DRAWING_BOX = { width: 1000, height: 560 };
+
+export interface DrawingStroke {
+  d: string;
+  color: string;
+  width: number;
+}
+
+/* A document arrives from the other member, from an import, or from whatever a
+   file on disk held. What comes out of it goes into an SVG attribute, so it is
+   read strictly rather than trusted: path data is digits and the handful of
+   commands this writes, and an ink is a hex colour. Anything else is not a
+   stroke and is dropped rather than repaired. */
+const PATH_DATA = /^[ML][-\d.,\s ML]*$/;
+const INK = /^#[0-9a-fA-F]{6}$/;
+
+export function drawingStrokes(value: unknown): DrawingStroke[] {
+  if (typeof value !== "string" || !value) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((entry) => {
+    const stroke = entry as Partial<DrawingStroke> | null;
+    if (!stroke || typeof stroke.d !== "string" || !PATH_DATA.test(stroke.d)) return [];
+    const color =
+      typeof stroke.color === "string" && INK.test(stroke.color) ? stroke.color : DRAWING_INKS[0];
+    const width =
+      typeof stroke.width === "number" && stroke.width > 0 && stroke.width <= 40 ? stroke.width : 5;
+    return [{ d: stroke.d, color, width }];
+  });
+}
+
+/** The drawing as a standalone picture. This is what leaves in an exported
+ *  file: Obsidian renders inline SVG, and unlike `napp-image:` it carries its
+ *  own bytes, so it is a picture in somebody else's vault rather than a broken
+ *  link. One-way, like `[[Title]]` — reading it back would mean parsing
+ *  somebody's arbitrary SVG, and this file is not going to grow a parser. */
+export function drawingSvg(strokes: DrawingStroke[]): string {
+  const paths = strokes
+    .map(
+      (stroke) =>
+        `<path d="${stroke.d}" fill="none" stroke="${stroke.color}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    )
+    .join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${DRAWING_BOX.width} ${DRAWING_BOX.height}" width="${DRAWING_BOX.width}" height="${DRAWING_BOX.height}" role="img" aria-label="Drawing">${paths}</svg>`;
+}
+
+export const Drawing = Node.create({
+  name: "drawing",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      strokes: {
+        default: "[]",
+        parseHTML: (element) => element.getAttribute("strokes") ?? "[]",
+        renderHTML: (attributes) => ({ strokes: attributes.strokes }),
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "napp-drawing" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["napp-drawing", mergeAttributes(HTMLAttributes)];
+  },
+  renderMarkdown: (node) => `${drawingSvg(drawingStrokes(node.attrs?.strokes))}\n\n`,
+});
+
 /** The name of the mark below, needed by anything that reads a document
  *  looking for one rather than building a schema. */
 export const WRITE_LOCK_MARK = "writeLock";
@@ -273,7 +378,7 @@ export const BASE_EXTENSIONS = [
 ];
 
 /** The persisted document schema, whole. */
-export const DOCUMENT_EXTENSIONS = [...BASE_EXTENSIONS, PrivateImage, PrivateFile];
+export const DOCUMENT_EXTENSIONS = [...BASE_EXTENSIONS, PrivateImage, PrivateFile, Drawing];
 
 const legacyMarkdown = new MarkdownManager({
   extensions: DOCUMENT_EXTENSIONS,
