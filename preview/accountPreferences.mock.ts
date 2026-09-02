@@ -1,26 +1,35 @@
 /* The preview has no profile row, so preferences are whatever this browser
    already holds and nothing is ever written back. Presence is on here, unlike
-   the real default, because the point of the preview is to look at the pill. */
+   the real default, because the point of the preview is to look at the pill.
+
+   Kept in step with `@/lib/accountPreferences` by hand: every export the route
+   imports has to exist here, or the whole route fails to load. */
 import { currentAppearance } from "@/lib/appearance";
 import { currentAxes } from "@/lib/axes";
+import { accountPreferences, flagsOf, type AccountFlags } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
 
-export type { AccountFlags, AccountPreferences } from "@/lib/accountPreferences";
+export { flagsOf };
+export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
 
-export const DEFAULT_FLAGS = {
+export const DEFAULT_FLAGS: AccountFlags = {
   presence: true,
   collaborators: true,
   proofreader: true,
-  autoLock: 0 as const,
+  autoLock: 0,
 };
 
+export function preferencesWith(flags: AccountFlags) {
+  return accountPreferences(
+    currentAppearance(),
+    currentAxes(),
+    currentWritingPreferences(),
+    flags,
+  );
+}
+
 export function localPreferences() {
-  return {
-    appearance: currentAppearance(),
-    axes: currentAxes(),
-    writing: currentWritingPreferences(),
-    ...DEFAULT_FLAGS,
-  };
+  return preferencesWith(DEFAULT_FLAGS);
 }
 
 export async function pullAccountPreferences() {

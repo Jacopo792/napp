@@ -1762,7 +1762,8 @@
   transition:
     color 180ms var(--ease),
     background-color 180ms var(--ease),
-    border-color 180ms var(--ease);
+    border-color 180ms var(--ease),
+    transform var(--dur-base) var(--ease-spring);
 }
 
 .toolbar-button:hover,
@@ -4379,7 +4380,7 @@
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
-    transform var(--dur-press) var(--ease-press);
+    transform var(--dur-base) var(--ease-spring);
 }
 
 .menu-row:active {
@@ -6678,5 +6679,101 @@
 
   @page {
     margin: 16mm;
+  }
+}
+
+/* ── Answering the pointer ───────────────────────────────────────────────────
+   Hover states here used to change colour and nothing else, which is a light
+   coming on rather than a thing responding. These give the pointer something
+   with a little mass behind it: a step, or a lift, that goes slightly past
+   where it is going and settles — `--ease-spring`, the overshoot curve that
+   was already in the file for the swipe gesture.
+
+   **The transitions are restated rather than added to, and this block is last
+   in the file on purpose.** `transition` is a shorthand: it replaces the whole
+   list instead of extending it, and every one of these elements already picks
+   one up — from `.press`, and in the sidebar's case from a later rule of its
+   own that narrows the list to `color` alone. Declaring only a `transform`
+   here would have been overwritten and the movement would have snapped.
+
+   Every rule is behind `(hover: hover) and (pointer: fine)`, and that is not
+   politeness. A touch screen has no hover to leave: the state latches on tap
+   and stays on the last thing touched, so a phone would carry one row nudged
+   sideways for the rest of the session.
+
+   Deliberately *not* here: the editor's toolbar clusters. Those already track
+   the pointer with dock magnification and write their transform inline, and
+   the repository guide records why nothing that follows a cursor may carry a
+   transition on transform — a second animation on the same property is the
+   rubber-banding that rule exists to prevent. */
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-target,
+  .sidebar-footer-button,
+  .filter-chip {
+    transition:
+      color var(--dur-fast) var(--ease),
+      background-color var(--dur-fast) var(--ease-press),
+      transform var(--dur-base) var(--ease-spring);
+  }
+
+  .icon-button,
+  .new-note-button,
+  .toolbar-button:not(.editor-tool-button) {
+    transition:
+      color 180ms var(--ease),
+      background-color 180ms var(--ease),
+      border-color 180ms var(--ease),
+      transform var(--dur-base) var(--ease-spring);
+  }
+
+  /* A step toward the pointer rather than a swell. A wide row scaled up reads
+     as the list breathing; the same row moved four pixels reads as the row
+     answering, and the words stay exactly the size they were. The row already
+     carries the spring on its transform — the swipe gesture puts it there
+     inline — so this only has to say where to go. */
+  .note-row:hover {
+    transform: translateX(4px);
+  }
+
+  .sidebar-target:hover,
+  .sidebar-footer-button:hover,
+  .filter-chip:hover {
+    transform: translateX(3px);
+  }
+
+  /* Small, round and isolated: these can afford to grow, which a row cannot. */
+  .icon-button:hover:not(:disabled),
+  .toolbar-button:not(.editor-tool-button):hover:not(:disabled) {
+    transform: scale(1.08);
+  }
+
+  .new-note-button:hover:not(:disabled) {
+    transform: scale(1.04);
+  }
+
+  /* The press wins over the hover — a finger going down is more recent news
+     than a pointer arriving — and it lands on the short flat curve rather than
+     the spring, because a control that overshoots on the way *down* feels
+     loose rather than lively. */
+  .press:active:not(:disabled),
+  .icon-button:active:not(:disabled),
+  .toolbar-button:active:not(:disabled),
+  .sidebar-target:active,
+  .sidebar-footer-button:active {
+    transition: transform var(--dur-press) var(--ease-press);
+  }
+}
+
+/* Somebody who has asked for less movement gets the colour and none of the
+   travel. The rest of the interface already honours this; these must too. */
+@media (prefers-reduced-motion: reduce) {
+  .note-row:hover,
+  .sidebar-target:hover,
+  .sidebar-footer-button:hover,
+  .filter-chip:hover,
+  .icon-button:hover,
+  .toolbar-button:hover,
+  .new-note-button:hover {
+    transform: none;
   }
 }

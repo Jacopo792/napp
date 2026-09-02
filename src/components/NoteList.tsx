@@ -263,7 +263,7 @@ const Row = memo(function Row({
         transform: slid === 0 ? "" : `translateX(${Math.max(-140, Math.min(140, slid))}px)`,
         transition: slid === 0 ? "transform var(--dur-base) var(--ease-spring)" : "none",
       }}
-      className={`group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
+      className={`note-row group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
