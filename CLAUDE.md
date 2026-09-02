@@ -286,6 +286,19 @@ while nothing has shipped. `VITE_COLLAB_URL` was missing for the whole life of
 the collaboration branch and that is exactly how it read. Check the run, not the
 site: `gh run list --branch main --limit 1`.
 
+**The free plan sleeps, and that is answered in two places, neither of which
+is the plan.** `.github/workflows/keep-collab-awake.yml` pings `/healthz` every
+five minutes between 06:00 and 22:59 UTC — a window, not a loop, because a
+workspace gets **750 free instance-hours a calendar month** across every free
+web service and going over does not throttle anything, it _suspends every free
+service until the month turns over_. Round-the-clock pinging spends 744 hours
+in a 31-day month; this window spends about 527, against roughly 260 the
+service was using on its own. `/healthz` and not `/readyz`, so a ping never
+puts a query on Supabase. And the client says what the wait is: `waking` in
+`collab.ts` flips after four unready seconds and the header reads "Waking the
+server" instead of "Connecting", because an unexplained minute is
+indistinguishable from a fault — it was being read as one.
+
 The collaboration server is `notes-collab` on Render, in Frankfurt, built from
 `server/Dockerfile` with the repository root as its build context, with the
 Valkey instance `notes-collab-bus` beside it. `render.yaml` describes it and
@@ -547,8 +560,19 @@ filtered by table RLS; `private_only` is not on globally, so they are undisturbe
 
 ## Preferences belong to the account
 
-`profiles.preferences` is one jsonb column, and `accountPreferences.ts` is the
-only thing that reads or writes it. Appearance, the reading axes, the presence
+`profile_preferences` is one row per account with one jsonb column, and
+`accountPreferences.ts` is the only thing that reads or writes it.
+
+**Its own table, and that is the point.** It was a column on `profiles` for
+half a day, which was wrong twice over and both faults only appeared once
+something wrote it often. `subscribeToArchive` treats any change to `profiles`
+as a wake-up and reloads the whole archive snapshot — so dragging a colour
+slider here reloaded the _other member's_ archive over there. And
+`profiles_read_shared` is a row policy with no column list, so sharing an
+archive would have handed her your wallpaper, your palette and your lock
+timeout. Nobody else may read this table, so nobody else is woken by it.
+`profiles.preferences` still exists, empty, until a client that never asks for
+it has been deployed and confirmed. Appearance, the reading axes, the presence
 palette and the four Privacy/Security switches all used to live in
 localStorage alone, so two browsers signed into the same account disagreed
 about every one of them — silently, which is what made it worth fixing: nothing

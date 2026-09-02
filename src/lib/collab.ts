@@ -18,7 +18,7 @@
  * server, on every message. Losing the network keeps the mounted editor usable
  * and reconnect sends its Yjs updates normally. */
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { BODY_FRAGMENT, collaborationColor, TITLE_TEXT } from "@/features/editor/lib/ydoc";
@@ -27,6 +27,11 @@ import { supabase } from "./supabaseClient";
 const COLLAB_URL = import.meta.env.VITE_COLLAB_URL as string;
 
 export type ConnectionState = "connecting" | "connected" | "offline";
+
+/** How long a note may take to open before the wait is explained rather than
+ *  merely displayed. Short enough that nobody stares at "Connecting" wondering
+ *  whether it is broken; long enough that an ordinary open never trips it. */
+const WAKING_AFTER_MS = 4000;
 
 export interface CollaborationIdentity {
   userId: string;
@@ -61,6 +66,11 @@ export interface CollaborativeNote {
   connection: ConnectionState;
   /** Why the server closed the door: signed out, not a member, no such note. */
   refusal: string;
+  /** Unready for long enough that this is the server rather than the network.
+   *  On the free Render plan it is almost always sleep, which takes about
+   *  fifty seconds — a wait worth naming, because the note refusing to open
+   *  with no reason given is exactly what a fault looks like from a chair. */
+  waking: boolean;
 }
 
 const CLOSED: CollaborativeNote = {
@@ -70,6 +80,7 @@ const CLOSED: CollaborativeNote = {
   cached: false,
   connection: "connecting",
   refusal: "",
+  waking: false,
 };
 
 export { collaborationColor };
@@ -136,7 +147,15 @@ export function useCollaborativeNote(
        reason the `provider.destroy()` below leaves the shared socket alone. */
     provider.attach();
 
-    setState({ doc, provider, ready: false, cached: false, connection: "connecting", refusal: "" });
+    setState({
+      doc,
+      provider,
+      ready: false,
+      cached: false,
+      connection: "connecting",
+      refusal: "",
+      waking: false,
+    });
 
     /* The local store, which is milliseconds away rather than a continent.
        Its job is only to put the words on screen; it decides nothing. What
@@ -189,7 +208,20 @@ export function useCollaborativeNote(
     });
   }, [provider, userId, name]);
 
-  return state;
+  /* Four seconds is "the network is slow"; longer than that, on a plan whose
+     server sleeps after fifteen idle minutes, is the server getting up. Held
+     outside `state` so the timer cannot race the socket's own updates. */
+  const [waking, setWaking] = useState(false);
+  useEffect(() => {
+    if (!noteId || state.ready || state.refusal) {
+      setWaking(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setWaking(true), WAKING_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [noteId, state.ready, state.refusal]);
+
+  return useMemo(() => ({ ...state, waking }), [state, waking]);
 }
 
 /** Who else is on this page, from awareness alone — never stored, and gone the

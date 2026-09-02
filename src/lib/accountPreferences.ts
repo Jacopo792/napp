@@ -136,7 +136,7 @@ let settled = "";
 
 export async function pullAccountPreferences(session: AppSession): Promise<AccountPreferences> {
   const result = await supabase
-    .from("profiles")
+    .from("profile_preferences")
     .select("preferences")
     .eq("user_id", session.userId)
     .maybeSingle();
@@ -167,7 +167,7 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
        function as one more change to push. */
     void shareWallpaper(session).catch(() => undefined);
     void supabase
-      .from("profiles")
+      .from("profile_preferences")
       .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
   }, 500);
 }
@@ -187,8 +187,18 @@ export async function unsubscribeFromAccountPreferences(channel: RealtimeChannel
   await supabase.removeChannel(channel);
 }
 
-/** The other browser's change, arriving. Filtered to this account's own row,
- *  so the roster's profile updates do not wake it. */
+/** The other browser's change, arriving.
+ *
+ *  Its own table, and not a column on `profiles`, for two reasons that only
+ *  appeared once something wrote it often. `subscribeToArchive` treats any
+ *  change to `profiles` as a wake-up and reloads the whole archive snapshot —
+ *  so a colour slider dragged here reloaded *her* archive over there. And
+ *  `profiles_read_shared` has no column list, so sharing an archive would have
+ *  handed her your wallpaper, your palette and your lock timeout.
+ *
+ *  `*` rather than `UPDATE`: the first write an account ever makes is the
+ *  insert half of the upsert, and the browser left open in the other room
+ *  wants that one too. */
 export function subscribeToAccountPreferences(
   session: AppSession,
   onChange: (preferences: AccountPreferences) => void,
@@ -198,9 +208,9 @@ export function subscribeToAccountPreferences(
     .on(
       "postgres_changes",
       {
-        event: "UPDATE",
+        event: "*",
         schema: "public",
-        table: "profiles",
+        table: "profile_preferences",
         filter: `user_id=eq.${session.userId}`,
       },
       (payload) => {

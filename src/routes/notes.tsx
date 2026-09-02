@@ -1874,6 +1874,28 @@ function NotesPage() {
         void handleNew();
         return;
       }
+      /* Three doors that had none, all above the `typing` guard because all
+         three are things you reach for *while* writing — which is exactly when
+         that guard hands the key back to the field it was typed in.
+
+         The keys are the conventions rather than choices: ⌘, is Preferences on
+         every Mac application there has ever been, and neither ⌘. nor ⌘\ means
+         anything inside the text, so no formatting shortcut loses its key. */
+      if (mod && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+        return;
+      }
+      if (mod && e.key === ".") {
+        e.preventDefault();
+        toggleFocus();
+        return;
+      }
+      if (mod && e.key === "\\") {
+        e.preventDefault();
+        setNavigationOpen((current) => !current);
+        return;
+      }
       if (typing) return;
 
       if (e.key === "?") {
@@ -2272,7 +2294,22 @@ function NotesPage() {
   ) : statusFlash ? (
     <span className="label text-accent">{statusFlash}</span>
   ) : selectedId && !collaborative.ready ? (
-    <span className="label text-ink-4">Connecting</span>
+    /* The free plan's server sleeps after fifteen idle minutes and takes about
+       fifty seconds to get up, and nothing opens until it has. Saying so is
+       most of the fix: an unexplained wait is indistinguishable from a fault,
+       and this one was being read as "live is broken again". What you type
+       meanwhile is kept and sent on arrival, which is the other half worth
+       saying — so it goes in the tooltip rather than in a second line. */
+    <span
+      className="label text-ink-4"
+      title={
+        collaborative.waking
+          ? "The collaboration server sleeps when nobody is writing and takes about a minute to wake. Anything you type now is kept on this device and sent when it arrives."
+          : undefined
+      }
+    >
+      {collaborative.waking ? "Waking the server" : "Connecting"}
+    </span>
   ) : selectedId && collaborative.connection === "offline" ? (
     <span className="label text-ink-2" title="Changes stay on this device and sync on reconnect">
       Offline
@@ -2285,9 +2322,13 @@ function NotesPage() {
     <span className="label text-accent">Updated elsewhere</span>
   ) : (
     <span className="flex items-center gap-2">
-      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>
-        {selectedId ? "Live" : "Saved"}
-      </span>
+      {/* "Saved", not "Live". This readout is the state of the *write*, and
+          the word "Live" beside a row of collaborators was read — by the
+          person who commissioned the app, which settles it — as the presence
+          feature rather than as "nothing is pending". Every other state here
+          already says what it means, and the two that were about the socket
+          say so in their own words: Connecting, Waking the server, Offline. */}
+      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Saved</span>
       {lastSavedAt && (
         <span className="readout tabular-nums text-ink-4">{formatStamp(lastSavedAt)}</span>
       )}
