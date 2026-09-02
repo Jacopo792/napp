@@ -5459,6 +5459,33 @@
   max-height: 34rem;
   object-fit: contain;
 }
+/* The picture and the ink over it, and nothing else: the caption below is not
+   part of the picture and must not be drawn on. */
+.rich-media-image-frame {
+  position: relative;
+  display: block;
+}
+
+.rich-media-image-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.rich-media-image-ink.is-drawing {
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.rich-media-image-ink.is-erasing {
+  cursor: cell;
+  pointer-events: auto;
+  touch-action: none;
+}
+
 .rich-media-remove {
   position: absolute;
   top: 0.55rem;
@@ -5476,6 +5503,19 @@
 }
 .rich-media-image:hover .rich-media-remove,
 .rich-media-remove:focus-visible {
+  opacity: 1;
+}
+
+/* The pen sits beside the bin, and stays out once it is in hand — a control
+   that vanishes when the pointer leaves is a control you cannot put down. */
+.rich-media-remove.is-ink {
+  right: 3.15rem;
+  color: var(--ink-2);
+}
+
+.rich-media-remove.is-ink.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
   opacity: 1;
 }
 .rich-media-caption {

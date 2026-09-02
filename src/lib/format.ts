@@ -1,3 +1,13 @@
+/** The form a word is searched in: lower case, and without the marks over its
+ *  letters. `perche` finds "perché", which is how it is typed when somebody is
+ *  in a hurry — and an archive written in Italian is mostly accents. */
+export function fold(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
 /** Collapse a note's searchable plain text into one readable preview line. */
 export function previewOf(body: string): string {
   return body.replace(/\s+/g, " ").trim();

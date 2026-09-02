@@ -173,10 +173,33 @@ up. The words underneath stay words.
 - Six inks are one press each; every other colour is an `<input type="color">`
   **inside a label**, invisible, with the label as the swatch. Styling the
   input itself means three vendor pseudo-elements that disagree, one of which
-  draws a blue halo. The ink and the nib are module-level, so a colour chosen
-  once is still chosen on the next drawing and on the other surface.
+  draws a blue halo. The ink, the nib and the highlighter are module-level, so
+  what was chosen once is still chosen on the next drawing and on the other
+  surface.
+- The **highlighter** is one wide nib and the chosen ink with an alpha on the
+  end. Translucency is a property of the colour, not a field on every stroke
+  ever written — which is why `INK` admits eight hex digits as well as six.
 - The eraser takes whole strokes, not pixels of them: half a line left behind
   is a line somebody has to go back for.
+- **Hold still and the stroke becomes the shape it meant.** `straightenStroke`
+  measures the points against a line, a rectangle and an ellipse rather than
+  recognising anything, and emits the winner in `M`/`L` alone — a stored format
+  that grows a curve command is a stored format every reader has to learn.
+  Moving away again takes the scrawl back, because a shape you cannot refuse is
+  worse than no shape.
+- **Three surfaces, one hand.** `useInk` holds the ink, the nib, the eraser and
+  the gesture; a board, the page and a picture in the note differ only in the
+  box the strokes are measured in. A picture keeps its strokes in
+  `privateImage.strokes` and they do not leave in an export, because the
+  picture does not either.
+- **Measure the parent, not the `<svg>`.** Chrome fires no `ResizeObserver`
+  callback at all — not even the first — for an SVG sized entirely by its
+  parent, so a layer that measured itself stayed the shape of a board and the
+  ink landed below the hand.
+
+Searching folds the marks off its letters, both sides (`fold()` in
+`format.ts`): `perche` finds "perché", which is how it is typed by anybody in a
+hurry, and this archive is written in Italian.
 
 ## The shelf and the waiting room
 
@@ -190,6 +213,12 @@ Whether the other members see your archived notes is the one boundary in this
 archive that is _not_ plain membership, and it is enforced in Postgres for the
 reason every boundary here is: a list filtered in the browser has already
 handed the rows over. `SECURITY.md` records what the hiding is worth.
+
+Trash empties itself after **thirty days**, once a session and only in your own
+scope — the other member's browser keeps their side, and two clients racing to
+delete the same rows is a second delete that finds nothing. The Trash's own
+tally says so under its name: the reader is owed the fact that something will be
+destroyed for them, and the line that is already there is where it goes.
 
 Each place has one act it can perform on everything in it, in the ⋯ menu beside
 "Export all as Markdown", and they are not the same kind of act: emptying the

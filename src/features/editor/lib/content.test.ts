@@ -3,6 +3,7 @@ import test from "node:test";
 import type { JSONContent } from "@tiptap/react";
 import {
   DRAWING_BOX,
+  DRAWING_INKS,
   checklistProgress,
   documentGlyph,
   drawingBox,
@@ -11,6 +12,7 @@ import {
   firstDrawing,
   legacyMarkdownToRichText,
   richTextToPlainText,
+  straightenStroke,
   withoutInvisibleDocumentEnding,
 } from "./content.ts";
 
@@ -115,4 +117,60 @@ test("a page drawing exports a box as tall as its lowest stroke", () => {
   assert.deepEqual(drawingBox(strokes, "board"), DRAWING_BOX);
   assert.deepEqual(drawingBox(strokes, "page"), { width: 1000, height: 906 });
   assert.match(drawingSvg(strokes, "page"), /viewBox="0 0 1000 906"/);
+});
+
+/* Held still at the end of a stroke, a scrawl becomes the shape it was aiming
+   at — or stays a scrawl, which is the answer for most of them. */
+test("a held stroke becomes the shape it was meant to be", () => {
+  const wobblyLine = [
+    { x: 100, y: 100 },
+    { x: 200, y: 108 },
+    { x: 300, y: 96 },
+    { x: 400, y: 104 },
+  ];
+  assert.equal(straightenStroke(wobblyLine), "M100,100L400,104");
+
+  const circle = Array.from({ length: 40 }, (_, i) => {
+    const a = (i / 39) * Math.PI * 2;
+    return { x: 500 + 200 * Math.cos(a) + (i % 3), y: 500 + 200 * Math.sin(a) - (i % 2) };
+  });
+  const round = straightenStroke(circle);
+  assert.equal(round?.split("L").length, 49, "an ellipse is drawn as forty-eight segments");
+
+  const square = [
+    ...Array.from({ length: 10 }, (_, i) => ({ x: 100 + i * 30, y: 100 })),
+    ...Array.from({ length: 10 }, (_, i) => ({ x: 400, y: 100 + i * 30 })),
+    ...Array.from({ length: 10 }, (_, i) => ({ x: 400 - i * 30, y: 400 })),
+    ...Array.from({ length: 10 }, (_, i) => ({ x: 100, y: 400 - i * 30 })),
+    { x: 100, y: 100 },
+  ];
+  assert.equal(straightenStroke(square)?.split("L").length, 5, "a rectangle is four corners back");
+
+  // Too small, too few points: a tick is a tick.
+  assert.equal(straightenStroke([{ x: 0, y: 0 }]), null);
+  assert.equal(
+    straightenStroke([
+      { x: 0, y: 0 },
+      { x: 3, y: 3 },
+      { x: 6, y: 2 },
+      { x: 9, y: 5 },
+    ]),
+    null,
+  );
+});
+
+/* The highlighter is the ink with an alpha on the end, so the reader has to
+   admit eight digits as well as six. */
+test("an ink may carry an alpha", () => {
+  const strokes = drawingStrokes(
+    JSON.stringify([
+      { d: "M0,0L10,10", color: "#5B9BFF59", width: 30 },
+      { d: "M0,0L10,10", color: "#5B9BFF", width: 6 },
+      { d: "M0,0L10,10", color: "not a colour", width: 6 },
+    ]),
+  );
+  assert.deepEqual(
+    strokes.map((s) => s.color),
+    ["#5B9BFF59", "#5B9BFF", DRAWING_INKS[0]],
+  );
 });

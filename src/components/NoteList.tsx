@@ -471,9 +471,15 @@ const Row = memo(function Row({
 });
 
 /** The tally under the collection's name. One note is a note — said in both
- *  headers below, so it is said here once. */
-function noteTally(count: number): string {
-  return `${count} ${count === 1 ? "note" : "notes"}`;
+ *  headers below, so it is said here once.
+ *
+ *  The Trash says the one thing about it that is not visible in it: that
+ *  waiting here runs out. It is the tally answering, not a paragraph under a
+ *  control — the reader is owed the fact that something will be destroyed for
+ *  them, and this is the line that is already there to say it. */
+function noteTally(count: number, trash = false): string {
+  const notes = `${count} ${count === 1 ? "note" : "notes"}`;
+  return trash && count > 0 ? `${notes} · deleted for good after 30 days` : notes;
 }
 
 function Skeletons() {
@@ -892,7 +898,7 @@ export function NoteList({
               {folderLabel}
             </h1>
             <p className="readout mt-1.5 text-ink-4">
-              {loading ? "Loading" : noteTally(entries.length)}
+              {loading ? "Loading" : noteTally(entries.length, trashMode)}
             </p>
           </div>
           <span className="flex items-center gap-1">{toolbarActions}</span>
@@ -985,7 +991,7 @@ export function NoteList({
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">
-            {loading ? "Loading" : noteTally(entries.length)}
+            {loading ? "Loading" : noteTally(entries.length, trashMode)}
           </p>
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged

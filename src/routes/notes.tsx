@@ -81,7 +81,7 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { formatStamp } from "@/lib/format";
+import { fold, formatStamp } from "@/lib/format";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
   clearDrafts,
@@ -781,7 +781,8 @@ function NotesPage() {
       }
     }
 
-    const q = query.trim().toLowerCase();
+    /* Folded, like the haystack it is looked for in. */
+    const q = fold(query.trim());
     if (q) {
       list = list.filter((e) => derivedOf(e.note).haystack.includes(q));
     }
@@ -1638,6 +1639,30 @@ function NotesPage() {
     [selectedId, handleMetaChange],
   );
 
+  /* Trash is a waiting room, not a cupboard. A note that has been in it for a
+     month is a note nobody came back for, and an archive whose Trash is only
+     ever emptied by hand is an archive that never empties it. Thirty days is
+     what the Trash itself says under its own name.
+
+     Once a session, and only in your own scope: the other member's browser
+     keeps their side, and two clients racing to delete the same rows is a
+     second delete that finds nothing. */
+  const swept = useRef(false);
+  useEffect(() => {
+    if (!session || loading || !canWriteArchive || swept.current) return;
+    if (viewAs !== session.userId) return;
+    const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const stale = new Set(
+      activeMeta.notes
+        .filter((note) => note.trashedAt && note.trashedAt < cutoff)
+        .map((note) => note.id),
+    );
+    if (stale.size === 0) return;
+    swept.current = true;
+    void deleteForever(entriesRef.current.filter((entry) => stale.has(entry.note.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMeta, canWriteArchive, loading, session, viewAs]);
+
   /* One note or the whole trash: the same four prunes either way — the draft
      store, the loaded entries, this scope's metadata, and the selection if it
      was pointing at something that just stopped existing. */
@@ -1791,6 +1816,17 @@ function NotesPage() {
         }
         setPaletteQuery("");
         setPaletteOpen(true);
+        return;
+      }
+      /* The pen, without the menu. Above the guard below because it is a thing
+         you reach for *while* writing, which is exactly when the guard says a
+         key belongs to the field it was typed in. */
+      /* `code`, not `key`: Option and D together are "∂" on a Mac, and a
+         shortcut that has to be spelled in dead keys is a shortcut nobody
+         writes down. */
+      if (e.altKey && !mod && e.code === "KeyD" && selectedId && canEdit) {
+        e.preventDefault();
+        noteEditorRef.current?.drawOnPage();
         return;
       }
       if (mod && e.key.toLowerCase() === "n") {

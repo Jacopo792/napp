@@ -23,6 +23,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "The list", keys: "J K", what: "Move between notes" },
   { group: "The list", keys: "\u2325 \u2191 \u2193", what: "Move between days" },
   { group: "The list", keys: "\u21b5", what: "Open the title of the selected note" },
+  { group: "In a note", keys: "\u2325D", what: "Draw on the page" },
   { group: "In a note", keys: "\u2318F", what: "Find in this note" },
   { group: "In a note", keys: "\u2318K", what: "Link the selected words" },
   { group: "In a note", keys: "/", what: "Formatting and blocks" },

@@ -2,7 +2,7 @@
    runs under `node --experimental-strip-types`, which does not resolve an
    extensionless relative import. `allowImportingTsExtensions` is already on, so
    the extension costs nothing and is what makes this file testable. */
-import { countWords, previewOf } from "./format.ts";
+import { countWords, fold, previewOf } from "./format.ts";
 import type { Note, Folder, Meta, NoteMeta } from "./types.ts";
 
 /* ── Derived reading, computed once ──────────────────────────────────────────
@@ -33,7 +33,7 @@ export function derivedOf(note: Note): Derived {
     derived = {
       preview: previewOf(note.body),
       words: countWords(note.body),
-      haystack: `${note.title}\n${note.body}`.toLowerCase(),
+      haystack: fold(`${note.title}\n${note.body}`),
     };
     notes.set(note, derived);
   }

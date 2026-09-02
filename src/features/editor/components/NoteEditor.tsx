@@ -105,6 +105,7 @@ const TOOLBAR_ROOM = 550;
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
   openLink: () => void;
+  drawOnPage: () => void;
   focus: () => void;
 }
 
@@ -242,6 +243,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     },
     openLink() {
       openLinkForm();
+    },
+    /* Taking up the pen without going to the menu for it. The command is the
+       same one the menu runs, so there is one path in and one place it can be
+       wrong. */
+    drawOnPage() {
+      editorRef.current?.format("drawing-page");
     },
     focus() {
       editorRef.current?.focus();

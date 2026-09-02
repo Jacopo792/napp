@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
+import { fold } from "@/lib/format";
 import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
 
 export interface Command {
@@ -25,13 +26,13 @@ export interface Command {
 const RESTING_LIMIT = 5;
 
 function score(command: Command, query: string): number {
-  const name = command.name.toLowerCase();
+  const name = fold(command.name);
   if (name.startsWith(query)) return 0;
   const word = name.split(/\s+/).some((part) => part.startsWith(query));
   if (word) return 1;
   if (name.includes(query)) return 2;
-  if (command.keywords?.toLowerCase().includes(query)) return 3;
-  if (command.hint?.toLowerCase().includes(query)) return 4;
+  if (command.keywords && fold(command.keywords).includes(query)) return 3;
+  if (command.hint && fold(command.hint).includes(query)) return 4;
   return -1;
 }
 
@@ -62,7 +63,7 @@ export function CommandPalette({
      order of a resting palette is the caller's editorial decision and not
      whatever the sort happened to produce. */
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = fold(query.trim());
     const ranked = q
       ? commands
           .map((command) => ({ command, rank: score(command, q) }))

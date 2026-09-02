@@ -79,7 +79,15 @@ export const PrivateImage = Node.create({
   atom: true,
   draggable: true,
   addAttributes() {
-    return { objectId: { default: "" }, alt: { default: "Image" } };
+    return {
+      objectId: { default: "" },
+      alt: { default: "Image" },
+      /* Ink over the picture, held exactly the way a drawing holds it — a JSON
+         string, for the two reasons in `Drawing` below. It does not leave in
+         an export: a picture leaves as `napp-image:`, which carries no bytes
+         of its own, so there is nothing for the strokes to be drawn on. */
+      strokes: { default: "[]" },
+    };
   },
   parseHTML: () => [{ tag: "napp-private-image" }],
   renderHTML({ HTMLAttributes }) {
@@ -202,7 +210,10 @@ export interface DrawingStroke {
    commands this writes, and an ink is a hex colour. Anything else is not a
    stroke and is dropped rather than repaired. */
 const PATH_DATA = /^[ML][-\d.,\s ML]*$/;
-const INK = /^#[0-9a-fA-F]{6}$/;
+/* Six or eight digits: the highlighter is the same ink with an alpha on the
+   end, which keeps a translucent stroke a colour rather than a second field on
+   every stroke ever written. */
+const INK = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
 
 export function drawingStrokes(value: unknown): DrawingStroke[] {
   if (typeof value !== "string" || !value) return [];
@@ -265,6 +276,76 @@ export function drawingBox(
     }
   }
   return { width: DRAWING_BOX.width, height: Math.max(Math.ceil(lowest), 1) };
+}
+
+/** A stroke somebody held still at the end of, as the shape they meant.
+ *
+ *  Three shapes and no more: a line, a rectangle, an ellipse. Which one is
+ *  decided by measuring the points against each candidate rather than by
+ *  recognising anything — a closed stroke is whichever of the two it sits
+ *  closer to, in units of its own half-size so a small circle is judged as
+ *  strictly as a large one.
+ *
+ *  The ellipse is emitted as line segments because `PATH_DATA` above admits
+ *  `M` and `L` and nothing else, and a stored format that grows a curve
+ *  command is a stored format every reader has to learn. Forty-eight segments
+ *  is smooth at any size a note is read at.
+ *
+ *  Null means the stroke is too small or too short to have meant a shape,
+ *  which is the answer for a tick, a dot, or a scribble. */
+export function straightenStroke(points: { x: number; y: number }[]): string | null {
+  if (points.length < 4) return null;
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const left = Math.min(...xs);
+  const right = Math.max(...xs);
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  const width = right - left;
+  const height = bottom - top;
+  const span = Math.max(width, height);
+  if (span < 40) return null;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const closed = Math.hypot(last.x - first.x, last.y - first.y) < span * 0.3;
+  const round = (n: number) => Math.round(n);
+  if (!closed) return `M${round(first.x)},${round(first.y)}L${round(last.x)},${round(last.y)}`;
+
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  const rx = Math.max(width / 2, 1);
+  const ry = Math.max(height / 2, 1);
+  const half = span / 2;
+
+  const mean = (of: (p: { x: number; y: number }) => number) =>
+    points.reduce((sum, p) => sum + of(p), 0) / points.length;
+  const roundness = mean((p) => Math.abs(Math.hypot((p.x - cx) / rx, (p.y - cy) / ry) - 1));
+  const squareness = mean(
+    (p) =>
+      Math.min(
+        Math.abs(p.x - left),
+        Math.abs(right - p.x),
+        Math.abs(p.y - top),
+        Math.abs(bottom - p.y),
+      ) / half,
+  );
+
+  if (squareness < roundness) {
+    return (
+      `M${round(left)},${round(top)}L${round(right)},${round(top)}` +
+      `L${round(right)},${round(bottom)}L${round(left)},${round(bottom)}L${round(left)},${round(top)}`
+    );
+  }
+  const steps = 48;
+  let path = "";
+  for (let step = 0; step <= steps; step += 1) {
+    const angle = (step / steps) * Math.PI * 2;
+    const x = round(cx + rx * Math.cos(angle));
+    const y = round(cy + ry * Math.sin(angle));
+    path += `${step === 0 ? "M" : "L"}${x},${y}`;
+  }
+  return path;
 }
 
 export const Drawing = Node.create({

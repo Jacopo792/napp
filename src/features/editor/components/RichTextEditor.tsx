@@ -23,6 +23,7 @@ import {
   Eraser,
   ExternalLink,
   GripVertical,
+  Highlighter,
   Lock,
   MessageSquarePlus,
   Pencil,
@@ -52,6 +53,7 @@ import {
   type TextColor,
   drawingStrokes,
   drawingSurface,
+  straightenStroke,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
@@ -535,7 +537,13 @@ function slashMenuExtension(run: (action: SlashCommand["action"]) => void) {
   });
 }
 
-function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps) {
+function PrivateImageView({
+  node,
+  extension,
+  updateAttributes,
+  deleteNode,
+  editor,
+}: NodeViewProps) {
   const { objectId, alt } = node.attrs as { objectId: string; alt: string };
   const options = extension.options as PrivateImageOptions;
   const resolveImage = options.resolve;
@@ -546,6 +554,23 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
      Storage yet, left a permanent "could not be displayed" in a note whose
      picture was perfectly fine. Bumping this re-runs the effect. */
   const [attempt, setAttempt] = useState(0);
+
+  /* Ink over the picture. A photograph of a page of notes is the thing people
+     most want to write on, and the layer is the same one the note itself
+     takes — same hand, same box, measured against the picture's width. It is
+     put down until it is picked up, so the picture still opens when clicked. */
+  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
+  const writeInk = useCallback(
+    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
+    [updateAttributes],
+  );
+  const [pen, setPen] = useState(false);
+  const ink = useInk({
+    strokes,
+    write: writeInk,
+    fit: "width",
+    editable: editor.isEditable,
+  });
 
   useEffect(() => {
     let active = true;
@@ -570,28 +595,59 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
 
   return (
     <NodeViewWrapper className={`rich-media-image ${error ? "is-error" : ""}`}>
-      {src ? (
+      {/* The frame is what the ink lies over, and it holds the picture alone:
+          an overlay on the wrapper would reach down over the caption, and the
+          caption is not part of the picture. */}
+      <span className="rich-media-image-frame" contentEditable={false}>
+        {src ? (
+          <button
+            type="button"
+            className="rich-media-image-open"
+            onClick={() => options.open(src, alt || "Image")}
+          >
+            <img src={src} alt={alt || "Image"} draggable={false} />
+          </button>
+        ) : (
+          <span className="rich-media-loading">
+            {error || "Loading image…"}
+            {error && (
+              <button
+                type="button"
+                className="rich-media-retry"
+                onClick={() => setAttempt((count) => count + 1)}
+              >
+                Try again
+              </button>
+            )}
+          </span>
+        )}
+        {/* Always mounted, even with nothing on it: the layer measures itself
+            to know how tall it is in stroke units, and a layer that appears
+            only once the pen is out has nothing to measure until too late. */}
+        <svg
+          ref={ink.surface}
+          className={`rich-media-image-ink ${pen && !ink.erasing ? "is-drawing" : ""} ${
+            pen && ink.erasing ? "is-erasing" : ""
+          }`}
+          viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
+          preserveAspectRatio="none"
+          onPointerDown={ink.start}
+        >
+          {ink.inked}
+        </svg>
+      </span>
+      {editor.isEditable && (
         <button
           type="button"
-          className="rich-media-image-open"
-          onClick={() => options.open(src, alt || "Image")}
+          className={`rich-media-remove is-ink ${pen ? "is-active" : ""}`}
+          aria-label={pen ? "Put the pen down" : "Draw on this picture"}
+          title={pen ? "Put the pen down" : "Draw on this picture"}
+          aria-pressed={pen}
+          onClick={() => setPen((on) => !on)}
           contentEditable={false}
         >
-          <img src={src} alt={alt || "Image"} draggable={false} />
+          {pen ? <Check size={15} /> : <Pencil size={15} />}
         </button>
-      ) : (
-        <div className="rich-media-loading" contentEditable={false}>
-          {error || "Loading image…"}
-          {error && (
-            <button
-              type="button"
-              className="rich-media-retry"
-              onClick={() => setAttempt((count) => count + 1)}
-            >
-              Try again
-            </button>
-          )}
-        </div>
       )}
       {editor.isEditable && (
         <button
@@ -604,6 +660,11 @@ function PrivateImageView({ node, extension, deleteNode, editor }: NodeViewProps
         >
           <Trash2 size={15} />
         </button>
+      )}
+      {editor.isEditable && pen && (
+        <span className="rich-media-drawing-tools" contentEditable={false}>
+          {ink.tools}
+        </span>
       )}
       {alt && alt !== "Image" && <span className="rich-media-caption">{alt}</span>}
     </NodeViewWrapper>
@@ -735,15 +796,27 @@ const TAKE_UP_THE_PEN = "napp:take-up-the-pen";
 let penWanted = false;
 
 /** The ink and the nib outlive the drawing they were chosen on: picking red
- *  once should not have to be done again on the next sketch, or on the other
- *  surface. Module-level because it is a fact about the hand, not about any
- *  document — nothing here is ever written to a note. */
+ *  once should not have to be done again on the next sketch, on the next
+ *  picture, or on the other surface. Module-level because it is a fact about
+ *  the hand, not about any document — nothing here is ever written to a note. */
 let lastInk: string = DRAWING_INKS[0];
 let lastNib = 5;
+let lastMarker = false;
 
 /** Three nibs. A slider offers a hundred widths nobody wants to choose
  *  between; these are a fine line, a line, and a marker. */
 const DRAWING_NIBS = [3, 6, 13];
+
+/** The highlighter: one wide nib, and the chosen ink with an alpha on the end
+ *  so the words underneath are still readable through it. Translucency is a
+ *  property of the colour rather than a field of its own, so nothing that
+ *  reads a stroke has to learn about highlighters. */
+const MARKER_NIB = 30;
+const MARKER_ALPHA = "59";
+
+/** How long the pointer has to hold still at the end of a stroke before the
+ *  stroke becomes the shape it was aiming at. */
+const STRAIGHTEN_AFTER_MS = 450;
 
 /** The points a stroke passes through, for the eraser to measure against. */
 function strokePoints(d: string): { x: number; y: number }[] {
@@ -756,56 +829,81 @@ function strokePoints(d: string): { x: number; y: number }[] {
     });
 }
 
-function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
-  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
-  const onPage = drawingSurface(node.attrs.surface) === "page";
+/* ── One hand, three surfaces ────────────────────────────────────────────────
+   A board, the page itself, and a picture in the note all take the same ink in
+   the same way, so they take it from here. What differs is only the box the
+   strokes are measured in: a board is always 1000 × 560, and everything else
+   measures both axes against its own width — which is what keeps a drawing the
+   shape it was drawn as when the column it is read in is narrower.
+
+   A stroke is gathered in local state while the pointer is down and written to
+   the document once, on release. Writing per pointer event would be a Yjs
+   update per pixel of a gesture, sent to the other member and persisted, for a
+   line nobody has finished drawing yet.
+
+   The pointer is followed with `window` listeners rather than
+   `setPointerCapture`, for the reason the cover learned the hard way: a
+   captured pointer retargets the click that follows to the capturing element,
+   and every control sitting on this surface would go dead the moment somebody
+   drew on it.
+
+   ponytail: a stroke is placed against the width it was drawn on, not against
+   the words under it — so a note read at another width keeps the shape of the
+   drawing and loses which paragraph it was pointing at. Anchoring ink to text
+   means a mark in the document, like `CommentAnchor`, and a drawing that is a
+   mark is a different feature. ──────────────────────────────────────────── */
+function useInk({
+  strokes,
+  write,
+  fit,
+  editable,
+}: {
+  strokes: DrawingStroke[];
+  write: (next: DrawingStroke[]) => void;
+  fit: "board" | "width";
+  editable: boolean;
+}) {
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
+  const [marker, setMarker] = useState<boolean>(lastMarker);
   const [erasing, setErasing] = useState(false);
-  /* The pen is in hand only if this layer is the one that was just asked for.
-     Coming back to a note is coming back to read or to write it; drawing on it
-     again is a thing you ask for, from the ⋯ palette or from the pen in the
-     corner. A board has no pen state at all: it is a sheet, and there is
-     nothing on it to protect from the pointer. */
-  const [pen, setPen] = useState(() => {
-    if (!onPage || !penWanted) return false;
-    penWanted = false;
-    return true;
-  });
-  useEffect(() => {
-    if (!onPage) return;
-    const take = () => setPen(true);
-    window.addEventListener(TAKE_UP_THE_PEN, take);
-    return () => window.removeEventListener(TAKE_UP_THE_PEN, take);
-  }, [onPage]);
   const [drawing, setDrawing] = useState<string>("");
   const surface = useRef<SVGSVGElement>(null);
   const path = useRef<string>("");
+  const trail = useRef<{ x: number; y: number }[]>([]);
+  const snapped = useRef<string | null>(null);
   const live = useRef(strokes);
   live.current = strokes;
 
-  /* What the layer is, in the units the strokes are stored in. A board is
-     always the same box; a page is as tall as the note it is over, which
-     nothing knows until it has been laid out. */
+  const width = marker ? MARKER_NIB : nib;
+  const laid = marker ? `${ink}${MARKER_ALPHA}` : ink;
+
+  /* What the surface is, in the units the strokes are stored in. A board is
+     always the same box; anything measured against its width is as tall as
+     whatever it is lying over, which nothing knows until it has been laid
+     out. */
   const [aspect, setAspect] = useState(DRAWING_BOX.height / DRAWING_BOX.width);
   useEffect(() => {
-    const element = surface.current;
-    if (!onPage || !element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0) setAspect(height / width);
-    });
+    /* The element the layer is stretched over, not the layer: Chrome reports
+       no resize at all for an `<svg>` sized entirely by its parent — no
+       initial callback either — so a surface that measured itself stayed the
+       shape of a board, and the ink landed a little below the hand. The parent
+       is an ordinary box and is observed properly. */
+    const element = surface.current?.parentElement;
+    if (fit === "board" || !element) return;
+    const measure = () => {
+      const box = element.getBoundingClientRect();
+      if (box.width > 0) setAspect(box.height / box.width);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [onPage]);
-  const box = onPage
-    ? { width: DRAWING_BOX.width, height: Math.round(DRAWING_BOX.width * aspect) }
-    : DRAWING_BOX;
-
-  const write = useCallback(
-    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
-    [updateAttributes],
-  );
+  }, [fit]);
+  const box =
+    fit === "board"
+      ? DRAWING_BOX
+      : { width: DRAWING_BOX.width, height: Math.max(1, Math.round(DRAWING_BOX.width * aspect)) };
 
   const choose = useCallback((colour: string) => {
     lastInk = colour;
@@ -813,20 +911,20 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
     setErasing(false);
   }, []);
 
-  /* A page measures both axes against the width, so the drawing keeps its
-     shape in a narrower column instead of being squashed into it. */
   const at = useCallback(
     (event: { clientX: number; clientY: number }) => {
       const rect = surface.current?.getBoundingClientRect();
       if (!rect || rect.width === 0) return null;
-      const x = Math.round(((event.clientX - rect.left) / rect.width) * DRAWING_BOX.width);
+      const scale = DRAWING_BOX.width / rect.width;
+      const x = Math.round((event.clientX - rect.left) * scale);
       const y = Math.round(
-        ((event.clientY - rect.top) / (onPage ? rect.width : rect.height)) *
-          (onPage ? DRAWING_BOX.width : DRAWING_BOX.height),
+        fit === "board"
+          ? ((event.clientY - rect.top) / rect.height) * DRAWING_BOX.height
+          : (event.clientY - rect.top) * scale,
       );
       return { x, y, at: `${x},${y}` };
     },
-    [onPage],
+    [fit],
   );
 
   /** The eraser takes whole strokes, not pixels of them. Half a line left
@@ -841,14 +939,14 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
       );
       if (kept.length !== live.current.length) {
         live.current = kept;
-        void write(kept);
+        write(kept);
       }
     },
     [write],
   );
 
   function start(event: React.PointerEvent) {
-    if (!editor.isEditable || event.button !== 0) return;
+    if (!editable || event.button !== 0) return;
     const point = at(event);
     if (!point) return;
     event.preventDefault();
@@ -871,26 +969,54 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
     }
 
     path.current = `M${point.at}`;
+    trail.current = [point];
+    snapped.current = null;
     setDrawing(path.current);
+
+    /* Hold still at the end of a stroke and it becomes the shape it was aiming
+       at. The timer is restarted by every movement, so what it measures is a
+       hand that has stopped — and moving away again from a snapped shape takes
+       the scrawl back, because the alternative is a shape you cannot refuse. */
+    let idle = 0;
+    const rearm = () => {
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => {
+        const shape = straightenStroke(trail.current);
+        if (!shape) return;
+        snapped.current = shape;
+        setDrawing(shape);
+      }, STRAIGHTEN_AFTER_MS);
+    };
+    rearm();
 
     const move = (next: PointerEvent) => {
       const step = at(next);
       if (!step) return;
+      const last = trail.current[trail.current.length - 1];
+      if (snapped.current) {
+        if (Math.hypot(step.x - last.x, step.y - last.y) < 25) return;
+        snapped.current = null;
+      }
+      trail.current.push(step);
       path.current = `${path.current}L${step.at}`;
       setDrawing(path.current);
+      rearm();
     };
     const finish = () => {
+      window.clearTimeout(idle);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", finish);
       /* A tap that never moved is a dot, and a dot is a stroke of one point —
          which draws nothing without a second. Give it one. */
-      const committed = path.current.includes("L")
-        ? path.current
-        : `${path.current}L${path.current.slice(1)}`;
+      const committed =
+        snapped.current ??
+        (path.current.includes("L") ? path.current : `${path.current}L${path.current.slice(1)}`);
       setDrawing("");
       path.current = "";
-      void write([...live.current, { d: committed, color: ink, width: nib }]);
+      trail.current = [];
+      snapped.current = null;
+      write([...live.current, { d: committed, color: laid, width }]);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
@@ -914,8 +1040,8 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         <path
           d={drawing}
           fill="none"
-          stroke={ink}
-          strokeWidth={nib}
+          stroke={laid}
+          strokeWidth={width}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -957,22 +1083,38 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
 
       <span className="drawing-tools-rule" />
 
-      {DRAWING_NIBS.map((width) => (
+      {DRAWING_NIBS.map((size) => (
         <button
-          key={width}
+          key={size}
           type="button"
-          className={`drawing-nib ${!erasing && width === nib ? "is-chosen" : ""}`}
-          aria-label={`Nib ${width}`}
-          aria-pressed={!erasing && width === nib}
+          className={`drawing-nib ${!erasing && !marker && size === nib ? "is-chosen" : ""}`}
+          aria-label={`Nib ${size}`}
+          aria-pressed={!erasing && !marker && size === nib}
           onClick={() => {
-            lastNib = width;
-            setNib(width);
+            lastNib = size;
+            lastMarker = false;
+            setNib(size);
+            setMarker(false);
             setErasing(false);
           }}
         >
-          <span style={{ width: width + 2, height: width + 2 }} />
+          <span style={{ width: size + 2, height: size + 2 }} />
         </button>
       ))}
+      <button
+        type="button"
+        className={`rich-media-file-action ${!erasing && marker ? "is-active" : ""}`}
+        aria-label="Highlighter"
+        aria-pressed={!erasing && marker}
+        title="Highlighter"
+        onClick={() => {
+          lastMarker = !marker;
+          setMarker((on) => !on);
+          setErasing(false);
+        }}
+      >
+        <Highlighter size={15} />
+      </button>
       <button
         type="button"
         className={`rich-media-file-action ${erasing ? "is-active" : ""}`}
@@ -989,20 +1131,57 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         aria-label="Undo the last stroke"
         title="Undo the last stroke"
         disabled={strokes.length === 0}
-        onClick={() => void write(strokes.slice(0, -1))}
+        onClick={() => write(strokes.slice(0, -1))}
       >
         <Undo2 size={15} />
       </button>
-      <button
-        type="button"
-        className="rich-media-file-action is-danger"
-        aria-label={onPage ? "Remove the drawing layer" : "Remove drawing"}
-        title={onPage ? "Remove the drawing layer" : "Remove drawing"}
-        onClick={deleteNode}
-      >
-        <Trash2 size={15} />
-      </button>
     </>
+  );
+
+  return { surface, box, start, inked, tools, erasing };
+}
+
+function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
+  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
+  const onPage = drawingSurface(node.attrs.surface) === "page";
+  /* The pen is in hand only if this layer is the one that was just asked for.
+     Coming back to a note is coming back to read or to write it; drawing on it
+     again is a thing you ask for, from the ⋯ palette or from the pen in the
+     corner. A board has no pen state at all: it is a sheet, and there is
+     nothing on it to protect from the pointer. */
+  const [pen, setPen] = useState(() => {
+    if (!onPage || !penWanted) return false;
+    penWanted = false;
+    return true;
+  });
+  useEffect(() => {
+    if (!onPage) return;
+    const take = () => setPen(true);
+    window.addEventListener(TAKE_UP_THE_PEN, take);
+    return () => window.removeEventListener(TAKE_UP_THE_PEN, take);
+  }, [onPage]);
+
+  const write = useCallback(
+    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
+    [updateAttributes],
+  );
+  const { surface, box, start, inked, tools, erasing } = useInk({
+    strokes,
+    write,
+    fit: onPage ? "width" : "board",
+    editable: editor.isEditable,
+  });
+
+  const remove = (
+    <button
+      type="button"
+      className="rich-media-file-action is-danger"
+      aria-label={onPage ? "Remove the drawing layer" : "Remove drawing"}
+      title={onPage ? "Remove the drawing layer" : "Remove drawing"}
+      onClick={deleteNode}
+    >
+      <Trash2 size={15} />
+    </button>
   );
 
   if (onPage) {
@@ -1024,16 +1203,14 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
             {pen ? (
               <>
                 {tools}
+                {remove}
                 <span className="drawing-tools-rule" />
                 <button
                   type="button"
                   className="rich-media-file-action"
                   aria-label="Put the pen down"
                   title="Put the pen down"
-                  onClick={() => {
-                    setErasing(false);
-                    setPen(false);
-                  }}
+                  onClick={() => setPen(false)}
                 >
                   <Check size={15} />
                 </button>
@@ -1071,6 +1248,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
       {editor.isEditable && (
         <span className="rich-media-drawing-tools" contentEditable={false}>
           {tools}
+          {remove}
         </span>
       )}
     </NodeViewWrapper>
