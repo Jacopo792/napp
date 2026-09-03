@@ -261,6 +261,58 @@ describe("the collaboration server", { skip }, () => {
     assert.equal(edited.data?.body, "");
   });
 
+  it("puts a note back where it was when a real edit is undone", async () => {
+    /* The one the invisible-ending rule never reached. A word is not an empty
+       paragraph: it is a difference from the save before it, and honestly so.
+       What was wrong was the thing being compared against — the previous
+       debounce tick, which inside one burst of typing is the middle of the
+       same sentence rather than where the note was resting. */
+    const noteId = await newNote("Undone", "Now it works");
+    const { doc, provider } = connect(noteId, editor.token);
+    await until(() => provider.isSynced);
+    await sleep(400);
+
+    const before = await asService(local)
+      .from("notes")
+      .select("updated_at, version, body")
+      .eq("id", noteId)
+      .single();
+
+    const body = doc.getXmlFragment("default");
+    const paragraph = body.get(0) as Y.XmlElement;
+    const text = paragraph.get(0) as Y.XmlText;
+    const was = text.length;
+
+    doc.transact(() => text.insert(was, " davvero"));
+    await sleep(400);
+
+    // Stored, and rightly counted as an edit while it stands.
+    const during = await asService(local)
+      .from("notes")
+      .select("updated_at, body")
+      .eq("id", noteId)
+      .single();
+    assert.equal(during.data?.body, "Now it works davvero");
+    assert.notEqual(during.data?.updated_at, before.data?.updated_at);
+
+    doc.transact(() => text.delete(was, " davvero".length));
+    await sleep(600);
+    provider.destroy();
+    await sleep(400);
+
+    const after = await asService(local)
+      .from("notes")
+      .select("updated_at, body")
+      .eq("id", noteId)
+      .single();
+    assert.equal(after.data?.body, before.data?.body);
+    assert.equal(
+      after.data?.updated_at,
+      before.data?.updated_at,
+      "a note typed into and put back still reads as edited",
+    );
+  });
+
   it("converges two people typing in the same note, and projects the result", async () => {
     const noteId = await newNote("Shared", "start");
     const mine = connect(noteId, editor.token);

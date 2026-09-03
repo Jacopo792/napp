@@ -4028,7 +4028,19 @@
   cursor: grabbing;
 }
 
+/* Taken out of flow so its centre *is* the stage's centre, which is the one
+   thing `avatarCropRect` assumes and the one thing a grid would not give it.
+   `place-items: center` does not centre an item larger than its container: the
+   track grows to the item and is laid at the start, so a 900px picture in a
+   260px stage sat flush against the left edge and overflowed entirely to the
+   right — half its overflow off centre, measured at 49.5px with nothing
+   dragged at all. The circle showed one square and the cut took another, by a
+   margin that changed with every picture's proportions and every turn of the
+   zoom, which is what made it read as random. */
 .cropper-stage img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   max-width: none;
   will-change: transform;
 }

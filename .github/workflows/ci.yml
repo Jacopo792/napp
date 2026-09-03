@@ -206,3 +206,25 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deploy
+
+      # The collaboration server, from the run that has just proved it. Render's
+      # own auto-deploy has never fired: the service was created through its API,
+      # so nothing on this repository subscribes to a push — no webhook, no
+      # installation. This asks for the same deploy from the one place that
+      # knows the tests passed, which `On Commit` could not promise: it deploys
+      # a red commit as happily as a green one.
+      #
+      # The hook is a URL carrying its own key, so it is a secret and never a
+      # variable. Absent, this step says so and passes: a fork cannot read it,
+      # and neither can a clone nobody has given it to.
+      - name: Deploy the collaboration server
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not set — the collaboration server was not deployed."
+            exit 0
+          fi
+          echo "asked Render for a deploy, HTTP $(curl --fail --silent \
+            --max-time 60 --request POST --output /dev/null \
+            --write-out '%{http_code}' "$HOOK")"
