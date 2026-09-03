@@ -63,12 +63,17 @@ jobs:
 
       # Only for a tag. A manual run is for finding out whether the build still
       # works, and it should not invent a release to hang the result on.
+      # Published rather than drafted. A draft is invisible on the Releases
+      # page, and the README sends people straight to `/releases/latest` — a
+      # download link that leads to "there aren't any releases here" is worse
+      # than no link. The tag is the deliberate act; it does not need a second
+      # one behind it.
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifacts }}
-          draft: true
+          draft: false
           body: |
             Unsigned builds. On macOS the .dmg has to be opened with
             right-click → Open the first time, because Gatekeeper reports an

@@ -32,6 +32,36 @@ The editor is made for long notes as well as quick ones. It uses Tiptap for rich
 and Yjs/Hocuspocus for live editing. Supabase handles accounts, the shared database and
 private files.
 
+## Get the app
+
+It runs in a browser at <https://jacopo792.github.io/note-sharing-app/>. Nothing
+to install, and it is always the current version.
+
+There is also a Mac app. It is the same application in a window of its own, not
+a wrapper around the website, and a note you already have open keeps working
+without a connection.
+
+**[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/note-sharing-app/releases/latest)**
+
+The first time you open it, macOS will say the app is damaged. It is not. That
+is what macOS says about anything that has not been signed with a paid Apple
+Developer ID, and this build is not signed. Control-click the app in
+Applications, choose Open, then Open again. macOS remembers the choice and it
+opens normally after that.
+
+What the window has that a browser tab cannot:
+
+- A real menu bar, carrying the shortcuts you already use.
+- Traffic lights, a title that names the note you are reading, and a window that
+  reopens where you left it.
+- The number of unread remarks on the Dock icon.
+- Emoji & Symbols, smart quotes and text replacement, the way any Mac app has
+  them.
+
+Windows gets an installer from the same release. Intel Macs are not built yet.
+[`DESKTOP.md`](DESKTOP.md) covers the rest: what it keeps on your machine, what
+to check when something does not work, and how a release is made.
+
 ## Make it yours
 
 ![Appearance settings](docs/customisation-preview-v2.png)
@@ -46,54 +76,39 @@ line spacing. Profiles, avatars, note pictures, covers and live-caret colours ad
 last personal touches. Most interface and reading settings stay on your device, so the
 other person does not have to use the same setup.
 
-## Get it for your Mac
+## Accounts and shared archives
 
-The app runs in a browser at
-<https://jacopo792.github.io/note-sharing-app/>, and it also runs as a real
-macOS window. **Download the latest `.dmg` for Apple Silicon from
-[Releases](https://github.com/Jacopo792/note-sharing-app/releases)** — it is the
-same application, not a wrapper around the website, and it works offline on a
-note you already have open.
+Each person signs in with a separate account. Membership in `archive_members` is the
+access boundary: being a Supabase user by itself does not grant access to somebody
+else's archive.
 
-macOS will say the app "is damaged and can't be opened". It is not: the build is
-unsigned, which is what macOS says about anything without an Apple Developer ID.
-Open it once from the right-click menu — **Control-click the app → Open → Open**
-— and macOS remembers the decision.
+New users receive a personal archive on first sign-in. To share an existing archive, a
+member creates a one-time invitation from **Settings → Members**. Invitations expire
+after seven days and can only be claimed by the invited address.
 
-> Apple Silicon only for now (M1 and later). An Intel build takes one flag on
-> the release workflow and nobody has needed one. Windows gets an NSIS
-> installer from the same tag.
+A member reads and writes the whole archive; there is no lesser kind, and the interface
+asks for no role when it invites somebody. `owner_id` only decides where a note appears
+in the interface; it is not a security boundary.
 
-[`DESKTOP.md`](DESKTOP.md) is the app's own manual — installing, what it keeps
-on your machine, what to check when a note will not open, and how a release is
-cut.
+What one member can take back from another is a note, or a passage of one. **Only I may
+write this** in a note's ⋯ menu sets `notes.locked_by`, and `notes_editor_update`
+refuses the row to everybody else – the lock, the trash stamp and the words alike. A
+passage locked from the selection toolbar is held by the collaboration server instead,
+which is the only place that can hold it: the mark lives inside a document both members
+are entitled to write, and anything written under somebody else's lock is put back
+before it reaches them.
 
-What the window adds over the tab is the part a Mac expects and a web page
-cannot give itself:
-
-- A real menu bar — File, Edit, Format, View, Window, Help — with every archive
-  command on the key it already had, plus the text services the system provides
-  every field: Emoji & Symbols, smart quotes, smart dashes, text replacement.
-- Traffic lights in their own gutter, a window you can drag by its toolbar,
-  zoom and full screen, and a window title that names the note you are reading.
-- An icon in the Dock carrying the number of remarks nobody here has read.
-- The window opens where you left it, on a display that is still attached.
-- Notes you have open keep working through a dropped connection, and the window
-  notices when it has come back from a closed lid or a changed network.
-
-Building it yourself instead:
-
-```bash
-VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop
-```
-
-The `.dmg` and `.exe` land in `apps/desktop/release/`. The `VITE_COLLAB_URL` is
-not optional: a packaged build refuses to carry a collaboration server on
-`localhost`, because an installed app would take that address to a machine where
-nothing answers it, and the way that fails is a note that never opens rather
-than an error.
+The seat limit is a database rule. `archives.seat_limit` defaults to `2` (`1`–`8`
+allowed) and a `before insert` trigger on `archive_members`,
+`private.enforce_archive_seats()`, refuses the extra row whichever path it arrives by:
+bootstrap, invitation redemption or a direct write. Issuing an invitation counts
+unclaimed, unexpired invitations against the same limit, so a link that could never be
+redeemed is never created. Settings does the same arithmetic to close the form early;
+that part is a courtesy, not the boundary.
 
 ## Running it locally
+
+Everything below is for working on the app rather than using it.
 
 ```bash
 cp .env.example .env.local
@@ -156,7 +171,7 @@ VITE_BASE_PATH=/note-sharing-app/ pnpm build
 The repository is a pnpm workspace of two packages and two shells:
 
 - `packages/core/` is the application. Both shells mount it and neither may
-  fork it — `eslint.config.js` forbids the core from importing a shell, and
+  fork it – `eslint.config.js` forbids the core from importing a shell, and
   `packages/core/src/platform.ts` is the six-member interface each shell
   answers instead.
 - `apps/web/` is the browser build, published to GitHub Pages.
@@ -180,35 +195,31 @@ The main areas of the repository are:
 Notes are stored as Tiptap JSON with a plain-text projection for search and previews.
 Markdown is supported as an import/export format, not as the editor's internal format.
 
-## Accounts and shared archives
+## Deployment
 
-Each person signs in with a separate account. Membership in `archive_members` is the
-access boundary: being a Supabase user by itself does not grant access to somebody
-else's archive.
+The app runs at <https://jacopo792.github.io/note-sharing-app/>. There is no other
+deployment.
 
-New users receive a personal archive on first sign-in. To share an existing archive, a
-member creates a one-time invitation from **Settings → Members**. Invitations expire
-after seven days and can only be claimed by the invited address.
+The frontend is published through GitHub Pages after the frontend checks, local
+Supabase integration tests, Redis tests and server image build pass. It needs the
+repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
+`VITE_COLLAB_URL`.
 
-A member reads and writes the whole archive; there is no lesser kind, and the interface
-asks for no role when it invites somebody. `owner_id` only decides where a note appears
-in the interface; it is not a security boundary.
+Desktop installers are built on a tag, from a matrix of macOS and Windows
+runners, because electron-builder cannot cross-compile them. Bump the version in
+`apps/desktop/package.json` to match, then:
 
-What one member can take back from another is a note, or a passage of one. **Only I may
-write this** in a note's ⋯ menu sets `notes.locked_by`, and `notes_editor_update`
-refuses the row to everybody else — the lock, the trash stamp and the words alike. A
-passage locked from the selection toolbar is held by the collaboration server instead,
-which is the only place that can hold it: the mark lives inside a document both members
-are entitled to write, and anything written under somebody else's lock is put back
-before it reaches them.
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
-The seat limit is a database rule. `archives.seat_limit` defaults to `2` (`1`–`8`
-allowed) and a `before insert` trigger on `archive_members`,
-`private.enforce_archive_seats()`, refuses the extra row whichever path it arrives by:
-bootstrap, invitation redemption or a direct write. Issuing an invitation counts
-unclaimed, unexpired invitations against the same limit, so a link that could never be
-redeemed is never created. Settings does the same arithmetic to close the form early;
-that part is a courtesy, not the boundary.
+The workflow publishes both installers to the repository's Releases.
+
+The collaboration server runs separately on Render with Valkey. `render.yaml`
+documents that service. Database migrations must be applied before deploying a client
+that reads new columns, while destructive schema changes must wait until old clients
+no longer depend on them.
 
 ## Documentation
 
@@ -220,25 +231,6 @@ that part is a courtesy, not the boundary.
 | [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes        |
 | [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting        |
 | [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes        |
-
-## Deployment
-
-The app runs at <https://jacopo792.github.io/note-sharing-app/>. There is no other
-deployment.
-
-The frontend is published through GitHub Pages after the frontend checks, local
-Supabase integration tests, Redis tests and server image build pass. It needs the
-repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
-`VITE_COLLAB_URL`.
-
-Desktop installers are built on a tag — `git tag v0.1.0 && git push --tags` —
-from a matrix of macOS and Windows runners, because electron-builder cannot
-cross-compile them. They are published to the repository's Releases.
-
-The collaboration server runs separately on Render with Valkey. `render.yaml`
-documents that service. Database migrations must be applied before deploying a client
-that reads new columns, while destructive schema changes must wait until old clients
-no longer depend on them.
 
 ## Licence
 
