@@ -182,9 +182,20 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     port: config.port,
     name: config.instanceName ?? "notes-collab",
     quiet: true,
-    // A save is a database transaction: batch a burst of keystrokes into one,
-    // but never let a long unbroken session go unsaved.
-    debounce: config.debounce ?? 2000,
+    /* A save is a database transaction: batch a burst of keystrokes into one,
+       but never let a long unbroken session go unsaved.
+
+       It was 2000, and that number is most of what "editing a note is very
+       slow" is. Nothing about an edit is visible to the other member — or in
+       your own list, where the stamp and the ordering live — until this has
+       fired, the projection has landed in Postgres and Realtime has said so. Two
+       seconds of it was the debounce alone.
+
+       1000 halves that for one more write per second of unbroken typing, which
+       for an archive built for two people is not a number worth protecting. The
+       client coalesces its end of it, so the extra announcements cost one
+       snapshot read between them rather than one each. */
+    debounce: config.debounce ?? 1000,
     maxDebounce: 10000,
     // Handled by the caller, so the flush can be awaited and logged.
     stopOnSignals: false,

@@ -2490,6 +2490,36 @@
   background: var(--paper);
 }
 
+/* ── Which note is the one waiting ───────────────────────────────────────────
+   The sidebar's badge says how many remarks nobody here has read; this says
+   which notes they are on. Without it the count is a number with nothing under
+   it — the row that produced it looks exactly like every other row, and "I have
+   read them all" is a reasonable thing to believe.
+
+   On the leading slot, whichever of the three it is — the note's photograph,
+   its drawing, or the glyph for the kind of document it is — because that slot
+   is already the one place in the row that says what you are about to open.
+   The ring is the column's own surface, so the dot reads as sitting on top of
+   the picture rather than as part of it. */
+.note-row-glyph.has-unread,
+.note-photo.is-row.has-unread {
+  position: relative;
+  overflow: visible;
+}
+
+.note-row-glyph.has-unread::after,
+.note-photo.is-row.has-unread::after {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 2px var(--paper);
+  content: "";
+}
+
 /* What is left of a checklist, in the line that already says when. */
 .note-row-tally {
   margin-left: 0.5rem;
@@ -5995,9 +6025,13 @@
   background: var(--paper-2);
 }
 
+/* The round crop is the picture's own, not the box's. `overflow: hidden` did
+   it, which meant a dot sitting on the corner of the slot was clipped away by
+   the very rule that made it round. */
 .note-photo img {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
   object-fit: cover;
 }
 

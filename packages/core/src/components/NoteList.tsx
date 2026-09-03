@@ -81,6 +81,11 @@ interface Props {
   folderLabel: string;
   trashMode: boolean;
   archiveMode: boolean;
+  /** Notes carrying a remark the reader has not seen. The badge in the sidebar
+   *  says how many are waiting; this is what says which. Without it the count
+   *  is a number with nothing under it, and the honest answer to "I have read
+   *  them all" is a note nobody could find. */
+  unreadIds?: Set<string>;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
@@ -134,6 +139,7 @@ const Row = memo(function Row({
   entry,
   meta,
   selected,
+  unread,
   onSelect,
   trashMode,
   archiveMode,
@@ -151,6 +157,7 @@ const Row = memo(function Row({
   entry: NoteEntry;
   meta: Meta;
   selected: boolean;
+  unread: boolean;
   trashMode: boolean;
   archiveMode: boolean;
   canWrite: boolean;
@@ -459,7 +466,9 @@ const Row = memo(function Row({
       {/* The note's own picture stands where its kind-of-document glyph
           stands: one place in the row says what you are about to open. */}
       {entry.note.photo ? (
-        <span className={`note-photo is-row ${gallery ? "is-gallery" : ""}`}>
+        <span
+          className={`note-photo is-row ${gallery ? "is-gallery" : ""} ${unread ? "has-unread" : ""}`}
+        >
           {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
         </span>
       ) : sketch ? (
@@ -469,7 +478,7 @@ const Row = memo(function Row({
           role="img"
           className={`note-row-glyph is-sketch ${gallery ? "is-gallery" : ""} ${
             selected ? "is-selected" : ""
-          }`}
+          } ${unread ? "has-unread" : ""}`}
         >
           <svg
             viewBox={`0 0 ${drawingBox(sketch.strokes, sketch.surface).width} ${
@@ -498,7 +507,7 @@ const Row = memo(function Row({
           role="img"
           className={`note-row-glyph ${gallery ? "is-gallery" : ""} ${
             selected ? "is-selected" : ""
-          } ${pinned ? "is-pinned" : ""}`}
+          } ${pinned ? "is-pinned" : ""} ${unread ? "has-unread" : ""}`}
         >
           <Glyph size={mobile && !gallery ? 16 : 14} />
         </span>
@@ -731,6 +740,7 @@ export function NoteList({
   folderLabel,
   trashMode,
   archiveMode,
+  unreadIds,
   searchRef,
   onQueryChange,
   onSelect,
@@ -1069,6 +1079,7 @@ export function NoteList({
                 entry={entry}
                 meta={meta}
                 selected={selectedId === entry.note.id}
+                unread={unreadIds?.has(entry.note.id) ?? false}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
                 canWrite={canWrite}

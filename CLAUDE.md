@@ -237,6 +237,13 @@ notes-being-talked-about — which clears only when the last thread is resolved 
 took the badge's place in the same slot and read as a stuck count. The Remarks
 row now carries the dot and no tally.
 
+The badge says how many are waiting; **the dot on the row says which**. Without
+it the count is a number with nothing under it — the note that produced it looks
+like every other note, and "I have read them all" is a reasonable thing to
+believe. It sits on the leading slot, whichever of the three that is, because
+that slot is already the one place in a row that says what you are about to
+open. Opening the _list_ is not reading: only opening the note moves its line.
+
 `refreshRemarks` is debounced by 400 ms. Realtime announces every insert,
 update and delete on `note_comments` separately, so resolving a thread of six
 remarks is six announcements — each one re-reading every comment in the
@@ -903,6 +910,13 @@ signals, because no one of them covers the three ways of leaving:
   lid was shut: the display slept, the window stayed "visible" the whole time,
   and nothing else fires. A tick that arrives long after it was due is a machine
   that was asleep between the two.
+
+**A burst of saves is one read.** `refreshRemote` is debounced by 250 ms and an
+announcement that lands while a read is in flight is repeated once when that
+read finishes, rather than dropped — the read that was already running had asked
+the database before that change, so the last word of a burst could otherwise sit
+unread until something else happened to move. Somebody typing announces about
+once a second, and each announcement was a whole snapshot.
 
 Both halves matter on a wake. The snapshot is read again, because whatever
 happened while we were away was never announced; and the channels are rebuilt —

@@ -556,9 +556,29 @@ export default function NotesPage() {
     setSyncRevision((n) => n + 1);
   }, []);
 
-  const refreshRemote = useCallback(async () => {
+  /* Realtime says a row moved; this reads a coherent snapshot back. Two things
+     have to be true of it and only one was.
+
+     **A burst is one read.** Somebody typing produces a save about once a
+     second, each one an announcement, and each announcement was a whole
+     snapshot — six queries for a change to one note. They arrive together, so
+     they are answered together, the way `refreshRemarks` already does it.
+
+     **And an announcement that lands mid-read is not lost.** Events arriving
+     while a snapshot was in flight were dropped on the floor: the read that was
+     already running had asked the database *before* that change, so the last
+     word of a burst could sit unread until something else happened to move.
+     A dropped event is now a repeat, once, when the read that dropped it
+     finishes. */
+  const refreshTimer = useRef(0);
+  const refreshAgainRef = useRef(false);
+  const readSnapshot = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s || !readyRef.current || syncingRef.current) return;
+    if (!s || !readyRef.current) return;
+    if (syncingRef.current) {
+      refreshAgainRef.current = true;
+      return;
+    }
     if (inFlightRef.current) {
       realtimePendingRef.current = true;
       return;
@@ -571,8 +591,17 @@ export default function NotesPage() {
       // Realtime retries automatically. Save errors remain visible separately.
     } finally {
       syncingRef.current = false;
+      if (refreshAgainRef.current) {
+        refreshAgainRef.current = false;
+        void readSnapshot();
+      }
     }
   }, [applySnapshot]);
+
+  const refreshRemote = useCallback(() => {
+    window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => void readSnapshot(), 250);
+  }, [readSnapshot]);
 
   useEffect(() => {
     if (!session) return;
@@ -647,12 +676,14 @@ export default function NotesPage() {
   // ── Realtime subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
-    /* A no-op on the first run: `refreshRemote` stands down until the initial
-       load has landed, and the initial load is the effect above this one. */
-    void refreshRemote();
+    /* At once rather than through the debounce: nothing is arriving in a burst
+       here, this is the window asking what it missed. A no-op on the first run,
+       because `readSnapshot` stands down until the initial load has landed and
+       the initial load is the effect above this one. */
+    void readSnapshot();
     const channel = subscribeToArchive(session.archiveId, () => void refreshRemote());
     return () => void unsubscribeFromArchive(channel);
-  }, [session, refreshRemote, awake]);
+  }, [session, refreshRemote, readSnapshot, awake]);
 
   /* The account's preferences, in three moves: read the row over whatever this
      browser had, follow the row while another browser is open on it, and push
@@ -820,6 +851,15 @@ export default function NotesPage() {
   }, [session, refreshRemarks, awake]);
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
+  const unreadRemarkNotes = useMemo(
+    () =>
+      new Set(
+        selfId
+          ? unreadRemarks(archiveComments, selfId, remarksSeen).map((remark) => remark.noteId)
+          : [],
+      ),
+    [archiveComments, selfId, remarksSeen],
+  );
   const unreadRemarkCount = useMemo(
     () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
     [archiveComments, selfId, remarksSeen],
@@ -2199,7 +2239,10 @@ export default function NotesPage() {
     setProfileError("");
     try {
       await saveProfile(session, next);
-      await refreshRemote();
+      /* `readSnapshot`, not the debounced wrapper: this one is waited on, and
+         the wait is the point — the form stays busy until the roster it just
+         changed has come back. */
+      await readSnapshot();
     } catch (reason) {
       setProfile(previous);
       setProfileError(reason instanceof Error ? reason.message : "Could not save your profile");
@@ -2999,6 +3042,7 @@ export default function NotesPage() {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
+                  unreadIds={unreadRemarkNotes}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
@@ -3167,6 +3211,7 @@ export default function NotesPage() {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   trashMode={selectedFolderId === TRASH}
+                  unreadIds={unreadRemarkNotes}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
