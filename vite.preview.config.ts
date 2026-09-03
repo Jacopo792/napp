@@ -3,15 +3,19 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
-import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 
 /* The UI preview. Identical application code, with the modules that talk
    to Supabase swapped for the in-memory stand-ins in preview/ — so the notes
    surface can be looked at, on either breakpoint, without credentials, a
-   network or a real archive. Never used by `pnpm build`. */
+   network or a real archive. Never used by `pnpm build`.
+
+   It runs against the web shell's index.html, but what it is previewing is the
+   core, which the desktop shell mounts unchanged. One harness, both shells. */
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
+  root: here("./apps/web"),
+  envDir: here("."),
   server: { port: 5199 },
   resolve: {
     alias: [
@@ -27,14 +31,5 @@ export default defineConfig({
       { find: /^@\/lib\/comments$/, replacement: here("./preview/comments.mock.ts") },
     ],
   },
-  plugins: [
-    TanStackRouterVite({
-      routesDirectory: "./src/routes",
-      generatedRouteTree: "./src/routeTree.gen.ts",
-      autoCodeSplitting: true,
-    }),
-    react(),
-    tailwindcss(),
-    tsConfigPaths(),
-  ],
+  plugins: [react(), tailwindcss(), tsConfigPaths({ root: here(".") })],
 });

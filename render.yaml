@@ -27,8 +27,18 @@ services:
       # Only the deployed site and a developer's own machine. A WebSocket
       # upgrade carries an Origin like any other browser request, and one that
       # is not on this list is refused before authentication is attempted.
+      # `app://notes` is the desktop window. It is served from a scheme of its
+      # own rather than from file:// precisely so that it has an origin to put
+      # here — `originAllowed` in src/access.ts refuses a socket without one,
+      # and a desktop app that cannot open a note says nothing about why.
+      # 5174 is the desktop renderer's dev server, 5173 the web one, 5199 the
+      # preview harness.
+      #
+      # This file documents the service and does not drive it (see above), so
+      # changing this line changes nothing on its own: the live value is set in
+      # the Render dashboard.
       - key: ALLOWED_ORIGINS
-        value: https://jacopo792.github.io,http://localhost:5173,http://localhost:5199
+        value: https://jacopo792.github.io,app://notes,http://localhost:5173,http://localhost:5174,http://localhost:5199
       # The bus below. One instance is the plan, but Render starts the new
       # instance before it stops the old one, so every deploy has a minute in
       # which two processes hold the same note — long enough to lose somebody's

@@ -4,7 +4,17 @@
 
 ## Platform
 
-web
+Web, and a desktop window on macOS and Windows.
+
+One application, two shells. `packages/core/` is the app; `apps/web/` publishes
+it to GitHub Pages and `apps/desktop/` wraps it in an Electron window. Neither
+shell may fork it — the lint config forbids the core from importing a shell, and
+`packages/core/src/platform.ts` is the six-member interface each shell answers
+instead. A feature is never available in one and not the other.
+
+The macOS build is distributed for **Apple Silicon** as an unsigned `.dmg`;
+Windows gets an NSIS installer. Both are built on a tag by
+`.github/workflows/release.yml`.
 
 ## Users
 

@@ -43,6 +43,13 @@ row.** It is not encryption. Nothing in this archive is encrypted, so anyone
 holding database credentials reads archived notes like any other. Hiding here
 is a boundary between members, not between a member and the database.
 
+Preferences, including the per-note record of which conversations an account
+has read, are one row per account in `profile_preferences`. Nobody else may read
+that table — it is deliberately not a column on `profiles`, whose select policy
+has no column list and would therefore have handed a shared archive's other
+member your palette, your wallpaper and your lock timeout along with your
+nickname.
+
 Membership is capped in the database, not in the interface. A `before insert`
 trigger on `archive_members` refuses a row once the archive holds
 `archives.seat_limit` members, so every path in — the personal-archive
@@ -70,6 +77,27 @@ invite-link model, not the stronger one it replaced. Restoring the earlier
 guarantee means configuring `[auth.email.smtp]`, setting
 `enable_confirmations = true`, and putting the `email_confirmed_at` check back
 into `private.redeem_archive_invite()`.
+
+The desktop window is the same application in an Electron shell, and the shell
+adds no privilege to it. The renderer runs with `contextIsolation`, `sandbox`
+and no Node integration; the preload exposes three functions — save a file, show
+a file, print — and a one-way channel that lets the menu bar dispatch a
+keystroke. It does not load `file://`: the built renderer is served from a
+registered `app://notes` scheme, both because the collaboration server refuses a
+socket whose origin it does not know and because a `file://` page is not a secure
+context and therefore has no IndexedDB. A content security policy written into
+the production HTML names exactly the two remote origins the app may reach —
+Supabase and the collaboration server, each under both `https` and `wss`, because
+Chromium does not match a `wss://` request against an `https://` source
+expression — and everything else is refused. Links inside a note open in the
+reader's own browser rather than in the application's window.
+
+**Distributed builds are unsigned.** macOS reports an unsigned `.dmg` as
+damaged, and the instruction to open it from the right-click menu is the same
+instruction that would open a tampered one, so the download is only as
+trustworthy as the Releases page it came from. Signing needs an Apple Developer
+ID and a Windows certificate; `CSC_LINK` and `CSC_KEY_PASSWORD` plus dropping
+the `identity: null` line is the whole of the change.
 
 Live documents pass through the Hocuspocus service. One WebSocket carries the
 whole session and every note opened in it, so the unit of authorization is the

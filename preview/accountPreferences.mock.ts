@@ -6,10 +6,16 @@
    imports has to exist here, or the whole route fails to load. */
 import { currentAppearance } from "@/lib/appearance";
 import { currentAxes } from "@/lib/axes";
-import { accountPreferences, flagsOf, type AccountFlags } from "@/lib/preferenceShape";
+import {
+  accountPreferences,
+  flagsOf,
+  mergeRemarksSeen,
+  type AccountFlags,
+  type RemarksSeen,
+} from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
 
-export { flagsOf };
+export { flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
 
 export const DEFAULT_FLAGS: AccountFlags = {
@@ -19,17 +25,23 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autoLock: 0,
 };
 
-export function preferencesWith(flags: AccountFlags) {
+export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {
   return accountPreferences(
     currentAppearance(),
     currentAxes(),
     currentWritingPreferences(),
     flags,
+    seen,
   );
 }
 
-export function localPreferences() {
-  return preferencesWith(DEFAULT_FLAGS);
+export function localPreferences(seen: RemarksSeen = {}) {
+  return preferencesWith(DEFAULT_FLAGS, seen);
+}
+
+/* No account to read it off, so the preview simply has read everything. */
+export function heldRemarksSeen(): RemarksSeen {
+  return {};
 }
 
 export async function pullAccountPreferences() {

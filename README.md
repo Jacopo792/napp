@@ -46,12 +46,60 @@ line spacing. Profiles, avatars, note pictures, covers and live-caret colours ad
 last personal touches. Most interface and reading settings stay on your device, so the
 other person does not have to use the same setup.
 
+## Get it for your Mac
+
+The app runs in a browser at
+<https://jacopo792.github.io/note-sharing-app/>, and it also runs as a real
+macOS window. **Download the latest `.dmg` for Apple Silicon from
+[Releases](https://github.com/Jacopo792/note-sharing-app/releases)** — it is the
+same application, not a wrapper around the website, and it works offline on a
+note you already have open.
+
+macOS will say the app "is damaged and can't be opened". It is not: the build is
+unsigned, which is what macOS says about anything without an Apple Developer ID.
+Open it once from the right-click menu — **Control-click the app → Open → Open**
+— and macOS remembers the decision.
+
+> Apple Silicon only for now (M1 and later). An Intel build takes one flag on
+> the release workflow and nobody has needed one. Windows gets an NSIS
+> installer from the same tag.
+
+[`DESKTOP.md`](DESKTOP.md) is the app's own manual — installing, what it keeps
+on your machine, what to check when a note will not open, and how a release is
+cut.
+
+What the window adds over the tab is the part a Mac expects and a web page
+cannot give itself:
+
+- A real menu bar — File, Edit, Format, View, Window, Help — with every archive
+  command on the key it already had, plus the text services the system provides
+  every field: Emoji & Symbols, smart quotes, smart dashes, text replacement.
+- Traffic lights in their own gutter, a window you can drag by its toolbar,
+  zoom and full screen, and a window title that names the note you are reading.
+- An icon in the Dock carrying the number of remarks nobody here has read.
+- The window opens where you left it, on a display that is still attached.
+- Notes you have open keep working through a dropped connection, and the window
+  notices when it has come back from a closed lid or a changed network.
+
+Building it yourself instead:
+
+```bash
+VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop
+```
+
+The `.dmg` and `.exe` land in `apps/desktop/release/`. The `VITE_COLLAB_URL` is
+not optional: a packaged build refuses to carry a collaboration server on
+`localhost`, because an installed app would take that address to a machine where
+nothing answers it, and the way that fails is a note that never opens rather
+than an error.
+
 ## Running it locally
 
 ```bash
 cp .env.example .env.local
 pnpm install
-pnpm dev
+pnpm dev            # in a browser
+pnpm dev:desktop    # in its own window
 ```
 
 `.env.local` needs these public browser values:
@@ -60,6 +108,9 @@ pnpm dev
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_COLLAB_URL=ws://127.0.0.1:8080
+# Only the desktop build needs this one: where an invitation link has to point,
+# since the link is opened on a machine that may not have the app.
+VITE_WEB_ORIGIN=https://jacopo792.github.io/note-sharing-app/
 ```
 
 Run the collaboration server separately:
@@ -102,14 +153,28 @@ VITE_BASE_PATH=/note-sharing-app/ pnpm build
 - **Offline support:** IndexedDB keeps an already authorised open document usable
   during a disconnect and syncs it after reconnecting.
 
+The repository is a pnpm workspace of two packages and two shells:
+
+- `packages/core/` is the application. Both shells mount it and neither may
+  fork it — `eslint.config.js` forbids the core from importing a shell, and
+  `packages/core/src/platform.ts` is the six-member interface each shell
+  answers instead.
+- `apps/web/` is the browser build, published to GitHub Pages.
+- `apps/desktop/` is the Electron window: `pnpm build:desktop` writes a macOS
+  `.dmg` and a Windows `.exe` into `apps/desktop/release/`, and
+  `.github/workflows/release.yml` builds both on a tag. See
+  [Get it for your Mac](#get-it-for-your-mac). The renderer is served from
+  `app://notes` rather than `file://`, because the collaboration server refuses
+  a socket whose origin it does not know and a `file://` page sends none.
+
 The main areas of the repository are:
 
-- `src/routes/notes.tsx` for workspace and note metadata state.
-- `src/components/` for the sidebar, note list and workspace menus.
-- `src/features/editor/` for the editor, comments, imports, attachments and language
+- `packages/core/src/screens/Notes.tsx` for workspace and note metadata state.
+- `packages/core/src/components/` for the sidebar, note list and workspace menus.
+- `packages/core/src/features/editor/` for the editor, comments, imports, attachments and language
   tools.
-- `src/lib/` for sessions, Supabase access, presence, appearance and collaboration.
-- `server/` for the Hocuspocus service, persistence and health checks.
+- `packages/core/src/lib/` for sessions, Supabase access, presence, appearance and collaboration.
+- `packages/collab-server/` for the Hocuspocus service, persistence and health checks.
 - `supabase/migrations/` for the database schema and policies.
 
 Notes are stored as Tiptap JSON with a plain-text projection for search and previews.
@@ -147,13 +212,14 @@ that part is a courtesy, not the boundary.
 
 ## Documentation
 
-| File                           | Contents                                   |
-| ------------------------------ | ------------------------------------------ |
-| [`PRODUCT.md`](PRODUCT.md)     | Product scope and behaviour                |
-| [`DESIGN.md`](DESIGN.md)       | Interface rules and design decisions       |
-| [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes |
-| [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting |
-| [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes |
+| File                           | Contents                                          |
+| ------------------------------ | ------------------------------------------------- |
+| [`PRODUCT.md`](PRODUCT.md)     | Product scope and behaviour                       |
+| [`DESKTOP.md`](DESKTOP.md)     | The downloadable app: install and troubleshooting |
+| [`DESIGN.md`](DESIGN.md)       | Interface rules and design decisions              |
+| [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes        |
+| [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting        |
+| [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes        |
 
 ## Deployment
 
@@ -164,6 +230,10 @@ The frontend is published through GitHub Pages after the frontend checks, local
 Supabase integration tests, Redis tests and server image build pass. It needs the
 repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
 `VITE_COLLAB_URL`.
+
+Desktop installers are built on a tag — `git tag v0.1.0 && git push --tags` —
+from a matrix of macOS and Windows runners, because electron-builder cannot
+cross-compile them. They are published to the repository's Releases.
 
 The collaboration server runs separately on Render with Valkey. `render.yaml`
 documents that service. Database migrations must be applied before deploying a client

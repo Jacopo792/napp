@@ -1,0 +1,47 @@
+appId: com.jacopo792.napp
+productName: Napp
+copyright: © Jacopo792 · GPL-3.0-or-later
+
+# Not "Notes". macOS already has an app by that name, and a second one collides
+# with it everywhere the operating system lists apps by name — two identical
+# Spotlight rows, and a Dock that hands the wrong icon to whichever it decided
+# was which. `napp` is not a new name either: it is the prefix on every
+# localStorage key, every custom event and the private image scheme, so the
+# window is now called what the code has always called it.
+
+directories:
+  output: release
+  buildResources: build
+
+# The renderer is bundled and the main process imports nothing but `electron`
+# and `node:`, so the app carries no node_modules at all — which is also why
+# every dependency of this package is a devDependency. electron-builder ships
+# whatever is in `dependencies`, and leaving React and Tiptap there put a
+# second, unused copy of the whole application inside the asar: a 410 MB app
+# around a 2 MB bundle.
+files:
+  - dist/**
+  - electron/**
+  - package.json
+
+# Unsigned, deliberately and for now. macOS reports an unsigned .dmg as
+# "damaged"; it opens from the right-click menu. Signing needs an Apple
+# Developer ID and a Windows certificate — set CSC_LINK / CSC_KEY_PASSWORD and
+# delete the two `identity: null` lines below and this becomes a signed build
+# without any other change.
+# No arch list: electron-builder then builds for the machine it is on. Asking
+# for both here made two Notes.app bundles on every local build, and Spotlight
+# indexes build output like anything else — three results for one app, next to
+# Apple's. Both architectures are release.yml's job, where they are asked for
+# by flag.
+mac:
+  category: public.app-category.productivity
+  identity: null
+  target: dmg
+
+win:
+  target: nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

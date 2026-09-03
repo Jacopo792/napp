@@ -1,9 +1,59 @@
 # Repository guide
 
+## One app, two shells
+
+The application is `packages/core`. It is mounted by two shells that share it
+and may never fork it:
+
+|                          |                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `packages/core`          | the app: `lib/`, `components/`, `features/editor/`, `screens/`, `styles.css`, `App.tsx`, `platform.ts` |
+| `apps/web`               | the browser. Vite → GitHub Pages, exactly as before                                                    |
+| `apps/desktop`           | the Electron window. macOS `.dmg`, Windows `.exe`                                                      |
+| `packages/collab-server` | the Hocuspocus service (was `server/`)                                                                 |
+
+A shell contains an `index.html`, a `main.tsx` of about nine lines, one
+`platform.*.ts`, and a bundler config. **Nothing else.** A component appearing
+under `apps/` is not a feature, it is the first branch of a fork — and it is
+visible from the directory listing, which is the point of the shape.
+
+That is a habit; the rule underneath it is mechanical. `eslint.config.js`
+forbids `packages/core/**` from importing `electron`, `electron/*` or anything
+under `apps/`, so a shell-specific import in the core fails the build with a
+message naming what to do instead. CI builds **both** shells on every push for
+the same reason: a change to the core that breaks the desktop renderer has to
+fail in the pull request, not at the next release.
+
+`packages/core/src/platform.ts` is what to do instead. Six members, and every
+one has two real implementations from the day it was written: `webOrigin`,
+`inviteToken`, `saveFile`, `saveFolder`, `openFile`, `print`. Each shell calls
+`setPlatform()` before mounting.
+
+**Do not widen it for something both shells do the same way.** `import.meta.env`,
+`localStorage`, IndexedDB, the clipboard and the pdf.js worker are all
+deliberately absent: both shells are Vite over Chromium, so those resolve
+identically, and what differs is the values in a `.env` file. A member with two
+identical implementations is an interface that has stopped describing a
+boundary and started describing a habit.
+
+`openFile` takes a **loader** rather than a blob, and that shape is
+load-bearing: a browser must claim the new tab synchronously inside the click
+or the pop-up blocker takes it, so the shell — not the caller — decides when
+the bytes are fetched. A desktop window has no such rule and simply awaits.
+
+Routing lives in `core/src/App.tsx` and a shell never imports the router: `App`
+takes `history="hash"` or nothing, so the browser gets its own history and a
+basepath, and the desktop window gets a hash history because there is no server
+under it to answer a path. The route tree is written out rather than generated
+— the file-based generator wanted a plugin in every shell's bundler config, all
+writing the same `routeTree.gen.ts`. What it earned was code splitting, and
+`lazyRouteComponent` keeps that; the built chunks are the proof, and the
+sign-in chunk must never contain ProseMirror.
+
 ## Architecture
 
 - React 19 + Vite SPA on GitHub Pages, plus a Node 22 Hocuspocus service in
-  `server/`.
+  `packages/collab-server/`.
 - Supabase supplies Auth, Postgres RLS, metadata, Realtime and private Storage.
   Yjs/Hocuspocus is authoritative for live title and content documents.
 - Redis/Valkey is the bus between overlapping server instances; durable Yjs
@@ -40,7 +90,7 @@ reload, and `persistMetaDiff` carried an upsert, a delete and an insert for
 links that were always empty. Creating a note fired a redundant `note_tags`
 DELETE, because a note with no row in `before` counts as "retagged".
 
-All of that is gone from `src/`. **The Postgres side is untouched**: `tags`,
+All of that is gone from the core. **The Postgres side is untouched**: `tags`,
 `note_tags`, their policies and their rows all still stand, which is what makes
 this a deletion and not a migration. Re-adding the feature means re-adding the
 reads. Do not re-propose the tag _interface_ — it was removed on purpose.
@@ -83,11 +133,63 @@ the boundary is the one place every update passes through:
   disagreeing with the document it is bound to.
 
 A note row carries no buttons on a pointer machine — everything they did is in
-the row's right-click menu. On a phone the acts are gestures instead: push a
-card left to file it, right to trash it. Pinning has no direction, so it keeps
-its button there, and Trash and Archive keep theirs.
+the row's right-click menu. The acts are also a gesture, and it is Mail's
+gesture rather than a swipe of our own: push the row **left to uncover Delete**
+on its right, **right to uncover Archive**. A finger drags it; a trackpad
+pushes it with two fingers.
 
-`handleMetaChange` in `notes.tsx` is the one place every per-note metadata
+**Three behaviours, not one, and this is what the first attempt got wrong.**
+The action is not a sign riding on the row, it is a surface behind it that the
+row uncovers, and it grows with the travel. Let go partway and the row **stays
+open** with its button showing, so the act is still a deliberate press. Push it
+past `COMMIT` and it happens on release. A row that only ever sprang back said
+nothing about what it was about to do, which is what made the gesture read as a
+twitch rather than a control.
+
+The directions are Apple's. They were once the other way round, on the argument
+that muscle memory outranks convention; the muscle memory being protected was
+of a gesture nobody could use, and the hand's real memory is of Mail. Changing
+them was the report, not a liberty.
+
+**Every scope has the gesture, and each one has its own pair.** It was the
+ordinary list alone at first, on the argument that Trash and Archive have
+different acts — they do, and that is a reason to give them their own pair
+rather than to take the hand's gesture away in the two places a row is most
+likely to want moving. The list deletes and archives, the Archive deletes and
+puts back, the Trash deletes for good and restores. One rule crosses all three:
+**a full swipe may not do something irreversible**, so deleting for good stays a
+deliberate press however far the row is pushed.
+
+`OPEN`, `COMMIT` and `MAX` in `NoteList.tsx` are the whole of the tuning, and
+**the clamp is load-bearing**: a trackpad keeps sending decaying momentum after
+the fingers lift, so unclamped travel turns a flick into a commit nobody asked
+for. Clamped, a flick arrives at the open position and waits there, which is
+what Mail does with the same flick.
+
+The panels are parked outside the row's own edges (`left: 100%`, `right: 100%`)
+rather than inside a wrapper, so the travelling row is the only thing that
+moves and the list's own `overflow-x: hidden` is what keeps a parked panel out
+of sight. A row that is open paints `--paper`, or the panel is read through it.
+One row is open at a time, announced on `napp:close-other-swipes` as the
+gesture starts rather than lifted into the list's state — a re-render of every
+row to move one row is the wrong shape for something a hand changes constantly.
+
+A trackpad has no gesture-end event: the fingers lift and macOS keeps sending
+decaying momentum. The end is therefore a silence — 90 ms without a wheel
+event — and two things follow that are easy to get wrong. The travel lives in
+a **ref**, because every wheel event re-renders the row. And the settle is read
+through a ref too: closed over directly it changes each render, the effect
+re-runs, and its cleanup cancels the very timer that ends the gesture, so the
+row travels and never springs back. Following the hand and settling afterwards
+are also two motions and take two curves — `dragging` takes the transition off
+while the fingers are on it, or the row snaps to its open position and the one
+frame that says it was caught is lost. Chromium reads the same two-finger swipe
+as "go back"; the handler calls `preventDefault` on a deliberately non-passive
+listener, the list carries `overscroll-behavior-x: contain`, and the desktop
+shell turns `OverscrollHistoryNavigation` off outright. Pinning has no
+direction, so it keeps its button there, and Trash and Archive keep theirs.
+
+`handleMetaChange` in `Notes.tsx` is the one place every per-note metadata
 change passes through, so the lock is honoured there once rather than in each
 of pinning, filing, trashing and shelving.
 
@@ -107,11 +209,25 @@ a note leaves it the moment its last thread is dealt with. Opening a note from
 there opens its conversation with it.
 
 The badge counts remarks _somebody else_ wrote, in an open thread, since this
-browser last opened their note. The line it compares against is a timestamp
-**per note** in `localStorage`, not a column: it is a fact about a device
-looking rather than about the archive, and a set of read ids is a thing nobody
-ever finishes pruning. A new device therefore starts with everything unread,
-which is the right answer for it.
+account last opened their note. The line is a timestamp **per note**, and it
+belongs to the **account**: it travels in `profile_preferences` with everything
+else in _Preferences belong to the account_ below, with `localStorage` as the
+device's cache for the first paint.
+
+It was per device once, on the argument that a device looking is what it
+records. It is not — having read a conversation is something a person did — and
+the way that showed was installing the desktop app: it had read nothing, so it
+put a badge on every conversation already read in the browser, and there was no
+way to clear it but opening every note again. The web app said nothing was
+waiting and the desktop app said something was, about the same archive, at the
+same moment.
+
+`mergeRemarksSeen` is the **one field in that blob that is not
+last-write-wins**, and it has to be: a watermark's answer to "which of these two
+is right" is neither, it is the further one. A device that has read nothing must
+not un-read what the other one read. Its keys come out sorted, because the push
+guard compares `JSON.stringify` output and insertion order is part of that
+string.
 
 Opening the note is what moves that note's line — not looking at the list,
 which is what moved the single archive-wide line this used to keep. One line
@@ -120,6 +236,13 @@ after you had read the only thing under it, and the sidebar row's tally of
 notes-being-talked-about — which clears only when the last thread is resolved —
 took the badge's place in the same slot and read as a stuck count. The Remarks
 row now carries the dot and no tally.
+
+The badge says how many are waiting; **the dot on the row says which**. Without
+it the count is a number with nothing under it — the note that produced it looks
+like every other note, and "I have read them all" is a reasonable thing to
+believe. It sits on the leading slot, whichever of the three that is, because
+that slot is already the one place in a row that says what you are about to
+open. Opening the _list_ is not reading: only opening the note moves its line.
 
 `refreshRemarks` is debounced by 400 ms. Realtime announces every insert,
 update and delete on `note_comments` separately, so resolving a thread of six
@@ -244,13 +367,21 @@ same statement with `.in` where it had `.eq`.
 ```bash
 cp .env.example .env.local
 pnpm install
-pnpm dev
+pnpm dev              # the web shell, localhost:5173
+pnpm dev:desktop      # the Electron window, renderer on localhost:5174
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:server
-pnpm build
+pnpm build            # the web app → apps/web/dist
+pnpm build:desktop    # .dmg and .exe → apps/desktop/release
 ```
+
+`.env.local` needs a fourth name for the desktop build: `VITE_WEB_ORIGIN`, the
+published web address. An invitation is a link somebody else opens, on a
+machine that has a browser and very likely not this app, so it can never point
+at the desktop window — and the desktop window has no address bar to read its
+own origin out of.
 
 `pnpm preview:ui` runs the whole interface against an in-memory fixture on
 `localhost:5199`, with `@/lib/supabase`, `session`, `sync` and `presence`
@@ -259,6 +390,148 @@ with anything. Change a mock whenever you change the real module's shape —
 `preview/supabase.mock.ts` must return a **fresh** roster array from
 `loadArchive`, because handing back the same object makes every roster change
 invisible to React.
+
+## The desktop app
+
+**It does not load `file://`, and that is not a preference.**
+`originAllowed()` in `packages/collab-server/src/access.ts` refuses a socket
+whose `Origin` header is absent or not in the allow-list, and a page loaded
+from `file://` sends nothing usable. Every note would fail to open, with a
+message that never names the cause. So `electron/main.js` registers a scheme
+of its own and serves the built renderer from **`app://notes`** — an origin the
+server can be told about.
+
+Which somebody has to do by hand: `ALLOWED_ORIGINS` must contain `app://notes`
+and, for development, `http://localhost:5174`. `render.yaml` records both but
+**does not apply them** — the live service was made through the API, so the
+value is set in the Render dashboard. The Render CLI has no env-var command, so
+this cannot be scripted from here.
+
+Until it is set the live server answers a handshake from `app://notes` with
+**HTTP 403**, which is what to check first when the desktop app signs in and
+then opens nothing. Asking it directly beats reading the dashboard:
+
+```bash
+node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onrender.com",{origin:"app://notes"});s.on("open",()=>{console.log("accepted");s.close()});s.on("unexpected-response",(_q,r)=>console.log("refused",r.statusCode))})'
+```
+
+(from `packages/collab-server/`, where `ws` resolves.)
+
+**A window is not a tab, and three of the differences are not optional.**
+
+`electron/menu.js` builds the menu bar, and almost nothing in it has logic.
+Every item that acts on the archive is already a shortcut the renderer answers
+to — `packages/core/src/lib/shortcuts.ts` is the list, read by the `?` sheet and
+by Settings — so the menu does not implement the commands, it **presses the
+key**: `registerAccelerator: false` shows the shortcut beside the item without
+taking it off the page, and clicking the item sends the same keystroke down for
+the preload to dispatch on whatever has focus. One implementation of "new note",
+and a menu item that cannot drift away from the key that does the same thing.
+What stays a real role is what belongs to the system rather than to us: undo
+inside a contenteditable, ⌘W, Services, speech, zoom, full screen.
+
+**The three buttons and `--titlebar-inset` are one decision in two files.**
+`hiddenInset` leaves the traffic lights at the window's own top-left, which here
+is on top of the avatar in the first row of the sidebar — the panes are cards
+inset by 10px, so the window's corner is inside the first one. `main.js` moves
+them to the middle of the 52px header strip with `trafficLightPosition`, and the
+stylesheet holds a gutter open for them. Change one number and the buttons are
+either over the avatar or floating in a gap. The gutter follows the leftmost
+strip, not the sidebar: ⌘\ collapses the whole navigation pane and the buttons
+are then over the note's own toolbar.
+
+**And a hidden title bar is a window with nothing left to drag by.** There is no
+default: without `-webkit-app-region: drag` somewhere, the window cannot be
+moved at all, which is the single loudest way an Electron app announces it is a
+web page. The header strips are the title bar, so they drag — and everything
+pressable inside them needs `no-drag`, menus included, because drag is inherited
+and a menu opened from a toolbar is a descendant of it.
+
+**The icon is cut to Apple's template, not to the edge of the canvas.** A macOS
+icon is 824×824 of artwork centred in a 1024 canvas with transparent corners, so
+that every icon in the Dock reads at the same size. `build/icon.png` was
+full-bleed with no alpha at all, which in the Dock is a black square standing a
+head taller than everything beside it. The corner is a **superellipse**, not a
+rounded rectangle: the curvature runs continuously into the straight edge rather
+than meeting it at a point, and that difference is most of what separates an
+icon that looks drawn by Apple from one drawn by a `border-radius`.
+
+The number on that icon is `navigator.setAppBadge`, called from the core with no
+bridge and no member on `platform.ts`. It is a standard the browser has too, and
+Electron implements it straight onto the Dock — a platform member for it would
+have been an interface describing a habit rather than a boundary.
+
+`data-shell` on the root element is what the stylesheet reads, set by the
+desktop `main.tsx` and by nothing else, so every rule keyed on it is inert in a
+tab.
+
+The scheme is registered with `registerSchemesAsPrivileged` before `ready`.
+Without that it is not a secure context, and without a secure context there is
+no IndexedDB — which means no offline notes and no Supabase session. It is two
+lines that look like ceremony and are not.
+
+**A policy that allows `https://host` does not allow `wss://host`.** Chromium
+does not perform the scheme-part upgrade CSP3 describes, and the way that fails
+is the worst kind: the desktop app saved notes correctly, held its collaboration
+socket, and silently refused Supabase Realtime — so an edit landed in Postgres
+and the list never heard the row had changed. The "edited" line stayed where it
+was, and it read as nothing being saved at all. The policy builder emits both
+schemes for every host, and the check is one line in the page:
+
+```js
+document.addEventListener("securitypolicyviolation", (e) =>
+  console.log(e.violatedDirective, e.blockedURI),
+);
+```
+
+A refused socket fires that and nothing else — no exception, no console error
+of its own. Reading the outcome of a `WebSocket` alone cannot tell a policy
+refusal from a server that said no.
+
+**The content security policy is written by `apps/desktop/vite.config.ts`, not
+by the main process.** It names the Supabase and collaboration origins, those
+are build-time values of the _renderer_, and the packaged main process has no
+`.env` to read them back out of: assembled there it would silently lose them
+and block every request the app makes. It goes into the production HTML only —
+the dev server needs the inline script and the websocket that hot reload is
+made of.
+
+**Every dependency of `apps/desktop` is a `devDependency`,** which is not
+tidiness. electron-builder ships whatever is in `dependencies`, and React and
+Tiptap left there put a second, unused copy of the whole application inside the
+asar: a 410 MB app around a 2 MB bundle. It is 3.8 MB now.
+
+Builds are **unsigned**. macOS reports an unsigned `.dmg` as damaged; it opens
+from the right-click menu. Signing needs an Apple Developer ID and a Windows
+certificate — set `CSC_LINK` and `CSC_KEY_PASSWORD` and drop the `identity:
+null` line in `apps/desktop/electron-builder.yml`, and nothing else changes.
+
+`.github/workflows/release.yml` builds the installers on a tag, from a matrix
+of `macos-latest` and `windows-latest`, because electron-builder cannot
+cross-compile these. `ci.yml` builds the desktop _renderer_ on every push and
+stops there.
+
+**A packaged build refuses a `VITE_COLLAB_URL` on localhost**, and that guard
+is worth its four lines. A build reads the same `.env.local` the dev server
+does, and that file points the collaboration URL at a server on this machine —
+so the first `.dmg` made here carried `ws://127.0.0.1:8080` to an installed
+app. The way that fails is not an error: an editor opens only after the server
+has synced, so the app signs in, says "Waking the server", and never opens a
+note. It reads as lag. Build with the deployed server:
+
+```bash
+VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop
+```
+
+`ALLOW_LOCAL_COLLAB=1` is the way past it for a build genuinely aimed at a
+local server.
+
+**`pnpm build:desktop` builds for the machine it is run on, and that is not
+timidity.** Asked for `--win` on an Apple Silicon Mac it packs `win-unpacked/`
+correctly and then dies on `makensis: spawn Unknown system error -86` —
+EBADARCH, because the NSIS binary electron-builder fetches is x86_64. There is
+no arrangement of flags that fixes it; the Windows installer is made on a
+Windows runner, which is what the matrix is for.
 
 ## Deployment
 
@@ -279,7 +552,7 @@ Pushing to `main` builds and publishes to GitHub Pages. The workflow reads
 repository variables. No service-role key, account password or archive
 passphrase belongs anywhere near the build.
 
-All three are required — `vite.config.ts` throws on a missing one — and the
+All three are required — `apps/web/vite.config.ts` throws on a missing one — and the
 throw happens in the `deploy` job, after `checks` and `backend` are already
 green. Pages then keeps serving the previous build, so the site looks healthy
 while nothing has shipped. `VITE_COLLAB_URL` was missing for the whole life of
@@ -297,6 +570,21 @@ that hour with a loop, which has a clock. The loop's test is an `if` and never
 `&&`: Actions runs every `run` under `bash -e`, where a false AND-list ends the
 job — written that way it would have pinged once and stopped, green.
 
+Hourly turned out to be a fiction too. On 3 September it fired **three times in
+twenty-four hours** — 00:01, 13:08, 17:24 — so the server slept through a
+thirteen-hour gap and a three-hour one with the workflow green above it, which
+is what "the Render server does not work properly" is. There is no cron
+expression that fixes a best-effort scheduler, so the job stopped trying to
+cover an hour and covers **the rest of the window**: it pings until 23:00 UTC or
+until it approaches the six-hour ceiling Actions puts on a job, and the schedule
+asks every three hours. A firing that lands does the work of the several that
+did not.
+
+**The standing alternative is Render's `starter` plan at $7 a month**, which
+does not sleep — and takes this workflow and the whole 750-hour argument with
+it. Any external pinger with a real scheduler (cron-job.org, UptimeRobot) is the
+other way, and needs an account nobody has made.
+
 It is a window, not a loop around the clock, because a
 workspace gets **750 free instance-hours a calendar month** across every free
 web service and going over does not throttle anything, it _suspends every free
@@ -309,7 +597,7 @@ server" instead of "Connecting", because an unexplained minute is
 indistinguishable from a fault — it was being read as one.
 
 The collaboration server is `notes-collab` on Render, in Frankfurt, built from
-`server/Dockerfile` with the repository root as its build context, with the
+`packages/collab-server/Dockerfile` with the repository root as its build context, with the
 Valkey instance `notes-collab-bus` beside it. `render.yaml` describes it and
 does not drive it: the live service was created through the Render API, because
 the CLI has no flag for a Dockerfile outside the root and the blueprint was
@@ -339,7 +627,7 @@ leave out a file the image needs: `server.ts` began importing `writeLocks.ts`
 while the Dockerfile named `content.ts` and `ydoc.ts` by hand, so the image
 built, deployed, exited on ERR_MODULE_NOT_FOUND — and Render held the previous
 instance up, which is the same silence as above. The image now copies the whole
-of `src/features/editor/lib/`, and CI starts what it builds and asks it for
+of `packages/core/src/features/editor/lib/`, and CI starts what it builds and asks it for
 `/healthz`, because that is the only step that can tell the difference.
 
 **Deploy before you drop.** The oldest client still running is whatever `main` last built,
@@ -505,7 +793,7 @@ editor's to do, deleting is the author's alone.
 `private.shares_archive()` lets you read the profile of someone you share an
 archive with; only the account itself may write its own row. Avatars live in
 their own private bucket under the owner's user id.
-`src/lib/avatarCache.ts` keeps one object URL per avatar, and Realtime keeps the
+`packages/core/src/lib/avatarCache.ts` keeps one object URL per avatar, and Realtime keeps the
 roster live.
 
 Who is on the _note_ is a different question, and it is asked of Yjs awareness
@@ -516,9 +804,9 @@ and still feeds the Settings roster.
 
 A picture is placed before it is uploaded, not cut from the middle of the file.
 `AvatarCropper` shows a round window over the image, draggable and zoomable;
-`avatarCropRect()` in `src/lib/image.ts` turns what the window shows into the
+`avatarCropRect()` in `packages/core/src/lib/image.ts` turns what the window shows into the
 square `prepareAvatar()` cuts. Preview and output take the same three numbers,
-so they cannot disagree. The math has tests in `src/lib/image.test.ts`.
+so they cannot disagree. The math has tests in `packages/core/src/lib/image.test.ts`.
 
 ## A picture for the note, and one behind the title
 
@@ -576,7 +864,7 @@ writer raises and lowers**, not a timestamp — a timestamp needs a clock, an
 expiry and a re-render tick in every reader to notice it lapse, for something
 the writer already knows — but it now travels beside the identity it describes,
 so a reader who can see the face can always see the flag. `markTyping()` in
-`notes.tsx` announces once when a burst starts and once `TYPING_IDLE_MS` after
+`Notes.tsx` announces once when a burst starts and once `TYPING_IDLE_MS` after
 it ends; changing note lowers it first, so it is never left raised on a page
 nobody is on.
 
@@ -597,6 +885,43 @@ not re-gate the broadcast; that is the bug this arrangement exists to end.
 `realtime.topic()` via `private.presence_archive_id()` — `SELECT` to receive,
 `INSERT` to publish. Postgres Changes subscriptions stay public channels
 filtered by table RLS; `private_only` is not on globally, so they are undisturbed.
+
+## Coming back
+
+A tab is reloaded a dozen times a day. A desktop window is opened once and left
+open for a week, through a closed lid, a changed network and a hotel wifi — and
+a Realtime socket does not survive all of that. The way it fails is the worst
+kind: the channel is gone, nothing throws, and the list simply stops hearing
+that rows have changed.
+
+That is what "editing a note no longer says edited" was, and it took a while to
+find because every part of it was working. `save_note_document` stamped
+`updated_at` correctly, the collaboration server persisted, the content security
+policy allowed the socket (checked by opening one from `app://notes` under the
+packaged policy), and the web app — freshly loaded — showed the change. The
+desktop window, open since the morning, showed yesterday.
+
+So the window is asked to notice it has come back, in `Notes.tsx`. Three
+signals, because no one of them covers the three ways of leaving:
+
+- `visibilitychange`, for a window that was hidden.
+- `online`, for the network returning.
+- **A clock that jumped**, which is the only one that catches a laptop whose
+  lid was shut: the display slept, the window stayed "visible" the whole time,
+  and nothing else fires. A tick that arrives long after it was due is a machine
+  that was asleep between the two.
+
+**A burst of saves is one read.** `refreshRemote` is debounced by 250 ms and an
+announcement that lands while a read is in flight is repeated once when that
+read finishes, rather than dropped — the read that was already running had asked
+the database before that change, so the last word of a burst could otherwise sit
+unread until something else happened to move. Somebody typing announces about
+once a second, and each announcement was a whole snapshot.
+
+Both halves matter on a wake. The snapshot is read again, because whatever
+happened while we were away was never announced; and the channels are rebuilt —
+the archive's and the remarks' both — because the ones we had may be listening
+to nothing.
 
 ## Preferences belong to the account
 
@@ -650,8 +975,11 @@ the middle term is the subtlety — a field the row does not carry keeps the
 **local** value, never the default, or signing in on the browser you have used
 for a year would undo a year of choices on the strength of an empty column.
 
-What stays local, deliberately: pane widths, collapsed groups, expanded folders
-and the per-note remarks-seen stamps. Those are facts about a device looking.
+What stays local, deliberately: pane widths, collapsed groups and expanded
+folders. Those are facts about a device looking. The remarks-seen stamps were on
+that list and are not any more; see _Remarks, and knowing one is waiting_ above
+for why, and `mergeRemarksSeen` for the one merge rule in the blob that is not
+last-write-wins.
 
 ## Migrations
 
@@ -683,7 +1011,7 @@ pg_trigger join pg_proc …` found this in one query.
 
 ## Markdown in and out
 
-`src/features/editor/lib/exchange.ts` is the whole of this app's
+`packages/core/src/features/editor/lib/exchange.ts` is the whole of this app's
 interoperability, and deliberately so. Obsidian **is** a folder of `.md` files,
 Notion and Google Docs both read pasted Markdown, and Apple Notes has no API —
 so a file and a clipboard reach all three, and none of them needs an OAuth
@@ -707,7 +1035,7 @@ none and is not going to grow one. The id never leaves; a uuid in somebody
 else's file is exactly the broken link `demotePrivateMedia` avoids inventing.
 
 What points at a note is found by walking the Tiptap JSON of the notes already
-in memory (`linksTo()` in `src/lib/derived.ts`), never by querying a column: a
+in memory (`linksTo()` in `packages/core/src/lib/derived.ts`), never by querying a column: a
 link is a mark inside the document, so there is nothing to index. It therefore
 follows the Postgres projection, which means a link written now appears in the
 other note's foot when the save lands rather than as it is typed.
@@ -726,7 +1054,7 @@ the extension costs nothing and is what makes a source file testable.
 
 The archive was encrypted once and is not any more. Every note, folder, tag and
 archive setting is a plaintext column; every Storage object carries its real
-content type; no code under `src/` decrypts anything. `crypto.ts` lives in
+content type; no code under `packages/core/src/` decrypts anything. `crypto.ts` lives in
 `scripts/lib/`, for the one-time migration tools that still need it.
 
 `20260829200000_drop_the_retired_format.sql` and
@@ -757,7 +1085,7 @@ variables are documented in `.env.migration.example`. Never expose
 
 ## What the sign-in page is allowed to import
 
-`src/lib/session.ts` is the login screen's entire back end and imports
+`packages/core/src/lib/session.ts` is the login screen's entire back end and imports
 `./supabaseClient` and `./noteStore` — never `./supabase`. `supabase.ts` reaches
 `content.ts` for the note projection, `content.ts` builds the Tiptap schema, and
 Rollup then puts all of ProseMirror in the chunk both routes share: the sign-in
@@ -776,6 +1104,38 @@ needs anyway.
 The in-memory note cache (`noteCache`, `resetArchiveCache`, `adoptArchiveCache`)
 lives in `noteStore.ts` for that reason and no other — `session.ts` has to clear
 it on sign-out, and that one import was the whole rope. Keep it there.
+
+## Flush columns, one band of chrome
+
+The panes were rounded cards on a ground, ten pixels of air round the outside
+and between them. It is a good look and it is not what a Mac application looks
+like: Finder, Mail and Notes are flush columns divided by a hairline, under one
+band of chrome that runs the width of the window. The floating cards were the
+loudest single thing saying "this is a web page in a frame".
+
+Nothing structural changed for it, which is the point. The three header strips
+were already 52px and already side by side; taking away `.workspace-grid`'s
+padding and the columns' radius is what makes them read as one toolbar, and the
+hairline under **all three** is what draws the line across the window. The note's
+own strip used to go without one so a cover picture was not cut by a rule —
+underlined for two thirds of the window and open for the last third reads as a
+mistake, and a toolbar separator over a picture is what every Mac window does.
+Focus mode is the exception, where the column stops being a pane at all.
+
+Two things that were load-bearing and are easy to undo by accident:
+
+- **The columns carry no border.** `.sidebar-column` and its two siblings had
+  `border: 1px`, which with the panes flush pushed each column's contents down
+  by a pixel — so the three strips no longer agreed on where 52 pixels ended and
+  the line across the window was drawn at two heights.
+- **The seam is the resizer.** It was a 10px strip of the ground with a line
+  down the middle on hover, which between touching panes would have been a 10px
+  gap of background. So the element _is_ the 1px line, and what you can grab is
+  a pseudo-element nine pixels wider overhanging both neighbours. A hairline you
+  have to hit exactly is a hairline nobody moves.
+
+The gain is not only the look. The gutter and the two ten-pixel seams were 40px
+of a narrow window spent on air.
 
 ## Interface notes worth knowing
 
@@ -841,5 +1201,5 @@ it on sign-out, and that one import was the whole rope. Keep it there.
   settings row's own anatomy, which names the row rather than explaining it —
   and which is where the reason a disabled control is disabled belongs.
 - A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `?` and Focus
-  mode are all named in the ⋯ menus that already open, and `src/lib/shortcuts.ts`
+  mode are all named in the ⋯ menus that already open, and `packages/core/src/lib/shortcuts.ts`
   is the single list both the `?` sheet and the Settings section read.

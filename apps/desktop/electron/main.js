@@ -1,0 +1,204 @@
+/* The desktop window, and the four things a window can do that a tab cannot.
+ *
+ * Plain JavaScript on purpose. Electron's main process has no type stripping,
+ * so TypeScript here would mean a build step and a bundler for eighty lines
+ * that import nothing but `electron` and `node:`. The renderer is where the
+ * application is, and the renderer is TypeScript like the rest of the
+ * repository.
+ *
+ * ── Why this does not load a file:// URL ─────────────────────────────────────
+ * The collaboration server refuses a socket whose Origin is absent or not in
+ * its allow-list (`originAllowed` in packages/collab-server/src/access.ts). A
+ * page loaded from file:// sends no usable origin, so every note would fail to
+ * open with a message that never says why. So the built renderer is served
+ * from a scheme of its own, and `app://notes` is an origin the server can be
+ * told about. Render's ALLOWED_ORIGINS has to contain it. */
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, screen, shell } = require("electron");
+const { installMenu } = require("./menu");
+const path = require("node:path");
+const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
+const os = require("node:os");
+
+const DEV_URL = "http://localhost:5174";
+const APP_ORIGIN = "app://notes";
+const isDev = !app.isPackaged;
+
+/* A two-finger swipe on a note row files it or throws it away, and Chromium
+   reads the same gesture as "go back". The row's own handler calls
+   preventDefault, but overscroll navigation is decided above the page, so it
+   is turned off here — there is nowhere to go back to in a window with two
+   routes and a hash history. */
+app.commandLine.appendSwitch("disable-features", "OverscrollHistoryNavigation");
+
+/* Where the window was, so it opens there again. Every Mac app does this, and
+   an app that forgets is an app you rearrange every morning. A file rather
+   than a dependency: it is one object, written on close. */
+const windowStateFile = () => path.join(app.getPath("userData"), "window.json");
+
+function rememberedBounds() {
+  try {
+    const saved = JSON.parse(fsSync.readFileSync(windowStateFile(), "utf8"));
+    /* A display that is gone takes its coordinates with it: a window restored
+       onto a monitor that is no longer attached opens off-screen, and there is
+       no way to drag back something you cannot see. */
+    const visible = screen.getAllDisplays().some((display) => {
+      const a = display.workArea;
+      return (
+        saved.x + saved.width > a.x &&
+        saved.x < a.x + a.width &&
+        saved.y + saved.height > a.y &&
+        saved.y < a.y + a.height
+      );
+    });
+    return visible ? saved : { width: saved.width, height: saved.height };
+  } catch {
+    return null;
+  }
+}
+
+/* Registered before `ready`, or `protocol.handle` gets a scheme with none of
+   the privileges a document needs — no fetch, no storage, no secure context,
+   which means no IndexedDB and therefore no offline notes. */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
+]);
+
+/* The content security policy is not here. It names the Supabase and
+   collaboration origins, which are build-time values of the renderer, and this
+   process is packaged without the .env they came from — a policy assembled
+   here would silently lose them and block every request the app makes. It is a
+   <meta> tag that vite.config.ts writes into the production HTML, where those
+   values already are, and leaves out of the dev HTML, which needs the inline
+   script and the websocket that hot reload is made of. */
+function serveRenderer() {
+  const root = path.join(__dirname, "..", "dist");
+  protocol.handle("app", async (request) => {
+    const { pathname } = new URL(request.url);
+    /* One index.html for every path: the router is a hash history, so a real
+       path only ever appears here as a mistake, and answering it with the app
+       is kinder than answering it with nothing. */
+    const asset = path.join(root, pathname);
+    const file =
+      pathname === "/" || !path.extname(pathname) ? path.join(root, "index.html") : asset;
+    /* A request that climbs out of dist/ is not a request this app made. */
+    if (!path.resolve(file).startsWith(path.resolve(root)))
+      return new Response("", { status: 403 });
+    return net.fetch(`file://${file}`);
+  });
+}
+
+function createWindow() {
+  const window = new BrowserWindow({
+    width: 1280,
+    height: 840,
+    ...rememberedBounds(),
+    minWidth: 640,
+    minHeight: 480,
+    show: false,
+    backgroundColor: "#191919",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    /* Where the three buttons sit, and it is not decoration. `hiddenInset`
+       puts them at the window's own top-left, which is on top of the first row
+       of the sidebar — so they are moved down to the middle of the 52px header
+       strip, and the strip is given a gutter to stand in (`--titlebar-inset` in
+       the stylesheet). The two numbers are one decision in two files: change
+       one and the buttons are either over the avatar or floating in a gap. y is
+       the top of the buttons, which are 12px, so 20 centres them in a strip
+       that runs from 0 to 52. */
+    trafficLightPosition: { x: 19, y: 20 },
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  /* Painted before shown, so opening the app is not a white rectangle that
+     becomes the archive a moment later. */
+  window.once("ready-to-show", () => window.show());
+
+  /* On close, not on every move: a resize sends a great many events and this
+     is a fact worth exactly one write. `getNormalBounds` and not `getBounds`,
+     or a window closed while full-screen is remembered as the whole screen and
+     opens that way for ever. */
+  window.on("close", () => {
+    try {
+      fsSync.writeFileSync(windowStateFile(), JSON.stringify(window.getNormalBounds()));
+    } catch {
+      /* A window that cannot write down where it was still closes. */
+    }
+  });
+
+  /* A link in a note belongs to the reader's browser. Opening it in here would
+     put a page nobody chose inside the application's own window, with the
+     application's own permissions. */
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:$/.test(new URL(url).protocol)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  void window.loadURL(isDev ? DEV_URL : `${APP_ORIGIN}/index.html`);
+  return window;
+}
+
+async function chooseAndWrite(window, files, fallbackName) {
+  if (files.length === 1) {
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      defaultPath: files[0].name,
+    });
+    if (canceled || !filePath) return "file";
+    await fs.writeFile(filePath, Buffer.from(files[0].data));
+    return "file";
+  }
+  const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+    title: fallbackName,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (canceled || filePaths.length === 0) return "folder";
+  for (const file of files) {
+    await fs.writeFile(path.join(filePaths[0], path.basename(file.name)), Buffer.from(file.data));
+  }
+  return "folder";
+}
+
+ipcMain.handle("napp:save", (event, files, fallbackName) =>
+  chooseAndWrite(BrowserWindow.fromWebContents(event.sender), files, fallbackName),
+);
+
+/* Shown, not saved: written where the operating system keeps things it is
+   allowed to throw away, then handed to whatever opens that kind of file. */
+ipcMain.handle("napp:open", async (_event, name, data) => {
+  const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "napp-")), path.basename(name));
+  await fs.writeFile(file, Buffer.from(data));
+  const failure = await shell.openPath(file);
+  return failure || null;
+});
+
+ipcMain.handle("napp:print", (event) => {
+  event.sender.print({});
+});
+
+app.whenReady().then(() => {
+  if (!isDev) serveRenderer();
+  /* The About panel is a native window and it is free; without this it says
+     "Electron" and gives the version of the runtime rather than of the app. */
+  app.setAboutPanelOptions({
+    applicationName: "Napp",
+    applicationVersion: app.getVersion(),
+    credits: "A shared archive, for the people who write in it.",
+  });
+  installMenu(isDev);
+  createWindow();
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
