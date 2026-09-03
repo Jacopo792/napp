@@ -7,6 +7,28 @@ changes. The commit history remains the detailed engineering record.
 
 ### Added
 
+- **A desktop window that behaves like one.** The application now ships as a
+  macOS `.dmg` for Apple Silicon and a Windows installer, built on a tag, and
+  the window has what a window has: a real menu bar whose every archive command
+  presses the key the interface already answers to, the system's own text
+  services (Emoji & Symbols, smart quotes, smart dashes, text replacement), a
+  gutter for the three traffic lights that follows the leftmost column and
+  disappears in full screen, a toolbar you can drag the window by, a title that
+  names the note you are reading, and an icon cut to the platform's template
+  carrying the count of unread remarks. None of it changes the interface: the
+  same core mounts in a browser tab unchanged.
+- **The swipe, in every scope.** A catalogue row answers a sideways push — a
+  finger, or two fingers on a trackpad — and the action is a surface behind the
+  row that the row uncovers as it travels. Let go partway and the row stays open
+  with its button showing; push past the far threshold and it happens on
+  release. Left uncovers the destructive one, right the one that files it. The
+  list deletes and archives, the Archive deletes and puts back, the Trash
+  deletes for good and restores — and a full swipe may never do something
+  irreversible, so deleting for good stays a deliberate press.
+- **Notes worth reading, marked.** A dot on a catalogue row's leading slot says
+  the note carries a remark this account has not read, so the badge in the
+  sidebar has something findable under it.
+
 - **Live collaborative documents.** Title and rich-text content now share one
   Yjs document served by Hocuspocus. Supabase still decides access through
   `archive_members`; Redis/Valkey connects overlapping server instances; an
@@ -105,9 +127,30 @@ changes. The commit history remains the detailed engineering record.
   conversation nobody has resolved; a note leaves it the moment its last thread
   is dealt with, and opening one from there opens its conversation with it. The
   badge counts what the other member has said, in an open thread, since this
-  browser last looked — a timestamp in `localStorage`, because it is a fact
-  about a device looking rather than about the archive, so a new device starts
-  with everything unread.
+  **account** last looked — a timestamp per note carried in
+  `profile_preferences`, with `localStorage` as the device's cache for the first
+  paint. A dot on the row's leading slot says which notes those remarks are on.
+
+### Changed
+
+- **The workspace is three flush columns, not three floating cards.** Divided
+  by a one-pixel seam that is also the resizer, under one band of chrome running
+  the width of the window. The gutter and the two ten-pixel seams were 40 px of
+  a narrow window spent on air.
+- **Read watermarks belong to the account, not the device.** Installing the
+  desktop app used to produce a badge for every conversation already read in the
+  browser, with no way to clear it but opening every note again. The per-note
+  stamps now travel in `profile_preferences`; they are the one field in that
+  blob that is not last-write-wins, because a watermark's answer to "which of
+  these two devices is right" is neither — it is the further one.
+- **An edit shows up in about half the time.** The collaboration server's
+  persistence debounce is 1000 ms rather than 2000, which was most of the wait
+  before an edit existed for anybody; the client answers a burst of the
+  resulting announcements with one snapshot read rather than one each.
+- **The keep-awake schedule covers the rest of the day, not the hour.** GitHub
+  fired the hourly job three times in twenty-four hours, leaving the
+  collaboration server asleep through a thirteen-hour gap. Each run now pings
+  until the window closes.
 
 ### Removed
 
@@ -131,6 +174,29 @@ changes. The commit history remains the detailed engineering record.
   the column still accepts their shape, so no stored row was invalidated.
 
 ### Fixed
+
+- **Panes kept their stored width while the window shrank**, so the writing
+  column took the whole difference: at 900 px it was 232 px wide and everything
+  in its toolbar was printed on top of everything else. The shown widths are
+  clamped to the room there is; the stored ones are untouched, so widening the
+  window puts the panes back where they were.
+- **The saved readout was printed over the last tool.** The strip is a
+  three-column grid and the right-hand group needed 244 px in a 196 px track; a
+  grid item wider than its track overflows rather than shrinking. The threshold
+  that chooses one row or two is now the arithmetic that decides it.
+- **A long-open window stopped hearing that rows had changed.** A Realtime
+  channel does not survive a closed lid, and it fails silently — the edit landed
+  in Postgres with the right stamp and the list beside it went on showing
+  yesterday, which reads exactly like the save not working. The window now
+  notices it has come back, on three signals: the page becoming visible, the
+  network returning, and a clock that jumped, which is the only one that catches
+  a laptop that slept with the window still "visible".
+- **An announcement arriving mid-read was dropped.** The read already running
+  had asked the database before that change, so the last word of a burst could
+  sit unread until something else happened to move. It is repeated once now.
+- **Two rows at the top of the window were out of true.** The scope switch and
+  the search field beside it started 12 px apart, and the traffic-light gutter
+  was tight enough that the avatar touched the green button.
 
 - **A note with a cover would not scroll.** The run-out below the last line was
   padding on the scrolling box itself, which is `height: 100%` and

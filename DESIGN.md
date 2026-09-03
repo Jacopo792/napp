@@ -31,7 +31,9 @@ the same hairlines. A theme repaints the interface; it never rearranges it.
 ## Composition and density
 
 - The desktop keeps its compact mouse-and-keyboard rhythm. The phone is a separate composition, not a narrowed one: it lands on the notes, shows the narrowing currently in force as dismissible chips above the list, and keeps folder maintenance in a sheet over it.
-- The primary workspace is three rounded, elevated panes with 12 px breathing room: a sidebar of destinations, a note catalogue, and a flexible editor. The first two are draggable — 210–420 px and 300–620 px, defaulting to 248 and 380 — and the handles stop before either can take the editor below 380 px. All three use a fine border, large radius, clipped contents, and a restrained soft shadow.
+- The primary workspace is three **flush columns** divided by a hairline, under one band of chrome that runs the width of the window: a sidebar of destinations, a note catalogue, and a flexible editor. It was three rounded cards floating on a ground with ten pixels of air around and between them, which is a good look and is not what a Mac application looks like — Finder, Mail and Notes are flush columns, and of everything here that read as a web page in a frame the floating cards read loudest. The columns carry no border and no radius: with the panes touching, a 1 px border pushed each column's contents down by a pixel, so the three 52 px header strips disagreed about where they ended and the line across the window was drawn at two heights.
+- The seam between two columns is the resizer, and it is one pixel wide. What you can grab is a pseudo-element nine pixels wider that overhangs both neighbours — a hairline you have to hit exactly is a hairline nobody moves. The two navigation columns are draggable, 210–420 px and 300–620 px, defaulting to 248 and 380, and the handles stop before either can take the editor below 380 px. The _shown_ widths are clamped to the room the window actually has while the stored ones are left alone, so shrinking the window takes the difference back off the panes rather than out of the note, and widening it puts them back where they were.
+- The second row of the two navigation columns sits on one line: the scope switch and the search field are both 44 px, both start 12 px under the header band, and both columns begin scrolling at the same y. Two controls of different shapes 12 px out of step is enough to read the whole top of the window as crooked.
 - The editor is visually dominant. Its page surface is the quietest layer and its content is centred on the active reading measure, so collapsing the navigation moves title and text together instead of stranding them against the left edge. The measure counts characters of the reading face, and the frontispiece resolves `ch` against that same face so title and body share one column edge. The sidebar and catalogue share a slightly more recessive paper surface; the app background sits on the furthest surface. Both navigation panes can be collapsed together for a full-page writing focus.
 - The sidebar is the column of destinations, top to bottom: the scope switch, the scopes and folder tree, then the archive and the wastebasket together at the foot, then Settings and the lock. Both feet are places a note leaves the folders for, and the one you can come back from stands first. The switch is built from the archive's roster — your notes, and each other member by nickname — and each account opens on its own scope. Both navigation panes can be hidden together for focused writing. The reading axes live in Settings, next to a specimen that changes under the slider; they are not a bar across the bottom of the note.
 - Controls are rounded throughout: pills for identity, rounded rectangles for inputs and actions, and circular slider thumbs. Use borders and surface shifts before adding shadow or saturated colour.
@@ -131,11 +133,12 @@ Tiptap edits a structured document in one continuous reading surface. There are 
 
 ## Navigation and interaction states
 
-- The sidebar makes scope separation explicit. The switch is a segmented control built from the archive's roster — "My notes" plus each other member by nickname, one segment per member, with the active one filled; members are shown with avatars and an online indicator while you share presence. Scopes are never presented as blended. The separation is organisational and the permission behind it is recorded in `PRODUCT.md`: every member reads and writes every scope. Below the folder tree the rail carries the places a note leaves it for — Remarks, Archive and Trash. Remarks holds the notes with a conversation nobody has resolved, and it is the one row that can carry a badge: what the other member has said, in an open thread, since this browser last looked.
+- The sidebar makes scope separation explicit. The switch is a segmented control built from the archive's roster — "My notes" plus each other member by nickname, one segment per member, with the active one filled; members are shown with avatars and an online indicator while you share presence. Scopes are never presented as blended. The separation is organisational and the permission behind it is recorded in `PRODUCT.md`: every member reads and writes every scope. Below the folder tree the rail carries the places a note leaves it for — Remarks, Archive and Trash. Remarks holds the notes with a conversation nobody has resolved, and it is the one row that can carry a badge: what the other member has said, in an open thread, since **this account** last looked. The badge says how many are waiting; a dot on the leading slot of a catalogue row says which notes they are on, because a count with nothing findable under it is a count the reader has no way to answer. Looking at the list is not reading — only opening the note moves its line.
 - Folder selection uses the accent wash, full ink and stable count alignment. Notes can be dragged onto valid folder rows, which show an inset ring while targeted.
 - Catalogue rows stay dense. Pinned notes appear first, then every group is ordered by the latest real edit; opening a note never changes its position. Each row leads with a glyph saying what it will open — a checklist, a note carrying a picture, a note carrying a file — then a multiline title, a timestamp, a clipped preview and a pin action. It does not show its own position in the sort: that is a number about the list, not about the note. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.
 - Icon actions are quiet until hover or keyboard focus. Hover shifts them toward the accent wash; destructive actions shift to `--danger`.
 - Note deletion is deliberately two-step in place: the first click changes the row action to a visible **Delete?** confirmation, and the second click performs the permanent deletion. The confirmation expires after three seconds. Do not replace this with a one-click destructive icon.
+- A catalogue row answers a sideways push — a finger on the phone, two fingers on a trackpad — and it is Mail's gesture rather than one of our own. The action is a surface _behind_ the row that the row uncovers as it travels, not a sign riding on top of it. Let go partway and the row stays open with its button showing; push past the far threshold and the action happens on release. Pushing left uncovers the destructive one on the right, pushing right the one that files it, which is where the hand learned them. Every scope has the gesture and each has its own pair: the list deletes and archives, the Archive deletes and puts back, the Trash deletes for good and restores. **A full swipe may never do something irreversible**, so deleting for good stays a deliberate press however far the row is pushed.
 
 ## The right button
 
@@ -181,6 +184,39 @@ the note timestamp.
 
 The readout occupies one stable slot. Unbounded refusal or server error text
 belongs in a tooltip or alert, never in the toolbar row.
+
+## The window, when it is a window
+
+The same application runs in a browser tab and in a desktop window, and it is
+one interface — the desktop shell adds nothing to it and forks nothing in it.
+What it does add is the handful of things a window has and a page does not, and
+leaving them out is what makes an Electron app read as a web page in a frame:
+
+- **A menu bar**, and almost nothing in it has logic. Every item that acts on
+  the archive is already a shortcut the interface answers to, so the menu
+  presses the key rather than reimplementing the command — one implementation of
+  "new note", and a menu item that cannot drift from the key beside it. What
+  stays a real role is what belongs to the system: undo inside a contenteditable,
+  ⌘W, Services, speech, zoom, full screen, and the text services a Mac gives
+  every field — Emoji & Symbols, smart quotes, smart dashes, text replacement.
+- **A gutter for the three traffic lights**, held open in the leftmost header
+  strip and following it when the navigation collapses, and released again in
+  full screen where the buttons are not there. The lights are moved to the
+  middle of the 52 px strip to meet it; the two numbers are one decision in two
+  files and changing either alone puts the buttons over the avatar or in a gap.
+- **Somewhere to drag the window by.** A hidden title bar leaves none, and there
+  is no default: the header strips are the title bar, so they drag, and
+  everything pressable in them opts out — menus included, since a menu opened
+  from a toolbar is a descendant of it.
+- **A window named after what is open in it**, because that name is what Mission
+  Control, the Window menu and ⌘Tab have to go on.
+- **An icon cut to the platform's template** — on macOS, 824 of artwork centred
+  in 1024 with transparent corners and a superellipse edge, so it reads at the
+  same size as everything beside it in the Dock — carrying the count of remarks
+  nobody here has read.
+
+None of these change the interface. They are the difference between an
+application and a page that has been given a frame.
 
 ## Accessibility and motion
 

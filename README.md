@@ -46,6 +46,49 @@ line spacing. Profiles, avatars, note pictures, covers and live-caret colours ad
 last personal touches. Most interface and reading settings stay on your device, so the
 other person does not have to use the same setup.
 
+## Get it for your Mac
+
+The app runs in a browser at
+<https://jacopo792.github.io/note-sharing-app/>, and it also runs as a real
+macOS window. **Download the latest `.dmg` for Apple Silicon from
+[Releases](https://github.com/Jacopo792/note-sharing-app/releases)** — it is the
+same application, not a wrapper around the website, and it works offline on a
+note you already have open.
+
+macOS will say the app "is damaged and can't be opened". It is not: the build is
+unsigned, which is what macOS says about anything without an Apple Developer ID.
+Open it once from the right-click menu — **Control-click the app → Open → Open**
+— and macOS remembers the decision.
+
+> Apple Silicon only for now (M1 and later). An Intel build takes one flag on
+> the release workflow and nobody has needed one. Windows gets an NSIS
+> installer from the same tag.
+
+What the window adds over the tab is the part a Mac expects and a web page
+cannot give itself:
+
+- A real menu bar — File, Edit, Format, View, Window, Help — with every archive
+  command on the key it already had, plus the text services the system provides
+  every field: Emoji & Symbols, smart quotes, smart dashes, text replacement.
+- Traffic lights in their own gutter, a window you can drag by its toolbar,
+  zoom and full screen, and a window title that names the note you are reading.
+- An icon in the Dock carrying the number of remarks nobody here has read.
+- The window opens where you left it, on a display that is still attached.
+- Notes you have open keep working through a dropped connection, and the window
+  notices when it has come back from a closed lid or a changed network.
+
+Building it yourself instead:
+
+```bash
+VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop
+```
+
+The `.dmg` and `.exe` land in `apps/desktop/release/`. The `VITE_COLLAB_URL` is
+not optional: a packaged build refuses to carry a collaboration server on
+`localhost`, because an installed app would take that address to a machine where
+nothing answers it, and the way that fails is a note that never opens rather
+than an error.
+
 ## Running it locally
 
 ```bash
@@ -114,8 +157,11 @@ The repository is a pnpm workspace of two packages and two shells:
   answers instead.
 - `apps/web/` is the browser build, published to GitHub Pages.
 - `apps/desktop/` is the Electron window: `pnpm build:desktop` writes a macOS
-  `.dmg` and a Windows `.exe` into `apps/desktop/release/`. The builds are
-  unsigned, so macOS asks to open the first one from the right-click menu.
+  `.dmg` and a Windows `.exe` into `apps/desktop/release/`, and
+  `.github/workflows/release.yml` builds both on a tag. See
+  [Get it for your Mac](#get-it-for-your-mac). The renderer is served from
+  `app://notes` rather than `file://`, because the collaboration server refuses
+  a socket whose origin it does not know and a `file://` page sends none.
 
 The main areas of the repository are:
 
@@ -179,6 +225,10 @@ The frontend is published through GitHub Pages after the frontend checks, local
 Supabase integration tests, Redis tests and server image build pass. It needs the
 repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
 `VITE_COLLAB_URL`.
+
+Desktop installers are built on a tag — `git tag v0.1.0 && git push --tags` —
+from a matrix of macOS and Windows runners, because electron-builder cannot
+cross-compile them. They are published to the repository's Releases.
 
 The collaboration server runs separately on Render with Valkey. `render.yaml`
 documents that service. Database migrations must be applied before deploying a client
