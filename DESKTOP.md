@@ -208,8 +208,9 @@ fixable quietly:
 
 1. **The collaboration server has to be current.** It deploys on a push to
    `main`, not on a tag, so a client built from a tag can be ahead of the server
-   it talks to. Ask what it is actually running:
-   `render deploys list <service-id>`.
+   it talks to. Ask what it is actually running rather than whether it is up,
+   because a failed build leaves the previous instance serving and nothing
+   looks wrong: `render deploys list <service-id>`.
 2. **Migrations have to be applied.** PostgREST fails the whole select when one
    column in the list is unknown, so a client shipped ahead of its migration
    does not lose a field, it loses the archive.
