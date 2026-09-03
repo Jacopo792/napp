@@ -1,36 +1,28 @@
 # note-sharing-app
 
-A private notes app built around one shared archive.
+A private place for your notes, shared with one other person if you want it.
 
 ![App preview](docs/app-preview-v3.png)
 
 ## Why I built it
 
-I wanted the simplicity of a normal notes app without the usual wall of features.
-Most note-taking tools eventually turn into project-management suites; I just wanted
-a calm place to write, with a few genuinely useful things to do together with the
-person sharing the archive.
+I wanted an ordinary notes app that did not slowly turn into a project-management
+tool. Somewhere calm for quick lists and long writing alike, with just enough sharing
+for two people who keep things together: partners, friends, siblings, whoever.
 
-The result is deliberately simple when you are writing and collaborative where it
-matters. Each archive holds two people by default: friends, partners, siblings or any
-other pair who want a shared place for their notes. It is not meant to be a workspace
-for teams, and the limit is enforced in the database rather than by the interface.
+## What is in it
 
-## What we can do together
+- A rich editor for writing, checklists, tables, links, images, PDFs and other files.
+- Folders, pins, search, Archive and Trash so notes do not get lost as they pile up.
+- Live editing when two people are in the same note, plus comments on a specific
+  sentence or paragraph.
+- Separate **My notes** and shared views inside one archive.
+- Covers, avatars, themes and reading settings that each person can make their own.
+- Markdown import and export, PDF text import, and local translation and proofreading
+  tools.
 
-- Write in the same note in real time, with live cursors and optional presence.
-- Comment on specific parts of a note and keep replies in one thread.
-- Switch between **My notes** and the other person's notes while staying in the same
-  archive.
-- Organise notes with nested folders, pins, search, Archive and Trash.
-- Add covers, images, links, tables, checklists, PDFs and other attachments.
-- Import and export Markdown, or bring the text of a PDF into a note.
-- Use local translation and proofreading tools without sending the text to an AI
-  service.
-
-The editor is made for long notes as well as quick ones. It uses Tiptap for rich text
-and Yjs/Hocuspocus for live editing. Supabase handles accounts, the shared database and
-private files.
+It is for keeping notes, not for running a team. The useful collaboration is there
+when you need it; the rest stays out of the way while you write.
 
 ## Get the app
 
@@ -58,7 +50,7 @@ What the window has that a browser tab cannot:
 - Emoji & Symbols, smart quotes and text replacement, the way any Mac app has
   them.
 
-Windows gets an installer from the same release. Intel Macs are not built yet.
+Intel Macs and Windows get their own file in the same release.
 [`DESKTOP.md`](DESKTOP.md) covers the rest: what it keeps on your machine, what
 to check when something does not work, and how a release is made.
 
