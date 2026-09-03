@@ -618,6 +618,21 @@ connected, because the _source_ was; what was empty was Settings → Build → G
 Credentials, whose value when unset is the button that sets it. Signing in and
 pressing **Use My Credentials** fixed both halves at once.
 
+**And it came back, with a second cause on top of it.** After the move into
+`packages/`, the live service was still pointing `dockerfilePath` at
+`./server/Dockerfile`, which no longer exists — so every build failed on
+`lstat /opt/render/project/src/server: no such file or directory` while Render
+kept the previous instance serving, and the app went on working perfectly on
+code from that morning. The Render CLI has no flag for that field either, so it
+is a dashboard change like `ALLOWED_ORIGINS`: **Settings → Docker → Dockerfile
+Path → `./packages/collab-server/Dockerfile`**. And the anonymous-clone line was
+back above it, which is the Git credential gone again: **Settings → Build → Git
+Credentials → Use My Credentials**, which is also what makes a push to `main`
+trigger anything at all.
+
+Neither is catchable by CI. CI builds the image from the repository, where the
+path is right; what was wrong was a value stored in Render.
+
 The lesson is the check, not the fix: **a service that is up is not a service
 that is current.** Ask `render deploys list <service-id>` what it is actually
 running, the way `gh run list` is asked about Pages above.

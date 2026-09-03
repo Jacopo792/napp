@@ -17,7 +17,14 @@ services:
     # wait stops being acceptable.
     plan: free
     region: frankfurt
-    dockerfilePath: ./server/Dockerfile
+    # `packages/collab-server`, not `server`. The service predates the move
+    # into packages/ and the live one still names the old path, which is why
+    # every build since that reorg has failed on
+    # `lstat /opt/render/project/src/server: no such file or directory` while
+    # Render kept the previous instance up. This file documents the service and
+    # does not drive it, so correcting it here fixes nothing on its own: the
+    # value has to be changed in the dashboard, under Settings → Docker.
+    dockerfilePath: ./packages/collab-server/Dockerfile
     dockerContext: .
     healthCheckPath: /readyz
     numInstances: 1
