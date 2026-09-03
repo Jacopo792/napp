@@ -22,9 +22,20 @@
 # firings, not the schedule asked for. The server slept through the morning of
 # 3 September with the workflow green and idle above it.
 #
-# So the schedule is asked for the one thing it does honour — roughly hourly —
-# and the pinging is done by the job, which has a real clock. One firing covers
-# its own hour; a firing that is dropped costs at most the rest of that hour.
+# Hourly was a fiction too. On 3 September this fired three times in
+# twenty-four hours — 00:01, 13:08, 17:24 — leaving a thirteen-hour gap and a
+# three-hour one, and the server slept through both with the workflow green
+# above it. GitHub's schedules are best-effort and that is all they are; there
+# is no cron expression that fixes this.
+#
+# So the job stops trying to cover an hour and covers **the rest of the
+# window**. A run pings until 23:00 UTC or until it approaches the six-hour
+# ceiling Actions puts on a job, and the schedule asks every three hours — so a
+# firing that lands does the work of the several that did not, and the cost of
+# a dropped one is minutes rather than hours. `cancel-in-progress` means a
+# firing that arrives on top of a running loop replaces it, which is one loop's
+# worth of use rather than two.
+#
 # Actions minutes are free on a public repository, which this is.
 #
 # The standing alternative, and the honest one: Render's `starter` plan does
@@ -34,9 +45,11 @@ name: Keep the collaboration server awake
 
 on:
   schedule:
-    # Hourly, 06:00–22:59 UTC. In Italian summer time that is 08:00 to just
-    # before 01:00; in winter, 07:00 to midnight.
-    - cron: "2 6-22 * * *"
+    # Every three hours through the window, 06:00–22:59 UTC. In Italian summer
+    # time that is 08:00 to just before 01:00; in winter, 07:00 to midnight.
+    # Six chances at a schedule that honours maybe a third of them, each one
+    # covering everything left of the window.
+    - cron: "2 6,9,12,15,18,21 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -51,7 +64,7 @@ permissions: {}
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 355
 
     steps:
       # `/healthz` and deliberately not `/readyz`: liveness never consults
@@ -62,15 +75,20 @@ jobs:
       # A failed ping does not end the loop, because the point of the loop is
       # to go on pinging; it is remembered and the job fails at the end, so a
       # server that is genuinely down is still a red run rather than silence.
-      - name: Ping the collaboration server for the hour
+      - name: Ping the collaboration server for the rest of the window
         run: |
           fail=0
-          deadline=$(( SECONDS + 3480 ))
+          # The window closes at 23:00 UTC; a job is killed at six hours. Stop
+          # at whichever comes first, with twenty minutes in hand so the run
+          # ends rather than being cut off mid-ping.
+          window_closes=$(date -u -d 'today 23:00' +%s)
+          ceiling=$(( SECONDS + 20400 ))
           while :; do
             curl --fail --silent --show-error \
                  --max-time 120 --retry 2 --retry-all-errors \
                  https://notes-collab.onrender.com/healthz || fail=1
-            if [ "$SECONDS" -ge "$deadline" ]; then break; fi
+            if [ "$(date -u +%s)" -ge "$window_closes" ]; then break; fi
+            if [ "$SECONDS" -ge "$ceiling" ]; then break; fi
             sleep 300
           done
           exit $fail

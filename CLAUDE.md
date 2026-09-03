@@ -540,6 +540,21 @@ that hour with a loop, which has a clock. The loop's test is an `if` and never
 `&&`: Actions runs every `run` under `bash -e`, where a false AND-list ends the
 job — written that way it would have pinged once and stopped, green.
 
+Hourly turned out to be a fiction too. On 3 September it fired **three times in
+twenty-four hours** — 00:01, 13:08, 17:24 — so the server slept through a
+thirteen-hour gap and a three-hour one with the workflow green above it, which
+is what "the Render server does not work properly" is. There is no cron
+expression that fixes a best-effort scheduler, so the job stopped trying to
+cover an hour and covers **the rest of the window**: it pings until 23:00 UTC or
+until it approaches the six-hour ceiling Actions puts on a job, and the schedule
+asks every three hours. A firing that lands does the work of the several that
+did not.
+
+**The standing alternative is Render's `starter` plan at $7 a month**, which
+does not sleep — and takes this workflow and the whole 750-hour argument with
+it. Any external pinger with a real scheduler (cron-job.org, UptimeRobot) is the
+other way, and needs an account nobody has made.
+
 It is a window, not a loop around the clock, because a
 workspace gets **750 free instance-hours a calendar month** across every free
 web service and going over does not throttle anything, it _suspends every free
