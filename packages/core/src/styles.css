@@ -1618,8 +1618,20 @@
   background: var(--surface);
 }
 
+/* ── Flush, not floating ─────────────────────────────────────────────────────
+   The panes used to be rounded cards on a ground, with ten pixels of air round
+   the outside and between them. It is a perfectly good look and it is not what
+   a Mac application looks like: Finder, Mail and Notes are flush columns
+   divided by a hairline, under one band of chrome that runs the width of the
+   window. The floating cards were the single loudest thing saying "this is a
+   web page in a frame".
+
+   Nothing structural changed for it. The three header strips were already 52px
+   and already side by side; taking the gutter and the radius away is what makes
+   them read as one toolbar, and the hairline under each of them is what draws
+   the line across the window. The gain is not only the look: the gutter and the
+   two ten-pixel seams were 40px of a narrow window spent on air. */
 .workspace-grid {
-  padding: 10px;
   background: var(--surface);
 }
 
@@ -1685,34 +1697,35 @@
   }
 }
 
+/* The seam between two flush columns, which is the divider and the handle at
+   once. It was a ten-pixel strip of the ground with a line drawn down the
+   middle of it on hover — which, with the panes now touching, would have been a
+   ten-pixel gap of background between them. So the element *is* the line, and
+   the thing you can grab is a pseudo-element nine pixels wider that overhangs
+   both neighbours. A hairline you have to hit exactly is a hairline nobody
+   ever moves. */
 .pane-resizer {
   position: relative;
   z-index: 35;
-  width: 10px;
-  flex: 0 0 10px;
+  width: 1px;
+  flex: 0 0 1px;
+  background: var(--rule);
   cursor: col-resize;
   touch-action: none;
+  transition: background-color var(--dur-fast) var(--ease);
 }
 
 .pane-resizer::before {
   position: absolute;
-  inset-block: 0.65rem;
-  left: 50%;
-  width: 1px;
-  border-radius: 999px;
-  background: transparent;
+  inset-block: 0;
+  inset-inline: -4px;
   content: "";
-  transform: translateX(-50%);
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
 }
 
-.pane-resizer:hover::before,
-.pane-resizer:focus-visible::before,
-.is-pane-resizing .pane-resizer::before {
+.pane-resizer:hover,
+.pane-resizer:focus-visible,
+.is-pane-resizing .pane-resizer {
   background: var(--ink-4);
-  box-shadow: 0 0 0 2px var(--surface);
 }
 
 .pane-resizer:focus-visible {
@@ -1725,14 +1738,18 @@
   user-select: none !important;
 }
 
+/* A column, not a card. The border and the radius were what made it one, and
+   with the panes flush they did two things wrong at once: the border pushed
+   every column's contents a pixel down, so the three header strips no longer
+   agreed on where 52 pixels ended and the line across the window was drawn at
+   two heights — and the radius rounded a corner that has nothing beside it any
+   more. What separates two columns now is the seam between them, which is a
+   real element and can be dragged. */
 .sidebar-column,
 .collection-column,
 .editor-shell {
   min-height: 0;
   background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
@@ -1748,7 +1765,7 @@
 .workspace-grid .soft-pane,
 .editor-shell.soft-pane {
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   box-shadow: none;
 }
 
@@ -1761,9 +1778,21 @@
    the 52 pixels, leaving an odd content box, and every 32px control centred in
    it landed on a half pixel — which is what softens a hairline and a rounded
    hover pill alike. An inset shadow draws the same line and costs no height. */
+/* One line across the window, and it has to be every strip or it is not a line.
+   The note's own strip used to go without, so that a cover picture directly
+   under it was not cut by a rule — but with the columns flush that left the
+   band underlined for two thirds of the window and open for the last third,
+   which reads as a mistake rather than as a choice. A toolbar separator over
+   the top of a picture is what every Mac window does. */
 .collection-toolbar,
-.editor-toolbar.has-rule {
+.sidebar-topbar,
+.editor-toolbar {
   box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+/* Except in focus mode, where the column stops being a pane at all. */
+.workspace-shell.is-focus .editor-toolbar {
+  box-shadow: none;
 }
 
 .editor-toolbar {
@@ -6880,12 +6909,11 @@
    do for itself and a window has to.
 
    1. The three buttons. `titleBarStyle: "hiddenInset"` leaves them at the
-      window's own top-left, which here is on top of the avatar in the first row
-      of the sidebar — the panes are cards inset by 10px, so the window's corner
-      is inside the first one. The main process moves them down to the middle of
-      the 52px header strip; this holds a gutter open for them to stand in. The
-      two numbers are one decision in two files: `trafficLightPosition` in
-      main.js and `--titlebar-inset` here.
+      window's own top-left, which is on top of the avatar in the first row of
+      the sidebar. The main process moves them to the middle of the 52px header
+      strip; this holds a gutter open for them to stand in. The two numbers are
+      one decision in two files: `trafficLightPosition` in main.js and
+      `--titlebar-inset` here.
 
    2. Moving the window. A hidden title bar is a window with nothing left to
       drag by, and there is no default: without `-webkit-app-region: drag`

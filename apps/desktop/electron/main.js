@@ -102,15 +102,14 @@ function createWindow() {
     backgroundColor: "#191919",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     /* Where the three buttons sit, and it is not decoration. `hiddenInset`
-       puts them at the window's own top-left — which is on top of the first
-       row of the sidebar, because the panes here are cards inset by 10px and
-       their header strip is 52px tall. So they are moved down to the middle of
-       that strip, and the strip is given a gutter to stand in
-       (`--titlebar-inset` in the stylesheet). The two numbers have to agree:
-       change one and the buttons are either over the avatar or floating in a
-       gap. y is the top of the buttons, which are 12px, so 31 centres them in
-       a strip that runs from 10 to 62. */
-    trafficLightPosition: { x: 19, y: 31 },
+       puts them at the window's own top-left, which is on top of the first row
+       of the sidebar — so they are moved down to the middle of the 52px header
+       strip, and the strip is given a gutter to stand in (`--titlebar-inset` in
+       the stylesheet). The two numbers are one decision in two files: change
+       one and the buttons are either over the avatar or floating in a gap. y is
+       the top of the buttons, which are 12px, so 20 centres them in a strip
+       that runs from 0 to 52. */
+    trafficLightPosition: { x: 19, y: 20 },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

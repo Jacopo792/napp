@@ -2877,7 +2877,7 @@ export default function NotesPage() {
      they were put. The list gives ground first, because it is a preview column
      and the folders are a fixed vocabulary that either fits or does not. */
   const editorReserve = 380;
-  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 28);
+  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 2);
   const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
   const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
   const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
@@ -3062,7 +3062,7 @@ export default function NotesPage() {
             className={`pane-slide ${navigationOpen ? "" : "is-collapsed"} ${
               navigationSliding ? "is-sliding" : ""
             }`}
-            style={{ width: navigationOpen ? sidebarShown + listShown + 20 : 0 }}
+            style={{ width: navigationOpen ? sidebarShown + listShown + 2 : 0 }}
             aria-hidden={!navigationOpen}
             inert={!navigationOpen}
             onTransitionEnd={(event) => {
@@ -3071,7 +3071,7 @@ export default function NotesPage() {
           >
             <div
               className="pane-slide-track flex h-full min-h-0"
-              style={{ width: sidebarShown + listShown + 20 }}
+              style={{ width: sidebarShown + listShown + 2 }}
             >
               <div className="pane-frame" style={{ width: sidebarShown }}>
                 {sidebar}

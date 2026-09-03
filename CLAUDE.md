@@ -1038,6 +1038,38 @@ The in-memory note cache (`noteCache`, `resetArchiveCache`, `adoptArchiveCache`)
 lives in `noteStore.ts` for that reason and no other — `session.ts` has to clear
 it on sign-out, and that one import was the whole rope. Keep it there.
 
+## Flush columns, one band of chrome
+
+The panes were rounded cards on a ground, ten pixels of air round the outside
+and between them. It is a good look and it is not what a Mac application looks
+like: Finder, Mail and Notes are flush columns divided by a hairline, under one
+band of chrome that runs the width of the window. The floating cards were the
+loudest single thing saying "this is a web page in a frame".
+
+Nothing structural changed for it, which is the point. The three header strips
+were already 52px and already side by side; taking away `.workspace-grid`'s
+padding and the columns' radius is what makes them read as one toolbar, and the
+hairline under **all three** is what draws the line across the window. The note's
+own strip used to go without one so a cover picture was not cut by a rule —
+underlined for two thirds of the window and open for the last third reads as a
+mistake, and a toolbar separator over a picture is what every Mac window does.
+Focus mode is the exception, where the column stops being a pane at all.
+
+Two things that were load-bearing and are easy to undo by accident:
+
+- **The columns carry no border.** `.sidebar-column` and its two siblings had
+  `border: 1px`, which with the panes flush pushed each column's contents down
+  by a pixel — so the three strips no longer agreed on where 52 pixels ended and
+  the line across the window was drawn at two heights.
+- **The seam is the resizer.** It was a 10px strip of the ground with a line
+  down the middle on hover, which between touching panes would have been a 10px
+  gap of background. So the element _is_ the 1px line, and what you can grab is
+  a pseudo-element nine pixels wider overhanging both neighbours. A hairline you
+  have to hit exactly is a hairline nobody moves.
+
+The gain is not only the look. The gutter and the two ten-pixel seams were 40px
+of a narrow window spent on air.
+
 ## Interface notes worth knowing
 
 - **The sign-in page does not scroll.** It carries no wordmark and no tagline —
