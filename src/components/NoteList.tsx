@@ -487,10 +487,16 @@ const Row = memo(function Row({
  *  The Trash says the one thing about it that is not visible in it: that
  *  waiting here runs out. It is the tally answering, not a paragraph under a
  *  control — the reader is owed the fact that something will be destroyed for
- *  them, and this is the line that is already there to say it. */
+ *  them, and this is the line that is already there to say it.
+ *
+ *  Said in as few words as it takes, because the line has one line to say it
+ *  in. "deleted for good after 30 days" wrapped, and a second line in a header
+ *  that is one line tall is not a second line — it is the first one squashed.
+ *  The header below grew a floor for the same reason; the word "Trash" is
+ *  already at the top of it, so "deleted" need not be said twice. */
 function noteTally(count: number, trash = false): string {
   const notes = `${count} ${count === 1 ? "note" : "notes"}`;
-  return trash && count > 0 ? `${notes} · deleted for good after 30 days` : notes;
+  return trash && count > 0 ? `${notes} · erased after 30 days` : notes;
 }
 
 function Skeletons() {
@@ -667,7 +673,11 @@ export function NoteList({
               }}
             >
               <Trash2 size={16} />
-              {confirming ? "Delete forever?" : "Delete forever"}
+              {/* The second press is the one that destroys, so it says so. A
+                  label that only grew a question mark read as the same button
+                  asked twice — and the reader who had already decided could
+                  not tell whether the first press had done it. */}
+              {confirming ? "Yes, delete it now" : "Delete forever"}
             </MenuButton>
           </>
         ) : archiveMode ? (
@@ -998,7 +1008,7 @@ export function NoteList({
       className={`collection-column flex h-full w-full shrink-0 flex-col ${gallery ? "is-gallery" : ""}`}
     >
       {topBar}
-      <header className="collection-toolbar flex h-13 shrink-0 items-center gap-2 px-4">
+      <header className="collection-toolbar flex min-h-13 shrink-0 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">

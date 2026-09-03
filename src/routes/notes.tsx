@@ -2615,7 +2615,7 @@ function NotesPage() {
           : selectedFolderId === TRASH
             ? {
                 label: "Delete all",
-                confirm: "Delete all forever?",
+                confirm: "Yes, delete them now",
                 danger: true,
                 count: trashedEntries.length,
                 run: handleEmptyTrash,
@@ -2623,7 +2623,7 @@ function NotesPage() {
             : selectedFolderId === ARCHIVE
               ? {
                   label: "Remove all from Archive",
-                  confirm: "Move all back?",
+                  confirm: "Yes, move them back",
                   danger: false,
                   count: archivedEntries.length,
                   run: handleEmptyArchive,
