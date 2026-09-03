@@ -26,77 +26,42 @@ when you need it; the rest stays out of the way while you write.
 
 ## Get the app
 
-It runs in a browser at <https://jacopo792.github.io/note-sharing-app/>. Nothing
-to install, and it is always the current version.
+Use it in the browser at <https://jacopo792.github.io/note-sharing-app/>: there is
+nothing to install and it is always up to date. If you would rather have it in its own
+window, there is a desktop app too.
 
-There is also a Mac app. It is the same application in a window of its own, not
-a wrapper around the website, and a note you already have open keeps working
-without a connection.
+![Desktop sign-in screen](docs/desktop-sign-in.png)
 
 **[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/note-sharing-app/releases/latest)**
 
-The first time you open it, macOS will say the app is damaged. It is not. That
-is what macOS says about anything that has not been signed with a paid Apple
-Developer ID, and this build is not signed. Control-click the app in
-Applications, choose Open, then Open again. macOS remembers the choice and it
-opens normally after that.
+The Mac version is the same app, with its own menu bar, shortcuts and Dock badge for
+unread comments. Notes already open keep working if the connection drops.
 
-What the window has that a browser tab cannot:
+The first launch needs one extra step because the app is not signed with an Apple
+Developer ID. If macOS says it is damaged, Control-click it in Applications, choose
+**Open**, then choose **Open** again. You only need to do this once.
 
-- A real menu bar, carrying the shortcuts you already use.
-- Traffic lights, a title that names the note you are reading, and a window that
-  reopens where you left it.
-- The number of unread remarks on the Dock icon.
-- Emoji & Symbols, smart quotes and text replacement, the way any Mac app has
-  them.
-
-Intel Macs and Windows get their own file in the same release.
-[`DESKTOP.md`](DESKTOP.md) covers the rest: what it keeps on your machine, what
-to check when something does not work, and how a release is made.
+Intel Macs and Windows have their own file on the same release page.
+[`DESKTOP.md`](DESKTOP.md) has installation help and the practical details.
 
 ## Make it yours
 
 ![Appearance settings](docs/customisation-preview-v2.png)
 
-The app is highly customisable, and each person can set it up independently. You can
-start from a ready-made palette or choose the accent, background and text colours
-yourself; switch between light, dark and system themes; adjust contrast and sidebar
-transparency; or use your own wallpaper with separate dim, blur and fit controls.
-
-Reading has its own presets and controls for text size, line width, font weight and
-line spacing. Profiles, avatars, note pictures, covers and live-caret colours add the
-last personal touches. Most interface and reading settings stay on your device, so the
-other person does not have to use the same setup.
+Start with a ready-made palette or choose your own colours, theme and wallpaper. You
+can also change the reading width, text size, line spacing and weight until longer
+notes feel right. Your settings stay on your device, so the person sharing the archive
+does not have to look at it the way you do.
 
 ## Accounts and shared archives
 
-Each person signs in with a separate account. Membership in `archive_members` is the
-access boundary: being a Supabase user by itself does not grant access to somebody
-else's archive.
+Everyone has their own account. On first sign-in, you get a private archive; to share
+one, send an invitation from **Settings → Members**. It works for two people by
+default, and invitations expire after seven days.
 
-New users receive a personal archive on first sign-in. To share an existing archive, a
-member creates a one-time invitation from **Settings → Members**. Invitations expire
-after seven days and can only be claimed by the invited address.
-
-A member reads and writes the whole archive; there is no lesser kind, and the interface
-asks for no role when it invites somebody. `owner_id` only decides where a note appears
-in the interface; it is not a security boundary.
-
-What one member can take back from another is a note, or a passage of one. **Only I may
-write this** in a note's ⋯ menu sets `notes.locked_by`, and `notes_editor_update`
-refuses the row to everybody else – the lock, the trash stamp and the words alike. A
-passage locked from the selection toolbar is held by the collaboration server instead,
-which is the only place that can hold it: the mark lives inside a document both members
-are entitled to write, and anything written under somebody else's lock is put back
-before it reaches them.
-
-The seat limit is a database rule. `archives.seat_limit` defaults to `2` (`1`–`8`
-allowed) and a `before insert` trigger on `archive_members`,
-`private.enforce_archive_seats()`, refuses the extra row whichever path it arrives by:
-bootstrap, invitation redemption or a direct write. Issuing an invitation counts
-unclaimed, unexpired invitations against the same limit, so a link that could never be
-redeemed is never created. Settings does the same arithmetic to close the form early;
-that part is a courtesy, not the boundary.
+Both members can read and edit the shared archive. If a note needs to stay yours, you
+can lock the whole thing or just a passage. Accounts outside the archive cannot see its
+notes or files.
 
 ## Running it locally
 
