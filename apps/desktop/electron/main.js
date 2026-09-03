@@ -13,14 +13,48 @@
  * open with a message that never says why. So the built renderer is served
  * from a scheme of its own, and `app://notes` is an origin the server can be
  * told about. Render's ALLOWED_ORIGINS has to contain it. */
-const { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, screen, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const os = require("node:os");
 
 const DEV_URL = "http://localhost:5174";
 const APP_ORIGIN = "app://notes";
 const isDev = !app.isPackaged;
+
+/* A two-finger swipe on a note row files it or throws it away, and Chromium
+   reads the same gesture as "go back". The row's own handler calls
+   preventDefault, but overscroll navigation is decided above the page, so it
+   is turned off here — there is nowhere to go back to in a window with two
+   routes and a hash history. */
+app.commandLine.appendSwitch("disable-features", "OverscrollHistoryNavigation");
+
+/* Where the window was, so it opens there again. Every Mac app does this, and
+   an app that forgets is an app you rearrange every morning. A file rather
+   than a dependency: it is one object, written on close. */
+const windowStateFile = () => path.join(app.getPath("userData"), "window.json");
+
+function rememberedBounds() {
+  try {
+    const saved = JSON.parse(fsSync.readFileSync(windowStateFile(), "utf8"));
+    /* A display that is gone takes its coordinates with it: a window restored
+       onto a monitor that is no longer attached opens off-screen, and there is
+       no way to drag back something you cannot see. */
+    const visible = screen.getAllDisplays().some((display) => {
+      const a = display.workArea;
+      return (
+        saved.x + saved.width > a.x &&
+        saved.x < a.x + a.width &&
+        saved.y + saved.height > a.y &&
+        saved.y < a.y + a.height
+      );
+    });
+    return visible ? saved : { width: saved.width, height: saved.height };
+  } catch {
+    return null;
+  }
+}
 
 /* Registered before `ready`, or `protocol.handle` gets a scheme with none of
    the privileges a document needs — no fetch, no storage, no secure context,
@@ -60,6 +94,7 @@ function createWindow() {
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
+    ...rememberedBounds(),
     minWidth: 640,
     minHeight: 480,
     show: false,
@@ -76,6 +111,18 @@ function createWindow() {
   /* Painted before shown, so opening the app is not a white rectangle that
      becomes the archive a moment later. */
   window.once("ready-to-show", () => window.show());
+
+  /* On close, not on every move: a resize sends a great many events and this
+     is a fact worth exactly one write. `getNormalBounds` and not `getBounds`,
+     or a window closed while full-screen is remembered as the whole screen and
+     opens that way for ever. */
+  window.on("close", () => {
+    try {
+      fsSync.writeFileSync(windowStateFile(), JSON.stringify(window.getNormalBounds()));
+    } catch {
+      /* A window that cannot write down where it was still closes. */
+    }
+  });
 
   /* A link in a note belongs to the reader's browser. Opening it in here would
      put a page nobody chose inside the application's own window, with the

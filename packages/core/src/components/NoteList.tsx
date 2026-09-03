@@ -187,11 +187,80 @@ const Row = memo(function Row({
      jumps at the end of a gesture nobody committed to is a row that acts on
      its own.
 
+     A trackpad does the same thing with two fingers, which is what macOS Mail
+     has taught every hand that has used it. Two inputs and one gesture: both
+     feed the same travel, cross the same threshold and end in the same call,
+     so there is one behaviour to reason about and the phone and the desk
+     cannot drift apart.
+
      Only where there is something to act on: in the Trash and the Archive the
      acts are different ones and the buttons are still there. */
-  const swipeable = mobile && canWrite && !trashMode && !archiveMode;
+  const gesturable = canWrite && !trashMode && !archiveMode;
+  const swipeable = mobile && gesturable;
   const swipe = useRef<{ x: number; y: number; live: boolean } | null>(null);
   const SWIPE_COMMIT = 96;
+
+  /* The far end of a committed swipe. Left files the note away, right sends it
+     to the Trash — which is reversible, and is why a swipe is allowed to reach
+     it at all when deleting for good still takes two deliberate clicks. */
+  const commitSwipe = useCallback(
+    (travelled: number) => {
+      if (travelled <= -SWIPE_COMMIT) onArchiveChange(entry, true);
+      else if (travelled >= SWIPE_COMMIT) onMoveToTrash(entry);
+    },
+    [entry, onArchiveChange, onMoveToTrash],
+  );
+
+  /* A trackpad has no gesture-end event: the fingers lift and macOS keeps
+     sending decaying momentum for a while afterwards. So the end is a silence,
+     and the travel is held in a ref rather than in the effect's closure — the
+     row re-renders on every one of these events, and a gesture must not lose
+     its distance because a dependency changed underneath it. */
+  const wheel = useRef({ dx: 0, axis: null as null | "x" | "y", idle: 0 });
+  /* Read through a ref, not closed over. Every wheel event re-renders this row,
+     which remakes `commitSwipe`, which would re-run the effect below — and its
+     cleanup would cancel the very timer that ends the gesture. The row then
+     travelled and never sprang back. */
+  const commitRef = useRef(commitSwipe);
+  commitRef.current = commitSwipe;
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || !gesturable || mobile) return;
+    const state = wheel.current;
+
+    function settle() {
+      const travelled = state.dx;
+      state.dx = 0;
+      state.axis = null;
+      setSlid(0);
+      commitRef.current(travelled);
+    }
+
+    function onWheel(event: WheelEvent) {
+      window.clearTimeout(state.idle);
+      state.idle = window.setTimeout(settle, 90);
+      /* The list scrolls up and down; this only ever answers to sideways, and
+         once a gesture has been read as one it stays that one. */
+      if (state.axis === null) {
+        state.axis = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? "x" : "y";
+      }
+      if (state.axis !== "x") return;
+      /* Or the window takes the same swipe as "go back". */
+      event.preventDefault();
+      /* Fingers moving left report a positive deltaX, and the row they are
+         pushing goes left. */
+      state.dx -= event.deltaX;
+      setSlid(state.dx);
+    }
+
+    /* Not passive, or preventDefault above is ignored and the gesture is the
+       browser's before it is ours. */
+    row.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      row.removeEventListener("wheel", onWheel);
+      window.clearTimeout(state.idle);
+    };
+  }, [gesturable, mobile]);
 
   function swipeStart(event: React.PointerEvent) {
     if (!swipeable || event.pointerType === "mouse") return;
@@ -219,10 +288,7 @@ const Row = memo(function Row({
   function swipeEnd() {
     const from = swipe.current;
     swipe.current = null;
-    if (from?.live) {
-      if (slid <= -SWIPE_COMMIT) onArchiveChange(entry, true);
-      else if (slid >= SWIPE_COMMIT) onMoveToTrash(entry);
-    }
+    if (from?.live) commitSwipe(slid);
     setSlid(0);
   }
 
@@ -373,7 +439,7 @@ const Row = memo(function Row({
         </p>
       </div>
 
-      {swipeable && slid !== 0 && (
+      {gesturable && slid !== 0 && (
         <span className={`note-row-swipe ${slid < 0 ? "is-archive" : "is-trash"}`} aria-hidden>
           {slid < 0 ? <Archive size={16} /> : <Trash2 size={16} />}
         </span>
@@ -961,7 +1027,7 @@ export function NoteList({
           key={`${folderLabel}:${query.trim()}`}
           role="listbox"
           aria-label={`Notes in ${folderLabel}`}
-          className="list-in min-h-0 flex-1 overflow-y-auto pb-24"
+          className="list-in min-h-0 flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pb-24"
         >
           <div>
             {loading ? (
@@ -1065,7 +1131,7 @@ export function NoteList({
         key={`${folderLabel}:${query.trim()}`}
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
-        className="list-in flex-1 overflow-y-auto pt-2 pb-2"
+        className="list-in flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-2"
       >
         {loading ? (
           <Skeletons />

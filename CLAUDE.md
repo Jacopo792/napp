@@ -349,6 +349,24 @@ Without that it is not a secure context, and without a secure context there is
 no IndexedDB — which means no offline notes and no Supabase session. It is two
 lines that look like ceremony and are not.
 
+**A policy that allows `https://host` does not allow `wss://host`.** Chromium
+does not perform the scheme-part upgrade CSP3 describes, and the way that fails
+is the worst kind: the desktop app saved notes correctly, held its collaboration
+socket, and silently refused Supabase Realtime — so an edit landed in Postgres
+and the list never heard the row had changed. The "edited" line stayed where it
+was, and it read as nothing being saved at all. The policy builder emits both
+schemes for every host, and the check is one line in the page:
+
+```js
+document.addEventListener("securitypolicyviolation", (e) =>
+  console.log(e.violatedDirective, e.blockedURI),
+);
+```
+
+A refused socket fires that and nothing else — no exception, no console error
+of its own. Reading the outcome of a `WebSocket` alone cannot tell a policy
+refusal from a server that said no.
+
 **The content security policy is written by `apps/desktop/vite.config.ts`, not
 by the main process.** It names the Supabase and collaboration origins, those
 are build-time values of the _renderer_, and the packaged main process has no

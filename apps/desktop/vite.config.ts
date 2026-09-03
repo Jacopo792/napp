@@ -57,7 +57,25 @@ export default defineConfig(({ command, mode }) => {
    and not in the main process, because these values are the renderer's: the
    packaged main process has no .env to read them back out of. */
 function contentSecurityPolicy(env: Record<string, string | undefined>): Plugin {
-  const remote = [env.VITE_SUPABASE_URL, env.VITE_COLLAB_URL].filter(Boolean).join(" ");
+  /* Both schemes for every host, and this is not belt and braces.
+     Chromium does not match a `wss://host` request against an `https://host`
+     source expression, whatever CSP3 says about scheme-part upgrades — so a
+     policy naming only the Supabase https origin silently refused its Realtime
+     socket while every ordinary request to the same host went through.
+     Nothing looked broken: notes saved, the collaboration socket was fine, and
+     the list simply never heard that a row had changed. An edit landed in
+     Postgres and the "edited" line stayed where it was. */
+  const remote = [env.VITE_SUPABASE_URL, env.VITE_COLLAB_URL]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((value) => {
+      const url = new URL(value);
+      const secure = url.protocol === "https:" || url.protocol === "wss:";
+      return [
+        `${secure ? "https" : "http"}://${url.host}`,
+        `${secure ? "wss" : "ws"}://${url.host}`,
+      ];
+    })
+    .join(" ");
   const policy = [
     "default-src 'self'",
     "script-src 'self'",
