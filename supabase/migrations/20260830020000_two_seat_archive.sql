@@ -9,7 +9,7 @@
 -- with `user_id` / `nickname` / `avatar_object`. Every insert into `auth.users`
 -- raised inside the trigger, GoTrue reported it as a generic database error,
 -- and no account could be created. Nothing needs replacing: `ensureProfile()`
--- in `src/lib/session.ts` writes the profile on first sign-in, under the
+-- in `packages/core/src/lib/session.ts` writes the profile on first sign-in, under the
 -- account's own RLS, with a nickname taken from the address.
 --
 -- Second: this archive holds two people. The seat cap belongs on the insert

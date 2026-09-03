@@ -91,7 +91,7 @@ export { collaborationColor };
  * destroys it again when the note closes — so every note switch paid a fresh
  * TCP handshake, a TLS handshake and a token round trip before it could even
  * ask for the document. Hocuspocus already multiplexes documents by name over
- * one socket; this is the same arrangement `server/src/integration.test.ts`
+ * one socket; this is the same arrangement `packages/collab-server/src/integration.test.ts`
  * connects with.
  *
  * Holding it open has a second effect worth as much as the first: the free

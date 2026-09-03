@@ -15,7 +15,7 @@
     "preview:dist": "pnpm --filter @notes-app/web preview:dist",
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/desktop && tsc --noEmit -p packages/collab-server && tsc --noEmit",
+    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/desktop && tsc --noEmit -p packages/collab-server && tsc --noEmit -p scripts && tsc --noEmit",
     "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",
     "test:server": "pnpm --filter @notes-app/collab-server test",
     "format": "prettier --write '**/*.{js,mjs,cjs,ts,tsx,json,css,md,yml,yaml,html}'",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@notes-app/core": "workspace:*",
+    "@supabase/supabase-js": "^2.112.4",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",

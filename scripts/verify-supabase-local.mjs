@@ -63,9 +63,8 @@ const claimed = await secondClient.rpc("claim_archive_invite", { token: invited.
 if (claimed.error) throw new Error(`claim: ${claimed.error.message}`);
 
 /* A freshly reset local stack reports Realtime as healthy before its tenant
- * has installed the first Postgres Changes subscription. Prime that one-time
- * path here so the archive verification measures delivery rather than the
- * container's cold start. */
+ * has finished starting. Prime that one-time path here so the archive
+ * verification measures delivery rather than the container's cold start. */
 const session = (await secondClient.auth.getSession()).data.session;
 if (!session) throw new Error("Realtime warm-up has no authenticated session");
 await secondClient.realtime.setAuth(session.access_token);

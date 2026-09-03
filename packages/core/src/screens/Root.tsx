@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components -- TanStack's root-route factory must
+   reference the three local screen components; splitting this file only hides that dependency. */
 import { createRootRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { initAxes } from "@/lib/axes";

@@ -21,7 +21,10 @@
 
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
 
-const REALTIME_SETTLE_MS = 1_000;
+/* `SUBSCRIBED` only confirms the socket join. A cold Realtime tenant still has
+   to register its Postgres Changes subscription, so wait long enough for the
+   first real database event not to disappear into that gap. */
+const REALTIME_SETTLE_MS = 3_000;
 const REALTIME_TIMEOUT_MS = 25_000;
 
 function delay(ms) {

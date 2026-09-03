@@ -7,7 +7,12 @@
  * need to read the old format — and because a crypto module sitting in
  * `src/lib` reads as part of the application's security story when it is not.
  */
-import type { Folder, Meta, Note, Tag } from "../../src/lib/types.ts";
+import type { Folder, Meta, Note } from "../../packages/core/src/lib/types.ts";
+
+/** Tags belonged to the retired encrypted payload but not to the current app model. */
+interface LegacyTag {
+  name: string;
+}
 
 export interface SessionKeys {
   u1?: CryptoKey;
@@ -192,7 +197,7 @@ export const encryptFolder = (folder: Folder, key: CryptoKey) =>
   encryptJson(key, { name: folder.name, parentId: folder.parentId ?? null });
 export const decryptFolder = (ciphertext: string, key: CryptoKey) =>
   decryptJson<{ name: string; parentId?: string | null }>(key, ciphertext);
-export const encryptTag = (tag: Tag, key: CryptoKey) => encryptJson(key, { name: tag.name });
+export const encryptTag = (tag: LegacyTag, key: CryptoKey) => encryptJson(key, { name: tag.name });
 export const decryptTag = (ciphertext: string, key: CryptoKey) =>
   decryptJson<{ name: string }>(key, ciphertext);
 
