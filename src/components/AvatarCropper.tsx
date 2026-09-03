@@ -157,7 +157,10 @@ export function AvatarCropper({
                   ? {
                       width: size.width * scale,
                       height: size.height * scale,
-                      transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
+                      /* The half-translate is the centring, in the same
+                         property as the drag: two transforms on one element,
+                         not a transform fighting a layout. */
+                      transform: `translate(-50%, -50%) translate3d(${offset.x}px, ${offset.y}px, 0)`,
                     }
                   : { opacity: 0 }
               }
