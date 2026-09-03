@@ -2155,14 +2155,6 @@
      recess comes from the ink and the atmosphere still passes through. */
   background: color-mix(in srgb, var(--surface) 62%, transparent);
   padding: 4px;
-  /* The same 40 as the search field beside it. These two are the second row of
-     their columns and they sit on the same line, or the eye reads the whole top
-     of the window as being out of true — which, at 12px apart, it was. */
-  height: 2.5rem;
-}
-
-.archive-switch.archive-switch-tight {
-  height: auto;
 }
 
 /* The thumb used to be half the track, moved once. A roster is any length, so
@@ -2472,15 +2464,23 @@
   cursor: pointer;
 }
 
-/* Pushed left uncovers Delete on the right, which is the direction every hand
-   that has used Mail or Notes already has. */
-.note-row-action.is-trash {
+/* Where a panel is parked is the direction it answers to; what colour it is
+   is what it does. The two are separate because every scope has the same pair
+   of directions and a different pair of acts — Trash restores where the list
+   archives, and both of them delete. */
+.note-row-action.is-left {
   left: 100%;
+}
+
+.note-row-action.is-right {
+  right: 100%;
+}
+
+.note-row-action.is-trash {
   background: var(--danger);
 }
 
 .note-row-action.is-archive {
-  right: 100%;
   background: var(--accent);
 }
 

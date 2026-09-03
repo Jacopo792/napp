@@ -199,14 +199,18 @@ const Row = memo(function Row({
      the gesture read as a twitch instead of a control.
 
      The directions are Apple's, because that is where the hand learned them:
-     left uncovers Delete on the right of the row, right uncovers Archive.
+     pushing left uncovers the destructive one on the right of the row, pushing
+     right uncovers the one that files it somewhere.
 
      A finger drags it; a trackpad pushes it with two fingers. Two inputs, one
      travel, one settle, so the phone and the desk cannot drift apart.
 
-     Only where there is something to act on: in the Trash and the Archive the
-     acts are different ones and the buttons are still there. */
-  const gesturable = canWrite && !trashMode && !archiveMode;
+     **Every scope has the gesture**, and each one has its own pair. It was only
+     the ordinary list at first, on the argument that Trash and Archive have
+     different acts — they do, and that is a reason to give them their own pair
+     rather than a reason to take the hand's gesture away in the two places
+     where a row is most likely to want moving. */
+  const gesturable = canWrite;
   const swipeable = mobile && gesturable;
   const swipe = useRef<{ x: number; y: number; from: number; live: boolean } | null>(null);
 
@@ -217,6 +221,8 @@ const Row = memo(function Row({
   const OPEN = 92;
   const COMMIT = 190;
   const MAX = 240;
+  /* What the row is inset by, which the panel behind it has to make up. */
+  const EDGE = mobile || gallery ? 0 : 8;
 
   /* The clamp is not tidiness. A trackpad keeps sending decaying momentum
      after the fingers have lifted, so an unclamped travel turns a flick into a
@@ -241,21 +247,57 @@ const Row = memo(function Row({
     window.dispatchEvent(new CustomEvent(CLOSE_OTHER_SWIPES, { detail: entry.note.id }));
   }, [entry.note.id]);
 
+  /* What each scope's two directions do. The shape is the same everywhere so
+     the hand learns one gesture; what changes is what is under it, which is
+     what changes about the scope anyway.
+
+     `final` is the one thing a full swipe may not do on its own. Everything
+     else here is reversible — a trashed note comes back, an archived one is
+     filed rather than gone — and deleting for good is not, so it stays a
+     deliberate press however far the row is pushed. */
+  const acts = trashMode
+    ? {
+        left: { label: "Delete", Icon: Trash2, tone: "trash", final: true, run: onDeleteForever },
+        right: { label: "Restore", Icon: RotateCcw, tone: "archive", run: onRestore },
+      }
+    : archiveMode
+      ? {
+          left: { label: "Delete", Icon: Trash2, tone: "trash", run: onMoveToTrash },
+          right: {
+            label: "Put back",
+            Icon: ArchiveRestore,
+            tone: "archive",
+            run: (e: NoteEntry) => onArchiveChange(e, false),
+          },
+        }
+      : {
+          left: { label: "Delete", Icon: Trash2, tone: "trash", run: onMoveToTrash },
+          right: {
+            label: "Archive",
+            Icon: Archive,
+            tone: "archive",
+            run: (e: NoteEntry) => onArchiveChange(e, true),
+          },
+        };
+  const actsRef = useRef(acts);
+  actsRef.current = acts;
+
   /* The end of a gesture: act, stay open, or close. */
   const settle = useCallback(
     (travelled: number) => {
-      if (travelled <= -COMMIT) {
+      const { left, right } = actsRef.current;
+      if (travelled <= -COMMIT && !("final" in left && left.final)) {
         setSlid(0);
-        onMoveToTrash(entry);
-      } else if (travelled >= COMMIT) {
+        left.run(entry);
+      } else if (travelled >= COMMIT && !("final" in right && right.final)) {
         setSlid(0);
-        onArchiveChange(entry, true);
+        right.run(entry);
       } else if (travelled <= -OPEN / 2) setSlid(-OPEN);
       else if (travelled >= OPEN / 2) setSlid(OPEN);
       else setSlid(0);
       setDragging(false);
     },
-    [entry, onArchiveChange, onMoveToTrash],
+    [entry],
   );
 
   /* A trackpad has no gesture-end event: the fingers lift and macOS keeps
@@ -506,41 +548,34 @@ const Row = memo(function Row({
           the row is already the positioned element and already the thing that
           translates, and a wrapper would have to reproduce every one of the
           layout classes below it, in three variants. */}
-      {gesturable && slid !== 0 && (
-        <>
-          <button
-            type="button"
-            className="note-row-action is-trash"
-            style={{ width: Math.max(OPEN, -slid) }}
-            /* The row is travelling under the pointer; a press has to be the
-               end of the gesture rather than a click that also opens the note
-               underneath. */
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSlid(0);
-              onMoveToTrash(entry);
-            }}
-          >
-            <Trash2 size={16} />
-            <span>Delete</span>
-          </button>
-          <button
-            type="button"
-            className="note-row-action is-archive"
-            style={{ width: Math.max(OPEN, slid) }}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSlid(0);
-              onArchiveChange(entry, true);
-            }}
-          >
-            <Archive size={16} />
-            <span>Archive</span>
-          </button>
-        </>
-      )}
+      {gesturable &&
+        slid !== 0 &&
+        (["left", "right"] as const).map((side) => {
+          const act = acts[side];
+          return (
+            <button
+              key={side}
+              type="button"
+              className={`note-row-action is-${act.tone} is-${side}`}
+              /* Plus the margin the row itself keeps on a pointer machine, or
+                 the panel stops short of the column's edge and leaves a sliver
+                 of background beside it. Mail's action reaches the edge. */
+              style={{ width: Math.max(OPEN, side === "left" ? -slid : slid) + EDGE }}
+              /* The row is travelling under the pointer; a press has to be the
+                 end of the gesture rather than a click that also opens the note
+                 underneath. */
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSlid(0);
+                act.run(entry);
+              }}
+            >
+              <act.Icon size={16} />
+              <span>{act.label}</span>
+            </button>
+          );
+        })}
 
       {/* Touch keeps the acts a swipe does not do: pinning, which has no
           direction to it, and restoring or deleting for good, which are what
@@ -1196,7 +1231,13 @@ export function NoteList({
 
       {filterStrip}
 
-      <div className="glass-search mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 px-3">
+      {/* 42, not 40: the scope switch in the column beside this one is 34 of
+          button inside 4 of padding, and these two are the second row of their
+          columns. They meet at the switch's height rather than the switch
+          being cut down to this one's, which squeezed the faces in it. 44 and
+          not 42, because the switch is a pill with a border and the border is
+          two of those pixels. */}
+      <div className="glass-search mx-3 mt-3 flex h-11 shrink-0 items-center gap-2 px-3">
         <Search size={14} className="shrink-0 text-ink-4" />
         <input
           ref={searchRef}

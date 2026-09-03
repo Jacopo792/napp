@@ -151,6 +151,15 @@ that muscle memory outranks convention; the muscle memory being protected was
 of a gesture nobody could use, and the hand's real memory is of Mail. Changing
 them was the report, not a liberty.
 
+**Every scope has the gesture, and each one has its own pair.** It was the
+ordinary list alone at first, on the argument that Trash and Archive have
+different acts — they do, and that is a reason to give them their own pair
+rather than to take the hand's gesture away in the two places a row is most
+likely to want moving. The list deletes and archives, the Archive deletes and
+puts back, the Trash deletes for good and restores. One rule crosses all three:
+**a full swipe may not do something irreversible**, so deleting for good stays a
+deliberate press however far the row is pushed.
+
 `OPEN`, `COMMIT` and `MAX` in `NoteList.tsx` are the whole of the tuning, and
 **the clamp is load-bearing**: a trackpad keeps sending decaying momentum after
 the fingers lift, so unclamped travel turns a flick into a commit nobody asked
