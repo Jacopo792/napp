@@ -19,7 +19,7 @@ import type { Server } from "@hocuspocus/server";
 import IORedis from "ioredis";
 import WebSocket from "ws";
 import * as Y from "yjs";
-import { BODY_FRAGMENT, TITLE_TEXT } from "../../src/features/editor/lib/ydoc.ts";
+import { BODY_FRAGMENT, TITLE_TEXT } from "@notes-app/core/editor/ydoc.ts";
 import { asService, localStack, makeAccount, type Account, type LocalStack } from "./fixture.ts";
 import { createCollaborationServer, type Context } from "./server.ts";
 

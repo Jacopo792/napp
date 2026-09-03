@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
@@ -153,10 +153,6 @@ const NoteEditor = lazy(() =>
   import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
 );
 
-export const Route = createFileRoute("/notes")({
-  component: NotesPage,
-});
-
 /** A Postgres row write is cheap enough to commit shortly after typing stops. */
 const AUTOSAVE_MS = 250;
 /** How long a pause has to be before the other person is told you stopped. */
@@ -200,7 +196,7 @@ function metaShape(meta: Meta): string {
   return shape;
 }
 
-function NotesPage() {
+export default function NotesPage() {
   /* Direction contract: an opaque three-pane graphite workspace on desktop;
      a notes-first gallery on phone; neutral emphasis for ordinary interaction;
      translucency belongs only to temporary overlays. */

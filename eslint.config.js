@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // .claude/.github hold installed agent tooling, not app source.
-  { ignores: ["dist", ".output", ".vinxi", ".claude/**", ".github/**", "src/routeTree.gen.ts"] },
+  { ignores: ["**/dist", ".output", ".vinxi", ".claude/**", ".github/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

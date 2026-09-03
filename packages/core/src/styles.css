@@ -1,5 +1,5 @@
 @import "tailwindcss" source(none);
-@source "../src";
+@source ".";
 
 /* Graphite UI: opaque neutral planes, white ink and complete hairline borders. */
 :root {

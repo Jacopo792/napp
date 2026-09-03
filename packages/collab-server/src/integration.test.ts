@@ -27,7 +27,7 @@ import {
   BODY_FRAGMENT as BODY,
   TITLE_TEXT as TITLE,
   noteSchema,
-} from "../../src/features/editor/lib/ydoc.ts";
+} from "@notes-app/core/editor/ydoc.ts";
 import { createCollaborationServer, type Context } from "./server.ts";
 
 const ORIGIN = "http://localhost:5173";

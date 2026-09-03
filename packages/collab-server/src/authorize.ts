@@ -12,7 +12,7 @@
  * the delay between losing access and being cut off: a few seconds is short
  * enough to be a boundary and long enough to be free. */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { collaborationColor } from "../../src/features/editor/lib/ydoc.ts";
+import { collaborationColor } from "@notes-app/core/editor/ydoc.ts";
 import { decideAccess, type NoteRow } from "./access.ts";
 
 export interface Identity {

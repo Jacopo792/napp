@@ -1,12 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
-import logoUrl from "../../docs/branding/logo-n-botanical-transparent.png";
-
-export const Route = createFileRoute("/")({ component: Login });
+import logoUrl from "../assets/logo-n-botanical-transparent.png";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -35,7 +33,7 @@ const COPY: Record<Mode, { title: string; lede: string; action: string; footnote
   },
 };
 
-function Login() {
+export default function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");

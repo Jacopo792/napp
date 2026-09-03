@@ -10,6 +10,7 @@
   "dependencies": {
     "@hocuspocus/extension-redis": "4.6.0",
     "@hocuspocus/server": "4.6.0",
+    "@notes-app/core": "workspace:*",
     "@supabase/supabase-js": "^2.112.4",
     "@tiptap/core": "^3.30.5",
     "@tiptap/extension-image": "^3.30.5",

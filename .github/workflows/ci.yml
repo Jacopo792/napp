@@ -119,7 +119,7 @@ jobs:
       # The image is what Render runs, so a Dockerfile that no longer builds is
       # a broken deploy waiting for somebody to notice.
       - name: Build the collaboration server image
-        run: docker build -f server/Dockerfile -t notes-collab:ci .
+        run: docker build -f packages/collab-server/Dockerfile -t notes-collab:ci .
 
       # And a Dockerfile that builds is not a Dockerfile that runs. `COPY` is
       # happy to leave out a file the server imports; the image then builds
@@ -202,7 +202,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: apps/web/dist
 
       - uses: actions/deploy-pages@v4
         id: deploy

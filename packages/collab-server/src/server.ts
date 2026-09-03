@@ -26,7 +26,7 @@ import {
   guard as lockGuard,
   restore as restoreLocked,
   type Guard,
-} from "../../src/features/editor/lib/writeLocks.ts";
+} from "@notes-app/core/editor/writeLocks.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";

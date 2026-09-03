@@ -2,7 +2,7 @@ import { createRootRoute, Link, Outlet, useRouter } from "@tanstack/react-router
 import { useEffect } from "react";
 import { initAxes } from "@/lib/axes";
 
-export const Route = createRootRoute({
+export const rootRoute = createRootRoute({
   component: Root,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,

@@ -10,12 +10,12 @@ import {
   noteDocument,
   richTextToPlainText,
   withoutInvisibleDocumentEnding,
-} from "../../src/features/editor/lib/content.ts";
+} from "@notes-app/core/editor/content.ts";
 import {
   DOCUMENT_FORMAT_VERSION,
   projectDocument,
   seedDocument,
-} from "../../src/features/editor/lib/ydoc.ts";
+} from "@notes-app/core/editor/ydoc.ts";
 
 function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
