@@ -17,11 +17,11 @@ what is different about running it in a window.
 
 **[Download the latest release](https://github.com/Jacopo792/note-sharing-app/releases)**
 
-| Platform   | File                   | Requirement                      |
-| ---------- | ---------------------- | -------------------------------- |
-| macOS      | `Napp-0.1.0-arm64.dmg` | Apple Silicon (M1 or later)      |
-| Windows    | `Napp Setup 0.1.0.exe` | 64-bit                           |
-| Intel Macs | –                      | Not built; see _Not built_ below |
+| Platform           | File                       |
+| ------------------ | -------------------------- |
+| Mac, Apple Silicon | `Napp-<version>-arm64.dmg` |
+| Mac, Intel         | `Napp-<version>.dmg`       |
+| Windows, 64-bit    | `Napp Setup <version>.exe` |
 
 Open the `.dmg` and drag Napp to Applications.
 
@@ -182,8 +182,9 @@ timidity. Asked for `--win` on an Apple Silicon Mac, electron-builder packs
 -86` – the NSIS binary it fetches is x86_64. There is no arrangement of flags
 that fixes it, which is what the release matrix is for.
 
-An Intel Mac build is one flag (`--x64`) on the release workflow and has not
-been asked for.
+Both Mac architectures are built on a tag: `release:desktop:mac` asks
+electron-builder for `--arm64 --x64`, which is two `.dmg` files off one macOS
+runner. `pnpm build:desktop` builds only for the machine you are standing at.
 
 ---
 
