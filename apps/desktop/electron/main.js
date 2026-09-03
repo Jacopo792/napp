@@ -14,6 +14,7 @@
  * from a scheme of its own, and `app://notes` is an origin the server can be
  * told about. Render's ALLOWED_ORIGINS has to contain it. */
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, screen, shell } = require("electron");
+const { installMenu } = require("./menu");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
@@ -100,6 +101,16 @@ function createWindow() {
     show: false,
     backgroundColor: "#191919",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    /* Where the three buttons sit, and it is not decoration. `hiddenInset`
+       puts them at the window's own top-left — which is on top of the first
+       row of the sidebar, because the panes here are cards inset by 10px and
+       their header strip is 52px tall. So they are moved down to the middle of
+       that strip, and the strip is given a gutter to stand in
+       (`--titlebar-inset` in the stylesheet). The two numbers have to agree:
+       change one and the buttons are either over the avatar or floating in a
+       gap. y is the top of the buttons, which are 12px, so 31 centres them in
+       a strip that runs from 10 to 62. */
+    trafficLightPosition: { x: 19, y: 31 },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -175,6 +186,14 @@ ipcMain.handle("napp:print", (event) => {
 
 app.whenReady().then(() => {
   if (!isDev) serveRenderer();
+  /* The About panel is a native window and it is free; without this it says
+     "Electron" and gives the version of the runtime rather than of the app. */
+  app.setAboutPanelOptions({
+    applicationName: "Napp",
+    applicationVersion: app.getVersion(),
+    credits: "A shared archive, for the people who write in it.",
+  });
+  installMenu(isDev);
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

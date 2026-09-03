@@ -48,6 +48,12 @@ import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuButton } from "./WorkspaceMenus";
 
+/** A row that has just been pushed open says so, and every other row closes.
+ *  Announced rather than lifted into the list's state: this is a fact about a
+ *  hand, it changes on every gesture, and passing it down would re-render the
+ *  whole list to move one row. */
+const CLOSE_OTHER_SWIPES = "napp:close-other-swipes";
+
 export interface ActiveFilter {
   id: string;
   label: string;
@@ -166,6 +172,10 @@ const Row = memo(function Row({
   const rowRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [slid, setSlid] = useState(0);
+  /* Following a hand and settling afterwards are two motions and want two
+     curves. Without this the row snapped to its open position at the end of
+     every gesture, which is the one frame that says whether it was caught. */
+  const [dragging, setDragging] = useState(false);
 
   const noteMeta = indexOf(meta).byNote.get(entry.note.id);
 
@@ -180,33 +190,70 @@ const Row = memo(function Row({
   }, [confirmDelete]);
 
   /* ── The swipe ──────────────────────────────────────────────────────────
-     A finger has no right-click and no hover, so the two acts a row is for
-     are the two directions it can be pushed: left files it away, right sends
-     it to the Trash. The row follows the finger and springs back if it was
-     not pushed far enough, which is the whole of the feedback — a row that
-     jumps at the end of a gesture nobody committed to is a row that acts on
-     its own.
+     What Mail and Notes taught the hand, and it is three behaviours rather
+     than one. Push a row and an action is *uncovered* behind it, growing as
+     the row travels; let go partway and the row stays open with its button
+     showing, so the act is still a deliberate press; push it past the far
+     threshold and let go, and it happens on its own. A row that only ever
+     sprang back said nothing about what it was about to do, which is what made
+     the gesture read as a twitch instead of a control.
 
-     A trackpad does the same thing with two fingers, which is what macOS Mail
-     has taught every hand that has used it. Two inputs and one gesture: both
-     feed the same travel, cross the same threshold and end in the same call,
-     so there is one behaviour to reason about and the phone and the desk
-     cannot drift apart.
+     The directions are Apple's, because that is where the hand learned them:
+     left uncovers Delete on the right of the row, right uncovers Archive.
+
+     A finger drags it; a trackpad pushes it with two fingers. Two inputs, one
+     travel, one settle, so the phone and the desk cannot drift apart.
 
      Only where there is something to act on: in the Trash and the Archive the
      acts are different ones and the buttons are still there. */
   const gesturable = canWrite && !trashMode && !archiveMode;
   const swipeable = mobile && gesturable;
-  const swipe = useRef<{ x: number; y: number; live: boolean } | null>(null);
-  const SWIPE_COMMIT = 96;
+  const swipe = useRef<{ x: number; y: number; from: number; live: boolean } | null>(null);
 
-  /* The far end of a committed swipe. Left files the note away, right sends it
-     to the Trash — which is reversible, and is why a swipe is allowed to reach
-     it at all when deleting for good still takes two deliberate clicks. */
-  const commitSwipe = useCallback(
+  /* Where a row rests with one action showing, how far it has to be pushed for
+     the action to happen by itself, and how far it may travel at all.
+     ponytail: three constants tuned by hand against Mail; if the row ever
+     carries two actions on a side, OPEN is what has to grow. */
+  const OPEN = 92;
+  const COMMIT = 190;
+  const MAX = 240;
+
+  /* The clamp is not tidiness. A trackpad keeps sending decaying momentum
+     after the fingers have lifted, so an unclamped travel turns a flick into a
+     commit nobody asked for — with the clamp a flick simply arrives at the
+     open position and waits there, which is what Mail does with the same
+     flick. */
+  const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
+
+  /* One row open at a time. A second open row is a second answer to "which one
+     am I about to act on", and the id travels rather than the state because
+     every row would otherwise need the whole list's attention passed down to
+     it. Same shape as the pen's announcement in the editor. */
+  useEffect(() => {
+    function onOther(event: Event) {
+      if ((event as CustomEvent<string>).detail !== entry.note.id) setSlid(0);
+    }
+    window.addEventListener(CLOSE_OTHER_SWIPES, onOther);
+    return () => window.removeEventListener(CLOSE_OTHER_SWIPES, onOther);
+  }, [entry.note.id]);
+
+  const claim = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(CLOSE_OTHER_SWIPES, { detail: entry.note.id }));
+  }, [entry.note.id]);
+
+  /* The end of a gesture: act, stay open, or close. */
+  const settle = useCallback(
     (travelled: number) => {
-      if (travelled <= -SWIPE_COMMIT) onArchiveChange(entry, true);
-      else if (travelled >= SWIPE_COMMIT) onMoveToTrash(entry);
+      if (travelled <= -COMMIT) {
+        setSlid(0);
+        onMoveToTrash(entry);
+      } else if (travelled >= COMMIT) {
+        setSlid(0);
+        onArchiveChange(entry, true);
+      } else if (travelled <= -OPEN / 2) setSlid(-OPEN);
+      else if (travelled >= OPEN / 2) setSlid(OPEN);
+      else setSlid(0);
+      setDragging(false);
     },
     [entry, onArchiveChange, onMoveToTrash],
   );
@@ -218,38 +265,48 @@ const Row = memo(function Row({
      its distance because a dependency changed underneath it. */
   const wheel = useRef({ dx: 0, axis: null as null | "x" | "y", idle: 0 });
   /* Read through a ref, not closed over. Every wheel event re-renders this row,
-     which remakes `commitSwipe`, which would re-run the effect below — and its
+     which remakes `settle`, which would re-run the effect below — and its
      cleanup would cancel the very timer that ends the gesture. The row then
      travelled and never sprang back. */
-  const commitRef = useRef(commitSwipe);
-  commitRef.current = commitSwipe;
+  const settleRef = useRef(settle);
+  settleRef.current = settle;
+  const claimRef = useRef(claim);
+  claimRef.current = claim;
+  /* Likewise: where the row already was when this gesture started, so a push
+     from an open row carries on from where it is rather than jumping to zero. */
+  const slidRef = useRef(slid);
+  slidRef.current = slid;
   useEffect(() => {
     const row = rowRef.current;
     if (!row || !gesturable || mobile) return;
     const state = wheel.current;
 
-    function settle() {
+    function end() {
       const travelled = state.dx;
       state.dx = 0;
       state.axis = null;
-      setSlid(0);
-      commitRef.current(travelled);
+      settleRef.current(travelled);
     }
 
     function onWheel(event: WheelEvent) {
       window.clearTimeout(state.idle);
-      state.idle = window.setTimeout(settle, 90);
+      state.idle = window.setTimeout(end, 90);
       /* The list scrolls up and down; this only ever answers to sideways, and
          once a gesture has been read as one it stays that one. */
       if (state.axis === null) {
         state.axis = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? "x" : "y";
+        if (state.axis === "x") {
+          state.dx = slidRef.current;
+          setDragging(true);
+          claimRef.current();
+        }
       }
       if (state.axis !== "x") return;
       /* Or the window takes the same swipe as "go back". */
       event.preventDefault();
       /* Fingers moving left report a positive deltaX, and the row they are
          pushing goes left. */
-      state.dx -= event.deltaX;
+      state.dx = clamp(state.dx - event.deltaX);
       setSlid(state.dx);
     }
 
@@ -264,7 +321,7 @@ const Row = memo(function Row({
 
   function swipeStart(event: React.PointerEvent) {
     if (!swipeable || event.pointerType === "mouse") return;
-    swipe.current = { x: event.clientX, y: event.clientY, live: false };
+    swipe.current = { x: event.clientX, y: event.clientY, from: slid, live: false };
   }
 
   function swipeMove(event: React.PointerEvent) {
@@ -281,15 +338,16 @@ const Row = memo(function Row({
       }
       if (Math.abs(dx) < 12) return;
       from.live = true;
+      setDragging(true);
+      claim();
     }
-    setSlid(dx);
+    setSlid(clamp(from.from + dx));
   }
 
   function swipeEnd() {
     const from = swipe.current;
     swipe.current = null;
-    if (from?.live) commitSwipe(slid);
-    setSlid(0);
+    if (from?.live) settle(slid);
   }
 
   const { preview } = derivedOf(entry.note);
@@ -314,8 +372,9 @@ const Row = memo(function Row({
       {...(!mobile && canWrite ? attributes : {})}
       role="option"
       aria-selected={selected}
-      /* A finished swipe must not also open the note underneath it. */
-      onClick={() => slid === 0 && onSelect(entry)}
+      /* A row standing open is showing a question, and the answer to it is
+         either the button beside it or "never mind" — never the note. */
+      onClick={() => (slid === 0 ? onSelect(entry) : setSlid(0))}
       onContextMenu={(event) => onContextMenu(event, entry)}
       onPointerDown={swipeStart}
       onPointerMove={swipeMove}
@@ -326,7 +385,7 @@ const Row = memo(function Row({
         /* Written even when it is nothing: a row that comes back from a swipe
            and simply stops carrying the property keeps the last one it was
            given. */
-        transform: slid === 0 ? "" : `translateX(${Math.max(-140, Math.min(140, slid))}px)`,
+        transform: slid === 0 ? "" : `translateX(${slid}px)`,
         /* Two motions on one row, so they are kept on two properties and given
            two curves. `transform` is the swipe letting go, which wants the
            spring: a card thrown at the edge should come back with some weight
@@ -335,12 +394,11 @@ const Row = memo(function Row({
            under the cursor reads as the list twitching. Sharing one property
            would mean sharing one curve, and the inline value here wins over any
            stylesheet, so the hover could not have had its own. */
-        transition:
-          slid === 0
-            ? "transform var(--dur-base) var(--ease-spring), translate var(--dur-base) var(--ease)"
-            : "none",
+        transition: dragging
+          ? "none"
+          : "transform var(--dur-base) var(--ease-spring), translate var(--dur-base) var(--ease)",
       }}
-      className={`note-row group relative cursor-pointer transition-colors ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
+      className={`note-row group relative cursor-pointer transition-colors ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
@@ -439,10 +497,49 @@ const Row = memo(function Row({
         </p>
       </div>
 
+      {/* What is under the row. Each panel is parked just outside the edge it
+          belongs to, so the row travelling is the only thing that moves and the
+          panel is simply uncovered — the list clips its own overflow, which is
+          what keeps a parked panel invisible until there is a gap for it.
+
+          `left: 100%` and `right: 100%` rather than a wrapper around the row:
+          the row is already the positioned element and already the thing that
+          translates, and a wrapper would have to reproduce every one of the
+          layout classes below it, in three variants. */}
       {gesturable && slid !== 0 && (
-        <span className={`note-row-swipe ${slid < 0 ? "is-archive" : "is-trash"}`} aria-hidden>
-          {slid < 0 ? <Archive size={16} /> : <Trash2 size={16} />}
-        </span>
+        <>
+          <button
+            type="button"
+            className="note-row-action is-trash"
+            style={{ width: Math.max(OPEN, -slid) }}
+            /* The row is travelling under the pointer; a press has to be the
+               end of the gesture rather than a click that also opens the note
+               underneath. */
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setSlid(0);
+              onMoveToTrash(entry);
+            }}
+          >
+            <Trash2 size={16} />
+            <span>Delete</span>
+          </button>
+          <button
+            type="button"
+            className="note-row-action is-archive"
+            style={{ width: Math.max(OPEN, slid) }}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setSlid(0);
+              onArchiveChange(entry, true);
+            }}
+          >
+            <Archive size={16} />
+            <span>Archive</span>
+          </button>
+        </>
       )}
 
       {/* Touch keeps the acts a swipe does not do: pinning, which has no

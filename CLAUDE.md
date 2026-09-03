@@ -133,27 +133,52 @@ the boundary is the one place every update passes through:
   disagreeing with the document it is bound to.
 
 A note row carries no buttons on a pointer machine — everything they did is in
-the row's right-click menu. The acts are also a gesture: push a card left to
-file it, right to trash it. A finger drags the row; a trackpad pushes it with
-two fingers, which is what macOS Mail has taught every hand that has used it.
+the row's right-click menu. The acts are also a gesture, and it is Mail's
+gesture rather than a swipe of our own: push the row **left to uncover Delete**
+on its right, **right to uncover Archive**. A finger drags it; a trackpad
+pushes it with two fingers.
 
-**Two inputs, one gesture.** Both feed the same travel, cross the same
-threshold and end in the same `commitSwipe`, so the phone and the desk cannot
-drift apart — and the direction is the one already in the reader's hands, not
-the iOS convention, because flipping it would betray muscle memory the other
-member already has.
+**Three behaviours, not one, and this is what the first attempt got wrong.**
+The action is not a sign riding on the row, it is a surface behind it that the
+row uncovers, and it grows with the travel. Let go partway and the row **stays
+open** with its button showing, so the act is still a deliberate press. Push it
+past `COMMIT` and it happens on release. A row that only ever sprang back said
+nothing about what it was about to do, which is what made the gesture read as a
+twitch rather than a control.
+
+The directions are Apple's. They were once the other way round, on the argument
+that muscle memory outranks convention; the muscle memory being protected was
+of a gesture nobody could use, and the hand's real memory is of Mail. Changing
+them was the report, not a liberty.
+
+`OPEN`, `COMMIT` and `MAX` in `NoteList.tsx` are the whole of the tuning, and
+**the clamp is load-bearing**: a trackpad keeps sending decaying momentum after
+the fingers lift, so unclamped travel turns a flick into a commit nobody asked
+for. Clamped, a flick arrives at the open position and waits there, which is
+what Mail does with the same flick.
+
+The panels are parked outside the row's own edges (`left: 100%`, `right: 100%`)
+rather than inside a wrapper, so the travelling row is the only thing that
+moves and the list's own `overflow-x: hidden` is what keeps a parked panel out
+of sight. A row that is open paints `--paper`, or the panel is read through it.
+One row is open at a time, announced on `napp:close-other-swipes` as the
+gesture starts rather than lifted into the list's state — a re-render of every
+row to move one row is the wrong shape for something a hand changes constantly.
 
 A trackpad has no gesture-end event: the fingers lift and macOS keeps sending
 decaying momentum. The end is therefore a silence — 90 ms without a wheel
 event — and two things follow that are easy to get wrong. The travel lives in
-a **ref**, because every wheel event re-renders the row. And the commit is read
+a **ref**, because every wheel event re-renders the row. And the settle is read
 through a ref too: closed over directly it changes each render, the effect
 re-runs, and its cleanup cancels the very timer that ends the gesture, so the
-row travels and never springs back. Chromium reads the same two-finger swipe as
-"go back"; the handler calls `preventDefault` on a deliberately non-passive
+row travels and never springs back. Following the hand and settling afterwards
+are also two motions and take two curves — `dragging` takes the transition off
+while the fingers are on it, or the row snaps to its open position and the one
+frame that says it was caught is lost. Chromium reads the same two-finger swipe
+as "go back"; the handler calls `preventDefault` on a deliberately non-passive
 listener, the list carries `overscroll-behavior-x: contain`, and the desktop
-shell turns `OverscrollHistoryNavigation` off outright. Pinning has no direction, so it keeps
-its button there, and Trash and Archive keep theirs.
+shell turns `OverscrollHistoryNavigation` off outright. Pinning has no
+direction, so it keeps its button there, and Trash and Archive keep theirs.
 
 `handleMetaChange` in `Notes.tsx` is the one place every per-note metadata
 change passes through, so the lock is honoured there once rather than in each
@@ -361,6 +386,40 @@ node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onr
 ```
 
 (from `packages/collab-server/`, where `ws` resolves.)
+
+**A window is not a tab, and three of the differences are not optional.**
+
+`electron/menu.js` builds the menu bar, and almost nothing in it has logic.
+Every item that acts on the archive is already a shortcut the renderer answers
+to — `packages/core/src/lib/shortcuts.ts` is the list, read by the `?` sheet and
+by Settings — so the menu does not implement the commands, it **presses the
+key**: `registerAccelerator: false` shows the shortcut beside the item without
+taking it off the page, and clicking the item sends the same keystroke down for
+the preload to dispatch on whatever has focus. One implementation of "new note",
+and a menu item that cannot drift away from the key that does the same thing.
+What stays a real role is what belongs to the system rather than to us: undo
+inside a contenteditable, ⌘W, Services, speech, zoom, full screen.
+
+**The three buttons and `--titlebar-inset` are one decision in two files.**
+`hiddenInset` leaves the traffic lights at the window's own top-left, which here
+is on top of the avatar in the first row of the sidebar — the panes are cards
+inset by 10px, so the window's corner is inside the first one. `main.js` moves
+them to the middle of the 52px header strip with `trafficLightPosition`, and the
+stylesheet holds a gutter open for them. Change one number and the buttons are
+either over the avatar or floating in a gap. The gutter follows the leftmost
+strip, not the sidebar: ⌘\ collapses the whole navigation pane and the buttons
+are then over the note's own toolbar.
+
+**And a hidden title bar is a window with nothing left to drag by.** There is no
+default: without `-webkit-app-region: drag` somewhere, the window cannot be
+moved at all, which is the single loudest way an Electron app announces it is a
+web page. The header strips are the title bar, so they drag — and everything
+pressable inside them needs `no-drag`, menus included, because drag is inherited
+and a menu opened from a toolbar is a descendant of it.
+
+`data-shell` on the root element is what the stylesheet reads, set by the
+desktop `main.tsx` and by nothing else, so every rule keyed on it is inert in a
+tab.
 
 The scheme is registered with `registerSchemesAsPrivileged` before `ready`.
 Without that it is not a secure context, and without a secure context there is

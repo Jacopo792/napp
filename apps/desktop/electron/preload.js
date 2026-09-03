@@ -13,3 +13,18 @@ contextBridge.exposeInMainWorld("napp", {
   open: (name, bytes) => ipcRenderer.invoke("napp:open", name, bytes),
   print: () => ipcRenderer.invoke("napp:print"),
 });
+
+/* The menu presses the key. Nothing here decides what a command does — the
+   renderer already answers every one of these from the keyboard, and this is a
+   second way to type it. Dispatched on whatever has focus, so ⌘B from the
+   Format menu reaches the selection the way ⌘B from the keyboard does; on the
+   body for the few items that a bare letter's own guard would otherwise hand
+   back to the field it was typed in.
+
+   The DOM is shared across the isolation boundary even though the two
+   JavaScript worlds are not, so a keydown dispatched from here is a keydown the
+   page's own listener sees. */
+ipcRenderer.on("napp:command", (_event, init) => {
+  const target = init.atBody ? document.body : (document.activeElement ?? document.body);
+  target?.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
+});

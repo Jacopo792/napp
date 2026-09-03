@@ -2402,29 +2402,50 @@
   height: 100%;
 }
 
-/* The sign on a row being pushed. It rides with the row rather than sitting in
-   the slot behind it: on the phone the list is a grid of cards, and a sign left
-   behind in the slot would be a sign over the card next to it. */
-.note-row-swipe {
+/* ── What is under a row being pushed ────────────────────────────────────────
+   Mail's arrangement: the action is not a sign riding on the row, it is a
+   surface *behind* it that the row uncovers. Each panel is parked immediately
+   outside the edge it belongs to — `left: 100%` for the one on the right — so
+   nothing about it moves during the gesture and the row travelling is the whole
+   animation. The list clips its own horizontal overflow, which is what keeps a
+   parked panel out of sight until there is a gap for it to be seen through.
+
+   The width follows the travel rather than being fixed, so a row pushed past
+   its resting place is not a panel with a strip of background beside it. It
+   never goes below OPEN, because the label has to fit from the first frame. */
+.note-row-action {
   position: absolute;
-  top: 50%;
-  right: 0.9rem;
+  top: 0;
+  bottom: 0;
   display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   align-items: center;
-  transform: translateY(-50%);
-  pointer-events: none;
+  justify-content: center;
+  border: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 560;
+  color: #fff;
+  cursor: pointer;
 }
 
-/* Pushed left to file it away, right to throw it away — so the sign stands on
-   the edge the push is heading for. */
-.note-row-swipe.is-archive {
-  right: auto;
-  left: 0.9rem;
-  color: var(--accent);
+/* Pushed left uncovers Delete on the right, which is the direction every hand
+   that has used Mail or Notes already has. */
+.note-row-action.is-trash {
+  left: 100%;
+  background: var(--danger);
 }
 
-.note-row-swipe.is-trash {
-  color: var(--danger);
+.note-row-action.is-archive {
+  right: 100%;
+  background: var(--accent);
+}
+
+/* A travelling row has to be opaque, or the panel it is uncovering is read
+   through it. The list column's own surface, so a row at rest is unchanged. */
+.note-row.is-swiped {
+  background: var(--paper);
 }
 
 /* What is left of a checklist, in the line that already says when. */
@@ -6851,4 +6872,58 @@
     transform: none;
     translate: none;
   }
+}
+
+/* ── The window this is in, when it is a window ──────────────────────────────
+   Set by the desktop shell's main.tsx and by nothing else: the browser never
+   carries it, so every rule below is inert in a tab. Two things a page cannot
+   do for itself and a window has to.
+
+   1. The three buttons. `titleBarStyle: "hiddenInset"` leaves them at the
+      window's own top-left, which here is on top of the avatar in the first row
+      of the sidebar — the panes are cards inset by 10px, so the window's corner
+      is inside the first one. The main process moves them down to the middle of
+      the 52px header strip; this holds a gutter open for them to stand in. The
+      two numbers are one decision in two files: `trafficLightPosition` in
+      main.js and `--titlebar-inset` here.
+
+   2. Moving the window. A hidden title bar is a window with nothing left to
+      drag by, and there is no default: without `-webkit-app-region: drag`
+      somewhere the window simply cannot be moved, which is the single loudest
+      way an Electron app announces that it is a web page. The header strips are
+      the title bar, so they are what drags — and everything that can be pressed
+      inside them has to say so, because drag is inherited and a button in a
+      draggable strip does not receive its own click.
+
+   The gutter follows the leftmost strip rather than the sidebar: closing the
+   folders (⌘\, and focus mode does it too) collapses the whole navigation pane,
+   and the buttons are then over the note's own toolbar. ───────────────────── */
+:root {
+  --titlebar-inset: 0px;
+}
+
+[data-shell="mac"] {
+  /* Three 12px buttons at 20px pitch from x:19, plus the breathing room the
+     system leaves after them. */
+  --titlebar-inset: 72px;
+}
+
+[data-shell="mac"] .sidebar-topbar,
+[data-shell="mac"] .pane-slide.is-collapsed ~ .editor-shell .editor-toolbar {
+  padding-left: var(--titlebar-inset);
+}
+
+[data-shell] .sidebar-topbar,
+[data-shell] .collection-toolbar,
+[data-shell] .editor-toolbar {
+  -webkit-app-region: drag;
+}
+
+/* Anything that answers a press, and the menus they open — a menu hanging off
+   a toolbar is a descendant of it, so it inherits the drag and every item in it
+   would move the window instead of being chosen. */
+[data-shell]
+  :is(.sidebar-topbar, .collection-toolbar, .editor-toolbar)
+  :is(button, a, input, select, textarea, label, [role], [tabindex], [contenteditable]) {
+  -webkit-app-region: no-drag;
 }
