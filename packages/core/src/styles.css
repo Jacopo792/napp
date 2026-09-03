@@ -2150,6 +2150,14 @@
      recess comes from the ink and the atmosphere still passes through. */
   background: color-mix(in srgb, var(--surface) 62%, transparent);
   padding: 4px;
+  /* The same 40 as the search field beside it. These two are the second row of
+     their columns and they sit on the same line, or the eye reads the whole top
+     of the window as being out of true — which, at 12px apart, it was. */
+  height: 2.5rem;
+}
+
+.archive-switch.archive-switch-tight {
+  height: auto;
 }
 
 /* The thumb used to be half the track, moved once. A roster is any length, so
@@ -6931,14 +6939,26 @@
 }
 
 [data-shell="mac"] {
-  /* Three 12px buttons at 20px pitch from x:19, plus the breathing room the
-     system leaves after them. */
-  --titlebar-inset: 72px;
+  /* Three 12px buttons at 20px pitch from x:19 end at 71, and content starting
+     at 72 is content touching the green one — which is what the first attempt
+     did, and it read as the avatar being pushed out of the way by the window
+     rather than as a gutter. The extra is the air every Mac sidebar leaves
+     after the lights. */
+  --titlebar-inset: 88px;
+}
+
+/* Full screen takes the three buttons away, and a gutter held open for
+   buttons that are not there is a hole in the corner of the window. */
+@media (display-mode: fullscreen) {
+  [data-shell="mac"] {
+    --titlebar-inset: 0px;
+  }
 }
 
 [data-shell="mac"] .sidebar-topbar,
 [data-shell="mac"] .pane-slide.is-collapsed ~ .editor-shell .editor-toolbar {
   padding-left: var(--titlebar-inset);
+  transition: padding-left var(--dur-base) var(--ease);
 }
 
 [data-shell] .sidebar-topbar,

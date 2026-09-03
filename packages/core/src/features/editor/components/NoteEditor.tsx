@@ -100,7 +100,7 @@ interface Props {
    the cluster takes a row of its own, the way the phone already gives it one.
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
-const TOOLBAR_ROOM = 550;
+const TOOLBAR_ROOM = 750;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -495,7 +495,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onContextMenu(event);
   }
 
-  /* Inline while there is room for it; on its own row otherwise. */
+  /* Inline while there is room for it; on its own row otherwise.
+     The number is arithmetic, not a feeling: the group on the right is about
+     244px of readout, faces and buttons, the tools in the middle are about 210,
+     the two outer tracks are equal because they are both `1fr`, and the strip
+     has 32 of padding and 16 of gaps. 244 × 2 + 210 + 48 is 746. Under that the
+     tools go to their own row, which is what the narrow window already did.
+
+     It was 550, which is where the readout ended up printed on top of the last
+     tool: the right-hand group needed 244 and its track was 196, and a grid
+     item wider than its track does not shrink, it overflows — leftwards, here,
+     because that group is justified to the end. The track is
+     `minmax(max-content, 1fr)` now, so the number above being wrong one day
+     costs the label on the left its last few characters instead. */
   const inlineToolbar =
     !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
 
@@ -618,7 +630,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div
         className={`editor-toolbar relative h-13 shrink-0 px-4 ${
           inlineToolbar
-            ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+            ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2"
             : "flex items-center gap-2"
         }`}
       >

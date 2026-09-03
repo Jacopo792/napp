@@ -539,7 +539,10 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="px-2 pb-2">{archiveSwitch}</div>
+      {/* `pt-3` and no bottom padding, so this sits in the same band as the
+          search field in the column beside it: both start 12px under a 52px
+          header and both end where their column starts scrolling. */}
+      <div className="px-2 pt-3">{archiveSwitch}</div>
 
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {all && (
