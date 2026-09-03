@@ -121,6 +121,36 @@ jobs:
       - name: Build the collaboration server image
         run: docker build -f server/Dockerfile -t notes-collab:ci .
 
+      # And a Dockerfile that builds is not a Dockerfile that runs. `COPY` is
+      # happy to leave out a file the server imports; the image then builds
+      # green here, deploys, and exits on ERR_MODULE_NOT_FOUND, and Render
+      # keeps serving the previous instance — so the service looks healthy
+      # while three days of commits are not on it. That is exactly what
+      # happened when `writeLocks.ts` was added.
+      #
+      # Placeholders, like the frontend build above: `/healthz` is liveness and
+      # asks nothing of Supabase or the bus. What this proves is that every
+      # module the server imports is in the image.
+      - name: Start the collaboration server image
+        run: |
+          docker run -d --name collab-smoke -p 8099:8080 \
+            -e SUPABASE_URL=https://checks.example.invalid \
+            -e SUPABASE_PUBLISHABLE_KEY=not-a-real-key \
+            -e SUPABASE_SERVICE_ROLE_KEY=not-a-real-key \
+            -e ALLOWED_ORIGINS=https://checks.example.invalid \
+            notes-collab:ci
+          for _ in $(seq 30); do
+            curl --fail --silent http://127.0.0.1:8099/healthz && exit 0
+            sleep 1
+          done
+          echo "the image never answered /healthz:"
+          docker logs collab-smoke
+          exit 1
+
+      - name: Stop the collaboration server image
+        if: always()
+        run: docker rm -f collab-smoke || true
+
       - name: Stop Supabase
         if: always()
         run: supabase stop

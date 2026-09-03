@@ -6,10 +6,6 @@
 # and for that minute the other member's face does not appear on it. Read as a
 # bug, because that is what it looks like from a chair.
 #
-# The service's own logs say how often: seventeen wake-ups on 1 September,
-# ten by three in the afternoon on the 2nd. Roughly eleven minutes a day spent
-# watching a note refuse to open.
-#
 # **The window is the whole point, and it is a budget, not a preference.** A
 # workspace gets 750 free instance-hours a calendar month, shared across every
 # free web service, and time spent asleep costs nothing. Pinging around the
@@ -19,39 +15,62 @@
 # is seventeen hours a day, which is about 527 a month, and leaves a third of
 # the allowance unspent.
 #
-# Actual use, from those same logs, is around 8.6 hours a day — so the window
-# adds roughly 270 hours to a bill that has 490 to spare.
+# **The loop is here because `*/5` was a fiction.** GitHub's schedules are
+# best-effort, and it deprioritises high-frequency ones outright: written as
+# `*/5 6-22` this fired three times in the twelve hours after it was added,
+# twice at one minute past an hour and both times outside the window — delayed
+# firings, not the schedule asked for. The server slept through the morning of
+# 3 September with the workflow green and idle above it.
 #
-# GitHub's schedules are best-effort and can run late, which is why this is
-# every five minutes against a fifteen-minute timeout rather than every ten:
-# two missed firings in a row still land inside it. Actions minutes are free on
-# a public repository, so the frequency costs nothing here.
+# So the schedule is asked for the one thing it does honour — roughly hourly —
+# and the pinging is done by the job, which has a real clock. One firing covers
+# its own hour; a firing that is dropped costs at most the rest of that hour.
+# Actions minutes are free on a public repository, which this is.
+#
+# The standing alternative, and the honest one: Render's `starter` plan does
+# not sleep, and this file and the whole 750-hour argument go in the bin with
+# it.
 name: Keep the collaboration server awake
 
 on:
   schedule:
-    # Every five minutes, 06:00–22:59 UTC. In Italian summer time that is
-    # 08:00 to just before 01:00; in winter, 07:00 to midnight.
-    - cron: "*/5 6-22 * * *"
+    # Hourly, 06:00–22:59 UTC. In Italian summer time that is 08:00 to just
+    # before 01:00; in winter, 07:00 to midnight.
+    - cron: "2 6-22 * * *"
   workflow_dispatch:
 
 concurrency:
   group: keep-collab-awake
-  cancel-in-progress: false
+  # A late firing replaces the run it arrives on top of rather than queueing
+  # behind it: two loops pinging the same service is one loop's worth of use
+  # and twice the runner.
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 65
+
     steps:
       # `/healthz` and deliberately not `/readyz`: liveness never consults
       # Supabase or the bus, so this keeps the process warm without putting a
       # query on the archive every five minutes. The generous timeout is the
       # cold start itself — the first ping after a sleep is the one that waits.
-      - name: Ping the collaboration server
+      #
+      # A failed ping does not end the loop, because the point of the loop is
+      # to go on pinging; it is remembered and the job fails at the end, so a
+      # server that is genuinely down is still a red run rather than silence.
+      - name: Ping the collaboration server for the hour
         run: |
-          curl --fail --silent --show-error \
-               --max-time 120 --retry 2 --retry-all-errors \
-               https://notes-collab.onrender.com/healthz
+          fail=0
+          deadline=$(( SECONDS + 3480 ))
+          while :; do
+            curl --fail --silent --show-error \
+                 --max-time 120 --retry 2 --retry-all-errors \
+                 https://notes-collab.onrender.com/healthz || fail=1
+            if [ "$SECONDS" -ge "$deadline" ]; then break; fi
+            sleep 300
+          done
+          exit $fail

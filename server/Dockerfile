@@ -19,11 +19,18 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY server/package.json ./server/package.json
 COPY server/src ./server/src
 
-# The document schema and the Yjs conversion are shared verbatim with the
-# browser, not reimplemented here: one definition is what keeps a note written
-# in a tab legible to this process. They keep their path in the repository, so
-# the import is the same line in development and in the image.
-COPY src/features/editor/lib/content.ts src/features/editor/lib/ydoc.ts ./src/features/editor/lib/
+# The document schema, the Yjs conversion and the write locks are shared
+# verbatim with the browser, not reimplemented here: one definition is what
+# keeps a note written in a tab legible to this process. They keep their path
+# in the repository, so the import is the same line in development and in the
+# image.
+#
+# The whole directory, and not the two or three files the server imports today.
+# A named list is a second place to remember, and it was forgotten the moment
+# `writeLocks.ts` arrived: the image built, started, and exited on
+# ERR_MODULE_NOT_FOUND. Nothing here is loaded unless it is imported, so the
+# cost of the files the server never reaches is the bytes.
+COPY src/features/editor/lib/ ./src/features/editor/lib/
 
 USER node
 EXPOSE 8080
