@@ -288,7 +288,16 @@ site: `gh run list --branch main --limit 1`.
 
 **The free plan sleeps, and that is answered in two places, neither of which
 is the plan.** `.github/workflows/keep-collab-awake.yml` pings `/healthz` every
-five minutes between 06:00 and 22:59 UTC — a window, not a loop, because a
+five minutes between 06:00 and 22:59 UTC — but the five minutes are the job's
+own doing, not the cron's. Asked for as `*/5`, GitHub deprioritised it and gave
+about one firing an hour, twice landing outside the window it declared; the
+server slept through the morning of 3 September with the workflow green above
+it. The schedule now asks for the hour, which GitHub honours, and the job holds
+that hour with a loop, which has a clock. The loop's test is an `if` and never
+`&&`: Actions runs every `run` under `bash -e`, where a false AND-list ends the
+job — written that way it would have pinged once and stopped, green.
+
+It is a window, not a loop around the clock, because a
 workspace gets **750 free instance-hours a calendar month** across every free
 web service and going over does not throttle anything, it _suspends every free
 service until the month turns over_. Round-the-clock pinging spends 744 hours
@@ -308,6 +317,30 @@ never connected. Editing that file changes nothing by itself. It deploys on
 every push to `main`, and on the free plan it sleeps after fifteen idle minutes
 and takes about fifty seconds to wake — during which no editor opens, because an
 editor opens only after the server has authorized and synced.
+
+**A service made through the API has no Git credential, and that is silent.**
+It was created with a repository URL and nobody attached to it, so Render
+cloned anonymously — `==> It looks like we don't have access to your repo, but
+we'll try to clone it anyway` — and GitHub rate-limits unauthenticated clones
+and then refuses them outright. Between 31 August and 3 September `main` took
+86 commits and Render recorded **one** deploy, the one that made the service:
+not eighty-six failures, none at all, because there was no identity to receive
+a push event either. Nothing showed. The dashboard said the repository was
+connected, because the _source_ was; what was empty was Settings → Build → Git
+Credentials, whose value when unset is the button that sets it. Signing in and
+pressing **Use My Credentials** fixed both halves at once.
+
+The lesson is the check, not the fix: **a service that is up is not a service
+that is current.** Ask `render deploys list <service-id>` what it is actually
+running, the way `gh run list` is asked about Pages above.
+
+**And a green Docker build is not a server that starts.** `COPY` is happy to
+leave out a file the image needs: `server.ts` began importing `writeLocks.ts`
+while the Dockerfile named `content.ts` and `ydoc.ts` by hand, so the image
+built, deployed, exited on ERR_MODULE_NOT_FOUND — and Render held the previous
+instance up, which is the same silence as above. The image now copies the whole
+of `src/features/editor/lib/`, and CI starts what it builds and asks it for
+`/healthz`, because that is the only step that can tell the difference.
 
 **Deploy before you drop.** The oldest client still running is whatever `main` last built,
 plus anybody holding an open tab. When four `ciphertext` columns were dropped
