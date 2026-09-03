@@ -133,8 +133,26 @@ the boundary is the one place every update passes through:
   disagreeing with the document it is bound to.
 
 A note row carries no buttons on a pointer machine — everything they did is in
-the row's right-click menu. On a phone the acts are gestures instead: push a
-card left to file it, right to trash it. Pinning has no direction, so it keeps
+the row's right-click menu. The acts are also a gesture: push a card left to
+file it, right to trash it. A finger drags the row; a trackpad pushes it with
+two fingers, which is what macOS Mail has taught every hand that has used it.
+
+**Two inputs, one gesture.** Both feed the same travel, cross the same
+threshold and end in the same `commitSwipe`, so the phone and the desk cannot
+drift apart — and the direction is the one already in the reader's hands, not
+the iOS convention, because flipping it would betray muscle memory the other
+member already has.
+
+A trackpad has no gesture-end event: the fingers lift and macOS keeps sending
+decaying momentum. The end is therefore a silence — 90 ms without a wheel
+event — and two things follow that are easy to get wrong. The travel lives in
+a **ref**, because every wheel event re-renders the row. And the commit is read
+through a ref too: closed over directly it changes each render, the effect
+re-runs, and its cleanup cancels the very timer that ends the gesture, so the
+row travels and never springs back. Chromium reads the same two-finger swipe as
+"go back"; the handler calls `preventDefault` on a deliberately non-passive
+listener, the list carries `overscroll-behavior-x: contain`, and the desktop
+shell turns `OverscrollHistoryNavigation` off outright. Pinning has no direction, so it keeps
 its button there, and Trash and Archive keep theirs.
 
 `handleMetaChange` in `Notes.tsx` is the one place every per-note metadata
