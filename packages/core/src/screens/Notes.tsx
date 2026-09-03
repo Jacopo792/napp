@@ -825,6 +825,23 @@ export default function NotesPage() {
     [archiveComments, selfId, remarksSeen],
   );
 
+  /* The number on the icon in the Dock, which is the whole of what an
+     application can say to somebody who is not looking at it.
+     `navigator.setAppBadge` and not a bridge to `app.dock.setBadge`: it is a
+     standard the browser has too, Electron implements it and puts it on the
+     Dock, and a member on `platform.ts` for it would have been an interface
+     describing a habit. Absent in a plain tab, where it simply does nothing. */
+  useEffect(() => {
+    const badge = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (!badge.setAppBadge || !badge.clearAppBadge) return;
+    void (
+      unreadRemarkCount > 0 ? badge.setAppBadge(unreadRemarkCount) : badge.clearAppBadge()
+    ).catch(() => undefined);
+  }, [unreadRemarkCount]);
+
   /* Who has taken a note back, keyed by note. A lock is metadata on the row
      like the trash stamp beside it, and it is read from the same place — but
      unlike `owner_id` it is a permission, and `notes_editor_update` refuses

@@ -431,6 +431,20 @@ web page. The header strips are the title bar, so they drag — and everything
 pressable inside them needs `no-drag`, menus included, because drag is inherited
 and a menu opened from a toolbar is a descendant of it.
 
+**The icon is cut to Apple's template, not to the edge of the canvas.** A macOS
+icon is 824×824 of artwork centred in a 1024 canvas with transparent corners, so
+that every icon in the Dock reads at the same size. `build/icon.png` was
+full-bleed with no alpha at all, which in the Dock is a black square standing a
+head taller than everything beside it. The corner is a **superellipse**, not a
+rounded rectangle: the curvature runs continuously into the straight edge rather
+than meeting it at a point, and that difference is most of what separates an
+icon that looks drawn by Apple from one drawn by a `border-radius`.
+
+The number on that icon is `navigator.setAppBadge`, called from the core with no
+bridge and no member on `platform.ts`. It is a standard the browser has too, and
+Electron implements it straight onto the Dock — a platform member for it would
+have been an interface describing a habit rather than a boundary.
+
 `data-shell` on the root element is what the stylesheet reads, set by the
 desktop `main.tsx` and by nothing else, so every rule keyed on it is inert in a
 tab.
