@@ -1,6 +1,13 @@
-appId: com.jacopo792.notes
-productName: Notes
+appId: com.jacopo792.napp
+productName: Napp
 copyright: © Jacopo792 · GPL-3.0-or-later
+
+# Not "Notes". macOS already has an app by that name, and a second one collides
+# with it everywhere the operating system lists apps by name — two identical
+# Spotlight rows, and a Dock that hands the wrong icon to whichever it decided
+# was which. `napp` is not a new name either: it is the prefix on every
+# localStorage key, every custom event and the private image scheme, so the
+# window is now called what the code has always called it.
 
 directories:
   output: release
