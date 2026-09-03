@@ -5,7 +5,7 @@ import tsConfigPaths from "vite-tsconfig-paths";
 
 /* The renderer. The same core the browser mounts, built for a window that
    loads it from `app://notes` rather than from a server. */
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const root = new URL("../../", import.meta.url).pathname;
   const env = { ...loadEnv(mode, root, ""), ...process.env };
   const required = [
@@ -18,6 +18,25 @@ export default defineConfig(({ mode }) => {
   ];
   for (const name of required) {
     if (!env[name]) throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  /* A build reads the same `.env.local` the dev server does, and that file
+     points the collaboration URL at a server on this machine. An installed app
+     carries that address to a laptop where nothing answers it — and the way
+     that fails is not an error: an editor opens only after the server has
+     synced, so the app signs in, says "Waking the server", and never opens a
+     note. It is indistinguishable from being slow.
+     A packaged app addressed to localhost is always a mistake, so it is one
+     here rather than an afternoon later. Explicitly wanted, for a build aimed
+     at a server on this machine: ALLOW_LOCAL_COLLAB=1. */
+  const local = /(^|\/\/)(localhost|127\.0\.0\.1|\[::1\])(:|$|\/)/;
+  if (command === "build" && !env.ALLOW_LOCAL_COLLAB && local.test(env.VITE_COLLAB_URL ?? "")) {
+    throw new Error(
+      `VITE_COLLAB_URL is ${env.VITE_COLLAB_URL}, which is this machine.\n` +
+        `A packaged app cannot reach it. Build with the deployed server, e.g.\n` +
+        `  VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop\n` +
+        `or set ALLOW_LOCAL_COLLAB=1 if a local server is really what you want.`,
+    );
   }
 
   return {

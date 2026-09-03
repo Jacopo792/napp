@@ -27,10 +27,10 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            script: build:desktop:mac
+            script: release:desktop:mac
             artifacts: "apps/desktop/release/*.dmg"
           - os: windows-latest
-            script: build:desktop:win
+            script: release:desktop:win
             artifacts: "apps/desktop/release/*.exe"
     runs-on: ${{ matrix.os }}
     steps:

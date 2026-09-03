@@ -10,6 +10,8 @@
     "build:desktop": "pnpm --filter @notes-app/desktop build",
     "build:desktop:mac": "pnpm --filter @notes-app/desktop build:mac",
     "build:desktop:win": "pnpm --filter @notes-app/desktop build:win",
+    "release:desktop:mac": "pnpm --filter @notes-app/desktop release:mac",
+    "release:desktop:win": "pnpm --filter @notes-app/desktop release:win",
     "preview:dist": "pnpm --filter @notes-app/web preview:dist",
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "lint": "eslint .",

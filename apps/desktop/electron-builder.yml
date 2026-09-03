@@ -22,17 +22,18 @@ files:
 # Developer ID and a Windows certificate — set CSC_LINK / CSC_KEY_PASSWORD and
 # delete the two `identity: null` lines below and this becomes a signed build
 # without any other change.
+# No arch list: electron-builder then builds for the machine it is on. Asking
+# for both here made two Notes.app bundles on every local build, and Spotlight
+# indexes build output like anything else — three results for one app, next to
+# Apple's. Both architectures are release.yml's job, where they are asked for
+# by flag.
 mac:
   category: public.app-category.productivity
   identity: null
-  target:
-    - target: dmg
-      arch: [arm64, x64]
+  target: dmg
 
 win:
-  target:
-    - target: nsis
-      arch: [x64]
+  target: nsis
 
 nsis:
   oneClick: false

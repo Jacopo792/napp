@@ -11,7 +11,9 @@
     "build:renderer": "vite build",
     "build": "pnpm build:renderer && electron-builder --publish never",
     "build:mac": "pnpm build:renderer && electron-builder --mac --publish never",
-    "build:win": "pnpm build:renderer && electron-builder --win --publish never"
+    "build:win": "pnpm build:renderer && electron-builder --win --publish never",
+    "release:mac": "pnpm build:renderer && electron-builder --mac --arm64 --x64 --publish never",
+    "release:win": "pnpm build:renderer && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "@notes-app/core": "workspace:*",

@@ -331,7 +331,18 @@ server can be told about.
 Which somebody has to do by hand: `ALLOWED_ORIGINS` must contain `app://notes`
 and, for development, `http://localhost:5174`. `render.yaml` records both but
 **does not apply them** — the live service was made through the API, so the
-value is set in the Render dashboard.
+value is set in the Render dashboard. The Render CLI has no env-var command, so
+this cannot be scripted from here.
+
+Until it is set the live server answers a handshake from `app://notes` with
+**HTTP 403**, which is what to check first when the desktop app signs in and
+then opens nothing. Asking it directly beats reading the dashboard:
+
+```bash
+node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onrender.com",{origin:"app://notes"});s.on("open",()=>{console.log("accepted");s.close()});s.on("unexpected-response",(_q,r)=>console.log("refused",r.statusCode))})'
+```
+
+(from `packages/collab-server/`, where `ws` resolves.)
 
 The scheme is registered with `registerSchemesAsPrivileged` before `ready`.
 Without that it is not a secure context, and without a secure context there is
@@ -360,6 +371,21 @@ null` line in `apps/desktop/electron-builder.yml`, and nothing else changes.
 of `macos-latest` and `windows-latest`, because electron-builder cannot
 cross-compile these. `ci.yml` builds the desktop _renderer_ on every push and
 stops there.
+
+**A packaged build refuses a `VITE_COLLAB_URL` on localhost**, and that guard
+is worth its four lines. A build reads the same `.env.local` the dev server
+does, and that file points the collaboration URL at a server on this machine —
+so the first `.dmg` made here carried `ws://127.0.0.1:8080` to an installed
+app. The way that fails is not an error: an editor opens only after the server
+has synced, so the app signs in, says "Waking the server", and never opens a
+note. It reads as lag. Build with the deployed server:
+
+```bash
+VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:desktop
+```
+
+`ALLOW_LOCAL_COLLAB=1` is the way past it for a build genuinely aimed at a
+local server.
 
 **`pnpm build:desktop` builds for the machine it is run on, and that is not
 timidity.** Asked for `--win` on an Apple Silicon Mac it packs `win-unpacked/`
