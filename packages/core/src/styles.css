@@ -1790,8 +1790,13 @@
   box-shadow: inset 0 -1px 0 var(--rule);
 }
 
-/* Except in focus mode, where the column stops being a pane at all. */
+/* Except in focus mode, where the column stops being a pane at all — and the
+   strip has to stop being one with it. Left painting `--page` over a shell that
+   has gone transparent, it was a lighter rectangle floating above the writing
+   with a hard edge on three sides: the one thing in a mode whose whole job is
+   to have nothing in it. */
 .workspace-shell.is-focus .editor-toolbar {
+  background: transparent;
   box-shadow: none;
 }
 
