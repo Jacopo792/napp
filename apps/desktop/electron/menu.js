@@ -92,6 +92,26 @@ function template(isDev) {
         item("Find…", "Command+F", mod("f")),
         item("Search Notes and Commands…", "Command+K", mod("k")),
         { type: "separator" },
+        /* What a Mac gives every text field and this window was not offering:
+           the system emoji picker on ⌃⌘Space, and the substitutions AppKit
+           applies as you type. All of it belongs to the operating system rather
+           than to us, which is exactly why leaving it out was a hole — there is
+           nothing to implement, only to expose. */
+        {
+          label: "Emoji & Symbols",
+          accelerator: "Control+Command+Space",
+          click: () => app.showEmojiPanel(),
+        },
+        {
+          label: "Substitutions",
+          submenu: [
+            { role: "showSubstitutions" },
+            { type: "separator" },
+            { role: "toggleSmartQuotes" },
+            { role: "toggleSmartDashes" },
+            { role: "toggleTextReplacement" },
+          ],
+        },
         { label: "Speech", submenu: [{ role: "startSpeaking" }, { role: "stopSpeaking" }] },
       ],
     },
