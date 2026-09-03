@@ -599,12 +599,60 @@ export default function NotesPage() {
     };
   }, [session, applySnapshot]);
 
+  /* ── Coming back ─────────────────────────────────────────────────────────
+     A tab is reloaded a dozen times a day and a desktop window is not: it is
+     opened once and left open for a week, through a closed lid, a changed
+     network and a hotel wifi. A Realtime socket does not survive all of that,
+     and the way it fails is the worst kind — the channel is gone, nothing
+     throws, and the list simply stops hearing that rows have changed. An edit
+     made in the window landed in Postgres with the right stamp on it and the
+     list beside it went on saying what it said yesterday, which reads exactly
+     like the save not working.
+
+     So the window is asked to notice it has come back. Three signals, because
+     no one of them covers the three ways of leaving:
+
+     - `visibilitychange`, for a window that was hidden or a tab in the
+       background.
+     - `online`, for the network returning.
+     - **A clock that jumped**, which is the only one that catches a laptop
+       whose lid was shut: the display slept, the window stayed "visible" the
+       whole time, and nothing else fires. A tick that arrives long after it was
+       due is a machine that was asleep between the two.
+
+     Both halves matter on a wake: the snapshot is read again, because whatever
+     happened while we were away was never announced, and the channel is rebuilt,
+     because the one we had may be listening to nothing. */
+  const [awake, setAwake] = useState(0);
+  useEffect(() => {
+    const wake = () => setAwake((count) => count + 1);
+    const onVisible = () => document.visibilityState === "visible" && wake();
+    const BEAT = 30_000;
+    let last = Date.now();
+    const beat = window.setInterval(() => {
+      const now = Date.now();
+      const slept = now - last > BEAT * 3;
+      last = now;
+      if (slept) wake();
+    }, BEAT);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", wake);
+    return () => {
+      window.clearInterval(beat);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", wake);
+    };
+  }, []);
+
   // ── Realtime subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
+    /* A no-op on the first run: `refreshRemote` stands down until the initial
+       load has landed, and the initial load is the effect above this one. */
+    void refreshRemote();
     const channel = subscribeToArchive(session.archiveId, () => void refreshRemote());
     return () => void unsubscribeFromArchive(channel);
-  }, [session, refreshRemote]);
+  }, [session, refreshRemote, awake]);
 
   /* The account's preferences, in three moves: read the row over whatever this
      browser had, follow the row while another browser is open on it, and push
@@ -766,7 +814,10 @@ export default function NotesPage() {
     refreshRemarks();
     const channel = subscribeToComments(session.archiveId, refreshRemarks);
     return () => void unsubscribeFromArchive(channel);
-  }, [session, refreshRemarks]);
+    /* `awake` for the same reason the archive channel takes it: a socket that
+       died while the machine slept announces nothing, and this one carries the
+       badge. */
+  }, [session, refreshRemarks, awake]);
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
   const unreadRemarkCount = useMemo(

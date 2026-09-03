@@ -856,6 +856,36 @@ not re-gate the broadcast; that is the bug this arrangement exists to end.
 `INSERT` to publish. Postgres Changes subscriptions stay public channels
 filtered by table RLS; `private_only` is not on globally, so they are undisturbed.
 
+## Coming back
+
+A tab is reloaded a dozen times a day. A desktop window is opened once and left
+open for a week, through a closed lid, a changed network and a hotel wifi — and
+a Realtime socket does not survive all of that. The way it fails is the worst
+kind: the channel is gone, nothing throws, and the list simply stops hearing
+that rows have changed.
+
+That is what "editing a note no longer says edited" was, and it took a while to
+find because every part of it was working. `save_note_document` stamped
+`updated_at` correctly, the collaboration server persisted, the content security
+policy allowed the socket (checked by opening one from `app://notes` under the
+packaged policy), and the web app — freshly loaded — showed the change. The
+desktop window, open since the morning, showed yesterday.
+
+So the window is asked to notice it has come back, in `Notes.tsx`. Three
+signals, because no one of them covers the three ways of leaving:
+
+- `visibilitychange`, for a window that was hidden.
+- `online`, for the network returning.
+- **A clock that jumped**, which is the only one that catches a laptop whose
+  lid was shut: the display slept, the window stayed "visible" the whole time,
+  and nothing else fires. A tick that arrives long after it was due is a machine
+  that was asleep between the two.
+
+Both halves matter on a wake. The snapshot is read again, because whatever
+happened while we were away was never announced; and the channels are rebuilt —
+the archive's and the remarks' both — because the ones we had may be listening
+to nothing.
+
 ## Preferences belong to the account
 
 `profile_preferences` is one row per account with one jsonb column, and
