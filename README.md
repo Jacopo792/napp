@@ -51,7 +51,8 @@ other person does not have to use the same setup.
 ```bash
 cp .env.example .env.local
 pnpm install
-pnpm dev
+pnpm dev            # in a browser
+pnpm dev:desktop    # in its own window
 ```
 
 `.env.local` needs these public browser values:
@@ -60,6 +61,9 @@ pnpm dev
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_COLLAB_URL=ws://127.0.0.1:8080
+# Only the desktop build needs this one: where an invitation link has to point,
+# since the link is opened on a machine that may not have the app.
+VITE_WEB_ORIGIN=https://jacopo792.github.io/note-sharing-app/
 ```
 
 Run the collaboration server separately:
@@ -102,14 +106,25 @@ VITE_BASE_PATH=/note-sharing-app/ pnpm build
 - **Offline support:** IndexedDB keeps an already authorised open document usable
   during a disconnect and syncs it after reconnecting.
 
+The repository is a pnpm workspace of two packages and two shells:
+
+- `packages/core/` is the application. Both shells mount it and neither may
+  fork it — `eslint.config.js` forbids the core from importing a shell, and
+  `packages/core/src/platform.ts` is the six-member interface each shell
+  answers instead.
+- `apps/web/` is the browser build, published to GitHub Pages.
+- `apps/desktop/` is the Electron window: `pnpm build:desktop` writes a macOS
+  `.dmg` and a Windows `.exe` into `apps/desktop/release/`. The builds are
+  unsigned, so macOS asks to open the first one from the right-click menu.
+
 The main areas of the repository are:
 
-- `src/routes/notes.tsx` for workspace and note metadata state.
-- `src/components/` for the sidebar, note list and workspace menus.
-- `src/features/editor/` for the editor, comments, imports, attachments and language
+- `packages/core/src/screens/Notes.tsx` for workspace and note metadata state.
+- `packages/core/src/components/` for the sidebar, note list and workspace menus.
+- `packages/core/src/features/editor/` for the editor, comments, imports, attachments and language
   tools.
-- `src/lib/` for sessions, Supabase access, presence, appearance and collaboration.
-- `server/` for the Hocuspocus service, persistence and health checks.
+- `packages/core/src/lib/` for sessions, Supabase access, presence, appearance and collaboration.
+- `packages/collab-server/` for the Hocuspocus service, persistence and health checks.
 - `supabase/migrations/` for the database schema and policies.
 
 Notes are stored as Tiptap JSON with a plain-text projection for search and previews.
