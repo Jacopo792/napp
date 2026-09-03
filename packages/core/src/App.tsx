@@ -13,11 +13,11 @@
  * server under it to answer a deep path. */
 import { StrictMode, useState } from "react";
 import {
+  createHashHistory,
   createRoute,
   createRouter,
   lazyRouteComponent,
   RouterProvider,
-  type RouterHistory,
 } from "@tanstack/react-router";
 import { rootRoute } from "./screens/Root";
 import { initAxes } from "./lib/axes";
@@ -45,8 +45,23 @@ const notesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([loginRoute, notesRoute]);
 
-function createAppRouter(options: { history?: RouterHistory; basepath?: string }) {
-  return createRouter({ routeTree, ...options });
+/** Which history a shell wants, rather than which history object — so a shell
+ *  never imports the router, and the routing stays one thing in one package. */
+export type HistoryKind = "browser" | "hash";
+
+function createAppRouter({ history, basepath }: AppProps) {
+  return createRouter({
+    routeTree,
+    basepath,
+    history: history === "hash" ? createHashHistory() : undefined,
+  });
+}
+
+interface AppProps {
+  /** "hash" for a window with no server under it. Defaults to the browser's
+   *  own history. */
+  history?: HistoryKind;
+  basepath?: string;
 }
 
 declare module "@tanstack/react-router" {
@@ -59,7 +74,7 @@ declare module "@tanstack/react-router" {
  *
  *  The router is built once and kept: it holds the history, and rebuilding it
  *  on a re-render would throw away where the reader is. */
-export function App({ history, basepath }: { history?: RouterHistory; basepath?: string }) {
+export function App({ history, basepath }: AppProps) {
   const [router] = useState(() => createAppRouter({ history, basepath }));
   return (
     <StrictMode>

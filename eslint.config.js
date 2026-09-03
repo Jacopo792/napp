@@ -37,5 +37,46 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  /* The core does not know which shell it is in, and this is what keeps that
+     true after everybody has forgotten it was a decision. A shell-specific
+     import here is not a mistake to be found in review — it is the first
+     branch of a fork, and it fails the build.
+
+     What replaces it is a member on `Platform` (packages/core/src/platform.ts)
+     that both shells implement. */
+  {
+    files: ["packages/core/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "electron",
+                "electron/*",
+                "**/apps/*",
+                "@notes-app/web",
+                "@notes-app/desktop",
+              ],
+              message:
+                "The core may not import a shell. Add a member to Platform in @/platform and let apps/web and apps/desktop each answer it.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  /* The main process and the preload. Node, not a browser, and CommonJS
+     because Electron's main process has no type stripping and no ESM loader
+     for a preload — see the comment at the top of electron/main.js. */
+  {
+    files: ["apps/desktop/electron/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "commonjs",
+      globals: { ...globals.node, Response: "readonly", Headers: "readonly" },
+    },
+  },
   eslintPluginPrettier,
 );

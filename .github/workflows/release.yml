@@ -1,0 +1,75 @@
+# The downloadable app.
+#
+# A matrix and not one job, because electron-builder cannot cross-compile
+# these: a .dmg is made on macOS and an NSIS installer on Windows, and a Ubuntu
+# runner produces neither. This is the only reason the workflow is separate
+# from ci.yml, which builds the renderer on every push and stops there.
+#
+# Unsigned, deliberately, for now. macOS reports an unsigned .dmg as "damaged";
+# it opens from the right-click menu. Signing means an Apple Developer ID and a
+# Windows certificate, and both are secrets somebody has to buy and add —
+# CSC_LINK and CSC_KEY_PASSWORD are where electron-builder reads them, and
+# apps/desktop/electron-builder.yml says what else to remove.
+name: Release the desktop app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: build:desktop:mac
+            artifacts: "apps/desktop/release/*.dmg"
+          - os: windows-latest
+            script: build:desktop:win
+            artifacts: "apps/desktop/release/*.exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The same three repository variables the Pages deploy reads, plus where
+      # an invitation link has to point: the desktop app cannot be the place a
+      # link lands, so it has to know the address of the app that can.
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_COLLAB_URL: ${{ vars.VITE_COLLAB_URL }}
+          VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://jacopo792.github.io/note-sharing-app/' }}
+        run: pnpm run ${{ matrix.script }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes-${{ matrix.os }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+
+      # Only for a tag. A manual run is for finding out whether the build still
+      # works, and it should not invent a release to hang the result on.
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifacts }}
+          draft: true
+          body: |
+            Unsigned builds. On macOS the .dmg has to be opened with
+            right-click → Open the first time, because Gatekeeper reports an
+            unsigned app as damaged.

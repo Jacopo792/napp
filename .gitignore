@@ -45,3 +45,6 @@ yarn.lock
 # versioned on purpose: it runs the whole interface against an in-memory
 # fixture, so anyone can work on the front end without an archive of their own.
 tmp/
+
+# Desktop build output
+apps/*/release/

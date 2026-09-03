@@ -1,0 +1,30 @@
+{
+  "name": "@notes-app/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "Notes — a shared archive for two",
+  "author": "Jacopo792",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -s first \"vite dev\" \"wait-on tcp:5174 && electron .\"",
+    "build:renderer": "vite build",
+    "build": "pnpm build:renderer && electron-builder --mac --win --publish never",
+    "build:mac": "pnpm build:renderer && electron-builder --mac --publish never",
+    "build:win": "pnpm build:renderer && electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "@notes-app/core": "workspace:*",
+    "@tailwindcss/vite": "^4.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.1.2",
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.2.1",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^6.0.2",
+    "wait-on": "^8.0.2"
+  }
+}

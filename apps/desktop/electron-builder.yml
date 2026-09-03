@@ -1,0 +1,39 @@
+appId: com.jacopo792.notes
+productName: Notes
+copyright: © Jacopo792 · GPL-3.0-or-later
+
+directories:
+  output: release
+  buildResources: build
+
+# The renderer is bundled and the main process imports nothing but `electron`
+# and `node:`, so the app carries no node_modules at all — which is also why
+# every dependency of this package is a devDependency. electron-builder ships
+# whatever is in `dependencies`, and leaving React and Tiptap there put a
+# second, unused copy of the whole application inside the asar: a 410 MB app
+# around a 2 MB bundle.
+files:
+  - dist/**
+  - electron/**
+  - package.json
+
+# Unsigned, deliberately and for now. macOS reports an unsigned .dmg as
+# "damaged"; it opens from the right-click menu. Signing needs an Apple
+# Developer ID and a Windows certificate — set CSC_LINK / CSC_KEY_PASSWORD and
+# delete the two `identity: null` lines below and this becomes a signed build
+# without any other change.
+mac:
+  category: public.app-category.productivity
+  identity: null
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
