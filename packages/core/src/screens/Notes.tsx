@@ -837,6 +837,17 @@ export default function NotesPage() {
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   const selected = visible.find((e) => e.note.id === selectedId) ?? null;
+
+  /* The window is named after what is open in it. A Mac window's title is not
+     decoration — it is what Mission Control, the Window menu and ⌘Tab's preview
+     have to go on, and a row of windows all called "Napp" is a row of windows
+     you have to open to tell apart. Free in the browser too, where it is the
+     tab's name. */
+  useEffect(() => {
+    const name = selected?.note.title.trim();
+    document.title = name ? `${name} — Napp` : "Napp";
+  }, [selected]);
+
   const selfMember = members.find((member) => member.isSelf);
   const canWriteArchive = selfMember?.role === "editor";
   /* A question about the archive and the note — your role, and whether this is
