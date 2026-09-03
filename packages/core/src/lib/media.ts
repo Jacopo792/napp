@@ -16,6 +16,24 @@ export function useIsCompact(): boolean {
   );
 }
 
+/** How wide the window is, as something a render can depend on.
+ *
+ *  Reading `window.innerWidth` during a render is reading a value nothing
+ *  subscribes to: it is right on the first paint and then wrong for the rest of
+ *  the session, because resizing a window is not a reason React re-renders.
+ *  That is how the panes kept the widths they were stored with while the window
+ *  shrank underneath them, and the writing column took the whole difference. */
+export function useWindowWidth(): number {
+  return useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener("resize", onChange);
+      return () => window.removeEventListener("resize", onChange);
+    },
+    () => window.innerWidth,
+    () => 1280,
+  );
+}
+
 /* ── Stored pictures, resolved once ──────────────────────────────────────────
    A note photo is shown by every row that names the note and by the page
    itself, so the object URL belongs to the object rather than to whichever

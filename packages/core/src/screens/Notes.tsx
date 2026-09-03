@@ -117,7 +117,7 @@ import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
-import { forgetStoredImage, useIsCompact } from "@/lib/media";
+import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import { announceTyping, useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
 import { useAutoLock } from "@/lib/autoLock";
 import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
@@ -201,6 +201,7 @@ export default function NotesPage() {
      translucency belongs only to temporary overlays. */
   const navigate = useNavigate();
   const compact = useIsCompact();
+  const windowWidth = useWindowWidth();
 
   const [session, setSession] = useState<AppSession | null>(null);
   /** The scope on screen, which is a member id. Empty until the session and
@@ -2861,17 +2862,24 @@ export default function NotesPage() {
       />
     ) : null;
 
-  /* Always leave a useful writing surface. On narrower desktop windows the
-     handles stop before either navigation pane can consume the editor. */
+  /* ── Always leave a useful writing surface ──────────────────────────────
+     The handles already stopped before either navigation pane could eat the
+     editor. What they could not stop is the window itself getting smaller: a
+     pane keeps the width it was stored with, so shrinking the window took the
+     whole difference out of the note — at 900px the writing column was 232px
+     and everything in its toolbar was on top of everything else, which is the
+     "squashed in miniature" report.
+
+     So the *shown* widths are clamped to the room there is, and the stored ones
+     are left alone: widen the window again and the panes come back to where
+     they were put. The list gives ground first, because it is a preview column
+     and the folders are a fixed vocabulary that either fits or does not. */
   const editorReserve = 380;
-  const sidebarMax = Math.max(
-    SIDEBAR_MIN,
-    Math.min(SIDEBAR_MAX, window.innerWidth - listWidth - editorReserve - 28),
-  );
-  const listMax = Math.max(
-    LIST_MIN,
-    Math.min(LIST_MAX, window.innerWidth - sidebarWidth - editorReserve - 28),
-  );
+  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 28);
+  const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
+  const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
+  const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
+  const listMax = Math.max(LIST_MIN, Math.min(LIST_MAX, room - sidebarShown));
 
   if (compact) {
     return (
@@ -3052,7 +3060,7 @@ export default function NotesPage() {
             className={`pane-slide ${navigationOpen ? "" : "is-collapsed"} ${
               navigationSliding ? "is-sliding" : ""
             }`}
-            style={{ width: navigationOpen ? sidebarWidth + listWidth + 20 : 0 }}
+            style={{ width: navigationOpen ? sidebarShown + listShown + 20 : 0 }}
             aria-hidden={!navigationOpen}
             inert={!navigationOpen}
             onTransitionEnd={(event) => {
@@ -3061,20 +3069,20 @@ export default function NotesPage() {
           >
             <div
               className="pane-slide-track flex h-full min-h-0"
-              style={{ width: sidebarWidth + listWidth + 20 }}
+              style={{ width: sidebarShown + listShown + 20 }}
             >
-              <div className="pane-frame" style={{ width: sidebarWidth }}>
+              <div className="pane-frame" style={{ width: sidebarShown }}>
                 {sidebar}
               </div>
               <PaneResizer
                 label="Resize folders sidebar"
-                value={sidebarWidth}
+                value={sidebarShown}
                 min={SIDEBAR_MIN}
                 max={sidebarMax}
                 defaultValue={SIDEBAR_DEFAULT}
                 onChange={setSidebarWidth}
               />
-              <div className="pane-frame" style={{ width: listWidth }}>
+              <div className="pane-frame" style={{ width: listShown }}>
                 <NoteList
                   entries={visible}
                   groups={noteGroups}
@@ -3107,7 +3115,7 @@ export default function NotesPage() {
               </div>
               <PaneResizer
                 label="Resize notes list"
-                value={listWidth}
+                value={listShown}
                 min={LIST_MIN}
                 max={listMax}
                 defaultValue={LIST_DEFAULT}
