@@ -200,11 +200,25 @@ a note leaves it the moment its last thread is dealt with. Opening a note from
 there opens its conversation with it.
 
 The badge counts remarks _somebody else_ wrote, in an open thread, since this
-browser last opened their note. The line it compares against is a timestamp
-**per note** in `localStorage`, not a column: it is a fact about a device
-looking rather than about the archive, and a set of read ids is a thing nobody
-ever finishes pruning. A new device therefore starts with everything unread,
-which is the right answer for it.
+account last opened their note. The line is a timestamp **per note**, and it
+belongs to the **account**: it travels in `profile_preferences` with everything
+else in _Preferences belong to the account_ below, with `localStorage` as the
+device's cache for the first paint.
+
+It was per device once, on the argument that a device looking is what it
+records. It is not — having read a conversation is something a person did — and
+the way that showed was installing the desktop app: it had read nothing, so it
+put a badge on every conversation already read in the browser, and there was no
+way to clear it but opening every note again. The web app said nothing was
+waiting and the desktop app said something was, about the same archive, at the
+same moment.
+
+`mergeRemarksSeen` is the **one field in that blob that is not
+last-write-wins**, and it has to be: a watermark's answer to "which of these two
+is right" is neither, it is the further one. A device that has read nothing must
+not un-read what the other one read. Its keys come out sorted, because the push
+guard compares `JSON.stringify` output and insertion order is part of that
+string.
 
 Opening the note is what moves that note's line — not looking at the list,
 which is what moved the single archive-wide line this used to keep. One line
@@ -879,8 +893,11 @@ the middle term is the subtlety — a field the row does not carry keeps the
 **local** value, never the default, or signing in on the browser you have used
 for a year would undo a year of choices on the strength of an empty column.
 
-What stays local, deliberately: pane widths, collapsed groups, expanded folders
-and the per-note remarks-seen stamps. Those are facts about a device looking.
+What stays local, deliberately: pane widths, collapsed groups and expanded
+folders. Those are facts about a device looking. The remarks-seen stamps were on
+that list and are not any more; see _Remarks, and knowing one is waiting_ above
+for why, and `mergeRemarksSeen` for the one merge rule in the blob that is not
+last-write-wins.
 
 ## Migrations
 

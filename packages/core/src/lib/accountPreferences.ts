@@ -19,9 +19,16 @@
  *   next sign-in. Our own write comes back too and is recognised by its
  *   payload rather than by a flag, which is what keeps a loop from starting.
  *
- * What stays local, deliberately: pane widths, collapsed groups, the expanded
- * folders and the per-note "remarks I have seen" stamps. Those are facts about
- * a device looking at the archive, not about the person reading it. */
+ * What stays local, deliberately: pane widths, collapsed groups and the
+ * expanded folders. Those are facts about a device looking at the archive.
+ *
+ * The per-note "remarks I have seen" stamps used to be on that list, on the
+ * argument that a device looking is what they record. They are not: having read
+ * a conversation is something a *person* did, and keeping it per device meant
+ * installing the desktop app produced a badge for every remark already read in
+ * the browser — with no way to clear it but opening every note again. So they
+ * travel in the blob, and they are the one field in it that is not
+ * last-write-wins; see `mergeRemarksSeen`. */
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   loadProofreaderPreference,
@@ -43,8 +50,10 @@ import {
   DEFAULT_FLAGS,
   flagsOf,
   mergeAccountPreferences,
+  mergeRemarksSeen,
   type AccountFlags,
   type AccountPreferences,
+  type RemarksSeen,
 } from "./preferenceShape.ts";
 import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
@@ -54,7 +63,7 @@ import {
   subscribeToWritingPreferences,
 } from "./writingPreferences";
 
-export { DEFAULT_FLAGS, flagsOf };
+export { DEFAULT_FLAGS, flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "./preferenceShape.ts";
 
 /** What this browser holds right now: what a fresh account's first push
@@ -62,18 +71,74 @@ export type { AccountFlags, AccountPreferences } from "./preferenceShape.ts";
 /** The live stores, plus the flags the caller is holding — assembled through
  *  the one constructor, so what is written and what was read are the same
  *  shape as well as the same values. */
-export function preferencesWith(flags: AccountFlags): AccountPreferences {
-  return accountPreferences(currentAppearance(), currentAxes(), currentWritingPreferences(), flags);
+export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}): AccountPreferences {
+  return accountPreferences(
+    currentAppearance(),
+    currentAxes(),
+    currentWritingPreferences(),
+    flags,
+    seen,
+  );
 }
 
 /** What this browser holds right now: what a field the row does not carry
  *  falls back to, and what a fresh account's first change writes. */
-export function localPreferences(): AccountPreferences {
-  return preferencesWith({
-    ...DEFAULT_FLAGS,
-    proofreader: loadProofreaderPreference(),
-    autoLock: loadAutoLock(),
-  });
+export function localPreferences(seen: RemarksSeen = {}): AccountPreferences {
+  return preferencesWith(
+    {
+      ...DEFAULT_FLAGS,
+      proofreader: loadProofreaderPreference(),
+      autoLock: loadAutoLock(),
+    },
+    seen,
+  );
+}
+
+/* This device's copy of the read line, so the first paint has one before the
+   row arrives. A cache and never the authority — same standing as the
+   wallpaper's object id below. Keyed by account and not by archive: a note id
+   is a uuid, so there is nothing for an archive to disambiguate. */
+const seenKey = (userId: string) => `napp:remarks-seen:${userId}`;
+
+function seenAt(key: string): RemarksSeen {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored)
+      ? (stored as RemarksSeen)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export function heldRemarksSeen(userId: string): RemarksSeen {
+  const held = seenAt(seenKey(userId));
+  if (Object.keys(held).length > 0) return held;
+  /* The line used to be kept per archive as well as per account. Dropping the
+     archive from the key is correct — a note id is a uuid — but a browser that
+     had read everything would come back from this change with everything
+     unread, which is the report this change exists to answer. So the old keys
+     are taken in on the way past. They can be several: one archive each, and
+     they merge because a note is only ever in one of them. */
+  let carried: RemarksSeen = {};
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("napp:remarks-seen:") && key.endsWith(`:${userId}`))
+        carried = mergeRemarksSeen(carried, seenAt(key));
+    }
+  } catch {
+    /* No storage to read, which is the same as nothing having been read. */
+  }
+  return carried;
+}
+
+function holdRemarksSeen(userId: string, seen: RemarksSeen): void {
+  try {
+    localStorage.setItem(seenKey(userId), JSON.stringify(seen));
+  } catch {
+    /* A browser refusing storage costs the first paint's copy, not the row. */
+  }
 }
 
 /** Hand the stores their values without echoing a write back up. The setters
@@ -168,9 +233,13 @@ export async function pullAccountPreferences(session: AppSession): Promise<Accou
     .maybeSingle();
   fail(result.error);
   const stored = (result.data as { preferences: unknown } | null)?.preferences;
-  const preferences = mergeAccountPreferences(stored, localPreferences());
+  const preferences = mergeAccountPreferences(
+    stored,
+    localPreferences(heldRemarksSeen(session.userId)),
+  );
   settled = JSON.stringify(preferences);
   apply(preferences);
+  holdRemarksSeen(session.userId, preferences.remarksSeen);
   /* The picture is a download, so it lands after the colours do rather than
      holding them up — and a failure leaves this device on its own copy. */
   void collectWallpaper(session, preferences.appearance.wallpaperObject).catch(() => undefined);
@@ -185,6 +254,7 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   const blob = JSON.stringify(preferences);
   if (blob === settled) return;
   settled = blob;
+  holdRemarksSeen(session.userId, preferences.remarksSeen);
   window.clearTimeout(pending);
   pending = window.setTimeout(() => void write(session, preferences), 500);
 }
@@ -257,11 +327,15 @@ export function subscribeToAccountPreferences(
       },
       (payload) => {
         const stored = (payload.new as { preferences?: unknown } | null)?.preferences;
-        const preferences = mergeAccountPreferences(stored, localPreferences());
+        const preferences = mergeAccountPreferences(
+          stored,
+          localPreferences(heldRemarksSeen(session.userId)),
+        );
         const blob = JSON.stringify(preferences);
         if (blob === settled) return;
         settled = blob;
         apply(preferences);
+        holdRemarksSeen(session.userId, preferences.remarksSeen);
         void collectWallpaper(session, preferences.appearance.wallpaperObject).catch(
           () => undefined,
         );

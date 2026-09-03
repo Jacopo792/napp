@@ -7,6 +7,7 @@ import {
   DEFAULT_FLAGS,
   flagsOf,
   mergeAccountPreferences,
+  mergeRemarksSeen,
 } from "./preferenceShape.ts";
 import { DEFAULT_WRITING_PREFERENCES } from "./writingPreferences.ts";
 
@@ -16,6 +17,7 @@ const local = accountPreferences(
   { ...DEFAULT_AXES, size: 21 },
   { ...DEFAULT_WRITING_PREFERENCES, presencePalette: "mint" as const },
   { ...DEFAULT_FLAGS, proofreader: false, autoLock: 15 as const },
+  { n1: "2026-09-01T10:00:00.000Z" },
 );
 
 test("an empty row leaves this browser exactly as it was", () => {
@@ -81,6 +83,63 @@ test("a browser's own values survive being merged and pushed back unchanged", ()
      which keeps insertion order — so the same values in a different order are
      a different string and every mount rewrites the row it just read. */
   const pulled = mergeAccountPreferences({}, local);
-  const pushed = accountPreferences(local.appearance, local.axes, local.writing, flagsOf(pulled));
+  const pushed = accountPreferences(
+    local.appearance,
+    local.axes,
+    local.writing,
+    flagsOf(pulled),
+    pulled.remarksSeen,
+  );
   assert.equal(JSON.stringify(pushed), JSON.stringify(pulled));
+});
+
+/* ── The read line, which is the one field that is not last-write-wins ──────
+   A watermark: the answer to "which of these two devices is right" is neither,
+   it is the further one. This is what an installed desktop app got wrong — it
+   had read nothing, so it showed a badge for every conversation the browser had
+   already been through, and there was no way to clear it but opening every note
+   again. */
+test("two devices' readings are merged note by note, taking the later", () => {
+  const merged = mergeRemarksSeen(
+    { read: "2026-09-01T00:00:00.000Z", mineOnly: "2026-09-02T00:00:00.000Z" },
+    { read: "2026-09-03T00:00:00.000Z", theirsOnly: "2026-09-04T00:00:00.000Z" },
+  );
+  assert.deepEqual(merged, {
+    mineOnly: "2026-09-02T00:00:00.000Z",
+    read: "2026-09-03T00:00:00.000Z",
+    theirsOnly: "2026-09-04T00:00:00.000Z",
+  });
+});
+
+test("a device that has read nothing does not un-read the account's line", () => {
+  const line = { n1: "2026-09-01T00:00:00.000Z" };
+  assert.deepEqual(mergeRemarksSeen({}, line), line);
+  assert.deepEqual(mergeRemarksSeen(line, {}), line);
+});
+
+test("the merged line has the same key order whichever side it came from", () => {
+  const a = { b: "2026-09-01T00:00:00.000Z", a: "2026-09-01T00:00:00.000Z" };
+  const b = { a: "2026-09-01T00:00:00.000Z", b: "2026-09-01T00:00:00.000Z" };
+  assert.equal(JSON.stringify(mergeRemarksSeen(a, b)), JSON.stringify(mergeRemarksSeen(b, a)));
+});
+
+/* The row over what this browser holds, for the line as for everything else —
+   except that here "over" means the later of the two rather than the row's. */
+test("the account's line and this device's are both kept after a pull", () => {
+  const pulled = mergeAccountPreferences(
+    { remarksSeen: { n2: "2026-09-05T00:00:00.000Z" } },
+    local,
+  );
+  assert.deepEqual(pulled.remarksSeen, {
+    n1: "2026-09-01T10:00:00.000Z",
+    n2: "2026-09-05T00:00:00.000Z",
+  });
+});
+
+test("a row with no line at all leaves this device's alone", () => {
+  assert.deepEqual(mergeAccountPreferences({}, local).remarksSeen, local.remarksSeen);
+  assert.deepEqual(
+    mergeAccountPreferences({ remarksSeen: "nonsense" }, local).remarksSeen,
+    local.remarksSeen,
+  );
 });

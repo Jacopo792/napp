@@ -71,6 +71,8 @@ import {
   DEFAULT_FLAGS,
   flagsOf,
   localPreferences,
+  heldRemarksSeen,
+  mergeRemarksSeen,
   preferencesWith,
   pullAccountPreferences,
   pushAccountPreferences,
@@ -297,6 +299,16 @@ export default function NotesPage() {
      the other browser moves one. `writingPreferences`, the appearance and the
      axes ride along in `accountPreferences.ts`, which watches their stores. */
   const [flags, setFlags] = useState<AccountFlags>(DEFAULT_FLAGS);
+  /* Which conversations this account has read, note by note. Held here beside
+     the flags because it travels in the same blob and is pushed by the same
+     effect; the archive-wide reading of it is further down. */
+  const [remarksSeen, setRemarksSeen] = useState<RemarksSeen>({});
+
+  /* This device's copy, for the first paint. The account's row lands on top of
+     it a moment later, in the preferences effect below. */
+  useEffect(() => {
+    setRemarksSeen(session ? heldRemarksSeen(session.userId) : {});
+  }, [session]);
   const writingPreferences = useWritingPreferences();
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
@@ -607,10 +619,13 @@ export default function NotesPage() {
       .then((preferences) => {
         if (!live) return;
         setFlags(flagsOf(preferences));
+        setRemarksSeen((current) => mergeRemarksSeen(current, preferences.remarksSeen));
         setPreferencesReady(true);
       });
     const channel = subscribeToAccountPreferences(session, (preferences) => {
-      if (live) setFlags(flagsOf(preferences));
+      if (!live) return;
+      setFlags(flagsOf(preferences));
+      setRemarksSeen((current) => mergeRemarksSeen(current, preferences.remarksSeen));
     });
     return () => {
       live = false;
@@ -625,10 +640,10 @@ export default function NotesPage() {
      about to read. */
   useEffect(() => {
     if (!session || !preferencesReady) return;
-    const push = () => pushAccountPreferences(session, preferencesWith(flags));
+    const push = () => pushAccountPreferences(session, preferencesWith(flags, remarksSeen));
     push();
     return watchLocalStores(push);
-  }, [session, preferencesReady, flags]);
+  }, [session, preferencesReady, flags, remarksSeen]);
 
   useEffect(() => {
     if (!session || !preferencesReady || !flags.presence) {
@@ -718,37 +733,13 @@ export default function NotesPage() {
      whole archive could only be moved by looking at the list, which left the
      dot up after you had read the one remark under it. */
   const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
-  const remarksSeenKey = session ? `napp:remarks-seen:${session.archiveId}:${session.userId}` : "";
-  const [remarksSeen, setRemarksSeen] = useState<RemarksSeen>({});
-
-  useEffect(() => {
-    if (!remarksSeenKey) return;
-    try {
-      const stored: unknown = JSON.parse(localStorage.getItem(remarksSeenKey) ?? "{}");
-      /* Anything else is the archive-wide string this used to hold. Either
-         way the notes are unread until they are opened. */
-      setRemarksSeen(stored && typeof stored === "object" ? (stored as RemarksSeen) : {});
-    } catch {
-      setRemarksSeen({});
-    }
-  }, [remarksSeenKey]);
-
-  /* Reading a note is having read its remarks. */
-  const markRemarksSeen = useCallback(
-    (noteId: string) => {
-      if (!remarksSeenKey) return;
-      setRemarksSeen((current) => {
-        const next = { ...current, [noteId]: new Date().toISOString() };
-        try {
-          localStorage.setItem(remarksSeenKey, JSON.stringify(next));
-        } catch {
-          /* A browser refusing storage costs the dot, not the remarks. */
-        }
-        return next;
-      });
-    },
-    [remarksSeenKey],
-  );
+  /* Reading a note is having read its remarks. Written to the account, not to
+     this browser: it is a thing the person did, and a badge that says "unread"
+     for every conversation already read on the other device is a badge nobody
+     can clear. The push effect below carries it up. */
+  const markRemarksSeen = useCallback((noteId: string) => {
+    setRemarksSeen((current) => ({ ...current, [noteId]: new Date().toISOString() }));
+  }, []);
 
   /* One read per burst, not one per row. Realtime announces every insert,
      update and delete on `note_comments` separately, and a resolved thread of

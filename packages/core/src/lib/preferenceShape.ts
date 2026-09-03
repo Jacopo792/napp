@@ -10,6 +10,8 @@ import { DEFAULT_APPEARANCE, type Appearance } from "./appearance.ts";
 import { AUTO_LOCK_CHOICES, type AutoLockMinutes } from "./autoLock.ts";
 import { DEFAULT_AXES, type Axes } from "./axes.ts";
 import { PRESENCE_PALETTES, type WritingPreferences } from "./writingPreferences.ts";
+export type { RemarksSeen } from "./commentThreads.ts";
+import type { RemarksSeen } from "./commentThreads.ts";
 
 /** The switches that have no store of their own. */
 export interface AccountFlags {
@@ -29,6 +31,35 @@ export interface AccountPreferences extends AccountFlags {
   appearance: Appearance;
   axes: Axes;
   writing: WritingPreferences;
+  remarksSeen: RemarksSeen;
+}
+
+/**
+ * The later of two readings, note by note.
+ *
+ * The one place in this blob that is not last-write-wins, and it has to be:
+ * this is a watermark, so the answer to "which of these two is right" is
+ * neither — it is the further one. Two devices that have each read different
+ * conversations have both read them, and a device that has read none of them
+ * must not un-read the other's.
+ *
+ * The keys come out sorted, because the write guard compares `JSON.stringify`
+ * output and insertion order is part of that string: unsorted, the same map
+ * assembled from two directions is two different blobs and the guard never
+ * matches.
+ *
+ * ponytail: nothing prunes a note that has been deleted for good. It is one
+ * short string per note ever opened; sweep it against the catalogue if an
+ * archive ever gets big enough for that to matter.
+ */
+export function mergeRemarksSeen(a: RemarksSeen, b: RemarksSeen): RemarksSeen {
+  const merged: RemarksSeen = {};
+  for (const noteId of [...new Set([...Object.keys(a), ...Object.keys(b)])].sort()) {
+    const mine = a[noteId] ?? "";
+    const theirs = b[noteId] ?? "";
+    merged[noteId] = mine > theirs ? mine : theirs;
+  }
+  return merged;
 }
 
 export const DEFAULT_FLAGS: AccountFlags = {
@@ -74,8 +105,9 @@ export function accountPreferences(
   axes: Axes,
   writing: WritingPreferences,
   flags: AccountFlags,
+  remarksSeen: RemarksSeen,
 ): AccountPreferences {
-  return { appearance, axes, writing, ...flagsOf(flags) };
+  return { appearance, axes, writing, remarksSeen, ...flagsOf(flags) };
 }
 
 function isAutoLock(value: unknown): value is AutoLockMinutes {
@@ -113,5 +145,13 @@ export function mergeAccountPreferences(
       proofreader: typeof row.proofreader === "boolean" ? row.proofreader : local.proofreader,
       autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
     },
+    mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
   );
+}
+
+function asSeen(value: unknown): RemarksSeen {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const seen: RemarksSeen = {};
+  for (const [noteId, at] of Object.entries(value)) if (typeof at === "string") seen[noteId] = at;
+  return seen;
 }
