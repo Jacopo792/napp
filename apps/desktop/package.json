@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -k -s first \"vite dev\" \"wait-on tcp:5174 && electron .\"",
     "build:renderer": "vite build",
-    "build": "pnpm build:renderer && electron-builder --mac --win --publish never",
+    "build": "pnpm build:renderer && electron-builder --publish never",
     "build:mac": "pnpm build:renderer && electron-builder --mac --publish never",
     "build:win": "pnpm build:renderer && electron-builder --win --publish never"
   },

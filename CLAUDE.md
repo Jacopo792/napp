@@ -358,9 +358,15 @@ null` line in `apps/desktop/electron-builder.yml`, and nothing else changes.
 
 `.github/workflows/release.yml` builds the installers on a tag, from a matrix
 of `macos-latest` and `windows-latest`, because electron-builder cannot
-cross-compile these: a Ubuntu runner produces neither a `.dmg` nor an NSIS
-installer. `ci.yml` builds the desktop _renderer_ on every push and stops
-there.
+cross-compile these. `ci.yml` builds the desktop _renderer_ on every push and
+stops there.
+
+**`pnpm build:desktop` builds for the machine it is run on, and that is not
+timidity.** Asked for `--win` on an Apple Silicon Mac it packs `win-unpacked/`
+correctly and then dies on `makensis: spawn Unknown system error -86` —
+EBADARCH, because the NSIS binary electron-builder fetches is x86_64. There is
+no arrangement of flags that fixes it; the Windows installer is made on a
+Windows runner, which is what the matrix is for.
 
 ## Deployment
 
