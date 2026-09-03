@@ -60,6 +60,7 @@ import { attachmentExtension } from "@/features/editor/lib/attachments";
 import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
+import { platform } from "@/platform";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
 import type * as Y from "yjs";
@@ -689,37 +690,20 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
   }
 
   function open() {
-    const openedTab = window.open("", "_blank");
     setStatus("Opening…");
-    void resolve()
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        if (openedTab) {
-          openedTab.location.replace(url);
-          openedTab.opener = null;
-        }
-        setStatus(
-          openedTab
-            ? "Private attachment · opens in a new tab"
-            : "Allow pop-ups to open this attachment",
-        );
-        window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
-      })
-      .catch(() => openedTab?.close());
+    /* `resolve` is passed rather than awaited: a browser has to claim the new
+       tab inside this click, and only the shell knows whether it needs to. */
+    void platform()
+      .openFile(label, resolve)
+      .then((hint) => setStatus(hint ?? "Private attachment · opens in a new tab"))
+      .catch(() => undefined);
   }
 
   function download() {
     setStatus("Preparing download…");
     void resolve()
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = label;
-        anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-        setStatus("Private attachment · opens in a new tab");
-      })
+      .then((blob) => platform().saveFile(label, blob))
+      .then(() => setStatus("Private attachment · opens in a new tab"))
       .catch(() => undefined);
   }
 

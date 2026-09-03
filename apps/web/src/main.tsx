@@ -5,6 +5,10 @@
  * the moment the two shells started to diverge. */
 import { createRoot } from "react-dom/client";
 import { App } from "@notes-app/core";
+import { setPlatform } from "@notes-app/core/platform";
+import { webPlatform } from "./platform.web";
 import "@notes-app/core/styles.css";
+
+setPlatform(webPlatform);
 
 createRoot(document.getElementById("root")!).render(<App basepath={import.meta.env.BASE_URL} />);

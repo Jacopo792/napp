@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
 import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
+import { platform } from "@/platform";
 import logoUrl from "../assets/logo-n-botanical-transparent.png";
 
 type Mode = "sign-in" | "sign-up";
@@ -47,7 +48,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const invited = Boolean(new URL(window.location.href).searchParams.get("invite"));
+  const invited = Boolean(platform().inviteToken());
   const copy = COPY[mode];
 
   function switchMode(next: Mode) {
@@ -72,7 +73,7 @@ export default function Login() {
           return;
         }
       } else {
-        const inviteToken = new URL(window.location.href).searchParams.get("invite") ?? undefined;
+        const inviteToken = platform().inviteToken();
         const result = await authenticate(email.trim(), password, inviteToken);
         if (!result.session) {
           setArchiveChoice({ account: result.account, archives: result.archives });

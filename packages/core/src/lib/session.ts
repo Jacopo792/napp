@@ -4,6 +4,7 @@
    loads before you can type a password. This module is the login screen's
    entire back end and must stay editor-free. */
 import { supabase } from "./supabaseClient";
+import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
 
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
@@ -162,8 +163,8 @@ export async function registerAccount(
   email: string,
   password: string,
 ): Promise<RegistrationResult> {
-  const redirect = new URL(import.meta.env.BASE_URL, window.location.origin);
-  const inviteToken = new URL(window.location.href).searchParams.get("invite");
+  const redirect = new URL(platform().webOrigin());
+  const inviteToken = platform().inviteToken();
   if (inviteToken) redirect.searchParams.set("invite", inviteToken);
   const emailRedirectTo = redirect.toString();
   const { data, error } = await supabase.auth.signUp({

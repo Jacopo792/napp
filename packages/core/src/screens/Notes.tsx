@@ -106,13 +106,12 @@ import {
 import { projectDocument } from "@/features/editor/lib/ydoc";
 import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
 import {
-  downloadText,
   exportFileName,
-  exportMarkdown,
   markdownToNote,
   noteToMarkdown,
   uniqueFileNames,
 } from "@/features/editor/lib/exchange";
+import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { attachmentType } from "@/features/editor/lib/attachments";
@@ -1476,7 +1475,10 @@ export default function NotesPage() {
   const handleExportMarkdown = useCallback(
     (entry: NoteEntry) => {
       const draft = readDraft(entry.note.id);
-      downloadText(exportFileName(draft?.title ?? entry.note.title), markdownFor(entry));
+      void platform().saveFile(
+        exportFileName(draft?.title ?? entry.note.title),
+        markdownFor(entry),
+      );
     },
     [markdownFor],
   );
@@ -1491,7 +1493,7 @@ export default function NotesPage() {
       list.map((entry) => readDraft(entry.note.id)?.title ?? entry.note.title),
     );
     try {
-      const shape = await exportMarkdown(
+      const shape = await platform().saveFolder(
         list.map((entry, index) => ({ name: names[index], text: markdownFor(entry) })),
         `${folderLabel}.md`,
       );
@@ -2759,7 +2761,7 @@ export default function NotesPage() {
         onAvatarRemove={() => void handleAvatarRemove()}
         onCreateInvite={async (email) => {
           const token = await createArchiveInvite(session, email);
-          const link = new URL(import.meta.env.BASE_URL, window.location.origin);
+          const link = new URL(platform().webOrigin());
           link.searchParams.set("invite", token);
           await refreshInvites();
           return link.toString();
@@ -2820,7 +2822,7 @@ export default function NotesPage() {
           }}
           onCopyMarkdown={() => void handleCopyMarkdown(selected)}
           onExportMarkdown={() => handleExportMarkdown(selected)}
-          onPrint={() => window.print()}
+          onPrint={() => void platform().print()}
           onTogglePin={() => handleTogglePin(selected.note.id)}
           onFind={() => noteEditorRef.current?.openFind()}
           onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
@@ -2850,7 +2852,7 @@ export default function NotesPage() {
         }}
         onCopyMarkdown={() => void handleCopyMarkdown(selected)}
         onExportMarkdown={() => handleExportMarkdown(selected)}
-        onPrint={() => window.print()}
+        onPrint={() => void platform().print()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
