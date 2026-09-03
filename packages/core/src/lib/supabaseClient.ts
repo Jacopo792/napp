@@ -7,7 +7,10 @@ const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
  * do not need to depend on the archive loading and note persistence layer. */
 export const supabase = createClient(url, publishableKey, {
   auth: {
-    storage: typeof window === "undefined" ? undefined : window.sessionStorage,
+    /* `sessionStorage` is erased with an Electron window, which made closing
+       the desktop app indistinguishable from signing out. The refresh token is
+       kept in this origin's local storage and revoked on explicit sign-out. */
+    storage: typeof window === "undefined" ? undefined : window.localStorage,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,

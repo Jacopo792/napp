@@ -10,7 +10,7 @@ import { clearNoteStore, resetArchiveCache } from "./noteStore";
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
    a plaintext column and every stored object carries its real content type, so
    there is no longer a key to unwrap, nothing to decrypt on read, and — the
-   part that mattered — no raw archive key sitting in sessionStorage for a
+   part that mattered — no raw archive key sitting in browser storage for a
    format nothing writes any more. `scripts/` keeps the tools that performed the
    conversion, and `scripts/lib/crypto.ts` exists for them alone. */
 
@@ -64,7 +64,7 @@ async function ensureProfile(userId: string, email: string): Promise<void> {
 
 function storeSession(userId: string, email: string, archiveId: string): AppSession {
   const stored: StoredSession = { userId, email, archiveId };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
   resetArchiveCache();
   return stored;
 }
@@ -132,7 +132,7 @@ export async function authenticate(
   try {
     return await openAccount(data.user.id, data.user.email ?? email, inviteToken);
   } catch (reason) {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
     await supabase.auth.signOut({ scope: "local" });
     if (reason instanceof Error && reason.message.toLowerCase().includes("invitation"))
@@ -179,12 +179,12 @@ export async function registerAccount(
     return { session: result.session, confirmationRequired: false };
   }
 
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
   return { session: null, confirmationRequired: true };
 }
 
 export async function restoreSession(): Promise<AppSession | null> {
-  const raw = sessionStorage.getItem(SESSION_KEY);
+  const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
     const stored = JSON.parse(raw) as StoredSession;
@@ -192,13 +192,13 @@ export async function restoreSession(): Promise<AppSession | null> {
     if (error || !data.user || data.user.id !== stored.userId) throw new Error("Session expired");
     return stored;
   } catch {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
 
 export async function clearSession(): Promise<void> {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();
   /* The in-memory cache goes with the tab; the one on disk has to be asked.
      Signing out is the moment the archive's words stop being welcome here. */

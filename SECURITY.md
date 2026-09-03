@@ -80,9 +80,10 @@ into `private.redeem_archive_invite()`.
 
 The desktop window is the same application in an Electron shell, and the shell
 adds no privilege to it. The renderer runs with `contextIsolation`, `sandbox`
-and no Node integration; the preload exposes three functions — save a file, show
-a file, print — and a one-way channel that lets the menu bar dispatch a
-keystroke. It does not load `file://`: the built renderer is served from a
+and no Node integration; the preload exposes three file functions — save a
+file, show a file, print — plus one-way cosmetic colour and menu-command
+channels. The main process validates the colour before it can paint the Windows
+title bar. It does not load `file://`: the built renderer is served from a
 registered `app://notes` scheme, both because the collaboration server refuses a
 socket whose origin it does not know and because a `file://` page is not a secure
 context and therefore has no IndexedDB. A content security policy written into

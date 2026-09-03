@@ -11,13 +11,15 @@ import { desktopPlatform } from "./platform.desktop";
 
 setPlatform(desktopPlatform);
 
-/* What the stylesheet needs to know about the window it is in, and the whole of
-   it: whether there is a title bar to keep out of the way of, and whether that
-   title bar is the macOS one with the three buttons at the left. A tab carries
-   neither, so every rule keyed on this is inert in the browser. */
-document.documentElement.dataset.shell = navigator.userAgent.includes("Mac OS X")
+/* What the stylesheet needs to know about the window it is in. A tab carries
+   none of it, macOS reserves room for its traffic lights, and Windows reserves
+   its compact native control strip. */
+const userAgent = navigator.userAgent;
+document.documentElement.dataset.shell = userAgent.includes("Mac OS X")
   ? "mac"
-  : "desktop";
+  : userAgent.includes("Windows")
+    ? "windows"
+    : "desktop";
 
 /* A hash history, because there is no server under this window to answer a
    path: `app://notes/notes` is a request for a file that does not exist, and

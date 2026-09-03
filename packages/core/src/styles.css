@@ -6962,7 +6962,11 @@
       one decision in two files: `trafficLightPosition` in main.js and
       `--titlebar-inset` here.
 
-   2. Moving the window. A hidden title bar is a window with nothing left to
+   2. Windows reserves a compact, palette-coloured native control strip. The
+      app starts immediately below it, so the close/minimise controls never
+      cover a note command; macOS keeps its traffic-light gutter instead.
+
+   3. Moving the window. A hidden title bar is a window with nothing left to
       drag by, and there is no default: without `-webkit-app-region: drag`
       somewhere the window simply cannot be moved, which is the single loudest
       way an Electron app announces that it is a web page. The header strips are
@@ -6998,6 +7002,14 @@
 [data-shell="mac"] .pane-slide.is-collapsed ~ .editor-shell .editor-toolbar {
   padding-left: var(--titlebar-inset);
   transition: padding-left var(--dur-base) var(--ease);
+}
+
+/* The Windows caption buttons are an overlay. Keep every full-height screen
+   below its 40px strip rather than leaving controls hidden behind Close. */
+[data-shell="windows"] :is(.workspace-shell, .login-shell, #root > .min-h-screen) {
+  height: calc(100vh - 40px);
+  min-height: calc(100vh - 40px);
+  margin-top: 40px;
 }
 
 [data-shell] .sidebar-topbar,

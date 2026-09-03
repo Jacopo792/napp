@@ -192,13 +192,11 @@ one interface — the desktop shell adds nothing to it and forks nothing in it.
 What it does add is the handful of things a window has and a page does not, and
 leaving them out is what makes an Electron app read as a web page in a frame:
 
-- **A menu bar**, and almost nothing in it has logic. Every item that acts on
-  the archive is already a shortcut the interface answers to, so the menu
-  presses the key rather than reimplementing the command — one implementation of
-  "new note", and a menu item that cannot drift from the key beside it. What
-  stays a real role is what belongs to the system: undo inside a contenteditable,
-  ⌘W, Services, speech, zoom, full screen, and the text services a Mac gives
-  every field — Emoji & Symbols, smart quotes, smart dashes, text replacement.
+- **Platform-native chrome.** macOS keeps the application menu in the system
+  menu bar, where archive commands press the same shortcuts the renderer
+  answers to. Windows has a single compact title bar coloured from Napp's active
+  palette, with no separate File/Edit strip or package-name label. Keyboard
+  shortcuts remain identical on both platforms.
 - **A gutter for the three traffic lights**, held open in the leftmost header
   strip and following it when the navigation collapses, and released again in
   full screen where the buttons are not there. The lights are moved to the

@@ -76,11 +76,11 @@ function sameDraft(left: Draft, right: Draft): boolean {
    flush on `pagehide` covers a deliberate close; it does not cover a reload
    that beats the write, and it cannot cover one made offline.
 
-   `sessionStorage`, not `localStorage`, and on purpose: the auth session lives
-   there too, so an unsaved note has exactly the lifetime of the sign-in that
-   can save it. A reload keeps it. Closing the tab drops it, the same as the
-   session — signing out already calls `clearDrafts()`, which now clears this
-   as well, so no note text outlives the archive being open.
+   `sessionStorage`, not `localStorage`, and on purpose: an unsaved note has
+   the lifetime of the open tab even though the auth session survives a restart.
+   A reload keeps it. Closing the tab drops it; signing out already calls
+   `clearDrafts()`, which clears this as well, so no note text outlives the
+   archive being open.
 
    `base` is stored beside `draft` because the three-way merge needs it. A
    draft restored without the version it departed from would read the other

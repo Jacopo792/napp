@@ -288,6 +288,16 @@ export function applyAppearance(config = current): void {
     mix(background, dark ? 0.17 + contrastShift * 0.12 : 0.045, dark ? "black" : "white"),
   );
   root.style.setProperty("--ink", foreground);
+  /* Windows owns the caption buttons, so the native strip follows the page
+     ground and ink whenever a reader changes palette. A wallpaper is content,
+     not something Windows can safely crop into window controls; its own base
+     palette remains the visual bridge between the two. */
+  const nativeFrame = (
+    window as unknown as {
+      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
+    }
+  ).napp;
+  nativeFrame?.setFrameTheme?.(background, foreground);
   root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
   /* The two muted inks are the whole legibility budget of the interface: every
      metadata line, every list marker and every idle glyph is one of them, and

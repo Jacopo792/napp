@@ -419,7 +419,8 @@ node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onr
 
 **A window is not a tab, and three of the differences are not optional.**
 
-`electron/menu.js` builds the menu bar, and almost nothing in it has logic.
+`electron/menu.js` builds the macOS menu bar; Windows deliberately has no
+second File/Edit application strip. Almost nothing in the macOS menu has logic.
 Every item that acts on the archive is already a shortcut the renderer answers
 to — `packages/core/src/lib/shortcuts.ts` is the list, read by the `?` sheet and
 by Settings — so the menu does not implement the commands, it **presses the
@@ -430,7 +431,7 @@ and a menu item that cannot drift away from the key that does the same thing.
 What stays a real role is what belongs to the system rather than to us: undo
 inside a contenteditable, ⌘W, Services, speech, zoom, full screen.
 
-**The three buttons and `--titlebar-inset` are one decision in two files.**
+**The three macOS buttons and `--titlebar-inset` are one decision in two files.**
 `hiddenInset` leaves the traffic lights at the window's own top-left, which here
 is on top of the avatar in the first row of the sidebar — the panes are cards
 inset by 10px, so the window's corner is inside the first one. `main.js` moves
@@ -439,6 +440,12 @@ stylesheet holds a gutter open for them. Change one number and the buttons are
 either over the avatar or floating in a gap. The gutter follows the leftmost
 strip, not the sidebar: ⌘\ collapses the whole navigation pane and the buttons
 are then over the note's own toolbar.
+
+**Windows has a different compact strip, also one decision in two files.**
+`main.js` uses `titleBarOverlay` and `styles.css` starts full-height screens
+40px below it. The renderer sends only the validated palette ground and ink
+through preload, so the native caption buttons match the app without gaining a
+privileged renderer API.
 
 **And a hidden title bar is a window with nothing left to drag by.** There is no
 default: without `-webkit-app-region: drag` somewhere, the window cannot be

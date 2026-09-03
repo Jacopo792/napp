@@ -160,6 +160,15 @@ function template(isDev) {
 }
 
 function installMenu(isDev) {
+  /* Windows has a compact native title bar, not a second application bar above
+     the archive. Keeping this empty removes Electron's File/Edit strip (and
+     the package-name label it led with) while preserving the normal macOS
+     menu in the system menu bar. Keyboard shortcuts still belong to the
+     renderer, so this does not remove a command from the app. */
+  if (process.platform === "win32") {
+    Menu.setApplicationMenu(null);
+    return;
+  }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template(isDev)));
 }
 

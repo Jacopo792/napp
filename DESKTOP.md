@@ -58,14 +58,11 @@ groups and expanded folders stay local, because those are facts about a screen.
 Everything below is what a desktop application has and a page cannot give
 itself. None of it changes the interface.
 
-**A menu bar.** File, Edit, Format, View, Window, Help. Almost nothing in it has
-logic of its own. Every item that acts on the archive presses the key the
-interface already answers to, so there is one implementation of "new note" and a
-menu item cannot drift away from the shortcut printed beside it. The rest are
-real system roles, because they belong to the system: undo inside the text, ⌘W,
-Services, Speech, zoom, full screen, and the text services macOS gives every
-field. **Emoji & Symbols** is on ⌃⌘Space, with smart quotes, smart dashes and
-text replacement beside it.
+**Native chrome, not a second app bar.** macOS keeps File, Edit, Format, View,
+Window and Help in its system menu bar. Every archive command there presses the
+same shortcut the interface answers to. Windows instead has one compact title
+bar, coloured from the active Napp palette: there is no black File/Edit strip or
+package-name label above the app. Keyboard shortcuts work on both platforms.
 
 **A window you can move and name.** The traffic lights get a gutter of their own
 in the leftmost column, which follows when you collapse the folders (⌘\) and
@@ -105,12 +102,13 @@ version and Releases gives the latest.
 
 ## What it keeps on this machine
 
-| What                   | Where                                             |
-| ---------------------- | ------------------------------------------------- |
-| Session, notes, caches | IndexedDB under the `app://notes` origin          |
-| Device-local settings  | `localStorage` under the same origin              |
-| Window position        | `~/Library/Application Support/Napp/window.json`  |
-| Everything else        | The archive, which is Supabase – not this machine |
+| What                  | Where                                             |
+| --------------------- | ------------------------------------------------- |
+| Sign-in session       | `localStorage` under the `app://notes` origin     |
+| Notes and caches      | IndexedDB under the `app://notes` origin          |
+| Device-local settings | `localStorage` under the same origin              |
+| Window position       | `~/Library/Application Support/Napp/window.json`  |
+| Everything else       | The archive, which is Supabase – not this machine |
 
 Removing the app does not sign you out of the website and does not touch a note.
 To clear the machine completely, delete

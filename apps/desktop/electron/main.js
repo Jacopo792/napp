@@ -18,6 +18,10 @@ const { installMenu } = require("./menu");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
+
+/* `package.json` uses the scoped package name for tooling; the window and the
+   OS must use the product name instead. */
+app.setName("Napp");
 const os = require("node:os");
 
 const DEV_URL = "http://localhost:5174";
@@ -92,6 +96,8 @@ function serveRenderer() {
 }
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
+  const isWindows = process.platform === "win32";
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -99,8 +105,20 @@ function createWindow() {
     minWidth: 640,
     minHeight: 480,
     show: false,
-    backgroundColor: "#191919",
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    backgroundColor: "#030202",
+    /* Windows owns one small native control strip, painted in the same ground
+       colour as the active Napp palette. It replaces both the blue system
+       frame and Electron's separate File/Edit application menu. */
+    titleBarStyle: isMac ? "hiddenInset" : isWindows ? "hidden" : "default",
+    ...(isWindows
+      ? {
+          titleBarOverlay: {
+            color: "#030202",
+            symbolColor: "#e8e8e8",
+            height: 40,
+          },
+        }
+      : {}),
     /* Where the three buttons sit, and it is not decoration. `hiddenInset`
        puts them at the window's own top-left, which is on top of the first row
        of the sidebar — so they are moved down to the middle of the 52px header
@@ -109,7 +127,7 @@ function createWindow() {
        one and the buttons are either over the avatar or floating in a gap. y is
        the top of the buttons, which are 12px, so 20 centres them in a strip
        that runs from 0 to 52. */
-    trafficLightPosition: { x: 19, y: 20 },
+    ...(isMac ? { trafficLightPosition: { x: 19, y: 20 } } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -145,6 +163,15 @@ function createWindow() {
   void window.loadURL(isDev ? DEV_URL : `${APP_ORIGIN}/index.html`);
   return window;
 }
+
+/* The renderer may choose colours, never window behaviour: only literal RGB
+   values are accepted and only the window that sent the message is updated. */
+ipcMain.on("napp:frame-theme", (event, color, symbolColor) => {
+  if (process.platform !== "win32") return;
+  if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(symbolColor)) return;
+  const window = BrowserWindow.fromWebContents(event.sender);
+  window?.setTitleBarOverlay({ color, symbolColor });
+});
 
 async function chooseAndWrite(window, files, fallbackName) {
   if (files.length === 1) {

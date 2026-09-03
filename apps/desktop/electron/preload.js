@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("napp", {
   save: (files, fallbackName) => ipcRenderer.invoke("napp:save", files, fallbackName),
   open: (name, bytes) => ipcRenderer.invoke("napp:open", name, bytes),
   print: () => ipcRenderer.invoke("napp:print"),
+  /* Colour is deliberately a one-way cosmetic message, not a privileged
+   * capability. The main process validates it before painting the frame. */
+  setFrameTheme: (color, symbolColor) => ipcRenderer.send("napp:frame-theme", color, symbolColor),
 });
 
 /* The menu presses the key. Nothing here decides what a command does — the
