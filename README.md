@@ -64,6 +64,10 @@ Open it once from the right-click menu — **Control-click the app → Open → 
 > the release workflow and nobody has needed one. Windows gets an NSIS
 > installer from the same tag.
 
+[`DESKTOP.md`](DESKTOP.md) is the app's own manual — installing, what it keeps
+on your machine, what to check when a note will not open, and how a release is
+cut.
+
 What the window adds over the tab is the part a Mac expects and a web page
 cannot give itself:
 
@@ -208,13 +212,14 @@ that part is a courtesy, not the boundary.
 
 ## Documentation
 
-| File                           | Contents                                   |
-| ------------------------------ | ------------------------------------------ |
-| [`PRODUCT.md`](PRODUCT.md)     | Product scope and behaviour                |
-| [`DESIGN.md`](DESIGN.md)       | Interface rules and design decisions       |
-| [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes |
-| [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting |
-| [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes |
+| File                           | Contents                                          |
+| ------------------------------ | ------------------------------------------------- |
+| [`PRODUCT.md`](PRODUCT.md)     | Product scope and behaviour                       |
+| [`DESKTOP.md`](DESKTOP.md)     | The downloadable app: install and troubleshooting |
+| [`DESIGN.md`](DESIGN.md)       | Interface rules and design decisions              |
+| [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes        |
+| [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting        |
+| [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes        |
 
 ## Deployment
 
