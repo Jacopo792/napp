@@ -54,6 +54,18 @@ import { MenuButton } from "./WorkspaceMenus";
  *  whole list to move one row. */
 const CLOSE_OTHER_SWIPES = "napp:close-other-swipes";
 
+const OPEN = 92;
+/* Nothing happens at the end of a push, however long it is. A row uncovers
+   its buttons and waits to be pressed — so travel past the open position is
+   give and nothing else, and there is no distance at which the hand has
+   committed to anything. 56 of give is enough to feel the row resist and
+   not enough to look like a threshold that was missed. */
+const MAX = OPEN + 56;
+/* The clamp is not tidiness. A trackpad keeps sending decaying momentum
+   after the fingers have lifted, so an unclamped flick travels half the
+   column; clamped it arrives at the give and springs back to open. */
+const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
+
 export interface ActiveFilter {
   id: string;
   label: string;
@@ -229,18 +241,8 @@ const Row = memo(function Row({
      the action to happen by itself, and how far it may travel at all.
      ponytail: three constants tuned by hand against Mail; if the row ever
      carries two actions on a side, OPEN is what has to grow. */
-  const OPEN = 92;
-  const COMMIT = 190;
-  const MAX = 240;
   /* What the row is inset by, which the panel behind it has to make up. */
   const EDGE = mobile || gallery ? 0 : 8;
-
-  /* The clamp is not tidiness. A trackpad keeps sending decaying momentum
-     after the fingers have lifted, so an unclamped travel turns a flick into a
-     commit nobody asked for — with the clamp a flick simply arrives at the
-     open position and waits there, which is what Mail does with the same
-     flick. */
-  const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
 
   /* One row open at a time. A second open row is a second answer to "which one
      am I about to act on", and the id travels rather than the state because
@@ -262,13 +264,12 @@ const Row = memo(function Row({
      the hand learns one gesture; what changes is what is under it, which is
      what changes about the scope anyway.
 
-     `final` is the one thing a full swipe may not do on its own. Everything
-     else here is reversible — a trashed note comes back, an archived one is
-     filed rather than gone — and deleting for good is not, so it stays a
-     deliberate press however far the row is pushed. */
+     None of them is done by the push. `final` used to mark the one act a full
+     swipe was not allowed to perform on its own; every act is that act now, so
+     there is no flag and no exception to remember. */
   const acts = trashMode
     ? {
-        left: { label: "Delete", Icon: Trash2, tone: "trash", final: true, run: onDeleteForever },
+        left: { label: "Delete", Icon: Trash2, tone: "trash", run: onDeleteForever },
         right: { label: "Restore", Icon: RotateCcw, tone: "archive", run: onRestore },
       }
     : archiveMode
@@ -290,26 +291,19 @@ const Row = memo(function Row({
             run: (e: NoteEntry) => onArchiveChange(e, true),
           },
         };
-  const actsRef = useRef(acts);
-  actsRef.current = acts;
-
-  /* The end of a gesture: act, stay open, or close. */
-  const settle = useCallback(
-    (travelled: number) => {
-      const { left, right } = actsRef.current;
-      if (travelled <= -COMMIT && !("final" in left && left.final)) {
-        setSlid(0);
-        left.run(entry);
-      } else if (travelled >= COMMIT && !("final" in right && right.final)) {
-        setSlid(0);
-        right.run(entry);
-      } else if (travelled <= -OPEN / 2) setSlid(-OPEN);
-      else if (travelled >= OPEN / 2) setSlid(OPEN);
-      else setSlid(0);
-      setDragging(false);
-    },
-    [entry],
-  );
+  /* The end of a gesture is a position and never an act. A push far enough
+     used to run the act on release, which meant the hand had to be careful:
+     flick a row a little too hard and a note was archived nobody meant to
+     archive, and the only way to know how hard was too hard was to have got it
+     wrong once. The row opens, the button shows, and the button is pressed —
+     which is the same two-step every irreversible act here already asked for,
+     now asked for by all of them. */
+  const settle = useCallback((travelled: number) => {
+    if (travelled <= -OPEN / 2) setSlid(-OPEN);
+    else if (travelled >= OPEN / 2) setSlid(OPEN);
+    else setSlid(0);
+    setDragging(false);
+  }, []);
 
   /* A trackpad has no gesture-end event: the fingers lift and macOS keeps
      sending decaying momentum for a while afterwards. So the end is a silence,
@@ -459,7 +453,7 @@ const Row = memo(function Row({
            stylesheet, so the hover could not have had its own. */
         transition: dragging
           ? "none"
-          : "transform var(--dur-base) var(--ease-spring), translate var(--dur-base) var(--ease)",
+          : "transform var(--dur-swipe) var(--ease-bounce), translate var(--dur-base) var(--ease)",
       }}
       className={`note-row group relative cursor-pointer transition-colors ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
@@ -592,8 +586,15 @@ const Row = memo(function Row({
               className={`note-row-action is-${act.tone} is-${side}`}
               /* Plus the margin the row itself keeps on a pointer machine, or
                  the panel stops short of the column's edge and leaves a sliver
-                 of background beside it. Mail's action reaches the edge. */
-              style={{ width: Math.max(OPEN, side === "left" ? -slid : slid) + EDGE }}
+                 of background beside it. `--reveal` is how far open the row is
+                 — the mark inside grows on the same travel rather than being
+                 there in full behind a row that has barely moved. */
+              style={
+                {
+                  width: Math.max(OPEN, side === "left" ? -slid : slid) + EDGE,
+                  "--reveal": Math.min(1, Math.abs(slid) / OPEN),
+                } as React.CSSProperties
+              }
               /* The row is travelling under the pointer; a press has to be the
                  end of the gesture rather than a click that also opens the note
                  underneath. */

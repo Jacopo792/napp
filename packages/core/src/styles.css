@@ -131,11 +131,19 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  /* One step past the spring, for the one gesture the hand is still holding
+     when the animation starts: a row let go of should arrive with some weight
+     in it, and overshoot far enough to be seen doing it. Nothing that tracks a
+     pointer may use this — an overshoot under the finger reads as the list
+     twitching. */
+  --ease-bounce: cubic-bezier(0.2, 1.7, 0.5, 1);
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
 
   --dur-press: 90ms;
   --dur-fast: 160ms;
   --dur-base: 240ms;
+  /* Long enough for the overshoot above to be a movement rather than a blip. */
+  --dur-swipe: 340ms;
   --dur-slow: 360ms;
 
   /* ── The sidebar rail ──────────────────────────────────────────────────────
@@ -2630,10 +2638,20 @@
    The width follows the travel rather than being fixed, so a row pushed past
    its resting place is not a panel with a strip of background beside it. It
    never goes below OPEN, because the label has to fit from the first frame. */
+/* A button, not a wall. Full-bleed to the row's own top and bottom it was a
+   rectangle of flat colour the height of the list, which is what a mail client
+   does with a row that is about to fly away — and nothing here flies away any
+   more, it waits to be pressed. So it is inset by three and carries the corner
+   every other pressable thing in the app carries, which says "press me" rather
+   than "let go and I happen".
+
+   The corner is on the outer edge only: the inner one is under the row until
+   the moment it is uncovered, and rounding it would show two corners meeting
+   at nothing while the row travels. */
 .note-row-action {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 3px;
+  bottom: 3px;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -2647,16 +2665,36 @@
   cursor: pointer;
 }
 
+/* What is in it arrives rather than being there. `--reveal` is how far open
+   the row is, written by the row itself, so the mark grows with the gesture
+   and lands at full size exactly as the panel finishes opening — the same
+   travel, two things doing it. */
+.note-row-action > * {
+  transform: scale(calc(0.55 + 0.45 * var(--reveal, 1)));
+  opacity: var(--reveal, 1);
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.note-row-action:active {
+  filter: brightness(0.92);
+}
+
 /* Where a panel is parked is the direction it answers to; what colour it is
    is what it does. The two are separate because every scope has the same pair
    of directions and a different pair of acts — Trash restores where the list
    archives, and both of them delete. */
 .note-row-action.is-left {
   left: 100%;
+  border-start-end-radius: var(--radius-md);
+  border-end-end-radius: var(--radius-md);
 }
 
 .note-row-action.is-right {
   right: 100%;
+  border-start-start-radius: var(--radius-md);
+  border-end-start-radius: var(--radius-md);
 }
 
 .note-row-action.is-trash {

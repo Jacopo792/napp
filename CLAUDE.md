@@ -146,13 +146,16 @@ gesture rather than a swipe of our own: push the row **left to uncover Delete**
 on its right, **right to uncover Archive**. A finger drags it; a trackpad
 pushes it with two fingers.
 
-**Three behaviours, not one, and this is what the first attempt got wrong.**
+**The push opens; the press acts. There is no distance that does anything.**
 The action is not a sign riding on the row, it is a surface behind it that the
-row uncovers, and it grows with the travel. Let go partway and the row **stays
-open** with its button showing, so the act is still a deliberate press. Push it
-past `COMMIT` and it happens on release. A row that only ever sprang back said
-nothing about what it was about to do, which is what made the gesture read as a
-twitch rather than a control.
+row uncovers, and it grows with the travel. Let go and the row **stays open**
+with its button showing, and the button is pressed. A row that only ever sprang
+back said nothing about what it was about to do, which is what made the gesture
+read as a twitch rather than a control — but a row that ran its act on release
+past a threshold made the hand careful, because a flick a little too hard
+archived a note nobody meant to archive and the only way to learn how hard was
+too hard was to have got it wrong once. `COMMIT` is gone. Travel past `OPEN` is
+give and nothing else.
 
 The directions are Apple's. They were once the other way round, on the argument
 that muscle memory outranks convention; the muscle memory being protected was
@@ -164,15 +167,23 @@ ordinary list alone at first, on the argument that Trash and Archive have
 different acts — they do, and that is a reason to give them their own pair
 rather than to take the hand's gesture away in the two places a row is most
 likely to want moving. The list deletes and archives, the Archive deletes and
-puts back, the Trash deletes for good and restores. One rule crosses all three:
-**a full swipe may not do something irreversible**, so deleting for good stays a
-deliberate press however far the row is pushed.
+puts back, the Trash deletes for good and restores. Deleting for good was once
+the one act a full swipe was not allowed to perform on its own; every act is
+that act now, so there is no flag on the pair and no exception to remember.
 
-`OPEN`, `COMMIT` and `MAX` in `NoteList.tsx` are the whole of the tuning, and
-**the clamp is load-bearing**: a trackpad keeps sending decaying momentum after
-the fingers lift, so unclamped travel turns a flick into a commit nobody asked
-for. Clamped, a flick arrives at the open position and waits there, which is
-what Mail does with the same flick.
+`OPEN` and `MAX` in `NoteList.tsx` are the whole of the tuning, and **the clamp
+is load-bearing**: a trackpad keeps sending decaying momentum after the fingers
+lift, so unclamped travel takes the row half the column. Clamped, a flick
+arrives at the give and springs back to open.
+
+The panel is a **button**, not a wall: inset by three from the row's own edges
+and carrying the corner on its outer side only — the inner one is under the row
+until the moment it is uncovered, and rounding it would show two corners
+meeting at nothing while the row travels. What is inside it arrives rather than
+being there: the row writes `--reveal`, how far open it is, and the mark grows
+on that same travel. The settle takes `--ease-bounce`, which is one step past
+`--ease-spring` and is only for a gesture the hand has already let go of — an
+overshoot under a finger reads as the list twitching.
 
 The panels are parked outside the row's own edges (`left: 100%`, `right: 100%`)
 rather than inside a wrapper, so the travelling row is the only thing that
