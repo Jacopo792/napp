@@ -81,9 +81,13 @@ into `private.redeem_archive_invite()`.
 The desktop window is the same application in an Electron shell, and the shell
 adds no privilege to it. The renderer runs with `contextIsolation`, `sandbox`
 and no Node integration; the preload exposes three file functions — save a
-file, show a file, print — plus one-way cosmetic colour and menu-command
-channels. The main process validates the colour before it can paint the Windows
-title bar. It does not load `file://`: the built renderer is served from a
+file, show a file, print — plus one cosmetic channel out and two receive-only
+channels in: the menu's keystrokes, and whether a newer release exists on
+GitHub. The main process validates the colour before it can paint the Windows
+title bar, and the two inbound channels add nothing to `window.napp` — they
+arrive as DOM events, so the page may listen and has nothing new to call. The
+release check runs in the main process rather than the renderer precisely so
+that reaching `api.github.com` does not widen the page's own network policy. It does not load `file://`: the built renderer is served from a
 registered `app://notes` scheme, both because the collaboration server refuses a
 socket whose origin it does not know and because a `file://` page is not a secure
 context and therefore has no IndexedDB. A content security policy written into
