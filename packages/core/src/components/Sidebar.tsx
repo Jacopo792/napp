@@ -13,6 +13,7 @@ import {
   PanelLeftClose,
   Pencil,
   Pin,
+  Settings,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,7 +22,7 @@ import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { UpdateNotice } from "./UpdateNotice";
-import { Avatar, MenuButton } from "./WorkspaceMenus";
+import { MenuButton } from "./MenuPrimitives";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -67,10 +68,6 @@ interface Props {
   onClose: () => void;
   onSettings: () => void;
   onLock: () => void;
-  selfAvatarUrl: string | null;
-  selfName: string;
-  selfEmail: string;
-  selfOnline: boolean;
   /** The archive switch, which belongs above the destinations it re-points. */
   archiveSwitch: React.ReactNode;
 }
@@ -352,10 +349,6 @@ export function Sidebar({
   onClose,
   onSettings,
   onLock,
-  selfAvatarUrl,
-  selfName,
-  selfEmail,
-  selfOnline,
   archiveSwitch,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -500,23 +493,27 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
+      {/* The window's own strip, and nothing else. It carried a face and a name
+          as well, forty pixels above the switch that carries the same face —
+          two controls asking almost the same question, and on macOS the gutter
+          held for the traffic lights left the name thirty-four pixels to say
+          itself in, so it never did. Who you are is answered by the switch
+          below, where your face is the one under the thumb; where you go to
+          change it is at the foot of the column, with the lock.
+
+          The pane toggle stands first, immediately after the lights, which is
+          where every Mac window keeps it. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
         <button
           type="button"
-          aria-label="Open profile and settings"
-          title="Profile and settings"
-          className="sidebar-profile-button press"
-          onClick={onSettings}
+          onClick={onClose}
+          aria-label="Hide the sidebar"
+          title="Hide the sidebar"
+          className="toolbar-button press shrink-0"
         >
-          <Avatar
-            url={selfAvatarUrl}
-            name={selfName}
-            email={selfEmail}
-            compact
-            online={selfOnline}
-          />
-          <span className="truncate">{selfName || selfEmail.split("@")[0]}</span>
+          <PanelLeftClose size={16} />
         </button>
+        <span className="ml-auto" />
         {canWrite && (
           <button
             type="button"
@@ -528,16 +525,6 @@ export function Sidebar({
             <FolderPlus size={16} />
           </button>
         )}
-        <span className="ml-auto" />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Hide the sidebar"
-          title="Hide the sidebar"
-          className="toolbar-button press shrink-0"
-        >
-          <PanelLeftClose size={16} />
-        </button>
       </div>
 
       {/* `pt-3` and no bottom padding, so this sits in the same band as the
@@ -675,8 +662,16 @@ export function Sidebar({
         </div>
       )}
 
+      {/* Where an application's account controls stand, which is what this
+          block was built for and what the stylesheet still says it holds. The
+          two of them left together when the top of the column grew a face;
+          only the lock came back. */}
       <div className="sidebar-footer">
         <UpdateNotice />
+        <button type="button" className="sidebar-footer-button press" onClick={onSettings}>
+          <Settings size={16} />
+          <span>Settings</span>
+        </button>
         <button type="button" className="sidebar-footer-button press" onClick={onLock}>
           <Lock size={16} />
           <span>Lock &amp; sign out</span>

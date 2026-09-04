@@ -2143,6 +2143,9 @@
   position: relative;
   display: flex;
   min-width: 0;
+  /* It is asked about its own width down in the sizing section, where the
+     names stop fitting. */
+  container-type: inline-size;
   isolation: isolate;
   border: 1px solid var(--rule);
   /* Fully round. The two halves each hold a face, and a face is a circle; a
@@ -2160,6 +2163,18 @@
 /* The thumb used to be half the track, moved once. A roster is any length, so
    both the width and the travel come from the count and the position the
    switch is told about. */
+/* Two properties, two curves, and that is the whole of the gesture. `translate`
+   and `scale` are their own properties rather than halves of one `transform`,
+   which is what lets the travel keep the macOS slide curve while the squash
+   gets the spring.
+
+   The thumb is not allowed to overshoot its *position*. With two members both
+   slots are edge slots, so an overshoot on the travel would leave the track on
+   every throw, and clipping it would read as hitting a wall. A body that stops
+   against a wall deforms instead of passing through it: pressing squashes the
+   thumb, and letting go is the same instant the index changes — so it travels
+   while springing back out, which is the whole of what a segmented control
+   does under a finger. */
 .archive-switch-thumb {
   position: absolute;
   z-index: -1;
@@ -2175,10 +2190,17 @@
   width: calc((100% - 8px) / var(--switch-count, 2));
   width: round(down, calc((100% - 8px) / var(--switch-count, 2)), 1px);
   border-radius: var(--radius-pill);
-  background: var(--accent-wash);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
   box-shadow: inset 0 0 0 1px var(--glass-highlight);
-  transform: translateX(calc(100% * var(--switch-index, 0)));
-  transition: transform var(--dur-base) var(--ease);
+  translate: calc(100% * var(--switch-index, 0)) 0;
+  scale: 1;
+  transition:
+    translate var(--dur-base) var(--ease),
+    scale var(--dur-base) var(--ease-spring);
+}
+
+.archive-switch:active .archive-switch-thumb {
+  scale: 0.96 0.92;
 }
 
 .archive-switch button {
@@ -2190,21 +2212,41 @@
   min-height: 34px;
   padding: 0 12px 0 4px;
   border-radius: var(--radius-pill);
-  color: var(--ink-2);
+  color: var(--ink-3);
   font-size: 13px;
   font-weight: 540;
-  transition:
-    color var(--dur-fast) var(--ease-press),
-    transform var(--dur-press) var(--ease-press);
 }
 
-.archive-switch button:hover {
+/* Pointing at a segment that is not in use lifts it; pressing it takes it all
+   the way, because the thumb has not started travelling yet and the control
+   has to say it heard the press. */
+.archive-switch button:not(.is-active):hover {
   color: var(--ink-2);
 }
 
+.archive-switch button:not(.is-active):active {
+  color: var(--ink);
+}
+
+/* `--accent-strong` is the 4.5:1 lift of an accent this archive's reader chose
+   to be darker than the ink, so it landed at #8a8989 — dimmer than the
+   `--ink-2` the *unselected* name is set in. The name under the thumb was the
+   quieter of the two, which is the one thing a selection may never be. The
+   accent keeps the fill, where being quiet is what it is for. */
 .archive-switch button.is-active {
-  color: var(--accent-strong);
+  color: var(--ink);
   font-weight: 620;
+}
+
+/* The face that is not the one in use is dimmed rather than absent, so the
+   thumb is not the only thing saying which of them you are reading. */
+.archive-switch .avatar {
+  opacity: 0.78;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.archive-switch button.is-active .avatar {
+  opacity: 1;
 }
 
 .glass-toolbar,
@@ -2937,24 +2979,6 @@
   font-size: 9px;
 }
 
-.sidebar-profile-button {
-  display: inline-flex;
-  min-width: 0;
-  max-width: 9.5rem;
-  align-items: center;
-  gap: 7px;
-  border-radius: var(--radius-pill);
-  padding: 3px 8px 3px 3px;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  font-weight: 560;
-}
-
-.sidebar-profile-button:hover {
-  background: var(--accent-wash);
-  color: var(--ink);
-}
-
 .archive-switch button {
   gap: 7px;
 }
@@ -2969,18 +2993,25 @@
   font-size: 10px;
 }
 
-/* The phone app bar has a bar's worth of room, not a column's. The portrait
-   gives back what the name needs there: a face nobody can read beside a name
-   nobody can read is two things lost instead of one. */
-.archive-switch-tight button {
-  padding-inline: 7px 9px;
-  font-size: 12.5px;
-}
+/* Where the room runs out, the portrait gives back what the name needs: a face
+   nobody can read beside a name nobody can read is two things lost instead of
+   one. It was a class the phone app bar wore, on the argument that a bar has a
+   bar's worth of room and a column has a column's — but the column has the
+   phone's width too, at the far end of the resizer, and there the same two
+   names clipped. So the switch is asked about its own width rather than about
+   which shell it is in, and the phone gets the same answer without being told.
+   208px of app bar and 194px of dragged-in column are both under this. */
+@container (max-width: 215px) {
+  .archive-switch button {
+    padding-inline: 4px 9px;
+    font-size: 12.5px;
+  }
 
-.archive-switch-tight .avatar.is-compact {
-  width: 21px;
-  height: 21px;
-  font-size: 8px;
+  .archive-switch .avatar.is-compact {
+    width: 21px;
+    height: 21px;
+    font-size: 8px;
+  }
 }
 
 /* ── The profile section ──────────────────────────────────────────────────
@@ -4642,20 +4673,27 @@
   transform: scale(0.88);
 }
 
+/* `font-weight` is in the list on purpose. The active label is 620 against
+   540, and without it the label thickens in one frame somewhere in the middle
+   of the thumb's travel — the one pop in a movement that is otherwise
+   continuous. macOS resolves `-apple-system` to a variable SF Pro and Chromium
+   interpolates it; a static face snaps at the halfway point, which is where it
+   snaps today. */
 .archive-switch button {
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
     box-shadow var(--dur-fast) var(--ease-press),
+    font-weight var(--dur-fast) var(--ease),
     transform var(--dur-press) var(--ease-press);
-}
-
-.archive-switch:active {
-  transform: scale(0.985);
 }
 
 .archive-switch {
   transition: transform var(--dur-press) var(--ease-press);
+}
+
+.archive-switch:active {
+  transform: scale(0.985);
 }
 
 .editor-tool-button {
@@ -4729,6 +4767,12 @@
   .archive-switch-thumb,
   .settings-nav-marker {
     transition: none;
+  }
+
+  /* `transition: none` above stops the travel; the squash is a value, not a
+     transition, so it has to be taken back by hand. */
+  .archive-switch:active .archive-switch-thumb {
+    scale: 1;
   }
 
   .sidebar-branch,
@@ -4877,13 +4921,20 @@
     box-shadow var(--dur-fast) var(--ease);
 }
 
+/* Three depths of the same wash, and they have to be three: the row you are
+   pointing at, the switch's thumb above them, the row you are actually in.
+   They were two — hover and the selected row painted the identical
+   `--accent-wash`, with a 1px white ring standing in for the difference. So
+   the row you were in was the row you were pointing at wearing a border no
+   other row in this column has, and the ring is what made it read as a card
+   sitting on the sidebar rather than a row of it. A selected row in Finder or
+   Mail is a filled shape, never an outlined one. */
 .sidebar-row:hover {
   background: var(--accent-wash);
 }
 
 .sidebar-row.is-active {
-  background: var(--accent-wash);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* The folder a note is being dragged onto says so before it is dropped. */
@@ -4995,9 +5046,17 @@
   transition: color var(--dur-fast) var(--ease);
 }
 
-.sidebar-row:hover .sidebar-glyph,
+/* Toward the ink, never toward the accent. `--accent` is derived to a 3:1
+   floor against `--paper`, and this archive's palette puts that floor at
+   #737171 — below the `--ink-3` these glyphs already are. So the rule meant to
+   light the row you are in was turning its icon *down*, on the row you look at
+   most. A state change belongs to the ink; the accent belongs to the fill. */
+.sidebar-row:hover .sidebar-glyph {
+  color: var(--ink-2);
+}
+
 .sidebar-row.is-active .sidebar-glyph {
-  color: var(--accent);
+  color: var(--ink);
 }
 
 /* Colour alone carries the active glyph. It used to scale to 1.06, which put a
@@ -5131,7 +5190,7 @@
 }
 
 .sidebar-footer-button:hover svg {
-  color: var(--accent);
+  color: var(--ink-2);
 }
 
 /* The one line down here that is news rather than a destination, so it carries

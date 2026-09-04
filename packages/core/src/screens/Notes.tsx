@@ -2776,6 +2776,25 @@ export default function NotesPage() {
     />
   );
 
+  /* One roster, ordered with yourself first, and it is local on purpose:
+     `members` arrives in the order people joined and stays that way for the
+     Settings roster, the avatar cache and the note's peers, all of which have
+     their own reasons to keep it. Only the switch wants you at the left.
+
+     Sorted on every render rather than memoised: this is at most eight names,
+     and the switch beside it already walked the same array to find the index. */
+  const roster = [...members].sort((a, b) => Number(b.isSelf) - Number(a.isSelf));
+
+  /* What to call a member, and what to call their notes. The nickname on the
+     roster row is a snapshot; your own has just been edited in Settings often
+     enough that the profile wins for you. */
+  const nameOf = (member: ArchiveMember) =>
+    member.isSelf
+      ? profile.nickname || member.nickname || session.email.split("@")[0]
+      : member.nickname || "Member";
+  const notesOf = (member: ArchiveMember) =>
+    member.isSelf ? "Your notes" : `${member.nickname || "Another member"}'s notes`;
+
   /* ── Whose notes ───────────────────────────────────────────────────────────
      The control that re-points the entire window, so it is built as a real
      switch rather than two buttons that happen to sit together: one track, one
@@ -2784,41 +2803,48 @@ export default function NotesPage() {
      slide between the halves instead of blinking from one to the other.
 
      `flex-1` children need a parent with a width of its own; in the phone app
-     bar the switch is shrink-to-fit, so it is given one. */
+     bar the switch is shrink-to-fit, so it is given one.
+
+     Everybody is named the same way, yourself included. It used to label you
+     with a role — "My notes" — and everybody else with their name, which is
+     two kinds of answer to one question and gets worse with every member: a
+     possessive beside a face that is already yours says nothing the face did
+     not. Yours is also always the first slot, so the thumb starts where the
+     hand expects it whether you made this archive or were invited to it. */
   const archiveSwitch = (
     <div
       role="group"
       aria-label="Scope"
       style={
         {
-          "--switch-count": Math.max(members.length, 1),
+          "--switch-count": Math.max(roster.length, 1),
           "--switch-index": Math.max(
-            members.findIndex((member) => member.userId === viewAs),
+            roster.findIndex((member) => member.userId === viewAs),
             0,
           ),
         } as React.CSSProperties
       }
-      className={`archive-switch ${compact ? "archive-switch-tight w-52 shrink-0" : "w-full"}`}
+      className={`archive-switch ${compact ? "w-52 shrink-0" : "w-full"}`}
     >
       <span className="archive-switch-thumb" aria-hidden="true" />
-      {members.map((member) => (
+      {roster.map((member) => (
         <button
           key={member.userId}
           type="button"
           onClick={() => handleViewChange(member.userId)}
           aria-pressed={viewAs === member.userId}
+          aria-label={notesOf(member)}
+          title={notesOf(member)}
           className={viewAs === member.userId ? "is-active" : ""}
         >
           <Avatar
             url={avatarUrls[member.userId] ?? null}
-            name={member.nickname}
+            name={nameOf(member)}
             email=""
             compact
             online={flags.presence && onlineMemberIds.has(member.userId)}
           />
-          <span className="truncate">
-            {member.isSelf ? (compact ? "Mine" : "My notes") : member.nickname || "Member"}
-          </span>
+          <span className="truncate">{nameOf(member)}</span>
         </button>
       ))}
     </div>
@@ -2846,10 +2872,6 @@ export default function NotesPage() {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
-      selfAvatarUrl={avatarUrls[session.userId] ?? null}
-      selfName={selfMember?.nickname || profile.nickname}
-      selfEmail={session.email}
-      selfOnline={flags.presence && onlineMemberIds.has(session.userId)}
       archiveSwitch={archiveSwitch}
     />
   );
@@ -2858,11 +2880,7 @@ export default function NotesPage() {
      used to read "Jacopo's notes" or the partner's, which was the last place
      in the interface still assuming an archive holds exactly two people. */
   const viewedMember = members.find((member) => member.userId === viewAs);
-  const readingLabel = !viewedMember
-    ? "This archive"
-    : viewedMember.isSelf
-      ? "Your notes"
-      : `${viewedMember.nickname || "Another member"}'s notes`;
+  const readingLabel = viewedMember ? notesOf(viewedMember) : "This archive";
 
   /* Both keyboard sheets travel with the settings panel, because both layouts
      mount that and neither wants a second copy of this. */
@@ -3039,7 +3057,12 @@ export default function NotesPage() {
                     <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
                   </div>
                 </header>
+                {/* Keyed on the scope, so changing whose notes these are re-runs
+                    the list's own entrance instead of swapping the rows in
+                    place. Nothing is lost by the remount: `handleViewChange`
+                    already clears the query, the folder and the selection. */}
                 <NoteList
+                  key={viewAs}
                   mobile
                   entries={visible}
                   groups={noteGroups}
@@ -3209,7 +3232,12 @@ export default function NotesPage() {
                 onChange={setSidebarWidth}
               />
               <div className="pane-frame" style={{ width: listShown }}>
+                {/* Keyed on the scope, so changing whose notes these are re-runs
+                    the list's own entrance instead of swapping the rows in
+                    place. Nothing is lost by the remount: `handleViewChange`
+                    already clears the query, the folder and the selection. */}
                 <NoteList
+                  key={viewAs}
                   entries={visible}
                   groups={noteGroups}
                   view="list"
