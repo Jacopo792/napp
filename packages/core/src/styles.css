@@ -2816,15 +2816,8 @@
   display: none;
 }
 
-/* Inside the pill a button is the cluster's button: a wash, no second frame,
-   and the same dock magnification — `--mag` and `--dock-shift` are written by
-   `useDock`, which drives all three groups. It grows from its own foot, so the
-   icon rises out of the bar the way a dock icon does. */
-.editor-tool-group .toolbar-button {
-  transform: translateX(var(--dock-shift, 0)) scale(var(--mag, 1));
-  transform-origin: 50% 100%;
-}
-
+/* Inside the pill a button is the cluster's button: a wash and no second
+   frame. */
 .editor-tool-group .toolbar-button:hover,
 .editor-tool-group .toolbar-button.is-active {
   border-color: transparent;
@@ -2832,12 +2825,6 @@
   color: var(--accent-strong);
 }
 
-/* `--mag` and `--dock-shift` are written by the toolbar itself while the
-   pointer is over the cluster, and removed when it leaves. Both default here,
-   so the button is a plain button until something says otherwise.
-
-   It grows from its own foot, so the icon rises out of the bar the way a dock
-   icon does rather than pushing down through it. */
 .editor-tool-button {
   display: inline-flex;
   width: 2rem;
@@ -2846,7 +2833,6 @@
   justify-content: center;
   border-radius: var(--radius-md);
   color: var(--ink-2);
-  transform: translateX(var(--dock-shift, 0)) scale(var(--mag, 1));
   transform-origin: 50% 100%;
   transition:
     color 160ms var(--ease),
@@ -4895,11 +4881,8 @@
     transform var(--dur-press) var(--ease-press);
 }
 
-/* The press multiplies the magnification rather than replacing it: a button
-   that snapped from 1.4 back to 0.92 on mousedown would jump, and a button
-   that lost `--dock-shift` would jump sideways as well. */
 .editor-tool-button:active {
-  transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
+  transform: scale(0.92);
 }
 
 .editor-tool-group .toolbar-button {
@@ -4911,25 +4894,7 @@
 }
 
 .editor-tool-group .toolbar-button:active {
-  transform: translateX(var(--dock-shift, 0)) scale(calc(var(--mag, 1) * 0.92));
-}
-
-/* While the pointer is over the cluster the dock follows it exactly. A
-   transition here would mean the row is permanently chasing a target it never
-   reaches: the icons lag the cursor and rubber-band when it stops, which reads
-   as latency rather than as magnification. The transition is for the way out
-   only, which is why it lives on the resting rule and this one takes it off. */
-.editor-tool-cluster.is-docked .editor-tool-button {
-  transition:
-    color var(--dur-fast) var(--ease-press),
-    background-color var(--dur-fast) var(--ease-press);
-}
-
-.editor-tool-group.is-docked .toolbar-button {
-  transition:
-    color var(--dur-fast) var(--ease-press),
-    background-color var(--dur-fast) var(--ease-press),
-    border-color var(--dur-fast) var(--ease-press);
+  transform: scale(0.92);
 }
 
 /* The pill keeps its own height while the icons rise out of it — and it holds
@@ -4963,11 +4928,7 @@
   .mobile-compose:active,
   .note-row-actions button:active,
   .archive-switch:active,
-  /* Not `:active` — the dock magnification is a hover state, and this is the
-     rule that switches the whole of it off. */
-  .editor-tool-button,
   .editor-tool-button:active,
-  .editor-tool-group .toolbar-button,
   .editor-tool-group .toolbar-button:active {
     transform: none;
   }
@@ -6557,21 +6518,6 @@
 /* Now a control in the toolbar rather than the one thing in the reading column
    that was not the note, so it is sized like its neighbours there and needs no
    optical correction against a text edge. */
-.note-add-property {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-}
-
-.note-add-property:hover {
-  background: var(--paper-2);
-}
-
 @media (max-width: 700px) {
   .note-page-cover {
     height: 160px;

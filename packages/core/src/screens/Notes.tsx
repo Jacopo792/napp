@@ -87,6 +87,7 @@ import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
 import { fold, formatStamp, memberSince } from "@/lib/format";
+import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
   clearDrafts,
@@ -3060,6 +3061,17 @@ export default function NotesPage() {
     </>
   ) : null;
 
+  /* Adding a cover is one of the acts the note's own menu carries. Offered
+     only while there is not one: a cover carries its own Change and Remove. */
+  const addCover =
+    selected && canWriteArchive && !selected.note.cover
+      ? () =>
+          void handleUpdatePageProperties({
+            photo: selected.note.photo,
+            cover: { kind: "preset", id: COVER_PRESETS[0].id, position: 0.5 },
+          }).catch(() => undefined)
+      : undefined;
+
   const noteActions = selected ? (
     <>
       <button
@@ -3078,6 +3090,7 @@ export default function NotesPage() {
           recent={recentNotes}
           focusMode={focusMode}
           onToggleFocus={toggleFocus}
+          onAddCover={addCover}
           onOpenBeside={() => {
             setPaletteQuery("beside ");
             setPaletteOpen(true);
@@ -3426,6 +3439,12 @@ export default function NotesPage() {
               navigationAction={
                 !navigationOpen ? (
                   <>
+                    {/* The one control here, and it is about the window
+                        rather than about the note. Settings used to stand
+                        beside it as a rescue for the row lost at the foot of
+                        the collapsed column — the app's preferences inside the
+                        note's own chrome, one click from the button that gives
+                        that row back, and already on ⌘, and in ⌘K. */}
                     <button
                       type="button"
                       onClick={() => changeNavigation(true)}
@@ -3433,14 +3452,6 @@ export default function NotesPage() {
                       className="toolbar-button press"
                     >
                       <PanelLeftOpen size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSettingsOpen(true)}
-                      aria-label="Settings"
-                      className="toolbar-button press"
-                    >
-                      <Settings size={16} />
                     </button>
                   </>
                 ) : null

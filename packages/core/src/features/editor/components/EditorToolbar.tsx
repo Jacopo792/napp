@@ -18,7 +18,6 @@ import {
   ListChecks,
   ListOrdered,
   Minus,
-  Palette,
   Paperclip,
   Pencil,
   Pilcrow,
@@ -31,7 +30,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { TEXT_COLORS, type TextColor } from "@/features/editor/lib/content";
-import { useDock } from "./useDock";
 import type { FormatAction } from "./RichTextEditor";
 
 /* ── The writing toolbar ─────────────────────────────────────────────────────
@@ -48,7 +46,7 @@ import type { FormatAction } from "./RichTextEditor";
    The same component serves the phone: parity is not a port, it is this file
    being rendered twice. ──────────────────────────────────────────────────── */
 
-type Tool = "text" | "color" | "lists" | "table" | "attach";
+type Tool = "text" | "draw" | "lists" | "table" | "attach";
 
 interface Props {
   mobile?: boolean;
@@ -117,13 +115,7 @@ export function EditorToolbar({
   onCloseLink,
 }: Props) {
   const [open, setOpen] = useState<Tool | null>(null);
-  /* The dock stands down while a menu is open rather than sliding the button
-     that opened it out from under the menu. */
-  const {
-    ref: root,
-    settle: settleDock,
-    handlers: dockHandlers,
-  } = useDock<HTMLDivElement>(open !== null);
+  const root = useRef<HTMLDivElement>(null);
   const id = useId();
 
   useEffect(() => {
@@ -154,10 +146,6 @@ export function EditorToolbar({
 
   function toggle(tool: Tool) {
     onCloseLink?.();
-    // A menu hangs off its button's resting position, not its magnified one, so
-    // the dock stands down for as long as one is open rather than sliding the
-    // button out from under its own popover.
-    settleDock();
     setOpen((current) => (current === tool ? null : tool));
   }
 
@@ -199,7 +187,6 @@ export function EditorToolbar({
     <div
       ref={root}
       className={`editor-tool-cluster glass-toolbar flex items-center ${mobile ? "is-mobile" : ""}`}
-      {...dockHandlers}
     >
       {/* ── Text ── */}
       <div className="relative">
@@ -249,6 +236,36 @@ export function EditorToolbar({
             </div>
 
             <div className="menu-separator" />
+            <p className="menu-label">Colour the selection</p>
+            <div className="menu-swatches" role="group" aria-label="Text colour">
+              {TEXT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`${COLOR_LABEL[color]} text`}
+                  title={COLOR_LABEL[color]}
+                  className={`menu-swatch is-${color}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => run(`color-${color}`)}
+                >
+                  A
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-row text-ink-2"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => run("color-clear")}
+            >
+              <span className="text-ink-3">
+                <Eraser size={16} />
+              </span>
+              <span>Back to normal</span>
+            </button>
+
+            <div className="menu-separator" />
             <p className="menu-label">Paragraph style</p>
             <Row icon={<Pilcrow size={16} />} label="Body" onClick={() => run("body")} />
             <Row icon={<Heading1 size={16} />} label="Title" onClick={() => run("heading-1")} />
@@ -290,48 +307,14 @@ export function EditorToolbar({
         {linkOpen && linkForm}
       </div>
 
-      {/* ── Colour ── */}
+      {/* ── Ink ── */}
       <div className="relative">
-        {tab("color", "Text colour", <Palette size={16} />)}
+        {tab("draw", "Draw", <Pencil size={16} />)}
         {menu(
-          "color",
-          "Text colour",
+          "draw",
+          "Draw",
           "left",
           <>
-            <p className="menu-label">Colour the selection</p>
-            <div className="menu-swatches" role="group" aria-label="Text colour">
-              {TEXT_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={`${COLOR_LABEL[color]} text`}
-                  title={COLOR_LABEL[color]}
-                  className={`menu-swatch is-${color}`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => run(`color-${color}`)}
-                >
-                  A
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              role="menuitem"
-              className="menu-row text-ink-2"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => run("color-clear")}
-            >
-              <span className="text-ink-3">
-                <Eraser size={16} />
-              </span>
-              <span>Back to normal</span>
-            </button>
-            {/* A drawing is the other way of putting colour on a page, and the
-                only one that does not need words underneath it first — so it
-                sits below the swatches with a rule of its own rather than
-                among them. */}
-            <div className="menu-separator" />
-            <p className="menu-label">Draw</p>
             <Row
               icon={<Pencil size={16} />}
               label="On the page"

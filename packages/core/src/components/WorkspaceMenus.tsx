@@ -12,7 +12,7 @@ import {
   BookOpen,
   Contrast,
   Copy,
-  Image,
+  Image as ImageIcon,
   Layers,
   LogOut,
   Mail,
@@ -250,6 +250,7 @@ function noteMenuItems({
   onFind,
   onToggleFocus,
   focusMode,
+  onAddCover,
   onOpenBeside,
   onMove,
   onRecent,
@@ -298,6 +299,23 @@ function noteMenuItems({
       icon: <Columns2 size={16} />,
       run: onOpenBeside,
     },
+    /* Setting a cover is something you do to the note, so it is here with
+       everything else you do to the note. It stood on the far left of the
+       strip instead, labelled, which made it the one thing up there that was
+       neither the window's nor the note's own state — and it was as far from
+       this menu as the window is wide. Offered only while there is no cover:
+       once there is one, the cover carries its own Change and Remove. */
+    ...(onAddCover
+      ? [
+          {
+            kind: "item" as const,
+            id: "cover",
+            label: "Add cover",
+            icon: <ImageIcon size={16} />,
+            run: onAddCover,
+          },
+        ]
+      : []),
     { kind: "separator" },
     {
       kind: "item",
@@ -391,6 +409,8 @@ interface NoteMenuActions {
   onFind: () => void;
   onToggleFocus: () => void;
   focusMode: boolean;
+  /** Absent where there already is one, or where this reader cannot write. */
+  onAddCover?: () => void;
   onOpenBeside: () => void;
   onMove: (folderId: string | null) => void;
   onRecent: (id: string) => void;

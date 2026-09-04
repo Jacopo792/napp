@@ -1,13 +1,4 @@
-import {
-  ChevronDown,
-  ChevronUp,
-  Image as ImageIcon,
-  Link2,
-  ListTree,
-  MessageSquare,
-  Search,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Link2, ListTree, MessageSquare, Search, X } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -28,12 +19,10 @@ import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
-import { COVER_PRESETS } from "@/lib/pageProperties";
 import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
 import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
-import { useDock } from "./useDock";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
@@ -99,7 +88,7 @@ interface Props {
    the cluster takes a row of its own, the way the phone already gives it one.
    Measured, not guessed: the cluster is 210px and the actions 184px, and a
    desktop window of 1024px leaves the editor 334px to hold both. */
-const TOOLBAR_ROOM = 750;
+const TOOLBAR_ROOM = 810;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
@@ -210,13 +199,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const editorRef = useRef<RichTextEditorHandle>(null);
   const findRef = useRef<HTMLInputElement>(null);
 
-  /* The header's controls are a dock like the formatting cluster: the same
-     pill and the same magnification, so the two read as one thing. The state
-     it reports — the readout, the faces — gets the pill without the dock, and
-     the left of the header keeps neither: "Editing" and Add cover were there
-     before any of this and stay as they were. The phone gets none of it, its
-     header being one tight row already. */
-  const rightDock = useDock<HTMLSpanElement>(mobile);
   const [shellWidth, setShellWidth] = useState<number | null>(null);
 
   const shellRef = useCallback((node: HTMLElement | null) => {
@@ -475,10 +457,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   /* Inline while there is room for it; on its own row otherwise.
      The number is arithmetic, not a feeling: the group on the right is about
-     244px of readout, faces and buttons, the tools in the middle are about 210,
-     the two outer tracks are equal because they are both `1fr`, and the strip
-     has 32 of padding and 16 of gaps. 244 × 2 + 210 + 48 is 746. Under that the
-     tools go to their own row, which is what the narrow window already did.
+     293px of state, readout, faces and buttons — it was 244 before the note's
+     own state moved over to join the rest of what the note says about itself —
+     the tools in the middle are 174, the two outer tracks are equal because
+     they are both `1fr`, and the strip has 32 of padding and 16 of gaps.
+     293 × 2 + 174 + 48 is 808. Under that the tools go to their own row, which
+     is what the narrow window already did.
 
      It was 550, which is where the readout ended up printed on top of the last
      tool: the right-hand group needed 244 and its track was 196, and a grid
@@ -612,42 +596,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             : "flex items-center gap-2"
         }`}
       >
+        {/* What the window is doing, and nothing else. Add cover stood here
+            too — an act on the note, labelled, as far from the ⋯ menu that
+            carries the note's other acts as the window is wide — and it is in
+            that menu now. */}
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
-          {/* The state, not the control: taking a note back is done from the ⋯
-              menu the note's other actions live in, and a second button up
-              here was only a second thing to keep agreeing with this line. */}
-          {!mobile && (
-            <span className="label truncate text-ink-4">
-              {lock?.holderName
-                ? lock.mine
-                  ? "Locked by you"
-                  : `Locked by ${lock.holderName}`
-                : canEdit
-                  ? "Editing"
-                  : "Read only"}
-            </span>
-          )}
-          {/* Setting a cover is something you do to the page, so it belongs
-              with the page's own controls rather than standing in the reading
-              column above the title — where it was the one thing in that column
-              that was not the note. It appears only while there is no cover;
-              once there is one, the cover carries its own Change and Remove. */}
-          {canEdit && !entry.note.cover && (
-            <button
-              type="button"
-              className="note-add-property"
-              onClick={() =>
-                updatePageProperties({
-                  photo: entry.note.photo,
-                  cover: { kind: "preset", id: COVER_PRESETS[0].id, position: 0.5 },
-                })
-              }
-            >
-              <ImageIcon size={16} />
-              Add cover
-            </button>
-          )}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the
@@ -662,17 +616,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             inlineToolbar ? "" : "ml-auto"
           }`}
         >
-          {/* No pill. The readout and the faces are what the header says, not
-              what it does — the same kind of thing as "Editing" opposite them,
-              which stands on the bar in plain text. A pill around something
-              that never moves and cannot be pressed only offers to be pressed.
-              They stay out of the dock beside them for the same reason: a dock
-              that carried them would be moving its icons around two things
-              that are not icons. */}
+          {/* Everything the note says about itself, in one place. It used to
+              say it in two: whether you may write it at the far left of the
+              strip, whether it is saved and who else is here at the far right
+              — one kind of thing, two corners.
+
+              No pill on any of it. The readout, the state and the faces are
+              what the header says, not what it does, and a pill around
+              something that never moves and cannot be pressed only offers to
+              be pressed. They stay out of the dock beside them for the same
+              reason: a dock carrying them would be moving its icons around
+              three things that are not icons. */}
+          {!mobile && (
+            <span className="label truncate text-ink-4">
+              {lock?.holderName
+                ? lock.mine
+                  ? "Locked by you"
+                  : `Locked by ${lock.holderName}`
+                : canEdit
+                  ? "Editing"
+                  : "Read only"}
+            </span>
+          )}
           <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
           <span
-            ref={rightDock.ref}
-            {...rightDock.handlers}
             className={`flex min-w-0 items-center justify-end gap-1 ${
               mobile ? "gap-1" : "editor-tool-group glass-toolbar"
             }`}

@@ -1244,18 +1244,17 @@ of a narrow window spent on air.
   it is one `@media print` block deciding what is _not_ the note — and giving
   the scroll box back its height and overflow, or the printer is handed one
   screenful and told the rest is off-page.
-- **A dock stops at its own box.** A menu opened from a docked button is a
-  _descendant_ of the row, so walking down into it never fires `pointerleave`
-  and the row went on magnifying to the pointer's x with the cursor two hundred
-  pixels below it. `useDock` settles when the pointer leaves its bounding rect,
-  and again when `suspended` is raised — standing the dock down has to put it
-  back down, or it freezes at whatever magnification it had.
-- **Nothing that tracks the pointer may have a transition on `transform`.** The
-  toolbar's dock magnification chases a target it never reaches otherwise: the
-  icons lag the cursor and rubber-band when it stops, which reads as latency
-  rather than as magnification. `EditorToolbar` adds `is-docked` while
-  tracking, which takes the transition off, and removes it in the same tick as
-  the properties so the settle animates.
+- **The toolbar does not magnify, and that was a decision rather than a gap.**
+  The two pills were a dock: the icon under the pointer grew, its neighbours
+  grew less, the rest stepped aside. It is gone at the reader's request, and
+  what it took with it is worth knowing before anybody puts it back. A menu
+  opened from a docked button is a _descendant_ of the row, so walking down
+  into it never fires `pointerleave` and the row went on magnifying to a
+  pointer two hundred pixels below it. Nothing that tracks a pointer may carry
+  a transition on `transform`, or the icons chase a target they never reach and
+  it reads as latency. And the row could not be measured with
+  `getBoundingClientRect`, because that reports the box after the transforms
+  the dock itself had written — `de5f344` has the numbers.
 - **Two `Suggestion` plugins in one editor need two `pluginKey`s.** Every
   instance defaults to `suggestion$`, and ProseMirror refuses two plugins that
   share a key — so adding `[[` beside `/` threw on every note until the second
