@@ -213,9 +213,19 @@ function createWindow() {
      becomes the archive a moment later. */
   window.once("ready-to-show", () => window.show());
 
-  /* An answer that arrived before this page had a listener for it. */
+  /* macOS takes the traffic lights away in full screen, so the gutter held for
+     them has to go with them. It is stated here rather than read from CSS: the
+     window is the only thing that knows, and `--titlebar-inset` and
+     `trafficLightPosition` are already one decision in two files. */
+  const tellFullScreen = () => window.webContents.send("napp:fullscreen", window.isFullScreen());
+  window.on("enter-full-screen", tellFullScreen);
+  window.on("leave-full-screen", tellFullScreen);
+
+  /* An answer that arrived before this page had a listener for it — and the
+     window's own presentation, which a fresh page has no way to ask about. */
   window.webContents.on("did-finish-load", () => {
     if (pendingUpdate) window.webContents.send("napp:update", pendingUpdate);
+    tellFullScreen();
   });
 
   /* On close, not on every move: a resize sends a great many events and this

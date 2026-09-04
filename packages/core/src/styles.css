@@ -2208,7 +2208,12 @@
   /* Sized to the faces in it rather than to the pane it sits in. As wide as
      the column it was a slab; sixty-six pixels it is a control. */
   flex: none;
-  border: 1px solid var(--rule);
+  /* The soft rule, not the hairline the toolbars are divided by. A well is
+     read by its ground going darker, and at `--rule` this one had the
+     brightest edge in a control that already carries a ring per face — four
+     concentric outlines in seventy pixels, of which the outermost was winning.
+     The recess is the ink; the edge only has to close it. */
+  border: 1px solid var(--rule-soft);
   /* Fully round. The two halves each hold a face, and a face is a circle; a
      0.8rem rectangle around two circles is a box with something round rattling
      inside it. The pill is the shape the contents already have. */
@@ -3034,6 +3039,17 @@
 
 .archive-switch .avatar.is-compact:not(.is-online) {
   box-shadow: inset 0 0 0 1px var(--glass-highlight);
+}
+
+/* The roster's ring is three pixels, and three is exactly the room a 24px face
+   has inside a 30px slot — so with both members here the two rings met on the
+   same pixel and the pair read as one amber stadium with two heads in it
+   rather than as two people. Two pixels leaves two of track showing between
+   them, which is the whole of what says they are two. */
+.archive-switch .avatar.is-compact.is-online {
+  box-shadow:
+    0 0 0 1px var(--surface),
+    0 0 0 2px var(--presence, var(--accent-strong));
 }
 
 /* Being here is drawn as a ring around the face, not as a green bead stuck to
@@ -7367,10 +7383,14 @@
 
 /* Full screen takes the three buttons away, and a gutter held open for
    buttons that are not there is a hole in the corner of the window. */
-@media (display-mode: fullscreen) {
-  [data-shell="mac"] {
-    --titlebar-inset: 0px;
-  }
+/* In full screen macOS takes the three buttons away, so the gutter held for
+   them goes too — or the switch stands 88px in from the edge beside nothing,
+   which is what it was doing. Not `@media (display-mode: fullscreen)`: a
+   Chromium embedded in a window of our own answers `browser` to that however
+   the window is presented, so the rule never once fired. The desktop preload
+   writes this attribute from the window's own `enter-full-screen`. */
+[data-shell="mac"][data-fullscreen] {
+  --titlebar-inset: 0px;
 }
 
 /* The window's own edge. `transparent: true` is what lets the vibrancy through

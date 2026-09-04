@@ -32,6 +32,20 @@ ipcRenderer.on("napp:command", (_event, init) => {
   target?.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
 });
 
+/* Whether the window is full screen, which the page cannot find out for
+   itself. `@media (display-mode: fullscreen)` answers `browser` in a Chromium
+   embedded this way however the window is presented — so macOS hid the traffic
+   lights and the stylesheet went on holding their 88px gutter open beside
+   nothing, which left the scope switch stranded to the right of an empty hole.
+   The window knows; this is it saying so.
+
+   An attribute and not an event, because it is a state and not a thing that
+   happened: the stylesheet reads it the way it reads `data-shell`, and no
+   component has to hold it. */
+ipcRenderer.on("napp:fullscreen", (_event, on) => {
+  document.documentElement.toggleAttribute("data-fullscreen", !!on);
+});
+
 /* The main process asked GitHub whether there is a newer release; this is how
    the page hears the answer. Same one-way shape as the menu above, and for the
    same reason: an event the page may listen to is not a capability the page
