@@ -79,6 +79,10 @@ interface Props {
   busy: boolean;
   canWrite: boolean;
   folderLabel: string;
+  /** Whose notes these are, when they are not yours. The switch is portraits
+   *  now and says no names, so the tally under the folder carries the member —
+   *  a readout, which is what that line already is. */
+  scopeLabel?: string;
   trashMode: boolean;
   archiveMode: boolean;
   /** Notes carrying a remark the reader has not seen. The badge in the sidebar
@@ -751,6 +755,7 @@ export function NoteList({
   busy,
   canWrite,
   folderLabel,
+  scopeLabel,
   trashMode,
   archiveMode,
   unreadIds,
@@ -1142,6 +1147,7 @@ export function NoteList({
             </h1>
             <p className="readout mt-1.5 text-ink-4">
               {loading ? "Loading" : noteTally(entries.length, trashMode)}
+              {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
             </p>
           </div>
           <span className="flex items-center gap-1">{toolbarActions}</span>
@@ -1235,6 +1241,7 @@ export function NoteList({
           <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
           <p className="readout mt-0.5 text-ink-4">
             {loading ? "Loading" : noteTally(entries.length, trashMode)}
+            {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
           </p>
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged

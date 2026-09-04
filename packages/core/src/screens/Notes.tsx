@@ -2796,21 +2796,25 @@ export default function NotesPage() {
     member.isSelf ? "Your notes" : `${member.nickname || "Another member"}'s notes`;
 
   /* ── Whose notes ───────────────────────────────────────────────────────────
-     The control that re-points the entire window, so it is built as a real
-     switch rather than two buttons that happen to sit together: one track, one
-     travelling thumb, and the two names always both legible. The thumb is a
-     single element moved by `data-active`, which is what lets the selection
-     slide between the halves instead of blinking from one to the other.
+     Faces, and no names. It carried both, side by side, for each member: two
+     drawings of one person touching each other — which is the fault the
+     profile button had at forty pixels, committed again at four. A portrait
+     already is the name.
 
-     `flex-1` children need a parent with a width of its own; in the phone app
-     bar the switch is shrink-to-fit, so it is given one.
+     Losing the names is what lets it stop being as wide as the pane. Shrunk to
+     its contents it is sixty-six pixels, which fits in the window's own strip
+     beside the traffic lights — so the column goes back to one band of chrome
+     over its rows instead of two, and the row under it stops being the second
+     of two slabs of identical width. That stacking, not the colour, was what
+     made "All notes" unreadable.
 
-     Everybody is named the same way, yourself included. It used to label you
-     with a role — "My notes" — and everybody else with their name, which is
-     two kinds of answer to one question and gets worse with every member: a
-     possessive beside a face that is already yours says nothing the face did
-     not. Yours is also always the first slot, so the thumb starts where the
-     hand expects it whether you made this archive or were invited to it. */
+     It stays a switch rather than becoming a menu: one track, one travelling
+     thumb, and the difference between a control that throws and two buttons
+     that light up. Yours is always the first slot, so the thumb rests where
+     the hand expects it whether you made this archive or were invited to it.
+
+     What the faces no longer say, the column beside this one does: the tally
+     under the folder's name carries the member when the member is not you. */
   const archiveSwitch = (
     <div
       role="group"
@@ -2824,7 +2828,7 @@ export default function NotesPage() {
           ),
         } as React.CSSProperties
       }
-      className={`archive-switch ${compact ? "w-52 shrink-0" : "w-full"}`}
+      className="archive-switch shrink-0"
     >
       <span className="archive-switch-thumb" aria-hidden="true" />
       {roster.map((member) => (
@@ -2844,7 +2848,6 @@ export default function NotesPage() {
             compact
             online={flags.presence && onlineMemberIds.has(member.userId)}
           />
-          <span className="truncate">{nameOf(member)}</span>
         </button>
       ))}
     </div>
@@ -2881,6 +2884,9 @@ export default function NotesPage() {
      in the interface still assuming an archive holds exactly two people. */
   const viewedMember = members.find((member) => member.userId === viewAs);
   const readingLabel = viewedMember ? notesOf(viewedMember) : "This archive";
+  /* Only when it is somebody else's. Your own name under your own notes is the
+     possessive the switch just stopped saying. */
+  const scopeTag = viewedMember && !viewedMember.isSelf ? nameOf(viewedMember) : undefined;
 
   /* Both keyboard sheets travel with the settings panel, because both layouts
      mount that and neither wants a second copy of this. */
@@ -3076,6 +3082,7 @@ export default function NotesPage() {
                   busy={saving}
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
+                  scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
                   archiveMode={selectedFolderId === ARCHIVE}
@@ -3250,6 +3257,7 @@ export default function NotesPage() {
                   busy={saving}
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
+                  scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
                   archiveMode={selectedFolderId === ARCHIVE}

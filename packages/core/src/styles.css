@@ -2143,10 +2143,10 @@
   position: relative;
   display: flex;
   min-width: 0;
-  /* It is asked about its own width down in the sizing section, where the
-     names stop fitting. */
-  container-type: inline-size;
   isolation: isolate;
+  /* Sized to the faces in it rather than to the pane it sits in. As wide as
+     the column it was a slab; sixty-six pixels it is a control. */
+  flex: none;
   border: 1px solid var(--rule);
   /* Fully round. The two halves each hold a face, and a face is a circle; a
      0.8rem rectangle around two circles is a box with something round rattling
@@ -2157,7 +2157,7 @@
      thing in the sidebar that refused to belong to it. Tinted instead, so the
      recess comes from the ink and the atmosphere still passes through. */
   background: color-mix(in srgb, var(--surface) 62%, transparent);
-  padding: 4px;
+  padding: 3px;
 }
 
 /* The thumb used to be half the track, moved once. A roster is any length, so
@@ -2178,17 +2178,17 @@
 .archive-switch-thumb {
   position: absolute;
   z-index: -1;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
   /* Whole pixels, or the ring below is drawn across two of them. A roster of
      three in a column the width of this one gives slots of 67.98, 68.33, 74.98
      — measured while dragging the pane — and the thumb carries a 1px inset
      ring at both edges. Rounding down costs at most one pixel per step of
      alignment with the label behind it, against a ring that is crisp at every
      width. The unrounded value stays as the fallback. */
-  width: calc((100% - 8px) / var(--switch-count, 2));
-  width: round(down, calc((100% - 8px) / var(--switch-count, 2)), 1px);
+  width: calc((100% - 6px) / var(--switch-count, 2));
+  width: round(down, calc((100% - 6px) / var(--switch-count, 2)), 1px);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   box-shadow: inset 0 0 0 1px var(--glass-highlight);
@@ -2203,49 +2203,32 @@
   scale: 0.96 0.92;
 }
 
+/* A square slot around a round face, so the thumb behind it is a circle in a
+   pill and not a lozenge with something rattling in it. */
 .archive-switch button {
   display: flex;
-  min-width: 0;
-  flex: 1 1 0;
+  width: 30px;
+  height: 30px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 0 12px 0 4px;
   border-radius: var(--radius-pill);
-  color: var(--ink-3);
-  font-size: 13px;
-  font-weight: 540;
 }
 
-/* Pointing at a segment that is not in use lifts it; pressing it takes it all
-   the way, because the thumb has not started travelling yet and the control
-   has to say it heard the press. */
-.archive-switch button:not(.is-active):hover {
-  color: var(--ink-2);
-}
-
-.archive-switch button:not(.is-active):active {
-  color: var(--ink);
-}
-
-/* `--accent-strong` is the 4.5:1 lift of an accent this archive's reader chose
-   to be darker than the ink, so it landed at #8a8989 — dimmer than the
-   `--ink-2` the *unselected* name is set in. The name under the thumb was the
-   quieter of the two, which is the one thing a selection may never be. The
-   accent keeps the fill, where being quiet is what it is for. */
-.archive-switch button.is-active {
-  color: var(--ink);
-  font-weight: 620;
-}
-
-/* The face that is not the one in use is dimmed rather than absent, so the
-   thumb is not the only thing saying which of them you are reading. */
+/* With no names left, the faces carry the whole answer: the one in use is at
+   full strength and the others stand back, which is what the thumb underneath
+   is agreeing with rather than saying alone. */
 .archive-switch .avatar {
-  opacity: 0.78;
+  opacity: 0.62;
   transition: opacity var(--dur-fast) var(--ease);
 }
 
-.archive-switch button.is-active .avatar {
+.archive-switch button:hover .avatar {
+  opacity: 0.85;
+}
+
+.archive-switch button.is-active .avatar,
+.archive-switch button.is-active:hover .avatar {
   opacity: 1;
 }
 
@@ -2338,11 +2321,26 @@
 
 /* The heading folds the group. A date bucket is the one grouping in this list
    nobody chose — the app decided that six notes were "Yesterday" — so the least
-   it can do is let you put the old ones away. */
+   it can do is let you put the old ones away.
+
+   And it stays at the top while its own group scrolls under it, which is what
+   Mail, Notes and Finder all do and what this list was the only one not doing:
+   scrolling a long list, the reader had no way of knowing which day they were
+   in without scrolling back. It sticks inside its own `<section>`, so the next
+   day's heading pushes this one out rather than piling on top of it.
+
+   It has to paint. The column already paints its own ground — it is the
+   sidebar, not this one, that is the window's material — so `--paper` here is
+   the column's own colour and is invisible against it, and opaque against the
+   rows passing beneath. */
 .note-group-heading {
+  position: sticky;
+  z-index: 2;
+  top: 0;
   display: flex;
   width: 100%;
   align-items: center;
+  background: var(--paper);
   gap: 0.5rem;
   text-align: left;
   /* Whole pixels, like the rows underneath. 1.2rem and 0.55rem are 19.2 and
@@ -2370,6 +2368,14 @@
   color: var(--ink-4);
   font-family: var(--font-mono);
   font-size: 0.63rem;
+}
+
+/* Whose notes these are, when they are not yours. It is set apart by a middot
+   rather than by a colour of its own: this line is a readout and the name is
+   one more measurement on it. */
+.scope-tag::before {
+  margin: 0 0.4em;
+  content: "·";
 }
 
 /* Rotation, not a scale: a chevron is a shape, and turning one costs nothing.
@@ -2980,39 +2986,22 @@
 }
 
 .archive-switch button {
-  gap: 7px;
+  gap: 0;
 }
 
-/* Big enough to be a person rather than a bullet. The ring is what keeps a
-   photograph from bleeding into the track behind it — a portrait needs an edge
-   of its own, and the initials placeholder gets the same one so the two read
-   as the same object. */
+/* Big enough to be a person rather than a bullet, and exactly the slot's
+   width once the presence ring is counted — 24 plus three of ring on each
+   side. The ring is also what keeps a photograph from bleeding into the track
+   behind it: a portrait needs an edge of its own, and the initials placeholder
+   gets the same one so the two read as the same object. */
 .archive-switch .avatar.is-compact {
-  width: 26px;
-  height: 26px;
-  font-size: 10px;
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
 }
 
-/* Where the room runs out, the portrait gives back what the name needs: a face
-   nobody can read beside a name nobody can read is two things lost instead of
-   one. It was a class the phone app bar wore, on the argument that a bar has a
-   bar's worth of room and a column has a column's — but the column has the
-   phone's width too, at the far end of the resizer, and there the same two
-   names clipped. So the switch is asked about its own width rather than about
-   which shell it is in, and the phone gets the same answer without being told.
-   208px of app bar and 194px of dragged-in column are both under this. */
-@container (max-width: 215px) {
-  .archive-switch button {
-    padding-inline: 4px 9px;
-    font-size: 12.5px;
-  }
-
-  .archive-switch .avatar.is-compact {
-    width: 21px;
-    height: 21px;
-    font-size: 8px;
-  }
-}
+/* No width rule of its own any more. It was one because two names in a slot
+   narrower than they were is a name nobody can read; there are no names. */
 
 /* ── The profile section ──────────────────────────────────────────────────
    The picture is the hero of this section, not the first of its rows: it is a
@@ -4673,19 +4662,8 @@
   transform: scale(0.88);
 }
 
-/* `font-weight` is in the list on purpose. The active label is 620 against
-   540, and without it the label thickens in one frame somewhere in the middle
-   of the thumb's travel — the one pop in a movement that is otherwise
-   continuous. macOS resolves `-apple-system` to a variable SF Pro and Chromium
-   interpolates it; a static face snaps at the halfway point, which is where it
-   snaps today. */
 .archive-switch button {
-  transition:
-    background-color var(--dur-fast) var(--ease-press),
-    color var(--dur-fast) var(--ease-press),
-    box-shadow var(--dur-fast) var(--ease-press),
-    font-weight var(--dur-fast) var(--ease),
-    transform var(--dur-press) var(--ease-press);
+  transition: transform var(--dur-press) var(--ease-press);
 }
 
 .archive-switch {
@@ -5201,6 +5179,33 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Sits where the count sits, at the heading's own weight — an action on a
+   section, not a button parked on a label. */
+.sidebar-heading-action {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.sidebar-heading-action:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+/* The count on the row you are in has to come up with the label and the glyph,
+   or it is the one thing on that row still set for the ground behind it. */
+.sidebar-row.is-active .sidebar-count {
+  color: var(--ink-2);
 }
 
 .sidebar-count {
@@ -7316,18 +7321,6 @@
     border-radius: 6px;
   }
 
-  /* The switch was sized against 34px rows and is now the one thing in the
-     column still built to them — 44px of it above a 28px row, which reads as
-     the control having been left behind rather than as emphasis. It keeps its
-     pill and its travelling thumb; only the box comes down with everything
-     else, and the faces with the box, or two circles rattle in a shape that no
-     longer fits them. */
-  .archive-switch button {
-    min-height: 26px;
-  }
-
-  .archive-switch .avatar.is-compact {
-    width: 20px;
-    height: 20px;
-  }
+  /* The switch is in the window's own strip now, not in the column, so it is
+     not sized against the rows any more and does not come down with them. */
 }

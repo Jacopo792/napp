@@ -500,17 +500,20 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
-      {/* The window's own strip, and nothing else. It carried a face and a name
-          as well, forty pixels above the switch that carries the same face —
-          two controls asking almost the same question, and on macOS the gutter
-          held for the traffic lights left the name thirty-four pixels to say
-          itself in, so it never did. Who you are is answered by the switch
-          below, where your face is the one under the thumb; where you go to
-          change it is at the foot of the column, with the lock.
+      {/* The window's own strip, and what the column is about. The switch used
+          to have a band of its own directly under this one, as wide as the
+          pane and touching the first row — two slabs of identical width, one a
+          pill and one a rectangle, which is what made the row under them
+          unreadable however the fill was coloured. Shrunk to two faces it fits
+          in here beside the traffic lights, and the column is back to one band
+          of chrome over its rows.
 
-          The pane toggle stands first, immediately after the lights, which is
-          where every Mac window keeps it. */}
-      <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-1 px-2">
+          On macOS the gutter is 88 of a column that may be dragged down to
+          210, so the strip holds the switch and the pane toggle and nothing
+          else: "new folder" went to the Folders heading, where it acts. */}
+      <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
+        {archiveSwitch}
+        <span className="ml-auto" />
         <button
           type="button"
           onClick={onClose}
@@ -520,26 +523,9 @@ export function Sidebar({
         >
           <PanelLeftClose size={16} />
         </button>
-        <span className="ml-auto" />
-        {canWrite && (
-          <button
-            type="button"
-            aria-label="New folder"
-            title="New folder"
-            className="toolbar-button press shrink-0"
-            onClick={() => setAdding("")}
-          >
-            <FolderPlus size={16} />
-          </button>
-        )}
       </div>
 
-      {/* `pt-3` and no bottom padding, so this sits in the same band as the
-          search field in the column beside it: both start 12px under a 52px
-          header and both end where their column starts scrolling. */}
-      <div className="px-2 pt-3">{archiveSwitch}</div>
-
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pt-3 pb-2">
         {all && (
           <Row
             scope={all}
@@ -587,16 +573,32 @@ export function Sidebar({
           </>
         )}
 
+        {/* The action stands on the heading of the thing it acts on, the way
+            a Finder sidebar section carries its own. In the strip above it was
+            competing with the traffic lights for a column that can be dragged
+            to 210 pixels. */}
         <p className="sidebar-heading">
           Folders
-          <span>{folders.length || ""}</span>
+          {canWrite ? (
+            <button
+              type="button"
+              aria-label="New folder"
+              title="New folder"
+              className="sidebar-heading-action press"
+              onClick={() => setAdding("")}
+            >
+              <FolderPlus size={13} />
+            </button>
+          ) : (
+            <span>{folders.length || ""}</span>
+          )}
         </p>
 
         {tree.length === 0 && adding === null && (
           <p className="sidebar-empty">
             {canWrite ? (
               <>
-                No folders yet. Use <FolderPlus size={12} /> above to make one.
+                No folders yet. Use <FolderPlus size={12} /> beside Folders to make one.
               </>
             ) : (
               "No folders yet."
