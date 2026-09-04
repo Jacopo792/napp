@@ -508,12 +508,30 @@ export function Sidebar({
           in here beside the traffic lights, and the column is back to one band
           of chrome over its rows.
 
-          On macOS the gutter is 88 of a column that may be dragged down to
-          210, so the strip holds the switch and the pane toggle and nothing
-          else: "new folder" went to the Folders heading, where it acts. */}
+          On macOS the gutter is 88, the switch is 70, and the two acts at the
+          end are 32 each: the strip is what `SIDEBAR_MIN` is measured from,
+          rather than the other way round. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
         {archiveSwitch}
         <span className="ml-auto" />
+        {/* Back in the strip, at the end of it, which is where the Finder and
+            Notes both keep it — beside the control that hides the column
+            rather than on the heading of the section it fills. It was moved
+            down to that heading because the strip was thought too narrow to
+            hold it; the answer to a strip that cannot hold what belongs in it
+            is a wider minimum, and `SIDEBAR_MIN` is now the width of what
+            stands here. */}
+        {canWrite && (
+          <button
+            type="button"
+            onClick={() => setAdding("")}
+            aria-label="New folder"
+            title="New folder"
+            className="toolbar-button press shrink-0"
+          >
+            <FolderPlus size={16} />
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -573,38 +591,16 @@ export function Sidebar({
           </>
         )}
 
-        {/* The action stands on the heading of the thing it acts on, the way
-            a Finder sidebar section carries its own. In the strip above it was
-            competing with the traffic lights for a column that can be dragged
-            to 210 pixels. */}
+        {/* A heading and a tally, like every other heading in this column.
+            The act that makes one lives in the strip above, where the window
+            keeps the acts that are about the column rather than about a row
+            in it. */}
         <p className="sidebar-heading">
           Folders
-          {canWrite ? (
-            <button
-              type="button"
-              aria-label="New folder"
-              title="New folder"
-              className="sidebar-heading-action press"
-              onClick={() => setAdding("")}
-            >
-              <FolderPlus size={12} />
-            </button>
-          ) : (
-            <span>{folders.length || ""}</span>
-          )}
+          <span>{folders.length || ""}</span>
         </p>
 
-        {tree.length === 0 && adding === null && (
-          <p className="sidebar-empty">
-            {canWrite ? (
-              <>
-                No folders yet. Use <FolderPlus size={12} /> beside Folders to make one.
-              </>
-            ) : (
-              "No folders yet."
-            )}
-          </p>
-        )}
+        {tree.length === 0 && adding === null && <p className="sidebar-empty">No folders yet.</p>}
 
         {tree.map((node) => renderNode(node, 0))}
 

@@ -2567,6 +2567,7 @@
    opts out of the fill the same way, by never being handed the class. */
 .note-row-glyph.is-sketch {
   padding: 0.15rem;
+  background: var(--surface);
 }
 
 .note-row-glyph.is-sketch svg {
@@ -2656,6 +2657,33 @@
   background: var(--accent-strong);
   box-shadow: 0 0 0 2px var(--paper);
   content: "";
+}
+
+/* One hairline between two rows, not an underline under each. The rows used
+   to carry a bottom border and four pixels of margin under it, which draws a
+   line and then a gap — a row with a rule below it rather than two rows with a
+   rule between them. And it starts past the leading slot, which is where every
+   list on this platform starts one: a divider that runs under the glyph as
+   well cuts the column in half horizontally instead of separating two rows. */
+.note-row-list::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 2.5rem;
+  /* `--rule`, not `--rule-soft`. The soft one is four values off the paper it
+     is drawn on — a line that is only there in the stylesheet. This is the
+     most repeated hairline in the application and it still has to be seen. */
+  border-bottom: 1px solid var(--rule);
+  content: "";
+}
+
+/* Not under the last one, and not against a row that is already a filled
+   shape: a hairline running into the corner of the selection is the one place
+   the eye reads it as an edge of the selection rather than as a divider. */
+.note-row-list:last-child::after,
+.note-row-list[aria-selected="true"]::after,
+.note-row-list:has(+ .note-row-list[aria-selected="true"])::after {
+  display: none;
 }
 
 /* What is left of a checklist, in the line that already says when. */
@@ -5559,7 +5587,12 @@
   }
 }
 
-/* The list's own glyph, in the same alphabet as the sidebar's. */
+/* The list's own glyph, in the same alphabet as the sidebar's — and no tile
+   behind it. A tile is a frame, and a frame drawn identically around twenty
+   generic document glyphs down one column frames nothing: it is the single
+   loudest thing in a list whose whole job is to be read past. What keeps its
+   frame is what has a picture in it — the note's own photograph and its
+   drawing, below — because there the tile is holding something. */
 .note-row-glyph {
   display: inline-flex;
   flex-shrink: 0;
@@ -5569,7 +5602,6 @@
   height: 1.75rem;
   margin-top: 0.05rem;
   border-radius: var(--radius-sm);
-  background: var(--surface);
   color: var(--ink-4);
   transition:
     background-color var(--dur-fast) var(--ease),
@@ -5581,15 +5613,17 @@
   color: var(--ink-2);
 }
 
+/* Toward the ink, not toward the accent. The accent is derived to a contrast
+   floor against the paper, and in a palette whose ink is bright it lands below
+   `--ink-3` — so the rule that was meant to light a pinned note up was putting
+   it out. The accent holds fills, where being quiet is its job. */
 .note-row-glyph.is-pinned {
-  color: var(--accent);
+  color: var(--ink);
 }
 
-.note-row-glyph.is-selected {
-  background: var(--accent);
-  color: var(--on-accent);
-  transform: scale(1.04);
-}
+/* Nothing. The row is already washed and already says it is the selected one;
+   a second announcement in the same row was the glyph filling with accent and
+   growing, which is a lot of movement for a fact already on screen. */
 
 /* A gallery card is a column, so the glyph sits above the title rather than
    beside it — same sign, same meaning, different arrangement. */

@@ -466,7 +466,7 @@ const Row = memo(function Row({
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
-            : "mx-2 mb-1 touch-none border-b border-rule-soft px-3 py-3"
+            : "note-row-list mx-2 touch-none px-3 py-2.5"
       } ${
         selected
           ? mobile
@@ -539,10 +539,17 @@ const Row = memo(function Row({
           className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
+          /* One line in the column, and that is the whole of why the list
+             reads as a list. A title allowed three lines is three lines of one
+             sentence, and the rows below it start wherever that sentence
+             happened to end — so the column has no rhythm and you cannot see
+             how many notes are under a heading without reading all of them.
+             A card in the gallery has room for four; a phone keeps three,
+             where a thumb is scrolling and the rows are further apart. */
           style={{
             fontWeight: 520,
             display: "-webkit-box",
-            WebkitLineClamp: gallery ? 4 : 3,
+            WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}

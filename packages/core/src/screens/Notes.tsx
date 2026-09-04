@@ -168,7 +168,10 @@ const SIDEBAR_WIDTH_KEY = "napp:sidebar-width";
 const LIST_WIDTH_KEY = "napp:list-width";
 const SIDEBAR_DEFAULT = 248;
 const LIST_DEFAULT = 380;
-const SIDEBAR_MIN = 210;
+/* What the strip above the column has to hold: 88px of traffic-light gutter on
+   macOS, the 70px scope switch, and the two buttons at the end of it, with the
+   gaps. Narrower than this and the buttons are underneath the faces. */
+const SIDEBAR_MIN = 248;
 const SIDEBAR_MAX = 420;
 const LIST_MIN = 300;
 const LIST_MAX = 620;
@@ -3207,7 +3210,7 @@ export default function NotesPage() {
               and every note title reflowing while it goes.
 
               Clipped only while it is away. The sidebar's own menu is wider
-              than the column it hangs in — 14.5rem against a 210px minimum —
+              than the column it hangs in — 14.5rem against a 248px minimum —
               so a clip that was always on would cut it in half whenever
               somebody narrowed the pane. Closing, there is nothing left to
               cut; opening, the track is off to the left of the window and the
