@@ -5,6 +5,33 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+### Fixed
+
+- **The macOS download said it was damaged, and it was not.** The app was built
+  with signing switched off entirely, which left the downloaded Electron
+  binary's own signature over a bundle whose contents had since been replaced —
+  a broken seal, which macOS reports as "damaged" and offers only the Bin for.
+  The bundle is now sealed ad-hoc at build time, so the first launch is the
+  ordinary refusal you answer once in Privacy & Security. Nobody has to remove
+  the quarantine attribute from a terminal any more.
+- **One background at a time.** With a picture of your own set, the folders
+  column showed the desktop behind the window while the note showed your
+  picture — two grounds side by side, which reads as a hole in the window rather
+  than as a material. The system's material is now used only when Translucency
+  is on and no picture has been chosen, and a picture runs under the whole
+  window as it does in the browser. Translucency, which is off by default, now
+  governs the surface it is named after.
+- **Windows: the window no longer scrolls under its own title bar.** The band
+  held for the caption buttons was measured outside the shell rather than
+  inside it, so the page came out taller than the window by exactly that band.
+  It also stays held open in full screen, where the buttons are gone.
+- **Windows: menus are the application's own again**, rather than the operating
+  system's — a system menu is drawn from the system's theme, not the palette
+  you chose here.
+- **Shortcuts are named after the keys on your keyboard.** The list, Settings,
+  the ⋯ menu and the toolbar said ⌘ on machines that have none. The keys
+  themselves always worked.
+
 ### Added
 
 - **The window says when it is out of date.** A tab is always the version that
