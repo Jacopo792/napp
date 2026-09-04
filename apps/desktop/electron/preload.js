@@ -1,7 +1,7 @@
 /* The only opening in the wall.
  *
  * `contextIsolation` and `sandbox` are both on, so the renderer holds no Node
- * and no Electron — it holds these four functions and nothing else. Each one
+ * and no Electron — it holds these five functions and nothing else. Each one
  * ends in a dialog the reader answers, which is the point: the window cannot
  * write a file, only ask. */
 const { contextBridge, ipcRenderer } = require("electron");
@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("napp", {
   /* Colour is deliberately a one-way cosmetic message, not a privileged
    * capability. The main process validates it before painting the frame. */
   setFrameTheme: (color, symbolColor) => ipcRenderer.send("napp:frame-theme", color, symbolColor),
+  /* A menu the system draws, and the id of what was chosen in it. The page
+   * describes the menu and hears the answer; it never holds a `Menu`. */
+  popUpMenu: (items) => ipcRenderer.invoke("napp:menu", items),
 });
 
 /* The menu presses the key. Nothing here decides what a command does — the

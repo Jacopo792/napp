@@ -1,7 +1,7 @@
 /* The desktop window's answers. Every one of them ends at the preload bridge,
    because a renderer with `sandbox: true` holds no Node and cannot write a
    byte on its own. */
-import type { Platform, SavedAs } from "@notes-app/core/platform";
+import type { Platform, SavedAs, SystemMenuItem } from "@notes-app/core/platform";
 
 interface Bridge {
   save(
@@ -10,6 +10,7 @@ interface Bridge {
   ): Promise<SavedAs | undefined>;
   open(name: string, bytes: Uint8Array): Promise<string | null>;
   print(): Promise<void>;
+  popUpMenu(items: SystemMenuItem[]): Promise<string | null>;
 }
 
 const bridge = (window as unknown as { napp: Bridge }).napp;
@@ -51,4 +52,9 @@ export const desktopPlatform: Platform = {
   openFile: async (name, load) => bridge.open(name, await bytes(await load())),
 
   print: () => bridge.print(),
+
+  /* The one member a tab has no answer for. An `NSMenu` is drawn by macOS
+     over the window, in the material the system is using that year; a page
+     can only paint what is inside itself. */
+  popUpMenu: (items) => bridge.popUpMenu(items),
 };

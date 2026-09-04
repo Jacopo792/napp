@@ -13,7 +13,17 @@
  * open with a message that never says why. So the built renderer is served
  * from a scheme of its own, and `app://notes` is an origin the server can be
  * told about. Render's ALLOWED_ORIGINS has to contain it. */
-const { app, BrowserWindow, dialog, ipcMain, net, protocol, screen, shell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  screen,
+  shell,
+} = require("electron");
 const { installMenu } = require("./menu");
 const path = require("node:path");
 const fs = require("node:fs/promises");
@@ -296,6 +306,63 @@ ipcMain.handle("napp:open", async (_event, name, data) => {
 
 ipcMain.handle("napp:print", (event) => {
   event.sender.print({});
+});
+
+/* ── The menu the system draws ───────────────────────────────────────────────
+   The page describes a menu; macOS draws it. That is the whole of why this
+   exists: an `NSMenu` is painted by the window server over the window, in the
+   material the system is wearing that year, and nothing inside a renderer can
+   reach past its own document to imitate it.
+
+   The description is data off the bridge, so it is read rather than trusted —
+   not because the page is hostile but because a malformed template throws in
+   the main process, and a throw there closes the application. Depth is capped
+   at the one level the page is allowed to describe, and the count at more
+   items than any menu here has. */
+const MENU_DEPTH = 2;
+const MENU_ITEMS = 64;
+
+function menuTemplate(items, chosen, depth = 1) {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, MENU_ITEMS).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    if (item.type === "separator") return [{ type: "separator" }];
+    if (typeof item.label !== "string" || !item.label) return [];
+    const label = item.label.slice(0, 200);
+    const submenu =
+      depth < MENU_DEPTH && Array.isArray(item.submenu)
+        ? menuTemplate(item.submenu, chosen, depth + 1)
+        : null;
+    if (submenu?.length) return [{ label, submenu }];
+    const id = typeof item.id === "string" ? item.id : null;
+    return [
+      {
+        label,
+        enabled: item.enabled !== false && !!id,
+        ...(item.checked ? { type: "checkbox", checked: true } : {}),
+        click: id ? () => chosen(id) : undefined,
+      },
+    ];
+  });
+}
+
+ipcMain.handle("napp:menu", (event, items) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return null;
+  return new Promise((resolve) => {
+    let picked = null;
+    const menu = Menu.buildFromTemplate(
+      menuTemplate(items, (id) => {
+        picked = id;
+      }),
+    );
+    /* No coordinates: a context menu opens where the pointer already is, and
+       the system knows that without our converting a client x into a screen
+       one. `callback` runs when the menu closes, which on macOS is after the
+       item's own `click` — so the answer is ready by the time it is asked
+       for, and a dismissal answers null. */
+    menu.popup({ window, callback: () => resolve(picked) });
+  });
 });
 
 app.whenReady().then(() => {

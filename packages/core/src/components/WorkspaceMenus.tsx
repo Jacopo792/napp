@@ -72,7 +72,9 @@ import type { Folder, NoteLock } from "@/lib/types";
 import type { ListPreferences } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
-import { MenuButton } from "./MenuPrimitives";
+import { MenuButton, MenuItems } from "./MenuPrimitives";
+import { useSystemMenu } from "./useSystemMenu";
+import type { MenuItem } from "@/lib/menuShape";
 import { useDismiss } from "./useDismiss";
 import { PRESENCE_PALETTES, type WritingPreferences } from "@/lib/writingPreferences";
 
@@ -237,7 +239,9 @@ export function CollectionMenu({
 
 /* The items a note carries, wherever they are asked for: from the ⋯ in the
    editor toolbar, and from a right-click on the page. One list, two doors. */
-function NoteMenuContent({
+/** Every act a note offers, described once. Both menus below read it, and on
+ *  a desktop so does the system, which draws its own. */
+function noteMenuItems({
   pinned,
   lock,
   folders,
@@ -253,201 +257,131 @@ function NoteMenuContent({
   onExportMarkdown,
   onPrint,
   onDelete,
-  close,
-}: {
-  pinned: boolean;
-  /** Absent where locking is not on offer: Trash, the preview, a reader. */
-  lock?: NoteLock;
-  folders: Folder[];
-  recent: { id: string; title: string }[];
-  onTogglePin: () => void;
-  onFind: () => void;
-  onToggleFocus: () => void;
-  focusMode: boolean;
-  onOpenBeside: () => void;
-  onMove: (folderId: string | null) => void;
-  onRecent: (id: string) => void;
-  onCopyMarkdown: () => void;
-  onExportMarkdown: () => void;
-  onPrint: () => void;
-  onDelete: () => void;
-  close: () => void;
-}) {
-  const [section, setSection] = useState<"root" | "move" | "recent">("root");
-  return (
-    <>
-      {section !== "root" && (
-        <MenuButton onClick={() => setSection("root")}>
-          <ChevronRight size={16} className="rotate-180" />
-          Back
-        </MenuButton>
-      )}
-      {section === "root" && (
-        <>
-          <MenuButton
-            active={pinned}
-            onClick={() => {
-              onTogglePin();
-              close();
-            }}
-          >
-            <Pin size={16} />
-            {pinned ? "Unpin note" : "Pin note"}
-          </MenuButton>
-          {lock &&
-            (lock.mine || !lock.holderName ? (
-              <MenuButton
-                active={lock.mine}
-                onClick={() => {
-                  lock.onToggle();
-                  close();
-                }}
-              >
-                {lock.mine ? <LockOpen size={16} /> : <Lock size={16} />}
-                {lock.mine ? "Let them write again" : "Only I may write this"}
-              </MenuButton>
-            ) : (
-              <p className="menu-label">Locked by {lock.holderName}</p>
-            ))}
-          <MenuButton
-            onClick={() => {
-              onFind();
-              close();
-            }}
-          >
-            <Search size={16} />
-            Find in note
-          </MenuButton>
-          <MenuButton
-            active={focusMode}
-            onClick={() => {
-              onToggleFocus();
-              close();
-            }}
-          >
-            {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            {focusMode ? "Leave focus" : "Focus mode"}
-            {focusMode && <kbd className="menu-key">esc</kbd>}
-          </MenuButton>
-          <MenuButton
-            onClick={() => {
-              onOpenBeside();
-              close();
-            }}
-          >
-            <Columns2 size={16} />
-            Open a note beside this
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton onClick={() => setSection("move")}>
-            <FolderInput size={16} />
-            Move note
-            <ChevronRight size={16} className="ml-auto" />
-          </MenuButton>
-          <MenuButton onClick={() => setSection("recent")}>
-            <Clock3 size={16} />
-            Recent notes
-            <ChevronRight size={16} className="ml-auto" />
-          </MenuButton>
-          <div className="menu-separator" />
-          {/* Both doors out of this app, and neither needs a server: the
-              clipboard is what Notion and Google Docs read, and the file is
-              what Obsidian keeps a vault of. */}
-          <MenuButton
-            onClick={() => {
-              onCopyMarkdown();
-              close();
-            }}
-          >
-            <ClipboardCopy size={16} />
-            Copy as Markdown
-          </MenuButton>
-          <MenuButton
-            onClick={() => {
-              onExportMarkdown();
-              close();
-            }}
-          >
-            <FileDown size={16} />
-            Export as Markdown
-          </MenuButton>
-          {/* The third door, and the one that keeps the cover and the
-              typesetting: every browser prints to PDF, so a paged copy of the
-              note costs a stylesheet rather than a PDF writer in the bundle. */}
-          <MenuButton
-            onClick={() => {
-              close();
-              onPrint();
-            }}
-          >
-            <Printer size={16} />
-            Print or save as PDF
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton
-            danger
-            onClick={() => {
-              onDelete();
-              close();
-            }}
-          >
-            <Trash2 size={16} />
-            Delete note
-          </MenuButton>
-        </>
-      )}
-      {section === "move" && (
-        <>
-          <p className="menu-label">Move to</p>
-          <MenuButton
-            onClick={() => {
-              onMove(null);
-              close();
-            }}
-          >
-            <FolderInput size={16} />
-            Unfiled
-          </MenuButton>
-          {folders.map((folder) => (
-            <MenuButton
-              key={folder.id}
-              onClick={() => {
-                onMove(folder.id);
-                close();
-              }}
-            >
-              <FolderInput size={16} />
-              {folder.name}
-            </MenuButton>
-          ))}
-        </>
-      )}
-      {section === "recent" && (
-        <>
-          <p className="menu-label">Recent notes</p>
-          {recent.length ? (
-            recent.map((note) => (
-              <MenuButton
-                key={note.id}
-                onClick={() => {
-                  onRecent(note.id);
-                  close();
-                }}
-              >
-                <Clock3 size={16} />
-                <span className="truncate">{note.title || "Untitled"}</span>
-              </MenuButton>
-            ))
-          ) : (
-            <p className="px-3 py-4 text-sm text-ink-4">No recent notes yet</p>
-          )}
-        </>
-      )}
-    </>
-  );
+}: NoteMenuActions): MenuItem[] {
+  return [
+    {
+      kind: "item",
+      id: "pin",
+      label: pinned ? "Unpin note" : "Pin note",
+      icon: <Pin size={16} />,
+      checked: pinned,
+      run: onTogglePin,
+    },
+    ...(lock
+      ? lock.mine || !lock.holderName
+        ? [
+            {
+              kind: "item" as const,
+              id: "lock",
+              label: lock.mine ? "Let them write again" : "Only I may write this",
+              icon: lock.mine ? <LockOpen size={16} /> : <Lock size={16} />,
+              checked: lock.mine,
+              run: lock.onToggle,
+            },
+          ]
+        : [{ kind: "label" as const, label: `Locked by ${lock.holderName}` }]
+      : []),
+    { kind: "item", id: "find", label: "Find in note", icon: <Search size={16} />, run: onFind },
+    {
+      kind: "item",
+      id: "focus",
+      label: focusMode ? "Leave focus" : "Focus mode",
+      icon: focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />,
+      checked: focusMode,
+      hint: focusMode ? "esc" : undefined,
+      run: onToggleFocus,
+    },
+    {
+      kind: "item",
+      id: "beside",
+      label: "Open a note beside this",
+      icon: <Columns2 size={16} />,
+      run: onOpenBeside,
+    },
+    { kind: "separator" },
+    {
+      kind: "item",
+      id: "move",
+      label: "Move note",
+      icon: <FolderInput size={16} />,
+      submenu: [
+        { kind: "label", label: "Move to" },
+        {
+          kind: "item",
+          id: "move:unfiled",
+          label: "Unfiled",
+          icon: <FolderInput size={16} />,
+          run: () => onMove(null),
+        },
+        ...folders.map((folder) => ({
+          kind: "item" as const,
+          id: `move:${folder.id}`,
+          label: folder.name,
+          icon: <FolderInput size={16} />,
+          run: () => onMove(folder.id),
+        })),
+      ],
+    },
+    {
+      kind: "item",
+      id: "recent",
+      label: "Recent notes",
+      icon: <Clock3 size={16} />,
+      whenEmpty: "No recent notes yet",
+      submenu: recent.length
+        ? [
+            { kind: "label", label: "Recent notes" },
+            ...recent.map((note) => ({
+              kind: "item" as const,
+              id: `recent:${note.id}`,
+              label: note.title || "Untitled",
+              icon: <Clock3 size={16} />,
+              run: () => onRecent(note.id),
+            })),
+          ]
+        : [],
+    },
+    { kind: "separator" },
+    /* Both doors out of this app, and neither needs a server: the clipboard is
+       what Notion and Google Docs read, and the file is what Obsidian keeps a
+       vault of. */
+    {
+      kind: "item",
+      id: "copy",
+      label: "Copy as Markdown",
+      icon: <ClipboardCopy size={16} />,
+      run: onCopyMarkdown,
+    },
+    {
+      kind: "item",
+      id: "export",
+      label: "Export as Markdown",
+      icon: <FileDown size={16} />,
+      run: onExportMarkdown,
+    },
+    /* The third door, and the one that keeps the cover and the typesetting:
+       every browser prints to PDF, so a paged copy of the note costs a
+       stylesheet rather than a PDF writer in the bundle. */
+    {
+      kind: "item",
+      id: "print",
+      label: "Print or save as PDF",
+      icon: <Printer size={16} />,
+      run: onPrint,
+    },
+    { kind: "separator" },
+    {
+      kind: "item",
+      id: "delete",
+      label: "Delete note",
+      icon: <Trash2 size={16} />,
+      danger: true,
+      run: onDelete,
+    },
+  ];
 }
 
-export function NoteMenu(props: {
+interface NoteMenuActions {
   pinned: boolean;
   /** Absent where locking is not on offer: Trash, the preview, a reader. */
   lock?: NoteLock;
@@ -464,7 +398,9 @@ export function NoteMenu(props: {
   onExportMarkdown: () => void;
   onPrint: () => void;
   onDelete: () => void;
-}) {
+}
+
+export function NoteMenu(props: NoteMenuActions) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const ref = useDismiss(open, close);
@@ -484,41 +420,26 @@ export function NoteMenu(props: {
           role="menu"
           className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
         >
-          <NoteMenuContent {...props} close={close} />
+          <MenuItems items={noteMenuItems(props)} close={close} />
         </div>
       )}
     </div>
   );
 }
 
-/** The same items, opened where the pointer is. */
+/** The same items, opened where the pointer is — and where the shell has a
+ *  window manager, opened by it rather than by us. */
 export function NoteContextMenu({
   point,
   onClose,
   ...props
-}: {
-  point: MenuPoint;
-  onClose: () => void;
-  pinned: boolean;
-  /** Absent where locking is not on offer: Trash, the preview, a reader. */
-  lock?: NoteLock;
-  folders: Folder[];
-  recent: { id: string; title: string }[];
-  onTogglePin: () => void;
-  onFind: () => void;
-  onToggleFocus: () => void;
-  focusMode: boolean;
-  onOpenBeside: () => void;
-  onMove: (folderId: string | null) => void;
-  onRecent: (id: string) => void;
-  onCopyMarkdown: () => void;
-  onExportMarkdown: () => void;
-  onPrint: () => void;
-  onDelete: () => void;
-}) {
+}: NoteMenuActions & { point: MenuPoint; onClose: () => void }) {
+  const items = noteMenuItems(props);
+  const system = useSystemMenu(items, onClose);
+  if (system) return null;
   return (
     <ContextMenu point={point} onClose={onClose}>
-      <NoteMenuContent {...props} close={onClose} />
+      <MenuItems items={items} close={onClose} />
     </ContextMenu>
   );
 }
