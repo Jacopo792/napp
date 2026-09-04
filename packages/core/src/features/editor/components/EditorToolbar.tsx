@@ -282,7 +282,7 @@ export function EditorToolbar({
 
       {/* ── Colour ── */}
       <div className="relative">
-        {tab("color", "Text colour", <Palette size={18} />)}
+        {tab("color", "Text colour", <Palette size={20} />)}
         {menu(
           "color",
           "Text colour",
@@ -334,7 +334,7 @@ export function EditorToolbar({
 
       {/* ── Lists ── */}
       <div className="relative">
-        {tab("lists", "Lists", <ListChecks size={18} />)}
+        {tab("lists", "Lists", <ListChecks size={20} />)}
         {menu(
           "lists",
           "Lists",
@@ -361,7 +361,7 @@ export function EditorToolbar({
 
       {/* ── Tables ── */}
       <div className="relative">
-        {tab("table", "Tables", <Table2 size={18} />)}
+        {tab("table", "Tables", <Table2 size={20} />)}
         {menu(
           "table",
           "Tables",
@@ -394,7 +394,7 @@ export function EditorToolbar({
 
       {/* ── Language, on this device ── */}
       <div className="relative">
-        {tab("translate", "Language tools", <Languages size={18} />)}
+        {tab("translate", "Language tools", <Languages size={20} />)}
         {menu(
           "translate",
           "Language tools",
@@ -433,7 +433,7 @@ export function EditorToolbar({
 
       {/* ── Attachments ── */}
       <div className="relative">
-        {tab("attach", "Attachments", <Paperclip size={18} />)}
+        {tab("attach", "Attachments", <Paperclip size={20} />)}
         {menu(
           "attach",
           "Attachments",

@@ -168,12 +168,12 @@ export function AvatarCropper({
           )}
           <span className="cropper-window" aria-hidden="true" />
           <span className="cropper-grip" aria-hidden="true">
-            <Move size={15} />
+            <Move size={16} />
           </span>
         </div>
 
         <label className="cropper-zoom" aria-label="Zoom">
-          <ZoomIn size={15} aria-hidden="true" />
+          <ZoomIn size={16} aria-hidden="true" />
           <input
             type="range"
             min={1}
@@ -190,7 +190,7 @@ export function AvatarCropper({
             Cancel
           </button>
           <button type="button" className="is-primary" onClick={confirm} disabled={busy || !size}>
-            {busy && <Loader2 size={15} className="animate-spin" />}
+            {busy && <Loader2 size={16} className="animate-spin" />}
             {busy ? "Saving…" : "Use this picture"}
           </button>
         </div>

@@ -125,7 +125,7 @@ export default function Login() {
                   year: "numeric",
                 })}
               </small>
-              <ArrowRight size={14} />
+              <ArrowRight size={16} />
             </button>
           ))}
         </div>
@@ -276,7 +276,7 @@ export default function Login() {
             )
           ) : (
             <>
-              {copy.action} <ArrowRight size={14} />
+              {copy.action} <ArrowRight size={16} />
             </>
           )}
         </button>

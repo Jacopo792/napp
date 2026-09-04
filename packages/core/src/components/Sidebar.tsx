@@ -185,7 +185,7 @@ function FolderMenu({
           setOpen((current) => !current);
         }}
       >
-        <MoreHorizontal size={14} />
+        <MoreHorizontal size={16} />
       </button>
       {open && (
         <div role="menu" className="popover menu-popover sidebar-menu">
@@ -279,7 +279,7 @@ function NameField({
         onMouseDown={(event) => event.preventDefault()}
         onClick={onCancel}
       >
-        <X size={14} />
+        <X size={16} />
       </button>
     </div>
   );
@@ -446,7 +446,7 @@ export function Sidebar({
                   toggle(node.folder.id);
                 }}
               >
-                <ChevronRight size={14} />
+                <ChevronRight size={16} />
               </button>
             ) : null
           }
@@ -564,7 +564,7 @@ export function Sidebar({
                   onClick={() => onSelectNote(note.id)}
                 >
                   <span className="sidebar-glyph" data-motion="pin">
-                    <Pin size={15} />
+                    <Pin size={16} />
                   </span>
                   <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
                 </button>
@@ -587,7 +587,7 @@ export function Sidebar({
               className="sidebar-heading-action press"
               onClick={() => setAdding("")}
             >
-              <FolderPlus size={13} />
+              <FolderPlus size={12} />
             </button>
           ) : (
             <span>{folders.length || ""}</span>

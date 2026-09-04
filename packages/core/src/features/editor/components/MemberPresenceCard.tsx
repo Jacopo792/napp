@@ -90,7 +90,7 @@ export function MemberPresenceCard({
 
           <span className="member-presence-facts">
             <span>
-              <Clock3 size={15} />
+              <Clock3 size={16} />
               <span>
                 <small>In this note since</small>
                 <strong>{timeLabel(noteJoinedAt)}</strong>
@@ -98,7 +98,7 @@ export function MemberPresenceCard({
             </span>
             {archiveJoinedAt && (
               <span>
-                <UserRound size={15} />
+                <UserRound size={16} />
                 <span>
                   <small>Archive member since</small>
                   <strong>{memberSince(archiveJoinedAt)}</strong>
@@ -107,7 +107,7 @@ export function MemberPresenceCard({
             )}
             {role && (
               <span>
-                <ShieldCheck size={15} />
+                <ShieldCheck size={16} />
                 <span>
                   <small>Access</small>
                   <strong>{role === "editor" ? "Can edit" : "View only"}</strong>

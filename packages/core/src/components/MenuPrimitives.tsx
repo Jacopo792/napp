@@ -20,7 +20,7 @@ export function MenuButton({
       className={`menu-row ${danger ? "text-danger" : active ? "text-accent" : "text-ink-2"}`}
     >
       {children}
-      {active && <Check size={14} className="ml-auto" />}
+      {active && <Check size={16} className="ml-auto" />}
     </button>
   );
 }

@@ -526,7 +526,7 @@ const Row = memo(function Row({
             selected ? "is-selected" : ""
           } ${pinned ? "is-pinned" : ""} ${unread ? "has-unread" : ""}`}
         >
-          <Glyph size={mobile && !gallery ? 16 : 14} />
+          <Glyph size={16} />
         </span>
       )}
 
@@ -628,7 +628,7 @@ const Row = memo(function Row({
                 pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
               }`}
             >
-              <Pin size={14} fill={pinned ? "currentColor" : "none"} />
+              <Pin size={16} fill={pinned ? "currentColor" : "none"} />
             </button>
           )}
           {trashMode && (
@@ -642,7 +642,7 @@ const Row = memo(function Row({
               onPointerDown={(event) => event.stopPropagation()}
               className="icon-button h-7 w-7 shrink-0 text-accent"
             >
-              <RotateCcw size={14} />
+              <RotateCcw size={16} />
             </button>
           )}
           {archiveMode && (
@@ -656,7 +656,7 @@ const Row = memo(function Row({
               onPointerDown={(event) => event.stopPropagation()}
               className="icon-button h-7 w-7 shrink-0 text-accent"
             >
-              <ArchiveRestore size={14} />
+              <ArchiveRestore size={16} />
             </button>
           )}
 
@@ -695,7 +695,7 @@ const Row = memo(function Row({
               {confirmDelete ? (
                 <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
               ) : (
-                <Trash2 size={14} />
+                <Trash2 size={16} />
               )}
             </button>
           )}
@@ -1077,7 +1077,7 @@ export function NoteList({
           className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}
         >
           <ChevronRight
-            size={14}
+            size={16}
             aria-hidden="true"
             className={`note-group-twisty ${open ? "is-open" : ""}`}
           />
@@ -1179,7 +1179,7 @@ export function NoteList({
                 onClick={() => onQueryChange("")}
                 className="icon-button h-8 w-8 shrink-0 text-ink-4"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             )}
           </div>
@@ -1253,7 +1253,7 @@ export function NoteList({
             title="New note · N"
             className="new-note-button press shrink-0"
           >
-            <SquarePen size={14} />
+            <SquarePen size={16} />
             <span>New note</span>
           </button>
         )}
@@ -1269,7 +1269,7 @@ export function NoteList({
           not 42, because the switch is a pill with a border and the border is
           two of those pixels. */}
       <div className="glass-search mx-3 mt-3 flex h-11 shrink-0 items-center gap-2 px-3">
-        <Search size={14} className="shrink-0 text-ink-4" />
+        <Search size={16} className="shrink-0 text-ink-4" />
         <input
           ref={searchRef}
           value={query}

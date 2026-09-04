@@ -650,7 +650,7 @@ function PrivateImageView({
           onClick={() => setPen((on) => !on)}
           contentEditable={false}
         >
-          {pen ? <Check size={15} /> : <Pencil size={15} />}
+          {pen ? <Check size={16} /> : <Pencil size={16} />}
         </button>
       )}
       {editor.isEditable && (
@@ -662,7 +662,7 @@ function PrivateImageView({
           onClick={deleteNode}
           contentEditable={false}
         >
-          <Trash2 size={15} />
+          <Trash2 size={16} />
         </button>
       )}
       {editor.isEditable && pen && (
@@ -716,7 +716,7 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
           <span className="rich-media-file-name">{label}</span>
           <span className="rich-media-file-hint">{status}</span>
         </span>
-        <ExternalLink size={15} />
+        <ExternalLink size={16} />
       </button>
       {editor.isEditable && (
         <span className="rich-media-file-actions" contentEditable={false}>
@@ -726,7 +726,7 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
             onClick={download}
             aria-label={`Download ${label}`}
           >
-            <Download size={15} />
+            <Download size={16} />
           </button>
           <button
             type="button"
@@ -734,7 +734,7 @@ function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps)
             onClick={deleteNode}
             aria-label={`Remove ${label}`}
           >
-            <Trash2 size={15} />
+            <Trash2 size={16} />
           </button>
         </span>
       )}
@@ -1100,7 +1100,7 @@ function useInk({
           setErasing(false);
         }}
       >
-        <Highlighter size={15} />
+        <Highlighter size={16} />
       </button>
       <button
         type="button"
@@ -1110,7 +1110,7 @@ function useInk({
         title="Erase strokes"
         onClick={() => setErasing((on) => !on)}
       >
-        <Eraser size={15} />
+        <Eraser size={16} />
       </button>
       <button
         type="button"
@@ -1120,7 +1120,7 @@ function useInk({
         disabled={strokes.length === 0}
         onClick={() => write(strokes.slice(0, -1))}
       >
-        <Undo2 size={15} />
+        <Undo2 size={16} />
       </button>
     </>
   );
@@ -1167,7 +1167,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
       title={onPage ? "Remove the drawing layer" : "Remove drawing"}
       onClick={deleteNode}
     >
-      <Trash2 size={15} />
+      <Trash2 size={16} />
     </button>
   );
 
@@ -1216,7 +1216,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
                   title="Put the pen down"
                   onClick={() => setPen(false)}
                 >
-                  <Check size={15} />
+                  <Check size={16} />
                 </button>
               </>
             ) : (
@@ -1227,7 +1227,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
                 title="Draw on the page"
                 onClick={() => setPen(true)}
               >
-                <Pencil size={15} />
+                <Pencil size={16} />
               </button>
             )}
           </span>
@@ -1831,7 +1831,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={onComment}
               >
-                <MessageSquarePlus size={15} />
+                <MessageSquarePlus size={16} />
               </button>
             )}
             {writeLockOwner && (
@@ -1856,7 +1856,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                   }
                 }}
               >
-                <Lock size={15} />
+                <Lock size={16} />
               </button>
             )}
             <span className="menu-separator rich-bubble-separator" />
@@ -1877,7 +1877,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           </BubbleMenu>
           {!mobile && (
             <DragHandle editor={editor} className="rich-drag-handle">
-              <GripVertical size={17} />
+              <GripVertical size={16} />
             </DragHandle>
           )}
         </>

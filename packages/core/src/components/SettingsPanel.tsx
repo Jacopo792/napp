@@ -231,18 +231,18 @@ const SETTINGS_SECTIONS = [
   {
     group: "Account",
     items: [
-      { id: "profile", name: "Profile", icon: <UserRound size={15} /> },
-      { id: "members", name: "Members", icon: <Users size={15} /> },
-      { id: "security", name: "Security", icon: <ShieldCheck size={15} /> },
+      { id: "profile", name: "Profile", icon: <UserRound size={16} /> },
+      { id: "members", name: "Members", icon: <Users size={16} /> },
+      { id: "security", name: "Security", icon: <ShieldCheck size={16} /> },
     ],
   },
   {
     group: "Interface",
     items: [
-      { id: "appearance", name: "Appearance", icon: <Palette size={15} /> },
-      { id: "reading", name: "Reading", icon: <BookOpen size={15} /> },
-      { id: "writing", name: "Writing", icon: <Type size={15} /> },
-      { id: "shortcuts", name: "Shortcuts", icon: <Keyboard size={15} /> },
+      { id: "appearance", name: "Appearance", icon: <Palette size={16} /> },
+      { id: "reading", name: "Reading", icon: <BookOpen size={16} /> },
+      { id: "writing", name: "Writing", icon: <Type size={16} /> },
+      { id: "shortcuts", name: "Shortcuts", icon: <Keyboard size={16} /> },
     ],
   },
 ] as const;
@@ -478,9 +478,9 @@ export function SettingsPanel({
   }
 
   const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
-    { id: "system", name: "System", icon: <Monitor size={18} /> },
-    { id: "light", name: "Light", icon: <Sun size={18} /> },
-    { id: "dark", name: "Dark", icon: <Moon size={18} /> },
+    { id: "system", name: "System", icon: <Monitor size={20} /> },
+    { id: "light", name: "Light", icon: <Sun size={20} /> },
+    { id: "dark", name: "Dark", icon: <Moon size={20} /> },
   ];
 
   if (!open) return null;
@@ -509,7 +509,7 @@ export function SettingsPanel({
             className="icon-button press ml-auto h-9 w-9"
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </header>
 
@@ -574,7 +574,7 @@ export function SettingsPanel({
                 <div className="profile-portrait">
                   <div className="appearance-row">
                     <RowLead
-                      icon={<ImagePlus size={17} />}
+                      icon={<ImagePlus size={16} />}
                       label="Picture"
                       hint="Shown to everyone in this archive. Kept square and small."
                     />
@@ -615,7 +615,7 @@ export function SettingsPanel({
                 <div className="appearance-controls">
                   <div className="appearance-row profile-row">
                     <RowLead
-                      icon={<UserRound size={17} />}
+                      icon={<UserRound size={16} />}
                       label="Nickname"
                       hint="What others in this archive call you"
                     />
@@ -637,7 +637,7 @@ export function SettingsPanel({
 
                   <div className="appearance-row profile-row">
                     <RowLead
-                      icon={<AtSign size={17} />}
+                      icon={<AtSign size={16} />}
                       label="Email"
                       hint="Where this account signs in"
                     />
@@ -646,7 +646,7 @@ export function SettingsPanel({
 
                   <div className="appearance-row profile-row">
                     <RowLead
-                      icon={<Users size={17} />}
+                      icon={<Users size={16} />}
                       label="Archive"
                       hint="Everybody here reads and writes every note"
                     />
@@ -660,7 +660,7 @@ export function SettingsPanel({
                       they were always going to end up. */}
                   <div className="appearance-row profile-row">
                     <RowLead
-                      icon={<Layers size={17} />}
+                      icon={<Layers size={16} />}
                       label="Reading"
                       hint="Whose notes the window is pointed at"
                     />
@@ -670,7 +670,7 @@ export function SettingsPanel({
                   {joinedAt && (
                     <div className="appearance-row profile-row">
                       <RowLead
-                        icon={<CalendarDays size={17} />}
+                        icon={<CalendarDays size={16} />}
                         label="Member since"
                         hint="When this account joined the archive"
                       />
@@ -692,7 +692,7 @@ export function SettingsPanel({
                 <h3>Leave shared archive</h3>
                 <div className="leave-archive-card">
                   <RowLead
-                    icon={<LogOut size={17} />}
+                    icon={<LogOut size={16} />}
                     label="Leave this archive"
                     hint={
                       members.length <= 1
@@ -706,7 +706,7 @@ export function SettingsPanel({
                     disabled={leaveBusy || members.length <= 1}
                     onClick={() => void leaveArchive()}
                   >
-                    <LogOut size={15} />
+                    <LogOut size={16} />
                     {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
                   </button>
                 </div>
@@ -787,15 +787,15 @@ export function SettingsPanel({
                         "Accent",
                         "accent",
                         "Selection, focus and every active state",
-                        <Palette size={17} />,
+                        <Palette size={16} />,
                       ],
                       [
                         "Background",
                         "background",
                         "The colour every surface is mixed from",
-                        <Type size={17} />,
+                        <Type size={16} />,
                       ],
-                      ["Foreground", "foreground", "Text colour", <Type size={17} />],
+                      ["Foreground", "foreground", "Text colour", <Type size={16} />],
                     ] as const
                   ).map(([label, key, hint, icon]) => (
                     <label key={key} className="appearance-row">
@@ -815,7 +815,7 @@ export function SettingsPanel({
 
                   <label className="appearance-row">
                     <RowLead
-                      icon={<Layers size={17} />}
+                      icon={<Layers size={16} />}
                       label="Translucent sidebar"
                       hint="Let the page show through the rail"
                     />
@@ -830,7 +830,7 @@ export function SettingsPanel({
                   </label>
 
                   <AppearanceSlider
-                    icon={<Contrast size={17} />}
+                    icon={<Contrast size={16} />}
                     label="Contrast"
                     hint="Distance between the stacked surfaces"
                     min={20}
@@ -842,7 +842,7 @@ export function SettingsPanel({
 
                   <div className="appearance-row wallpaper-row">
                     <RowLead
-                      icon={<Image size={17} />}
+                      icon={<Image size={16} />}
                       label="Background image"
                       hint="Kept with your account, so every browser opens to it"
                     />
@@ -864,7 +864,7 @@ export function SettingsPanel({
                         </button>
                       )}
                       <button type="button" onClick={() => wallpaperRef.current?.click()}>
-                        <ImagePlus size={15} /> Choose
+                        <ImagePlus size={16} /> Choose
                       </button>
                     </span>
                   </div>
@@ -888,7 +888,7 @@ export function SettingsPanel({
                         </span>
                       </div>
                       <AppearanceSlider
-                        icon={<Contrast size={17} />}
+                        icon={<Contrast size={16} />}
                         label="Darken image"
                         min={0}
                         max={80}
@@ -897,7 +897,7 @@ export function SettingsPanel({
                         onChange={(wallpaperDim) => setAppearance({ ...appearance, wallpaperDim })}
                       />
                       <AppearanceSlider
-                        icon={<Layers size={17} />}
+                        icon={<Layers size={16} />}
                         label="Blur"
                         min={0}
                         max={20}
@@ -950,7 +950,7 @@ export function SettingsPanel({
                   aria-expanded={tuning}
                   onClick={() => setTuning((current) => !current)}
                 >
-                  <ChevronRight size={14} />
+                  <ChevronRight size={16} />
                   <span>Fine-tune</span>
                   <small>{preset ? preset.name : "Custom"}</small>
                 </button>
@@ -970,7 +970,7 @@ export function SettingsPanel({
                 <div className="appearance-controls">
                   <label className="appearance-row">
                     <RowLead
-                      icon={<SpellCheck size={17} />}
+                      icon={<SpellCheck size={16} />}
                       label="Proofreading"
                       hint="Offer spelling and grammar corrections on this device"
                     />
@@ -1046,7 +1046,7 @@ export function SettingsPanel({
                 <dl className="settings-facts">
                   <div>
                     <span className="settings-lead" aria-hidden="true">
-                      <ShieldCheck size={17} />
+                      <ShieldCheck size={16} />
                     </span>
                     <span className="settings-label">
                       <dt>Storage</dt>
@@ -1055,7 +1055,7 @@ export function SettingsPanel({
                   </div>
                   <div>
                     <span className="settings-lead" aria-hidden="true">
-                      <BookOpen size={17} />
+                      <BookOpen size={16} />
                     </span>
                     <span className="settings-label">
                       <dt>Reading</dt>
@@ -1067,7 +1067,7 @@ export function SettingsPanel({
                 <div className="appearance-controls">
                   <div className="appearance-row">
                     <RowLead
-                      icon={<Timer size={17} />}
+                      icon={<Timer size={16} />}
                       label="Sign out when idle"
                       hint="Require the account password again after a period of inactivity"
                     />
@@ -1093,7 +1093,7 @@ export function SettingsPanel({
                       the channel is joined only while publishing. */}
                   <label className="appearance-row">
                     <RowLead
-                      icon={<Users size={17} />}
+                      icon={<Users size={16} />}
                       label="Show me in the roster"
                       hint="Others see you are here, and you see who else is"
                     />
@@ -1111,7 +1111,7 @@ export function SettingsPanel({
                       about what you give away. */}
                   <label className="appearance-row">
                     <RowLead
-                      icon={<MousePointer2 size={17} />}
+                      icon={<MousePointer2 size={16} />}
                       label="Collaborators in notes"
                       hint="Show who else has this note open, and their cursor"
                     />
@@ -1129,7 +1129,7 @@ export function SettingsPanel({
                       hiding them after they arrive. */}
                   <label className="appearance-row">
                     <RowLead
-                      icon={<Archive size={17} />}
+                      icon={<Archive size={16} />}
                       label="Keep archived notes private"
                       hint="Archived notes stay visible only to you"
                     />
@@ -1150,7 +1150,7 @@ export function SettingsPanel({
                 <dl className="settings-facts">
                   <div>
                     <span className="settings-lead" aria-hidden="true">
-                      <Users size={17} />
+                      <Users size={16} />
                     </span>
                     <span className="settings-label">
                       <dt>Occupied</dt>
@@ -1194,7 +1194,7 @@ export function SettingsPanel({
                               disabled={inviteBusy}
                               onClick={() => void withdrawInvite(invite.id)}
                             >
-                              <Undo2 size={14} />
+                              <Undo2 size={16} />
                               Withdraw
                             </button>
                           )}
@@ -1209,7 +1209,7 @@ export function SettingsPanel({
                   <dl className="settings-facts">
                     <div>
                       <span className="settings-lead" aria-hidden="true">
-                        <ShieldCheck size={17} />
+                        <ShieldCheck size={16} />
                       </span>
                       <span className="settings-label">
                         <dt>Editors only</dt>
@@ -1221,7 +1221,7 @@ export function SettingsPanel({
                   <dl className="settings-facts">
                     <div>
                       <span className="settings-lead" aria-hidden="true">
-                        <UserPlus size={17} />
+                        <UserPlus size={16} />
                       </span>
                       <span className="settings-label">
                         <dt>No seat free</dt>
@@ -1251,7 +1251,7 @@ export function SettingsPanel({
                         disabled={inviteBusy || !inviteEmail.trim()}
                         onClick={() => void createInvite()}
                       >
-                        <UserPlus size={15} />
+                        <UserPlus size={16} />
                         {inviteBusy ? "Creating…" : "Create invitation"}
                       </button>
                     </div>
@@ -1275,11 +1275,11 @@ export function SettingsPanel({
                           });
                         }}
                       >
-                        <Copy size={15} />
+                        <Copy size={16} />
                       </button>
                     </div>
                     <a className="invite-mail" href={inviteMailto(inviteEmail, inviteLink)}>
-                      <Mail size={15} />
+                      <Mail size={16} />
                       Send it by email
                     </a>
                   </div>

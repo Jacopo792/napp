@@ -2619,15 +2619,15 @@ export default function NotesPage() {
         name: scope.label,
         icon:
           scope.id === TRASH ? (
-            <Trash2 size={15} />
+            <Trash2 size={16} />
           ) : scope.id === REMARKS ? (
-            <MessageSquare size={15} />
+            <MessageSquare size={16} />
           ) : scope.id === ARCHIVE ? (
-            <Archive size={15} />
+            <Archive size={16} />
           ) : scope.id === ALL ? (
-            <NotebookText size={15} />
+            <NotebookText size={16} />
           ) : (
-            <Folder size={15} />
+            <Folder size={16} />
           ),
         run: () => handleSelectFolder(scope.id),
       })),
@@ -2637,7 +2637,7 @@ export default function NotesPage() {
         name: entry.note.title || "Untitled",
         hint: derivedOf(entry.note).preview || undefined,
         keywords: derivedOf(entry.note).haystack,
-        icon: <FileText size={15} />,
+        icon: <FileText size={16} />,
         run: open(entry.note.id),
       })),
       /* What was said, searchable with everything else. A remark is the one
@@ -2656,7 +2656,7 @@ export default function NotesPage() {
             name: remark.body,
             hint: title,
             keywords: `${remark.body} ${title}`.toLowerCase(),
-            icon: <MessageSquare size={15} />,
+            icon: <MessageSquare size={16} />,
             run: () => {
               setQuery("");
               setSelectedFolderId(REMARKS);
@@ -2670,7 +2670,7 @@ export default function NotesPage() {
         group: "Do",
         name: "New note",
         hint: "⌘N",
-        icon: <SquarePen size={15} />,
+        icon: <SquarePen size={16} />,
         run: () => void handleNew(),
       },
       ...(selectedId
@@ -2686,7 +2686,7 @@ export default function NotesPage() {
               group: "Open beside",
               name: entry.note.title || "Untitled",
               keywords: `split side by side beside ${derivedOf(entry.note).haystack}`,
-              icon: <Columns2 size={15} />,
+              icon: <Columns2 size={16} />,
               run: () => setSplitId(entry.note.id),
             }))
         : []),
@@ -2696,7 +2696,7 @@ export default function NotesPage() {
               id: "unsplit",
               group: "Do",
               name: "Close the second note",
-              icon: <Columns2 size={15} />,
+              icon: <Columns2 size={16} />,
               run: () => setSplitId(null),
             },
           ]
@@ -2707,21 +2707,21 @@ export default function NotesPage() {
         name: focusMode ? "Leave focus" : "Focus mode",
         hint: focusMode ? "Esc" : "One column, nothing else",
         keywords: "zen distraction free writing",
-        icon: focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />,
+        icon: focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />,
         run: toggleFocus,
       },
       {
         id: "settings",
         group: "Do",
         name: "Settings",
-        icon: <Settings size={15} />,
+        icon: <Settings size={16} />,
         run: () => setSettingsOpen(true),
       },
       {
         id: "export",
         group: "Do",
         name: "Export all as Markdown",
-        icon: <FolderDown size={15} />,
+        icon: <FolderDown size={16} />,
         run: () => void handleExportAll(),
       },
       {
@@ -2729,14 +2729,14 @@ export default function NotesPage() {
         group: "Do",
         name: "Keyboard shortcuts",
         hint: "?",
-        icon: <Keyboard size={15} />,
+        icon: <Keyboard size={16} />,
         run: () => setShortcutsOpen(true),
       },
       {
         id: "lock",
         group: "Do",
         name: "Lock & sign out",
-        icon: <Lock size={15} />,
+        icon: <Lock size={16} />,
         run: () => handleLock(),
       },
     ];
@@ -3050,7 +3050,7 @@ export default function NotesPage() {
                       className="toolbar-button press shrink-0"
                       onClick={() => setFoldersOpen(true)}
                     >
-                      <FolderTree size={18} />
+                      <FolderTree size={20} />
                     </button>
                     <button
                       type="button"
@@ -3058,7 +3058,7 @@ export default function NotesPage() {
                       className="toolbar-button press shrink-0"
                       onClick={() => setSettingsOpen(true)}
                     >
-                      <Settings size={18} />
+                      <Settings size={20} />
                     </button>
                     <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
                   </div>

@@ -297,8 +297,13 @@
     background: rgb(255 255 255 / 0.22);
   }
 
+  /* Toward the ink, for the same reason the selected row goes that way and
+     with more at stake: `--accent` is lifted only to a 3:1 floor against the
+     paper, so on a palette whose accent is darker than the ink — which this
+     archive's is — the one ring a keyboard has to find was the faintest thing
+     on the screen. A focus ring is not decoration and cannot be quiet. */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ink-2);
     outline-offset: 2px;
   }
 

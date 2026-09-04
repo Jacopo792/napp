@@ -84,7 +84,7 @@ export function NoteOutline({
   return (
     <aside className="note-outline" aria-label="Outline">
       <div className="note-comments-header">
-        <ListTree size={15} className="text-ink-4" />
+        <ListTree size={16} className="text-ink-4" />
         <p className="note-comments-title">Outline</p>
         <button
           type="button"
@@ -92,7 +92,7 @@ export function NoteOutline({
           className="icon-button press ml-auto h-7 w-7 text-ink-3"
           onClick={onClose}
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 

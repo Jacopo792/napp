@@ -431,7 +431,7 @@ export function NoteComments({
               setExpanded((current) => ({ ...current, [thread.threadId]: true }));
             }}
           >
-            <ChevronDown size={13} />
+            <ChevronDown size={12} />
             {hiddenCount} earlier {hiddenCount === 1 ? "reply" : "replies"}
           </button>
         )}
@@ -453,7 +453,7 @@ export function NoteComments({
                   : "Mark this dealt with — it stays readable under “resolved”"
               }
             >
-              {thread.resolved ? <RotateCcw size={13} /> : <Check size={13} />}
+              {thread.resolved ? <RotateCcw size={12} /> : <Check size={12} />}
               {thread.resolved ? "Reopen" : "Resolve"}
             </button>
           </div>
@@ -512,7 +512,7 @@ export function NoteComments({
         <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
       )}
       <header className="note-comments-header">
-        <MessageSquare size={15} />
+        <MessageSquare size={16} />
         <span className="note-comments-title">
           Comments
           {threads.length > 0 && <b className="note-comments-count">{threads.length}</b>}
@@ -532,7 +532,7 @@ export function NoteComments({
           aria-label="Close comments"
           onClick={onClose}
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </header>
 

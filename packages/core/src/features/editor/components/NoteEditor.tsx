@@ -666,7 +666,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 })
               }
             >
-              <ImageIcon size={15} />
+              <ImageIcon size={16} />
               Add cover
             </button>
           )}
@@ -939,7 +939,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                       className="note-backlink press"
                       onClick={() => onOpenNote?.(note.id)}
                     >
-                      <Link2 size={13} />
+                      <Link2 size={12} />
                       {note.title || "Untitled"}
                     </button>
                   ))}

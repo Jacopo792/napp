@@ -131,7 +131,7 @@ export function CollectionMenu({
         className="toolbar-button press"
         onClick={() => setOpen((current) => !current)}
       >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={20} />
       </button>
       {open && (
         <div
@@ -477,7 +477,7 @@ export function NoteMenu(props: {
         className="toolbar-button"
         onClick={() => setOpen((current) => !current)}
       >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={20} />
       </button>
       {open && (
         <div
