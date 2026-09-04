@@ -31,3 +31,11 @@ ipcRenderer.on("napp:command", (_event, init) => {
   const target = init.atBody ? document.body : (document.activeElement ?? document.body);
   target?.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
 });
+
+/* The main process asked GitHub whether there is a newer release; this is how
+   the page hears the answer. Same one-way shape as the menu above, and for the
+   same reason: an event the page may listen to is not a capability the page
+   holds. Nothing is added to `window.napp`, so there is nothing new to call. */
+ipcRenderer.on("napp:update", (_event, detail) => {
+  window.dispatchEvent(new CustomEvent("napp:update", { detail }));
+});

@@ -91,12 +91,19 @@ deleting for good is always a press, never a swipe.
 
 ## Keeping it up to date
 
-There is no automatic updater. A new version means downloading the new `.dmg`
-and replacing the app; your notes are in the archive and on the server, not in
-the bundle, so nothing is lost by replacing it.
+The app asks GitHub twice a working day whether a newer release exists. If one
+does, a line appears above **Lock & sign out** — _Version 0.1.3 is available_ —
+and opens the download page in your browser. Nothing downloads on its own yet:
+a new version means downloading the new `.dmg` and replacing the app. Your notes
+are in the archive and on the server, not in the bundle, so nothing is lost by
+replacing it.
 
-If you want to know whether you are behind, **Napp → About Napp** gives the
-version and Releases gives the latest.
+**Napp → About Napp** gives the version you are running, and Releases gives the
+latest, if you would rather ask than be told.
+
+Installing itself is coming to Windows, where an unsigned build can do it.
+macOS cannot: Squirrel validates the code signature before it will replace an
+app, and these builds are unsigned. That needs an Apple Developer ID.
 
 ---
 

@@ -7,6 +7,14 @@ changes. The commit history remains the detailed engineering record.
 
 ### Added
 
+- **The window says when it is out of date.** A tab is always the version that
+  was last deployed; an installed application can sit months behind without
+  anything saying so. The desktop app now asks GitHub twice a working day
+  whether a newer release exists, and says so on one line above "Lock & sign
+  out" that opens the download page. The check runs in the main process, so the
+  page's network policy is not widened to reach GitHub, and nothing is added to
+  the preload bridge for the renderer to call — the answer arrives as a DOM
+  event and the browser build never hears one.
 - **A desktop window that behaves like one.** The application now ships as a
   macOS `.dmg` for Apple Silicon and a Windows installer, built on a tag, and
   the window has what a window has: a real menu bar whose every archive command
@@ -175,6 +183,13 @@ changes. The commit history remains the detailed engineering record.
 
 ### Fixed
 
+- **A drawing was unreadable as a note's icon, in two different ways.** The
+  thumbnail is now measured by where the ink actually is rather than by the
+  sheet it was drawn on, so a sketch in one corner of a board no longer arrives
+  in the list as four specks; and selecting the row no longer fills the slot
+  with the accent colour, which on a pink palette painted a pastel drawing out
+  of existence entirely. The note's own photograph already opted out of that
+  fill; the drawing now does too.
 - **Panes kept their stored width while the window shrank**, so the writing
   column took the whole difference: at 900 px it was 232 px wide and everything
   in its toolbar was printed on top of everything else. The shown widths are

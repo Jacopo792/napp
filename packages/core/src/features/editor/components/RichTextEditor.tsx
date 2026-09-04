@@ -54,6 +54,7 @@ import {
   drawingStrokes,
   drawingSurface,
   straightenStroke,
+  strokePoints,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { attachmentExtension } from "@/features/editor/lib/attachments";
@@ -803,17 +804,6 @@ const MARKER_ALPHA = "59";
 /** How long the pointer has to hold still at the end of a stroke before the
  *  stroke becomes the shape it was aiming at. */
 const STRAIGHTEN_AFTER_MS = 450;
-
-/** The points a stroke passes through, for the eraser to measure against. */
-function strokePoints(d: string): { x: number; y: number }[] {
-  return d
-    .slice(1)
-    .split(/[ML]/)
-    .flatMap((pair) => {
-      const [x, y] = pair.split(",").map(Number);
-      return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : [];
-    });
-}
 
 /* ── One hand, three surfaces ────────────────────────────────────────────────
    A board, the page itself, and a picture in the note all take the same ink in

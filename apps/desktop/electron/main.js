@@ -95,6 +95,54 @@ function serveRenderer() {
   });
 }
 
+/* ── Whether there is a newer one ────────────────────────────────────────────
+   Asked from here rather than from the page, and that is forced rather than
+   preferred: the packaged renderer's content security policy (written by
+   apps/desktop/vite.config.ts) names Supabase and the collaboration server,
+   and widening `connect-src` to GitHub for one line of JSON widens it for
+   everything the page ever loads. `net.fetch` has no policy over it.
+
+   The answer travels one way. There is no function on the bridge for the
+   renderer to call and no value for it to receive back — main sends, preload
+   dispatches a DOM event, the page listens. A window with nothing to ask has
+   nothing that can be asked of it. */
+const RELEASES = "https://api.github.com/repos/Jacopo792/note-sharing-app/releases/latest";
+const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+
+/* Part by part and numerically, because 0.1.10 is newer than 0.1.9 and a
+   string comparison says it is not. Anything that is not three numbers is not
+   a version this understands, and the answer to a question it cannot read is
+   no. */
+function isNewer(tag, current) {
+  const parts = (value) => String(value).replace(/^v/, "").split(".").map(Number);
+  const [next, here] = [parts(tag), parts(current)];
+  if (next.length !== 3 || next.some(Number.isNaN)) return false;
+  for (let i = 0; i < 3; i += 1) if (next[i] !== here[i]) return next[i] > here[i];
+  return false;
+}
+
+/* Remembered, because a window made later — ⌘N on macOS after the last one was
+   closed — was not there when the answer arrived, and a page still loading has
+   no listener yet. Both are covered by announcing again on did-finish-load. */
+let pendingUpdate = null;
+
+async function checkForUpdate() {
+  try {
+    const response = await net.fetch(RELEASES, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!response.ok) return;
+    const { tag_name: tag } = await response.json();
+    if (!isNewer(tag, app.getVersion())) return;
+    pendingUpdate = { version: String(tag).replace(/^v/, "") };
+    for (const window of BrowserWindow.getAllWindows())
+      window.webContents.send("napp:update", pendingUpdate);
+  } catch {
+    /* No network, GitHub unreachable, a rate limit: an app that cannot ask
+       whether it is current still works perfectly well as the version it is. */
+  }
+}
+
 function createWindow() {
   const isMac = process.platform === "darwin";
   const isWindows = process.platform === "win32";
@@ -139,6 +187,11 @@ function createWindow() {
   /* Painted before shown, so opening the app is not a white rectangle that
      becomes the archive a moment later. */
   window.once("ready-to-show", () => window.show());
+
+  /* An answer that arrived before this page had a listener for it. */
+  window.webContents.on("did-finish-load", () => {
+    if (pendingUpdate) window.webContents.send("napp:update", pendingUpdate);
+  });
 
   /* On close, not on every move: a resize sends a great many events and this
      is a fact worth exactly one write. `getNormalBounds` and not `getBounds`,
@@ -224,6 +277,10 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+  /* Twice a working day. A desktop window is opened once and left open for a
+     week, so asking only at launch is asking once. */
+  void checkForUpdate();
+  setInterval(() => void checkForUpdate(), CHECK_EVERY_MS);
 });
 
 app.on("window-all-closed", () => {

@@ -24,7 +24,15 @@ function iso(daysAgo: number, hour = 11): string {
   return d.toISOString();
 }
 
-type Seed = { title: string; body: string; days: number; folder: string | null };
+type Seed = {
+  title: string;
+  body: string;
+  days: number;
+  folder: string | null;
+  /* Strokes for a drawing appended to the note, as the document stores them:
+     a JSON string, not an array. See `Drawing` in content.ts for why. */
+  sketch?: string;
+};
 
 const SEEDS: Seed[] = [
   {
@@ -161,6 +169,17 @@ To clarify: why neutral is at ground potential but is not ground.`,
     title: "Drafts",
     folder: null,
     days: 14,
+    /* Deliberately in one corner of the 1000 × 560 board rather than filling
+       it: a row's glyph slot is 28 pixels, and a drawing measured by the sheet
+       it was made on instead of by where its ink is arrives there as specks. */
+    sketch: JSON.stringify([
+      {
+        d: "M100,180L120,110L165,80L215,95L235,145L205,190L150,195L115,160L130,120L175,105",
+        color: "#5B9BFF",
+        width: 6,
+      },
+      { d: "M95,215L300,205", color: "#F4C550", width: 6 },
+    ]),
     body: `Things started and never finished. Do not delete.
 
 - A piece on why concept maps work only when you draw them yourself
@@ -201,6 +220,13 @@ export const FIXTURE_META: Meta = {
 
 export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
   const content = legacyMarkdownToRichText(seed.body);
+  /* Markdown has no drawing, so a seed that wants one gets it appended here,
+     which is where the real parser would have left it. */
+  if (seed.sketch)
+    content.content = [
+      ...(content.content ?? []),
+      { type: "drawing", attrs: { strokes: seed.sketch, surface: "board" } },
+    ];
   return {
     id: `n${index}`,
     title: seed.title,
