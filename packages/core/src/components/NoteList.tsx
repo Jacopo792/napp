@@ -14,12 +14,9 @@ import {
   ArchiveRestore,
   ChevronRight,
   FileText,
-  FolderInput,
   Image as ImageIcon,
   ImageOff,
   ListChecks,
-  Lock,
-  LockOpen,
   Paperclip,
   Pin,
   RotateCcw,
@@ -46,7 +43,9 @@ import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
-import { MenuButton } from "./WorkspaceMenus";
+import { MenuItems } from "./MenuPrimitives";
+import { pinItem, lockItems, moveItem } from "./menuNoteItems";
+import type { MenuItem } from "@/lib/menuShape";
 
 /** A row that has just been pushed open says so, and every other row closes.
  *  Announced rather than lifted into the list's state: this is a fact about a
@@ -794,8 +793,6 @@ export function NoteList({
   /* Right-click on the note it is about. Every item here already exists behind
      a button somewhere; what was missing was reaching them from the row. */
   const rowMenu = useContextMenu<NoteEntry>();
-  const [moving, setMoving] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   /* Which note the picture being cut is for: the menu is gone by the time the
      cropper is on screen. */
   const [cropping, setCropping] = useState<{ noteId: string; file: File } | null>(null);
@@ -823,17 +820,9 @@ export function NoteList({
   }, []);
   const photoNoteRef = useRef<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const closeRowMenu = useCallback(() => {
-    rowMenu.close();
-    setMoving(false);
-    setConfirming(false);
-  }, [rowMenu]);
+  const closeRowMenu = useCallback(() => rowMenu.close(), [rowMenu]);
   const openRowMenu = useCallback(
-    (event: ReactMouseEvent, entry: NoteEntry) => {
-      setMoving(false);
-      setConfirming(false);
-      rowMenu.open(event, entry);
-    },
+    (event: ReactMouseEvent, entry: NoteEntry) => rowMenu.open(event, entry),
     [rowMenu],
   );
 
@@ -842,201 +831,133 @@ export function NoteList({
     ? indexOf(meta).byNote.get(menuEntry.note.id)?.pinned === true
     : false;
 
-  /* Permanent deletion asks twice here too. The row's own button has always
-     done that, and a menu item is not a good reason to make it one click. */
+  /* ── The row's own menu, described rather than written out ──────────────────
+     Two hundred lines of JSX with a `moving` flag and a Back button of its own,
+     beside a note menu on the page that was already a `MenuItem[]` handed to
+     `MenuItems` — which has the going-in-and-coming-back-out built into it. So
+     this is a list too: the same shape, the same renderer, and the three items
+     both menus carry come from `menuNoteItems.tsx` instead of being spelled
+     twice.
+
+     What it is not, yet, is a menu the system draws. `NoteContextMenu` offers
+     itself to the window manager and this does not, and that is deliberate:
+     the photograph opens a file dialog, which a browser grants to a click and
+     not to a message coming back over an IPC bridge. Being a list is what makes
+     that a decision somebody can take in one line rather than a rewrite.
+
+     Deleting for good still asks twice, and it asks by being a submenu: the
+     confirm-in-place could not survive, because choosing an item closes the
+     menu before it runs. A section you go into to say yes is the same two
+     presses and says plainly which press is the one that destroys. */
+  const rowMenuItems = ((): MenuItem[] => {
+    if (!menuEntry) return [];
+    const entry = menuEntry;
+    const open: MenuItem = {
+      kind: "item",
+      id: "open",
+      label: "Open note",
+      icon: <FileText size={16} />,
+      run: () => onSelect(entry.note.id),
+    };
+    if (!canWrite) return [open];
+    if (trashMode)
+      return [
+        {
+          kind: "item",
+          id: "restore",
+          label: "Restore note",
+          icon: <RotateCcw size={16} />,
+          run: () => onRestore(entry),
+        },
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "forever",
+          label: "Delete forever",
+          icon: <Trash2 size={16} />,
+          danger: true,
+          submenu: [
+            {
+              kind: "item",
+              id: "forever:yes",
+              label: "Yes, delete it now",
+              icon: <Trash2 size={16} />,
+              danger: true,
+              run: () => onDeleteForever(entry),
+            },
+          ],
+        },
+      ];
+    if (archiveMode)
+      return [
+        open,
+        {
+          kind: "item",
+          id: "unarchive",
+          label: "Move out of Archive",
+          icon: <ArchiveRestore size={16} />,
+          run: () => onArchiveChange(entry, false),
+        },
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "trash",
+          label: "Move to Trash",
+          icon: <Trash2 size={16} />,
+          danger: true,
+          run: () => onMoveToTrash(entry),
+        },
+      ];
+    return [
+      open,
+      pinItem(menuPinned, () => onTogglePin(entry.note.id)),
+      ...lockItems(lockOf?.(entry.note.id)),
+      {
+        kind: "item",
+        id: "photo",
+        label: entry.note.photo ? "Change photo" : "Add photo",
+        icon: <Camera size={16} />,
+        run: () => {
+          photoNoteRef.current = entry.note.id;
+          photoInputRef.current?.click();
+        },
+      },
+      ...(entry.note.photo
+        ? [
+            {
+              kind: "item" as const,
+              id: "photo:remove",
+              label: "Remove photo",
+              icon: <ImageOff size={16} />,
+              run: () => onSetPhoto(entry.note.id, null),
+            },
+          ]
+        : []),
+      { kind: "separator" },
+      moveItem(meta.folders, (folderId) => onMoveToFolder(entry.note.id, folderId)),
+      {
+        kind: "item",
+        id: "archive",
+        label: "Archive note",
+        icon: <Archive size={16} />,
+        run: () => onArchiveChange(entry, true),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
+        id: "trash",
+        label: "Move to Trash",
+        icon: <Trash2 size={16} />,
+        danger: true,
+        run: () => onMoveToTrash(entry),
+      },
+    ];
+  })();
+
   const rowMenuPanel =
     rowMenu.target && menuEntry ? (
       <ContextMenu point={rowMenu.target} onClose={closeRowMenu}>
-        {!canWrite ? (
-          <MenuButton
-            onClick={() => {
-              onSelect(menuEntry.note.id);
-              closeRowMenu();
-            }}
-          >
-            <FileText size={16} />
-            Open note
-          </MenuButton>
-        ) : moving ? (
-          <>
-            <MenuButton onClick={() => setMoving(false)}>
-              <ChevronRight size={16} className="rotate-180" />
-              Back
-            </MenuButton>
-            <p className="menu-label">Move to</p>
-            <MenuButton
-              onClick={() => {
-                onMoveToFolder(menuEntry.note.id, null);
-                closeRowMenu();
-              }}
-            >
-              <FolderInput size={16} />
-              Unfiled
-            </MenuButton>
-            {meta.folders.map((folder) => (
-              <MenuButton
-                key={folder.id}
-                onClick={() => {
-                  onMoveToFolder(menuEntry.note.id, folder.id);
-                  closeRowMenu();
-                }}
-              >
-                <FolderInput size={16} />
-                <span className="truncate">{folder.name}</span>
-              </MenuButton>
-            ))}
-          </>
-        ) : trashMode ? (
-          <>
-            <MenuButton
-              onClick={() => {
-                onRestore(menuEntry);
-                closeRowMenu();
-              }}
-            >
-              <RotateCcw size={16} />
-              Restore note
-            </MenuButton>
-            <div className="menu-separator" />
-            <MenuButton
-              danger
-              onClick={() => {
-                if (!confirming) return setConfirming(true);
-                onDeleteForever(menuEntry);
-                closeRowMenu();
-              }}
-            >
-              <Trash2 size={16} />
-              {/* The second press is the one that destroys, so it says so. A
-                  label that only grew a question mark read as the same button
-                  asked twice — and the reader who had already decided could
-                  not tell whether the first press had done it. */}
-              {confirming ? "Yes, delete it now" : "Delete forever"}
-            </MenuButton>
-          </>
-        ) : archiveMode ? (
-          <>
-            <MenuButton
-              onClick={() => {
-                onSelect(menuEntry.note.id);
-                closeRowMenu();
-              }}
-            >
-              <FileText size={16} />
-              Open note
-            </MenuButton>
-            <MenuButton
-              onClick={() => {
-                onArchiveChange(menuEntry, false);
-                closeRowMenu();
-              }}
-            >
-              <ArchiveRestore size={16} />
-              Move out of Archive
-            </MenuButton>
-            <div className="menu-separator" />
-            <MenuButton
-              danger
-              onClick={() => {
-                onMoveToTrash(menuEntry);
-                closeRowMenu();
-              }}
-            >
-              <Trash2 size={16} />
-              Move to Trash
-            </MenuButton>
-          </>
-        ) : (
-          <>
-            <MenuButton
-              onClick={() => {
-                onSelect(menuEntry.note.id);
-                closeRowMenu();
-              }}
-            >
-              <FileText size={16} />
-              Open note
-            </MenuButton>
-            <MenuButton
-              active={menuPinned}
-              onClick={() => {
-                onTogglePin(menuEntry.note.id);
-                closeRowMenu();
-              }}
-            >
-              <Pin size={16} />
-              {menuPinned ? "Unpin note" : "Pin note"}
-            </MenuButton>
-            {(() => {
-              /* Taking the note back from the other member, from the row it
-                 is named on. A lock they hold is a line rather than a button:
-                 lifting it is theirs to do, here and in Postgres. */
-              const lock = lockOf?.(menuEntry.note.id);
-              if (!lock) return null;
-              return lock.mine || !lock.holderName ? (
-                <MenuButton
-                  active={lock.mine}
-                  onClick={() => {
-                    lock.onToggle();
-                    closeRowMenu();
-                  }}
-                >
-                  {lock.mine ? <LockOpen size={16} /> : <Lock size={16} />}
-                  {lock.mine ? "Let them write again" : "Only I may write this"}
-                </MenuButton>
-              ) : (
-                <p className="menu-label">Locked by {lock.holderName}</p>
-              );
-            })()}
-            <MenuButton
-              onClick={() => {
-                photoNoteRef.current = menuEntry.note.id;
-                photoInputRef.current?.click();
-                closeRowMenu();
-              }}
-            >
-              <Camera size={16} />
-              {menuEntry.note.photo ? "Change photo" : "Add photo"}
-            </MenuButton>
-            {menuEntry.note.photo && (
-              <MenuButton
-                onClick={() => {
-                  onSetPhoto(menuEntry.note.id, null);
-                  closeRowMenu();
-                }}
-              >
-                <ImageOff size={16} />
-                Remove photo
-              </MenuButton>
-            )}
-            <div className="menu-separator" />
-            <MenuButton onClick={() => setMoving(true)}>
-              <FolderInput size={16} />
-              Move note
-              <ChevronRight size={16} className="ml-auto" />
-            </MenuButton>
-            <MenuButton
-              onClick={() => {
-                onArchiveChange(menuEntry, true);
-                closeRowMenu();
-              }}
-            >
-              <Archive size={16} />
-              Archive note
-            </MenuButton>
-            <div className="menu-separator" />
-            <MenuButton
-              danger
-              onClick={() => {
-                onMoveToTrash(menuEntry);
-                closeRowMenu();
-              }}
-            >
-              <Trash2 size={16} />
-              Move to Trash
-            </MenuButton>
-          </>
-        )}
+        <MenuItems items={rowMenuItems} close={closeRowMenu} />
       </ContextMenu>
     ) : null;
 

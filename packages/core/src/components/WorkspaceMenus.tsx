@@ -73,6 +73,7 @@ import type { ListPreferences } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { MenuButton, MenuItems } from "./MenuPrimitives";
+import { pinItem, lockItems, moveItem } from "./menuNoteItems";
 import { useSystemMenu } from "./useSystemMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import { useDismiss } from "./useDismiss";
@@ -260,28 +261,8 @@ function noteMenuItems({
   onDelete,
 }: NoteMenuActions): MenuItem[] {
   return [
-    {
-      kind: "item",
-      id: "pin",
-      label: pinned ? "Unpin note" : "Pin note",
-      icon: <Pin size={16} />,
-      checked: pinned,
-      run: onTogglePin,
-    },
-    ...(lock
-      ? lock.mine || !lock.holderName
-        ? [
-            {
-              kind: "item" as const,
-              id: "lock",
-              label: lock.mine ? "Let them write again" : "Only I may write this",
-              icon: lock.mine ? <LockOpen size={16} /> : <Lock size={16} />,
-              checked: lock.mine,
-              run: lock.onToggle,
-            },
-          ]
-        : [{ kind: "label" as const, label: `Locked by ${lock.holderName}` }]
-      : []),
+    pinItem(pinned, onTogglePin),
+    ...lockItems(lock),
     { kind: "item", id: "find", label: "Find in note", icon: <Search size={16} />, run: onFind },
     {
       kind: "item",
@@ -317,29 +298,7 @@ function noteMenuItems({
         ]
       : []),
     { kind: "separator" },
-    {
-      kind: "item",
-      id: "move",
-      label: "Move note",
-      icon: <FolderInput size={16} />,
-      submenu: [
-        { kind: "label", label: "Move to" },
-        {
-          kind: "item",
-          id: "move:unfiled",
-          label: "Unfiled",
-          icon: <FolderInput size={16} />,
-          run: () => onMove(null),
-        },
-        ...folders.map((folder) => ({
-          kind: "item" as const,
-          id: `move:${folder.id}`,
-          label: folder.name,
-          icon: <FolderInput size={16} />,
-          run: () => onMove(folder.id),
-        })),
-      ],
-    },
+    moveItem(folders, onMove),
     {
       kind: "item",
       id: "recent",
