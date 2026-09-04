@@ -2757,7 +2757,7 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  left: 2.5rem;
+  left: 2rem;
   /* `--rule`, not `--rule-soft`. The soft one is four values off the paper it
      is drawn on — a line that is only there in the stylesheet. This is the
      most repeated hairline in the application and it still has to be seen. */
@@ -5076,6 +5076,35 @@
 .sidebar-topbar {
   position: relative;
   z-index: 30;
+  container-type: inline-size;
+  container-name: sidebar-header;
+}
+
+.sidebar-scope {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-scope-name {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+/* Use the room released by macOS full screen, or a wider browser sidebar.
+   Compact windows keep exactly the same portraits and toolbar geometry. */
+@container sidebar-header (min-width: 230px) {
+  .sidebar-scope-name {
+    display: block;
+  }
 }
 
 /* No reserved gutter. `scrollbar-gutter: stable` was holding 10px open down

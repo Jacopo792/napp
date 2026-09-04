@@ -24,6 +24,7 @@ export interface AuthenticationResult {
 
 const ARCHIVE_ID = "00000000-0000-4000-8000-000000000001";
 const EMAIL = "preview@example.invalid";
+let signedOut = false;
 
 async function previewSession(email = EMAIL): Promise<AppSession> {
   return {
@@ -34,6 +35,7 @@ async function previewSession(email = EMAIL): Promise<AppSession> {
 }
 
 export async function authenticate(email: string): Promise<AuthenticationResult> {
+  signedOut = false;
   const session = await previewSession(email || EMAIL);
   const archives: ArchiveOption[] = [
     { archiveId: session.archiveId, name: "Preview archive", joinedAt: "2026-05-18" },
@@ -67,9 +69,9 @@ export async function registerAccount(): Promise<{
 }
 
 export async function restoreSession(): Promise<AppSession | null> {
-  return previewSession();
+  return signedOut ? null : previewSession();
 }
 
 export async function clearSession(): Promise<void> {
-  /* Nothing to clear: the preview session is recreated on every load. */
+  signedOut = true;
 }

@@ -519,14 +519,23 @@ export default function NotesPage() {
 
   // ── Bootstrap ───────────────────────────────────────────────────────────
   useEffect(() => {
-    restoreSession().then((s) => {
-      if (!s) {
-        navigate({ to: "/" });
-        return;
-      }
-      setSession(s);
-      setViewAs(s.userId);
-    });
+    let active = true;
+    void restoreSession()
+      .then((s) => {
+        if (!active) return;
+        if (!s) {
+          navigate({ to: "/" });
+          return;
+        }
+        setSession(s);
+        setViewAs(s.userId);
+      })
+      .catch(() => {
+        if (active) void navigate({ to: "/", replace: true });
+      });
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   /**
@@ -2935,6 +2944,7 @@ export default function NotesPage() {
     );
   })();
 
+  const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
     <Sidebar
       scopes={scopes}
@@ -2958,13 +2968,13 @@ export default function NotesPage() {
       }}
       onLock={handleLock}
       archiveSwitch={archiveSwitch}
+      scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
     />
   );
 
   /* Whose notes the window is pointed at, said in the roster's own words. It
      used to read "Jacopo's notes" or the partner's, which was the last place
      in the interface still assuming an archive holds exactly two people. */
-  const viewedMember = members.find((member) => member.userId === viewAs);
   const readingLabel = viewedMember ? notesOf(viewedMember) : "This archive";
   /* Only when it is somebody else's. Your own name under your own notes is the
      possessive the switch just stopped saying. */

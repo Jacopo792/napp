@@ -16,6 +16,17 @@ You should receive an acknowledgement within seven days. A fix will be
 developed privately when disclosure before deployment would put existing
 archives at risk.
 
+## Persistent sign-in
+
+Both shells retain Supabase access and refresh tokens in their origin's local
+storage. On startup the SDK restores and, when needed, refreshes them, and
+`getUser()` validates the account before the saved archive opens. The archive
+selection in `napp:archive-session` is navigation metadata, never authorization;
+archive membership and RLS remain the access boundary. A transient auth/network
+failure preserves that selection and offers a retry. A missing, rejected, or
+mismatched identity discards it. Explicit sign-out clears the archive selection,
+the note cache and the local Supabase session. Auto-lock remains opt-in.
+
 ## Supported version
 
 Only the current `main` branch and the production build published from it are

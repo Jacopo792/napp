@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 /* ── Locking the archive when nobody is there ─────────────────────────────────
    This is the one preference in the app that protects something. The signed-in
-   session lives in this tab for as long as the tab does, so a laptop left open
+   session persists on this device until sign-out, so a laptop left open
    on a kitchen table is an open archive — and it is a *shared* archive, so it
    is not only your own notes sitting there.
 

@@ -70,6 +70,7 @@ interface Props {
   onLock: () => void;
   /** The archive switch, which belongs above the destinations it re-points. */
   archiveSwitch: React.ReactNode;
+  scopeLabel: string;
 }
 
 const EXPANDED_KEY = "napp:folders-open";
@@ -356,6 +357,7 @@ export function Sidebar({
   onSettings,
   onLock,
   archiveSwitch,
+  scopeLabel,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
   /** Where a new folder is being typed: null for none, "" for the top level. */
@@ -512,8 +514,12 @@ export function Sidebar({
           end are 32 each: the strip is what `SIDEBAR_MIN` is measured from,
           rather than the other way round. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
-        {archiveSwitch}
-        <span className="ml-auto" />
+        <div className="sidebar-scope">
+          {archiveSwitch}
+          <span className="sidebar-scope-name" title={scopeLabel}>
+            {scopeLabel}
+          </span>
+        </div>
         {/* Back in the strip, at the end of it, which is where the Finder and
             Notes both keep it — beside the control that hides the column
             rather than on the heading of the section it fills. It was moved

@@ -133,6 +133,13 @@ Tiptap edits a structured document in one continuous reading surface. There are 
 
 ## Navigation and interaction states
 
+The compact avatar switch keeps its portrait sizes. When the sidebar header has
+at least 230 px of content width (after the macOS traffic-light gutter), the
+selected member's name appears beside it, truncated if necessary. Folder and
+sidebar controls stay anchored at the right; pane widths and type sizes do not
+change. Desktop list rows use 4 px of left padding instead of 12 px, with their
+separators shifted by the same 8 px; gallery and mobile rows keep their spacing.
+
 - The sidebar makes scope separation explicit. The switch is a segmented control built from the archive's roster — "My notes" plus each other member by nickname, one segment per member, with the active one filled; members are shown with avatars and an online indicator while you share presence. Scopes are never presented as blended. The separation is organisational and the permission behind it is recorded in `PRODUCT.md`: every member reads and writes every scope. Below the folder tree the rail carries the places a note leaves it for — Remarks, Archive and Trash. Remarks holds the notes with a conversation nobody has resolved, and it is the one row that can carry a badge: what the other member has said, in an open thread, since **this account** last looked. The badge says how many are waiting; a dot on the leading slot of a catalogue row says which notes they are on, because a count with nothing findable under it is a count the reader has no way to answer. Looking at the list is not reading — only opening the note moves its line.
 - Folder selection uses the accent wash, full ink and stable count alignment. Notes can be dragged onto valid folder rows, which show an inset ring while targeted.
 - Catalogue rows stay dense. Pinned notes appear first, then every group is ordered by the latest real edit; opening a note never changes its position. Each row leads with a glyph saying what it will open — a checklist, a note carrying a picture, a note carrying a file — then a multiline title, a timestamp, a clipped preview and a pin action. It does not show its own position in the sort: that is a number about the list, not about the note. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.

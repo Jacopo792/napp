@@ -6,6 +6,8 @@
 import { supabase } from "./supabaseClient";
 import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
+import { restoreArchiveSession, SESSION_KEY, type AppSession } from "./sessionRestore";
+export type { AppSession } from "./sessionRestore";
 
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
    a plaintext column and every stored object carries its real content type, so
@@ -13,14 +15,6 @@ import { clearNoteStore, resetArchiveCache } from "./noteStore";
    part that mattered — no raw archive key sitting in browser storage for a
    format nothing writes any more. `scripts/` keeps the tools that performed the
    conversion, and `scripts/lib/crypto.ts` exists for them alone. */
-
-export interface AppSession {
-  userId: string;
-  email: string;
-  archiveId: string;
-}
-
-const SESSION_KEY = "napp:archive-session";
 
 type StoredSession = AppSession;
 
@@ -184,17 +178,7 @@ export async function registerAccount(
 }
 
 export async function restoreSession(): Promise<AppSession | null> {
-  const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
-  try {
-    const stored = JSON.parse(raw) as StoredSession;
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user || data.user.id !== stored.userId) throw new Error("Session expired");
-    return stored;
-  } catch {
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
+  return restoreArchiveSession(localStorage, supabase.auth);
 }
 
 export async function clearSession(): Promise<void> {

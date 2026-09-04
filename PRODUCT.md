@@ -248,3 +248,11 @@ success states retain their semantic meaning in every palette.
 No user-specific requirement established. Baseline still applies: visible focus rings,
 AA contrast on text and on both themes, and `prefers-reduced-motion` respected — the
 existing code already honors all three and must keep doing so.
+
+## Sign-in on reopening
+
+Closing a browser tab or the desktop app does not sign the account out. The next
+launch restores the saved session and selected archive, refreshing the JWT when
+needed. A temporary connection failure offers a retry without forgetting the
+archive. Explicit sign-out, configured auto-lock, or a revoked session still
+require authentication. Invitation links keep their account/claim flow.

@@ -5,6 +5,26 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+## 0.2.2 — 2026-09-05
+
+### Fixed
+
+- Reopening the app or the website now restores the saved session and opens
+  the selected archive automatically. Supabase refreshes expired access tokens;
+  connection failures show a retry action without erasing the saved archive.
+  Explicit sign-out and a configured auto-lock still end the session.
+- The sidebar shows the selected member's name beside the compact avatar switch
+  when there is enough room, including macOS full screen and wider web sidebars.
+  Portrait sizes, toolbar buttons and saved pane widths are unchanged.
+- Desktop note rows have 8 px less left padding, moving icons, titles, previews
+  and separators together. Gallery and phone layouts are unchanged.
+
+The native macOS corners, transparency and vibrancy are unchanged. Disabling
+native rounded corners removed the window controls during preview testing, so
+that experiment was discarded.
+
+## Changes through 0.2.1
+
 ### Fixed
 
 - **The macOS download said it was damaged, and it was not.** The app was built

@@ -1,7 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
-import { authenticate, chooseArchive, registerAccount, type ArchiveOption } from "@/lib/session";
+import {
+  authenticate,
+  chooseArchive,
+  registerAccount,
+  restoreSession,
+  type ArchiveOption,
+} from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import { platform } from "@/platform";
@@ -49,7 +55,28 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const invited = Boolean(platform().inviteToken());
+  const [restoring, setRestoring] = useState(!invited);
+  const [restoreError, setRestoreError] = useState("");
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
   const copy = COPY[mode];
+
+  useEffect(() => {
+    // Invitations must still go through the account flow that claims them.
+    if (invited) return;
+    let active = true;
+    void restoreSession()
+      .then((session) => {
+        if (!active) return;
+        if (session) void navigate({ to: "/notes", replace: true });
+        else setRestoring(false);
+      })
+      .catch(() => {
+        if (active) setRestoreError("Could not reconnect. Check your connection and try again.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [invited, navigate, restoreAttempt]);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -101,6 +128,36 @@ export default function Login() {
       setError(reason instanceof Error ? reason.message : "Could not open that archive");
       setLoading(false);
     }
+  }
+
+  if (restoring) {
+    return (
+      <LoginFrame>
+        <LoginMark />
+        <h1 className="login-title">Opening your notes</h1>
+        {restoreError ? (
+          <>
+            <p role="alert" className="login-lede">
+              {restoreError}
+            </p>
+            <button
+              type="button"
+              className="login-submit label"
+              onClick={() => {
+                setRestoreError("");
+                setRestoreAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Try again <ArrowRight size={16} />
+            </button>
+          </>
+        ) : (
+          <p role="status" className="login-lede">
+            Restoring your session…
+          </p>
+        )}
+      </LoginFrame>
+    );
   }
 
   if (archiveChoice) {

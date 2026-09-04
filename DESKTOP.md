@@ -53,7 +53,12 @@ else. `SECURITY.md` records what a signature would have been worth.
 
 The same account as the website. The window is a different browser as far as
 Supabase is concerned, so you sign in once here even if the browser is already
-signed in.
+signed in. The session and the selected archive persist across window closure
+and application restarts. At launch the app restores them before showing the
+sign-in form; Supabase renews an expired JWT using the stored refresh token.
+If the server is temporarily unreachable, **Try again** retries without clearing
+the saved archive. **Lock & sign out**, a configured auto-lock, or a revoked
+session still require signing in again.
 
 Preferences follow the account rather than the machine – appearance, the reading
 axes, the privacy switches, and which conversations you have read – so the

@@ -459,7 +459,7 @@ const Row = memo(function Row({
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
-            : "note-row-list mx-2 touch-none px-3 py-2.5"
+            : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-1"
       } ${
         selected
           ? mobile
