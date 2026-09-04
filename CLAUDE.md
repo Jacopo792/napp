@@ -29,6 +29,14 @@ one has two real implementations from the day it was written: `webOrigin`,
 `inviteToken`, `saveFile`, `saveFolder`, `openFile`, `print`. Each shell calls
 `setPlatform()` before mounting.
 
+And a seventh that is **optional**, which is a different kind of member.
+`popUpMenu` hands a menu to the window manager: an `NSMenu` is painted by the
+window server over the window, in the material the system is wearing that year,
+and a `<div>` reaches only what is behind it in the page. There is no browser
+implementation to write, so there is none — and `platform().popUpMenu` being
+falsy is the capability test, where a member returning a sentinel would have
+made every caller carry a third case. See _A menu, described once_ below.
+
 **Do not widen it for something both shells do the same way.** `import.meta.env`,
 `localStorage`, IndexedDB, the clipboard and the pdf.js worker are all
 deliberately absent: both shells are Vite over Chromium, so those resolve
@@ -440,6 +448,19 @@ stylesheet holds a gutter open for them. Change one number and the buttons are
 either over the avatar or floating in a gap. The gutter follows the leftmost
 strip, not the sidebar: ⌘\ collapses the whole navigation pane and the buttons
 are then over the note's own toolbar.
+
+**Full screen is a fact the window states, not one the page can ask for.**
+macOS hides the traffic lights in full screen, so the 88px held for them has to
+go too — or the scope switch stands 88 pixels in from the edge of the screen
+beside nothing. The rule for it read `@media (display-mode: fullscreen)`, and
+that never once fired: Chromium answers that feature out of its own
+presentation state, and a Chromium embedded in a window of our own answers
+`browser` however the window is presented. So `main.js` listens for
+`enter-full-screen` / `leave-full-screen` and the preload writes
+`data-fullscreen` on the root element, beside `data-shell`. An attribute rather
+than an event, because it is a state and not a thing that happened, and no
+component has to hold it. Windows still keeps its 40px band unconditionally;
+the same bug is almost certainly there and cannot be looked at from a Mac.
 
 **Windows has a different compact strip, also one decision in two files.**
 `main.js` uses `titleBarOverlay` and `styles.css` starts full-height screens
@@ -1030,6 +1051,37 @@ client's own `ensureProfile()` already wrote the profile row.
 **When a Supabase error names a schema object you cannot find in
 `supabase/migrations/`, look in the database.** `select tgname, proname from
 pg_trigger join pg_proc …` found this in one query.
+
+## A menu, described once
+
+A menu here is drawn two ways and described once, in
+`packages/core/src/lib/menuShape.ts`. The page draws it as a popover; a desktop
+shell hands it to the system, which draws its own. The second cannot be
+imitated by the first, which is the whole reason the boundary exists — see
+`popUpMenu` in _One app, two shells_ above.
+
+So the items are a **list**, not JSX. Writing them twice — once for
+`MenuItems` and once as a template — is a fork that drifts the first time
+somebody adds an item, and drifts silently, because only one of the two is ever
+on screen. `forSystem()` strips the list to what a process boundary can carry,
+which is also the sanitising: no icons, no functions. `useSystemMenu` offers it
+and answers whether the system took it; where it did, the component renders
+nothing, because the menu is already up and is not the page's to lay out.
+
+One level of submenu. The system draws a submenu as a submenu; the page draws
+it as a section you go into and come back from, because a flyout off a 240px
+popover pinned to the pointer is a thing to chase rather than to read.
+
+The main process **reads** the description rather than trusting it, and caps
+its depth and its length. Not because the page is hostile but because a
+malformed template throws in the main process, and a throw there closes the
+application.
+
+Icons stay in the page. An `NSMenu` item's image is a bitmap crossing a process
+boundary, and the menus this one is modelled on carry none.
+
+The pure half is its own file for the reason `preferenceShape.ts` is: it
+reaches nothing, so `node --experimental-strip-types` can test it.
 
 ## Markdown in and out
 
