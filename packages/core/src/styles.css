@@ -3100,8 +3100,8 @@
   padding-bottom: 16px;
 }
 
-.profile-portrait .appearance-row {
-  border-bottom: 0;
+.profile-portrait .appearance-row::after {
+  display: none;
 }
 
 .profile-portrait .avatar.is-large {
@@ -3361,20 +3361,44 @@
   overflow: hidden;
 }
 
+/* 46, not 62. A System Settings row is in the mid forties even carrying two
+   lines, and sixteen pixels of extra air on every row is what turns a form of
+   eight settings into a page you scroll.
+
+   And the rule between rows starts where the *label* starts, not at the card's
+   own edge — it runs under the words and never under the tile, which is what
+   makes a stack of rows read as one list rather than as slices of a card. It
+   is a pseudo-element because a border cannot be inset from one side. */
 .appearance-row {
+  position: relative;
   display: flex;
-  min-height: 62px;
+  min-height: 46px;
   align-items: center;
   gap: 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--rule-soft);
+  padding: 8px 16px;
   color: var(--ink-2);
   font-size: var(--text-md);
 }
 
-.appearance-row:last-child,
-.appearance-row:has(+ .appearance-row.is-stacked) {
-  border-bottom: 0;
+.appearance-row::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  /* padding + tile + gap */
+  left: 60px;
+  height: 1px;
+  background: var(--rule-soft);
+  content: "";
+}
+
+.appearance-row.is-bare::after {
+  left: 44px;
+}
+
+.appearance-row:last-child::after,
+.appearance-row:has(+ .appearance-row.is-stacked)::after,
+.appearance-row.is-stacked::after {
+  display: none;
 }
 
 /* A row standing on the section itself rather than inside a card. The 16px is
@@ -3399,17 +3423,27 @@
    of thing this is, the name of it with a line saying what it does, and the
    control flush right. Every row reserves the lead, so the labels line up down
    the whole column instead of each starting wherever its control ended. */
+/* A tile, not a disc. The rounded square holding a symbol is the single most
+   recognisable thing about a System Settings row, and it was a 34px circle
+   with a border — which is a bullet, and reads as one.
+
+   It painted `--surface` too, #020202 in this palette: a black hole punched in
+   a card, the same mistake the folder's ⋯ was making. The wash is what every
+   other filled thing in this app uses.
+
+   Apple colour-codes these tiles, blue for General and grey for About. This
+   archive does not: its palette is one accent and no colour anywhere the words
+   are not, so the tile takes the shape and leaves the colour coding. */
 .settings-lead {
   display: flex;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--rule-soft);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--ink-3);
+  border-radius: var(--radius-xs);
+  background: var(--accent-wash);
+  color: var(--ink-2);
 }
 
 .settings-label {
