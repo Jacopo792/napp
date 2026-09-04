@@ -2293,15 +2293,29 @@
   opacity: 1;
 }
 
+/* The material, at last. This painted `--glass` flat — an opaque colour — while
+   two fallbacks sat below it, one for browsers without `backdrop-filter` and
+   one for readers who have asked for less transparency, both guarding a blur
+   that was never declared. A menu that does not take any colour from what is
+   behind it is a rectangle laid on the screen, and no amount of radius or
+   shadow makes it read as a thing in front of the window.
+
+   It is not the system's material and cannot be: an AppKit menu blurs the
+   desktop behind the *window*, and a page can only reach what is behind
+   itself. Saturation is what closes most of the remaining distance — a blur
+   alone greys what it samples, and the colour coming back through is what the
+   eye reads as depth. */
 .glass-toolbar,
 .glass-search,
 .popover,
 .glass-sheet {
   border: 1px solid var(--glass-border);
-  background: var(--glass);
+  background: color-mix(in srgb, var(--glass) 76%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  backdrop-filter: blur(30px) saturate(1.7);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    0 14px 36px rgb(0 0 0 / 0.24);
+    var(--shadow-popover);
 }
 
 .glass-toolbar,
@@ -2309,7 +2323,10 @@
   border-radius: var(--radius-lg);
 }
 
-.popover,
+.popover {
+  border-radius: var(--radius-md);
+}
+
 .glass-sheet {
   border-radius: var(--radius-lg);
 }
@@ -2330,20 +2347,25 @@
   transform-origin: top left;
 }
 
+/* 28, not 37.6. A macOS menu row is between 22 and 28 pixels tall and this one
+   was `2.35rem`, which is a touch target — the single measurement that made
+   every menu in the app read as a phone sheet that had wandered onto a
+   desktop. Everything else here is the ramp; there is nothing bespoke left in
+   a menu row. */
 .menu-row {
   display: flex;
   width: 100%;
-  min-height: 2.35rem;
+  min-height: 28px;
   align-items: center;
-  gap: 0.7rem;
-  border-radius: var(--radius-md);
-  padding: 0.45rem 0.65rem;
+  gap: 8px;
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
   text-align: left;
-  font-size: 0.82rem;
-  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
   transition:
-    background-color 160ms var(--ease),
-    color 160ms var(--ease);
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .menu-row:hover,
@@ -2354,24 +2376,24 @@
 
 .menu-separator {
   height: 1px;
-  margin: 0.35rem 0.45rem;
+  margin: 4px 8px;
   background: var(--rule);
 }
 
 .menu-label {
-  padding: 0.45rem 0.7rem 0.25rem;
+  padding: 8px 8px 4px;
   color: var(--ink-4);
-  font-size: 0.64rem;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
 .menu-small-button {
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 .menu-small-button.is-primary {
@@ -4928,6 +4950,34 @@
   text-transform: uppercase;
 }
 
+/* One shape for every place with nothing in it, on the phone and in the
+   window alike. Two different ones is how they came to disagree about whether
+   an empty list is a dashed box or a sentence. */
+.empty-state {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.empty-state p {
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+
+/* Toward the ink, like every other state in this app: `--accent` is lifted to
+   a 3:1 floor and this is the one thing on the screen you are being asked to
+   press. */
+.empty-state button {
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.empty-state button:hover {
+  opacity: 0.7;
+}
+
 .sidebar-empty {
   display: flex;
   flex-wrap: wrap;
@@ -5244,10 +5294,15 @@
 
 /* Sits where the count sits, at the heading's own weight — an action on a
    section, not a button parked on a label. */
+/* The counts on the rows below end at the row's own 10px of right padding, and
+   this button has to end there too or the column has two right edges. The box
+   is 20 wide with the glyph centred in it, so the negative margin is what puts
+   the *glyph* where a numeral would be rather than the box. */
 .sidebar-heading-action {
   display: inline-flex;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  margin-right: -4px;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-xs);
@@ -5317,9 +5372,13 @@
     background-color var(--dur-fast) var(--ease);
 }
 
+/* It painted `--surface`, which in this palette is #020202 — a near-black tile
+   dropped onto a row that is a wash, so opening a folder's menu put a hole in
+   the column. Every other pressable thing in the sidebar answers with the
+   accent wash; there was never a reason for this one to be its own colour. */
 .sidebar-action:hover,
 .sidebar-action.is-open {
-  background: var(--surface);
+  background: var(--accent-wash);
   color: var(--ink);
 }
 
@@ -6000,9 +6059,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border: 1px dashed var(--rule);
+  border: 1px solid var(--rule-soft);
   border-radius: var(--radius-md);
-  padding: 1rem;
+  padding: 16px;
   color: var(--ink-3);
   font-family: var(--font-sans);
   font-size: 0.8rem;
@@ -7267,6 +7326,17 @@
   [data-shell="mac"] {
     --titlebar-inset: 0px;
   }
+}
+
+/* The window's own edge. `transparent: true` is what lets the vibrancy through
+   and it also means macOS stops drawing the hairline it draws around an opaque
+   window — so the app ended at nothing, which is the one thing every Mac window
+   has that this one did not. 10px is the system's window radius since Big Sur;
+   the ring is drawn inside it so the two corners are the same corner. */
+[data-shell="mac"] .workspace-shell,
+[data-shell="mac"] .login-shell {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.11);
 }
 
 [data-shell="mac"] .sidebar-topbar,

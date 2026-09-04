@@ -1195,15 +1195,10 @@ export function NoteList({
             {loading ? (
               <Skeletons />
             ) : entries.length === 0 ? (
-              <div className="px-6 py-14 text-center">
-                <p className="text-[14px] text-ink-3">
-                  {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
-                </p>
+              <div className="empty-state">
+                <p>{hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}</p>
                 {(hasQuery || (!trashMode && canWrite)) && (
-                  <button
-                    onClick={() => (hasQuery ? onQueryChange("") : onNew())}
-                    className="mt-3 text-[14px] font-medium text-accent"
-                  >
+                  <button onClick={() => (hasQuery ? onQueryChange("") : onNew())}>
                     {hasQuery ? "Clear search" : "Write the first note"}
                   </button>
                 )}
@@ -1305,15 +1300,15 @@ export function NoteList({
         {loading ? (
           <Skeletons />
         ) : entries.length === 0 ? (
-          <div className="mx-3 mt-2 rounded-xl border border-dashed border-rule px-6 py-12 text-center">
-            <p className="readout text-ink-2">
-              {hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}
-            </p>
+          /* No box, and nothing dashed. A dashed rectangle is a drop target or
+             a thing still loading, and this is neither — it is a place with
+             nothing in it, which every Mac list says with words alone. The
+             sentence was also set in the monospace readout, which is the voice
+             this app keeps for counts and states, not for talking. */
+          <div className="empty-state">
+            <p>{hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}</p>
             {(hasQuery || (!trashMode && canWrite)) && (
-              <button
-                onClick={() => (hasQuery ? onQueryChange("") : onNew())}
-                className="label mt-3 text-accent transition-opacity hover:opacity-70"
-              >
+              <button onClick={() => (hasQuery ? onQueryChange("") : onNew())}>
                 {hasQuery ? "Clear search" : "Write the first note"}
               </button>
             )}
