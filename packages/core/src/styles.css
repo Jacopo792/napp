@@ -610,6 +610,38 @@
   animation: menu-in 130ms var(--ease-out) both;
 }
 
+/* A card that answers a hold should look like it came out of the finger that
+   held. So it grows from the corner nearest the point it was asked from —
+   which is the top-left corner, because that is the corner the panel is placed
+   by — and it does it on the spring, which is what separates a thing arriving
+   from a thing appearing. Larger than `menu-in` on purpose: this is one card
+   about one person, not a list of things to do, and it can afford the travel a
+   menu cannot. */
+.context-menu.member-card-panel {
+  padding: 16px;
+  animation: member-card-in var(--dur-base) var(--ease-spring) both;
+  transform-origin: top left;
+}
+
+@keyframes member-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+}
+
+/* The card is laid out as the note header's is — it is the same card. */
+.context-menu.member-card-panel > .member-presence-heading,
+.context-menu.member-card-panel > .member-presence-facts {
+  display: flex;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-menu.member-card-panel {
+    animation: none;
+  }
+}
+
 /* ══ The door ════════════════════════════════════════════════════════════════
    The only screen in the app with nothing of the reader's on it yet, which is
    the one place it may say what kind of place this is. It says it with a drawn

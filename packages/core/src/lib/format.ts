@@ -52,3 +52,12 @@ export function countWords(s: string): number {
   const t = s.trim();
   return t ? t.split(/\s+/).length : 0;
 }
+
+/** The day somebody joined, said the way a member card says it. */
+export function memberSince(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}

@@ -19,11 +19,15 @@ export function ContextMenu({
   point,
   onClose,
   width = "15rem",
+  className = "",
   children,
 }: {
   point: MenuPoint;
   onClose: () => void;
   width?: string;
+  /** The shell is a panel at a point; what is in it decides how it is dressed
+   *  and how it arrives. A menu takes the default. */
+  className?: string;
   children: ReactNode;
 }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -81,7 +85,7 @@ export function ContextMenu({
     <div
       ref={measure}
       role="menu"
-      className="context-menu popover menu-popover p-1.5"
+      className={`context-menu popover menu-popover p-1.5 ${className}`}
       style={{ left, top, width, visibility: size.h ? "visible" : "hidden" }}
     >
       {children}

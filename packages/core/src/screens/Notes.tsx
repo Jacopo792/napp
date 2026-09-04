@@ -17,8 +17,10 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
+  ShieldCheck,
   SquarePen,
   Trash2,
+  UserRound,
   X,
 } from "lucide-react";
 import {
@@ -84,7 +86,7 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { fold, formatStamp } from "@/lib/format";
+import { fold, formatStamp, memberSince } from "@/lib/format";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
   clearDrafts,
@@ -130,6 +132,8 @@ const SettingsPanel = lazy(() =>
   import("@/components/SettingsPanel").then((module) => ({ default: module.SettingsPanel })),
 );
 import type { MenuPoint } from "@/lib/contextMenu";
+import { ContextMenu } from "@/components/ContextMenu";
+import { MemberCard } from "@/components/MemberCard";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
@@ -173,6 +177,10 @@ const LIST_DEFAULT = 380;
    gaps. Narrower than this and the buttons are underneath the faces. */
 const SIDEBAR_MIN = 248;
 const SIDEBAR_MAX = 420;
+/* How long a press has to be held before it stops being a press and becomes a
+   question. Long enough not to fire on a slow tap, short enough that nobody
+   wonders whether it is going to. */
+const HOLD_MS = 420;
 const LIST_MIN = 300;
 const LIST_MAX = 620;
 
@@ -320,6 +328,34 @@ export default function NotesPage() {
   const typingRef = useRef(false);
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
+  /** Whose card the switch is showing, and where the finger was when it was
+   *  asked for — the card grows out of that point rather than fading in. */
+  const [memberCard, setMemberCard] = useState<(MenuPoint & { userId: string }) | null>(null);
+
+  /* A hold, and the two refs it needs. The timer is one, because it has to be
+     cancelled by a hand that moved away; and whether it fired is the other,
+     because the press that ends a hold is still a press and would throw the
+     switch on its way out. */
+  const holdRef = useRef<number | undefined>(undefined);
+  const heldRef = useRef(false);
+
+  function holdStart(event: React.PointerEvent, userId: string) {
+    if (event.button !== 0 && event.pointerType === "mouse") return;
+    const { clientX: x, clientY: y } = event;
+    heldRef.current = false;
+    window.clearTimeout(holdRef.current);
+    holdRef.current = window.setTimeout(() => {
+      heldRef.current = true;
+      setMemberCard({ x, y, userId });
+    }, HOLD_MS);
+  }
+
+  function holdEnd() {
+    window.clearTimeout(holdRef.current);
+  }
+
+  useEffect(() => () => window.clearTimeout(holdRef.current), []);
+
   /** The phone has no room for a permanent sidebar, so it gets the same one
    *  as a drawer — the destinations are identical, only the staging differs. */
   const [foldersOpen, setFoldersOpen] = useState(false);
@@ -2838,7 +2874,25 @@ export default function NotesPage() {
         <button
           key={member.userId}
           type="button"
-          onClick={() => handleViewChange(member.userId)}
+          /* A press throws the switch; a press held asks the face who it is.
+             The faces stopped carrying names when the switch shrank to fit the
+             title bar, so this is the window's only answer to that question —
+             and holding is where a portrait keeps its answer on a phone, which
+             has no second button to ask with. A pointer may also right-click,
+             the way everything else here is asked. */
+          onClick={() => {
+            if (heldRef.current) return void (heldRef.current = false);
+            handleViewChange(member.userId);
+          }}
+          onPointerDown={(event) => holdStart(event, member.userId)}
+          onPointerUp={holdEnd}
+          onPointerLeave={holdEnd}
+          onPointerCancel={holdEnd}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            holdEnd();
+            setMemberCard({ x: event.clientX, y: event.clientY, userId: member.userId });
+          }}
           aria-pressed={viewAs === member.userId}
           aria-label={notesOf(member)}
           title={notesOf(member)}
@@ -2855,6 +2909,42 @@ export default function NotesPage() {
       ))}
     </div>
   );
+
+  /* Who that is. Grown out of the point the hand asked from — see
+     `.member-card-panel` in the stylesheet — rather than faded in, because a
+     card that answers a gesture should look like it came from it. */
+  const memberCardPanel = (() => {
+    if (!memberCard) return null;
+    const member = roster.find((one) => one.userId === memberCard.userId);
+    if (!member) return null;
+    const here = flags.presence && onlineMemberIds.has(member.userId);
+    return (
+      <ContextMenu
+        point={memberCard}
+        onClose={() => setMemberCard(null)}
+        width="17.5rem"
+        className="member-card-panel"
+      >
+        <MemberCard
+          avatarUrl={avatarUrls[member.userId] ?? null}
+          name={nameOf(member)}
+          status={here ? { label: "Here now", active: true } : undefined}
+          facts={[
+            {
+              icon: <UserRound size={16} />,
+              label: "Archive member since",
+              value: memberSince(member.joinedAt),
+            },
+            {
+              icon: <ShieldCheck size={16} />,
+              label: "Access",
+              value: member.role === "editor" ? "Can edit" : "View only",
+            },
+          ]}
+        />
+      </ContextMenu>
+    );
+  })();
 
   const sidebar = (
     <Sidebar
@@ -3430,6 +3520,7 @@ export default function NotesPage() {
       {settingsPanel}
       {keyboardSheets}
       {editorMenu}
+      {memberCardPanel}
       {/* The editor's attachment menu opens this; a file input is the only way
           a browser lets a page read a file the reader chose. */}
       <input

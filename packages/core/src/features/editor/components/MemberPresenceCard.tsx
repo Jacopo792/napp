@@ -1,6 +1,8 @@
 import { Clock3, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
+import { MemberCard } from "@/components/MemberCard";
+import { memberSince } from "@/lib/format";
 import { useDismiss } from "@/components/useDismiss";
 
 interface Props {
@@ -16,14 +18,6 @@ interface Props {
 
 function timeLabel(value: string): string {
   return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-function memberSince(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 /* Everyone this card is drawn for is on the note.
@@ -77,44 +71,36 @@ export function MemberPresenceCard({
           role="dialog"
           aria-label={`${name} profile`}
         >
-          <span className="member-presence-heading">
-            <Avatar url={avatarUrl} name={name} email="" large />
-            <span>
-              <strong>{name}</strong>
-              <small className="is-active">
-                <i aria-hidden="true" />
-                {typing ? "Writing now" : "Active now"}
-              </small>
-            </span>
-          </span>
-
-          <span className="member-presence-facts">
-            <span>
-              <Clock3 size={16} />
-              <span>
-                <small>In this note since</small>
-                <strong>{timeLabel(noteJoinedAt)}</strong>
-              </span>
-            </span>
-            {archiveJoinedAt && (
-              <span>
-                <UserRound size={16} />
-                <span>
-                  <small>Archive member since</small>
-                  <strong>{memberSince(archiveJoinedAt)}</strong>
-                </span>
-              </span>
-            )}
-            {role && (
-              <span>
-                <ShieldCheck size={16} />
-                <span>
-                  <small>Access</small>
-                  <strong>{role === "editor" ? "Can edit" : "View only"}</strong>
-                </span>
-              </span>
-            )}
-          </span>
+          <MemberCard
+            avatarUrl={avatarUrl}
+            name={name}
+            status={{ label: typing ? "Writing now" : "Active now", active: true }}
+            facts={[
+              {
+                icon: <Clock3 size={16} />,
+                label: "In this note since",
+                value: timeLabel(noteJoinedAt),
+              },
+              ...(archiveJoinedAt
+                ? [
+                    {
+                      icon: <UserRound size={16} />,
+                      label: "Archive member since",
+                      value: memberSince(archiveJoinedAt),
+                    },
+                  ]
+                : []),
+              ...(role
+                ? [
+                    {
+                      icon: <ShieldCheck size={16} />,
+                      label: "Access",
+                      value: role === "editor" ? "Can edit" : "View only",
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </span>
       )}
     </span>
