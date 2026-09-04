@@ -7093,3 +7093,50 @@
     transition: none;
   }
 }
+
+/* ── The hand this is under ──────────────────────────────────────────────────
+   The rail's numbers are a finger's: 7px of padding on a 20px line is a 34px
+   row, with a 14px label, and that is what a phone needs. It is also nothing
+   like a Mac sidebar — Finder and Mail sit at 28 and 13 — and the roomy version
+   is most of why the column read as a web page's navigation rather than as an
+   application's.
+
+   So the tighter set is asked for by the pointer instead of being written into
+   the defaults, using the same `(hover: hover) and (pointer: fine)` test this
+   file already keeps for the dock. A finger keeps its targets; a mouse gets the
+   density it can aim at. One stylesheet, both shells, both hands.
+
+   The radius comes down with them. 0.6rem on a 28px row is a lozenge, and a
+   Mac selection shape is a rectangle with the corner just taken off. */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --rail-gap: 7px;
+    --row-pad-y: 5px;
+    --row-line: 18px;
+  }
+
+  .sidebar-target,
+  .sidebar-footer-button {
+    font-size: 13px;
+  }
+
+  .sidebar-row,
+  .sidebar-footer-button {
+    border-radius: 6px;
+  }
+
+  /* The switch was sized against 34px rows and is now the one thing in the
+     column still built to them — 44px of it above a 28px row, which reads as
+     the control having been left behind rather than as emphasis. It keeps its
+     pill and its travelling thumb; only the box comes down with everything
+     else, and the faces with the box, or two circles rattle in a shape that no
+     longer fits them. */
+  .archive-switch button {
+    min-height: 26px;
+  }
+
+  .archive-switch .avatar.is-compact {
+    width: 20px;
+    height: 20px;
+  }
+}
