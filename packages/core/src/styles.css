@@ -4841,6 +4841,17 @@
   padding-bottom: 0.28rem;
 }
 
+/* Each button is wrapped, so that its menu has something to hang off. A block
+   wrapper gives its inline-flex button a *baseline* to sit on, and an
+   inline-flex box takes its baseline from its own first item — so the five
+   icon buttons sat 1.6px above the foot of their wrappers, in the room a
+   descender would want, and `Aa`, whose first item is text, sat flush. Five
+   icons a pixel and a half off the letters beside them is the whole of what
+   the row looked wrong by. A flex wrapper has no baseline to offer. */
+.editor-tool-cluster > * {
+  display: flex;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .press,
   .press:active,

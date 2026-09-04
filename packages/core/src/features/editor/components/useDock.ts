@@ -22,9 +22,18 @@ import { useEffect, useRef, type PointerEvent } from "react";
    what the real dock does: hovering the leftmost icon nudges the whole row
    right instead of pushing five icons off the end.
 
-   Positions are measured once when the pointer arrives and not per frame: by
-   the second frame the buttons are already scaled, so their own boxes have
-   stopped saying where they sit. ─────────────────────────────────────────── */
+   What is measured is **layout**, never paint. `getBoundingClientRect` reports
+   the box after the transforms this hook has itself written, so a pointer
+   returning while the row is still animating back measured buttons 42 px wide
+   that are 32 — and laid the row out around widths that were about to
+   disappear, which is the shove sideways that read as the dock jittering.
+   `offsetLeft` and `offsetWidth` are the geometry a transform does not touch.
+
+   Positions are therefore kept as distances **inside the row**, and the row's
+   own left edge is read afresh on every move. The row is not transformed — a
+   child's transform never moves its parent's box — so that one rect is honest,
+   and it follows the row when the header's readout changes width underneath
+   it. ────────────────────────────────────────────────────────────── */
 
 /** How far from the pointer the bulge reaches, in px — about three buttons. */
 const DOCK_REACH = 88;
@@ -69,6 +78,22 @@ export function dockLayout(
   return growth.map((grown, index) => ({ mag: 1 + grown, shift: offsets[index] - drift }));
 }
 
+/** Where an element sits, with every CSS transform in its ancestry ignored:
+ *  `offsetLeft` is layout and `getBoundingClientRect` is paint, and the dock
+ *  writes transforms of its own. Two of these subtracted give a distance
+ *  inside the row, which is what the layout is computed in. */
+function layoutLeft(element: HTMLElement): number {
+  let left = 0;
+  for (
+    let node: HTMLElement | null = element;
+    node;
+    node = node.offsetParent as HTMLElement | null
+  ) {
+    left += node.offsetLeft;
+  }
+  return left;
+}
+
 /** `suspended` stands the dock down — a cluster with a menu open holds still
  *  rather than sliding the button that opened it out from under the menu. */
 export function useDock<T extends HTMLElement>(suspended = false) {
@@ -78,21 +103,24 @@ export function useDock<T extends HTMLElement>(suspended = false) {
   function measure() {
     const cluster = root.current;
     if (!cluster) return;
+    const origin = layoutLeft(cluster);
     /* Both classes, because the formatting cluster is built out of its own
        buttons and the header's groups out of the ordinary toolbar button. A
        docked group holds nothing but its own controls, so this cannot pick up
        a button that is not in the row. */
     dock.current = [
       ...cluster.querySelectorAll<HTMLElement>(".editor-tool-button, .toolbar-button"),
-    ].map((button) => {
-      const box = button.getBoundingClientRect();
-      return { button, left: box.left, width: box.width };
-    });
+    ].map((button) => ({
+      button,
+      left: layoutLeft(button) - origin,
+      width: button.offsetWidth,
+    }));
   }
 
-  function magnify(pointerX: number) {
+  function magnify(clientX: number) {
     const items = dock.current;
-    if (items.length === 0) return;
+    const box = root.current?.getBoundingClientRect();
+    if (!box || items.length === 0) return;
     /* Tracking is instantaneous, and this class is what makes it so. A
        transition on `transform` while the pointer is moving means the row is
        permanently chasing a target it never reaches — the icons lag behind the
@@ -100,7 +128,7 @@ export function useDock<T extends HTMLElement>(suspended = false) {
        latency. The dock follows the pointer exactly, and animates only on the
        way out. */
     root.current?.classList.add("is-docked");
-    dockLayout(items, pointerX).forEach(({ mag, shift }, index) => {
+    dockLayout(items, clientX - box.left).forEach(({ mag, shift }, index) => {
       items[index].button.style.setProperty("--mag", String(mag));
       items[index].button.style.setProperty("--dock-shift", `${shift}px`);
     });
