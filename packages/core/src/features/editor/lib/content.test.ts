@@ -7,6 +7,7 @@ import {
   checklistProgress,
   documentGlyph,
   drawingBox,
+  drawingInkBox,
   drawingStrokes,
   drawingSvg,
   firstDrawing,
@@ -117,6 +118,27 @@ test("a page drawing exports a box as tall as its lowest stroke", () => {
   assert.deepEqual(drawingBox(strokes, "board"), DRAWING_BOX);
   assert.deepEqual(drawingBox(strokes, "page"), { width: 1000, height: 906 });
   assert.match(drawingSvg(strokes, "page"), /viewBox="0 0 1000 906"/);
+});
+
+/* A note row's glyph slot is 28 pixels, so a thumbnail is measured by where the
+   ink is and not by the sheet it was drawn on — measured by the sheet, a
+   signature in the corner of a board arrives as four specks. */
+test("a thumbnail is measured by the ink, not by the sheet", () => {
+  const corner = drawingStrokes(
+    JSON.stringify([{ d: "M10,10L30,40", color: "#5B9BFF", width: 6 }]),
+  );
+  /* Half the nib on each side, or the round cap is cut off by its own box. */
+  assert.deepEqual(drawingInkBox(corner), { x: 7, y: 7, width: 26, height: 36 });
+  /* Nothing drawn: the surface is the honest answer. */
+  assert.deepEqual(drawingInkBox([]), { x: 0, y: 0, ...DRAWING_BOX });
+  /* A viewBox with a side of zero is not drawn at all, so a flat stroke with
+     nothing to pad it still has to come back with a height. */
+  assert.deepEqual(drawingInkBox([{ d: "M0,50L100,50", color: "#5B9BFF", width: 0 }]), {
+    x: 0,
+    y: 50,
+    width: 100,
+    height: 1,
+  });
 });
 
 /* Held still at the end of a stroke, a scrawl becomes the shape it was aiming

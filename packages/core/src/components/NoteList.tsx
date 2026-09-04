@@ -39,7 +39,7 @@ import { derivedOf, indexOf } from "@/lib/derived";
 import {
   checklistProgress,
   documentGlyph,
-  drawingBox,
+  drawingInkBox,
   firstDrawing,
 } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
@@ -408,7 +408,17 @@ const Row = memo(function Row({
      in the row says what you are about to open. It costs a walk of a document
      already in memory and no Storage object at all, because the strokes are
      in the note. */
-  const sketch = useMemo(() => firstDrawing(entry.note.content), [entry.note.content]);
+  const sketch = useMemo(() => {
+    const drawing = firstDrawing(entry.note.content);
+    if (!drawing) return null;
+    /* Forty strokes is already more than a 28px square can say, and the box is
+       measured on the same ones that get drawn — measured on all of them it
+       would hold room open for ink nobody is going to see. The surface the
+       drawing was made on does not come into it: what the slot wants is where
+       the ink is, not what it was drawn on. */
+    const strokes = drawing.strokes.slice(0, 40);
+    return { strokes, box: drawingInkBox(strokes) };
+  }, [entry.note.content]);
   const checklist = useMemo(() => checklistProgress(entry.note.content), [entry.note.content]);
   const photoUrl = useStoredImage(entry.note.photo?.objectId ?? null, resolveImage);
   return (
@@ -477,23 +487,26 @@ const Row = memo(function Row({
           aria-label="Has a drawing"
           role="img"
           className={`note-row-glyph is-sketch ${gallery ? "is-gallery" : ""} ${
-            selected ? "is-selected" : ""
-          } ${unread ? "has-unread" : ""}`}
+            unread ? "has-unread" : ""
+          }`}
         >
           <svg
-            viewBox={`0 0 ${drawingBox(sketch.strokes, sketch.surface).width} ${
-              drawingBox(sketch.strokes, sketch.surface).height
-            }`}
+            viewBox={`${sketch.box.x} ${sketch.box.y} ${sketch.box.width} ${sketch.box.height}`}
             preserveAspectRatio="xMidYMid meet"
             aria-hidden
           >
-            {sketch.strokes.slice(0, 40).map((stroke, index) => (
+            {sketch.strokes.map((stroke, index) => (
               <path
                 key={index}
                 d={stroke.d}
                 fill="none"
                 stroke={stroke.color}
-                strokeWidth={stroke.width * 3}
+                /* Constant apparent weight, whatever the drawing's own scale:
+                   the slot is about 23px across once its padding is off, so the
+                   box's long side over 90 puts a default five-unit pen at
+                   roughly one and a third device pixels there — and leaves a
+                   highlighter the six times wider it was drawn as. */
+                strokeWidth={(stroke.width * Math.max(sketch.box.width, sketch.box.height)) / 90}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />

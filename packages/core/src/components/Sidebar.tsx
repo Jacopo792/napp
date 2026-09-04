@@ -20,6 +20,7 @@ import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
+import { UpdateNotice } from "./UpdateNotice";
 import { Avatar, MenuButton } from "./WorkspaceMenus";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
@@ -675,6 +676,7 @@ export function Sidebar({
       )}
 
       <div className="sidebar-footer">
+        <UpdateNotice />
         <button type="button" className="sidebar-footer-button press" onClick={onLock}>
           <Lock size={16} />
           <span>Lock &amp; sign out</span>

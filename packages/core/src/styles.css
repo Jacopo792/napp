@@ -2423,10 +2423,12 @@
   text-align: center;
 }
 
-/* The sketch stands in the glyph's slot, so it takes the glyph's box and its
-   ink is the drawing's own. Strokes are widened threefold on the way in: a
-   6-unit line in a 1000-unit box is a quarter of a pixel at this size, which
-   is not a drawing, it is a smudge. */
+/* The sketch stands in the glyph's slot, so it takes the glyph's box — but its
+   ink is the drawing's own, six literal colours that answer to no theme. That
+   is why it never takes `is-selected`, which fills the slot with `--accent`:
+   pastel ink on a saturated accent of the same luminance is a drawing nobody
+   can see, and the row already says it is selected. The note's own picture
+   opts out of the fill the same way, by never being handed the class. */
 .note-row-glyph.is-sketch {
   padding: 0.15rem;
 }
@@ -5129,6 +5131,18 @@
 }
 
 .sidebar-footer-button:hover svg {
+  color: var(--accent);
+}
+
+/* The one line down here that is news rather than a destination, so it carries
+   the accent without waiting to be hovered. It is an anchor and its siblings
+   are buttons — the underline an anchor comes with would be the only one in
+   the pane. */
+.sidebar-footer-button.is-update {
+  text-decoration: none;
+}
+
+.sidebar-footer-button.is-update svg {
   color: var(--accent);
 }
 

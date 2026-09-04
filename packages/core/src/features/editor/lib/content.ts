@@ -257,6 +257,21 @@ export type DrawingSurface = "board" | "page";
 export const drawingSurface = (value: unknown): DrawingSurface =>
   value === "page" ? "page" : "board";
 
+/** The points a stroke passes through. Three things want them — the page's
+ *  box, the thumbnail's box, and the eraser measuring a pointer against a line
+ *  — and a fourth reader of the stored format is a fourth thing to keep in step
+ *  with what `drawingStrokes` admits. The path data has already been through
+ *  that, so a pair which is not two numbers is not a point. */
+export function strokePoints(d: string): { x: number; y: number }[] {
+  return d
+    .slice(1)
+    .split(/[ML]/)
+    .flatMap((pair) => {
+      const [x, y] = pair.split(",").map(Number);
+      return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : [];
+    });
+}
+
 /** The box a set of strokes needs. A board is always the same one; a page is
  *  as tall as the lowest stroke on it, because the note it was drawn over has
  *  no height until it is read. */
@@ -266,16 +281,50 @@ export function drawingBox(
 ): { width: number; height: number } {
   if (surface === "board") return DRAWING_BOX;
   let lowest = 0;
-  for (const stroke of strokes) {
-    /* Every second number in the path is a y. The path data has already been
-       through `drawingStrokes`, so these are numbers or the stroke is gone. */
-    const points = stroke.d.slice(1).split(/[ML]/);
-    for (const point of points) {
-      const y = Number(point.split(",")[1]);
-      if (Number.isFinite(y)) lowest = Math.max(lowest, y + stroke.width);
-    }
-  }
+  for (const stroke of strokes)
+    for (const point of strokePoints(stroke.d)) lowest = Math.max(lowest, point.y + stroke.width);
   return { width: DRAWING_BOX.width, height: Math.max(Math.ceil(lowest), 1) };
+}
+
+/** The box the ink actually sits in, which is a different question from the
+ *  one above and is asked only by a thumbnail.
+ *
+ *  `drawingBox` is the *surface* — what the drawing was made on, and what
+ *  leaves in an export, where a board cropped to its ink is a board somebody
+ *  drew differently. A note row's glyph slot is 28 pixels: a signature in the
+ *  corner of a 1000 × 560 sheet fitted into that is four specks, which is what
+ *  the row was showing. */
+export function drawingInkBox(strokes: DrawingStroke[]): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  let nib = 0;
+  for (const stroke of strokes)
+    for (const point of strokePoints(stroke.d)) {
+      left = Math.min(left, point.x);
+      top = Math.min(top, point.y);
+      right = Math.max(right, point.x);
+      bottom = Math.max(bottom, point.y);
+      nib = Math.max(nib, stroke.width);
+    }
+  /* Nothing drawn, or nothing readable: the surface is the honest answer. */
+  if (!Number.isFinite(left)) return { x: 0, y: 0, ...DRAWING_BOX };
+  /* Half the widest nib on each side, or a round cap is cut off by the edge of
+     its own box. Floored at 1 on both axes, because a viewBox with a side of
+     zero — one perfectly horizontal line — is not drawn at all, which is this
+     same bug wearing a different hat. */
+  return {
+    x: left - nib / 2,
+    y: top - nib / 2,
+    width: Math.max(right - left + nib, 1),
+    height: Math.max(bottom - top + nib, 1),
+  };
 }
 
 /** A stroke somebody held still at the end of, as the shape they meant.
