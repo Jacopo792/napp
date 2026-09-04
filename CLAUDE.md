@@ -1150,6 +1150,31 @@ which is also the sanitising: no icons, no functions. `useSystemMenu` offers it
 and answers whether the system took it; where it did, the component renders
 nothing, because the menu is already up and is not the page's to lay out.
 
+**Every menu about a note is a list, including the row's** — which was two
+hundred lines of JSX with a `moving` flag and a Back button of its own, beside
+a page menu that already had both from `MenuItems`. `menuNoteItems.tsx` holds
+the three items the two share: pin, the write lock, and Move note with the
+folders under it. They are not the same menu — a row offers Open note, a
+photograph and its scope's own two acts, a page offers Find, Focus, the exports
+and Print — but what is true of the note wherever you are looking at it is
+written once.
+
+The row's is still **not** offered to the window manager, and that is the one
+place `useSystemMenu` is deliberately not called: Add photo opens a file
+dialog, which a browser grants to a click and not to a message coming back over
+an IPC bridge. Being a list is what makes that a decision somebody can take in
+one line. And Delete forever asks twice by being a **submenu** — choosing an
+item closes the menu before it runs, so a confirm in place cannot survive; a
+section you step into to say yes is the same two presses and says which one
+destroys.
+
+`popUpMenu` is offered on **macOS only**, which is the second half of the
+argument above: the `NSMenu` is drawn in the material the system is wearing,
+and a Win32 menu is drawn out of the OS theme rather than the palette the
+reader chose here — a grey menu hanging off a dark application. There is
+nothing to branch on, because the member is simply absent and every caller
+already tests for it.
+
 One level of submenu. The system draws a submenu as a submenu; the page draws
 it as a section you go into and come back from, because a flyout off a 240px
 popover pinned to the pointer is a thing to chase rather than to read.
