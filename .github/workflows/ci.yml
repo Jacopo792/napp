@@ -78,6 +78,46 @@ jobs:
           VITE_WEB_ORIGIN: https://checks.example.invalid/
         run: pnpm --filter @notes-app/desktop build:renderer
 
+  # The desktop renderer, on Windows, and nothing else.
+  #
+  # `checks` above builds it on Ubuntu, which cannot see a whole class of fault:
+  # a Windows path is not a POSIX one, and the tooling that reads paths quietly
+  # disagrees. `apps/desktop/vite.config.ts` used `new URL(...).pathname`, which
+  # on Windows is `/D:/a/repo` — a slash in front of the drive letter, which no
+  # Windows API accepts — so vite-tsconfig-paths found no tsconfig, the `@` alias
+  # resolved to nothing, and the Windows half of the release matrix died on
+  # `Rollup failed to resolve import "@/lib/axes"`. Every check this repository
+  # ran was green, because on Linux and macOS the two spellings happen to agree.
+  #
+  # Only the renderer: packaging is release.yml's job and takes minutes. And
+  # deliberately not in `deploy`'s `needs` — a fault only Windows can see must
+  # be loud, but it must not stop the website from updating.
+  desktop-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the desktop renderer
+        env:
+          VITE_SUPABASE_URL: https://checks.example.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
+          VITE_COLLAB_URL: wss://checks.example.invalid
+          VITE_WEB_ORIGIN: https://checks.example.invalid/
+        run: pnpm --filter @notes-app/desktop build:renderer
+
   # The collaboration server, against a real Postgres and a real Redis. Running
   # its suite without those would let every integration test report success
   # because it skipped, which is worse than not running them: `REQUIRE_INTEGRATION`

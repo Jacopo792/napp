@@ -26,6 +26,7 @@ const {
 } = require("electron");
 const { installMenu } = require("./menu");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
 
@@ -101,7 +102,12 @@ function serveRenderer() {
     /* A request that climbs out of dist/ is not a request this app made. */
     if (!path.resolve(file).startsWith(path.resolve(root)))
       return new Response("", { status: 403 });
-    return net.fetch(`file://${file}`);
+    /* `pathToFileURL` and not `file://${file}`. The concatenation survives on
+       Windows only because WHATWG's parser special-cases a drive letter where a
+       host should be — and it escapes nothing, so an install directory holding
+       a `#` or a `?` truncates the path at it. NSIS lets the reader choose that
+       directory. */
+    return net.fetch(pathToFileURL(file).href);
   });
 }
 
@@ -187,6 +193,10 @@ function createWindow() {
        window, which is what makes a background window's sidebar go quiet the
        way every other Mac window's does; forcing "active" is what makes a
        vibrant window look wrong. */
+    /* `DEFAULT_APPEARANCE.background` in `packages/core/src/lib/appearance.ts`,
+       spelled again because the main process cannot import the renderer. Only
+       the first frame is painted with it: the page sends its real palette
+       through `napp:frame-theme` as soon as it applies one. */
     backgroundColor: isMac ? "#00000000" : "#030202",
     ...(isMac ? { vibrancy: "sidebar", transparent: true } : {}),
     /* Windows owns one small native control strip, painted in the same ground
@@ -269,6 +279,10 @@ ipcMain.on("napp:frame-theme", (event, color, symbolColor) => {
   if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(symbolColor)) return;
   const window = BrowserWindow.fromWebContents(event.sender);
   window?.setTitleBarOverlay({ color, symbolColor });
+  /* And the window's own ground, which is what a resize uncovers for a frame
+     before the page has repainted into it — near-black behind a light palette
+     otherwise, for as long as the drag lasts. */
+  window?.setBackgroundColor(color);
 });
 
 async function chooseAndWrite(window, files, fallbackName) {
