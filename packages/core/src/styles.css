@@ -2841,10 +2841,10 @@
 .editor-tool-button {
   display: inline-flex;
   width: 2rem;
-  height: 1.8rem;
+  height: 2rem;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--ink-2);
   transform: translateX(var(--dock-shift, 0)) scale(var(--mag, 1));
   transform-origin: 50% 100%;
@@ -2857,6 +2857,15 @@
 .editor-tool-button.is-active {
   background: var(--accent-wash);
   color: var(--accent-strong);
+}
+
+/* The one button in the row whose glyph is letters. It is set to read at the
+   size of the icons beside it rather than at its own — a 17px `Aa` next to a
+   16px icon is the letters shouting. */
+.editor-tool-letters {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: 1;
 }
 
 /* ══ Settings ═════════════════════════════════════════════════════════════════
@@ -4923,10 +4932,15 @@
     border-color var(--dur-fast) var(--ease-press);
 }
 
-/* The pill keeps its own height while the icons rise out of it. */
+/* The pill keeps its own height while the icons rise out of it — and it holds
+   the same 32px button the strip's other pill holds, inset by the same 2.8px.
+   Two pills declared to be "the same pill, same glass, same corner, same
+   height" were holding buttons of two heights, two corners and two icon sizes,
+   which is most of what made one strip read as two toolbars that happened to
+   land beside each other. */
 .editor-tool-cluster {
   align-items: flex-end;
-  padding-bottom: 0.28rem;
+  padding: 0.175rem;
 }
 
 /* Each button is wrapped, so that its menu has something to hang off. A block

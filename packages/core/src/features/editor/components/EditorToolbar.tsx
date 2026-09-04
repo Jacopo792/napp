@@ -198,14 +198,12 @@ export function EditorToolbar({
   return (
     <div
       ref={root}
-      className={`editor-tool-cluster glass-toolbar flex items-center p-1 ${
-        mobile ? "is-mobile" : ""
-      }`}
+      className={`editor-tool-cluster glass-toolbar flex items-center ${mobile ? "is-mobile" : ""}`}
       {...dockHandlers}
     >
       {/* ── Text ── */}
       <div className="relative">
-        {tab("text", "Text formatting", <span className="font-display text-[17px]">Aa</span>)}
+        {tab("text", "Text formatting", <span className="editor-tool-letters">Aa</span>)}
         {menu(
           "text",
           "Text formatting",
@@ -294,7 +292,7 @@ export function EditorToolbar({
 
       {/* ── Colour ── */}
       <div className="relative">
-        {tab("color", "Text colour", <Palette size={20} />)}
+        {tab("color", "Text colour", <Palette size={16} />)}
         {menu(
           "color",
           "Text colour",
@@ -346,7 +344,7 @@ export function EditorToolbar({
 
       {/* ── Lists ── */}
       <div className="relative">
-        {tab("lists", "Lists", <ListChecks size={20} />)}
+        {tab("lists", "Lists", <ListChecks size={16} />)}
         {menu(
           "lists",
           "Lists",
@@ -373,7 +371,7 @@ export function EditorToolbar({
 
       {/* ── Tables ── */}
       <div className="relative">
-        {tab("table", "Tables", <Table2 size={20} />)}
+        {tab("table", "Tables", <Table2 size={16} />)}
         {menu(
           "table",
           "Tables",
@@ -406,7 +404,7 @@ export function EditorToolbar({
 
       {/* ── Attachments ── */}
       <div className="relative">
-        {tab("attach", "Attachments", <Paperclip size={20} />)}
+        {tab("attach", "Attachments", <Paperclip size={16} />)}
         {menu(
           "attach",
           "Attachments",

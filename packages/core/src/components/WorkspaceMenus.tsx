@@ -413,7 +413,7 @@ export function NoteMenu(props: NoteMenuActions) {
         className="toolbar-button"
         onClick={() => setOpen((current) => !current)}
       >
-        <MoreHorizontal size={20} />
+        <MoreHorizontal size={16} />
       </button>
       {open && (
         <div
