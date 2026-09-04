@@ -54,12 +54,11 @@ changes. The commit history remains the detailed engineering record.
   same core mounts in a browser tab unchanged.
 - **The swipe, in every scope.** A catalogue row answers a sideways push — a
   finger, or two fingers on a trackpad — and the action is a surface behind the
-  row that the row uncovers as it travels. Let go partway and the row stays open
-  with its button showing; push past the far threshold and it happens on
-  release. Left uncovers the destructive one, right the one that files it. The
-  list deletes and archives, the Archive deletes and puts back, the Trash
-  deletes for good and restores — and a full swipe may never do something
-  irreversible, so deleting for good stays a deliberate press.
+  row that the row uncovers as it travels. The push opens the row; the button it
+  uncovers is what acts, so there is no distance that does anything and no flick
+  that can archive a note you did not mean to. Left uncovers the destructive
+  one, right the one that files it. The list deletes and archives, the Archive
+  deletes and puts back, the Trash deletes for good and restores.
 - **Notes worth reading, marked.** A dot on a catalogue row's leading slot says
   the note carries a remark this account has not read, so the badge in the
   sidebar has something findable under it.
