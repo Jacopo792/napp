@@ -38,3 +38,17 @@ export const SHORTCUTS: Shortcut[] = [
 export function shortcutGroups(): string[] {
   return [...new Set(SHORTCUTS.map((entry) => entry.group))];
 }
+
+/* Whether the keys go by their Apple names. `Notes.tsx` has always answered
+   `metaKey || ctrlKey`, so every shortcut above already works on a machine
+   with no ⌘ — what did not was the list *saying* so, which left the sheet and
+   Settings naming a key that is not on the keyboard. Windows and Linux, in the
+   desktop window and in a tab alike, so this is not a shell question and does
+   not belong on `platform.ts`. Read once: the keyboard does not change. */
+const APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+
+/** The same keys, named the way this machine names them. */
+export function keyName(keys: string): string {
+  if (APPLE) return keys;
+  return keys.replace(/\u2318\s*/g, "Ctrl+").replace(/\u2325\s*/g, "Alt+");
+}

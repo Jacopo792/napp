@@ -37,9 +37,10 @@ window, there is a desktop app too.
 The Mac version is the same app, with its own menu bar, shortcuts and Dock badge for
 unread comments. Notes already open keep working if the connection drops.
 
-The first launch needs one extra step because the app is not signed with an Apple
-Developer ID. If macOS says it is damaged, Control-click it in Applications, choose
-**Open**, then choose **Open** again. You only need to do this once.
+The first launch needs one extra step, because the app is not signed with an
+Apple Developer ID. Open it, let macOS refuse, then go to System Settings →
+Privacy & Security and press **Open Anyway**; on macOS 14 and earlier,
+Control-click the app in Applications and choose **Open**. Once only.
 
 Intel Macs and Windows have their own file on the same release page.
 [`DESKTOP.md`](DESKTOP.md) has installation help and the practical details.

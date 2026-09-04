@@ -7498,10 +7498,22 @@
    height Windows draws its caption at, paired with `titleBarOverlay.height` in
    the desktop main process — one decision in two files, and a mechanical pass
    over this stylesheet ate it once already. */
-[data-shell="windows"] :is(.workspace-shell, .login-shell, #root > .min-h-screen) {
-  height: calc(100vh - 40px);
-  min-height: calc(100vh - 40px);
-  margin-top: 40px;
+/* Padding and never a margin. A margin is outside the box, so the shell was
+   100vh tall *starting* 40px down — `documentElement.scrollHeight` came out at
+   880 against an 840 viewport, and nothing in the html/body/#root chain clips,
+   so the whole window scrolled 40px under the caption strip. Padding is inside
+   the box and `box-sizing: border-box` is already global, so the shell is
+   exactly one viewport and there is nothing to scroll.
+   And `:not([data-fullscreen])`, for the reason macOS has the same guard one
+   rule up: full screen takes the caption buttons away, and a band held open for
+   controls that are gone is a strip of nothing across the top of the window.
+   The preload writes the attribute on both platforms; only macOS was reading
+   it. */
+[data-shell="windows"]:not([data-fullscreen])
+  :is(.workspace-shell, .login-shell, #root > .min-h-screen) {
+  height: 100vh;
+  min-height: 100vh;
+  padding-top: 40px;
 }
 
 [data-shell] .sidebar-topbar,
@@ -7519,57 +7531,53 @@
   -webkit-app-region: no-drag;
 }
 
-/* ── The material behind the sidebar ─────────────────────────────────────────
+/* ── The material behind the sidebar, and the two things it is not for ───────
    `main.js` gives the macOS window an `NSVisualEffectView`, and the whole of
    what that needs from here is for nothing to be painted in front of it. So
    the chain from the window down to the sidebar goes transparent — `body`, the
    shell, the grid — and every surface that is *not* the sidebar keeps painting
    its own ground, which the three columns already did.
 
-   The backdrop filter comes off rather than stacking with it. A CSS blur over
-   a region whose backdrop is a native material blurs nothing the compositor
-   can see and still costs a full pass per frame: the same argument this file
-   already makes one layer down about nested `backdrop-filter`, and about
-   `blur(0)` not being free.
-
    Only the sidebar. A window that is vibrant all the way across is a window
-   you read a note through, and the note is the reason the window is open. */
-[data-shell="mac"] body,
-[data-shell="mac"] .workspace-shell,
-[data-shell="mac"] .workspace-grid {
+   you read a note through, and the note is the reason the window is open.
+
+   And only when it has been asked for, which is the half that was missing.
+   These rules had no condition on them, so the system's material was on in
+   every macOS window whatever the reader had said — including with the
+   Translucency switch off, which is the default, and which therefore governed
+   the toolbars and the popovers and not the one surface named after it.
+
+   `:not(.has-wallpaper)` is the second condition and it is the one that was
+   actually being reported. A reader with a picture of their own had two
+   different pictures side by side: their own behind the note, and — through a
+   sidebar painted at 55% — the macOS desktop behind the folders, which reads
+   as the window having a hole in it rather than as a material. Two grounds is
+   one too many, so a picture wins: it is the reader's, and it is the same
+   picture in the browser. `--wallpaper-left`, which used to start the picture
+   where the sidebar ended so the two could share the window, has nothing left
+   to avoid and is gone with them. */
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper)
+  :is(body, .workspace-shell, .workspace-grid) {
   background: transparent;
 }
 
-[data-shell="mac"] .sidebar-column {
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper) .sidebar-column {
   /* A tint, not a colour. The material supplies the depth; this only carries
      the palette across it, so it is much lighter than the opaque ground it
-     replaces — paint it at full strength and the vibrancy is behind a wall. */
+     replaces — paint it at full strength and the vibrancy is behind a wall.
+     The backdrop filter comes off rather than stacking with it: a CSS blur over
+     a region whose backdrop is a native material blurs nothing the compositor
+     can see and still costs a full pass per frame. */
   background: color-mix(in srgb, var(--paper) 55%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
-/* The footer painted `--paper` to match the column it sits in. The column is
-   now material, so matching it means painting nothing; its hairline is what
+/* The footer painted `--paper` to match the column it sits in. Where the column
+   is material, matching it means painting nothing; its hairline is what
    separated it in the first place. */
-[data-shell="mac"] .sidebar-footer {
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper) .sidebar-footer {
   background: transparent;
-}
-
-/* Two materials, one window: the system's behind the sidebar and the reader's
-   own picture behind the note. They cannot overlap, so the picture starts
-   where the sidebar ends — `#root::before` is a fixed layer under everything,
-   and `--wallpaper-left` is how far in it should begin. It travels on the same
-   curve as the pane slide, or the edge jumps while the columns glide. */
-[data-shell="mac"].has-wallpaper #root::before {
-  left: calc(var(--wallpaper-left, 0px) - 24px);
-  transition: left var(--dur-base) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-shell="mac"].has-wallpaper #root::before {
-    transition: none;
-  }
 }
 
 /* ── The hand this is under ──────────────────────────────────────────────────

@@ -56,7 +56,7 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
-import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
+import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
@@ -148,7 +148,7 @@ export function CollectionMenu({
           >
             <Search size={16} />
             Find anything
-            <kbd className="menu-key">⌘K</kbd>
+            <kbd className="menu-key">{keyName("⌘K")}</kbd>
           </MenuButton>
           <MenuButton
             onClick={() => {

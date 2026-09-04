@@ -350,18 +350,23 @@ ipcMain.handle("napp:menu", (event, items) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return null;
   return new Promise((resolve) => {
-    let picked = null;
-    const menu = Menu.buildFromTemplate(
-      menuTemplate(items, (id) => {
-        picked = id;
-      }),
-    );
+    /* Whichever lands first answers, and the close answers only after a tick.
+       The order of `click` and the close `callback` is macOS's, not a
+       guarantee: read the other way round — the menu closing before the item
+       it closed on has run — `picked` is still null when the promise settles
+       and every choice in the menu quietly does nothing. Written like this
+       there is no order to get right. */
+    let answered = false;
+    const answer = (id) => {
+      if (answered) return;
+      answered = true;
+      resolve(id);
+    };
+    const menu = Menu.buildFromTemplate(menuTemplate(items, answer));
     /* No coordinates: a context menu opens where the pointer already is, and
        the system knows that without our converting a client x into a screen
-       one. `callback` runs when the menu closes, which on macOS is after the
-       item's own `click` — so the answer is ready by the time it is asked
-       for, and a dismissal answers null. */
-    menu.popup({ window, callback: () => resolve(picked) });
+       one. A dismissal answers null. */
+    menu.popup({ window, callback: () => setImmediate(() => answer(null)) });
   });
 });
 

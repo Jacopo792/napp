@@ -30,6 +30,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { TEXT_COLORS, type TextColor } from "@/features/editor/lib/content";
+import { keyName } from "@/lib/shortcuts";
 import type { FormatAction } from "./RichTextEditor";
 
 /* ── The writing toolbar ─────────────────────────────────────────────────────
@@ -200,7 +201,7 @@ export function EditorToolbar({
               <button
                 type="button"
                 aria-label="Bold"
-                title="Bold · ⌘B"
+                title={`Bold · ${keyName("⌘B")}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("bold")}
               >
@@ -209,7 +210,7 @@ export function EditorToolbar({
               <button
                 type="button"
                 aria-label="Italic"
-                title="Italic · ⌘I"
+                title={`Italic · ${keyName("⌘I")}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => run("italic")}
               >

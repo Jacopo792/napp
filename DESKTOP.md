@@ -25,16 +25,25 @@ what is different about running it in a window.
 
 Open the `.dmg` and drag Napp to Applications.
 
-### macOS will say it is damaged. It is not.
+### macOS will ask once
 
-> **"Napp" is damaged and can't be opened. You should move it to the Trash.**
+The app carries an ad-hoc signature — the bundle is sealed, so macOS can see
+that nothing has been altered since it was built — but there is no paid Apple
+Developer ID behind that seal and it has not been notarized. So the first launch
+is refused, once:
 
-That is what macOS says about any app that has not been signed with a paid
-Apple Developer ID, whether it is broken or simply unsigned. This one is
-unsigned.
+Open the app, let macOS refuse, then go to **System Settings → Privacy &
+Security**, scroll to the message about Napp and press **Open Anyway**. On macOS
+14 and earlier, Control-click the app in Applications and choose **Open**
+instead. macOS remembers the choice and every launch after that is ordinary.
 
-Control-click the app in Applications, choose **Open**, then **Open** again.
-macOS remembers the choice and every launch after that is ordinary.
+> If a build ever says **"Napp" is damaged and can't be opened**, with the Bin
+> as the only button, that is a different message and a real fault: it means the
+> bundle's seal does not match its contents. Releases up to and including v0.2.0
+> were built without the ad-hoc signing step and said exactly that; the way past
+> it was `xattr -dr com.apple.quarantine /Applications/Napp.app`, which skips
+> Gatekeeper's check rather than answering it. Nobody should have to type that,
+> and from the next release nobody does.
 
 Worth saying plainly: this is the same instruction somebody would give you for a
 tampered build, so take the download from this repository's Releases and nowhere

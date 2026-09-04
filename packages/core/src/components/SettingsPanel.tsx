@@ -57,7 +57,7 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
-import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
+import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
@@ -1031,7 +1031,7 @@ export function SettingsPanel({
                           <span className="settings-label">
                             <b>{entry.what}</b>
                           </span>
-                          <kbd className="settings-key">{entry.keys}</kbd>
+                          <kbd className="settings-key">{keyName(entry.keys)}</kbd>
                         </div>
                       ))}
                     </div>

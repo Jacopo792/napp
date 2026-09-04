@@ -5,8 +5,9 @@
 # runner produces neither. This is the only reason the workflow is separate
 # from ci.yml, which builds the renderer on every push and stops there.
 #
-# Unsigned, deliberately, for now. macOS reports an unsigned .dmg as "damaged";
-# it opens from the right-click menu. Signing means an Apple Developer ID and a
+# Not signed with a Developer ID, deliberately, for now — the bundle is sealed
+# ad-hoc by electron-builder.yml's afterPack hook, which is what keeps macOS
+# from calling it damaged. Signing means an Apple Developer ID and a
 # Windows certificate, and both are secrets somebody has to buy and add —
 # CSC_LINK and CSC_KEY_PASSWORD are where electron-builder reads them, and
 # apps/desktop/electron-builder.yml says what else to remove.
@@ -75,6 +76,14 @@ jobs:
           files: ${{ matrix.artifacts }}
           draft: false
           body: |
-            Unsigned builds. On macOS the .dmg has to be opened with
-            right-click → Open the first time, because Gatekeeper reports an
-            unsigned app as damaged.
+            These builds are not signed with an Apple Developer ID or a Windows
+            certificate, so each system asks once before running one.
+
+            **macOS** — the app is sealed ad-hoc, so this is the ordinary
+            unverified-developer refusal and not "damaged". Open it once, let
+            macOS refuse, then go to System Settings → Privacy & Security and
+            press **Open Anyway**. On macOS 14 and earlier, Control-click the
+            app in Applications and choose **Open**. Once only.
+
+            **Windows** — SmartScreen shows "Windows protected your PC". Press
+            **More info**, then **Run anyway**.

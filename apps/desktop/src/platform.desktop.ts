@@ -53,8 +53,18 @@ export const desktopPlatform: Platform = {
 
   print: () => bridge.print(),
 
-  /* The one member a tab has no answer for. An `NSMenu` is drawn by macOS
-     over the window, in the material the system is using that year; a page
-     can only paint what is inside itself. */
-  popUpMenu: (items) => bridge.popUpMenu(items),
+  /* The one member a tab has no answer for — and, it turns out, a member only
+     macOS has an answer worth taking. An `NSMenu` is drawn by macOS over the
+     window in the material the system is using that year, which is the whole
+     argument; Windows draws its menus out of the OS theme, which is not this
+     app's palette, so what the window manager offers there is a grey system
+     menu hanging off a dark application. The page's own popover is the closer
+     thing, and `popUpMenu` being absent is already the test every caller
+     makes.
+
+     `bridge` as well, because this module is mounted by the preview harness
+     too, where there is no preload and no window manager under it. */
+  ...("napp" in window && navigator.userAgent.includes("Mac OS X")
+    ? { popUpMenu: (items: SystemMenuItem[]) => bridge.popUpMenu(items) }
+    : {}),
 };

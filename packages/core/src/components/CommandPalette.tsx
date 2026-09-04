@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import { fold } from "@/lib/format";
-import { SHORTCUTS, shortcutGroups } from "@/lib/shortcuts";
+import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
 
 export interface Command {
   id: string;
@@ -199,7 +199,7 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
               {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
                 <div key={`${entry.keys}-${entry.what}`} className="shortcut-row">
                   <span>{entry.what}</span>
-                  <kbd>{entry.keys}</kbd>
+                  <kbd>{keyName(entry.keys)}</kbd>
                 </div>
               ))}
             </section>

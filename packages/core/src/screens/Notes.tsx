@@ -2471,18 +2471,6 @@ export default function NotesPage() {
   const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
   const listMax = Math.max(LIST_MIN, Math.min(LIST_MAX, room - sidebarShown));
 
-  /* Where the reader's own wallpaper begins. On macOS the sidebar is the
-     system's material and the wallpaper is ours, and two materials cannot
-     share a region — so the picture starts where the sidebar ends. It is set
-     on the document element rather than on the shell because the layer it
-     steers is `#root::before`, which is not inside the shell and cannot read a
-     property declared there. Inert everywhere else: no other stylesheet rule
-     mentions it. */
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty("--wallpaper-left", `${navigationOpen ? sidebarShown : 0}px`);
-  }, [navigationOpen, sidebarShown]);
-
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, handleLock);

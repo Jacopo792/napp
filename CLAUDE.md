@@ -523,9 +523,22 @@ bridge and no member on `platform.ts`. It is a standard the browser has too, and
 Electron implements it straight onto the Dock — a platform member for it would
 have been an interface describing a habit rather than a boundary.
 
+**The system's material is asked for, and it loses to a picture.** The vibrancy
+rules had no condition on them at all, which was wrong twice. The Translucency
+switch is off by default and governed the toolbars and the popovers but not the
+one surface it is named after — and a reader who had set a wallpaper got two
+different grounds side by side: their own picture behind the note, and, through
+a sidebar painted at 55%, the macOS desktop behind the folders. That does not
+read as a material, it reads as a hole in the window. So the rules are
+`[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper)`, and
+`--wallpaper-left` — which used to start the picture where the sidebar ended so
+the two could share the window — is gone, along with the effect in `Notes.tsx`
+that wrote it. One ground at a time, and a picture wins, because it is the
+reader's and it is the same picture in the browser.
+
 `data-shell` on the root element is what the stylesheet reads, set by the
 desktop `main.tsx` and by nothing else, so every rule keyed on it is inert in a
-tab.
+tab. It is `mac`, `windows` or `desktop`, read off the user agent.
 
 The scheme is registered with `registerSchemesAsPrivileged` before `ready`.
 Without that it is not a secure context, and without a secure context there is
@@ -563,10 +576,45 @@ tidiness. electron-builder ships whatever is in `dependencies`, and React and
 Tiptap left there put a second, unused copy of the whole application inside the
 asar: a 410 MB app around a 2 MB bundle. It is 3.8 MB now.
 
-Builds are **unsigned**. macOS reports an unsigned `.dmg` as damaged; it opens
-from the right-click menu. Signing needs an Apple Developer ID and a Windows
-certificate — set `CSC_LINK` and `CSC_KEY_PASSWORD` and drop the `identity:
-null` line in `apps/desktop/electron-builder.yml`, and nothing else changes.
+**`identity: null` does not sign lightly, it does not sign at all**, and the
+difference is the whole first launch. `handleNullIdentity()` returns false, so
+what stays in the bundle is the _linker's_ ad-hoc signature on the downloaded
+Electron binary — `Identifier=Electron`, `Info.plist=not bound` — and
+electron-builder has since replaced the plist, the icon and the resources, so
+the seal no longer describes the bundle:
+
+```
+codesign --verify → code has no resources but signature indicates they must be present
+```
+
+macOS does not call that an unidentified developer. It calls it **"Napp is
+damaged and can't be opened"** and offers only the Bin, which is a refusal with
+no way through — every instruction in this repository about right-clicking was
+written for the milder dialog and was simply wrong up to and including v0.2.0.
+The way past it was `xattr -dr com.apple.quarantine`, which skips Gatekeeper
+rather than answering it.
+
+So `afterPack: build/adhoc-sign.cjs` re-seals the whole bundle with
+`codesign --sign -` and verifies it in the same breath. It needs no certificate,
+takes a second, and turns the refusal into the ordinary unverified-developer one:
+Privacy & Security → Open Anyway, or right-click → Open on macOS 14 and earlier.
+Only notarization removes the step, and that needs the paid ID — set `CSC_LINK`
+and `CSC_KEY_PASSWORD`, drop `identity: null`, and electron-builder signs before
+the hook ever runs.
+
+**Windows was the shell nobody looked at, and three things had drifted.** The
+40px band the caption overlay needs was a `margin-top`, which is outside the box
+— so with `height: calc(100vh - 40px)` the document came out 40px taller than
+the viewport and nothing in the html/body/#root chain clips, and the whole window
+scrolled under the caption strip. It is `padding-top` on a `100vh` shell now.
+The rule also carries `:not([data-fullscreen])`, which macOS's has had all along:
+the preload writes that attribute on both platforms and only one was reading it,
+so full screen left a strip of nothing where the caption buttons had been.
+And `popUpMenu` is offered **only on macOS**. The argument for it is the
+`NSMenu`; Windows draws its menus out of the OS theme rather than the app's
+palette, so what the window manager offers there is a grey system menu hanging
+off a dark application. `platform().popUpMenu` being absent is already the test
+every caller makes, so the page draws its own popover and nothing else changed.
 
 `.github/workflows/release.yml` builds the installers on a tag, from a matrix
 of `macos-latest` and `windows-latest`, because electron-builder cannot

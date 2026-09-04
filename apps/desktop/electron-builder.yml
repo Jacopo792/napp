@@ -34,6 +34,19 @@ files:
 # indexes build output like anything else — three results for one app, next to
 # Apple's. Both architectures are release.yml's job, where they are asked for
 # by flag.
+# `identity: null` skips signing; it does not sign lightly. Without the hook
+# below the bundle keeps only the linker's ad-hoc signature on the Electron
+# binary — `Identifier=Electron`, `Info.plist=not bound` — and since
+# electron-builder has replaced the plist, the icon and the resources, the seal
+# no longer matches the bundle. macOS calls that "damaged" and offers only the
+# Bin, which is a stronger refusal than the unsigned-app dialog everything we
+# have written assumes. `afterPack` re-seals the whole bundle ad-hoc, which
+# needs no certificate and turns "damaged" — which offers only the Bin — into
+# the ordinary unverified-developer refusal, which has a way through it:
+# Privacy & Security → Open Anyway, or right-click → Open on macOS 14 and
+# earlier. Only notarization removes the step, and that needs the paid ID.
+afterPack: build/adhoc-sign.cjs
+
 mac:
   category: public.app-category.productivity
   identity: null
