@@ -14,6 +14,7 @@
     "release:desktop:win": "pnpm --filter @notes-app/desktop release:win",
     "preview:dist": "pnpm --filter @notes-app/web preview:dist",
     "preview:ui": "vite dev --config vite.preview.config.ts",
+    "preview:desktop-ui": "NAPP_SHELL=desktop vite dev --config vite.preview.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/desktop && tsc --noEmit -p packages/collab-server && tsc --noEmit -p scripts && tsc --noEmit",
     "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",

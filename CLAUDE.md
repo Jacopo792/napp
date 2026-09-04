@@ -410,6 +410,29 @@ with anything. Change a mock whenever you change the real module's shape —
 `loadArchive`, because handing back the same object makes every roster change
 invisible to React.
 
+`pnpm preview:desktop-ui` is the same harness against the **desktop** renderer,
+on 5174 — the port `electron/main.js` loads in development. It is one config
+with a root and a port, not two: the shell is what differs, and the shell is
+not a second file. Run it, then start the window against it:
+
+```bash
+node_modules/.pnpm/electron@*/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron apps/desktop --remote-debugging-port=9333
+```
+
+Everything keyed on `data-shell` — the traffic-light gutter, the vibrancy
+behind the sidebar, the system menus, `data-fullscreen` — exists only there.
+
+**And it can be looked at.** `screencapture` takes whichever window is in
+front and `osascript` has no assistive access, so it was written down here
+that screenshots of that window were impossible. They are not:
+`Page.captureScreenshot` over CDP renders the web contents directly and works
+with the window behind everything else. Take the `webSocketDebuggerUrl` from
+`curl -s localhost:9333/json`, open a socket (`ws` resolves from
+`packages/collab-server/`, so import it by absolute path), and send
+`Runtime.evaluate` to drive it and `Page.captureScreenshot` to see it. What it
+cannot show is anything macOS draws outside the web contents — the traffic
+lights themselves, and a native menu.
+
 ## The desktop app
 
 **It does not load `file://`, and that is not a preference.**

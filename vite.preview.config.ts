@@ -9,14 +9,25 @@ import tsConfigPaths from "vite-tsconfig-paths";
    surface can be looked at, on either breakpoint, without credentials, a
    network or a real archive. Never used by `pnpm build`.
 
-   It runs against the web shell's index.html, but what it is previewing is the
-   core, which the desktop shell mounts unchanged. One harness, both shells. */
+   One harness, both shells, and that is not a figure of speech: what is being
+   previewed is the core, which each shell mounts unchanged, so the shell is a
+   root and a port rather than a second file. `NAPP_SHELL=desktop` runs the
+   desktop renderer instead — whose entry is what sets `data-shell`, and which
+   is therefore the only way to look at the traffic-light gutter, the vibrancy
+   behind the sidebar, the system menus or the full-screen attribute — on the
+   port `electron/main.js` loads in development. There was a second config for
+   that, copied from this one and labelled "throwaway", and it shipped in a
+   tagged release. */
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
+const desktop = process.env.NAPP_SHELL === "desktop";
+
 export default defineConfig({
-  root: here("./apps/web"),
+  root: here(desktop ? "./apps/desktop" : "./apps/web"),
   envDir: here("."),
-  server: { port: 5199 },
+  /* The desktop port is not a preference: it is the one the Electron window
+     loads in development, so it has to be that port or nothing. */
+  server: desktop ? { port: 5174, strictPort: true } : { port: 5199 },
   resolve: {
     alias: [
       { find: /^@\/lib\/supabase$/, replacement: here("./preview/supabase.mock.ts") },
