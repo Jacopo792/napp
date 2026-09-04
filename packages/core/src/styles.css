@@ -2309,18 +2309,30 @@
    desktop behind the *window*, and a page can only reach what is behind
    itself. Saturation is what closes most of the remaining distance — a blur
    alone greys what it samples, and the colour coming back through is what the
-   eye reads as depth. */
+   eye reads as depth.
+
+   And it is what the reader asked for, not what we assumed. There is a switch
+   in Appearance for translucency; it governed the rail alone, so somebody who
+   had turned it off still had see-through menus, bars and sheets over their
+   words. A preference that half the surfaces ignore is not a preference. Off
+   is the default and off is opaque — `--glass` is already the flat colour in
+   that case, computed in `appearance.ts` — and the material below is what the
+   switch turns on. */
 .glass-toolbar,
 .glass-search,
 .popover,
 .glass-sheet {
   border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--glass) 76%, transparent);
-  -webkit-backdrop-filter: blur(30px) saturate(1.7);
-  backdrop-filter: blur(30px) saturate(1.7);
+  background: var(--glass);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     var(--shadow-popover);
+}
+
+.has-translucent-sidebar :is(.glass-toolbar, .glass-search, .popover, .glass-sheet) {
+  background: color-mix(in srgb, var(--glass) 76%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  backdrop-filter: blur(30px) saturate(1.7);
 }
 
 .glass-toolbar,

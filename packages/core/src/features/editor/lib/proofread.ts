@@ -1,4 +1,37 @@
-import { detectLanguage } from "@/features/editor/lib/translation";
+interface DetectorResult {
+  detectedLanguage: string;
+  confidence: number;
+}
+
+interface Detector {
+  detect(text: string): Promise<DetectorResult[]>;
+  destroy?: () => void;
+}
+
+interface DetectorApi {
+  availability(): Promise<string>;
+  create(): Promise<Detector>;
+}
+
+/** The language of a passage, as a bare subtag: `it`, not `it-IT`.
+ *
+ *  It lived beside the translator, which had the same question to ask. The
+ *  translator is gone — three languages nobody chose, in a menu of its own,
+ *  over an archive written in one — so the question comes home to the only
+ *  thing that still asks it. */
+async function detectLanguage(text: string): Promise<string> {
+  const { LanguageDetector } = window as unknown as { LanguageDetector?: DetectorApi };
+  if (!LanguageDetector || (await LanguageDetector.availability()) === "unavailable") {
+    throw new Error("Language detection is not available in this browser");
+  }
+
+  const detector = await LanguageDetector.create();
+  const [best] = await detector.detect(text);
+  detector.destroy?.();
+  const language = best?.detectedLanguage?.split("-")[0];
+  if (!language) throw new Error("Could not detect the language of the selection");
+  return language;
+}
 
 interface Correction {
   startIndex: number;

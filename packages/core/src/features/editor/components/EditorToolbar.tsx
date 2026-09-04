@@ -17,7 +17,6 @@ import {
   List,
   ListChecks,
   ListOrdered,
-  Languages,
   Minus,
   Palette,
   Paperclip,
@@ -49,7 +48,7 @@ import type { FormatAction } from "./RichTextEditor";
    The same component serves the phone: parity is not a port, it is this file
    being rendered twice. ──────────────────────────────────────────────────── */
 
-type Tool = "text" | "color" | "lists" | "table" | "translate" | "attach";
+type Tool = "text" | "color" | "lists" | "table" | "attach";
 
 interface Props {
   mobile?: boolean;
@@ -59,8 +58,7 @@ interface Props {
   onImportMarkdown: () => void;
   onImportPdfText: () => void;
   onChoosePhoto: () => void;
-  onTranslate: (language: "it" | "fr" | "en") => void;
-  /** Off hides the proofreading row outright; the menu is then translation only. */
+  /** Off takes the proofreading row out of the text menu altogether. */
   proofreaderEnabled: boolean;
   onProofread: () => void;
   /** The insert-link form, anchored under the text tab that opened it. */
@@ -112,7 +110,6 @@ export function EditorToolbar({
   onImportMarkdown,
   onImportPdfText,
   onChoosePhoto,
-  onTranslate,
   proofreaderEnabled,
   onProofread,
   linkForm,
@@ -275,6 +272,21 @@ export function EditorToolbar({
               }}
             />
             <Row icon={<Minus size={16} />} label="Divider" onClick={() => run("divider")} />
+
+            {/* Where the selection already is. It used to have a tab of its
+                own, shared with a translator, and once the translator was gone
+                that tab was one item — a button that opens a menu holding one
+                row is a button with an extra press in it. */}
+            {proofreaderEnabled && (
+              <>
+                <div className="menu-separator" />
+                <Row
+                  icon={<SpellCheck size={16} />}
+                  label="Fix spelling and grammar"
+                  onClick={() => (setOpen(null), onProofread())}
+                />
+              </>
+            )}
           </>,
         )}
         {linkOpen && linkForm}
@@ -387,45 +399,6 @@ export function EditorToolbar({
               icon={<Trash2 size={16} />}
               label="Delete table"
               onClick={() => run("table-delete")}
-            />
-          </>,
-        )}
-      </div>
-
-      {/* ── Language, on this device ── */}
-      <div className="relative">
-        {tab("translate", "Language tools", <Languages size={20} />)}
-        {menu(
-          "translate",
-          "Language tools",
-          "right",
-          <>
-            {proofreaderEnabled && (
-              <>
-                <p className="menu-label">Selected text</p>
-                <Row
-                  icon={<SpellCheck size={16} />}
-                  label="Fix spelling and grammar"
-                  onClick={() => (setOpen(null), onProofread())}
-                />
-                <div className="menu-separator" />
-              </>
-            )}
-            <p className="menu-label">Translate selected text to</p>
-            <Row
-              icon={<span>IT</span>}
-              label="Italiano"
-              onClick={() => (setOpen(null), onTranslate("it"))}
-            />
-            <Row
-              icon={<span>FR</span>}
-              label="Français"
-              onClick={() => (setOpen(null), onTranslate("fr"))}
-            />
-            <Row
-              icon={<span>EN</span>}
-              label="English"
-              onClick={() => (setOpen(null), onTranslate("en"))}
             />
           </>,
         )}

@@ -816,8 +816,8 @@ export function SettingsPanel({
                   <label className="appearance-row">
                     <RowLead
                       icon={<Layers size={16} />}
-                      label="Translucent sidebar"
-                      hint="Let the page show through the rail"
+                      label="Translucency"
+                      hint="Rails, bars and menus let what is behind them through"
                     />
                     <input
                       type="checkbox"

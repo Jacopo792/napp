@@ -28,7 +28,6 @@ import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
 import { imageAltFromFilename } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
-import { translateText, type TranslationLanguage } from "@/features/editor/lib/translation";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
@@ -367,26 +366,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   const closeLink = useCallback(() => setLinkOpen(false), []);
 
-  async function handleTranslate(language: TranslationLanguage) {
-    const selected = editorRef.current?.getSelectedText() ?? "";
-    if (!selected.trim()) {
-      setFailure("Select the text you want to translate first");
-      return;
-    }
-    setFailure("");
-    setStatus("Detecting language…");
-    try {
-      const translated = await translateText(selected, language, (progress) => {
-        setStatus(`Downloading language pack… ${progress}%`);
-      });
-      editorRef.current?.replaceSelectedText(translated);
-      report("Translation inserted");
-    } catch (error) {
-      setStatus("");
-      setFailure(error instanceof Error ? error.message : "Could not translate the selection");
-    }
-  }
-
   async function handleProofread() {
     const selected = editorRef.current?.getSelectedText() ?? "";
     if (!selected.trim()) {
@@ -471,7 +450,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onImportMarkdown={onImportMarkdown}
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
-      onTranslate={(language) => void handleTranslate(language)}
       proofreaderEnabled={proofreaderEnabled}
       onProofread={() => void handleProofread()}
       linkForm={linkForm}

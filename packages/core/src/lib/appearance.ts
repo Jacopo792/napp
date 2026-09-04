@@ -8,6 +8,9 @@ export interface Appearance {
   background: string;
   foreground: string;
   contrast: number;
+  /** Every surface of the app's own chrome, not only the rail: the name is
+   *  older than what it governs and is kept because it is a stored key, and
+   *  renaming one loses the setting of everybody who has one. */
   translucentSidebar: boolean;
   wallpaper: boolean;
   /** The archive object holding the picture's bytes, once it has been shared
