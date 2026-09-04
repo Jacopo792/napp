@@ -580,9 +580,15 @@
     transform 0.16s var(--ease);
 }
 
+/* The wash lights it; the ink is what the glyph goes to. Sent to `--accent`
+   instead, the glyph went *out* in any palette whose accent is derived below
+   the ink it replaces — and the accent is derived, to a contrast floor of 3
+   against the paper, so that is not a rare palette. The rule everywhere: a
+   state goes toward the ink, and the accent holds fills and edges, where being
+   quiet is its job. */
 .icon-button:hover {
   background: var(--accent-wash);
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .popover {
@@ -6197,7 +6203,7 @@
 
 .rich-media-remove.is-ink.is-active {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--ink);
   opacity: 1;
 }
 .rich-media-caption {
