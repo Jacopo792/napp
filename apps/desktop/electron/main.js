@@ -153,7 +153,32 @@ function createWindow() {
     minWidth: 640,
     minHeight: 480,
     show: false,
-    backgroundColor: "#030202",
+    /* ── Real material, not a picture of one ──────────────────────────────────
+       The sidebar was a colour with a CSS blur behind it, over an opaque
+       window. That is the single loudest thing separating this from Mail and
+       Finder, whose sidebars are an `NSVisualEffectView`: the material picks up
+       what is behind the window, desaturates when the window loses focus, and
+       costs the compositor nothing because the system draws it.
+
+       The window background has to be transparent for any of it to show — an
+       opaque `backgroundColor` sits in front of the vibrant layer — so on macOS
+       every surface that is not the sidebar paints its own ground in the
+       stylesheet.
+
+       `transparent: true` is required and it is easy to leave out. Electron
+       honours the alpha channel of `backgroundColor` ONLY when it is set, so
+       `#00000000` on its own is read as opaque black: `vibrancy` is applied,
+       the material is created, and the window's own background is painted in
+       front of it. Nothing errors and nothing logs — the sidebar simply looks
+       exactly as it did before, which is how this was nearly shipped as
+       working.
+
+       `visualEffectState` is left unset on purpose. The default follows the
+       window, which is what makes a background window's sidebar go quiet the
+       way every other Mac window's does; forcing "active" is what makes a
+       vibrant window look wrong. */
+    backgroundColor: isMac ? "#00000000" : "#030202",
+    ...(isMac ? { vibrancy: "sidebar", transparent: true } : {}),
     /* Windows owns one small native control strip, painted in the same ground
        colour as the active Napp palette. It replaces both the blue system
        frame and Electron's separate File/Edit application menu. */

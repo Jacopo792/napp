@@ -7040,3 +7040,56 @@
   :is(button, a, input, select, textarea, label, [role], [tabindex], [contenteditable]) {
   -webkit-app-region: no-drag;
 }
+
+/* ── The material behind the sidebar ─────────────────────────────────────────
+   `main.js` gives the macOS window an `NSVisualEffectView`, and the whole of
+   what that needs from here is for nothing to be painted in front of it. So
+   the chain from the window down to the sidebar goes transparent — `body`, the
+   shell, the grid — and every surface that is *not* the sidebar keeps painting
+   its own ground, which the three columns already did.
+
+   The backdrop filter comes off rather than stacking with it. A CSS blur over
+   a region whose backdrop is a native material blurs nothing the compositor
+   can see and still costs a full pass per frame: the same argument this file
+   already makes one layer down about nested `backdrop-filter`, and about
+   `blur(0)` not being free.
+
+   Only the sidebar. A window that is vibrant all the way across is a window
+   you read a note through, and the note is the reason the window is open. */
+[data-shell="mac"] body,
+[data-shell="mac"] .workspace-shell,
+[data-shell="mac"] .workspace-grid {
+  background: transparent;
+}
+
+[data-shell="mac"] .sidebar-column {
+  /* A tint, not a colour. The material supplies the depth; this only carries
+     the palette across it, so it is much lighter than the opaque ground it
+     replaces — paint it at full strength and the vibrancy is behind a wall. */
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The footer painted `--paper` to match the column it sits in. The column is
+   now material, so matching it means painting nothing; its hairline is what
+   separated it in the first place. */
+[data-shell="mac"] .sidebar-footer {
+  background: transparent;
+}
+
+/* Two materials, one window: the system's behind the sidebar and the reader's
+   own picture behind the note. They cannot overlap, so the picture starts
+   where the sidebar ends — `#root::before` is a fixed layer under everything,
+   and `--wallpaper-left` is how far in it should begin. It travels on the same
+   curve as the pane slide, or the edge jumps while the columns glide. */
+[data-shell="mac"].has-wallpaper #root::before {
+  left: calc(var(--wallpaper-left, 0px) - 24px);
+  transition: left var(--dur-base) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-shell="mac"].has-wallpaper #root::before {
+    transition: none;
+  }
+}

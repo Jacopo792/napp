@@ -2412,6 +2412,37 @@ export default function NotesPage() {
     [ownedEntries, trashedIds, selectedId],
   );
 
+  /* ── Always leave a useful writing surface ──────────────────────────────
+     The handles already stopped before either navigation pane could eat the
+     editor. What they could not stop is the window itself getting smaller: a
+     pane keeps the width it was stored with, so shrinking the window took the
+     whole difference out of the note — at 900px the writing column was 232px
+     and everything in its toolbar was on top of everything else, which is the
+     "squashed in miniature" report.
+
+     So the *shown* widths are clamped to the room there is, and the stored ones
+     are left alone: widen the window again and the panes come back to where
+     they were put. The list gives ground first, because it is a preview column
+     and the folders are a fixed vocabulary that either fits or does not. */
+  const editorReserve = 380;
+  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 2);
+  const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
+  const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
+  const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
+  const listMax = Math.max(LIST_MIN, Math.min(LIST_MAX, room - sidebarShown));
+
+  /* Where the reader's own wallpaper begins. On macOS the sidebar is the
+     system's material and the wallpaper is ours, and two materials cannot
+     share a region — so the picture starts where the sidebar ends. It is set
+     on the document element rather than on the shell because the layer it
+     steers is `#root::before`, which is not inside the shell and cannot read a
+     property declared there. Inert everywhere else: no other stylesheet rule
+     mentions it. */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--wallpaper-left", `${navigationOpen ? sidebarShown : 0}px`);
+  }, [navigationOpen, sidebarShown]);
+
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, handleLock);
@@ -2974,25 +3005,6 @@ export default function NotesPage() {
         onDelete={() => handleMoveToTrash(selected)}
       />
     ) : null;
-
-  /* ── Always leave a useful writing surface ──────────────────────────────
-     The handles already stopped before either navigation pane could eat the
-     editor. What they could not stop is the window itself getting smaller: a
-     pane keeps the width it was stored with, so shrinking the window took the
-     whole difference out of the note — at 900px the writing column was 232px
-     and everything in its toolbar was on top of everything else, which is the
-     "squashed in miniature" report.
-
-     So the *shown* widths are clamped to the room there is, and the stored ones
-     are left alone: widen the window again and the panes come back to where
-     they were put. The list gives ground first, because it is a preview column
-     and the folders are a fixed vocabulary that either fits or does not. */
-  const editorReserve = 380;
-  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 2);
-  const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
-  const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
-  const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
-  const listMax = Math.max(LIST_MIN, Math.min(LIST_MAX, room - sidebarShown));
 
   if (compact) {
     return (
