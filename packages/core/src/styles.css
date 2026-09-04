@@ -5063,6 +5063,138 @@
    16px icon on a 16.96px box — permanently blurred, on the one row you look at
    most. State never justifies a fractional icon. */
 
+/* ── One move each ───────────────────────────────────────────────────────────
+   Every destination in this column does something of its own when the pointer
+   arrives on it: the bin tips, the shelf takes something in, the remark pops,
+   the gear turns. It is the difference between a list of pictures and a list
+   of places.
+
+   Three rules hold it together.
+
+   **On hover, and only where there is one.** `@media (hover: hover)` is not
+   politeness here, it is the whole of what keeps this from being noise: a tap
+   has no hover, so on a phone a destination opens rather than performs, and
+   nothing plays on mount either — which is what a move tied to the *selected*
+   row would do on every reload, and on the phone every time the drawer opens.
+
+   **The whole glyph moves, never a stroke inside it.** Reaching in for a
+   lucide path by position would put the bin's lid animation on whatever stroke
+   that library happens to draw first next version, and nothing would fail —
+   the wrong line would simply start moving.
+
+   **Every move ends where it started.** They are transient, so the note above
+   about fractional icons is not contradicted: the resting glyph is still on
+   the pixel grid, and what is off it for 240ms is a thing in motion, which is
+   the one time the eye does not read an edge. Held states stay square.
+
+   Durations and curves are the four this file allows and no fifth. */
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-row:hover .sidebar-glyph[data-motion="notes"] svg {
+    animation: glyph-leaf var(--dur-base) var(--ease-out);
+  }
+
+  .sidebar-row:hover .sidebar-glyph[data-motion="folder"] svg {
+    transform-origin: 20% 100%;
+    animation: glyph-lift var(--dur-base) var(--ease-spring);
+  }
+
+  .sidebar-row:hover .sidebar-glyph[data-motion="pin"] svg {
+    animation: glyph-jab var(--dur-base) var(--ease-spring);
+  }
+
+  .sidebar-row:hover .sidebar-glyph[data-motion="remarks"] svg {
+    animation: glyph-pop var(--dur-base) var(--ease-spring);
+  }
+
+  .sidebar-row:hover .sidebar-glyph[data-motion="archive"] svg {
+    animation: glyph-file var(--dur-base) var(--ease);
+  }
+
+  .sidebar-row:hover .sidebar-glyph[data-motion="trash"] svg {
+    transform-origin: 50% 100%;
+    animation: glyph-tip var(--dur-base) var(--ease-spring);
+  }
+
+  .sidebar-footer-button[data-motion="settings"]:hover svg {
+    animation: glyph-turn var(--dur-slow) var(--ease-in-out);
+  }
+
+  .sidebar-footer-button[data-motion="lock"]:hover svg {
+    animation: glyph-refuse var(--dur-base) var(--ease-press);
+  }
+}
+
+/* A page lifting off the ones under it, which is what "all notes" is. */
+@keyframes glyph-leaf {
+  50% {
+    transform: perspective(60px) rotateY(-26deg) translateX(1px);
+  }
+}
+
+/* The lid, hinged at the fold rather than at the middle of the box. */
+@keyframes glyph-lift {
+  50% {
+    transform: rotate(-9deg);
+  }
+}
+
+/* In, and it stays in — the overshoot on the way back is the spring, and it is
+   what a pin pushed home does. */
+@keyframes glyph-jab {
+  45% {
+    transform: translateY(1.5px) rotate(-8deg);
+  }
+}
+
+/* Somebody said something. */
+@keyframes glyph-pop {
+  45% {
+    transform: scale(1.18);
+  }
+}
+
+/* Down into the box, and back up empty-handed. */
+@keyframes glyph-file {
+  45% {
+    transform: translateY(2px);
+  }
+}
+
+/* Knocked, not emptied: the bin tips off its base and rocks back. */
+@keyframes glyph-tip {
+  45% {
+    transform: rotate(-14deg);
+  }
+}
+
+/* All the way round rather than partway and back, because a gear that returns
+   the way it came is a gear being wound, and no gear is wound. */
+@keyframes glyph-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The shake of something that will not open. */
+@keyframes glyph-refuse {
+  20%,
+  60% {
+    transform: translateX(-1.5px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(1.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-row:hover .sidebar-glyph svg,
+  .sidebar-footer-button:hover svg {
+    animation: none;
+  }
+}
+
 .sidebar-name {
   min-width: 0;
   flex: 1 1 auto;

@@ -288,6 +288,7 @@ function NameField({
 function Row({
   scope,
   glyph,
+  motion,
   depth = 0,
   active,
   droppable = true,
@@ -298,6 +299,9 @@ function Row({
 }: {
   scope: Scope;
   glyph: React.ReactNode;
+  /** Which move this glyph makes when the pointer arrives on it. The
+   *  stylesheet holds the moves; this only says which one. */
+  motion?: string;
   depth?: number;
   active: boolean;
   droppable?: boolean;
@@ -316,7 +320,9 @@ function Row({
     >
       <span className="sidebar-twisty">{disclosure}</span>
       <button type="button" className="sidebar-target press" onClick={onSelect}>
-        <span className="sidebar-glyph">{glyph}</span>
+        <span className="sidebar-glyph" data-motion={motion}>
+          {glyph}
+        </span>
         <span className="sidebar-name">{scope.label}</span>
         {/* The dot replaces the count rather than crowding beside it: while
             something is new, how much is new is the only number worth
@@ -424,6 +430,7 @@ export function Sidebar({
             count: open || !hasChildren ? node.scope.count : node.total,
           }}
           glyph={active || (open && hasChildren) ? <FolderOpen size={16} /> : <Folder size={16} />}
+          motion="folder"
           depth={depth}
           active={active}
           droppable={canWrite}
@@ -537,6 +544,7 @@ export function Sidebar({
           <Row
             scope={all}
             glyph={<NotebookText size={16} />}
+            motion="notes"
             active={selectedId === ALL}
             onSelect={() => onSelect(ALL)}
           />
@@ -569,7 +577,7 @@ export function Sidebar({
                   className="sidebar-target press"
                   onClick={() => onSelectNote(note.id)}
                 >
-                  <span className="sidebar-glyph">
+                  <span className="sidebar-glyph" data-motion="pin">
                     <Pin size={15} />
                   </span>
                   <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
@@ -636,6 +644,7 @@ export function Sidebar({
                  stuck at one, which is the one thing a badge must never do. */
               scope={{ ...remarks, count: 0 }}
               glyph={<MessageSquare size={16} />}
+              motion="remarks"
               active={selectedId === REMARKS}
               droppable={false}
               onSelect={() => onSelect(REMARKS)}
@@ -645,6 +654,7 @@ export function Sidebar({
             <Row
               scope={archive}
               glyph={<Archive size={16} />}
+              motion="archive"
               active={selectedId === ARCHIVE}
               droppable={false}
               onSelect={() => onSelect(ARCHIVE)}
@@ -654,6 +664,7 @@ export function Sidebar({
             <Row
               scope={trash}
               glyph={<Trash2 size={16} />}
+              motion="trash"
               active={selectedId === TRASH}
               droppable={false}
               onSelect={() => onSelect(TRASH)}
@@ -668,11 +679,21 @@ export function Sidebar({
           only the lock came back. */}
       <div className="sidebar-footer">
         <UpdateNotice />
-        <button type="button" className="sidebar-footer-button press" onClick={onSettings}>
+        <button
+          type="button"
+          className="sidebar-footer-button press"
+          data-motion="settings"
+          onClick={onSettings}
+        >
           <Settings size={16} />
           <span>Settings</span>
         </button>
-        <button type="button" className="sidebar-footer-button press" onClick={onLock}>
+        <button
+          type="button"
+          className="sidebar-footer-button press"
+          data-motion="lock"
+          onClick={onLock}
+        >
           <Lock size={16} />
           <span>Lock &amp; sign out</span>
         </button>
