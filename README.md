@@ -32,8 +32,6 @@ window, there is a desktop app too.
 
 ![Sign-in screen](docs/sign-in-preview.png)
 
-![Notes workspace](docs/notes-workspace-preview.png)
-
 **[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/note-sharing-app/releases/latest)**
 
 The Mac version is the same app, with its own menu bar, shortcuts and Dock badge for
