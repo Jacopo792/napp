@@ -97,9 +97,9 @@ of those and fails silently when it does not.
 
 **The gesture on a row.** Push a note row sideways with two fingers on the
 trackpad: left uncovers Delete, right uncovers Archive. Let go partway and the
-row stays open with its button showing; push it further and the action happens
-on release. Trash and Archive have their own pair – restore, put back – and
-deleting for good is always a press, never a swipe.
+row stays open with its button showing, then press that button to act. Trash
+and Archive have their own pair – restore, put back – and deleting for good is
+always a press, never a swipe.
 
 ---
 
