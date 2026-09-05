@@ -152,11 +152,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          # `latest` requires a GitHub Releases lookup before the CLI can be
-          # installed. That lookup is rate-limited independently of this
-          # repository and turned a healthy backend into a skipped test run.
-          # Keep CI on the version used to apply and verify this repository's
-          # migrations instead.
+          # Avoid a rate-limited lookup of GitHub Releases for `latest`.
           version: 2.116.0
 
       # Applies every migration in `supabase/migrations/` to a fresh database,

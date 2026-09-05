@@ -3,21 +3,29 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.3.4 — 2026-09-05
+
+### Fixed
+
+- **Restored the intentional note-row swipe.** The gesture remains available
+  on touch and trackpad with its existing explicit action buttons; it was
+  removed by mistake in 0.3.3.
+- **CI is deterministic again.** The backend job pins the verified Supabase
+  CLI rather than asking GitHub for `latest`, which was rate-limited before it
+  could install; cleanup now also tolerates a setup failure.
+
 ## 0.3.3 — 2026-09-05
 
 ### Fixed
 
 - **CI is deterministic again.** The backend job pins the verified Supabase
   CLI rather than asking GitHub for `latest`, which was rate-limited before it
-  could install; its cleanup now also tolerates a setup failure.
-- **No note action is hidden behind a swipe.** Rows use explicit controls on
-  touch and the context menu on pointer devices; the two-step deletion guard
-  remains in both places.
+  could install; cleanup now also tolerates a setup failure.
 
 ### Changed
 
-- Updated the desktop, contributor and public documentation to match the
-  release process, 100 MB video allowance and manual update flow.
+- This release mistakenly removed the intentional note-row swipe. It was
+  restored immediately in 0.3.4.
 
 ## 0.3.2 — 2026-09-05
 

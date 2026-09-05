@@ -95,9 +95,11 @@ when _it_ has come back – from a closed lid, a changed network, or being hidde
 – and reads the archive again, because a live subscription does not survive all
 of those and fails silently when it does not.
 
-**Deliberate note actions.** Archive, Trash, restore and permanent deletion
-are explicit controls in the interface. Nothing happens from a trackpad swipe,
-so an accidental gesture never files or removes a note.
+**The gesture on a row.** Push a note row sideways with two fingers on the
+trackpad: left uncovers Delete, right uncovers Archive. Let go partway and the
+row stays open with its button showing; push it further and the action happens
+on release. Trash and Archive have their own pair – restore, put back – and
+deleting for good is always a press, never a swipe.
 
 ---
 
@@ -208,13 +210,13 @@ runner. `pnpm build:desktop` builds only for the machine you are standing at.
 ## Cutting a release
 
 ```bash
-git tag v0.3.3
-git push origin v0.3.3
+git tag v0.3.4
+git push origin v0.3.4
 ```
 
 The tag has to match the version in `apps/desktop/package.json`, because that
 is what electron-builder puts in the filename and a `.dmg` called 0.0.0 hanging
-under a tag called v0.3.3 is a question somebody will have to answer later.
+under a tag called v0.3.4 is a question somebody will have to answer later.
 
 `.github/workflows/release.yml` builds the installers from a matrix of
 `macos-latest` and `windows-latest` – electron-builder cannot cross-compile

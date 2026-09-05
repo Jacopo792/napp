@@ -151,11 +151,73 @@ the boundary is the one place every update passes through:
   writing their own locked passage, and refusing one leaves the editor
   disagreeing with the document it is bound to.
 
-A note row carries no buttons on a pointer machine — its right-click menu is
-the one place for Pin, Archive, Trash, Restore and locks. Touch rows expose the
-same necessary actions as compact buttons because they have no context menu.
-There is no swipe path: every archive, restore or deletion action starts from a
-visible control, and permanent deletion remains a two-step confirmation.
+A note row carries no buttons on a pointer machine — everything they did is in
+the row's right-click menu. The acts are also a gesture, and it is Mail's
+gesture rather than a swipe of our own: push the row **left to uncover Delete**
+on its right, **right to uncover Archive**. A finger drags it; a trackpad
+pushes it with two fingers.
+
+**The push opens; the press acts. There is no distance that does anything.**
+The action is not a sign riding on the row, it is a surface behind it that the
+row uncovers, and it grows with the travel. Let go and the row **stays open**
+with its button showing, and the button is pressed. A row that only ever sprang
+back said nothing about what it was about to do, which is what made the gesture
+read as a twitch rather than a control — but a row that ran its act on release
+past a threshold made the hand careful, because a flick a little too hard
+archived a note nobody meant to archive and the only way to learn how hard was
+too hard was to have got it wrong once. `COMMIT` is gone. Travel past `OPEN` is
+give and nothing else.
+
+The directions are Apple's. They were once the other way round, on the argument
+that muscle memory outranks convention; the muscle memory being protected was
+of a gesture nobody could use, and the hand's real memory is of Mail. Changing
+them was the report, not a liberty.
+
+**Every scope has the gesture, and each one has its own pair.** It was the
+ordinary list alone at first, on the argument that Trash and Archive have
+different acts — they do, and that is a reason to give them their own pair
+rather than to take the hand's gesture away in the two places a row is most
+likely to want moving. The list deletes and archives, the Archive deletes and
+puts back, the Trash deletes for good and restores. Deleting for good was once
+the one act a full swipe was not allowed to perform on its own; every act is
+that act now, so there is no flag on the pair and no exception to remember.
+
+`OPEN` and `MAX` in `NoteList.tsx` are the whole of the tuning, and **the clamp
+is load-bearing**: a trackpad keeps sending decaying momentum after the fingers
+lift, so unclamped travel takes the row half the column. Clamped, a flick
+arrives at the give and springs back to open.
+
+The panel is a **button**, not a wall: inset by three from the row's own edges
+and carrying the corner on its outer side only — the inner one is under the row
+until the moment it is uncovered, and rounding it would show two corners
+meeting at nothing while the row travels. What is inside it arrives rather than
+being there: the row writes `--reveal`, how far open it is, and the mark grows
+on that same travel. The settle takes `--ease-bounce`, which is one step past
+`--ease-spring` and is only for a gesture the hand has already let go of — an
+overshoot under a finger reads as the list twitching.
+
+The panels are parked outside the row's own edges (`left: 100%`, `right: 100%`)
+rather than inside a wrapper, so the travelling row is the only thing that
+moves and the list's own `overflow-x: hidden` is what keeps a parked panel out
+of sight. A row that is open paints `--paper`, or the panel is read through it.
+One row is open at a time, announced on `napp:close-other-swipes` as the
+gesture starts rather than lifted into the list's state — a re-render of every
+row to move one row is the wrong shape for something a hand changes constantly.
+
+A trackpad has no gesture-end event: the fingers lift and macOS keeps sending
+decaying momentum. The end is therefore a silence — 90 ms without a wheel
+event — and two things follow that are easy to get wrong. The travel lives in
+a **ref**, because every wheel event re-renders the row. And the settle is read
+through a ref too: closed over directly it changes each render, the effect
+re-runs, and its cleanup cancels the very timer that ends the gesture, so the
+row travels and never springs back. Following the hand and settling afterwards
+are also two motions and take two curves — `dragging` takes the transition off
+while the fingers are on it, or the row snaps to its open position and the one
+frame that says it was caught is lost. Chromium reads the same two-finger swipe
+as "go back"; the handler calls `preventDefault` on a deliberately non-passive
+listener, the list carries `overscroll-behavior-x: contain`, and the desktop
+shell turns `OverscrollHistoryNavigation` off outright. Pinning has no
+direction, so it keeps its button there, and Trash and Archive keep theirs.
 
 `handleMetaChange` in `Notes.tsx` is the one place every per-note metadata
 change passes through, so the lock is honoured there once rather than in each
