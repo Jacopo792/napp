@@ -1,4 +1,4 @@
-# note-sharing-app
+# Napp
 
 A private place for your notes, shared with one other person if you want it.
 
@@ -26,13 +26,13 @@ when you need it; the rest stays out of the way while you write.
 
 ## Get the app
 
-Use it in the browser at <https://jacopo792.github.io/note-sharing-app/>: there is
+Use it in the browser at <https://jacopo792.github.io/napp/>: there is
 nothing to install and it is always up to date. If you would rather have it in its own
 window, there is a desktop app too.
 
 ![Sign-in screen](docs/sign-in-preview.png)
 
-**[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/note-sharing-app/releases/latest)**
+**[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/napp/releases/latest)**
 
 The Mac version is the same app, with its own menu bar, shortcuts and Dock badge for
 unread comments. Notes already open keep working if the connection drops.
@@ -83,7 +83,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_COLLAB_URL=ws://127.0.0.1:8080
 # Only the desktop build needs this one: where an invitation link has to point,
 # since the link is opened on a machine that may not have the app.
-VITE_WEB_ORIGIN=https://jacopo792.github.io/note-sharing-app/
+VITE_WEB_ORIGIN=https://jacopo792.github.io/napp/
 ```
 
 Run the collaboration server separately:
@@ -112,7 +112,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:server
-VITE_BASE_PATH=/note-sharing-app/ pnpm build
+VITE_BASE_PATH=/napp/ pnpm build
 ```
 
 ## How it is built
@@ -155,7 +155,7 @@ Markdown is supported as an import/export format, not as the editor's internal f
 
 ## Deployment
 
-The app runs at <https://jacopo792.github.io/note-sharing-app/>. There is no other
+The app runs at <https://jacopo792.github.io/napp/>. There is no other
 deployment.
 
 The frontend is published through GitHub Pages after the frontend checks, local

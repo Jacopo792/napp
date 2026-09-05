@@ -221,7 +221,7 @@ jobs:
       pages: write
       id-token: write
     env:
-      VITE_BASE_PATH: /note-sharing-app/
+      VITE_BASE_PATH: /napp/
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       # The collaboration server on Render. Public, like the two above.

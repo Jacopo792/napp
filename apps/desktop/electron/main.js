@@ -123,7 +123,7 @@ function serveRenderer() {
    renderer to call and no value for it to receive back — main sends, preload
    dispatches a DOM event, the page listens. A window with nothing to ask has
    nothing that can be asked of it. */
-const RELEASES = "https://api.github.com/repos/Jacopo792/note-sharing-app/releases/latest";
+const RELEASES = "https://api.github.com/repos/Jacopo792/napp/releases/latest";
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 
 /* Part by part and numerically, because 0.1.10 is newer than 0.1.9 and a

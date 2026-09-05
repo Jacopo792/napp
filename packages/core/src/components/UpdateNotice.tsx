@@ -20,7 +20,7 @@ import { ArrowUpCircle } from "lucide-react";
    in a tab this is an ordinary link. So there is no bridge to add, and no way
    for the page to start a download of its own. */
 
-const LATEST_RELEASE = "https://github.com/Jacopo792/note-sharing-app/releases/latest";
+const LATEST_RELEASE = "https://github.com/Jacopo792/napp/releases/latest";
 
 export function UpdateNotice() {
   const [version, setVersion] = useState<string | null>(null);

@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through
-[GitHub private vulnerability reporting](https://github.com/Jacopo792/note-sharing-app/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/Jacopo792/napp/security/advisories/new).
 Do not open a public issue for a vulnerability that could expose an archive,
 an account, or a Storage object.
 

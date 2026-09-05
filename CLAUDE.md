@@ -711,7 +711,7 @@ Windows runner, which is what the matrix is for.
 
 ## Deployment
 
-The deployed origin is `https://jacopo792.github.io/note-sharing-app/`, and
+The deployed origin is `https://jacopo792.github.io/napp/`, and
 Supabase Auth has to agree with it: the Site URL and the redirect allow-list are
 what a confirmation email is built from, so a stale value there sends new
 accounts to whatever was deployed last year. `supabase/config.toml` is the

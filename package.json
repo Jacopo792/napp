@@ -27,7 +27,7 @@
     "add:member": "node --experimental-strip-types scripts/add-archive-member.mjs",
     "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs",
     "verify:supabase:local": "node --experimental-strip-types scripts/verify-supabase-local.mjs",
-    "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/note-sharing-app/ pnpm build && git diff --check",
+    "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/napp/ pnpm build && git diff --check",
     "healthcheck:full": "pnpm healthcheck && REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server && pnpm verify:supabase:local"
   },
   "devDependencies": {

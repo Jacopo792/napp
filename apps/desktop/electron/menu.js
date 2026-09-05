@@ -152,7 +152,7 @@ function template(isDev) {
         { type: "separator" },
         {
           label: "Napp on GitHub",
-          click: () => void shell.openExternal("https://github.com/Jacopo792/note-sharing-app"),
+          click: () => void shell.openExternal("https://github.com/Jacopo792/napp"),
         },
       ],
     },

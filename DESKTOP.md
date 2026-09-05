@@ -1,6 +1,6 @@
 # The desktop app
 
-Napp runs in a browser at <https://jacopo792.github.io/note-sharing-app/> and as
+Napp runs in a browser at <https://jacopo792.github.io/napp/> and as
 a window on your own machine. This file is about the window: how to get it, what
 it adds, what it keeps on the disk, and what to check when it misbehaves.
 
@@ -15,7 +15,7 @@ what is different about running it in a window.
 
 ## Get it
 
-**[Download the latest release](https://github.com/Jacopo792/note-sharing-app/releases)**
+**[Download the latest release](https://github.com/Jacopo792/napp/releases)**
 
 | Platform           | File                       |
 | ------------------ | -------------------------- |

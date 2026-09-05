@@ -53,7 +53,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_COLLAB_URL: ${{ vars.VITE_COLLAB_URL }}
-          VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://jacopo792.github.io/note-sharing-app/' }}
+          VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://jacopo792.github.io/napp/' }}
         run: pnpm run ${{ matrix.script }}
 
       - uses: actions/upload-artifact@v4
