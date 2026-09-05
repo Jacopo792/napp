@@ -38,7 +38,11 @@ export function mediaPaste(options: {
                   const file = item.type.startsWith("image/") ? item.getAsFile() : null;
                   if (file) files.push(file);
                 }
-              const native = !html && platform().readClipboard;
+              /* Electron exposes rich copied text as HTML but commonly omits
+                 the image bytes from the renderer ClipboardEvent. Its native
+                 clipboard still has them, so use that fallback even when HTML
+                 is present. Web has no native bridge and remains unchanged. */
+              const native = platform().readClipboard;
               if (!/<img\b/i.test(html) && !files.length && !native) return false;
               event.preventDefault();
               const job = { bookmark: view.state.selection.getBookmark() };

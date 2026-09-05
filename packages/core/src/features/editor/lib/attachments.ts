@@ -9,8 +9,10 @@
    and hands the browser a blob in a new tab. The private bucket is protected by
    the same archive-membership policy as the notes. ────────────────────────── */
 
-/** Keep large attachments out of the note-writing path. */
-export const MAX_ATTACHMENT_BYTES = 24 * 1024 * 1024;
+/** Videos belong in the private object store, not in the note row. Keep a
+ * generous but bounded ceiling so ordinary phone videos do not fail at the
+ * previous 25 MB bucket limit. */
+export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
 const REFERENCE =
   /^napp-file:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;

@@ -3,6 +3,15 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.3.2 — 2026-09-05
+
+### Fixed
+
+- **Larger videos and reliable desktop image paste.** Private attachments now
+  accept files up to 100 MB. In Electron, a rich-text paste now reads the
+  native image bytes even when the copied text includes HTML, so copied images
+  are stored with the text as they already are in the web app.
+
 ## Unreleased
 
 ### Changed
