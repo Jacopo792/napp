@@ -35,8 +35,8 @@ pnpm build
 
 The CI also runs the server against a fresh local Supabase, exercises two
 instances through Redis, and builds the Docker image. Run `pnpm healthcheck`
-before opening a pull request. Formatting
-is Prettier through ESLint; `pnpm exec eslint . --fix` settles it.
+before opening a pull request. Formatting is checked with Prettier;
+`pnpm format` applies it and `pnpm lint --fix` applies safe lint fixes.
 
 ## Branches
 

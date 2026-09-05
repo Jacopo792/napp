@@ -12,7 +12,8 @@ for two people who keep things together: partners, friends, siblings, whoever.
 
 ## What is in it
 
-- A rich editor for writing, checklists, tables, links, images, PDFs and other files.
+- A rich editor for writing, checklists, tables, links, images, PDFs and videos
+  (MP4, WebM and MOV up to 100 MB).
 - Folders, pins, search, Archive and Trash so notes do not get lost as they pile up.
 - Live editing when two people are in the same note, plus comments on a specific
   sentence or paragraph.
@@ -136,7 +137,7 @@ The repository is a pnpm workspace of two packages and two shells:
 - `apps/desktop/` is the Electron window: `pnpm build:desktop` writes a macOS
   `.dmg` and a Windows `.exe` into `apps/desktop/release/`, and
   `.github/workflows/release.yml` builds both on a tag. See
-  [Get it for your Mac](#get-it-for-your-mac). The renderer is served from
+  [the desktop guide](DESKTOP.md). The renderer is served from
   `app://notes` rather than `file://`, because the collaboration server refuses
   a socket whose origin it does not know and a `file://` page sends none.
 
@@ -168,8 +169,8 @@ runners, because electron-builder cannot cross-compile them. Bump the version in
 `apps/desktop/package.json` to match, then:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.3
+git push origin v0.3.3
 ```
 
 The workflow publishes both installers to the repository's Releases.

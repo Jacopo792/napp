@@ -145,7 +145,9 @@ separators shifted by the same 8 px; gallery and mobile rows keep their spacing.
 - Catalogue rows stay dense. Pinned notes appear first, then every group is ordered by the latest real edit; opening a note never changes its position. Each row leads with a glyph saying what it will open — a checklist, a note carrying a picture, a note carrying a file — then a multiline title, a timestamp, a clipped preview and a pin action. It does not show its own position in the sort: that is a number about the list, not about the note. The selected row uses a page surface, border, and minimal shadow rather than a full-width saturated fill.
 - Icon actions are quiet until hover or keyboard focus. Hover shifts them toward the accent wash; destructive actions shift to `--danger`.
 - Note deletion is deliberately two-step in place: the first click changes the row action to a visible **Delete?** confirmation, and the second click performs the permanent deletion. The confirmation expires after three seconds. Do not replace this with a one-click destructive icon.
-- A catalogue row answers a sideways push — a finger on the phone, two fingers on a trackpad — and it is Mail's gesture rather than one of our own. The action is a surface _behind_ the row that the row uncovers as it travels, not a sign riding on top of it. Let go partway and the row stays open with its button showing; push past the far threshold and the action happens on release. Pushing left uncovers the destructive one on the right, pushing right the one that files it, which is where the hand learned them. Every scope has the gesture and each has its own pair: the list deletes and archives, the Archive deletes and puts back, the Trash deletes for good and restores. **A full swipe may never do something irreversible**, so deleting for good stays a deliberate press however far the row is pushed.
+- Note actions are explicit. Pointer users have the row's right-click menu;
+  touch users have compact Pin, Archive, Restore and Trash controls. Deletion
+  remains two-step in every surface, and no swipe can file or remove a note.
 
 ## The right button
 

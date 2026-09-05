@@ -143,7 +143,6 @@
   --dur-fast: 160ms;
   --dur-base: 240ms;
   /* Long enough for the overshoot above to be a movement rather than a blip. */
-  --dur-swipe: 340ms;
   --dur-slow: 360ms;
 
   /* ── The sidebar rail ──────────────────────────────────────────────────────
@@ -2631,90 +2630,6 @@
 .note-row-glyph.is-sketch svg {
   width: 100%;
   height: 100%;
-}
-
-/* ── What is under a row being pushed ────────────────────────────────────────
-   Mail's arrangement: the action is not a sign riding on the row, it is a
-   surface *behind* it that the row uncovers. Each panel is parked immediately
-   outside the edge it belongs to — `left: 100%` for the one on the right — so
-   nothing about it moves during the gesture and the row travelling is the whole
-   animation. The list clips its own horizontal overflow, which is what keeps a
-   parked panel out of sight until there is a gap for it to be seen through.
-
-   The width follows the travel rather than being fixed, so a row pushed past
-   its resting place is not a panel with a strip of background beside it. It
-   never goes below OPEN, because the label has to fit from the first frame. */
-/* A button, not a wall. Full-bleed to the row's own top and bottom it was a
-   rectangle of flat colour the height of the list, which is what a mail client
-   does with a row that is about to fly away — and nothing here flies away any
-   more, it waits to be pressed. So it is inset by three and carries the corner
-   every other pressable thing in the app carries, which says "press me" rather
-   than "let go and I happen".
-
-   The corner is on the outer edge only: the inner one is under the row until
-   the moment it is uncovered, and rounding it would show two corners meeting
-   at nothing while the row travels. */
-.note-row-action {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  color: #fff;
-  cursor: pointer;
-}
-
-/* What is in it arrives rather than being there. `--reveal` is how far open
-   the row is, written by the row itself, so the mark grows with the gesture
-   and lands at full size exactly as the panel finishes opening — the same
-   travel, two things doing it. */
-.note-row-action > * {
-  transform: scale(calc(0.55 + 0.45 * var(--reveal, 1)));
-  opacity: var(--reveal, 1);
-  transition:
-    transform var(--dur-base) var(--ease-spring),
-    opacity var(--dur-fast) var(--ease);
-}
-
-.note-row-action:active {
-  filter: brightness(0.92);
-}
-
-/* Where a panel is parked is the direction it answers to; what colour it is
-   is what it does. The two are separate because every scope has the same pair
-   of directions and a different pair of acts — Trash restores where the list
-   archives, and both of them delete. */
-.note-row-action.is-left {
-  left: 100%;
-  border-start-end-radius: var(--radius-md);
-  border-end-end-radius: var(--radius-md);
-}
-
-.note-row-action.is-right {
-  right: 100%;
-  border-start-start-radius: var(--radius-md);
-  border-end-start-radius: var(--radius-md);
-}
-
-.note-row-action.is-trash {
-  background: var(--danger);
-}
-
-.note-row-action.is-archive {
-  background: var(--accent);
-}
-
-/* A travelling row has to be opaque, or the panel it is uncovering is read
-   through it. The list column's own surface, so a row at rest is unchanged. */
-.note-row.is-swiped {
-  background: var(--paper);
 }
 
 /* ── Which note is the one waiting ───────────────────────────────────────────
@@ -7396,9 +7311,7 @@
 
   /* A step toward the pointer rather than a swell. A wide row scaled up reads
      as the list breathing; the same row moved four pixels reads as the row
-     answering, and the words stay exactly the size they were. The row already
-     carries the spring on its transform — the swipe gesture puts it there
-     inline — so this only has to say where to go. */
+     answering, and the words stay exactly the size they were. */
   .note-row:hover {
     translate: 4px;
   }

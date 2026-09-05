@@ -95,29 +95,27 @@ when _it_ has come back – from a closed lid, a changed network, or being hidde
 – and reads the archive again, because a live subscription does not survive all
 of those and fails silently when it does not.
 
-**The gesture on a row.** Push a note row sideways with two fingers on the
-trackpad: left uncovers Delete, right uncovers Archive. Let go partway and the
-row stays open with its button showing; push it further and the action happens
-on release. Trash and Archive have their own pair – restore, put back – and
-deleting for good is always a press, never a swipe.
+**Deliberate note actions.** Archive, Trash, restore and permanent deletion
+are explicit controls in the interface. Nothing happens from a trackpad swipe,
+so an accidental gesture never files or removes a note.
 
 ---
 
 ## Keeping it up to date
 
 The app asks GitHub twice a working day whether a newer release exists. If one
-does, a line appears above **Lock & sign out** — _Version 0.1.3 is available_ —
-and opens the download page in your browser. Nothing downloads on its own yet:
-a new version means downloading the new `.dmg` and replacing the app. Your notes
-are in the archive and on the server, not in the bundle, so nothing is lost by
-replacing it.
+does, a line appears above **Lock & sign out** — _Version <version> is
+available_ — and opens the download page in your browser. Nothing downloads or
+installs on its own yet: download the current installer, then replace the app
+on macOS or run the new NSIS installer on Windows. Your notes are in the archive
+and on the server, not in the bundle, so nothing is lost by replacing it.
 
 **Napp → About Napp** gives the version you are running, and Releases gives the
 latest, if you would rather ask than be told.
 
-Installing itself is coming to Windows, where an unsigned build can do it.
-macOS cannot: Squirrel validates the code signature before it will replace an
-app, and these builds are unsigned. That needs an Apple Developer ID.
+Automatic in-app updates are not implemented. The release page always carries
+both macOS DMGs and the Windows installer; macOS automatic replacement remains
+out of scope until the app has an Apple Developer ID.
 
 ---
 
@@ -210,13 +208,13 @@ runner. `pnpm build:desktop` builds only for the machine you are standing at.
 ## Cutting a release
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.3
+git push origin v0.3.3
 ```
 
 The tag has to match the version in `apps/desktop/package.json`, because that
 is what electron-builder puts in the filename and a `.dmg` called 0.0.0 hanging
-under a tag called v0.1.0 is a question somebody will have to answer later.
+under a tag called v0.3.3 is a question somebody will have to answer later.
 
 `.github/workflows/release.yml` builds the installers from a matrix of
 `macos-latest` and `windows-latest` – electron-builder cannot cross-compile

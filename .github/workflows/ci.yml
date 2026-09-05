@@ -152,7 +152,12 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # `latest` requires a GitHub Releases lookup before the CLI can be
+          # installed. That lookup is rate-limited independently of this
+          # repository and turned a healthy backend into a skipped test run.
+          # Keep CI on the version used to apply and verify this repository's
+          # migrations instead.
+          version: 2.116.0
 
       # Applies every migration in `supabase/migrations/` to a fresh database,
       # which is also the dry run: a migration that cannot be applied fails the
@@ -206,7 +211,10 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop
+        run: |
+          if command -v supabase >/dev/null 2>&1; then
+            supabase stop
+          fi
 
   # Pages is published by a run that proved both halves and by nothing else.
   # `needs` is the whole guard: a failed frontend job or a failed
