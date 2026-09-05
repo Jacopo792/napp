@@ -2,7 +2,7 @@
 
 A private place for your notes, shared with one other person if you want it.
 
-![App preview]([URL_DELL_IMMAGINE](https://chatgpt.com/backend-api/estuary/content?id=file_00000000ca3881f48a34be18a7730b2f&ts=496838&p=fs&cid=1&sig=471275caf6bf4b31eb2b82cd5b666d598c355005c5e4fef2dad582f3d5b1738a&v=0))
+![App preview](docs/app-preview.png)
 
 ## Why I built it
 
