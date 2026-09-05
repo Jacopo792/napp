@@ -2,7 +2,8 @@
 
 A private place for your notes, shared with one other person if you want it.
 
-![App preview](docs/app-preview-v3.png)
+![App preview](<img width="2048" height="1425" alt="image" src="https://github.com/user-attachments/assets/46850200-d1ca-4493-9dc7-f7069585bb67" />
+)
 
 ## Why I built it
 
