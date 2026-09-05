@@ -5,13 +5,16 @@ changes. The commit history remains the detailed engineering record.
 
 ## 0.3.5 — 2026-09-05
 
-### Fixed
+### Changed
 
-- **Copy and paste works again in the desktop app.** The native clipboard
-  fallback now uses Electron 44's asynchronous `clipboard.read()` API instead
-  of the removed `readImage()` and `readHTML()` helpers. Ordinary text and rich
-  text without images stay on the editor's normal paste path, while copied
-  images retain their actual MIME type when the native fallback is needed.
+- Migrated the native clipboard bridge to Electron 44's asynchronous
+  `clipboard.read()` API after the old helpers were removed.
+
+### Known issues
+
+- Pasting images, including text selections that contain images, remains
+  unresolved in the desktop app. Version 0.3.5 must not be considered a fix
+  for the original image-paste problem.
 
 ## 0.3.4 — 2026-09-05
 
