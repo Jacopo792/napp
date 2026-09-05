@@ -5,6 +5,10 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+### Changed
+
+- **Repository renamed to Napp.** `Jacopo792/note-sharing-app` → `Jacopo792/napp`. The web app now runs at `https://jacopo792.github.io/napp/` with base path `/napp/` (`supabase/config.toml`, GitHub Pages, `VITE_WEB_ORIGIN`/`VITE_BASE_PATH`, Electron update and menu links). The GitHub description is now _A private notes app for two, with rich-text editing, real-time collaboration, offline support, and native desktop and web clients._ The old repository name redirects.
+
 ## 0.3.0 — 2026-09-05
 
 ### Added
@@ -311,9 +315,10 @@ that experiment was discarded.
   landed in the middle, restoring the old contents restores the prior edit time
   too, so the note neither moves nor claims a change that did not survive.
 - **Every address but the root returned GitHub's own 404.** Pages serves files
-  and the application is one file, so a refresh on `/note-sharing-app/notes`
-  found nothing and the reader had to walk back to the root. The build now also
-  writes `404.html`, which is what Pages serves for an unknown path.
+  and the application is one file, so a refresh on `/napp/notes` (then
+  `/note-sharing-app/notes` before the rename) found nothing and the reader had
+  to walk back to the root. The build now also writes `404.html`, which is what
+  Pages serves for an unknown path.
 - **The controls on a note row were invisible until the pointer arrived.** Pin,
   restore and delete were `md:opacity-0`, so Trash in particular read as a list
   you could not act on. They are visible now.
@@ -335,7 +340,8 @@ that experiment was discarded.
   `SECURITY.md` states the trade and how to restore the earlier guarantee.
 - **The confirmation email pointed at an old Vercel deployment.** The Supabase
   project's Site URL had never been aligned with `supabase/config.toml`, which
-  already named `https://jacopo792.github.io/note-sharing-app/`. `supabase
+  already named `https://jacopo792.github.io/napp/` (then
+  `https://jacopo792.github.io/note-sharing-app/`). `supabase
 config push` aligned it; the redirect allow-list now holds only that origin
   and localhost. Email confirmation stays on — `private.redeem_archive_invite()`
   refuses a caller whose `email_confirmed_at` is null, so turning it off would
