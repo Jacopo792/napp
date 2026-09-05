@@ -50,7 +50,9 @@ export async function importImage(
       url,
       {
         lookup: (_hostname, _options, callback) => callback(null, [address]),
-        headers: { accept: "image/png,image/jpeg,image/webp,image/gif" },
+        headers: {
+          accept: "image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/avif",
+        },
       },
       (response) => {
         if (
@@ -61,10 +63,19 @@ export async function importImage(
           resolve(importImage(new URL(response.headers.location, url).href, redirects + 1));
           return;
         }
-        const type = response.headers["content-type"]?.split(";")[0] ?? "";
+        const rawType = response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() ?? "";
+        // Normalise jpeg aliases; the blob type is what prepareImageForNote checks.
+        const type = rawType === "image/jpg" || rawType === "image/pjpeg" ? "image/jpeg" : rawType;
         if (
           response.statusCode !== 200 ||
-          !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(type)
+          ![
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+            "image/svg+xml",
+            "image/avif",
+          ].includes(type)
         ) {
           response.resume();
           reject(new Error("Source did not return an image"));

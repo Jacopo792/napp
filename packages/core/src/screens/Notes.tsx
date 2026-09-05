@@ -1423,8 +1423,14 @@ export default function NotesPage() {
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before attaching a file");
       const objectId = crypto.randomUUID();
-      await uploadObject(current, objectId, file);
-      fileTypes.current.set(objectId, file.type || attachmentType(file.name));
+      const normalizedType = file.type || attachmentType(file.name);
+      // Supabase storage validates against the bucket's allowlist, which is
+      // extension-based; a browser that reports `video/mov` or an empty string
+      // would otherwise be rejected even though the file is a supported MOV.
+      const toUpload =
+        normalizedType !== file.type ? new File([file], file.name, { type: normalizedType }) : file;
+      await uploadObject(current, objectId, toUpload);
+      fileTypes.current.set(objectId, normalizedType);
       return objectId;
     },
     [canWriteArchive],

@@ -27,8 +27,10 @@ export function attachmentObjectId(url: string): string | null {
 const TYPES: Record<string, string> = {
   pdf: "application/pdf",
   mp4: "video/mp4",
+  m4v: "video/mp4",
   webm: "video/webm",
   mov: "video/quicktime",
+  qt: "video/quicktime",
   txt: "text/plain",
   md: "text/markdown",
   csv: "text/csv",

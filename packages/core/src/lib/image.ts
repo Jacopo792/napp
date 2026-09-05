@@ -1,4 +1,12 @@
-const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ACCEPTED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+]);
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_EDGE = 2560;
@@ -21,7 +29,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
  */
 export async function prepareImageForNote(file: Blob): Promise<Blob> {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Use a JPG, PNG or WebP image");
+    throw new Error("Use a JPG, PNG, WebP, GIF or AVIF image");
   }
   if (file.size > MAX_SOURCE_BYTES) {
     throw new Error("Image is too large (20 MB maximum)");
@@ -112,7 +120,7 @@ export function avatarDragBound(view: {
 
 export async function prepareAvatar(file: File, crop?: AvatarCrop): Promise<Blob> {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Use a JPG, PNG or WebP image");
+    throw new Error("Use a JPG, PNG, WebP, GIF or AVIF image");
   }
   if (file.size > MAX_SOURCE_BYTES) {
     throw new Error("Image is too large (20 MB maximum)");

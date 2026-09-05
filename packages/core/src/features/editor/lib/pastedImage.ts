@@ -2,10 +2,19 @@ import { supabase } from "@/lib/supabaseClient";
 
 export async function loadPastedImage(source: string, noteId: string): Promise<File> {
   let response: Response;
-  if (/^(data:image\/(png|jpeg|webp|gif);|blob:)/i.test(source)) {
-    response = await fetch(source);
+  if (/^data:image\//i.test(source) || /^blob:/i.test(source)) {
+    try {
+      response = await fetch(source);
+    } catch {
+      throw new Error("Could not copy an image. Download it from the source and attach it.");
+    }
   } else {
-    const url = new URL(source);
+    let url: URL;
+    try {
+      url = new URL(source);
+    } catch {
+      throw new Error("Could not copy an image. Download it from the source and attach it.");
+    }
     if (url.protocol !== "https:")
       throw new Error("Copy the image itself or attach the downloaded file");
     const { data } = await supabase.auth.getSession();

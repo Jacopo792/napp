@@ -596,7 +596,13 @@ function PrivateImageView({
       })
       .catch((reason: unknown) => {
         if (active)
-          setError(reason instanceof Error ? reason.message : "This image could not be displayed");
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : video
+                ? "This video could not be displayed"
+                : "This image could not be displayed",
+          );
       });
     return () => {
       active = false;
@@ -611,7 +617,12 @@ function PrivateImageView({
           caption is not part of the picture. */}
       <span className="rich-media-image-frame" contentEditable={false}>
         {src && video ? (
-          <video src={src} controls preload="metadata" />
+          <video
+            src={src}
+            controls
+            preload="metadata"
+            onError={() => setError("This video could not be played")}
+          />
         ) : src ? (
           <button
             type="button"
@@ -622,7 +633,7 @@ function PrivateImageView({
           </button>
         ) : (
           <span className="rich-media-loading">
-            {error || "Loading image…"}
+            {error || (video ? "Loading video…" : "Loading image…")}
             {error && (
               <button
                 type="button"

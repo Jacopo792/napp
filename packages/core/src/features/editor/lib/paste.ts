@@ -50,15 +50,37 @@ export function mediaPaste(options: {
                 const dom = new DOMParser().parseFromString(markup, "text/html");
                 const images = Array.from(dom.querySelectorAll("img"));
                 let failure = false;
+                const canUseFilesDirectly = images.length > 0 && files.length === images.length;
                 for (let index = 0; index < images.length; index++) {
                   const img = images[index];
                   let prepared: Prepared | null = null;
                   try {
-                    // A clipboard file is the exact image bytes when there is one image.
-                    prepared =
-                      images.length === 1 && files.length === 1
-                        ? await options.upload(files[0])
-                        : await options.load(img.getAttribute("src") ?? "");
+                    // When the clipboard carries the exact bytes (single paste from
+                    // an image viewer, or a multi-image copy where the browser
+                    // exposes each file alongside its <img>), those bytes are the
+                    // canonical source — no round-trip through the collaboration
+                    // server and no DNS-pinned fetch that might refuse the host.
+                    if (canUseFilesDirectly) {
+                      prepared = await options.upload(files[index]);
+                    } else if (images.length === 1 && files.length === 1) {
+                      prepared = await options.upload(files[0]);
+                    } else {
+                      const rawSrc = img.getAttribute("src") ?? "";
+                      // `src` from the clipboard is raw attribute value; for a
+                      // `blob:` or `data:` URL the bytes are already local, but a
+                      // `blob:` created in another renderer (e.g. Chrome -> Electron)
+                      // is not in this context's blob store and `fetch(blob:)` will
+                      // fail — fall back to the file when we have one.
+                      if (/^blob:/i.test(rawSrc) && files.length) {
+                        try {
+                          prepared = await options.load(rawSrc);
+                        } catch {
+                          prepared = await options.upload(files[0]);
+                        }
+                      } else {
+                        prepared = await options.load(rawSrc);
+                      }
+                    }
                   } catch {
                     failure = true;
                   }

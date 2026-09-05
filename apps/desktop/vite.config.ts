@@ -93,7 +93,7 @@ function contentSecurityPolicy(env: Record<string, string | undefined>): Plugin 
     `img-src 'self' data: blob: ${remote}`,
     "font-src 'self' data:",
     `connect-src 'self' data: blob: ${remote}`,
-    "media-src 'self' data: blob:",
+    `media-src 'self' data: blob: ${remote}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "frame-src 'none'",

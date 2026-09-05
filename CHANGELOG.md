@@ -9,6 +9,13 @@ changes. The commit history remains the detailed engineering record.
 
 - **Repository renamed to Napp.** `Jacopo792/note-sharing-app` → `Jacopo792/napp`. The web app now runs at `https://jacopo792.github.io/napp/` with base path `/napp/` (`supabase/config.toml`, GitHub Pages, `VITE_WEB_ORIGIN`/`VITE_BASE_PATH`, Electron update and menu links). The GitHub description is now _A private notes app for two, with rich-text editing, real-time collaboration, offline support, and native desktop and web clients._ The old repository name redirects.
 
+## 0.3.1 — 2026-09-05
+
+### Fixed
+
+- **Pasted images now load in the desktop app.** Copying text with images from a web page and pasting it into a note now works in the Electron window the same way it already did in the browser: the paste keeps the surrounding HTML and images in place, and a multi-image copy that exposes its files alongside its `<img>` tags uploads the files directly instead of refetching their `src` through the collaboration server. `blob:` URLs from another renderer, relative `src` values and `data:` images are handled without a round-trip that could never succeed, the import endpoint now accepts `image/svg+xml` and `image/avif` (with `image/jpg`/`pjpeg` normalised to `image/jpeg`), and the desktop content-security policy allows the resulting `blob:` video and image URLs.
+- **Videos (MP4/WebM/MOV) now upload and play everywhere.** The attachment allowlist was widened to `video/mov`, `video/x-quicktime` and `video/m4v` (`20260905020000_video_mime_variants.sql` — already applied to the linked project), MOV files that a browser reports as `video/mov` are normalised to the bucket's `video/quicktime` on upload, and the note view shows a proper loading state and a `This video could not be played` error instead of a blank frame when the codec is unsupported.
+
 ## 0.3.0 — 2026-09-05
 
 ### Added
