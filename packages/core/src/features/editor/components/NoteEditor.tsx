@@ -17,6 +17,7 @@ import { formatDateTime } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
+import { loadPastedImage } from "@/features/editor/lib/pastedImage";
 import { imageAltFromFilename } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
 import type { AppSession } from "@/lib/session";
@@ -257,13 +258,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     try {
       assertAttachable(file);
-      setStatus("Attaching PDF…");
+      setStatus("Attaching file…");
       const objectId = await onUploadFile(file);
       editorRef.current?.insertAttachment(attachmentLabel(file.name), objectId);
-      report("PDF attached");
+      report("File attached");
     } catch (error) {
       setStatus("");
-      setFailure(error instanceof Error ? error.message : "Could not attach the PDF");
+      setFailure(error instanceof Error ? error.message : "Could not attach the file");
     } finally {
       if (attachPdfRef.current) attachPdfRef.current.value = "";
     }
@@ -432,6 +433,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onImportMarkdown={onImportMarkdown}
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
+      onExport={async (format) => {
+        if (!entry) return;
+        setFailure("");
+        setStatus("Exporting…");
+        try {
+          await editorRef.current?.exportNote(
+            format,
+            readDraft(entry.note.id)?.title ?? entry.note.title,
+          );
+          report("Note exported");
+        } catch (error) {
+          setStatus("");
+          setFailure(error instanceof Error ? error.message : "Could not export note");
+        }
+      }}
       proofreaderEnabled={proofreaderEnabled}
       onProofread={() => void handleProofread()}
       linkForm={linkForm}
@@ -478,7 +494,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <input
         ref={attachPdfRef}
         type="file"
-        accept="application/pdf,.pdf"
+        accept="application/pdf,video/mp4,video/webm,video/quicktime,.pdf,.mp4,.webm,.mov"
         className="hidden"
         onChange={(event) => void handleAttachPdf(event.target.files?.[0])}
       />
@@ -627,17 +643,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               be pressed. They stay out of the dock beside them for the same
               reason: a dock carrying them would be moving its icons around
               three things that are not icons. */}
-          {!mobile && (
-            <span className="label truncate text-ink-4">
-              {lock?.holderName
-                ? lock.mine
-                  ? "Locked by you"
-                  : `Locked by ${lock.holderName}`
-                : canEdit
-                  ? "Editing"
-                  : "Read only"}
-            </span>
-          )}
           <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
           <span
             className={`flex min-w-0 items-center justify-end gap-1 ${
@@ -830,6 +835,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                  still needs to hear about a keystroke. */
                 onLocalEdit={onEdited}
                 onPasteImage={handlePastedImage}
+                onPasteImageSource={async (src) =>
+                  handlePastedImage(await loadPastedImage(src, entry.note.id))
+                }
+                onPasteError={setFailure}
                 onOpenLink={openLinkForm}
                 onComment={canComment ? startComment : undefined}
                 /* Locking a passage is the smaller half of locking the note,

@@ -53,6 +53,8 @@ export interface Platform {
   openFile(name: string, load: () => Promise<Blob>): Promise<string | null>;
 
   print(): Promise<void>;
+  /** Native rich clipboard fallback, read only in response to Paste. */
+  readClipboard?(): Promise<{ html: string; text: string; image?: File }>;
 
   /** Hand a menu to the window manager, at the pointer, and answer with the
    *  `id` chosen — or null if the reader dismissed it.

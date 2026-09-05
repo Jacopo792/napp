@@ -101,7 +101,11 @@ export const PrivateFile = Node.create({
   atom: true,
   draggable: true,
   addAttributes() {
-    return { objectId: { default: "" }, label: { default: "Attachment" } };
+    return {
+      objectId: { default: "" },
+      label: { default: "Attachment" },
+      strokes: { default: "[]" },
+    };
   },
   parseHTML: () => [{ tag: "napp-private-file" }],
   renderHTML({ HTMLAttributes }) {
@@ -230,7 +234,9 @@ export function drawingStrokes(value: unknown): DrawingStroke[] {
     const color =
       typeof stroke.color === "string" && INK.test(stroke.color) ? stroke.color : DRAWING_INKS[0];
     const width =
-      typeof stroke.width === "number" && stroke.width > 0 && stroke.width <= 40 ? stroke.width : 5;
+      typeof stroke.width === "number" && stroke.width > 0 && stroke.width <= DRAWING_BOX.width
+        ? stroke.width
+        : 5;
     return [{ d: stroke.d, color, width }];
   });
 }

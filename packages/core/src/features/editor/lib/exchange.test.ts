@@ -234,7 +234,7 @@ test("a stroke that is not a stroke is dropped rather than repaired", () => {
   assert.deepEqual(drawingStrokes("not json"), []);
   assert.deepEqual(drawingStrokes('{"d":"M1,1"}'), []);
   assert.deepEqual(drawingStrokes(undefined), []);
-  assert.deepEqual(drawingStrokes('[{"d":"M1,1L9,9","color":"#F4C550","width":900}]'), [
+  assert.deepEqual(drawingStrokes('[{"d":"M1,1L9,9","color":"#F4C550","width":5000}]'), [
     { d: "M1,1L9,9", color: "#F4C550", width: 5 },
   ]);
 });

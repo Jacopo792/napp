@@ -26,6 +26,9 @@ export function attachmentObjectId(url: string): string | null {
 
 const TYPES: Record<string, string> = {
   pdf: "application/pdf",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
   txt: "text/plain",
   md: "text/markdown",
   csv: "text/csv",
@@ -53,10 +56,14 @@ export function formatBytes(bytes: number): string {
 }
 
 export function assertAttachable(file: File): void {
-  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-    throw new Error("Choose a PDF file");
+  if (
+    !["application/pdf", "video/mp4", "video/webm", "video/quicktime"].includes(
+      attachmentType(file.name),
+    )
+  ) {
+    throw new Error("Choose a PDF, MP4, WebM or MOV file");
   }
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    throw new Error(`PDFs must be smaller than ${formatBytes(MAX_ATTACHMENT_BYTES)}`);
+    throw new Error(`Attachments must be smaller than ${formatBytes(MAX_ATTACHMENT_BYTES)}`);
   }
 }

@@ -86,7 +86,7 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { fold, formatStamp, memberSince } from "@/lib/format";
+import { fold, memberSince } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
@@ -237,7 +237,6 @@ export default function NotesPage() {
 
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
   /** A one-line answer to a command that has no other visible outcome —
    *  "Copied as Markdown", "Imported 12 notes". It borrows the save readout's
    *  slot, which is where this window already says what just happened. */
@@ -249,7 +248,6 @@ export default function NotesPage() {
   /** Raised only when a pull replaces the open draft, so the editor knows the
    *  new text is not its own and may be applied under the caret. */
   const [syncRevision, setSyncRevision] = useState(0);
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -1265,9 +1263,6 @@ export default function NotesPage() {
       }
       setError("");
       retryDelayRef.current = RETRY_MIN_MS;
-      setLastSavedAt(new Date().toISOString());
-      setSavedFlash(true);
-      window.setTimeout(() => setSavedFlash(false), 1800);
     } catch (e) {
       failed = true;
       setError(e instanceof Error ? e.message : "Save failed");
@@ -2541,20 +2536,7 @@ export default function NotesPage() {
     </span>
   ) : syncFlash ? (
     <span className="label text-accent">Updated elsewhere</span>
-  ) : (
-    <span className="flex items-center gap-2">
-      {/* "Saved", not "Live". This readout is the state of the *write*, and
-          the word "Live" beside a row of collaborators was read — by the
-          person who commissioned the app, which settles it — as the presence
-          feature rather than as "nothing is pending". Every other state here
-          already says what it means, and the two that were about the socket
-          say so in their own words: Connecting, Waking the server, Offline. */}
-      <span className={`label ${savedFlash ? "text-ok" : "text-ink-4"}`}>Saved</span>
-      {lastSavedAt && (
-        <span className="readout tabular-nums text-ink-4">{formatStamp(lastSavedAt)}</span>
-      )}
-    </span>
-  );
+  ) : null;
 
   const pinned = selected
     ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true

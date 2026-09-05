@@ -10,6 +10,7 @@ interface Bridge {
   ): Promise<SavedAs | undefined>;
   open(name: string, bytes: Uint8Array): Promise<string | null>;
   print(): Promise<void>;
+  readClipboard(): Promise<{ html: string; text: string; image: Uint8Array | null }>;
   popUpMenu(items: SystemMenuItem[]): Promise<string | null>;
 }
 
@@ -52,6 +53,24 @@ export const desktopPlatform: Platform = {
   openFile: async (name, load) => bridge.open(name, await bytes(await load())),
 
   print: () => bridge.print(),
+  ...(bridge
+    ? {
+        readClipboard: async () => {
+          const data = await bridge.readClipboard();
+          return {
+            html: data.html,
+            text: data.text,
+            ...(data.image
+              ? {
+                  image: new File([new Uint8Array(data.image)], "Pasted image.png", {
+                    type: "image/png",
+                  }),
+                }
+              : {}),
+          };
+        },
+      }
+    : {}),
 
   /* The one member a tab has no answer for — and, it turns out, a member only
      macOS has an answer worth taking. An `NSMenu` is drawn by macOS over the

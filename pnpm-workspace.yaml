@@ -9,3 +9,4 @@ allowBuilds:
   esbuild: true
   electron: true
   electron-winstaller: true
+  core-js: false

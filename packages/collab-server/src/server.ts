@@ -27,6 +27,7 @@ import {
   restore as restoreLocked,
   type Guard,
 } from "@notes-app/core/editor/writeLocks.ts";
+import { importImage } from "./importImage.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";
@@ -338,6 +339,42 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        out of rotation and leaves it running, which is the correct response to
        a database that is briefly away. */
     async onRequest({ request, response }) {
+      const url = new URL(request.url ?? "/", "http://localhost");
+      if (url.pathname === "/import-image") {
+        const origin = request.headers.origin;
+        if (!originAllowed(origin, config.allowedOrigins))
+          return respond(response, 403, { error: "Origin refused" });
+        response.setHeader("Access-Control-Allow-Origin", origin!);
+        response.setHeader("Vary", "Origin");
+        response.setHeader("Access-Control-Allow-Headers", "authorization");
+        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        if (request.method === "OPTIONS") {
+          response.writeHead(204);
+          response.end();
+          throw null;
+        }
+        if (request.method !== "GET") return respond(response, 405, { error: "Method refused" });
+        const noteId = noteIdOf(url.searchParams.get("note") ?? "");
+        const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
+        if (!noteId || !token) return respond(response, 401, { error: "Sign in to import images" });
+        const access = await authorize(token, noteId, { fresh: true });
+        if (!access.allowed || access.readOnly)
+          return respond(response, 403, { error: "This note cannot be edited" });
+        try {
+          const image = await importImage(url.searchParams.get("url") ?? "");
+          response.writeHead(200, {
+            "content-type": image.type,
+            "cache-control": "no-store",
+            "x-content-type-options": "nosniff",
+          });
+          response.end(image.bytes);
+        } catch {
+          return respond(response, 422, {
+            error: "Could not copy this image. Download it from the source and attach it.",
+          });
+        }
+        throw null;
+      }
       if (request.url === "/healthz") {
         return respond(response, 200, { status: "ok" });
       }

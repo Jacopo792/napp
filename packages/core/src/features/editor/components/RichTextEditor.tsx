@@ -57,7 +57,9 @@ import {
   strokePoints,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
-import { attachmentExtension } from "@/features/editor/lib/attachments";
+import { attachmentType, attachmentExtension } from "@/features/editor/lib/attachments";
+import { mediaPaste } from "@/features/editor/lib/paste";
+import { splitMediaStroke } from "@/features/editor/lib/mediaInk";
 import { takeAutocorrection } from "@/features/editor/lib/autocorrect";
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
@@ -99,6 +101,7 @@ export interface SearchStatus {
 
 export interface RichTextEditorHandle {
   format: (action: FormatAction) => void;
+  exportNote: (format: "pdf" | "docx", title: string) => Promise<void>;
   getSelectedText: () => string;
   replaceSelectedText: (text: string) => void;
   insertLink: (label: string, url: string) => void;
@@ -140,6 +143,8 @@ interface Props {
    *  from the other reader. Yjs is the writer; this is only who is writing. */
   onLocalEdit?: () => void;
   onPasteImage?: (file: File) => Promise<{ objectId: string; alt: string } | null>;
+  onPasteImageSource?: (src: string) => Promise<{ objectId: string; alt: string } | null>;
+  onPasteError?: (message: string) => void;
   onOpenLink: () => void;
   /** Every note `[[` can reach, and what to do when one is clicked. Absent in
    *  the preview and anywhere else without an archive behind it. */
@@ -546,7 +551,9 @@ function PrivateImageView({
   deleteNode,
   editor,
 }: NodeViewProps) {
-  const { objectId, alt } = node.attrs as { objectId: string; alt: string };
+  const { objectId } = node.attrs as { objectId: string };
+  const alt = String(node.attrs.alt ?? node.attrs.label ?? "Image");
+  const video = node.type.name === "privateFile";
   const options = extension.options as PrivateImageOptions;
   const resolveImage = options.resolve;
   const [src, setSrc] = useState("");
@@ -582,7 +589,9 @@ function PrivateImageView({
     void resolveImage(objectId)
       .then((blob) => {
         if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
+        objectUrl = URL.createObjectURL(
+          video ? new Blob([blob], { type: attachmentType(alt) }) : blob,
+        );
         setSrc(objectUrl);
       })
       .catch((reason: unknown) => {
@@ -593,7 +602,7 @@ function PrivateImageView({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [objectId, resolveImage, attempt]);
+  }, [objectId, resolveImage, attempt, video, alt]);
 
   return (
     <NodeViewWrapper className={`rich-media-image ${error ? "is-error" : ""}`}>
@@ -601,7 +610,9 @@ function PrivateImageView({
           an overlay on the wrapper would reach down over the caption, and the
           caption is not part of the picture. */}
       <span className="rich-media-image-frame" contentEditable={false}>
-        {src ? (
+        {src && video ? (
+          <video src={src} controls preload="metadata" />
+        ) : src ? (
           <button
             type="button"
             className="rich-media-image-open"
@@ -657,8 +668,8 @@ function PrivateImageView({
         <button
           type="button"
           className="rich-media-remove"
-          aria-label="Remove image"
-          title="Remove image"
+          aria-label={video ? "Remove video" : "Remove image"}
+          title={video ? "Remove video" : "Remove image"}
           onClick={deleteNode}
           contentEditable={false}
         >
@@ -670,12 +681,19 @@ function PrivateImageView({
           {ink.tools}
         </span>
       )}
+      {ink.menu}
       {alt && alt !== "Image" && <span className="rich-media-caption">{alt}</span>}
     </NodeViewWrapper>
   );
 }
 
-function PrivateFileView({ node, extension, deleteNode, editor }: NodeViewProps) {
+function PrivateFileView(props: NodeViewProps) {
+  if (attachmentType(String(props.node.attrs.label)).startsWith("video/"))
+    return <PrivateImageView {...props} />;
+  return <PrivateAttachmentView {...props} />;
+}
+
+function PrivateAttachmentView({ node, extension, deleteNode, editor }: NodeViewProps) {
   const { objectId, label } = node.attrs as { objectId: string; label: string };
   const options = extension.options as PrivateFileOptions;
   const [status, setStatus] = useState("Private attachment · opens in a new tab");
@@ -843,6 +861,23 @@ function useInk({
   const [nib, setNib] = useState<number>(lastNib);
   const [marker, setMarker] = useState<boolean>(lastMarker);
   const [erasing, setErasing] = useState(false);
+  const [selectedStroke, setSelectedStroke] = useState<{
+    stroke: DrawingStroke;
+    x: number;
+    y: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!selectedStroke) return;
+    const close = () => setSelectedStroke(null);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [selectedStroke]);
   const surface = useRef<SVGSVGElement>(null);
   /* The line being drawn right now is written straight onto its own element.
      It was a piece of React state, which meant a render of the whole layer for
@@ -1005,6 +1040,8 @@ function useInk({
       trail.current = [];
       snapped.current = null;
       write([...live.current, { d: committed, color: laid, width }]);
+      // A page stroke may have moved entirely to media, leaving this layer unchanged.
+      paint("");
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
@@ -1016,6 +1053,16 @@ function useInk({
       {strokes.map((stroke, index) => (
         <path
           key={index}
+          className={editable ? "ink-stroke" : undefined}
+          onPointerDown={
+            editable
+              ? (event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  setSelectedStroke({ stroke, x: event.clientX, y: event.clientY });
+                }
+              : undefined
+          }
           d={stroke.d}
           fill="none"
           stroke={stroke.color}
@@ -1125,7 +1172,33 @@ function useInk({
     </>
   );
 
-  return { surface, box, start, inked, tools, erasing };
+  const menu =
+    selectedStroke && editable
+      ? createPortal(
+          <div
+            role="menu"
+            className="ink-delete-menu"
+            style={{
+              left: Math.min(selectedStroke.x, window.innerWidth - 175),
+              top: Math.min(selectedStroke.y, window.innerHeight - 60),
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                write(live.current.filter((stroke) => stroke !== selectedStroke.stroke));
+                setSelectedStroke(null);
+              }}
+            >
+              Remove drawing
+            </button>
+          </div>,
+          document.body,
+        )
+      : null;
+  return { surface, box, start, inked, tools, erasing, menu };
 }
 
 function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
@@ -1144,15 +1217,57 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
   useEffect(() => {
     if (!onPage) return;
     const take = () => setPen(true);
-    window.addEventListener(TAKE_UP_THE_PEN, take);
-    return () => window.removeEventListener(TAKE_UP_THE_PEN, take);
-  }, [onPage]);
+    editor.view.dom.addEventListener(TAKE_UP_THE_PEN, take);
+    return () => editor.view.dom.removeEventListener(TAKE_UP_THE_PEN, take);
+  }, [onPage, editor]);
 
   const write = useCallback(
-    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
-    [updateAttributes],
+    (next: DrawingStroke[]) => {
+      if (!onPage || next.length !== strokes.length + 1) {
+        updateAttributes({ strokes: JSON.stringify(next) });
+        return;
+      }
+      const page = editor.view.dom.getBoundingClientRect();
+      const frames = Array.from(
+        editor.view.dom.querySelectorAll<HTMLElement>(".rich-media-image-frame"),
+      )
+        .map((element) => {
+          const wrapper = element.closest("[data-node-view-wrapper]")!;
+          const pos = editor.view.posAtDOM(wrapper, 0);
+          return { rect: element.getBoundingClientRect(), pos, node: editor.state.doc.nodeAt(pos) };
+        })
+        .filter(
+          (frame) => frame.node && ["privateImage", "privateFile"].includes(frame.node.type.name),
+        );
+      const stroke = next[next.length - 1];
+      const sections = splitMediaStroke(
+        stroke,
+        page,
+        frames.map((frame) => frame.rect),
+      );
+      const tr = editor.state.tr;
+      for (let index = 0; index < frames.length; index++) {
+        const added = sections
+          .filter((section) => section.target === index)
+          .map((section) => section.stroke);
+        if (!added.length) continue;
+        const frame = frames[index];
+        tr.setNodeMarkup(frame.pos, undefined, {
+          ...frame.node!.attrs,
+          strokes: JSON.stringify([...drawingStrokes(frame.node!.attrs.strokes), ...added]),
+        });
+      }
+      if (tr.docChanged) editor.view.dispatch(tr);
+      updateAttributes({
+        strokes: JSON.stringify([
+          ...strokes,
+          ...sections.filter((section) => section.target === -1).map((section) => section.stroke),
+        ]),
+      });
+    },
+    [updateAttributes, onPage, strokes, editor],
   );
-  const { surface, box, start, inked, tools, erasing } = useInk({
+  const { surface, box, start, inked, tools, erasing, menu } = useInk({
     strokes,
     write,
     fit: onPage ? "width" : "board",
@@ -1174,6 +1289,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
   if (onPage) {
     return (
       <NodeViewWrapper className="drawing-overlay" contentEditable={false}>
+        {menu}
         <svg
           ref={surface}
           className={`drawing-overlay-surface ${pen && !erasing ? "is-drawing" : ""} ${
@@ -1238,6 +1354,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
 
   return (
     <NodeViewWrapper className="rich-media-drawing">
+      {menu}
       <span className="rich-media-drawing-sheet" contentEditable={false}>
         <svg
           ref={surface}
@@ -1354,6 +1471,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onChange,
     onLocalEdit,
     onPasteImage,
+    onPasteImageSource,
+    onPasteError,
     onOpenLink,
     onComment,
     writeLockOwner = null,
@@ -1371,6 +1490,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const onChangeRef = useRef(onChange);
   const onLocalEditRef = useRef(onLocalEdit);
   const onPasteImageRef = useRef(onPasteImage);
+  const pasteSourceRef = useRef(onPasteImageSource);
+  pasteSourceRef.current = onPasteImageSource;
+  const pasteErrorRef = useRef(onPasteError);
+  pasteErrorRef.current = onPasteError;
   const appliedRevision = useRef(revision);
   const formatRef = useRef<(action: FormatAction) => void>(() => undefined);
   onChangeRef.current = onChange;
@@ -1382,6 +1505,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       privateImageExtension(resolveImage, (src, alt) => setPreview({ src, alt })),
       privateFileExtension(resolveFile),
       drawingExtension(),
+      mediaPaste({
+        upload: (file) => onPasteImageRef.current?.(file) ?? Promise.resolve(null),
+        load: (src) => pasteSourceRef.current?.(src) ?? Promise.resolve(null),
+        error: (message) => pasteErrorRef.current?.(message),
+      }),
     ],
     [resolveFile, resolveImage],
   );
@@ -1496,28 +1624,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
           return false;
         },
-        handlePaste(view, event) {
-          const clipboard = event.clipboardData;
-          const item = Array.from(clipboard?.items ?? []).find((candidate) =>
-            candidate.type.startsWith("image/"),
-          );
-          const file =
-            item?.getAsFile() ??
-            Array.from(clipboard?.files ?? []).find((candidate) =>
-              candidate.type.startsWith("image/"),
-            );
-          if (!file || !onPasteImageRef.current || !view.editable) return false;
-          event.preventDefault();
-          void onPasteImageRef.current(file).then((prepared) => {
-            if (!prepared || view.isDestroyed) return;
-            const node = view.state.schema.nodes.privateImage?.create({
-              objectId: prepared.objectId,
-              alt: prepared.alt,
-            });
-            if (node) view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView());
-          });
-          return true;
-        },
       },
       onUpdate({ editor: current, transaction }) {
         if (!transaction.docChanged) return;
@@ -1581,7 +1687,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           if (child.type.name === "drawing" && child.attrs.surface === "page") existing = true;
           return !existing;
         });
-        if (existing) window.dispatchEvent(new Event(TAKE_UP_THE_PEN));
+        if (existing) editor.view.dom.dispatchEvent(new Event(TAKE_UP_THE_PEN));
         else {
           /* The view for this layer has not mounted yet, so there is nothing
              to announce it to. It reads this instead, once. */
@@ -1607,6 +1713,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   useImperativeHandle(
     ref,
     () => ({
+      async exportNote(format, title) {
+        if (!editor) return;
+        const { saveNoteExport } = await import("@/features/editor/lib/exportNote");
+        await saveNoteExport(format, title, editor.getJSON(), editor.view.dom, resolveImage);
+      },
       format(action) {
         format(action);
       },
@@ -1748,7 +1859,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor?.commands.focus();
       },
     }),
-    [editor, format, readOnly],
+    [editor, format, readOnly, resolveImage],
   );
 
   useEffect(() => {

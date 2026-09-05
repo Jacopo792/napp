@@ -16,6 +16,7 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -406,4 +407,13 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+ipcMain.handle("napp:clipboard", () => {
+  const image = clipboard.readImage();
+  return {
+    html: clipboard.readHTML(),
+    text: clipboard.readText(),
+    image: image.isEmpty() ? null : image.toPNG(),
+  };
 });

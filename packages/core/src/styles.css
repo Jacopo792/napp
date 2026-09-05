@@ -6292,11 +6292,6 @@
   box-shadow: none;
 }
 
-.rich-text-content .rich-media-image.ProseMirror-selectednode .rich-media-image-open,
-.rich-text-content .rich-media-image.ProseMirror-selectednode .rich-media-loading {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
-}
 /* A drawing's ring goes on the sheet, for the reason a picture's does: the
    wrapper also holds the row of tools, and a ring round the wrapper drew a
    blue halo round the palette — which reads as the colour you had just
@@ -7642,4 +7637,43 @@
 
   /* The switch is in the window's own strip now, not in the column, so it is
      not sized against the rows any more and does not come down with them. */
+}
+
+/* Page ink is an overlay, including when ProseMirror selects its node. */
+.rich-text-content .drawing-overlay {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+.drawing-overlay-tools.is-put-away {
+  display: none;
+}
+.ink-stroke {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.is-drawing .ink-stroke,
+.is-erasing .ink-stroke {
+  pointer-events: none;
+}
+.ink-delete-menu {
+  position: fixed;
+  z-index: 1000;
+  padding: 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+.rich-media-image-frame video {
+  display: block;
+  width: 100%;
+  max-height: 34rem;
+}
+/* ReactNodeViewRenderer puts selection on the outer, zero-height wrapper. */
+.rich-text-content .node-drawing.ProseMirror-selectednode,
+.rich-text-content .node-privateImage.ProseMirror-selectednode,
+.rich-text-content .node-privateFile.ProseMirror-selectednode {
+  box-shadow: none;
+  outline: none;
 }

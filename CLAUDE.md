@@ -29,7 +29,7 @@ one has two real implementations from the day it was written: `webOrigin`,
 `inviteToken`, `saveFile`, `saveFolder`, `openFile`, `print`. Each shell calls
 `setPlatform()` before mounting.
 
-And a seventh that is **optional**, which is a different kind of member.
+And two more that are **optional**, which is a different kind of member.
 `popUpMenu` hands a menu to the window manager: an `NSMenu` is painted by the
 window server over the window, in the material the system is wearing that year,
 and a `<div>` reaches only what is behind it in the page. There is no browser
@@ -37,9 +37,20 @@ implementation to write, so there is none — and `platform().popUpMenu` being
 falsy is the capability test, where a member returning a sentinel would have
 made every caller carry a third case. See _A menu, described once_ below.
 
+`readClipboard` is the same shape for the same reason. A `paste` event's own
+`clipboardData` is identical in both shells — that path needs no member — but
+it sometimes carries neither `text/html` nor a decodable image `File`, which is
+the common shape of a screenshot the operating system put on the clipboard
+rather than a browser. No web API can be asked for the system clipboard's own
+representations the way a paste handler can be asked for its event; Electron's
+`clipboard.readImage()` and `readHTML()` can, over IPC. So it is read only as a
+fallback, when the event itself came up empty — never on its own, and never to
+second-guess a paste that already had something to say. See _Pasting into a
+note_ below.
+
 **Do not widen it for something both shells do the same way.** `import.meta.env`,
-`localStorage`, IndexedDB, the clipboard and the pdf.js worker are all
-deliberately absent: both shells are Vite over Chromium, so those resolve
+`localStorage`, IndexedDB, the ordinary paste event and the pdf.js worker are
+all deliberately absent: both shells are Vite over Chromium, so those resolve
 identically, and what differs is the values in a `.env` file. A member with two
 identical implementations is an interface that has stopped describing a
 boundary and started describing a habit.
@@ -349,10 +360,65 @@ up. The words underneath stay words.
   callback at all — not even the first — for an SVG sized entirely by its
   parent, so a layer that measured itself stayed the shape of a board and the
   ink landed below the hand.
+- **A page stroke that crosses a picture belongs to the picture.** The general
+  brush draws on `.rich-media-image-ink` too now, and `splitMediaStroke()` in
+  `mediaInk.ts` is what decides whose coordinate space a segment lands in: it
+  walks the stroke's own points, cuts it at every media rectangle's edge, and
+  re-expresses each piece in that target's own box — the picture's strokes are
+  `privateFile.strokes`/`privateImage.strokes`, not the page's, so the mark
+  keeps following the picture if it moves. Position and width are converted by
+  the same two factors (screen-pixels-per-box-unit, then box-units-per-target-
+  pixel), because a stroke drawn at the pointer's real width over a picture
+  rendered small is genuinely a wide stroke in that picture's own 1000-unit
+  box — which is why `drawingStrokes()`'s sanity bound on a stored width is the
+  whole box width and not the on-screen pen's own 40, and why a hostile width
+  has to be well past that to be worth rejecting rather than trusted as a
+  legitimate rescale.
 
 Searching folds the marks off its letters, both sides (`fold()` in
 `format.ts`): `perche` finds "perché", which is how it is typed by anybody in a
 hurry, and this archive is written in Italian.
+
+## Pasting into a note
+
+A paste that degrades to plain text lost the reason to copy from a web page.
+`mediaPaste` in `paste.ts` reads the clipboard's own HTML, walks its `<img>`
+elements, and swaps in the note's own `napp-private-image` before the
+ProseMirror slice is ever built — so what lands in the document is already the
+note's reference, at exactly the selection the paste happened at.
+
+A single image is the easy case: one `<img>` in the HTML and one `File` on the
+clipboard are the same picture, so it uploads the file directly rather than
+re-fetching the `src` the browser already decoded once. Everything else — more
+than one image, or an `<img>` with no accompanying `File` — goes through
+`loadPastedImage()`, which is the one place a source decides how it is
+fetched: a `data:` or `blob:` URL is already local and is simply read; an
+`https:` URL is not this app's to fetch from the browser, for CORS (most sites
+never send `Access-Control-Allow-Origin` on an image) and because a signed-in
+browser fetching an arbitrary third party's URL on the user's behalf is the
+exact request a malicious page would want. So it goes to `/import-image` on
+the collaboration server instead, carrying the caller's own bearer token.
+
+**`/import-image` is not a generic proxy.** `importImage()` in
+`packages/collab-server/src/importImage.ts` accepts only `https:`, refuses a
+port other than 443, credentials in the URL, and more than three redirects,
+and resolves the hostname itself so `publicAddress()` can refuse the private
+and reserved ranges before the request is ever sent — then pins that resolved
+address for the actual connection, so a second, different answer at request
+time cannot reintroduce what the check just refused. Every redirect hop is
+revalidated the same way rather than trusted. The endpoint sits behind the
+same `originAllowed()` and the same `authorize()` the websocket path uses, so
+importing an image is exactly as authorized as writing the note it lands in —
+a read-only member, a trashed note, or an archived note somebody has hidden
+refuses the fetch as the write it actually is, and it is checked fresh rather
+than off a cached grant. The response is capped at 20 MB, timed out at 15
+seconds for the connection and 60 for the caller, and never cached.
+
+`readClipboard` (see _One app, two shells_ above) is the fallback for the one
+shape a `paste` event's own `clipboardData` cannot describe: a screenshot the
+operating system put on the clipboard rather than a browser, which often
+carries no `text/html` and no decodable image `File`. The handler reaches for
+it only when the event itself came up empty.
 
 ## The shelf and the waiting room
 
@@ -1231,6 +1297,63 @@ test` runs under `node --experimental-strip-types`, which does not resolve an
 extensionless relative import; `allowImportingTsExtensions` is already on, so
 the extension costs nothing and is what makes a source file testable.
 
+## Attachments and exports
+
+The Attachments menu (the paperclip) is where a note gains a PDF or a video, and
+where it leaves as a DOCX or a PDF — four things behind one button because they
+share the one piece of code that decides what a `File` is:
+`assertAttachable()`/`attachmentType()` in `attachments.ts` read the **name's
+extension**, never `file.type`, because a browser's own MIME sniffing is not
+consistent across platforms for the same file, and the check has to hold before
+either shell has looked at the bytes. Video joined PDF as an attachment rather
+than becoming its own node type: the `privateFile` node already carries an
+`objectId` in the same private per-archive bucket, so a video is a `privateFile`
+whose `attachmentType()` happens to return `video/*`, not a new schema member.
+`supabase/migrations/20260905010000_video_attachments.sql` only widens the
+bucket's `allowed_mime_types`; nothing about the read or write path changed.
+`privateFile` also carries a `strokes` attribute now, for the same reason
+`privateImage` does — see _A drawing in the note_ above — so a video, like a
+picture, can be marked up.
+
+`exportNote.ts` is a second, self-contained renderer for the two formats that
+have no browser API to lean on the way `@media print` does for PDF (see
+_Printing is one of the two PDF exports_ in _Interface notes worth knowing_).
+
+- **DOCX has no equivalent to walk toward, so it walks the Tiptap JSON
+  directly.** `exportDocx()`'s `blocks()` is a small recursive match on node
+  type — paragraph, heading, list, table, image, drawing, `privateFile` — built
+  with the `docx` package rather than assembled as XML by hand, and `inline()`
+  does the same for marks (bold, italic, colour, links) inside a paragraph. A
+  picture or a drawing is rasterised through the same `picture()` helper the
+  PDF path uses, so both formats show a drawing's ink over its picture the same
+  way the editor does — which is also where a picture's ink stops staying out
+  of an export the way _A drawing in the note_ says a plain Markdown export
+  leaves it out: DOCX and PDF carry real pixels, so there is something for the
+  ink to be drawn onto.
+- **PDF has a renderer (`html2canvas`) but no pagination, so `exportPdf()`
+  supplies its own.** It clones the live DOM rather than re-deriving the note
+  from its JSON — so it needs no second serializer to keep in step with the
+  editor — restyles the clone from each node's own `getComputedStyle()` rather
+  than trusting a stylesheet the clone does not carry, and strips the editing
+  chrome (`.rich-media-remove`, drawing toolbars, the gap cursor) that
+  `getComputedStyle` cannot know is not part of the note. A page break has to
+  land between two lines or two blocks, never through one, so the break points
+  are gathered by walking every text node's `getClientRects()` and every
+  image's bottom edge **before** any page is rasterised, and each page is then
+  `html2canvas`'d separately at the nearest gathered break under the limit —
+  one call per page rather than one for the whole note, because a single
+  multi-thousand-pixel canvas is the slow and memory-heavy way to get the same
+  pixels. A video attachment renders as a plain caption; a `<video>` element is
+  not a document.
+- **Both formats are written to disk the same way Markdown is** — through
+  `platform().saveFile()`, never a second download mechanism — but a PDF export
+  can take far longer than the click that started it: `html2canvas` at 2×
+  scale, once per page, is real rendering work, and a note of any length is
+  worth ten seconds or more before the file appears. `NoteEditor.tsx` shows
+  "Exporting…" for exactly this reason; the absence of a progress bar is
+  deliberate, not an oversight — the status line already says what is
+  happening, and a bar over an indeterminate render is a number that lies.
+
 ## The retired encrypted format
 
 The archive was encrypted once and is not any more. Every note, folder, tag and
@@ -1347,10 +1470,13 @@ of a narrow window spent on air.
 - **A `1fr` grid track is floored at its content's min-content width.** Use
   `minmax(0, 1fr)`. The phone's Settings column ran off the side of the panel
   and took every control with it for exactly this reason.
-- **Printing is the PDF export.** Every browser prints to PDF, so the whole of
-  it is one `@media print` block deciding what is _not_ the note — and giving
-  the scroll box back its height and overflow, or the printer is handed one
-  screenful and told the rest is off-page.
+- **Printing is one of the two PDF exports.** The ⋯ menu's "Print or save as
+  PDF" is every browser's own print-to-PDF, so the whole of it is one
+  `@media print` block deciding what is _not_ the note — and giving the scroll
+  box back its height and overflow, or the printer is handed one screenful and
+  told the rest is off-page. The Attachments menu's "Export as PDF" is a
+  second, unrelated path that never opens the print dialog at all; see
+  _Attachments and exports_ below for why it needed one.
 - **The toolbar does not magnify, and that was a decision rather than a gap.**
   The two pills were a dock: the icon under the pointer grew, its neighbours
   grew less, the rest stepped aside. It is gone at the reader's request, and

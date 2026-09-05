@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("napp", {
    *  this bridge, and a Uint8Array does. */
   save: (files, fallbackName) => ipcRenderer.invoke("napp:save", files, fallbackName),
   open: (name, bytes) => ipcRenderer.invoke("napp:open", name, bytes),
+  readClipboard: () => ipcRenderer.invoke("napp:clipboard"),
   print: () => ipcRenderer.invoke("napp:print"),
   /* Colour is deliberately a one-way cosmetic message, not a privileged
    * capability. The main process validates it before painting the frame. */

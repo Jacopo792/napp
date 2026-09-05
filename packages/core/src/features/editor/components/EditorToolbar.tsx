@@ -57,6 +57,7 @@ interface Props {
   onImportMarkdown: () => void;
   onImportPdfText: () => void;
   onChoosePhoto: () => void;
+  onExport: (format: "pdf" | "docx") => void;
   /** Off takes the proofreading row out of the text menu altogether. */
   proofreaderEnabled: boolean;
   onProofread: () => void;
@@ -109,6 +110,7 @@ export function EditorToolbar({
   onImportMarkdown,
   onImportPdfText,
   onChoosePhoto,
+  onExport,
   proofreaderEnabled,
   onProofread,
   linkForm,
@@ -394,6 +396,22 @@ export function EditorToolbar({
           "Attachments",
           "right",
           <>
+            <Row
+              icon={<Paperclip size={16} />}
+              label="Export as DOCX"
+              onClick={() => {
+                setOpen(null);
+                onExport("docx");
+              }}
+            />
+            <Row
+              icon={<Paperclip size={16} />}
+              label="Export as PDF"
+              onClick={() => {
+                setOpen(null);
+                onExport("pdf");
+              }}
+            />
             {/* Importing is the one people reach for, so it is the first thing
                 under the clip rather than the afterthought below a rule. The
                 paragraph that used to explain the difference is gone: the two
@@ -419,7 +437,7 @@ export function EditorToolbar({
             <div className="menu-separator" />
             <Row
               icon={<FileText size={16} />}
-              label="Attach PDF"
+              label="Attach PDF or video"
               onClick={() => {
                 setOpen(null);
                 onAttachPdf();

@@ -5,6 +5,31 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+## 0.3.0 — 2026-09-05
+
+### Added
+
+- **Attach a video.** MP4, WebM and MOV join PDF as note attachments, in the
+  same private bucket and the same Attachments menu.
+- **Export a note as DOCX or PDF**, from the Attachments menu — a full
+  rendering of the note's own formatting, images and drawings, independent of
+  the browser's print-to-PDF.
+- **Pasting a picture keeps its formatting and its place.** Copying from a web
+  page now carries the surrounding HTML and inserts the image where it was
+  pasted, instead of dropping to plain text. An image from another site is
+  fetched through the collaboration server rather than the browser, so it
+  works regardless of that site's CORS policy. A screenshot copied on the
+  desktop app pastes as an image too.
+- The general drawing brush now marks up a picture or a video's own thumbnail
+  when a stroke crosses it, the same way it already could a `drawing` node.
+- A single stroke can be selected and deleted on its own, without erasing
+  around it or clearing the whole layer.
+
+### Fixed
+
+- A drawing's in-progress line no longer lingers on screen when the stroke
+  that finished it moved entirely onto a picture underneath.
+
 ## 0.2.2 — 2026-09-05
 
 ### Fixed
