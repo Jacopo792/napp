@@ -30,7 +30,9 @@ Use it in the browser at <https://jacopo792.github.io/note-sharing-app/>: there 
 nothing to install and it is always up to date. If you would rather have it in its own
 window, there is a desktop app too.
 
-![Desktop sign-in screen](docs/desktop-sign-in.png)
+![Sign-in screen](docs/sign-in-preview.png)
+
+![Notes workspace](docs/notes-workspace-preview.png)
 
 **[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/note-sharing-app/releases/latest)**
 
@@ -47,7 +49,7 @@ Intel Macs and Windows have their own file on the same release page.
 
 ## Make it yours
 
-![Appearance settings](docs/customisation-preview-v2.png)
+![Appearance settings](docs/appearance-settings-preview.png)
 
 Start with a ready-made palette or choose your own colours, theme and wallpaper. You
 can also change the reading width, text size, line spacing and weight until longer
