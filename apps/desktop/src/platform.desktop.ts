@@ -10,7 +10,12 @@ interface Bridge {
   ): Promise<SavedAs | undefined>;
   open(name: string, bytes: Uint8Array): Promise<string | null>;
   print(): Promise<void>;
-  readClipboard(): Promise<{ html: string; text: string; image: Uint8Array | null }>;
+  readClipboard(): Promise<{
+    html: string;
+    text: string;
+    image: Uint8Array | null;
+    imageType: string;
+  }>;
   popUpMenu(items: SystemMenuItem[]): Promise<string | null>;
 }
 
@@ -63,7 +68,7 @@ export const desktopPlatform: Platform = {
             ...(data.image
               ? {
                   image: new File([new Uint8Array(data.image)], "Pasted image.png", {
-                    type: "image/png",
+                    type: data.imageType || "image/png",
                   }),
                 }
               : {}),

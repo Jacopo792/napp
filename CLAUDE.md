@@ -43,10 +43,10 @@ it sometimes carries neither `text/html` nor a decodable image `File`, which is
 the common shape of a screenshot the operating system put on the clipboard
 rather than a browser. No web API can be asked for the system clipboard's own
 representations the way a paste handler can be asked for its event; Electron's
-`clipboard.readImage()` and `readHTML()` can, over IPC. So it is read only as a
-fallback, when the event itself came up empty — never on its own, and never to
-second-guess a paste that already had something to say. See _Pasting into a
-note_ below.
+asynchronous `clipboard.read()` can, over IPC. So it is read only as a
+fallback, when the event itself came up empty or its HTML names an image without
+carrying the image bytes — never for ordinary text or rich text without images.
+See _Pasting into a note_ below.
 
 **Do not widen it for something both shells do the same way.** `import.meta.env`,
 `localStorage`, IndexedDB, the ordinary paste event and the pdf.js worker are

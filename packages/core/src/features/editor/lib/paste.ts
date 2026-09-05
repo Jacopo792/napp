@@ -2,8 +2,10 @@ import { Extension } from "@tiptap/core";
 import { DOMParser as ProseMirrorParser, Fragment, Slice } from "@tiptap/pm/model";
 import { Plugin, type SelectionBookmark } from "@tiptap/pm/state";
 import { platform } from "@/platform";
+import { pasteMediaDecision } from "./pasteDecision";
 
 type Prepared = { objectId: string; alt: string };
+
 /** Keep the original paste selection mapped while media is saved, even if the user types. */
 export function mediaPaste(options: {
   upload: (file: File) => Promise<Prepared | null>;
@@ -38,17 +40,23 @@ export function mediaPaste(options: {
                   const file = item.type.startsWith("image/") ? item.getAsFile() : null;
                   if (file) files.push(file);
                 }
-              /* Electron exposes rich copied text as HTML but commonly omits
-                 the image bytes from the renderer ClipboardEvent. Its native
-                 clipboard still has them, so use that fallback even when HTML
-                 is present. Web has no native bridge and remains unchanged. */
               const native = platform().readClipboard;
-              if (!/<img\b/i.test(html) && !files.length && !native) return false;
+              const decision = pasteMediaDecision({
+                html,
+                text,
+                fileCount: files.length,
+                hasNativeClipboard: !!native,
+              });
+              /* Electron exposes copied rich text as HTML but can omit the
+                 corresponding image File. Its native clipboard is then the
+                 fallback. Do not invoke it for ordinary text/rich-text paste:
+                 doing so intercepts ProseMirror's normal paste path. */
+              if (!decision.handle) return false;
               event.preventDefault();
               const job = { bookmark: view.state.selection.getBookmark() };
               jobs.add(job);
               void (async () => {
-                const fallback = native ? await native() : null;
+                const fallback = decision.readNative && native ? await native() : null;
                 const markup = html || fallback?.html || "";
                 if (!files.length && fallback?.image) files.push(fallback.image);
                 const dom = new DOMParser().parseFromString(markup, "text/html");

@@ -409,11 +409,39 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-ipcMain.handle("napp:clipboard", () => {
-  const image = clipboard.readImage();
+ipcMain.handle("napp:clipboard", async () => {
+  /* Electron 44 removed readHTML/readImage in favour of the W3C-shaped,
+     asynchronous ClipboardItem API. Read one snapshot so all representations
+     belong to the same copy operation. */
+  const items = await clipboard.read();
+
+  async function textRepresentation(type) {
+    for (const item of items) {
+      if (!item.types.includes(type)) continue;
+      const value = await item.getType(type);
+      if (typeof value === "string") return value;
+      if (value && typeof value.text === "function") return value.text();
+    }
+    return "";
+  }
+
+  let image = null;
+  let imageType = "";
+  for (const item of items) {
+    const type = item.types.find((candidate) => candidate.startsWith("image/"));
+    if (!type) continue;
+    const value = await item.getType(type);
+    if (value && typeof value.arrayBuffer === "function") {
+      image = Buffer.from(await value.arrayBuffer());
+      imageType = value.type || type;
+      break;
+    }
+  }
+
   return {
-    html: clipboard.readHTML(),
-    text: clipboard.readText(),
-    image: image.isEmpty() ? null : image.toPNG(),
+    html: await textRepresentation("text/html"),
+    text: await textRepresentation("text/plain"),
+    image,
+    imageType,
   };
 });

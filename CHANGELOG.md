@@ -3,6 +3,16 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.3.5 — 2026-09-05
+
+### Fixed
+
+- **Copy and paste works again in the desktop app.** The native clipboard
+  fallback now uses Electron 44's asynchronous `clipboard.read()` API instead
+  of the removed `readImage()` and `readHTML()` helpers. Ordinary text and rich
+  text without images stay on the editor's normal paste path, while copied
+  images retain their actual MIME type when the native fallback is needed.
+
 ## 0.3.4 — 2026-09-05
 
 ### Fixed
