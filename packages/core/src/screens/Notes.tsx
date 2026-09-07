@@ -3037,15 +3037,15 @@ export default function NotesPage() {
   );
 
   /* What the header says about the note, beside the pill of things it can do:
-     whether the last write landed, and who else is reading over your shoulder. */
+     whether the last write landed. Who else is reading starts the header,
+     beside the window navigation. */
   const noteStatus = selected ? (
-    <>
-      <span className="flex shrink-0 items-center overflow-hidden">
-        {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
-      </span>
-      {noteReaders}
-    </>
+    <span className="flex shrink-0 items-center overflow-hidden">
+      {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
+    </span>
   ) : null;
+
+  const notePresence = selected ? noteReaders : null;
 
   /* Adding a cover is one of the acts the note's own menu carries. Offered
      only while there is not one: a cover carries its own Change and Remove. */
@@ -3242,6 +3242,7 @@ export default function NotesPage() {
                       </button>
                     }
                     headerStatus={noteStatus}
+                    headerPresence={notePresence}
                     headerActions={noteActions}
                     synced={collaborative.ready}
                     session={session}
@@ -3443,6 +3444,7 @@ export default function NotesPage() {
                 ) : null
               }
               headerStatus={noteStatus}
+              headerPresence={notePresence}
               headerActions={noteActions}
               synced={collaborative.ready}
               session={session}

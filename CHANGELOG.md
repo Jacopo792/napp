@@ -3,16 +3,24 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
-## 0.3.7 — 2026-09-08
+## 0.3.8 — 2026-09-08
 
 ### Fixed
 
 - **The formatting toolbar stays with the page controls in narrow note panes.**
-  It remains in the editor header alongside navigation, comments, search and
-  note actions instead of creating a second toolbar row.
+  It remains centred in the editor header alongside navigation, comments,
+  search and note actions instead of creating a second toolbar row.
+- **Live presence starts the editor header.** Collaborator avatars sit at the
+  left edge, leaving the formatting toolbar centred.
 - **Settings stays responsive under fast input.** Rapid section changes no
   longer replay a page entrance or repeatedly re-measure the navigation, and
   rapid appearance changes are coalesced before the next paint.
+
+## 0.3.7 — 2026-09-08
+
+### Fixed
+
+- Kept compact editor controls in one toolbar row.
 
 ## 0.3.6 — 2026-09-08
 

@@ -1973,9 +1973,9 @@
 /* ── Who else is in this note ────────────────────────────────────────────────
    The pill is the shape identity already has in this interface, so the other
    person arrives as one: their face, and a caret when they are actually
-   typing. It sits on the right, with the other things this toolbar says about
-   the state of the note — "Live", the time of the last write — rather than on
-   the left, which is about you.
+   typing. It starts the editor header, beside the window navigation: presence
+   is part of where you are, while the centred writing toolbar and the page
+   actions stay clear of it.
 
    No name on it. Sharing that side with the save readout and two buttons
    leaves the name about fifty pixels short of legible, and a name crushed to a
@@ -5774,14 +5774,15 @@
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
 .editor-toolbar-compact-tools {
-  display: flex;
-  flex: none;
-  margin-inline: auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-/* The compact arrangement shares one header with page actions. The toolbar's
-   popovers stay above those siblings, but their anchor never turns into a
-   second bar that costs the note another row of vertical space. */
+/* The compact arrangement shares one header with page actions, but is centred
+   against the editor itself — never against whatever space remains before the
+   right-hand controls. Its popovers stay above those siblings, while the
+   anchor never turns into a second bar that costs the note vertical space. */
 .editor-toolbar-compact-tools .editor-tool-cluster {
   position: relative;
   z-index: 1;

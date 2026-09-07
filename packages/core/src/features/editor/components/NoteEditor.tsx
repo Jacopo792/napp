@@ -67,11 +67,13 @@ interface Props {
   resolveImage: (imageId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
-  /** What the header says about the note — the save readout, the faces of who
-   *  else is on it. It stands beside the controls rather than inside them: a
-   *  dock magnifies what a pointer can press, and neither of these is a
-   *  button. */
+  /** What the header says about the note — the save readout. It stands beside
+   *  the controls rather than inside them: a dock magnifies what a pointer can
+   *  press, and this is not a button. */
   headerStatus?: ReactNode;
+  /** Who else is in the note. It belongs at the header's leading edge, with
+   *  the window navigation rather than either group of note actions. */
+  headerPresence?: ReactNode;
   headerActions?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
@@ -160,6 +162,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     resolveFile,
     navigationAction,
     headerStatus,
+    headerPresence,
     headerActions,
     onContextMenu,
     onUpdatePageProperties,
@@ -543,13 +546,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <section
         className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
       >
-        {(navigationAction || headerStatus || headerActions) && (
+        {(navigationAction || headerStatus || headerPresence || headerActions) && (
           <header className="editor-toolbar flex h-13 shrink-0 items-center px-4">
             {navigationAction && (
               <span className="flex items-center gap-1">{navigationAction}</span>
             )}
             <span className="ml-auto flex items-center gap-1">
               {headerStatus}
+              {headerPresence}
               {headerActions}
             </span>
           </header>
@@ -618,6 +622,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             that menu now. */}
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
+          {headerPresence}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the
@@ -640,8 +645,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         >
           {/* Everything the note says about itself, in one place. It used to
               say it in two: whether you may write it at the far left of the
-              strip, whether it is saved and who else is here at the far right
-              — one kind of thing, two corners.
+              strip, whether it is saved at the far right — one kind of thing,
+              two corners. Who else is here starts the header beside the
+              window navigation.
 
               No pill on any of it. The readout, the state and the faces are
               what the header says, not what it does, and a pill around

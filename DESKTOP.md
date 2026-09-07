@@ -210,13 +210,13 @@ runner. `pnpm build:desktop` builds only for the machine you are standing at.
 ## Cutting a release
 
 ```bash
-git tag v0.3.7
-git push origin v0.3.7
+git tag v0.3.8
+git push origin v0.3.8
 ```
 
 The tag has to match the version in `apps/desktop/package.json`, because that
 is what electron-builder puts in the filename and a `.dmg` called 0.0.0 hanging
-under a tag called v0.3.7 is a question somebody will have to answer later.
+under a tag called v0.3.8 is a question somebody will have to answer later.
 
 `.github/workflows/release.yml` builds the installers from a matrix of
 `macos-latest` and `windows-latest` – electron-builder cannot cross-compile
