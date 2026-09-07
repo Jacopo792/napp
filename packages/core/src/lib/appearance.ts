@@ -139,6 +139,7 @@ const listeners = new Set<() => void>();
 let current = DEFAULT_APPEARANCE;
 let wallpaperUrl = "";
 let media: MediaQueryList | null = null;
+let appearanceFrame: number | null = null;
 
 function validHex(value: unknown, fallback: string): string {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
@@ -414,6 +415,27 @@ function replaceWallpaperUrl(blob: Blob | null): void {
   applyAppearance();
 }
 
+/* The colour controls can emit much faster than a display can paint. Applying
+   every intermediate palette means recalculating the whole token set, then
+   rerendering every subscriber, for values that never reach a frame. Keep the
+   newest one and commit it once before the next paint. `current` itself still
+   changes synchronously, so another setting composed in the same turn always
+   starts from the value the reader just chose. */
+function commitAppearance(): void {
+  appearanceFrame = null;
+  applyAppearance(current);
+  listeners.forEach((listener) => listener());
+}
+
+function scheduleAppearanceCommit(): void {
+  if (appearanceFrame !== null) return;
+  if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+    commitAppearance();
+    return;
+  }
+  appearanceFrame = window.requestAnimationFrame(commitAppearance);
+}
+
 export function initAppearance(): void {
   media = window.matchMedia("(prefers-color-scheme: dark)");
   media.addEventListener("change", () => current.theme === "system" && applyAppearance());
@@ -428,8 +450,7 @@ export function initAppearance(): void {
 export function setAppearance(next: Appearance): void {
   current = next;
   localStorage.setItem(KEY, JSON.stringify(next));
-  applyAppearance(next);
-  listeners.forEach((listener) => listener());
+  scheduleAppearanceCommit();
 }
 
 export function setTheme(theme: ThemeMode): void {

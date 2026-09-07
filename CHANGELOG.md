@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.3.6 — 2026-09-08
+
+### Fixed
+
+- **The formatting toolbar stays at the top in narrow note panes.** When the
+  editor cannot hold every header group on one row, its writing controls now
+  take the leading row rather than dropping below the note actions.
+- **Settings stays responsive under fast input.** Rapid section changes no
+  longer replay a page entrance or repeatedly re-measure the navigation, and
+  rapid appearance changes are coalesced before the next paint.
+
 ## 0.3.5 — 2026-09-05
 
 ### Changed

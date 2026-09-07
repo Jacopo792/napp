@@ -3341,19 +3341,10 @@
   padding: 20px 0 24px;
 }
 
-/* Changing section changes the page, so it arrives rather than replacing the
-   last one in place. The column is keyed by section in React, so this runs on
-   the swap and nowhere else. */
-.settings-scroll {
-  animation: settings-page var(--dur-base) var(--ease-out) both;
-}
-
-@keyframes settings-page {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
+/* The section changes in place. Re-mounting this scroll box restarted a
+   240ms entrance for every press, so quick navigation showed old pages and
+   moving labels at once. The active marker is enough acknowledgement without
+   delaying the page somebody asked for. */
 
 .theme-picker {
   display: grid;
@@ -5784,6 +5775,14 @@
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
 .editor-format-bar {
   border-bottom: 1px solid var(--rule-soft);
+}
+
+/* When the editor is too narrow for all three header groups, the formatting
+   cluster keeps the first row rather than dropping beneath the note state.
+   Its menus open downward, so it also has to outrank the header immediately
+   after it; otherwise that header catches the first menu rows. */
+.editor-format-bar.is-top {
+  z-index: 50;
 }
 
 .editor-tool-cluster.is-mobile {

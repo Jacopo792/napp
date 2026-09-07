@@ -46,7 +46,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   AXIS_SPECS,
   PRESETS,
@@ -373,27 +373,46 @@ export function SettingsPanel({
      open showed the wash sliding ten pixels down into position under "Profile"
      — the fill that looked wrong until you clicked something else. It travels
      when the section changes and is placed instantly the rest of the time. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const list = navList.current;
     if (!list) return;
 
+    let frame: number | null = null;
     const measure = () => {
+      frame = null;
       const active = list.querySelector<HTMLElement>("button.is-active");
-      setTravelling(placedFor.current !== section);
+      const nextTravelling = placedFor.current !== section;
       placedFor.current = section;
-      setMarker(active ? { top: active.offsetTop, height: active.offsetHeight } : null);
+      const nextMarker = active ? { top: active.offsetTop, height: active.offsetHeight } : null;
+      setTravelling((current) => (current === nextTravelling ? current : nextTravelling));
+      setMarker((current) =>
+        current?.top === nextMarker?.top && current?.height === nextMarker?.height
+          ? current
+          : nextMarker,
+      );
     };
     measure();
+
+    /* A theme change can resize every label in this rail. ResizeObserver may
+       report each child separately; only the last geometry in a frame matters,
+       so measuring each report made rapid clicks visibly chase themselves. */
+    const scheduleMeasure = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(measure);
+    };
 
     /* `border-box`, because the change that started all of this was a change of
        padding — and a content box does not notice one, which is why this
        observer sat there watching the exact element that moved and reported
        nothing. */
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(scheduleMeasure);
     observer.observe(list, { box: "border-box" });
     for (const child of list.children) observer.observe(child, { box: "border-box" });
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [open, section]);
 
   useEffect(() => {
@@ -566,7 +585,7 @@ export function SettingsPanel({
             </button>
           </nav>
 
-          <div key={section} className="settings-scroll">
+          <div className="settings-scroll">
             {section === "profile" && (
               <section>
                 <h3>Profile details</h3>
