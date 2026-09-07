@@ -169,8 +169,8 @@ runners, because electron-builder cannot cross-compile them. Bump the version in
 `apps/desktop/package.json` to match, then:
 
 ```bash
-git tag v0.3.6
-git push origin v0.3.6
+git tag v0.3.7
+git push origin v0.3.7
 ```
 
 The workflow publishes both installers to the repository's Releases.

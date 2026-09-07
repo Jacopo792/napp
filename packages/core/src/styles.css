@@ -5773,16 +5773,18 @@
 }
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
-.editor-format-bar {
-  border-bottom: 1px solid var(--rule-soft);
+.editor-toolbar-compact-tools {
+  display: flex;
+  flex: none;
+  margin-inline: auto;
 }
 
-/* When the editor is too narrow for all three header groups, the formatting
-   cluster keeps the first row rather than dropping beneath the note state.
-   Its menus open downward, so it also has to outrank the header immediately
-   after it; otherwise that header catches the first menu rows. */
-.editor-format-bar.is-top {
-  z-index: 50;
+/* The compact arrangement shares one header with page actions. The toolbar's
+   popovers stay above those siblings, but their anchor never turns into a
+   second bar that costs the note another row of vertical space. */
+.editor-toolbar-compact-tools .editor-tool-cluster {
+  position: relative;
+  z-index: 1;
 }
 
 .editor-tool-cluster.is-mobile {

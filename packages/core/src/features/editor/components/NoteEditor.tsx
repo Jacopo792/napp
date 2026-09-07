@@ -604,18 +604,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onContextMenu={handlePageContextMenu}
       className={`editor-shell flex min-w-0 flex-1 flex-col ${mobile ? "mobile-editor h-full w-full border-0 bg-page" : "soft-pane pane-page"}`}
     >
-      {/* A narrow editor still puts the writing controls in the first band the
-          eye reaches. Keeping this fallback below the page-status header made
-          the cluster jump down a whole row as a pane was narrowed, despite it
-          being the primary thing to do with the note. The two rows remain
-          separate where they need to be — controls never crowd save state or
-          comments — but their order stays stable. */}
-      {!inlineToolbar && toolbar && (
-        <div className="editor-format-bar is-top flex shrink-0 items-center justify-center px-3 py-2">
-          {toolbar}
-        </div>
-      )}
-
       {/* Frontispiece — set over the measure the body will use. */}
       <div
         className={`editor-toolbar relative h-13 shrink-0 px-4 ${
@@ -638,6 +626,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             over a 632px editor the cluster ran fifteen pixels underneath the
             save readout, and no width of readout could have avoided it. */}
         {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
+
+        {/* On a narrower note, keep the writing controls in this same header
+            rather than creating a second strip above or below it. They take
+            the room between navigation and the page actions; the action group
+            stays at the far edge and can never be covered by a toolbar menu. */}
+        {!inlineToolbar && toolbar && <div className="editor-toolbar-compact-tools">{toolbar}</div>}
 
         <span
           className={`flex min-w-0 items-center justify-end gap-2 justify-self-end ${
