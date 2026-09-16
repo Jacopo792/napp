@@ -7130,8 +7130,13 @@
   cursor: crosshair;
 }
 
+/* It wraps, because the row is as long as the tools in it and the column it
+   sits in is as narrow as the reader has dragged it. A strip that overflows
+   takes the last of its tools off the side of the note, where nothing says
+   they are there. */
 .rich-media-drawing-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
   padding-top: 0.4rem;
@@ -7266,8 +7271,14 @@
   bottom: 1.1rem;
   z-index: 1;
   display: flex;
+  /* Wraps rather than running off the column, and stays centred when it does.
+     The pill's ends are drawn by a radius larger than the box, so two rows of
+     it are a rounded rectangle rather than a broken pill. */
+  flex-wrap: wrap;
+  max-width: 100%;
   align-self: center;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--rule);

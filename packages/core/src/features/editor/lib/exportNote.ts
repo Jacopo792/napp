@@ -20,11 +20,18 @@ async function picture(blob: Blob, strokes: DrawingStroke[] = []): Promise<HTMLC
     const scale = canvas.width / 1000;
     ctx.scale(scale, scale);
     for (const stroke of strokes) {
+      const path = new Path2D(stroke.d);
+      /* Under the outline, never over it: a closed shape is its edge, and a
+         fill painted afterwards eats half the line that draws it. */
+      if (stroke.fill) {
+        ctx.fillStyle = stroke.fill;
+        ctx.fill(path);
+      }
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.width;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.stroke(new Path2D(stroke.d));
+      ctx.stroke(path);
     }
     return canvas;
   } finally {

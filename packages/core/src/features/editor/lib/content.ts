@@ -206,6 +206,13 @@ export interface DrawingStroke {
   d: string;
   color: string;
   width: number;
+  /** A closed shape with something in it. Absent is the answer for every
+   *  stroke ever written before there were shapes, which is why it is
+   *  optional rather than `"none"`: a field added to a stored format has to
+   *  mean the same thing when it is missing as when the format had no such
+   *  field, or every note already in the archive is a note that says
+   *  something it never said. */
+  fill?: string;
 }
 
 /* A document arrives from the other member, from an import, or from whatever a
@@ -237,7 +244,8 @@ export function drawingStrokes(value: unknown): DrawingStroke[] {
       typeof stroke.width === "number" && stroke.width > 0 && stroke.width <= DRAWING_BOX.width
         ? stroke.width
         : 5;
-    return [{ d: stroke.d, color, width }];
+    const fill = typeof stroke.fill === "string" && INK.test(stroke.fill) ? stroke.fill : undefined;
+    return [fill ? { d: stroke.d, color, width, fill } : { d: stroke.d, color, width }];
   });
 }
 
@@ -251,7 +259,7 @@ export function drawingSvg(strokes: DrawingStroke[], surface: DrawingSurface = "
   const paths = strokes
     .map(
       (stroke) =>
-        `<path d="${stroke.d}" fill="none" stroke="${stroke.color}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        `<path d="${stroke.d}" fill="${stroke.fill ?? "none"}" stroke="${stroke.color}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
     )
     .join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Drawing">${paths}</svg>`;
@@ -333,18 +341,98 @@ export function drawingInkBox(strokes: DrawingStroke[]): {
   };
 }
 
+/** A shape somebody asked for outright, rather than one a held-still stroke
+ *  turned into.
+ *
+ *  Same four shapes and the same emitted format as `straightenStroke` below —
+ *  `M` and `L` and nothing else, so nothing that reads a stored stroke has to
+ *  learn a curve command, and a shape *is* a stroke: it needs no discriminant,
+ *  no new node kind, and no change to the eraser, the boxes, the media split
+ *  or either exporter. The two share `rectPath` and `ellipsePath` for the same
+ *  reason they share the format: two ways of drawing a rectangle is two
+ *  rectangles to keep the same shape.
+ *
+ *  An arrow is the one shape that is more than its outline, and it is still
+ *  one path: SVG draws a second `M` as a second subpath, `PATH_DATA` admits
+ *  it, and `strokePoints` reads every point of it — so an arrow erases, boxes
+ *  and moves exactly like a line. */
+export type DrawingShape = "line" | "arrow" | "rect" | "ellipse";
+
+const round = (n: number) => Math.round(n);
+
+function rectPath(left: number, top: number, right: number, bottom: number): string {
+  return (
+    `M${round(left)},${round(top)}L${round(right)},${round(top)}` +
+    `L${round(right)},${round(bottom)}L${round(left)},${round(bottom)}L${round(left)},${round(top)}`
+  );
+}
+
+/* Forty-eight segments is smooth at any size a note is read at. */
+function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
+  const steps = 48;
+  let path = "";
+  for (let step = 0; step <= steps; step += 1) {
+    const angle = (step / steps) * Math.PI * 2;
+    path += `${step === 0 ? "M" : "L"}${round(cx + rx * Math.cos(angle))},${round(cy + ry * Math.sin(angle))}`;
+  }
+  return path;
+}
+
+export function shapeStroke(
+  shape: DrawingShape,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  nib = 5,
+): string {
+  if (shape === "rect")
+    return rectPath(
+      Math.min(from.x, to.x),
+      Math.min(from.y, to.y),
+      Math.max(from.x, to.x),
+      Math.max(from.y, to.y),
+    );
+  if (shape === "ellipse")
+    return ellipsePath(
+      (from.x + to.x) / 2,
+      (from.y + to.y) / 2,
+      Math.max(Math.abs(to.x - from.x) / 2, 1),
+      Math.max(Math.abs(to.y - from.y) / 2, 1),
+    );
+
+  const line = `M${round(from.x)},${round(from.y)}L${round(to.x)},${round(to.y)}`;
+  if (shape === "line") return line;
+
+  /* The head is a proportion of the shaft, so a long arrow does not end in a
+     tick — with a floor under the nib, because a head narrower than the line
+     drawing it is a line with a bulge on the end. */
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  if (length < 1) return line;
+  const head = Math.min(Math.max(length * 0.24, nib * 3), 44);
+  const barb = (spread: number) =>
+    `M${round(to.x - head * Math.cos(angle - spread))},${round(to.y - head * Math.sin(angle - spread))}` +
+    `L${round(to.x)},${round(to.y)}`;
+  return `${line}${barb(0.45)}${barb(-0.45)}`;
+}
+
+/** Every point of a stroke moved by the same amount, which is what picking a
+ *  mark up and putting it down somewhere else comes to. The path data is the
+ *  only thing that changes, so a moved arrow is still an arrow and a moved
+ *  fill is still filled. */
+export function translateStroke(d: string, dx: number, dy: number): string {
+  const commands = d.match(/[ML]/g) ?? [];
+  return strokePoints(d)
+    .map((point, index) => `${commands[index] ?? "L"}${round(point.x + dx)},${round(point.y + dy)}`)
+    .join("");
+}
+
 /** A stroke somebody held still at the end of, as the shape they meant.
  *
- *  Three shapes and no more: a line, a rectangle, an ellipse. Which one is
- *  decided by measuring the points against each candidate rather than by
- *  recognising anything — a closed stroke is whichever of the two it sits
- *  closer to, in units of its own half-size so a small circle is judged as
- *  strictly as a large one.
- *
- *  The ellipse is emitted as line segments because `PATH_DATA` above admits
- *  `M` and `L` and nothing else, and a stored format that grows a curve
- *  command is a stored format every reader has to learn. Forty-eight segments
- *  is smooth at any size a note is read at.
+ *  Which shape is decided by measuring the points against each candidate
+ *  rather than by recognising anything — a closed stroke is whichever of the
+ *  two it sits closer to, in units of its own half-size so a small circle is
+ *  judged as strictly as a large one. What it emits is what `shapeStroke`
+ *  emits, because they are the same shapes.
  *
  *  Null means the stroke is too small or too short to have meant a shape,
  *  which is the answer for a tick, a dot, or a scribble. */
@@ -364,8 +452,7 @@ export function straightenStroke(points: { x: number; y: number }[]): string | n
   const first = points[0];
   const last = points[points.length - 1];
   const closed = Math.hypot(last.x - first.x, last.y - first.y) < span * 0.3;
-  const round = (n: number) => Math.round(n);
-  if (!closed) return `M${round(first.x)},${round(first.y)}L${round(last.x)},${round(last.y)}`;
+  if (!closed) return shapeStroke("line", first, last);
 
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
@@ -386,21 +473,8 @@ export function straightenStroke(points: { x: number; y: number }[]): string | n
       ) / half,
   );
 
-  if (squareness < roundness) {
-    return (
-      `M${round(left)},${round(top)}L${round(right)},${round(top)}` +
-      `L${round(right)},${round(bottom)}L${round(left)},${round(bottom)}L${round(left)},${round(top)}`
-    );
-  }
-  const steps = 48;
-  let path = "";
-  for (let step = 0; step <= steps; step += 1) {
-    const angle = (step / steps) * Math.PI * 2;
-    const x = round(cx + rx * Math.cos(angle));
-    const y = round(cy + ry * Math.sin(angle));
-    path += `${step === 0 ? "M" : "L"}${x},${y}`;
-  }
-  return path;
+  if (squareness < roundness) return rectPath(left, top, right, bottom);
+  return ellipsePath(cx, cy, rx, ry);
 }
 
 export const Drawing = Node.create({

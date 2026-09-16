@@ -24,7 +24,9 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import {
+  ArrowUpRight,
   Check,
+  Circle,
   Download,
   Eraser,
   ExternalLink,
@@ -32,7 +34,11 @@ import {
   Highlighter,
   Lock,
   MessageSquarePlus,
+  Minus,
+  Move,
+  PaintBucket,
   Pencil,
+  Square,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -55,12 +61,15 @@ import {
   PrivateImage,
   TEXT_COLOR_VALUE,
   WRITE_LOCK_MARK,
+  type DrawingShape,
   type DrawingStroke,
   type TextColor,
   drawingStrokes,
   drawingSurface,
+  shapeStroke,
   straightenStroke,
   strokePoints,
+  translateStroke,
   richTextToPlainText,
 } from "@/features/editor/lib/content";
 import { attachmentType, attachmentExtension } from "@/features/editor/lib/attachments";
@@ -871,9 +880,27 @@ let lastInk: string = DRAWING_INKS[0];
 let lastNib = 5;
 let lastMarker = false;
 
+/** What the hand is doing. `null` is the pen — the absence of a shape rather
+ *  than a sixth button saying "no shape" — so pressing the shape you are
+ *  holding puts it down, which is how the highlighter and the eraser beside it
+ *  already work. It outlives the drawing for the same reason the ink does. */
+let lastShape: DrawingShape | null = null;
+let lastFilling = false;
+
 /** Three nibs. A slider offers a hundred widths nobody wants to choose
  *  between; these are a fine line, a line, and a marker. */
 const DRAWING_NIBS = [3, 6, 13];
+
+/** The four shapes, in the order a hand reaches for them. Held as a list for
+ *  the reason a menu is one in `menuShape.ts`: four buttons written out are
+ *  four buttons to keep agreeing with each other, and the fifth somebody adds
+ *  will agree with none of them. */
+const DRAWING_SHAPES = [
+  { shape: "line", label: "Straight line", Glyph: Minus },
+  { shape: "arrow", label: "Arrow", Glyph: ArrowUpRight },
+  { shape: "rect", label: "Rectangle", Glyph: Square },
+  { shape: "ellipse", label: "Ellipse", Glyph: Circle },
+] as const satisfies readonly { shape: DrawingShape; label: string; Glyph: typeof Minus }[];
 
 /** The highlighter: one wide nib, and the chosen ink with an alpha on the end
  *  so the words underneath are still readable through it. Translucency is a
@@ -923,6 +950,8 @@ function useInk({
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
   const [marker, setMarker] = useState<boolean>(lastMarker);
+  const [shape, setShape] = useState<DrawingShape | null>(lastShape);
+  const [filling, setFilling] = useState<boolean>(lastFilling);
   const [erasing, setErasing] = useState(false);
   const [selectedStroke, setSelectedStroke] = useState<{
     stroke: DrawingStroke;
@@ -964,6 +993,14 @@ function useInk({
 
   const width = marker ? MARKER_NIB : nib;
   const laid = marker ? `${ink}${MARKER_ALPHA}` : ink;
+  /* A fill is the ink with the highlighter's own alpha on it, which is the
+     argument this file already makes about translucency: it is a property of
+     the colour, so nothing that reads a stroke has to learn about fills any
+     more than it had to learn about highlighters. It also means a filled
+     shape drawn over the words still has the words under it. Only a closed
+     shape can hold one — an arrow with an interior is a shape nobody drew. */
+  const closed = shape === "rect" || shape === "ellipse";
+  const fill = closed && filling ? `${ink}${MARKER_ALPHA}` : undefined;
 
   /* What the surface is, in the units the strokes are stored in. A board is
      always the same box; anything measured against its width is as tall as
@@ -1055,6 +1092,48 @@ function useInk({
       return;
     }
 
+    /* A shape asked for outright. It is the same gesture the pen makes and a
+       different thing to watch: the anchor stays where it went down and the
+       shape is redrawn between it and wherever the pointer is now, so the
+       hand is sizing one mark rather than laying a trail. Nothing is held
+       still for and nothing is guessed at — which is the whole difference
+       from `straightenStroke`, and the reason both exist: one is for a hand
+       that was drawing and meant a rectangle, this is for a hand that came to
+       draw a rectangle. */
+    if (shape) {
+      let last = point;
+      const move = (next: PointerEvent) => {
+        const step = at(next);
+        if (!step) return;
+        last = step;
+        paint(shapeStroke(shape, point, step, width));
+      };
+      const finish = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", finish);
+        window.removeEventListener("pointercancel", finish);
+        /* A press that never travelled is somebody changing their mind, not a
+           shape of no size — which on the page would be an invisible mark
+           only the eraser could find. */
+        if (Math.hypot(last.x - point.x, last.y - point.y) < 6) {
+          paint("");
+          return;
+        }
+        const drawn: DrawingStroke = {
+          d: shapeStroke(shape, point, last, width),
+          color: laid,
+          width,
+        };
+        write([...live.current, fill ? { ...drawn, fill } : drawn]);
+        paint("");
+      };
+      paint(shapeStroke(shape, point, point, width));
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", finish);
+      return;
+    }
+
     path.current = `M${point.at}`;
     trail.current = [point];
     snapped.current = null;
@@ -1111,23 +1190,59 @@ function useInk({
     window.addEventListener("pointercancel", finish);
   }
 
+  /* Pressing a mark already meant "this one" — it is how the menu that throws
+     one away is opened. Dragging from that press moves it, which needs no
+     tool of its own and no mode to be in: a thing you can point at is a thing
+     you can drag, and the two are told apart by whether the pointer travelled.
+     The translated path is written straight onto the element being dragged,
+     for the reason a line being drawn is: sixty renders a second of every
+     mark on the surface, to move one of them. */
+  function take(stroke: DrawingStroke, event: React.PointerEvent<SVGPathElement>) {
+    event.stopPropagation();
+    event.preventDefault();
+    const from = at(event);
+    const element = event.currentTarget;
+    if (!from) return;
+    let moved = false;
+    const move = (next: PointerEvent) => {
+      const step = at(next);
+      if (!step) return;
+      const dx = step.x - from.x;
+      const dy = step.y - from.y;
+      if (!moved && Math.hypot(dx, dy) < 6) return;
+      moved = true;
+      element.setAttribute("d", translateStroke(stroke.d, dx, dy));
+    };
+    const finish = (last: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      if (!moved) {
+        setSelectedStroke({ stroke, x: event.clientX, y: event.clientY });
+        return;
+      }
+      const step = at(last);
+      if (!step) {
+        element.setAttribute("d", stroke.d);
+        return;
+      }
+      const d = translateStroke(stroke.d, step.x - from.x, step.y - from.y);
+      write(live.current.map((each) => (each === stroke ? { ...each, d } : each)));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  }
+
   const inked = (
     <>
       {strokes.map((stroke, index) => (
         <path
           key={index}
           className={editable ? "ink-stroke" : undefined}
-          onPointerDown={
-            editable
-              ? (event) => {
-                  event.stopPropagation();
-                  event.preventDefault();
-                  setSelectedStroke({ stroke, x: event.clientX, y: event.clientY });
-                }
-              : undefined
-          }
+          onPointerDown={editable ? (event) => take(stroke, event) : undefined}
           d={stroke.d}
-          fill="none"
+          fill={stroke.fill ?? "none"}
           stroke={stroke.color}
           strokeWidth={stroke.width}
           strokeLinecap="round"
@@ -1137,7 +1252,7 @@ function useInk({
       <path
         ref={livePath}
         d=""
-        fill="none"
+        fill={fill ?? "none"}
         stroke={laid}
         strokeWidth={width}
         strokeLinecap="round"
@@ -1212,6 +1327,48 @@ function useInk({
       >
         <Highlighter size={16} />
       </button>
+
+      <span className="drawing-tools-rule" />
+
+      {/* The four shapes, and the pen is the one that is not pressed. A fifth
+          button saying "freehand" would be a second way to say what putting a
+          shape down already says, and the highlighter and the eraser beside
+          them are toggles for the same reason. */}
+      {DRAWING_SHAPES.map(({ shape: kind, label, Glyph }) => (
+        <button
+          key={kind}
+          type="button"
+          className={`rich-media-file-action ${!erasing && shape === kind ? "is-active" : ""}`}
+          aria-label={label}
+          aria-pressed={!erasing && shape === kind}
+          title={label}
+          onClick={() => {
+            const next = shape === kind ? null : kind;
+            lastShape = next;
+            setShape(next);
+            setErasing(false);
+          }}
+        >
+          <Glyph size={16} />
+        </button>
+      ))}
+      <button
+        type="button"
+        className={`rich-media-file-action ${!erasing && closed && filling ? "is-active" : ""}`}
+        aria-label="Fill the shape"
+        aria-pressed={!erasing && closed && filling}
+        title="Fill the shape"
+        disabled={!closed}
+        onClick={() => {
+          lastFilling = !filling;
+          setFilling((on) => !on);
+        }}
+      >
+        <PaintBucket size={16} />
+      </button>
+
+      <span className="drawing-tools-rule" />
+
       <button
         type="button"
         className={`rich-media-file-action ${erasing ? "is-active" : ""}`}

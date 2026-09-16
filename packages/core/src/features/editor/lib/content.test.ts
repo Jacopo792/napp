@@ -13,7 +13,10 @@ import {
   firstDrawing,
   legacyMarkdownToRichText,
   richTextToPlainText,
+  shapeStroke,
   straightenStroke,
+  strokePoints,
+  translateStroke,
   withoutInvisibleDocumentEnding,
 } from "./content.ts";
 
@@ -195,4 +198,63 @@ test("an ink may carry an alpha", () => {
     strokes.map((s) => s.color),
     ["#5B9BFF59", "#5B9BFF", DRAWING_INKS[0]],
   );
+});
+
+/* A shape asked for outright is a stroke and nothing else: the reader that
+   admits stored path data has to admit every one of them, or a rectangle is a
+   rectangle until the note is read back. */
+test("a shape drawn on purpose is an ordinary stroke", () => {
+  const from = { x: 100, y: 100 };
+  const to = { x: 400, y: 300 };
+  const shapes = (["line", "arrow", "rect", "ellipse"] as const).map((shape) => ({
+    d: shapeStroke(shape, from, to),
+    color: DRAWING_INKS[0],
+    width: 6,
+  }));
+  assert.equal(
+    drawingStrokes(JSON.stringify(shapes)).length,
+    4,
+    "every shape survives the stored-format reader",
+  );
+
+  assert.equal(shapeStroke("line", from, to), "M100,100L400,300");
+  assert.equal(shapeStroke("rect", to, from).split("L").length, 5, "corners back to the first");
+  assert.equal(shapeStroke("ellipse", from, to).split("L").length, 49);
+
+  /* An arrow is one path with three subpaths, so it erases, boxes and moves
+     the way a line does — which is only true if every point is readable. */
+  const arrow = shapeStroke("arrow", from, to);
+  assert.equal((arrow.match(/M/g) ?? []).length, 3, "a shaft and two barbs");
+  assert.equal(strokePoints(arrow).length, 6, "and every point of it is readable");
+  assert.ok(arrow.startsWith("M100,100L400,300"), "the shaft is the line");
+});
+
+/* A fill is a field a stored stroke did not use to have, so a stroke without
+   one has to keep meaning what it always meant. */
+test("a fill is optional, validated, and drawn", () => {
+  const strokes = drawingStrokes(
+    JSON.stringify([
+      { d: "M0,0L10,10", color: "#5B9BFF", width: 6, fill: "#5B9BFF59" },
+      { d: "M0,0L10,10", color: "#5B9BFF", width: 6, fill: "javascript:alert(1)" },
+      { d: "M0,0L10,10", color: "#5B9BFF", width: 6 },
+    ]),
+  );
+  assert.deepEqual(
+    strokes.map((s) => s.fill),
+    ["#5B9BFF59", undefined, undefined],
+    "an ink or nothing; a fill that is not a colour is not a fill",
+  );
+  const svg = drawingSvg(strokes);
+  assert.match(svg, /fill="#5B9BFF59"/);
+  assert.equal((svg.match(/fill="none"/g) ?? []).length, 2);
+});
+
+/* Picking a mark up and putting it down changes the path data and nothing
+   else, so a moved arrow is still an arrow and a moved fill is still filled. */
+test("a mark keeps its shape when it is moved", () => {
+  const arrow = shapeStroke("arrow", { x: 100, y: 100 }, { x: 400, y: 300 });
+  const moved = translateStroke(arrow, 50, -20);
+  assert.equal((moved.match(/M/g) ?? []).length, 3, "the subpaths survive the move");
+  assert.ok(moved.startsWith("M150,80L450,280"));
+  assert.equal(translateStroke(moved, -50, 20), arrow, "there and back again is where it started");
 });
