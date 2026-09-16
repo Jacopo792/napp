@@ -3,6 +3,40 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.4.0 — 2026-09-16
+
+### Added
+
+- **Shapes in a drawing, drawn on purpose.** A straight line, an arrow, a
+  rectangle and an ellipse are tools of their own now, beside the pen: press
+  one, drag between two points, and the mark is the shape. Pressing the shape
+  you are holding puts it down again. Holding a stroke still at the end still
+  snaps it, as before.
+- **A fill for a rectangle or an ellipse.** It is the chosen ink at the
+  highlighter's own translucency, so a filled shape over the words leaves the
+  words readable.
+- **Captions on a drawing.** Words placed on a board, on the page layer or on a
+  picture: choose Caption, press where they should start, type, press Return.
+  The nib chooses the size. They travel with the note, appear in the row's
+  thumbnail, and leave in an exported Markdown file, a DOCX and a PDF.
+- **Marks can be picked up and moved.** Choose Move a mark and drag any stroke,
+  shape or caption to somewhere else on the same surface.
+
+### Fixed
+
+- **A file attached from the Attachments menu lands where you are looking.**
+  Opening a note leaves the caret unset, and a chosen PDF, video or photograph
+  was being inserted above the first line of the note — out of sight in a note
+  of any length, while the status line said the file had been attached. With no
+  caret it now goes at the end, a caret you have placed still wins, and the note
+  scrolls to what arrived.
+- **The catalogue heading is one line with the rest of the window's chrome.**
+  The scope's name and its tally sat stacked, so neither shared a line with the
+  sidebar or the note beside them; they are side by side now, and New note is
+  as quiet as the controls around it.
+- Interface motion is back inside the durations the app declares, with a
+  duplicate description of the small round buttons removed.
+
 ## 0.3.8 — 2026-09-08
 
 ### Fixed
