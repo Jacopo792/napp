@@ -23,17 +23,21 @@ contextBridge.exposeInMainWorld("napp", {
 
 /* The menu presses the key. Nothing here decides what a command does — the
    renderer already answers every one of these from the keyboard, and this is a
-   second way to type it. Dispatched on whatever has focus, so ⌘B from the
-   Format menu reaches the selection the way ⌘B from the keyboard does; on the
-   body for the few items that a bare letter's own guard would otherwise hand
-   back to the field it was typed in.
+   second way to type it. Always dispatched on whatever has focus, so ⌘B from
+   the Format menu reaches the selection the way ⌘B from the keyboard does.
+
+   There used to be an `atBody` flag for items a bare letter's own guard would
+   hand back to the field it was typed in. Every accelerator in the menu is a
+   chord now — see the note at the top of menu.js for the bare `?` that made
+   that necessary — and a chord is answered above that guard wherever it lands,
+   so there is nothing left to route around it.
 
    The DOM is shared across the isolation boundary even though the two
    JavaScript worlds are not, so a keydown dispatched from here is a keydown the
    page's own listener sees. */
 ipcRenderer.on("napp:command", (_event, init) => {
-  const target = init.atBody ? document.body : (document.activeElement ?? document.body);
-  target?.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
+  const target = document.activeElement ?? document.body;
+  target.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
 });
 
 /* Whether the window is full screen, which the page cannot find out for

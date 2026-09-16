@@ -18,7 +18,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "Anywhere", keys: "\u2318,", what: "Settings" },
   { group: "Anywhere", keys: "\u2318.", what: "Focus mode" },
   { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the folders" },
-  { group: "Anywhere", keys: "?", what: "This list" },
+  { group: "Anywhere", keys: "\u2318/", what: "This list" },
   { group: "Anywhere", keys: "Esc", what: "Leave focus mode" },
   { group: "The list", keys: "/", what: "Jump to the search field" },
   { group: "The list", keys: "N", what: "New note" },

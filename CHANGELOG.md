@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.4.1 — 2026-09-16
+
+### Fixed
+
+- **Typing a question mark in the desktop app no longer opens the shortcuts
+  sheet.** The sheet was on a bare `?`, and macOS matches a menu's keys before
+  the keystroke reaches the page — so the app's own rule, that a bare letter
+  belongs to the field it was typed in, never got a say. It was the app only;
+  the browser was always fine. The sheet is **⌘/** now, on every platform and
+  in every place the shortcut is named.
+
 ## 0.4.0 — 2026-09-16
 
 ### Added

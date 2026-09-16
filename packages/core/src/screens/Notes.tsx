@@ -2090,13 +2090,29 @@ export default function NotesPage() {
         changeNavigation((current) => !current);
         return;
       }
-      if (typing) return;
+      /* The shortcuts sheet, and it is a chord rather than the bare `?` it was
+         for the same reason ⌘, and ⌘. above are chords: it is a thing you
+         reach for while writing, so it has to be above the guard.
 
-      if (e.key === "?") {
+         But the bare `?` had a second fault the guard could never have
+         answered. The desktop menu shows this item with its key beside it, and
+         macOS matches a menu's key equivalents in the window server *before*
+         the keystroke reaches the page — so `registerAccelerator: false`
+         notwithstanding, a menu item whose accelerator is a printable
+         character outranks the text field the character was being typed into.
+         A question mark typed into a note opened the sheet, in the app and
+         never in the browser, which is exactly the shape of a key taken above
+         the renderer.
+
+         A chord has no such failure: if the menu takes ⌘/ it performs this
+         command, which is what ⌘/ means anyway. The wrong outcome is no longer
+         reachable rather than merely guarded against. */
+      if (mod && e.key === "/") {
         e.preventDefault();
         setShortcutsOpen(true);
         return;
       }
+      if (typing) return;
 
       if (e.key === "Escape" && focusMode) {
         e.preventDefault();
@@ -2765,7 +2781,7 @@ export default function NotesPage() {
         id: "shortcuts",
         group: "Do",
         name: "Keyboard shortcuts",
-        hint: "?",
+        hint: "\u2318/",
         icon: <Keyboard size={16} />,
         run: () => setShortcutsOpen(true),
       },

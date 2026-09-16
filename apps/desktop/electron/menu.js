@@ -19,10 +19,21 @@
  * system rather than to us: ⌘Z inside a contenteditable, ⌘W, Services, speech. */
 const { Menu, app, shell } = require("electron");
 
-/* Press a key at the renderer. `atBody` is for the few items that must not be
-   swallowed by the guard that hands a bare letter back to the field it was
-   typed in — the shortcuts sheet is opened by `?`, and `?` typed in a note is
-   a question mark. */
+/* Press a key at the renderer.
+ *
+ * Every accelerator here is a chord, and that is not decoration. macOS matches
+ * a menu's key equivalents in the window server *before* the keystroke reaches
+ * the web contents, and `registerAccelerator: false` did not save us from it:
+ * the shortcuts sheet was on a bare `?`, so typing a question mark into a note
+ * opened the sheet — in this app, and never in the browser, which is the shape
+ * of a key taken above the renderer. The page's own guard hands a bare letter
+ * back to the field it was typed in, but it never got the chance to.
+ *
+ * So: no accelerator here may be a character somebody can type. A chord cannot
+ * be typed by accident, and if macOS does match it the item performs the
+ * command it was going to perform anyway — the wrong outcome stops being
+ * reachable rather than being guarded against. That also retired `atBody`,
+ * which existed only to force the bare `?` past the guard it kept losing to. */
 const press = (init) => ({
   click: (_item, window) => window?.webContents.send("napp:command", init),
 });
@@ -148,7 +159,7 @@ function template(isDev) {
     {
       role: "help",
       submenu: [
-        item("Keyboard Shortcuts", "?", press({ key: "?", shiftKey: true, atBody: true })),
+        item("Keyboard Shortcuts", "Command+/", mod("/")),
         { type: "separator" },
         {
           label: "Napp on GitHub",

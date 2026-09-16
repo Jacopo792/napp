@@ -572,14 +572,28 @@ node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onr
 `electron/menu.js` builds the macOS menu bar; Windows deliberately has no
 second File/Edit application strip. Almost nothing in the macOS menu has logic.
 Every item that acts on the archive is already a shortcut the renderer answers
-to — `packages/core/src/lib/shortcuts.ts` is the list, read by the `?` sheet and
-by Settings — so the menu does not implement the commands, it **presses the
-key**: `registerAccelerator: false` shows the shortcut beside the item without
-taking it off the page, and clicking the item sends the same keystroke down for
-the preload to dispatch on whatever has focus. One implementation of "new note",
-and a menu item that cannot drift away from the key that does the same thing.
-What stays a real role is what belongs to the system rather than to us: undo
-inside a contenteditable, ⌘W, Services, speech, zoom, full screen.
+to — `packages/core/src/lib/shortcuts.ts` is the list, read by the shortcuts
+sheet and by Settings — so the menu does not implement the commands, it
+**presses the key**: `registerAccelerator: false` shows the shortcut beside the
+item without taking it off the page, and clicking the item sends the same
+keystroke down for the preload to dispatch on whatever has focus. One
+implementation of "new note", and a menu item that cannot drift away from the
+key that does the same thing. What stays a real role is what belongs to the
+system rather than to us: undo inside a contenteditable, ⌘W, Services, speech,
+zoom, full screen.
+
+**No accelerator in that menu may be a character somebody can type**, and
+`registerAccelerator: false` is not what makes that safe. macOS matches a
+menu's key equivalents in the window server _before_ the keystroke reaches the
+web contents, so the page's own guard — the one that hands a bare letter back
+to the field it was typed in — never gets asked. The shortcuts sheet was on a
+bare `?`, and a question mark typed into a note opened the sheet: in the app,
+never in the browser, which is the shape of a key taken above the renderer. It
+is `⌘/` now, and the rule generalises — a chord cannot be typed by accident,
+and if macOS does match it the item performs the command it was going to
+perform anyway. The wrong outcome stops being reachable rather than being
+guarded against. That also retired `atBody` in the preload, which existed only
+to force the bare `?` past the guard it kept losing to.
 
 **The three macOS buttons and `--titlebar-inset` are one decision in two files.**
 `hiddenInset` leaves the traffic lights at the window's own top-left, which here
@@ -1548,6 +1562,6 @@ of a narrow window spent on air.
   is the interface answering rather than lecturing, and the one line of a
   settings row's own anatomy, which names the row rather than explaining it —
   and which is where the reason a disabled control is disabled belongs.
-- A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `?` and Focus
+- A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `⌘/` and Focus
   mode are all named in the ⋯ menus that already open, and `packages/core/src/lib/shortcuts.ts`
-  is the single list both the `?` sheet and the Settings section read.
+  is the single list both the shortcuts sheet and the Settings section read.
