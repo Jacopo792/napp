@@ -1,4 +1,10 @@
-import { Extension, mergeAttributes, Node, type JSONContent } from "@tiptap/core";
+import {
+  Extension,
+  mergeAttributes,
+  Node,
+  type FocusPosition,
+  type JSONContent,
+} from "@tiptap/core";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import { FindAndReplace } from "@tiptap/extension-find-and-replace";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -1685,6 +1691,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           return false;
         },
       },
+      /* The caret was put there by a person. It is a ref rather than state
+         because nothing renders on it, and it needs no reset: the editor is
+         keyed by note id, so a different note is a different instance. */
+      onFocus() {
+        caretPlaced.current = true;
+      },
       onUpdate({ editor: current, transaction }) {
         if (!transaction.docChanged) return;
         if (!collaboration) {
@@ -1770,6 +1782,25 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   );
   formatRef.current = format;
 
+  /* Where something chosen from a menu goes when nobody has said where.
+     Opening a note leaves the focus on the row in the list beside it, so the
+     editor has never held the caret, and Tiptap's `focus()` then restores the
+     selection the document mounted with — position zero. A video chosen from
+     the Attachments menu therefore landed above the first line of the note,
+     which in a note of any length is above the fold, while the status line
+     said "File attached" either way. That is the whole of "a note that already
+     has text will not take a video, a brand new note will": in a new note the
+     top of the document is where you were already looking.
+
+     A file chosen from a menu is an act on the note, so with no caret it goes
+     at the end, the way an attachment is appended. Once the caret has been put
+     somewhere it is what was meant, and it wins. Either way the chain ends by
+     scrolling to what it made: `focus()` scrolls to the selection it restores,
+     which is the one from *before* the insert, so without this the note stayed
+     exactly where it was and nothing on screen changed. */
+  const caretPlaced = useRef(false);
+  const insertionPoint = useCallback((): FocusPosition => (caretPlaced.current ? null : "end"), []);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -1804,22 +1835,29 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       },
       insertText(text) {
         if (!editor || readOnly) return;
-        editor.chain().focus().insertContent(paragraphs(text)).run();
+        editor
+          .chain()
+          .focus(insertionPoint())
+          .insertContent(paragraphs(text))
+          .scrollIntoView()
+          .run();
       },
       insertImage(objectId, alt) {
         if (!editor || readOnly) return;
         editor
           .chain()
-          .focus()
+          .focus(insertionPoint())
           .insertContent({ type: "privateImage", attrs: { objectId, alt } })
+          .scrollIntoView()
           .run();
       },
       insertAttachment(label, objectId) {
         if (!editor || readOnly) return;
         editor
           .chain()
-          .focus()
+          .focus(insertionPoint())
           .insertContent({ type: "privateFile", attrs: { objectId, label } })
+          .scrollIntoView()
           .run();
       },
       commentSelection(threadId) {
@@ -1919,7 +1957,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor?.commands.focus();
       },
     }),
-    [editor, format, readOnly, resolveImage],
+    [editor, format, insertionPoint, readOnly, resolveImage],
   );
 
   useEffect(() => {
