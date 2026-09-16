@@ -1161,9 +1161,18 @@ export function NoteList({
     >
       {topBar}
       <header className="collection-toolbar flex min-h-13 shrink-0 items-center gap-2 px-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold text-ink">{folderLabel}</h2>
-          <p className="readout mt-0.5 text-ink-4">
+        {/* One line, on the band's own baseline. Stacked, the name sat above
+            the strip's middle and the tally below it, so nothing in this
+            column shared a line with the sidebar's name or the note's — which
+            is what made a 52px strip that runs the width of the window read as
+            a heading pasted beside a toolbar. Side by side they are one
+            readout, separated by the middot this line already uses for the
+            scope. The name is what truncates: a folder you cannot read the end
+            of is named again in the column beside this one, and a count — or
+            the thirty days the Trash is counting — is owed in full. */}
+        <div className="collection-title min-w-0 flex-1">
+          <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
+          <p className="readout shrink-0 text-ink-4">
             {loading ? "Loading" : noteTally(entries.length, trashMode)}
             {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
           </p>
