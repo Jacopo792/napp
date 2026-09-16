@@ -31,6 +31,10 @@
  * last-write-wins; see `mergeRemarksSeen`. */
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
+  loadAutocorrectPreference,
+  saveAutocorrectPreference,
+} from "@/features/editor/lib/autocorrect";
+import {
   loadProofreaderPreference,
   saveProofreaderPreference,
 } from "@/features/editor/lib/proofread";
@@ -88,6 +92,7 @@ export function localPreferences(seen: RemarksSeen = {}): AccountPreferences {
     {
       ...DEFAULT_FLAGS,
       proofreader: loadProofreaderPreference(),
+      autocorrect: loadAutocorrectPreference(),
       autoLock: loadAutoLock(),
     },
     seen,
@@ -149,6 +154,7 @@ function apply(preferences: AccountPreferences): void {
   setAxes(preferences.axes);
   setWritingPreferences(preferences.writing);
   saveProofreaderPreference(preferences.proofreader);
+  saveAutocorrectPreference(preferences.autocorrect);
   saveAutoLock(preferences.autoLock);
 }
 

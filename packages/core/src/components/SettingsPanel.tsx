@@ -36,17 +36,20 @@ import {
   Printer,
   Search,
   Settings,
+  RotateCcw,
   SpellCheck,
   Sun,
   Trash2,
   Undo2,
   UserRound,
   UserPlus,
+  Wand2,
   MousePointer2,
   Users,
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
 import {
   AXIS_SPECS,
   PRESETS,
@@ -265,6 +268,7 @@ export function SettingsPanel({
   presenceEnabled,
   collaboratorsVisible,
   proofreaderEnabled,
+  autocorrectEnabled,
   writingPreferences,
   profileBusy,
   profileError,
@@ -277,6 +281,7 @@ export function SettingsPanel({
   onPresenceEnabledChange,
   onCollaboratorsVisibleChange,
   onProofreaderEnabledChange,
+  onAutocorrectEnabledChange,
   onWritingPreferencesChange,
   onHideArchivedChange,
   onAutoLockChange,
@@ -307,6 +312,7 @@ export function SettingsPanel({
   presenceEnabled: boolean;
   collaboratorsVisible: boolean;
   proofreaderEnabled: boolean;
+  autocorrectEnabled: boolean;
   writingPreferences: WritingPreferences;
   profileBusy: boolean;
   profileError: string;
@@ -319,6 +325,7 @@ export function SettingsPanel({
   onPresenceEnabledChange: (enabled: boolean) => void;
   onCollaboratorsVisibleChange: (visible: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
+  onAutocorrectEnabledChange: (enabled: boolean) => void;
   onWritingPreferencesChange: (next: WritingPreferences) => void;
   onHideArchivedChange: (hideArchived: boolean) => void;
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
@@ -330,6 +337,13 @@ export function SettingsPanel({
   const appearance = useAppearance();
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>("profile");
+  /* How many spellings this device has been told to leave alone. Read when the
+     panel opens rather than held live: the only thing that changes it while
+     the panel is up is the button below, which sets it itself. */
+  const [learned, setLearned] = useState(0);
+  useEffect(() => {
+    if (open) setLearned(learnedSpellings().length);
+  }, [open]);
   const [nickname, setNickname] = useState(profile.nickname);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState("");
@@ -987,6 +1001,52 @@ export function SettingsPanel({
               <section>
                 <h3>Writing</h3>
                 <div className="appearance-controls">
+                  {/* Two corrections, and they are not the same kind of thing.
+                      This one is a dictionary and it acts on its own as you
+                      write, so it is the one that needs a switch somebody can
+                      find; the one below is a model, and it only ever runs
+                      from a deliberate click on a selection. */}
+                  <label className="appearance-row">
+                    <RowLead
+                      icon={<Wand2 size={16} />}
+                      label="Correct as I type"
+                      hint={
+                        learned === 0
+                          ? "Accents and apostrophes, finished when a word is. Undo one to keep your spelling"
+                          : `Accents and apostrophes, finished when a word is. ${learned} ${
+                              learned === 1 ? "spelling is" : "spellings are"
+                            } yours and left alone`
+                      }
+                    />
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={autocorrectEnabled}
+                      onChange={(event) => onAutocorrectEnabledChange(event.target.checked)}
+                    />
+                  </label>
+                  {/* The only way back from a correction refused by accident.
+                      It is a row rather than a line of explanation under the
+                      switch above, because it is a thing you press. */}
+                  {learned > 0 && (
+                    <div className="appearance-row">
+                      <RowLead
+                        icon={<RotateCcw size={16} />}
+                        label="Words you kept"
+                        hint="Offer these corrections again"
+                      />
+                      <button
+                        type="button"
+                        className="settings-row-action press"
+                        onClick={() => {
+                          forgetSpellings();
+                          setLearned(0);
+                        }}
+                      >
+                        Forget {learned}
+                      </button>
+                    </div>
+                  )}
                   <label className="appearance-row">
                     <RowLead
                       icon={<SpellCheck size={16} />}

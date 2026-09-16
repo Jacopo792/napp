@@ -24,6 +24,11 @@ export interface AccountFlags {
    *  stop them seeing you, which is what the switch above is for. */
   collaborators: boolean;
   proofreader: boolean;
+  /** The accent-and-apostrophe correction that runs while you type. Separate
+   *  from the proofreader above, which is a model you ask a selection about —
+   *  this one is a dictionary and it acts on its own, which is exactly why it
+   *  is a switch somebody can find. */
+  autocorrect: boolean;
   autoLock: AutoLockMinutes;
 }
 
@@ -66,11 +71,12 @@ export const DEFAULT_FLAGS: AccountFlags = {
   presence: false,
   collaborators: true,
   proofreader: true,
+  autocorrect: true,
   autoLock: 0,
 };
 
 /**
- * The four switches, and nothing else.
+ * The switches, and nothing else.
  *
  * Load-bearing. `AccountPreferences` extends `AccountFlags`, so handing the
  * whole object to a `useState<AccountFlags>` type-checks and quietly carries
@@ -84,6 +90,7 @@ export function flagsOf(preferences: AccountFlags): AccountFlags {
     presence: preferences.presence,
     collaborators: preferences.collaborators,
     proofreader: preferences.proofreader,
+    autocorrect: preferences.autocorrect,
     autoLock: preferences.autoLock,
   };
 }
@@ -143,6 +150,7 @@ export function mergeAccountPreferences(
       collaborators:
         typeof row.collaborators === "boolean" ? row.collaborators : local.collaborators,
       proofreader: typeof row.proofreader === "boolean" ? row.proofreader : local.proofreader,
+      autocorrect: typeof row.autocorrect === "boolean" ? row.autocorrect : local.autocorrect,
       autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),

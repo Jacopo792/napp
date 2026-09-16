@@ -2603,20 +2603,6 @@
   white-space: nowrap;
 }
 
-/* Centred, deliberately. Everything else in the column starts on the same left
-   edge, and a timestamp joining that queue made the head of the page read as
-   one thin line of things stacked in single file. Set over the measure it
-   belongs to, it is a caption above a title rather than another item in a
-   list. */
-.note-date {
-  margin-bottom: 1.15rem;
-  color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  text-align: center;
-}
-
 /* The sketch stands in the glyph's slot, so it takes the glyph's box — but its
    ink is the drawing's own, six literal colours that answer to no theme. That
    is why it never takes `is-selected`, which fills the slot with `--accent`:
@@ -3789,6 +3775,31 @@
 
 .settings-reset {
   margin-top: 12px;
+}
+
+/* The same button at the end of a row rather than at the end of a section, so
+   it takes the look and leaves the margin — which is what puts a section's
+   closing button clear of the last row above it. */
+.settings-row-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    border-color var(--dur-fast) var(--ease-press);
+}
+
+.settings-row-action:hover {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
 }
 
 @media (max-width: 900px) {
@@ -7328,8 +7339,7 @@
   }
 
   .rich-text-content,
-  .note-title,
-  .note-date {
+  .note-title {
     color: #000 !important;
   }
 

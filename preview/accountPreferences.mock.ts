@@ -22,6 +22,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   presence: true,
   collaborators: true,
   proofreader: true,
+  autocorrect: true,
   autoLock: 0,
 };
 

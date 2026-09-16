@@ -63,13 +63,14 @@ test("a null column is the same as an empty one", () => {
   assert.deepEqual(mergeAccountPreferences(null, local), mergeAccountPreferences({}, local));
 });
 
-test("the four flags come away without the appearance riding along", () => {
+test("the flags come away without the appearance riding along", () => {
   /* The whole point: what the component holds is spread over a fresh reading
      of the live stores when the row is written. If the appearance travels
      inside it, choosing a colour pushes the colour from the previous pull. */
   const flags = flagsOf(mergeAccountPreferences({ presence: true }, local));
   assert.deepEqual(Object.keys(flags).sort(), [
     "autoLock",
+    "autocorrect",
     "collaborators",
     "presence",
     "proofreader",

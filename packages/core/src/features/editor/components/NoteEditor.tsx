@@ -13,7 +13,6 @@ import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import type { NoteEntry } from "@/lib/entries";
 import type { NoteLock } from "@/lib/types";
-import { formatDateTime } from "@/lib/format";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
@@ -48,6 +47,8 @@ interface Props {
   startWithComments?: boolean;
   /** Whether this browser offers the on-device proofreader at all. */
   proofreaderEnabled: boolean;
+  /** Whether the accent-and-apostrophe correction runs while you type. */
+  autocorrectEnabled: boolean;
   viewingAsPartner: boolean;
   partnerName: string;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -147,6 +148,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     lock,
     startWithComments = false,
     proofreaderEnabled,
+    autocorrectEnabled,
     viewingAsPartner,
     partnerName,
     titleRef,
@@ -777,12 +779,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           <header className={mobile ? "px-5 pt-5 pb-3" : "px-10 pt-8 pb-5"}>
             <div className="measure note-frontispiece-measure">
               <div className="font-sans text-base">
-                {/* Above everything the page carries, not tucked in over the
-                    title: it is the caption of the page rather than a line of
-                    the note, and read where the eye lands first it is out of
-                    the way of both. */}
-                <p className="note-date">{formatDateTime(entry.note.updatedAt)}</p>
-
+                {/* The note's time used to stand here, centred over the title.
+                    It was meant as the caption of the page and read as a line
+                    with nothing under it — a date floating in the gap between
+                    the toolbar and the words. It is in the editor header now,
+                    in the slot that already reports on this note; see
+                    `saveReadout` in `Notes.tsx`. */}
                 <PageIdentity
                   photo={entry.note.photo}
                   cover={entry.note.cover}
@@ -802,6 +804,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   canEdit={canEdit}
                   titleRef={titleRef}
                   onEdited={onEdited}
+                  onDone={() => editorRef.current?.focus()}
                   yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
                   synced={synced}
                 />
@@ -852,6 +855,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                    may write at all. */
                 writeLockOwner={canEdit && session ? session.userId : null}
                 mobile={mobile}
+                autocorrectOn={autocorrectEnabled}
                 resolveImage={resolveImage}
                 resolveFile={resolveFile}
                 collaboration={collaboration}

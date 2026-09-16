@@ -8,6 +8,12 @@ interface Props {
   canEdit: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onEdited: () => void;
+  /** Enter finishes the title and starts the note. It used to `blur()`, which
+   *  is not the same thing at all: nothing took the focus, so it landed on
+   *  `<body>` — where every bare key in the window is a shortcut. Pressing
+   *  Enter and then typing a question mark opened the shortcut sheet, `n`
+   *  wrote a new note and `j` changed which note you were looking at. */
+  onDone: () => void;
   /** The collaboration server has completed a sync for this note. Until it
    *  has, an empty collaborative title is not yet an answer. */
   synced?: boolean;
@@ -35,6 +41,7 @@ export function TitleField({
   canEdit,
   titleRef,
   onEdited,
+  onDone,
   yTitle = null,
   synced = false,
 }: Props) {
@@ -133,7 +140,7 @@ export function TitleField({
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.preventDefault();
-          event.currentTarget.blur();
+          onDone();
         }
       }}
       placeholder="Untitled"

@@ -86,7 +86,7 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { fold, memberSince } from "@/lib/format";
+import { fold, formatDateTime, formatStamp, memberSince } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linksTo } from "@/lib/derived";
 import {
@@ -241,7 +241,6 @@ export default function NotesPage() {
    *  "Copied as Markdown", "Imported 12 notes". It borrows the save readout's
    *  slot, which is where this window already says what just happened. */
   const [statusFlash, setStatusFlash] = useState("");
-  const [syncFlash, setSyncFlash] = useState(false);
   /** What the last merge did: a word for the readout, a sentence for its
    *  tooltip, because the readout slot holds one state and not a paragraph. */
   const [merge, setMerge] = useState<{ label: string; detail: string } | null>(null);
@@ -363,6 +362,7 @@ export default function NotesPage() {
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
   const autoLock = flags.autoLock;
   const proofreaderEnabled = flags.proofreader;
+  const autocorrectEnabled = flags.autocorrect;
 
   /* Uploaded this session, so the tab that just attached a file knows its type
      without a round trip. Anything else opens as the PDF it almost always is. */
@@ -575,11 +575,6 @@ export default function NotesPage() {
     const metadataChanged = Object.entries(snapshot.metas).some(
       ([owner, meta]) => metaShape(metasRef.current[owner] ?? EMPTY_META) !== metaShape(meta),
     );
-    if (remote && (entrySetChanged || changedIds.size > 0 || metadataChanged)) {
-      setSyncFlash(true);
-      window.setTimeout(() => setSyncFlash(false), 2000);
-    }
-
     // The open note, if the other device moved it and nothing local is queued.
     const open = selectedIdRef.current;
     if (!open || isDirty(open)) return;
@@ -2494,6 +2489,7 @@ export default function NotesPage() {
      Left to size itself it slid back and forth by 55px on each debounce, which
      is the one thing in the toolbar that moves while you are looking at it. The
      write error is carried in the tooltip for the same reason. */
+  const edited = selected?.note.updatedAt ?? "";
   const saveReadout = collaborative.refusal ? (
     <span className="label text-danger" title={collaborative.refusal}>
       Unavailable
@@ -2540,8 +2536,24 @@ export default function NotesPage() {
     <span className="label text-accent" title={merge.detail}>
       {merge.label}
     </span>
-  ) : syncFlash ? (
-    <span className="label text-accent">Updated elsewhere</span>
+  ) : selected ? (
+    /* The resting state of this slot, and the only place in the window the
+       note's own time is said.
+    
+       It used to be a line centred over the title, which is a caption with no
+       picture under it — and this slot, which is *about* the state of the
+       note, said nothing at all until something happened to it. So the two
+       swapped: the slot says when the note was last edited, and it says it in
+       the list's own shorthand, because everything else that appears here is
+       measured against a 7.5rem box that clips.
+
+       It also replaces "Updated elsewhere", which was two accented seconds of
+       blue and then nothing. A change made in the other window *is* a new
+       time, so the time arriving is the whole announcement — and unlike the
+       flash it is still there a minute later, when somebody looks up. */
+    <span className="label text-ink-4" title={`Last edited ${formatDateTime(edited)}`}>
+      Edited {formatStamp(edited)}
+    </span>
   ) : null;
 
   const pinned = selected
@@ -3023,8 +3035,10 @@ export default function NotesPage() {
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
         proofreaderEnabled={proofreaderEnabled}
+        autocorrectEnabled={autocorrectEnabled}
         writingPreferences={writingPreferences}
         onProofreaderEnabledChange={(proofreader) => changeFlags({ proofreader })}
+        onAutocorrectEnabledChange={(autocorrect) => changeFlags({ autocorrect })}
         onWritingPreferencesChange={setWritingPreferences}
         /* Straight through the one profile writer: this is a column on the row,
          and Postgres reads it back to decide what the other member may fetch. */
@@ -3211,6 +3225,7 @@ export default function NotesPage() {
                     lock={selected ? lockFor(selected.note.id) : undefined}
                     startWithComments={selectedFolderId === REMARKS}
                     proofreaderEnabled={proofreaderEnabled}
+                    autocorrectEnabled={autocorrectEnabled}
                     viewingAsPartner={viewAs === "u2"}
                     partnerName={partnerName}
                     titleRef={titleRef}
@@ -3399,6 +3414,7 @@ export default function NotesPage() {
               lock={selected ? lockFor(selected.note.id) : undefined}
               startWithComments={selectedFolderId === REMARKS}
               proofreaderEnabled={proofreaderEnabled}
+              autocorrectEnabled={autocorrectEnabled}
               viewingAsPartner={viewAs === "u2"}
               partnerName={partnerName}
               titleRef={titleRef}
@@ -3470,6 +3486,7 @@ export default function NotesPage() {
                   canEdit={splitCanEdit(splitEntry.note.id)}
                   lock={lockFor(splitEntry.note.id)}
                   proofreaderEnabled={proofreaderEnabled}
+                  autocorrectEnabled={autocorrectEnabled}
                   viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}
                   titleRef={splitTitleRef}
