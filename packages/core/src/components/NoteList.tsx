@@ -34,10 +34,12 @@ import { useStoredImage } from "@/lib/media";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import {
+  DRAWING_TEXT_FONT,
   checklistProgress,
   documentGlyph,
   drawingInkBox,
   firstDrawing,
+  isDrawingText,
 } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
 import type { ListView, NoteGroup } from "@/lib/listPreferences";
@@ -492,22 +494,38 @@ const Row = memo(function Row({
             preserveAspectRatio="xMidYMid meet"
             aria-hidden
           >
-            {sketch.strokes.map((stroke, index) => (
-              <path
-                key={index}
-                d={stroke.d}
-                fill="none"
-                stroke={stroke.color}
-                /* Constant apparent weight, whatever the drawing's own scale:
-                   the slot is about 23px across once its padding is off, so the
-                   box's long side over 90 puts a default five-unit pen at
-                   roughly one and a third device pixels there — and leaves a
-                   highlighter the six times wider it was drawn as. */
-                strokeWidth={(stroke.width * Math.max(sketch.box.width, sketch.box.height)) / 90}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
+            {sketch.strokes.map((mark, index) =>
+              /* A caption is drawn at the size it was written, not rescaled
+                 like a nib: the box is already cropped to the ink, so the
+                 words are as big in the slot as they are in the drawing. */
+              isDrawingText(mark) ? (
+                <text
+                  key={index}
+                  x={mark.x}
+                  y={mark.y}
+                  fill={mark.color}
+                  fontSize={mark.size}
+                  fontFamily={DRAWING_TEXT_FONT}
+                >
+                  {mark.text}
+                </text>
+              ) : (
+                <path
+                  key={index}
+                  d={mark.d}
+                  fill={mark.fill ?? "none"}
+                  stroke={mark.color}
+                  /* Constant apparent weight, whatever the drawing's own scale:
+                     the slot is about 23px across once its padding is off, so the
+                     box's long side over 90 puts a default five-unit pen at
+                     roughly one and a third device pixels there — and leaves a
+                     highlighter the six times wider it was drawn as. */
+                  strokeWidth={(mark.width * Math.max(sketch.box.width, sketch.box.height)) / 90}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ),
+            )}
           </svg>
         </span>
       ) : (

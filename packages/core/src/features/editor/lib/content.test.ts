@@ -8,9 +8,11 @@ import {
   documentGlyph,
   drawingBox,
   drawingInkBox,
+  drawingMarks,
   drawingStrokes,
   drawingSvg,
   firstDrawing,
+  isDrawingText,
   legacyMarkdownToRichText,
   richTextToPlainText,
   shapeStroke,
@@ -257,4 +259,64 @@ test("a mark keeps its shape when it is moved", () => {
   assert.equal((moved.match(/M/g) ?? []).length, 3, "the subpaths survive the move");
   assert.ok(moved.startsWith("M150,80L450,280"));
   assert.equal(translateStroke(moved, -50, 20), arrow, "there and back again is where it started");
+});
+
+/* A caption is the one mark that is not a stroke, and it shares the array with
+   them so that words written over a circle stay over it. Everything that reads
+   a drawing has to know that, and everything written before today has to go on
+   reading as what it was. */
+test("a caption lives beside the strokes it was written over", () => {
+  const stored = JSON.stringify([
+    { d: "M0,0L100,100", color: "#5B9BFF", width: 6 },
+    { text: "the second chapter", x: 40, y: 120, color: "#F4C550", size: 30 },
+  ]);
+  assert.equal(drawingMarks(stored).length, 2);
+  assert.equal(drawingStrokes(stored).length, 1, "a caption is not a stroke");
+
+  const svg = drawingSvg(drawingMarks(stored));
+  assert.match(svg, /<text x="40" y="120" fill="#F4C550" font-size="30"/);
+  assert.match(svg, /<path d="M0,0L100,100"/);
+});
+
+/* The words arrive from the other member, an import, or whatever was on disk,
+   and go straight into a document built by string concatenation. */
+test("a caption is read strictly and escaped on the way out", () => {
+  const marks = drawingMarks(
+    JSON.stringify([
+      { text: "  spaced  ", x: 0, y: 0, color: "#5B9BFF", size: 20 },
+      { text: "no anchor", y: 10, color: "#5B9BFF", size: 20 },
+      { text: "   ", x: 1, y: 1, color: "#5B9BFF", size: 20 },
+      { text: "far away", x: 1e9, y: 0, color: "#5B9BFF", size: 20 },
+      { text: "bad size", x: 0, y: 0, color: "#5B9BFF", size: -3 },
+    ]),
+  );
+  assert.deepEqual(
+    marks.map((mark) => (isDrawingText(mark) ? [mark.text, mark.size] : mark)),
+    [
+      ["spaced", 20],
+      ["bad size", 30],
+    ],
+    "no anchor, nothing to say, or nowhere near the page: not a caption",
+  );
+
+  const nasty = drawingMarks(
+    JSON.stringify([
+      { text: '</text><script>x</script>&"', x: 0, y: 0, color: "#5B9BFF", size: 20 },
+    ]),
+  );
+  const svg = drawingSvg(nasty);
+  assert.ok(!svg.includes("<script"), "nothing closes the element it was put inside");
+  assert.match(svg, /&lt;\/text&gt;&lt;script&gt;x&lt;\/script&gt;&amp;&quot;/);
+});
+
+/* A page is as tall as what is on it, and a thumbnail is cropped to it — both
+   of which used to mean "as tall as the lowest stroke". */
+test("a caption counts toward the boxes a drawing is measured by", () => {
+  const caption = drawingMarks(
+    JSON.stringify([{ text: "below", x: 100, y: 400, color: "#5B9BFF", size: 40 }]),
+  );
+  /* The baseline plus the room every face keeps under it for descenders. */
+  assert.deepEqual(drawingBox(caption, "page"), { width: 1000, height: 410 });
+  const box = drawingInkBox(caption);
+  assert.ok(box.y < 400 && box.height > 40, "the box reaches above the baseline and below it");
 });

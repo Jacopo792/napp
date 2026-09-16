@@ -40,6 +40,7 @@ import {
   Pencil,
   Square,
   Trash2,
+  Type,
   Undo2,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -61,11 +62,15 @@ import {
   PrivateImage,
   TEXT_COLOR_VALUE,
   WRITE_LOCK_MARK,
+  DRAWING_TEXT_FONT,
+  type DrawingMark,
   type DrawingShape,
   type DrawingStroke,
   type TextColor,
+  drawingMarks,
   drawingStrokes,
   drawingSurface,
+  isDrawingText,
   shapeStroke,
   straightenStroke,
   strokePoints,
@@ -629,9 +634,9 @@ function PrivateImageView({
      most want to write on, and the layer is the same one the note itself
      takes — same hand, same box, measured against the picture's width. It is
      put down until it is picked up, so the picture still opens when clicked. */
-  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
+  const strokes = useMemo(() => drawingMarks(node.attrs.strokes as string), [node.attrs.strokes]);
   const writeInk = useCallback(
-    (next: DrawingStroke[]) => updateAttributes({ strokes: JSON.stringify(next) }),
+    (next: DrawingMark[]) => updateAttributes({ strokes: JSON.stringify(next) }),
     [updateAttributes],
   );
   const [pen, setPen] = useState(false);
@@ -711,8 +716,10 @@ function PrivateImageView({
             only once the pen is out has nothing to measure until too late. */}
         <svg
           ref={ink.surface}
-          className={`rich-media-image-ink ${pen && !ink.erasing ? "is-drawing" : ""} ${
-            pen && ink.erasing ? "is-erasing" : ""
+          className={`rich-media-image-ink ${
+            pen && !ink.erasing && !ink.arranging ? "is-drawing" : ""
+          } ${pen && ink.erasing ? "is-erasing" : ""} ${
+            pen && ink.arranging ? "is-arranging" : ""
           }`}
           viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
           /* See the page layer below: a surface measured against its width
@@ -884,23 +891,37 @@ let lastMarker = false;
  *  than a sixth button saying "no shape" — so pressing the shape you are
  *  holding puts it down, which is how the highlighter and the eraser beside it
  *  already work. It outlives the drawing for the same reason the ink does. */
-let lastShape: DrawingShape | null = null;
+let lastShape: InkTool | null = null;
 let lastFilling = false;
+
+/** What the hand may be holding besides the pen: the four shapes, the one that
+ *  writes rather than draws, and the one that draws nothing and arranges what
+ *  is there. All in the same slot and none of them a toggle of its own,
+ *  because you are drawing a rectangle or captioning one or moving one, and
+ *  never two of those at once. */
+type InkTool = DrawingShape | "text" | "move";
+
+/** A caption is set at the nib's own size times this. The nibs are the
+ *  control that is already there for "how big", and reaching for the
+ *  highlighter's thirty here would set a caption at a hundred and fifty. */
+const TEXT_SCALE = 5;
 
 /** Three nibs. A slider offers a hundred widths nobody wants to choose
  *  between; these are a fine line, a line, and a marker. */
 const DRAWING_NIBS = [3, 6, 13];
 
-/** The four shapes, in the order a hand reaches for them. Held as a list for
- *  the reason a menu is one in `menuShape.ts`: four buttons written out are
- *  four buttons to keep agreeing with each other, and the fifth somebody adds
- *  will agree with none of them. */
-const DRAWING_SHAPES = [
-  { shape: "line", label: "Straight line", Glyph: Minus },
-  { shape: "arrow", label: "Arrow", Glyph: ArrowUpRight },
-  { shape: "rect", label: "Rectangle", Glyph: Square },
-  { shape: "ellipse", label: "Ellipse", Glyph: Circle },
-] as const satisfies readonly { shape: DrawingShape; label: string; Glyph: typeof Minus }[];
+/** What the hand can hold, in the order it reaches for them. Held as a list
+ *  for the reason a menu is one in `menuShape.ts`: five buttons written out
+ *  are five buttons to keep agreeing with each other, and the sixth somebody
+ *  adds will agree with none of them. */
+const DRAWING_TOOLS = [
+  { tool: "line", label: "Straight line", Glyph: Minus },
+  { tool: "arrow", label: "Arrow", Glyph: ArrowUpRight },
+  { tool: "rect", label: "Rectangle", Glyph: Square },
+  { tool: "ellipse", label: "Ellipse", Glyph: Circle },
+  { tool: "text", label: "Caption", Glyph: Type },
+  { tool: "move", label: "Move a mark", Glyph: Move },
+] as const satisfies readonly { tool: InkTool; label: string; Glyph: typeof Minus }[];
 
 /** The highlighter: one wide nib, and the chosen ink with an alpha on the end
  *  so the words underneath are still readable through it. Translucency is a
@@ -942,21 +963,30 @@ function useInk({
   fit,
   editable,
 }: {
-  strokes: DrawingStroke[];
-  write: (next: DrawingStroke[]) => void;
+  strokes: DrawingMark[];
+  write: (next: DrawingMark[]) => void;
   fit: "board" | "width";
   editable: boolean;
 }) {
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
   const [marker, setMarker] = useState<boolean>(lastMarker);
-  const [shape, setShape] = useState<DrawingShape | null>(lastShape);
+  const [shape, setShape] = useState<InkTool | null>(lastShape);
   const [filling, setFilling] = useState<boolean>(lastFilling);
   const [erasing, setErasing] = useState(false);
   const [selectedStroke, setSelectedStroke] = useState<{
-    stroke: DrawingStroke;
+    stroke: DrawingMark;
     x: number;
     y: number;
+  } | null>(null);
+  /* A caption being typed, at the point of the page it was asked for. Held
+     here and not in the document, because a caption nobody has finished is a
+     caption nobody else needs to see arriving letter by letter. */
+  const [composing, setComposing] = useState<{
+    x: number;
+    y: number;
+    left: number;
+    top: number;
   } | null>(null);
   useEffect(() => {
     if (!selectedStroke) return;
@@ -1001,6 +1031,9 @@ function useInk({
      shape can hold one — an arrow with an interior is a shape nobody drew. */
   const closed = shape === "rect" || shape === "ellipse";
   const fill = closed && filling ? `${ink}${MARKER_ALPHA}` : undefined;
+  /* A caption takes the ink flat. The highlighter's alpha under a word is a
+     word you cannot read, which is the opposite of what a caption is for. */
+  const textSize = nib * TEXT_SCALE;
 
   /* What the surface is, in the units the strokes are stored in. A board is
      always the same box; anything measured against its width is as tall as
@@ -1055,11 +1088,15 @@ function useInk({
    *  behind is a line somebody has to go back for. */
   const rub = useCallback(
     (point: { x: number; y: number }) => {
-      const kept = live.current.filter(
-        (stroke) =>
-          !strokePoints(stroke.d).some(
-            (p) => Math.hypot(p.x - point.x, p.y - point.y) < stroke.width / 2 + 10,
-          ),
+      const kept = live.current.filter((mark) =>
+        isDrawingText(mark)
+          ? /* A caption is rubbed out by its anchor rather than by its
+               outline: measuring the words would mean measuring the face, and
+               a caption is one thing the way a stroke is one thing. */
+            Math.hypot(mark.x - point.x, mark.y - point.y) > mark.size
+          : !strokePoints(mark.d).some(
+              (p) => Math.hypot(p.x - point.x, p.y - point.y) < mark.width / 2 + 10,
+            ),
       );
       if (kept.length !== live.current.length) {
         live.current = kept;
@@ -1100,6 +1137,25 @@ function useInk({
        from `straightenStroke`, and the reason both exist: one is for a hand
        that was drawing and meant a rectangle, this is for a hand that came to
        draw a rectangle. */
+    /* A caption is placed, not dragged: one press says where the words start,
+       and the words themselves arrive from a field at that point rather than
+       from the surface — an SVG takes no typing. It is portalled to the body
+       and positioned by the pointer, which is what the menu beside it already
+       does, so it costs none of the three surfaces a `position: relative` of
+       their own. */
+    if (shape === "text") {
+      setComposing({ x: point.x, y: point.y, left: event.clientX, top: event.clientY });
+      return;
+    }
+
+    /* Nothing. The move tool is not a thing the surface does, it is what makes
+       the marks on the surface reachable — the page and a picture keep their
+       ink transparent to the pointer while the pen is in hand, so that a line
+       can be drawn across a line already there, and that is exactly the rule
+       that has to be lifted to pick one up. A press on bare surface with it
+       held is a press on nothing. */
+    if (shape === "move") return;
+
     if (shape) {
       let last = point;
       const move = (next: PointerEvent) => {
@@ -1197,12 +1253,21 @@ function useInk({
      The translated path is written straight onto the element being dragged,
      for the reason a line being drawn is: sixty renders a second of every
      mark on the surface, to move one of them. */
-  function take(stroke: DrawingStroke, event: React.PointerEvent<SVGPathElement>) {
+  function take(mark: DrawingMark, event: React.PointerEvent<SVGElement>) {
     event.stopPropagation();
     event.preventDefault();
     const from = at(event);
     const element = event.currentTarget;
     if (!from) return;
+    /* Where the mark is put while the pointer is holding it. A caption moves
+       by its anchor and a stroke by every point of its path, which is the
+       only place the two differ in this whole gesture. */
+    const put = (dx: number, dy: number) => {
+      if (isDrawingText(mark)) {
+        element.setAttribute("x", String(Math.round(mark.x + dx)));
+        element.setAttribute("y", String(Math.round(mark.y + dy)));
+      } else element.setAttribute("d", translateStroke(mark.d, dx, dy));
+    };
     let moved = false;
     const move = (next: PointerEvent) => {
       const step = at(next);
@@ -1211,23 +1276,32 @@ function useInk({
       const dy = step.y - from.y;
       if (!moved && Math.hypot(dx, dy) < 6) return;
       moved = true;
-      element.setAttribute("d", translateStroke(stroke.d, dx, dy));
+      put(dx, dy);
     };
     const finish = (last: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", finish);
       if (!moved) {
-        setSelectedStroke({ stroke, x: event.clientX, y: event.clientY });
+        setSelectedStroke({ stroke: mark, x: event.clientX, y: event.clientY });
         return;
       }
       const step = at(last);
       if (!step) {
-        element.setAttribute("d", stroke.d);
+        put(0, 0);
         return;
       }
-      const d = translateStroke(stroke.d, step.x - from.x, step.y - from.y);
-      write(live.current.map((each) => (each === stroke ? { ...each, d } : each)));
+      const dx = step.x - from.x;
+      const dy = step.y - from.y;
+      write(
+        live.current.map((each) =>
+          each !== mark
+            ? each
+            : isDrawingText(each)
+              ? { ...each, x: Math.round(each.x + dx), y: Math.round(each.y + dy) }
+              : { ...each, d: translateStroke(each.d, dx, dy) },
+        ),
+      );
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
@@ -1236,19 +1310,34 @@ function useInk({
 
   const inked = (
     <>
-      {strokes.map((stroke, index) => (
-        <path
-          key={index}
-          className={editable ? "ink-stroke" : undefined}
-          onPointerDown={editable ? (event) => take(stroke, event) : undefined}
-          d={stroke.d}
-          fill={stroke.fill ?? "none"}
-          stroke={stroke.color}
-          strokeWidth={stroke.width}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
+      {strokes.map((mark, index) =>
+        isDrawingText(mark) ? (
+          <text
+            key={index}
+            className={editable ? "ink-stroke" : undefined}
+            onPointerDown={editable ? (event) => take(mark, event) : undefined}
+            x={mark.x}
+            y={mark.y}
+            fill={mark.color}
+            fontSize={mark.size}
+            fontFamily={DRAWING_TEXT_FONT}
+          >
+            {mark.text}
+          </text>
+        ) : (
+          <path
+            key={index}
+            className={editable ? "ink-stroke" : undefined}
+            onPointerDown={editable ? (event) => take(mark, event) : undefined}
+            d={mark.d}
+            fill={mark.fill ?? "none"}
+            stroke={mark.color}
+            strokeWidth={mark.width}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ),
+      )}
       <path
         ref={livePath}
         d=""
@@ -1334,19 +1423,20 @@ function useInk({
           button saying "freehand" would be a second way to say what putting a
           shape down already says, and the highlighter and the eraser beside
           them are toggles for the same reason. */}
-      {DRAWING_SHAPES.map(({ shape: kind, label, Glyph }) => (
+      {DRAWING_TOOLS.map(({ tool, label, Glyph }) => (
         <button
-          key={kind}
+          key={tool}
           type="button"
-          className={`rich-media-file-action ${!erasing && shape === kind ? "is-active" : ""}`}
+          className={`rich-media-file-action ${!erasing && shape === tool ? "is-active" : ""}`}
           aria-label={label}
-          aria-pressed={!erasing && shape === kind}
+          aria-pressed={!erasing && shape === tool}
           title={label}
           onClick={() => {
-            const next = shape === kind ? null : kind;
+            const next = shape === tool ? null : tool;
             lastShape = next;
             setShape(next);
             setErasing(false);
+            setComposing(null);
           }}
         >
           <Glyph size={16} />
@@ -1392,6 +1482,45 @@ function useInk({
     </>
   );
 
+  /* The field a caption is typed into. Portalled beside the menu and for the
+     same reason: an SVG takes no typing, and putting an input inside each of
+     the three surfaces means a `position: relative` and a stacking context on
+     each of them. Enter writes it, Escape and an empty field throw it away —
+     which is also what clicking elsewhere does, because a caption you walked
+     away from is a caption you did not want. */
+  const composer =
+    composing && editable
+      ? createPortal(
+          <input
+            className="ink-caption-field"
+            autoFocus
+            aria-label="Caption"
+            maxLength={280}
+            style={{
+              left: Math.min(composing.left, window.innerWidth - 240),
+              top: Math.min(composing.top, window.innerHeight - 52),
+              color: ink,
+            }}
+            placeholder="Caption"
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Escape") setComposing(null);
+              if (event.key !== "Enter") return;
+              const text = event.currentTarget.value.trim();
+              if (text)
+                write([
+                  ...live.current,
+                  { text, x: composing.x, y: composing.y, color: ink, size: textSize },
+                ]);
+              setComposing(null);
+            }}
+            onBlur={() => setComposing(null)}
+          />,
+          document.body,
+        )
+      : null;
+
   const menu =
     selectedStroke && editable
       ? createPortal(
@@ -1418,11 +1547,25 @@ function useInk({
           document.body,
         )
       : null;
-  return { surface, box, start, inked, tools, erasing, menu };
+  return {
+    surface,
+    box,
+    start,
+    inked,
+    tools,
+    erasing,
+    arranging: shape === "move",
+    menu: (
+      <>
+        {menu}
+        {composer}
+      </>
+    ),
+  };
 }
 
 function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
-  const strokes = useMemo(() => drawingStrokes(node.attrs.strokes as string), [node.attrs.strokes]);
+  const strokes = useMemo(() => drawingMarks(node.attrs.strokes as string), [node.attrs.strokes]);
   const onPage = drawingSurface(node.attrs.surface) === "page";
   /* The pen is in hand only if this layer is the one that was just asked for.
      Coming back to a note is coming back to read or to write it; drawing on it
@@ -1442,8 +1585,12 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
   }, [onPage, editor]);
 
   const write = useCallback(
-    (next: DrawingStroke[]) => {
-      if (!onPage || next.length !== strokes.length + 1) {
+    (next: DrawingMark[]) => {
+      const arrived = next[next.length - 1];
+      /* Only a stroke can cross into a picture. A caption belongs to the
+         surface it was written on: words that slid into a photograph when it
+         happened to be under them is not a thing anybody asked for. */
+      if (!onPage || next.length !== strokes.length + 1 || !arrived || isDrawingText(arrived)) {
         updateAttributes({ strokes: JSON.stringify(next) });
         return;
       }
@@ -1459,7 +1606,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         .filter(
           (frame) => frame.node && ["privateImage", "privateFile"].includes(frame.node.type.name),
         );
-      const stroke = next[next.length - 1];
+      const stroke: DrawingStroke = arrived;
       const sections = splitMediaStroke(
         stroke,
         page,
@@ -1474,7 +1621,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         const frame = frames[index];
         tr.setNodeMarkup(frame.pos, undefined, {
           ...frame.node!.attrs,
-          strokes: JSON.stringify([...drawingStrokes(frame.node!.attrs.strokes), ...added]),
+          strokes: JSON.stringify([...drawingMarks(frame.node!.attrs.strokes), ...added]),
         });
       }
       if (tr.docChanged) editor.view.dispatch(tr);
@@ -1487,7 +1634,7 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
     },
     [updateAttributes, onPage, strokes, editor],
   );
-  const { surface, box, start, inked, tools, erasing, menu } = useInk({
+  const { surface, box, start, inked, tools, erasing, arranging, menu } = useInk({
     strokes,
     write,
     fit: onPage ? "width" : "board",
@@ -1512,9 +1659,9 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         {menu}
         <svg
           ref={surface}
-          className={`drawing-overlay-surface ${pen && !erasing ? "is-drawing" : ""} ${
-            pen && erasing ? "is-erasing" : ""
-          }`}
+          className={`drawing-overlay-surface ${
+            pen && !erasing && !arranging ? "is-drawing" : ""
+          } ${pen && erasing ? "is-erasing" : ""} ${pen && arranging ? "is-arranging" : ""}`}
           viewBox={`0 0 ${box.width} ${box.height}`}
           /* **`meet`, never `none`.** A page measures both axes against its
              width — that is the whole of the stored model — and `none` throws

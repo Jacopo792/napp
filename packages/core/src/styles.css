@@ -6232,6 +6232,16 @@
   touch-action: none;
 }
 
+/* Arranging: the layer takes the pointer, and so do the marks on it — which
+   is the whole of what this state is. Drawing keeps the marks transparent so
+   a line can be laid across a line already there, and that is exactly the
+   rule that has to come off to pick one up. */
+.rich-media-image-ink.is-arranging,
+.drawing-overlay-surface.is-arranging {
+  pointer-events: auto;
+  touch-action: none;
+}
+
 .rich-media-remove {
   position: absolute;
   top: 0.55rem;
@@ -7687,13 +7697,32 @@
 .drawing-overlay-tools.is-put-away {
   display: none;
 }
+/* A mark is pressed by its own line, not by the box around it: a rectangle
+   drawn on a board would otherwise take every click inside it. A caption has
+   no line to hit, so it is pressed by the words. */
 .ink-stroke {
   pointer-events: stroke;
-  cursor: pointer;
+  cursor: grab;
 }
+
+text.ink-stroke {
+  pointer-events: all;
+}
+
+.ink-stroke:active {
+  cursor: grabbing;
+}
+
 .is-drawing .ink-stroke,
 .is-erasing .ink-stroke {
   pointer-events: none;
+}
+
+/* Nothing on the surface, everything on the marks: the pointer is here to
+   move one, and a press on bare paper with this in hand is a press on
+   nothing. */
+.is-arranging {
+  cursor: default;
 }
 .ink-delete-menu {
   position: fixed;
@@ -7703,6 +7732,27 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
+}
+
+/* A caption is typed into this and drawn as an SVG `<text>`, which cannot be
+   typed into. Set in the ink it will be written in, so the field is a preview
+   of the thing rather than a form about it. */
+.ink-caption-field {
+  position: fixed;
+  z-index: 1000;
+  width: 14rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.ink-caption-field::placeholder {
+  color: var(--ink-4);
 }
 .rich-media-image-frame video {
   display: block;

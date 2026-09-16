@@ -226,7 +226,47 @@ const PATH_DATA = /^[ML][-\d.,\s ML]*$/;
    every stroke ever written. */
 const INK = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
 
-export function drawingStrokes(value: unknown): DrawingStroke[] {
+/** Words written on the drawing rather than drawn on it: a caption, a label on
+ *  an arrow, the name of the thing that was circled.
+ *
+ *  The one kind here that is not a stroke, and it has to be: a `<text>` has an
+ *  anchor and a face and no path, and spelling a letter out in `M`/`L` would
+ *  be a font in the stored format. It lives in the same array as the strokes —
+ *  a caption written after a circle is drawn over it and has to stay over it —
+ *  and the two are told apart by `text` being there, which is also what makes
+ *  a note written before today still read: nothing in it has one. */
+export interface DrawingText {
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  size: number;
+}
+
+/** Everything a drawing is made of. `drawingStrokes` keeps its old name and
+ *  its old promise for the readers that only ever wanted the lines. */
+export type DrawingMark = DrawingStroke | DrawingText;
+
+export const isDrawingText = (mark: DrawingMark): mark is DrawingText => "text" in mark;
+
+/** What the face is, said the same way on the screen and in an exported file.
+ *  Naming `var(--font-sans)` in one and a real stack in the other is a caption
+ *  that is one shape in the note and another in the vault it lands in. */
+export const DRAWING_TEXT_FONT = "system-ui, -apple-system, Segoe UI, sans-serif";
+
+/** A caption is a caption, not a note stored in a note. Long enough for a
+ *  sentence over a diagram and short enough that a document arriving from the
+ *  other member cannot carry a chapter in an SVG attribute. */
+const MAX_TEXT = 280;
+
+/* Far enough outside the box to allow for a page as tall as any note and a
+   hand that overshot, and near enough that a coordinate out of a broken
+   document does not become an SVG nobody can draw. */
+const FAR = DRAWING_BOX.width * 100;
+const place = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= FAR ? value : null;
+
+export function drawingMarks(value: unknown): DrawingMark[] {
   if (typeof value !== "string" || !value) return [];
   let parsed: unknown;
   try {
@@ -235,18 +275,42 @@ export function drawingStrokes(value: unknown): DrawingStroke[] {
     return [];
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.flatMap((entry) => {
-    const stroke = entry as Partial<DrawingStroke> | null;
-    if (!stroke || typeof stroke.d !== "string" || !PATH_DATA.test(stroke.d)) return [];
+  return parsed.flatMap<DrawingMark>((entry) => {
+    const mark = entry as Partial<DrawingStroke & DrawingText> | null;
+    if (!mark) return [];
     const color =
-      typeof stroke.color === "string" && INK.test(stroke.color) ? stroke.color : DRAWING_INKS[0];
+      typeof mark.color === "string" && INK.test(mark.color) ? mark.color : DRAWING_INKS[0];
+
+    if (typeof mark.text === "string") {
+      /* `\p{Cc}` is the Unicode control category, which is every character
+         that would break the line the caption is drawn on, and it says so
+         where a range of escapes would only have looked like one. */
+      const text = mark.text
+        .slice(0, MAX_TEXT)
+        .replace(/\p{Cc}/gu, " ")
+        .trim();
+      const x = place(mark.x);
+      const y = place(mark.y);
+      if (!text || x === null || y === null) return [];
+      const size =
+        typeof mark.size === "number" && mark.size > 0 && mark.size <= DRAWING_BOX.width
+          ? mark.size
+          : 30;
+      return [{ text, x, y, color, size }];
+    }
+
+    if (typeof mark.d !== "string" || !PATH_DATA.test(mark.d)) return [];
     const width =
-      typeof stroke.width === "number" && stroke.width > 0 && stroke.width <= DRAWING_BOX.width
-        ? stroke.width
+      typeof mark.width === "number" && mark.width > 0 && mark.width <= DRAWING_BOX.width
+        ? mark.width
         : 5;
-    const fill = typeof stroke.fill === "string" && INK.test(stroke.fill) ? stroke.fill : undefined;
-    return [fill ? { d: stroke.d, color, width, fill } : { d: stroke.d, color, width }];
+    const fill = typeof mark.fill === "string" && INK.test(mark.fill) ? mark.fill : undefined;
+    return [fill ? { d: mark.d, color, width, fill } : { d: mark.d, color, width }];
   });
+}
+
+export function drawingStrokes(value: unknown): DrawingStroke[] {
+  return drawingMarks(value).filter((mark): mark is DrawingStroke => !isDrawingText(mark));
 }
 
 /** The drawing as a standalone picture. This is what leaves in an exported
@@ -254,15 +318,29 @@ export function drawingStrokes(value: unknown): DrawingStroke[] {
  *  own bytes, so it is a picture in somebody else's vault rather than a broken
  *  link. One-way, like `[[Title]]` — reading it back would mean parsing
  *  somebody's arbitrary SVG, and this file is not going to grow a parser. */
-export function drawingSvg(strokes: DrawingStroke[], surface: DrawingSurface = "board"): string {
-  const { width, height } = drawingBox(strokes, surface);
-  const paths = strokes
-    .map(
-      (stroke) =>
-        `<path d="${stroke.d}" fill="${stroke.fill ?? "none"}" stroke="${stroke.color}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
+export function drawingSvg(marks: DrawingMark[], surface: DrawingSurface = "board"): string {
+  const { width, height } = drawingBox(marks, surface);
+  const drawn = marks
+    .map((mark) =>
+      isDrawingText(mark)
+        ? `<text x="${mark.x}" y="${mark.y}" fill="${mark.color}" font-size="${mark.size}" font-family="${DRAWING_TEXT_FONT}">${escapeXml(mark.text)}</text>`
+        : `<path d="${mark.d}" fill="${mark.fill ?? "none"}" stroke="${mark.color}" stroke-width="${mark.width}" stroke-linecap="round" stroke-linejoin="round"/>`,
     )
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Drawing">${paths}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Drawing">${drawn}</svg>`;
+}
+
+/* A caption is the one thing in a drawing that is not digits, and this builds
+   a document out of it by hand. It arrives from the other member, an import,
+   or whatever was on disk, and `drawingMarks` above has already taken the
+   control characters out of it — what is left is the five that would close the
+   element it is being put inside. */
+function escapeXml(text: string): string {
+  return text.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!,
+  );
 }
 
 /** Where the ink sits: on a sheet of its own, or over the page itself. */
@@ -290,13 +368,18 @@ export function strokePoints(d: string): { x: number; y: number }[] {
  *  as tall as the lowest stroke on it, because the note it was drawn over has
  *  no height until it is read. */
 export function drawingBox(
-  strokes: DrawingStroke[],
+  marks: DrawingMark[],
   surface: DrawingSurface,
 ): { width: number; height: number } {
   if (surface === "board") return DRAWING_BOX;
   let lowest = 0;
-  for (const stroke of strokes)
-    for (const point of strokePoints(stroke.d)) lowest = Math.max(lowest, point.y + stroke.width);
+  for (const mark of marks) {
+    /* `y` is a baseline, so what hangs below it is the descenders. A quarter
+       of the size is what every face keeps for them, and a caption cut off at
+       its own baseline is a caption with no tails. */
+    if (isDrawingText(mark)) lowest = Math.max(lowest, mark.y + mark.size * 0.25);
+    else for (const point of strokePoints(mark.d)) lowest = Math.max(lowest, point.y + mark.width);
+  }
   return { width: DRAWING_BOX.width, height: Math.max(Math.ceil(lowest), 1) };
 }
 
@@ -308,7 +391,7 @@ export function drawingBox(
  *  drew differently. A note row's glyph slot is 28 pixels: a signature in the
  *  corner of a 1000 × 560 sheet fitted into that is four specks, which is what
  *  the row was showing. */
-export function drawingInkBox(strokes: DrawingStroke[]): {
+export function drawingInkBox(marks: DrawingMark[]): {
   x: number;
   y: number;
   width: number;
@@ -319,14 +402,27 @@ export function drawingInkBox(strokes: DrawingStroke[]): {
   let right = -Infinity;
   let bottom = -Infinity;
   let nib = 0;
-  for (const stroke of strokes)
-    for (const point of strokePoints(stroke.d)) {
-      left = Math.min(left, point.x);
-      top = Math.min(top, point.y);
-      right = Math.max(right, point.x);
-      bottom = Math.max(bottom, point.y);
-      nib = Math.max(nib, stroke.width);
-    }
+  const reach = (x: number, y: number) => {
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x);
+    bottom = Math.max(bottom, y);
+  };
+  for (const mark of marks)
+    if (isDrawingText(mark)) {
+      /* Measured without a font, because this runs where there is none — the
+         thumbnail is drawn in a list and the box is also asked for by a test
+         under `node`. Half the size per character across and the size itself
+         from cap height to descender is the ordinary proportion of a sans
+         face, and being a little generous here costs a thumbnail some air
+         while being mean cuts the last word off it. */
+      reach(mark.x, mark.y - mark.size * 0.8);
+      reach(mark.x + mark.text.length * mark.size * 0.5, mark.y + mark.size * 0.25);
+    } else
+      for (const point of strokePoints(mark.d)) {
+        reach(point.x, point.y);
+        nib = Math.max(nib, mark.width);
+      }
   /* Nothing drawn, or nothing readable: the surface is the honest answer. */
   if (!Number.isFinite(left)) return { x: 0, y: 0, ...DRAWING_BOX };
   /* Half the widest nib on each side, or a round cap is cut off by the edge of
@@ -505,7 +601,7 @@ export const Drawing = Node.create({
     return ["napp-drawing", mergeAttributes(HTMLAttributes)];
   },
   renderMarkdown: (node) =>
-    `${drawingSvg(drawingStrokes(node.attrs?.strokes), drawingSurface(node.attrs?.surface))}\n\n`,
+    `${drawingSvg(drawingMarks(node.attrs?.strokes), drawingSurface(node.attrs?.surface))}\n\n`,
 });
 
 /** The name of the mark below, needed by anything that reads a document
@@ -810,12 +906,12 @@ export function documentGlyph(document: JSONContent): DocumentGlyph {
  *  a node, so there is nothing to index. */
 export function firstDrawing(
   document: JSONContent,
-): { strokes: DrawingStroke[]; surface: DrawingSurface } | null {
-  let found: { strokes: DrawingStroke[]; surface: DrawingSurface } | null = null;
+): { strokes: DrawingMark[]; surface: DrawingSurface } | null {
+  let found: { strokes: DrawingMark[]; surface: DrawingSurface } | null = null;
   const visit = (node: JSONContent) => {
     if (found) return;
     if (node.type === "drawing") {
-      const strokes = drawingStrokes(node.attrs?.strokes);
+      const strokes = drawingMarks(node.attrs?.strokes);
       if (strokes.length > 0) {
         found = { strokes, surface: drawingSurface(node.attrs?.surface) };
         return;

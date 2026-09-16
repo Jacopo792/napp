@@ -1,12 +1,18 @@
 import type { JSONContent } from "@tiptap/core";
-import { drawingStrokes, drawingSvg, type DrawingStroke } from "./content";
+import {
+  DRAWING_TEXT_FONT,
+  drawingMarks,
+  drawingSvg,
+  isDrawingText,
+  type DrawingMark,
+} from "./content";
 import { platform } from "@/platform";
 
 type Resolve = (id: string) => Promise<Blob>;
 function png(canvas: HTMLCanvasElement): Uint8Array {
   return Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]), (c) => c.charCodeAt(0));
 }
-async function picture(blob: Blob, strokes: DrawingStroke[] = []): Promise<HTMLCanvasElement> {
+async function picture(blob: Blob, marks: DrawingMark[] = []): Promise<HTMLCanvasElement> {
   const src = URL.createObjectURL(blob);
   try {
     const image = new Image();
@@ -19,16 +25,23 @@ async function picture(blob: Blob, strokes: DrawingStroke[] = []): Promise<HTMLC
     ctx.drawImage(image, 0, 0);
     const scale = canvas.width / 1000;
     ctx.scale(scale, scale);
-    for (const stroke of strokes) {
-      const path = new Path2D(stroke.d);
+    for (const mark of marks) {
+      if (isDrawingText(mark)) {
+        ctx.fillStyle = mark.color;
+        ctx.font = `${mark.size}px ${DRAWING_TEXT_FONT}`;
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText(mark.text, mark.x, mark.y);
+        continue;
+      }
+      const path = new Path2D(mark.d);
       /* Under the outline, never over it: a closed shape is its edge, and a
          fill painted afterwards eats half the line that draws it. */
-      if (stroke.fill) {
-        ctx.fillStyle = stroke.fill;
+      if (mark.fill) {
+        ctx.fillStyle = mark.fill;
         ctx.fill(path);
       }
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width;
+      ctx.strokeStyle = mark.color;
+      ctx.lineWidth = mark.width;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke(path);
@@ -87,7 +100,7 @@ export async function exportDocx(
       let canvas: HTMLCanvasElement;
       if (node.type === "drawing")
         canvas = await picture(
-          new Blob([drawingSvg(drawingStrokes(node.attrs?.strokes), node.attrs?.surface)], {
+          new Blob([drawingSvg(drawingMarks(node.attrs?.strokes), node.attrs?.surface)], {
             type: "image/svg+xml",
           }),
         );
@@ -96,7 +109,7 @@ export async function exportDocx(
           node.type === "privateImage"
             ? await resolve(String(node.attrs?.objectId))
             : await (await fetch(String(node.attrs?.src))).blob();
-        canvas = await picture(blob, drawingStrokes(node.attrs?.strokes));
+        canvas = await picture(blob, drawingMarks(node.attrs?.strokes));
       }
       const scale = Math.min(1, 600 / canvas.width, 800 / canvas.height);
       return [

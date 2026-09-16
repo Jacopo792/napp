@@ -295,7 +295,7 @@ The strokes are a JSON **string**, not an array, and that is load-bearing
 twice: y-prosemirror diffs node attributes with `!==`, so an array would be a
 different object every comparison and would be rewritten into the document on
 every keystroke anywhere in the note — and a string is something Yjs stores and
-compares without knowing what is in it. `drawingStrokes()` reads rather than
+compares without knowing what is in it. `drawingMarks()` reads rather than
 trusts what comes back out, because it goes into an SVG attribute and it
 arrives from the other member, an import, or whatever was on disk.
 
@@ -345,11 +345,53 @@ up. The words underneath stay words.
   that grows a curve command is a stored format every reader has to learn.
   Moving away again takes the scrawl back, because a shape you cannot refuse is
   worse than no shape.
+- **A shape asked for outright is not a new kind of thing.** `shapeStroke()`
+  emits what `straightenStroke` emits — the two share `rectPath` and
+  `ellipsePath`, because two ways of drawing a rectangle is two rectangles to
+  keep the same shape — so the eraser, both boxes, the thumbnail, the media
+  split and both exporters needed no change for the line, arrow, rectangle and
+  ellipse tools and got none. An **arrow** is one path with three subpaths: SVG
+  draws a second `M` as a second subpath, `PATH_DATA` already admits one, and
+  `strokePoints` reads every point of it, so an arrow erases and moves the way
+  a line does. The pen is the tool that is _not_ pressed; there is no
+  "freehand" button, for the same reason the highlighter and the eraser beside
+  it are toggles.
+- **`fill` is optional, never `"none"`.** A field added to a stored format has
+  to mean the same thing when it is missing as when the format had no such
+  field, or every note already in the archive says something it never said. It
+  carries the highlighter's own alpha — translucency is a property of the
+  colour, as above — so nothing that reads a stroke learns about fills, and a
+  filled shape over the words leaves the words.
+- **A caption is the one mark that is not a stroke**, because a `<text>` has an
+  anchor and a face and no path, and spelling a letter out in `M`/`L` would be
+  a font in the stored format. `DrawingText` shares the array with the strokes
+  — words written over a circle have to stay over it — and the two are told
+  apart by `text` being there, which is also what makes every note written
+  before it still read. `drawingMarks()` is the one parser; `drawingStrokes()`
+  keeps its old name and its old promise for the readers that only ever wanted
+  the lines. Its words are validated and then **escaped** on the way into
+  `drawingSvg`, which builds a document by concatenation out of something the
+  other member wrote. A caption is typed into a field portalled to the body,
+  beside the delete menu and for the same reason: an SVG takes no typing, and
+  an input inside each of the three surfaces is a stacking context on each of
+  them. Only a stroke crosses into a picture — `splitMediaStroke` is never
+  handed a caption, because words that slid into a photograph when it happened
+  to be under them is not a thing anybody asked for.
+- **Moving a mark needs a tool because drawing does not.** The page and a
+  picture keep their ink `pointer-events: none` while the pen is in hand, so
+  that a line can be drawn across a line already there — and that is exactly
+  the rule that has to come off to pick one up. `is-arranging` is that rule
+  lifted. Pressing a mark already meant "this one", so dragging from that press
+  moves it and the two are told apart by whether the pointer travelled; the
+  translated path is written straight onto the element being dragged, for the
+  reason the line being drawn is.
 - **Three surfaces, one hand.** `useInk` holds the ink, the nib, the eraser and
   the gesture; a board, the page and a picture in the note differ only in the
   box the strokes are measured in. A picture keeps its strokes in
   `privateImage.strokes` and they do not leave in an export, because the
-  picture does not either.
+  picture does not either. `useInk` also holds which tool is in hand, and the
+  four shapes, the caption and the move share one slot: you are drawing a
+  rectangle or captioning one or moving one, never two of those at once.
 - **The line being drawn is written straight onto its own element.** As React
   state it was a render of the whole layer per pointer event — sixty a second,
   each rebuilding every stroke already on the surface — and nothing outside the
