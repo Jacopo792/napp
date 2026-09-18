@@ -1170,6 +1170,36 @@ happened while we were away was never announced; and the channels are rebuilt �
 the archive's and the remarks' both — because the ones we had may be listening
 to nothing.
 
+**And the note's own socket, which fails the same way and is worse.** Realtime
+going quiet costs a stale list; the collaboration socket going quiet costs every
+note, because an editor mounts only once the document has synced. There is one
+socket for the whole session, so nothing remounts it when a note is opened.
+
+`HocuspocusProviderWebsocket` reconnects itself from a _close_, and it closes a
+socket that has gone thirty seconds without a message — but a connection
+_attempt_ has no timeout at all (`timeout: 0`). A half-open socket left behind
+by a slept laptop or a changed network never opens, never errors and never
+closes, so the status sits at `connecting` for ever: `checkConnection` returns
+early because it only watches a socket that says it is connected, and `attach()`
+reconnects only one that says it is disconnected, so opening another note does
+not help either. Nothing is broken and nothing is retrying, which on screen is
+**"Waking the server" that never ends** — read, correctly enough, as the Render
+instance being down, which it was not.
+
+`wakeCollaboration()` in `collab.ts` is `connect()`: it cancels the stale
+attempt, and the first attempt after it drops the hung socket's listeners before
+replacing it, so the corpse cannot fire a close at the connection that replaced
+it. It is called from the wake path above, beside the channels, and from a
+**two-minute** timer on a note that has not opened. That number is the whole
+care in it: a sleeping Render instance leaves the connection hanging for about
+fifty seconds, and a nudge inside that window abandons the attempt that was
+about to succeed and starts the fifty seconds again. Do not shorten it to make
+the recovery feel quicker.
+
+A refusal is **said**, not left as a wait. `onAuthenticationFailed` sets
+`refusal`, and the status line used to go on reading "Connecting" — a wait the
+reader has no way to end, for a door that was already answered and shut.
+
 ## Preferences belong to the account
 
 `profile_preferences` is one row per account with one jsonb column, and

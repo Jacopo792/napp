@@ -3,6 +3,23 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.4.2 — 2026-09-18
+
+### Fixed
+
+- **A note that never opens, under "Waking the server" that never stops.** The
+  server was awake and answering the whole time; what had stopped was the one
+  socket the window holds for the session. A connection attempt has no timeout,
+  so a half-open socket left behind by a slept laptop or a changed network never
+  opened, never failed and never closed — and nothing retried, because the parts
+  that reconnect watch for a socket that is either connected or disconnected, and
+  this one said it was still connecting. Quitting the app was the only way out.
+  The window now takes the socket back up when it notices it has come back, and
+  after two minutes of a note not opening — well past the minute the server's own
+  waking takes, so a real wait is never cut short.
+- **A note you are not allowed to open says so**, instead of reading as a wait
+  that will not end.
+
 ## 0.4.1 — 2026-09-16
 
 ### Fixed
