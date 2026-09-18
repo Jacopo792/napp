@@ -17,7 +17,11 @@
  * is handed no such row. What authorises a *write* is still the collaboration
  * server, on every message. Losing the network keeps the mounted editor usable
  * and reconnect sends its Yjs updates normally. */
-import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
+import {
+  HocuspocusProvider,
+  HocuspocusProviderWebsocket,
+  WebSocketStatus,
+} from "@hocuspocus/provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
@@ -32,6 +36,11 @@ export type ConnectionState = "connecting" | "connected" | "offline";
  *  merely displayed. Short enough that nobody stares at "Connecting" wondering
  *  whether it is broken; long enough that an ordinary open never trips it. */
 const WAKING_AFTER_MS = 4000;
+
+/** How long a note may go on not opening before the socket under it is assumed
+ *  hung rather than slow. Comfortably past the fifty seconds a sleeping Render
+ *  instance takes, so an honest cold start is never interrupted. */
+const STALLED_AFTER_MS = 120_000;
 
 export interface CollaborationIdentity {
   userId: string;
@@ -104,6 +113,26 @@ let shared: HocuspocusProviderWebsocket | null = null;
 function sharedSocket(): HocuspocusProviderWebsocket {
   shared ??= new HocuspocusProviderWebsocket({ url: COLLAB_URL });
   return shared;
+}
+
+/* The one way that socket does not come back on its own.
+ *
+ * `HocuspocusProviderWebsocket` reconnects itself from a *close*, and it closes
+ * a connection that has gone quiet for thirty seconds — but a connection
+ * *attempt* has no timeout at all (`timeout: 0`), and a half-open socket left
+ * behind by a slept laptop or a changed network never opens, never errors and
+ * never closes. The status then sits at "connecting" for ever: `checkConnection`
+ * returns early because it only watches a socket that says it is connected, and
+ * `attach()` reconnects only a socket that says it is disconnected, so opening
+ * another note does not help either. Nothing in the window is broken and nothing
+ * is retrying — which on screen is "Waking the server" that never ends.
+ *
+ * `connect()` is the way back: it cancels the stale attempt, and its first new
+ * attempt drops the hung socket's listeners before replacing it, so the corpse
+ * cannot fire a close at the connection that replaced it. */
+export function wakeCollaboration(): void {
+  if (!shared || shared.status === WebSocketStatus.Connected) return;
+  void shared.connect();
 }
 
 export function useCollaborativeNote(
@@ -210,15 +239,27 @@ export function useCollaborativeNote(
 
   /* Four seconds is "the network is slow"; longer than that, on a plan whose
      server sleeps after fifteen idle minutes, is the server getting up. Held
-     outside `state` so the timer cannot race the socket's own updates. */
+     outside `state` so the timer cannot race the socket's own updates.
+
+     The second timer is the one that ends a wait that was never going to end.
+     It is deliberately well past the cold start: a sleeping Render instance
+     leaves the connection hanging for about fifty seconds, and a nudge inside
+     that window would abandon the attempt that was about to succeed and start
+     the same fifty seconds again. Past two minutes there is nothing left to
+     interrupt — the socket is hung, and one `connect()` is the difference
+     between a note that opens and a window that has to be quit. */
   const [waking, setWaking] = useState(false);
   useEffect(() => {
     if (!noteId || state.ready || state.refusal) {
       setWaking(false);
       return;
     }
-    const timer = window.setTimeout(() => setWaking(true), WAKING_AFTER_MS);
-    return () => window.clearTimeout(timer);
+    const explain = window.setTimeout(() => setWaking(true), WAKING_AFTER_MS);
+    const nudge = window.setInterval(wakeCollaboration, STALLED_AFTER_MS);
+    return () => {
+      window.clearTimeout(explain);
+      window.clearInterval(nudge);
+    };
   }, [noteId, state.ready, state.refusal]);
 
   return useMemo(() => ({ ...state, waking }), [state, waking]);

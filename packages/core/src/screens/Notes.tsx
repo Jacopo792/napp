@@ -123,7 +123,12 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
-import { announceTyping, useCollaborationPeers, useCollaborativeNote } from "@/lib/collab";
+import {
+  announceTyping,
+  useCollaborationPeers,
+  useCollaborativeNote,
+  wakeCollaboration,
+} from "@/lib/collab";
 import { useAutoLock } from "@/lib/autoLock";
 import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
 /* Lazily, and only once it is opened. Settings is one panel behind one button
@@ -723,6 +728,10 @@ export default function NotesPage() {
        because `readSnapshot` stands down until the initial load has landed and
        the initial load is the effect above this one. */
     void readSnapshot();
+    /* And the note's own socket, which fails the same way for the same reason
+       and is not rebuilt by anything else: it is one socket for the session, so
+       nothing remounts it when a note is opened. A no-op unless it is stalled. */
+    wakeCollaboration();
     const channel = subscribeToArchive(session.archiveId, () => void refreshRemote());
     return () => void unsubscribeFromArchive(channel);
   }, [session, refreshRemote, readSnapshot, awake]);
@@ -2527,6 +2536,12 @@ export default function NotesPage() {
     <span className="label text-ink-2">Unsaved</span>
   ) : statusFlash ? (
     <span className="label text-accent">{statusFlash}</span>
+  ) : selectedId && collaborative.refusal ? (
+    /* The door was answered and shut. Said rather than left as a wait, because
+       a refusal that renders as "Connecting" is a wait nobody can end. */
+    <span className="label text-ink-2" title={collaborative.refusal}>
+      {collaborative.refusal}
+    </span>
   ) : selectedId && !collaborative.ready ? (
     /* The free plan's server sleeps after fifteen idle minutes and takes about
        fifty seconds to get up, and nothing opens until it has. Saying so is
