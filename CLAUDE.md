@@ -865,6 +865,15 @@ trigger anything at all.
 Neither is catchable by CI. CI builds the image from the repository, where the
 path is right; what was wrong was a value stored in Render.
 
+**And the third time the button was not enough.** From 5 to 25 September
+twenty commits reached `main` and none reached Render, with the service's Git
+Credentials field reading the right account the whole time. That field names
+a _user_; the credential itself lives on the account, under Account settings →
+Git Deployment Credentials, and that list was empty — the Render GitHub App was
+not installed on the repository, so there was nobody to hear a push. **Add
+credential → GitHub** installs it (limit it to `Jacopo792/napp`), and only then
+does **Use My Credentials** on the service point at something.
+
 The lesson is the check, not the fix: **a service that is up is not a service
 that is current.** Ask `render deploys list <service-id>` what it is actually
 running, the way `gh run list` is asked about Pages above.
