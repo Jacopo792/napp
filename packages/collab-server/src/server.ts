@@ -178,6 +178,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     ttl: config.authorizationTtl ?? 5000,
   });
   const tokenRefresh = config.tokenRefresh ?? 60_000;
+  let readinessState: string | null = null;
 
   return new Server<Context>({
     port: config.port,
@@ -391,6 +392,12 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         ]);
         const checks = { supabase: supabaseOk === true, redis: redisOk };
         const ready = checks.supabase && checks.redis !== false;
+        const state = ready ? "ready" : `unavailable: ${JSON.stringify(checks)}`;
+        if (state !== readinessState) {
+          if (!ready) console.warn(`readiness ${state}`);
+          else if (readinessState !== null) console.info("readiness recovered");
+          readinessState = state;
+        }
         return respond(response, ready ? 200 : 503, {
           status: ready ? "ok" : "unavailable",
           checks,

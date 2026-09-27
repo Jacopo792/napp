@@ -5801,15 +5801,30 @@
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
 .editor-toolbar-compact-tools {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
 }
 
-/* The compact arrangement shares one header with page actions, but is centred
-   against the editor itself — never against whatever space remains before the
-   right-hand controls. Its popovers stay above those siblings, while the
-   anchor never turns into a second bar that costs the note vertical space. */
+/* The first row keeps the note's state readable; the second centres tools
+   against the whole editor width. */
+.editor-toolbar-stacked {
+  grid-template-rows: 52px 44px;
+}
+
+.editor-toolbar-stacked.is-cramped {
+  grid-template-rows: 52px 24px 44px;
+}
+
+.editor-toolbar-stacked.is-cramped .editor-toolbar-compact-tools {
+  grid-row: 3;
+}
+
+.editor-toolbar-stacked-status {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
 .editor-toolbar-compact-tools .editor-tool-cluster {
   position: relative;
   z-index: 1;

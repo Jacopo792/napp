@@ -3,6 +3,22 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.4.3 — 2026-09-27
+
+### Fixed
+
+- **The editor header stays readable in narrow windows.** Formatting controls
+  move to their own row before they can cover the last-edited time or note
+  actions. In very narrow panes, the time gets a separate line too.
+- **The UI preview opens again.** Its in-memory collaboration stand-in now
+  supports the reconnect action used by the app.
+
+### Changed
+
+- **Render readiness failures identify the unavailable dependency.** The
+  collaboration server logs whether Supabase or Redis failed the readiness
+  check and logs when the service recovers.
+
 ## 0.4.2 — 2026-09-18
 
 ### Fixed

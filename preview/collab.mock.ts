@@ -15,6 +15,10 @@ import { FIXTURE_NOTES, PREVIEW_U2 } from "./fixture";
 export { collaborationColor };
 export type { CollaborationIdentity, CollaborativeNote, ConnectionState, Peer } from "@/lib/collab";
 
+export function wakeCollaboration(): void {
+  /* Preview documents are already local and ready. */
+}
+
 const documents = new Map<string, Y.Doc>();
 
 export function useCollaborativeNote(
