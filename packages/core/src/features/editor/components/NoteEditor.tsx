@@ -94,6 +94,13 @@ interface Props {
    desktop window of 1024px leaves the editor 334px to hold both. */
 const TOOLBAR_ROOM = 810;
 
+/* Under TOOLBAR_ROOM the cluster can no longer be centred on the pane, but it
+   still fits on the one strip beside the other two groups — and a strip that
+   stays 52px is a hairline that stays level with the two columns beside it.
+   A 1280px window with both navigation columns open leaves the editor about
+   650px, which is here, and used to be two rows. */
+const TOOLBAR_ROW_ROOM = 640;
+
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
   openLink: () => void;
@@ -476,11 +483,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onContextMenu(event);
   }
 
-  /* When the side panels leave less than 810px, formatting gets its own row.
-     A centred absolute cluster can cover the save state and page actions. */
-  const inlineToolbar =
-    !mobile && Boolean(toolbar) && (shellWidth === null || shellWidth >= TOOLBAR_ROOM);
-  const crampedToolbar = !inlineToolbar && shellWidth !== null && shellWidth < 420;
+  /* Centred over the pane while there is room for that, then on the one strip
+     beside the other groups, and only then a row of its own — never two rows
+     of its own: the save state stays on the first row and gives up letters
+     rather than taking a third. A note with no toolbar is one row always. */
+  const toolbarLayout: "centred" | "row" | "stacked" = !toolbar
+    ? "row"
+    : mobile
+      ? "stacked"
+      : shellWidth === null || shellWidth >= TOOLBAR_ROOM
+        ? "centred"
+        : shellWidth >= TOOLBAR_ROW_ROOM
+          ? "row"
+          : "stacked";
 
   const fileInputs = (
     <>
@@ -601,11 +616,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {/* Frontispiece — set over the measure the body will use. */}
       <div
         className={`editor-toolbar relative shrink-0 px-4 ${
-          inlineToolbar
+          toolbarLayout === "centred"
             ? "grid h-13 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2"
-            : `editor-toolbar-stacked grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 ${
-                crampedToolbar ? "is-cramped" : ""
-              }`
+            : toolbarLayout === "row"
+              ? "grid h-13 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
+              : "editor-toolbar-stacked grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2"
         }`}
       >
         {/* What the window is doing, and nothing else. Add cover stood here
@@ -622,13 +637,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             absolute` used to, and unlike absolute it occupies room: centred
             over a 632px editor the cluster ran fifteen pixels underneath the
             save readout, and no width of readout could have avoided it. */}
-        {inlineToolbar && <div className="justify-self-center">{toolbar}</div>}
+        {toolbarLayout !== "stacked" &&
+          (toolbar ? <div className="justify-self-center">{toolbar}</div> : <span />)}
 
         {/* In a narrow pane the writing controls have a centred row of their
             own, leaving the status and page actions unobstructed. */}
-        {!inlineToolbar && toolbar && <div className="editor-toolbar-compact-tools">{toolbar}</div>}
+        {toolbarLayout === "stacked" && (
+          <div className="editor-toolbar-compact-tools">{toolbar}</div>
+        )}
 
-        <span className="flex min-w-0 items-center justify-end gap-2 justify-self-end">
+        <span
+          className={`flex min-w-0 items-center justify-end gap-2 justify-self-end ${
+            toolbarLayout === "stacked" ? "w-full" : ""
+          }`}
+        >
           {/* Everything the note says about itself, in one place. It used to
               say it in two: whether you may write it at the far left of the
               strip, whether it is saved at the far right — one kind of thing,
@@ -641,11 +663,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               be pressed. They stay out of the dock beside them for the same
               reason: a dock carrying them would be moving its icons around
               three things that are not icons. */}
-          {!crampedToolbar && (
-            <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
-          )}
+          <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
           <span
-            className={`flex min-w-0 items-center justify-end gap-1 ${
+            className={`flex shrink-0 items-center justify-end gap-1 ${
               mobile ? "gap-1" : "editor-tool-group glass-toolbar"
             }`}
           >
@@ -681,11 +701,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             {headerActions}
           </span>
         </span>
-        {crampedToolbar && (
-          <span className="editor-toolbar-stacked-status flex items-center justify-end">
-            {headerStatus}
-          </span>
-        )}
       </div>
 
       {fileInputs}

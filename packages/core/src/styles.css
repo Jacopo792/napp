@@ -268,9 +268,13 @@
        element and still runs a filter pass on every composite. The default is
        no blur, so the default is no filter at all. */
     filter: var(--wallpaper-filter, none);
-    opacity: 0;
+    /* Absent, not transparent, until there is a picture. A fixed box over the
+       document's own scroller needs a composited layer of its own even at
+       opacity 0, and everything in #root paints over it — so the whole app was
+       lifted into a second, transparent layer, and Chromium draws no subpixel
+       text into one of those. On Windows that is every word without ClearType. */
+    display: none;
     pointer-events: none;
-    transition: opacity var(--dur-base) var(--ease);
   }
 
   [data-theme="light"] #root::before {
@@ -283,7 +287,7 @@
   }
 
   .has-wallpaper #root::before {
-    opacity: 1;
+    display: block;
   }
 
   button,
@@ -503,11 +507,14 @@
   background: transparent;
 }
 
+/* The page stays opaque in front of a picture too. At 93% over a 12px blur
+   the picture behind it was a tint nobody could see — and a backdrop filter
+   is a composited layer that is not opaque, which is the one thing Chromium
+   will not draw subpixel text into: on Windows every word of the note lost
+   ClearType and read as grainy, for a wash of colour that was not visible. */
 .has-wallpaper .editor-shell,
 .has-wallpaper .pane-page {
-  background: color-mix(in srgb, var(--page) 93%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: var(--page);
 }
 
 /* The writing surface: opaque, calm, the lightest thing on screen. */
@@ -579,7 +586,7 @@
      is short enough that it is never a wait — the list is legible before the
      eye has finished travelling to it — and it comes from the corner the menu
      hangs off, so the panel looks attached to the control that opened it. */
-  animation: menu-in var(--dur-fast) var(--ease-out) both;
+  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -599,7 +606,7 @@
 }
 
 .context-menu {
-  animation: menu-in var(--dur-fast) var(--ease-out) both;
+  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
 }
 
 /* A card that answers a hold should look like it came out of the finger that
@@ -611,7 +618,7 @@
    menu cannot. */
 .context-menu.member-card-panel {
   padding: 16px;
-  animation: member-card-in var(--dur-base) var(--ease-spring) both;
+  animation: member-card-in var(--dur-base) var(--ease-spring) backwards;
   transform-origin: top left;
 }
 
@@ -806,7 +813,7 @@
    up for a beat and then let go. It is a fade, not a flash: the thread is
    already the one in view, and this only has to say which. */
 .note-comment-thread.is-arrived {
-  animation: comment-arrived 1.4s var(--ease) both;
+  animation: comment-arrived 1.4s var(--ease) backwards;
 }
 
 @keyframes comment-arrived {
@@ -1316,7 +1323,7 @@
     inset 0 1px 0 var(--glass-highlight),
     var(--shadow-soft);
   padding: clamp(1.75rem, 4vw, 2.4rem);
-  animation: login-settle var(--dur-slow) var(--ease-out) both;
+  animation: login-settle var(--dur-slow) var(--ease-out) backwards;
 }
 
 .login-brand {
@@ -2210,7 +2217,7 @@
      overlap is the reference behaviour and the honest one: the labels are
      translucent enough to read the one behind, and neither moves the text. */
   transform-origin: 0 100%;
-  animation: caret-label-in var(--dur-fast) var(--ease-spring) both;
+  animation: caret-label-in var(--dur-fast) var(--ease-spring) backwards;
 }
 
 @keyframes caret-label-in {
@@ -4075,7 +4082,7 @@
   display: grid;
   gap: 16px;
   padding: 12px 6px 4px;
-  animation: settings-expand var(--dur-base) var(--ease-out) both;
+  animation: settings-expand var(--dur-base) var(--ease-out) backwards;
 }
 
 @keyframes settings-expand {
@@ -4358,7 +4365,7 @@
   align-items: center;
   padding: 24px;
   border-radius: var(--radius-lg);
-  animation: settings-reveal var(--dur-base) var(--ease-out) both;
+  animation: settings-reveal var(--dur-base) var(--ease-out) backwards;
 }
 
 .cropper-panel h2 {
@@ -4611,7 +4618,7 @@
   padding: clamp(1rem, 5vw, 3.5rem);
   background: oklch(0.06 0 0 / 0.85);
   backdrop-filter: blur(18px) saturate(0.9);
-  animation: lightbox-in var(--dur-base) var(--ease) both;
+  animation: lightbox-in var(--dur-base) var(--ease) backwards;
 }
 
 .lightbox-figure {
@@ -4621,7 +4628,7 @@
   gap: 0.75rem;
   max-width: 100%;
   max-height: 100%;
-  animation: lightbox-lift var(--dur-slow) var(--ease) both;
+  animation: lightbox-lift var(--dur-slow) var(--ease) backwards;
 }
 
 .lightbox-figure img {
@@ -4792,7 +4799,7 @@
    you were reading it. Shorter, smaller, and no overshoot. */
 .menu-popover {
   transform-origin: top right;
-  animation: menu-reveal var(--dur-fast) var(--ease-out) both;
+  animation: menu-reveal var(--dur-fast) var(--ease-out) backwards;
 }
 
 .menu-popover.left-0 {
@@ -4823,11 +4830,11 @@
 
 /* The overlay pair: the scrim fades, the panel comes up on the long curve. */
 .settings-scrim {
-  animation: fade-in var(--dur-base) var(--ease-out) both;
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .settings-panel {
-  animation: settings-reveal var(--dur-base) var(--ease-out) both;
+  animation: settings-reveal var(--dur-base) var(--ease-out) backwards;
 }
 
 @keyframes fade-in {
@@ -4864,7 +4871,7 @@
    smaller than it was: 360ms of travel is an entrance for a screen, and this
    is a column of text being replaced inside a frame that never moved. */
 .page-in {
-  animation: page-in var(--dur-base) var(--ease) both;
+  animation: page-in var(--dur-base) var(--ease) backwards;
 }
 
 /* Phone screens push and pop the way the platform does: the incoming screen
@@ -4877,7 +4884,7 @@
 }
 
 .mobile-screen {
-  animation: mobile-push var(--dur-base) var(--ease) both;
+  animation: mobile-push var(--dur-base) var(--ease) backwards;
 }
 
 .mobile-note-row,
@@ -5025,6 +5032,14 @@
    cursor; a checkbox you tick acknowledges the tick. Nothing loops, nothing
    waits for the interface to catch up, and every one of these is suppressed
    under `prefers-reduced-motion`. ───────────────────────────────────────── */
+/* Every entrance below fills `backwards`, never `both`, and that is not a
+   detail. A finished animation that still fills forwards is, to Chromium, a
+   running one: the element keeps its own composited layer for as long as it is
+   on screen, everything painted over it is lifted into a second, transparent
+   layer, and a transparent layer gets no subpixel text. The note list did that
+   for the life of the window and took ClearType from the whole app with it. Each
+   of these keyframes ends where the element already is, so `backwards` looks
+   the same and lets the layer go. */
 @keyframes list-in {
   from {
     opacity: 0;
@@ -5033,7 +5048,7 @@
 }
 
 .list-in {
-  animation: list-in var(--dur-base) var(--ease-out) both;
+  animation: list-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .collection-column [role="option"],
@@ -5269,7 +5284,7 @@
   position: relative;
   margin-left: 16px;
   border-left: 1px solid var(--rule-soft);
-  animation: branch-open var(--dur-base) var(--ease-out) both;
+  animation: branch-open var(--dur-base) var(--ease-out) backwards;
 }
 
 .sidebar-branch-inner {
@@ -5666,7 +5681,7 @@
   border-right: 1px solid var(--rule);
   background: var(--paper);
   box-shadow: var(--shadow-popover);
-  animation: drawer-in var(--dur-base) var(--ease-out) both;
+  animation: drawer-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .mobile-nav-drawer > .sidebar-column {
@@ -5810,19 +5825,6 @@
    against the whole editor width. */
 .editor-toolbar-stacked {
   grid-template-rows: 52px 44px;
-}
-
-.editor-toolbar-stacked.is-cramped {
-  grid-template-rows: 52px 24px 44px;
-}
-
-.editor-toolbar-stacked.is-cramped .editor-toolbar-compact-tools {
-  grid-row: 3;
-}
-
-.editor-toolbar-stacked-status {
-  grid-column: 1 / -1;
-  grid-row: 2;
 }
 
 .editor-toolbar-compact-tools .editor-tool-cluster {
@@ -6473,7 +6475,7 @@
 
 .note-page-cover {
   position: relative;
-  animation: cover-in var(--dur-slow) var(--ease-out) both;
+  animation: cover-in var(--dur-slow) var(--ease-out) backwards;
   width: 100%;
   height: 240px;
   flex-shrink: 0;
@@ -6686,7 +6688,7 @@
   max-height: min(30rem, calc(100dvh - 14vh));
   flex-direction: column;
   overflow: hidden;
-  animation: palette-in var(--dur-base) var(--ease-out) both;
+  animation: palette-in var(--dur-base) var(--ease-out) backwards;
 }
 
 @keyframes palette-in {
@@ -7580,6 +7582,13 @@
   transition: padding-left var(--dur-base) var(--ease);
 }
 
+/* The compact layout is not only a phone's: a desktop window narrower than
+   768px, or shorter than 520, gets it too — and its strips are the first thing
+   under the traffic lights, exactly as the sidebar's is in the wide one. */
+[data-shell="mac"] :is(.mobile-appbar, .mobile-editor .editor-toolbar) {
+  padding-left: var(--titlebar-inset);
+}
+
 /* The Windows caption buttons are an overlay. Keep every full-height screen
    below its 40px strip rather than leaving controls hidden behind Close. */
 /* 40 is not on the spacing ramp and must not be snapped to it. It is the
@@ -7598,7 +7607,7 @@
    The preload writes the attribute on both platforms; only macOS was reading
    it. */
 [data-shell="windows"]:not([data-fullscreen])
-  :is(.workspace-shell, .login-shell, #root > .min-h-screen) {
+  :is(.workspace-shell, .mobile-workspace, .login-shell, #root > .min-h-screen) {
   height: 100vh;
   min-height: 100vh;
   padding-top: 40px;
@@ -7606,7 +7615,8 @@
 
 [data-shell] .sidebar-topbar,
 [data-shell] .collection-toolbar,
-[data-shell] .editor-toolbar {
+[data-shell] .editor-toolbar,
+[data-shell] .mobile-appbar {
   -webkit-app-region: drag;
 }
 
@@ -7614,7 +7624,7 @@
    a toolbar is a descendant of it, so it inherits the drag and every item in it
    would move the window instead of being chosen. */
 [data-shell]
-  :is(.sidebar-topbar, .collection-toolbar, .editor-toolbar)
+  :is(.sidebar-topbar, .collection-toolbar, .editor-toolbar, .mobile-appbar)
   :is(button, a, input, select, textarea, label, [role], [tabindex], [contenteditable]) {
   -webkit-app-region: no-drag;
 }

@@ -3,6 +3,32 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## Unreleased
+
+### Fixed
+
+- **"Something broke — removeChild" for anybody whose browser translates the
+  page.** Chrome and Edge offer to translate the interface into the reader's
+  language, and the translator replaces React's text nodes with its own; the
+  next render then removes a node that is no longer there and the whole app
+  falls to the error page (which the translator had rendered "Se tromper").
+  Both shells now declare the page untranslatable. A reader whose browser is in
+  another language sees the English interface rather than a crash.
+- **The editor header is one row again at ordinary widths.** It needed 810px of
+  pane to stay one row, so a 1280px window with both columns open got two and
+  a 1000px window got three. The tools now share the first row whenever they
+  fit beside the note's state and actions, and never take more than one extra
+  row; the save state shortens rather than moving to a line of its own.
+- **Text is sharp on Windows.** A finished entrance animation that still filled
+  forwards, and an invisible wallpaper layer fixed over the document, each kept
+  the whole interface in a transparent compositing layer — where Chromium draws
+  no ClearType. Neither is composited any more, and the note page is opaque in
+  front of a wallpaper.
+- **The desktop window's compact layout respects its own buttons.** Below 768px
+  wide the app switched to its phone layout and forgot the traffic lights on
+  macOS and the caption strip on Windows, which then sat on top of the back
+  button and the ⋯ menu — and the window had nothing to drag it by.
+
 ## 0.4.3 — 2026-09-27
 
 ### Fixed

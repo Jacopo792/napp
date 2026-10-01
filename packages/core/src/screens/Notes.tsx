@@ -2528,7 +2528,7 @@ export default function NotesPage() {
       <span className="label text-danger underline-offset-2 hover:underline">Save failed</span>
     </button>
   ) : saving ? (
-    <span className="flex items-center gap-2">
+    <span className="inline-flex items-center gap-2">
       <span className="animate-spin inline-block h-2.5 w-2.5 rounded-full border border-accent border-t-transparent" />
       <span className="label text-accent">Saving</span>
     </span>
@@ -3085,7 +3085,7 @@ export default function NotesPage() {
      whether the last write landed. Who else is reading starts the header,
      beside the window navigation. */
   const noteStatus = selected ? (
-    <span className="flex shrink-0 items-center overflow-hidden">
+    <span className="block min-w-0 truncate">
       {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
     </span>
   ) : null;

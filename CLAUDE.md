@@ -1544,6 +1544,19 @@ of a narrow window spent on air.
   made the door scrollable, and what was under it was the wallpaper of an app
   nobody has signed into yet. The shell itself must stay unclipped vertically,
   because on a short window the sign-up card is taller than the viewport.
+- **The page is `translate="no"`, and that is not about language.** A
+  browser's translator swaps React's text nodes for its own, and the next
+  render throws `removeChild` on a node that is no longer a child. Every
+  reader whose browser is set to another language was one prompt away from
+  the error page. Translating the interface for them is i18n, not the
+  browser's to do over React.
+- **An entrance animation fills `backwards`, never `both`.** A finished
+  animation that fills forwards is still running as far as Chromium is
+  concerned, so its element keeps a composited layer and everything painted
+  over it is lifted into a transparent one, which gets no subpixel text. That
+  is what "the fonts look grainy on Windows" was. The same goes for anything
+  `position: fixed` behind the app: `#root::before` is `display: none` until
+  there is a wallpaper, never merely `opacity: 0`.
 - **No nested `backdrop-filter`.** A toolbar inside a pane that is already
   translucent and already blurred takes neither again: the second coat darkens
   the strip, and the second filter is a full compositing pass per frame for
