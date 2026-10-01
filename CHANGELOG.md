@@ -3,7 +3,7 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
-## Unreleased
+## 0.4.4 — 2026-10-01
 
 ### Changed
 
@@ -186,7 +186,7 @@ changes. The commit history remains the detailed engineering record.
   native image bytes even when the copied text includes HTML, so copied images
   are stored with the text as they already are in the web app.
 
-## Unreleased
+## 0.4.4 — 2026-10-01
 
 ### Changed
 

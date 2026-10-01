@@ -1,5 +1,25 @@
 # Repository guide
 
+## Two branches, and no others
+
+The repository has exactly two branches: **`main`** and **`PP`**
+(pre-production). Work goes on one of them and nowhere else.
+
+**Never create a branch unless Jacopo asks for one by name in so many words.**
+That covers every kind: feature, fix, `claude/*`, `codex/*`, worktree
+branches, branches made only to open a pull request. Do not open pull requests
+either. A tool that wants to make a branch on its own — a worktree, an
+isolated agent, a "fix/" convenience — is told no: work in the checkout that is
+already there.
+
+- `PP` is where a change is tried before it is released; `main` is what deploys
+  (GitHub Pages on every push, the desktop app on a `v*` tag).
+- Keep `PP` level with `main` after a release: `git push origin main:PP`.
+- `pnpm healthcheck` is the gate before any push.
+
+A stray branch found on the remote that is fully merged into `main` is deleted;
+one that is not is reported, never deleted unasked.
+
 ## One app, two shells
 
 The application is `packages/core`. It is mounted by two shells that share it
