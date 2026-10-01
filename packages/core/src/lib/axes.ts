@@ -1,17 +1,31 @@
 import { useSyncExternalStore } from "react";
 
-/** The four reading axes. Size, measure and leading are page geometry; weight
- *  is a real variable-font axis on both DM Sans and Bricolage Grotesque, so
- *  moving it re-renders the outlines rather than swapping a static cut. */
+/** The reading face. `serif` is Literata, shipped with the app; `system` is
+ *  the platform's own sans, which is what the interface is set in. */
+export type ReadingFace = "serif" | "system";
+
+export const READING_FACES: { id: ReadingFace; name: string; hint: string }[] = [
+  { id: "serif", name: "Serif", hint: "Literata" },
+  { id: "system", name: "System", hint: "Interface face" },
+];
+
+/** The reading axes. Size, measure and leading are page geometry; weight is a
+ *  real variable-font axis on Literata, so moving it re-renders the outlines
+ *  rather than snapping to the nearest static cut — which is all the system
+ *  face could do on Windows, where Segoe UI has no 430 and the slider moved
+ *  nothing. The face is the one axis that is not a number. */
 export interface Axes {
   size: number;
   measure: number;
   weight: number;
   leading: number;
+  face: ReadingFace;
 }
 
+type NumericAxis = Exclude<keyof Axes, "face">;
+
 export interface AxisSpec {
-  key: keyof Axes;
+  key: NumericAxis;
   label: string;
   min: number;
   max: number;
@@ -27,11 +41,13 @@ export const AXIS_SPECS: AxisSpec[] = [
   { key: "leading", label: "Leading", min: 1.35, max: 2.0, step: 0.05, unit: "" },
 ];
 
+/** A preset is page geometry and leaves the face alone: choosing "Study" is
+ *  not a request for a different typeface. */
 export interface Preset {
   id: string;
   name: string;
   role: string;
-  axes: Axes;
+  axes: Omit<Axes, "face">;
 }
 
 /** Four working set-ups, named for the job rather than the numbers. */
@@ -62,7 +78,11 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-export const DEFAULT_AXES: Axes = PRESETS[1].axes;
+export const DEFAULT_AXES: Axes = { ...PRESETS[1].axes, face: "serif" };
+
+function validFace(face: unknown): ReadingFace {
+  return face === "system" ? "system" : "serif";
+}
 
 const KEY = "napp:axes:v2";
 
@@ -76,6 +96,7 @@ function read(): Axes {
       measure: clamp(parsed.measure ?? DEFAULT_AXES.measure, 48, 92),
       weight: clamp(parsed.weight ?? DEFAULT_AXES.weight, 300, 600),
       leading: clamp(parsed.leading ?? DEFAULT_AXES.leading, 1.35, 2),
+      face: validFace(parsed.face ?? DEFAULT_AXES.face),
     };
   } catch {
     return DEFAULT_AXES;
@@ -95,6 +116,10 @@ export function applyAxes(a: Axes): void {
   s.setProperty("--read-measure", `${a.measure}ch`);
   s.setProperty("--read-weight", String(a.weight));
   s.setProperty("--read-leading", String(a.leading));
+  /* An attribute, because the face changes the title's weight and tracking as
+     well as its family — a rule, not one variable. Read through `validFace`
+     because the value also arrives from the account row. */
+  document.documentElement.dataset.readingFace = validFace(a.face);
 }
 
 export function initAxes(): void {
@@ -115,6 +140,10 @@ export function setAxes(next: Axes): void {
 
 export function setAxis<K extends keyof Axes>(key: K, value: Axes[K]): void {
   setAxes({ ...current, [key]: value });
+}
+
+export function applyPreset(preset: Preset): void {
+  setAxes({ ...current, ...preset.axes });
 }
 
 export function currentAxes(): Axes {

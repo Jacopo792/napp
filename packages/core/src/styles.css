@@ -1,4 +1,6 @@
 @import "tailwindcss" source(none);
+@import "@fontsource-variable/literata/opsz.css";
+@import "@fontsource-variable/literata/opsz-italic.css";
 @source ".";
 
 /* Graphite UI: opaque neutral planes, white ink and complete hairline borders. */
@@ -554,6 +556,41 @@
      as damage rather than typesetting. */
   hyphens: auto;
   hyphenate-limit-chars: 10 5 4;
+}
+
+/* ── The reading face ────────────────────────────────────────────────────────
+   The note is set in Literata, shipped with the app; the interface around it
+   stays in the platform's own sans. Two reasons, and the second is the one
+   that decided it. A face drawn for long reading on a screen is the largest
+   single difference between a page and a form. And the system face is not one
+   face: SF Pro on a Mac, Segoe UI on Windows, which has no variable weight —
+   so the Weight axis snapped to 400 there and moved nothing, and the same note
+   looked like two different documents to the two people writing it.
+
+   `opsz` follows the size on its own (`font-optical-sizing: auto` on body), so
+   the title gets the tight display cut and the body the open text cut from
+   one file. A serif needs none of the negative tracking the sans display is
+   set with; kept, it closes the counters up. `system` is one click away in
+   Settings → Reading, and puts every rule below out of play. */
+[data-reading-face="serif"] {
+  --font-reading: "Literata Variable", "Iowan Old Style", Georgia, serif;
+}
+
+[data-reading-face="serif"] .note-title {
+  font-family: var(--font-reading);
+  font-weight: 640;
+  letter-spacing: -0.006em;
+  line-height: 1.12;
+}
+
+[data-reading-face="serif"] .rich-text-content :is(h1, h2, h3) {
+  font-family: var(--font-reading);
+  font-weight: 640;
+  letter-spacing: -0.004em;
+}
+
+[data-reading-face="serif"] .rich-text-content h3 {
+  letter-spacing: 0;
 }
 
 /* `--read-measure` is expressed in `ch`, so its physical width follows the

@@ -53,8 +53,9 @@ import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocor
 import {
   AXIS_SPECS,
   PRESETS,
+  READING_FACES,
+  applyPreset,
   matchingPreset,
-  setAxes,
   setAxis,
   useAxes,
   type Axes,
@@ -965,6 +966,12 @@ export function SettingsPanel({
                   </p>
                 </div>
                 <Segmented
+                  label="Reading face"
+                  value={axes.face}
+                  options={READING_FACES}
+                  onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
+                />
+                <Segmented
                   label="Reading preset"
                   value={preset?.id ?? null}
                   options={PRESETS.map((item) => ({
@@ -974,7 +981,7 @@ export function SettingsPanel({
                   }))}
                   onChange={(id) => {
                     const chosen = PRESETS.find((item) => item.id === id);
-                    if (chosen) setAxes(chosen.axes);
+                    if (chosen) applyPreset(chosen);
                   }}
                 />
                 <button

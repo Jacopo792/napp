@@ -5,6 +5,14 @@ changes. The commit history remains the detailed engineering record.
 
 ## Unreleased
 
+### Changed
+
+- **Notes are set in a reading face.** Title, headings and body use Literata,
+  a serif drawn for reading on screens and shipped with the app, so the note
+  looks the same on a Mac and on Windows and the Weight slider finally does
+  something on Windows. The interface stays in the system font. Settings →
+  Reading → Face puts the note back in the system font.
+
 ### Fixed
 
 - **"Something broke — removeChild" for anybody whose browser translates the

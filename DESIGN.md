@@ -113,9 +113,10 @@ it cannot be one of these.
 
 ## Typography
 
-- The native system sans-serif carries display, interface and reading text with grayscale antialiasing for crisp rendering on dark surfaces.
+- The native system sans-serif carries display and interface text with grayscale antialiasing for crisp rendering on dark surfaces.
+- The note itself — title, headings and body — is set in **Literata**, a variable serif drawn for long reading on screens and shipped with the app (`@fontsource-variable/literata`, latin subsets loaded on demand). The system face was two faces, SF Pro and Segoe UI, and Segoe UI has no variable weight, so the reading Weight axis moved nothing on Windows. Settings → Reading → Face switches the note back to the system sans; it is a reading axis, synced with the account like the other four, and the presets leave it alone.
 - The native system monospace is reserved for genuine readouts and code.
-- Weight is expressed through normal CSS `font-weight`, not explicit variable-font optical axes.
+- Weight is expressed through normal CSS `font-weight`; Literata's optical-size axis follows the size on its own (`font-optical-sizing: auto`), so the title gets the display cut and the body the text cut from one file.
 - Long titles are a first-class layout case. Catalogue titles wrap for up to three lines instead of collapsing to a single ellipsis. The editor title wraps freely and its textarea auto-grows to its content; it must never become a fixed-height or horizontally scrolling field.
 
 ## Reading and writing
