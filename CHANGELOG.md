@@ -3,6 +3,51 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.5.0 — 2026-10-03
+
+A redesign toward a Mac application rather than a web page in a window.
+
+### Changed
+
+- **New icons.** Every glyph is now Phosphor, drawn as filled outlines that sit
+  on whole pixels. The old set had its stroke forced to one pixel, which is
+  what made every icon look thin.
+- **The people the archive is shared between are faces at the top of the
+  sidebar.** Large, with names, the way iMessage shows pinned conversations:
+  the chosen one lifts and takes a ring in that person's colour, a green dot
+  says who is here, and a typing bubble says who is writing in the open note.
+  The row scrolls sideways, collapses as the folders scroll under it, and
+  changing person slides the list in from that side. A member without a
+  picture is a grey monogram, as Contacts draws one.
+- **Settings looks like System Settings.** Coloured tiles name the sections,
+  rows carry no icons, the pane is titled with its section, and Profile opens
+  on your face, name and address. It closes with an animation instead of
+  vanishing.
+- **New palettes.** Graphite (a Mac window's grey and the system blue) is the
+  default for new accounts. Night, Plum, Espresso and Moss are new; Midnight
+  and Paper are revised; Ink, Indigo, Aubergine, Amber and Sage are gone.
+  Fjord and Rosewood are unchanged, and the colours you already chose stay
+  yours.
+- **One shape for a note row.** Hover is a faint wash instead of a black row,
+  the selection is a rounded grey shape with the icon in the accent, and a
+  swipe uncovers the system red or purple behind the row.
+- **Calmer chrome.** Counts and dates are in the system font instead of
+  monospace, section labels are no longer in capitals, the search field is a
+  32px recess, toolbar buttons are grouped in capsules, and nothing moves or
+  grows when the pointer merely passes over it.
+- **Motion where the hand acts.** A note's cover, title and words arrive in
+  reading order; opening a folder or a person deals the notes in.
+- **The sidebar is one column from top to bottom.** New folder is on the
+  Folders heading, and the button that hides the columns is beside the list's
+  ⋯. With the columns hidden, the note's strip offers show, new note and
+  search. The note's header stays one row down to much narrower panes.
+
+### Desktop
+
+- Buttons and rows take the arrow cursor rather than the web's hand, and the
+  sidebar, list and menus no longer take a text selection.
+- The Dock menu offers New Note.
+
 ## 0.4.4 — 2026-10-01
 
 ### Changed
