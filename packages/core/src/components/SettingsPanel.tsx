@@ -235,18 +235,18 @@ const SETTINGS_SECTIONS = [
   {
     group: "Account",
     items: [
-      { id: "profile", name: "Profile", icon: <UserRound size={16} /> },
-      { id: "members", name: "Members", icon: <Users size={16} /> },
-      { id: "security", name: "Security", icon: <ShieldCheck size={16} /> },
+      { id: "profile", tone: "blue", name: "Profile", icon: <UserRound size={16} /> },
+      { id: "members", tone: "green", name: "Members", icon: <Users size={16} /> },
+      { id: "security", tone: "slate", name: "Security", icon: <ShieldCheck size={16} /> },
     ],
   },
   {
     group: "Interface",
     items: [
-      { id: "appearance", name: "Appearance", icon: <Palette size={16} /> },
-      { id: "reading", name: "Reading", icon: <BookOpen size={16} /> },
-      { id: "writing", name: "Writing", icon: <Type size={16} /> },
-      { id: "shortcuts", name: "Shortcuts", icon: <Keyboard size={16} /> },
+      { id: "appearance", tone: "violet", name: "Appearance", icon: <Palette size={16} /> },
+      { id: "reading", tone: "orange", name: "Reading", icon: <BookOpen size={16} /> },
+      { id: "writing", tone: "teal", name: "Writing", icon: <Type size={16} /> },
+      { id: "shortcuts", tone: "gray", name: "Shortcuts", icon: <Keyboard size={16} /> },
     ],
   },
 ] as const;
@@ -517,6 +517,11 @@ export function SettingsPanel({
     { id: "dark", name: "Dark", icon: <Moon size={20} /> },
   ];
 
+  const sectionName =
+    SETTINGS_SECTIONS.flatMap((group): readonly { id: string; name: string }[] => group.items).find(
+      (item) => item.id === section,
+    )?.name ?? "Settings";
+
   if (!open) return null;
   return (
     <div className="settings-layer" role="presentation">
@@ -532,21 +537,6 @@ export function SettingsPanel({
         aria-labelledby="settings-title"
         className="settings-panel glass-sheet"
       >
-        <header className="settings-header">
-          <div>
-            <h2 id="settings-title">Settings</h2>
-            <p>Kept with your account, on every browser you sign in from</p>
-          </div>
-          <button
-            type="button"
-            aria-label="Close"
-            className="icon-button press ml-auto h-9 w-9"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
-        </header>
-
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
             {/* Who this is, at the head of the rail rather than in a column of
@@ -581,7 +571,9 @@ export function SettingsPanel({
                       className={section === item.id ? "is-active" : ""}
                       onClick={() => setSection(item.id)}
                     >
-                      {item.icon}
+                      <span className="settings-nav-tile" data-tone={item.tone} aria-hidden="true">
+                        {item.icon}
+                      </span>
                       {item.name}
                     </button>
                   ))}
@@ -600,783 +592,778 @@ export function SettingsPanel({
             </button>
           </nav>
 
-          <div className="settings-scroll">
-            {section === "profile" && (
-              <section>
-                <h3>Profile details</h3>
-
-                <div className="profile-portrait">
-                  <div className="appearance-row">
-                    <RowLead
-                      icon={<ImagePlus size={16} />}
-                      label="Picture"
-                      hint="Shown to everyone in this archive. Kept square and small."
-                    />
+          <div className="settings-content">
+            {/* The pane names what it holds, the way System Settings does —
+                a big "Settings" over everything, with a sentence under it,
+                named the window rather than the page you were on. */}
+            <header className="settings-header">
+              <h2 id="settings-title">{sectionName}</h2>
+              <button
+                type="button"
+                aria-label="Close"
+                className="icon-button press ml-auto h-8 w-8"
+                onClick={onClose}
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="settings-scroll">
+              {section === "profile" && (
+                <section>
+                  <div className="profile-portrait">
                     <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
-                  </div>
-                  <input
-                    ref={avatarRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) setCropping(file);
-                      event.target.value = "";
-                    }}
-                  />
-                  <div className="profile-portrait-actions">
-                    <button
-                      type="button"
-                      disabled={profileBusy}
-                      onClick={() => avatarRef.current?.click()}
-                    >
-                      {profile.avatarObject ? "Change picture" : "Add a picture"}
-                    </button>
-                    {profile.avatarObject && (
-                      <button
-                        type="button"
-                        className="is-danger"
-                        disabled={profileBusy}
-                        onClick={onAvatarRemove}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="appearance-controls">
-                  <div className="appearance-row profile-row">
-                    <RowLead
-                      icon={<UserRound size={16} />}
-                      label="Nickname"
-                      hint="What others in this archive call you"
-                    />
+                    <b>{profile.nickname || email.split("@")[0]}</b>
+                    <small>{email}</small>
                     <input
-                      className="profile-field"
-                      value={nickname}
-                      maxLength={40}
-                      placeholder={email.split("@")[0]}
-                      aria-label="Nickname"
-                      disabled={profileBusy}
-                      onChange={(event) => setNickname(event.target.value)}
-                      onBlur={commitNickname}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") event.currentTarget.blur();
-                        if (event.key === "Escape") setNickname(profile.nickname);
-                      }}
-                    />
-                  </div>
-
-                  <div className="appearance-row profile-row">
-                    <RowLead
-                      icon={<AtSign size={16} />}
-                      label="Email"
-                      hint="Where this account signs in"
-                    />
-                    <span className="profile-static">{email}</span>
-                  </div>
-
-                  <div className="appearance-row profile-row">
-                    <RowLead
-                      icon={<Users size={16} />}
-                      label="Archive"
-                      hint="Everybody here reads and writes every note"
-                    />
-                    <span className="profile-static">
-                      {memberCount} {memberCount === 1 ? "member" : "members"}
-                    </span>
-                  </div>
-
-                  {/* The two facts the summary column carried and no section
-                      did. They are facts about this account, so this is where
-                      they were always going to end up. */}
-                  <div className="appearance-row profile-row">
-                    <RowLead
-                      icon={<Layers size={16} />}
-                      label="Reading"
-                      hint="Whose notes the window is pointed at"
-                    />
-                    <span className="profile-static">{reading}</span>
-                  </div>
-
-                  {joinedAt && (
-                    <div className="appearance-row profile-row">
-                      <RowLead
-                        icon={<CalendarDays size={16} />}
-                        label="Member since"
-                        hint="When this account joined the archive"
-                      />
-                      <span className="profile-static">
-                        {new Date(joinedAt).toLocaleDateString(undefined, {
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {profileError && (
-                  <p className="profile-note text-danger" role="alert">
-                    {profileError}
-                  </p>
-                )}
-                <h3>Leave shared archive</h3>
-                <div className="leave-archive-card">
-                  <RowLead
-                    icon={<LogOut size={16} />}
-                    label="Leave this archive"
-                    hint={
-                      members.length <= 1
-                        ? "Nobody to leave it to — you are the only member"
-                        : "Your access ends, but the notes stay for the other members"
-                    }
-                  />
-                  <button
-                    type="button"
-                    className={leaveConfirm ? "is-danger-confirm" : ""}
-                    disabled={leaveBusy || members.length <= 1}
-                    onClick={() => void leaveArchive()}
-                  >
-                    <LogOut size={16} />
-                    {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
-                  </button>
-                </div>
-                {leaveStatus && (
-                  <p className="profile-note" role="status">
-                    {leaveStatus}
-                  </p>
-                )}
-              </section>
-            )}
-
-            {section === "appearance" && (
-              <section>
-                <h3>Theme</h3>
-                <div className="theme-picker" role="radiogroup" aria-label="Theme">
-                  {themeChoices.map((choice) => (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={appearance.theme === choice.id}
-                      className={appearance.theme === choice.id ? "is-active" : ""}
-                      onClick={() => setTheme(choice.id)}
-                    >
-                      <span className={`theme-preview is-${choice.id}`}>
-                        {choice.icon}
-                        <i />
-                        <b />
-                      </span>
-                      {choice.name}
-                    </button>
-                  ))}
-                </div>
-
-                <h3>Palette</h3>
-                <div className="palette-presets" role="group" aria-label="Colour palettes">
-                  {APPEARANCE_PRESETS.map((palette) => {
-                    const active =
-                      appearance.accent === palette.accent &&
-                      appearance.background === palette.background &&
-                      appearance.foreground === palette.foreground;
-                    return (
-                      <button
-                        key={palette.id}
-                        type="button"
-                        aria-pressed={active}
-                        className={active ? "is-active" : ""}
-                        onClick={() =>
-                          setAppearance({
-                            ...appearance,
-                            theme: palette.theme,
-                            accent: palette.accent,
-                            background: palette.background,
-                            foreground: palette.foreground,
-                          })
-                        }
-                      >
-                        <span
-                          className="palette-chip"
-                          style={
-                            {
-                              "--palette-bg": palette.background,
-                              "--palette-fg": palette.foreground,
-                              "--palette-accent": palette.accent,
-                            } as React.CSSProperties
-                          }
-                        />
-                        {palette.name}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="appearance-controls">
-                  {(
-                    [
-                      [
-                        "Accent",
-                        "accent",
-                        "Selection, focus and every active state",
-                        <Palette size={16} />,
-                      ],
-                      [
-                        "Background",
-                        "background",
-                        "The colour every surface is mixed from",
-                        <Type size={16} />,
-                      ],
-                      ["Foreground", "foreground", "Text colour", <Type size={16} />],
-                    ] as const
-                  ).map(([label, key, hint, icon]) => (
-                    <label key={key} className="appearance-row">
-                      <RowLead icon={icon} label={label} hint={hint} />
-                      <span className="color-control">
-                        <input
-                          type="color"
-                          value={appearance[key]}
-                          onChange={(event) =>
-                            setAppearance({ ...appearance, [key]: event.target.value })
-                          }
-                        />
-                        <code>{appearance[key].toUpperCase()}</code>
-                      </span>
-                    </label>
-                  ))}
-
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<Layers size={16} />}
-                      label="Translucency"
-                      hint="Rails, bars and menus let what is behind them through"
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={appearance.translucentSidebar}
-                      onChange={(event) =>
-                        setAppearance({ ...appearance, translucentSidebar: event.target.checked })
-                      }
-                    />
-                  </label>
-
-                  <AppearanceSlider
-                    icon={<Contrast size={16} />}
-                    label="Contrast"
-                    hint="Distance between the stacked surfaces"
-                    min={20}
-                    max={80}
-                    value={appearance.contrast}
-                    readout={`${appearance.contrast}`}
-                    onChange={(contrast) => setAppearance({ ...appearance, contrast })}
-                  />
-
-                  <div className="appearance-row wallpaper-row">
-                    <RowLead
-                      icon={<Image size={16} />}
-                      label="Background image"
-                      hint="Kept with your account, so every browser opens to it"
-                    />
-                    <input
-                      ref={wallpaperRef}
+                      ref={avatarRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        if (file) void setWallpaper(file);
+                        if (file) setCropping(file);
                         event.target.value = "";
                       }}
                     />
-                    <span className="wallpaper-actions">
-                      {appearance.wallpaper && (
-                        <button type="button" onClick={() => void setWallpaper(null)}>
+                    <div className="profile-portrait-actions">
+                      <button
+                        type="button"
+                        disabled={profileBusy}
+                        onClick={() => avatarRef.current?.click()}
+                      >
+                        {profile.avatarObject ? "Change picture" : "Add a picture"}
+                      </button>
+                      {profile.avatarObject && (
+                        <button
+                          type="button"
+                          className="is-danger"
+                          disabled={profileBusy}
+                          onClick={onAvatarRemove}
+                        >
                           Remove
                         </button>
                       )}
-                      <button type="button" onClick={() => wallpaperRef.current?.click()}>
-                        <ImagePlus size={16} /> Choose
-                      </button>
-                    </span>
+                    </div>
                   </div>
 
-                  {appearance.wallpaper && (
-                    <>
-                      <div className="appearance-row wallpaper-fit-row">
-                        <span>Image fit</span>
-                        <span className="compact-segment" role="group" aria-label="Image fit">
-                          {(["cover", "contain"] as const).map((fit) => (
-                            <button
-                              key={fit}
-                              type="button"
-                              aria-pressed={appearance.wallpaperFit === fit}
-                              className={appearance.wallpaperFit === fit ? "is-active" : ""}
-                              onClick={() => setAppearance({ ...appearance, wallpaperFit: fit })}
-                            >
-                              {fit === "cover" ? "Fill" : "Fit"}
-                            </button>
-                          ))}
+                  <div className="appearance-controls">
+                    <div className="appearance-row profile-row">
+                      <RowLead
+                        icon={<UserRound size={16} />}
+                        label="Nickname"
+                        hint="What others in this archive call you"
+                      />
+                      <input
+                        className="profile-field"
+                        value={nickname}
+                        maxLength={40}
+                        placeholder={email.split("@")[0]}
+                        aria-label="Nickname"
+                        disabled={profileBusy}
+                        onChange={(event) => setNickname(event.target.value)}
+                        onBlur={commitNickname}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") event.currentTarget.blur();
+                          if (event.key === "Escape") setNickname(profile.nickname);
+                        }}
+                      />
+                    </div>
+
+                    <div className="appearance-row profile-row">
+                      <RowLead
+                        icon={<Users size={16} />}
+                        label="Archive"
+                        hint="Everybody here reads and writes every note"
+                      />
+                      <span className="profile-static">
+                        {memberCount} {memberCount === 1 ? "member" : "members"}
+                      </span>
+                    </div>
+
+                    {/* The two facts the summary column carried and no section
+                      did. They are facts about this account, so this is where
+                      they were always going to end up. */}
+                    <div className="appearance-row profile-row">
+                      <RowLead
+                        icon={<Layers size={16} />}
+                        label="Reading"
+                        hint="Whose notes the window is pointed at"
+                      />
+                      <span className="profile-static">{reading}</span>
+                    </div>
+
+                    {joinedAt && (
+                      <div className="appearance-row profile-row">
+                        <RowLead
+                          icon={<CalendarDays size={16} />}
+                          label="Member since"
+                          hint="When this account joined the archive"
+                        />
+                        <span className="profile-static">
+                          {new Date(joinedAt).toLocaleDateString(undefined, {
+                            month: "long",
+                            year: "numeric",
+                          })}
                         </span>
                       </div>
-                      <AppearanceSlider
-                        icon={<Contrast size={16} />}
-                        label="Darken image"
-                        min={0}
-                        max={80}
-                        value={appearance.wallpaperDim}
-                        readout={`${appearance.wallpaperDim}%`}
-                        onChange={(wallpaperDim) => setAppearance({ ...appearance, wallpaperDim })}
-                      />
-                      <AppearanceSlider
-                        icon={<Layers size={16} />}
-                        label="Blur"
-                        min={0}
-                        max={20}
-                        value={appearance.wallpaperBlur}
-                        readout={`${appearance.wallpaperBlur}px`}
-                        onChange={(wallpaperBlur) =>
-                          setAppearance({ ...appearance, wallpaperBlur })
-                        }
-                      />
-                    </>
+                    )}
+                  </div>
+
+                  {profileError && (
+                    <p className="profile-note text-danger" role="alert">
+                      {profileError}
+                    </p>
                   )}
-                </div>
+                  <h3>Leave shared archive</h3>
+                  <div className="leave-archive-card">
+                    <RowLead
+                      icon={<LogOut size={16} />}
+                      label="Leave this archive"
+                      hint={
+                        members.length <= 1
+                          ? "Nobody to leave it to — you are the only member"
+                          : "Your access ends, but the notes stay for the other members"
+                      }
+                    />
+                    <button
+                      type="button"
+                      className={leaveConfirm ? "is-danger-confirm" : ""}
+                      disabled={leaveBusy || members.length <= 1}
+                      onClick={() => void leaveArchive()}
+                    >
+                      <LogOut size={16} />
+                      {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
+                    </button>
+                  </div>
+                  {leaveStatus && (
+                    <p className="profile-note" role="status">
+                      {leaveStatus}
+                    </p>
+                  )}
+                </section>
+              )}
 
-                <button
-                  type="button"
-                  className="settings-reset"
-                  onClick={() =>
-                    void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
-                  }
-                >
-                  Reset appearance
-                </button>
-              </section>
-            )}
-
-            {section === "reading" && (
-              <section>
-                <h3>Reading</h3>
-                <div className="settings-specimen" aria-hidden="true">
-                  <p>
-                    Set the page for the way you read. Every note follows these choices instantly.
-                  </p>
-                </div>
-                <Segmented
-                  label="Reading face"
-                  value={axes.face}
-                  options={READING_FACES}
-                  onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
-                />
-                <Segmented
-                  label="Reading preset"
-                  value={preset?.id ?? null}
-                  options={PRESETS.map((item) => ({
-                    id: item.id,
-                    name: item.name,
-                    hint: item.role,
-                  }))}
-                  onChange={(id) => {
-                    const chosen = PRESETS.find((item) => item.id === id);
-                    if (chosen) applyPreset(chosen);
-                  }}
-                />
-                <button
-                  type="button"
-                  className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
-                  aria-expanded={tuning}
-                  onClick={() => setTuning((current) => !current)}
-                >
-                  <ChevronRight size={16} />
-                  <span>Fine-tune</span>
-                  <small>{preset ? preset.name : "Custom"}</small>
-                </button>
-                {tuning && (
-                  <div className="settings-sliders">
-                    {AXIS_SPECS.map((spec) => (
-                      <AxisSlider key={spec.key} spec={spec} axes={axes} />
+              {section === "appearance" && (
+                <section>
+                  <h3>Theme</h3>
+                  <div className="theme-picker" role="radiogroup" aria-label="Theme">
+                    {themeChoices.map((choice) => (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={appearance.theme === choice.id}
+                        className={appearance.theme === choice.id ? "is-active" : ""}
+                        onClick={() => setTheme(choice.id)}
+                      >
+                        <span className={`theme-preview is-${choice.id}`}>
+                          {choice.icon}
+                          <i />
+                          <b />
+                        </span>
+                        {choice.name}
+                      </button>
                     ))}
                   </div>
-                )}
-              </section>
-            )}
 
-            {section === "writing" && (
-              <section>
-                <h3>Writing</h3>
-                <div className="appearance-controls">
-                  {/* Two corrections, and they are not the same kind of thing.
+                  <h3>Palette</h3>
+                  <div className="palette-presets" role="group" aria-label="Colour palettes">
+                    {APPEARANCE_PRESETS.map((palette) => {
+                      const active =
+                        appearance.accent === palette.accent &&
+                        appearance.background === palette.background &&
+                        appearance.foreground === palette.foreground;
+                      return (
+                        <button
+                          key={palette.id}
+                          type="button"
+                          aria-pressed={active}
+                          className={active ? "is-active" : ""}
+                          onClick={() =>
+                            setAppearance({
+                              ...appearance,
+                              theme: palette.theme,
+                              accent: palette.accent,
+                              background: palette.background,
+                              foreground: palette.foreground,
+                            })
+                          }
+                        >
+                          <span
+                            className="palette-chip"
+                            style={
+                              {
+                                "--palette-bg": palette.background,
+                                "--palette-fg": palette.foreground,
+                                "--palette-accent": palette.accent,
+                              } as React.CSSProperties
+                            }
+                          />
+                          {palette.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="appearance-controls">
+                    {(
+                      [
+                        [
+                          "Accent",
+                          "accent",
+                          "Selection, focus and every active state",
+                          <Palette size={16} />,
+                        ],
+                        [
+                          "Background",
+                          "background",
+                          "The colour every surface is mixed from",
+                          <Type size={16} />,
+                        ],
+                        ["Foreground", "foreground", "Text colour", <Type size={16} />],
+                      ] as const
+                    ).map(([label, key, hint, icon]) => (
+                      <label key={key} className="appearance-row">
+                        <RowLead icon={icon} label={label} hint={hint} />
+                        <span className="color-control">
+                          <input
+                            type="color"
+                            value={appearance[key]}
+                            onChange={(event) =>
+                              setAppearance({ ...appearance, [key]: event.target.value })
+                            }
+                          />
+                          <code>{appearance[key].toUpperCase()}</code>
+                        </span>
+                      </label>
+                    ))}
+
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Layers size={16} />}
+                        label="Translucency"
+                        hint="Rails, bars and menus let what is behind them through"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={appearance.translucentSidebar}
+                        onChange={(event) =>
+                          setAppearance({ ...appearance, translucentSidebar: event.target.checked })
+                        }
+                      />
+                    </label>
+
+                    <AppearanceSlider
+                      icon={<Contrast size={16} />}
+                      label="Contrast"
+                      hint="Distance between the stacked surfaces"
+                      min={20}
+                      max={80}
+                      value={appearance.contrast}
+                      readout={`${appearance.contrast}`}
+                      onChange={(contrast) => setAppearance({ ...appearance, contrast })}
+                    />
+
+                    <div className="appearance-row wallpaper-row">
+                      <RowLead
+                        icon={<Image size={16} />}
+                        label="Background image"
+                        hint="Kept with your account, so every browser opens to it"
+                      />
+                      <input
+                        ref={wallpaperRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (file) void setWallpaper(file);
+                          event.target.value = "";
+                        }}
+                      />
+                      <span className="wallpaper-actions">
+                        {appearance.wallpaper && (
+                          <button type="button" onClick={() => void setWallpaper(null)}>
+                            Remove
+                          </button>
+                        )}
+                        <button type="button" onClick={() => wallpaperRef.current?.click()}>
+                          <ImagePlus size={16} /> Choose
+                        </button>
+                      </span>
+                    </div>
+
+                    {appearance.wallpaper && (
+                      <>
+                        <div className="appearance-row wallpaper-fit-row">
+                          <span>Image fit</span>
+                          <span className="compact-segment" role="group" aria-label="Image fit">
+                            {(["cover", "contain"] as const).map((fit) => (
+                              <button
+                                key={fit}
+                                type="button"
+                                aria-pressed={appearance.wallpaperFit === fit}
+                                className={appearance.wallpaperFit === fit ? "is-active" : ""}
+                                onClick={() => setAppearance({ ...appearance, wallpaperFit: fit })}
+                              >
+                                {fit === "cover" ? "Fill" : "Fit"}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                        <AppearanceSlider
+                          icon={<Contrast size={16} />}
+                          label="Darken image"
+                          min={0}
+                          max={80}
+                          value={appearance.wallpaperDim}
+                          readout={`${appearance.wallpaperDim}%`}
+                          onChange={(wallpaperDim) =>
+                            setAppearance({ ...appearance, wallpaperDim })
+                          }
+                        />
+                        <AppearanceSlider
+                          icon={<Layers size={16} />}
+                          label="Blur"
+                          min={0}
+                          max={20}
+                          value={appearance.wallpaperBlur}
+                          readout={`${appearance.wallpaperBlur}px`}
+                          onChange={(wallpaperBlur) =>
+                            setAppearance({ ...appearance, wallpaperBlur })
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="settings-reset"
+                    onClick={() =>
+                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
+                    }
+                  >
+                    Reset appearance
+                  </button>
+                </section>
+              )}
+
+              {section === "reading" && (
+                <section>
+                  <div className="settings-specimen" aria-hidden="true">
+                    <p>
+                      Set the page for the way you read. Every note follows these choices instantly.
+                    </p>
+                  </div>
+                  <Segmented
+                    label="Reading face"
+                    value={axes.face}
+                    options={READING_FACES}
+                    onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
+                  />
+                  <Segmented
+                    label="Reading preset"
+                    value={preset?.id ?? null}
+                    options={PRESETS.map((item) => ({
+                      id: item.id,
+                      name: item.name,
+                      hint: item.role,
+                    }))}
+                    onChange={(id) => {
+                      const chosen = PRESETS.find((item) => item.id === id);
+                      if (chosen) applyPreset(chosen);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
+                    aria-expanded={tuning}
+                    onClick={() => setTuning((current) => !current)}
+                  >
+                    <ChevronRight size={16} />
+                    <span>Fine-tune</span>
+                    <small>{preset ? preset.name : "Custom"}</small>
+                  </button>
+                  {tuning && (
+                    <div className="settings-sliders">
+                      {AXIS_SPECS.map((spec) => (
+                        <AxisSlider key={spec.key} spec={spec} axes={axes} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {section === "writing" && (
+                <section>
+                  <div className="appearance-controls">
+                    {/* Two corrections, and they are not the same kind of thing.
                       This one is a dictionary and it acts on its own as you
                       write, so it is the one that needs a switch somebody can
                       find; the one below is a model, and it only ever runs
                       from a deliberate click on a selection. */}
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<Wand2 size={16} />}
-                      label="Correct as I type"
-                      hint={
-                        learned === 0
-                          ? "Accents and apostrophes, finished when a word is. Undo one to keep your spelling"
-                          : `Accents and apostrophes, finished when a word is. ${learned} ${
-                              learned === 1 ? "spelling is" : "spellings are"
-                            } yours and left alone`
-                      }
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={autocorrectEnabled}
-                      onChange={(event) => onAutocorrectEnabledChange(event.target.checked)}
-                    />
-                  </label>
-                  {/* The only way back from a correction refused by accident.
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Wand2 size={16} />}
+                        label="Correct as I type"
+                        hint={
+                          learned === 0
+                            ? "Accents and apostrophes, finished when a word is. Undo one to keep your spelling"
+                            : `Accents and apostrophes, finished when a word is. ${learned} ${
+                                learned === 1 ? "spelling is" : "spellings are"
+                              } yours and left alone`
+                        }
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={autocorrectEnabled}
+                        onChange={(event) => onAutocorrectEnabledChange(event.target.checked)}
+                      />
+                    </label>
+                    {/* The only way back from a correction refused by accident.
                       It is a row rather than a line of explanation under the
                       switch above, because it is a thing you press. */}
-                  {learned > 0 && (
-                    <div className="appearance-row">
+                    {learned > 0 && (
+                      <div className="appearance-row">
+                        <RowLead
+                          icon={<RotateCcw size={16} />}
+                          label="Words you kept"
+                          hint="Offer these corrections again"
+                        />
+                        <button
+                          type="button"
+                          className="settings-row-action press"
+                          onClick={() => {
+                            forgetSpellings();
+                            setLearned(0);
+                          }}
+                        >
+                          Forget {learned}
+                        </button>
+                      </div>
+                    )}
+                    <label className="appearance-row">
                       <RowLead
-                        icon={<RotateCcw size={16} />}
-                        label="Words you kept"
-                        hint="Offer these corrections again"
+                        icon={<SpellCheck size={16} />}
+                        label="Proofreading"
+                        hint="Offer spelling and grammar corrections on this device"
                       />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={proofreaderEnabled}
+                        onChange={(event) => onProofreaderEnabledChange(event.target.checked)}
+                      />
+                    </label>
+                  </div>
+
+                  <h3>Live presence</h3>
+                  <div
+                    className="presence-palette-picker"
+                    role="radiogroup"
+                    aria-label="Live presence palette"
+                  >
+                    {PRESENCE_PALETTES.map((palette) => (
                       <button
+                        key={palette.id}
                         type="button"
-                        className="settings-row-action press"
-                        onClick={() => {
-                          forgetSpellings();
-                          setLearned(0);
-                        }}
+                        role="radio"
+                        aria-checked={writingPreferences.presencePalette === palette.id}
+                        className={
+                          writingPreferences.presencePalette === palette.id ? "is-active" : ""
+                        }
+                        onClick={() =>
+                          onWritingPreferencesChange({
+                            ...writingPreferences,
+                            presencePalette: palette.id,
+                          })
+                        }
                       >
-                        Forget {learned}
+                        <i style={{ background: palette.color }} aria-hidden="true" />
+                        {palette.name}
                       </button>
-                    </div>
-                  )}
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<SpellCheck size={16} />}
-                      label="Proofreading"
-                      hint="Offer spelling and grammar corrections on this device"
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={proofreaderEnabled}
-                      onChange={(event) => onProofreaderEnabledChange(event.target.checked)}
-                    />
-                  </label>
-                </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-                <h3>Live presence</h3>
-                <p className="writing-help">
-                  Choose the colour used for collaborators’ names while they are in the note with
-                  you.
-                </p>
-                <div
-                  className="presence-palette-picker"
-                  role="radiogroup"
-                  aria-label="Live presence palette"
-                >
-                  {PRESENCE_PALETTES.map((palette) => (
-                    <button
-                      key={palette.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={writingPreferences.presencePalette === palette.id}
-                      className={
-                        writingPreferences.presencePalette === palette.id ? "is-active" : ""
-                      }
-                      onClick={() =>
-                        onWritingPreferencesChange({
-                          ...writingPreferences,
-                          presencePalette: palette.id,
-                        })
-                      }
-                    >
-                      <i style={{ background: palette.color }} aria-hidden="true" />
-                      {palette.name}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* The keys, where somebody looking for a setting will find them.
+              {/* The keys, where somebody looking for a setting will find them.
                 The same list the `?` sheet shows, from the same place — two
                 copies of this would be one copy and one lie. */}
-            {section === "shortcuts" && (
-              <section>
-                {shortcutGroups().map((group) => (
-                  <Fragment key={group}>
-                    <h3>{group}</h3>
-                    <div className="appearance-controls">
-                      {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
-                        <div key={`${entry.keys}-${entry.what}`} className="appearance-row">
-                          <span className="settings-label">
-                            <b>{entry.what}</b>
-                          </span>
-                          <kbd className="settings-key">{keyName(entry.keys)}</kbd>
-                        </div>
-                      ))}
-                    </div>
-                  </Fragment>
-                ))}
-              </section>
-            )}
-
-            {section === "security" && (
-              <section>
-                <h3>Security</h3>
-                <dl className="settings-facts">
-                  <div>
-                    <span className="settings-lead" aria-hidden="true">
-                      <ShieldCheck size={16} />
-                    </span>
-                    <span className="settings-label">
-                      <dt>Storage</dt>
-                      <dd>Protected by your account</dd>
-                    </span>
-                  </div>
-                  <div>
-                    <span className="settings-lead" aria-hidden="true">
-                      <BookOpen size={16} />
-                    </span>
-                    <span className="settings-label">
-                      <dt>Reading</dt>
-                      <dd>{reading}</dd>
-                    </span>
-                  </div>
-                </dl>
-                <h3>Signing out</h3>
-                <div className="appearance-controls">
-                  <div className="appearance-row">
-                    <RowLead
-                      icon={<Timer size={16} />}
-                      label="Sign out when idle"
-                      hint="Require the account password again after a period of inactivity"
-                    />
-                  </div>
-                  <div className="appearance-row is-stacked">
-                    <Segmented
-                      label="Sign out when idle"
-                      value={String(autoLock)}
-                      options={AUTO_LOCK_CHOICES.map((minutes) => ({
-                        id: String(minutes),
-                        name: AUTO_LOCK_LABELS[minutes],
-                      }))}
-                      onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
-                    />
-                  </div>
-                </div>
-
-                <h3>Privacy</h3>
-                <div className="appearance-controls">
-                  {/* Two switches, and they are not two halves of one thing.
-                      This one is the archive-wide roster: the mark on a face
-                      that says somebody is here at all. It is mutual, because
-                      the channel is joined only while publishing. */}
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<Users size={16} />}
-                      label="Show me in the roster"
-                      hint="Others see you are here, and you see who else is"
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={presenceEnabled}
-                      onChange={(event) => onPresenceEnabledChange(event.target.checked)}
-                    />
-                  </label>
-
-                  {/* And this one is the note you have open. Being on a note
-                      both of you may write is not a disclosure, so it is on by
-                      default and it is about what you are shown rather than
-                      about what you give away. */}
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<MousePointer2 size={16} />}
-                      label="Collaborators in notes"
-                      hint="Show who else has this note open, and their cursor"
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={collaboratorsVisible}
-                      onChange={(event) => onCollaboratorsVisibleChange(event.target.checked)}
-                    />
-                  </label>
-
-                  {/* The one row here that is not a preference. Postgres reads
-                      this column back when the other member's client asks for
-                      notes, so switching it on withholds the rows rather than
-                      hiding them after they arrive. */}
-                  <label className="appearance-row">
-                    <RowLead
-                      icon={<Archive size={16} />}
-                      label="Keep archived notes private"
-                      hint="Archived notes stay visible only to you"
-                    />
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={profile.hideArchived}
-                      onChange={(event) => onHideArchivedChange(event.target.checked)}
-                    />
-                  </label>
-                </div>
-              </section>
-            )}
-
-            {section === "members" && (
-              <section>
-                <h3>Seats</h3>
-                <dl className="settings-facts">
-                  <div>
-                    <span className="settings-lead" aria-hidden="true">
-                      <Users size={16} />
-                    </span>
-                    <span className="settings-label">
-                      <dt>Occupied</dt>
-                      <dd>
-                        {seatsTaken} of {seatLimit}
-                        {invites.length > 0 && ` · ${invites.length} waiting to be claimed`}
-                      </dd>
-                    </span>
-                  </div>
-                </dl>
-
-                <h3>Members</h3>
-                <div className="member-role-list">
-                  {members.map((member) => (
-                    <div key={member.userId}>
-                      <span>
-                        <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
-                        <small>Can read and write every note</small>
-                      </span>
-                    </div>
+              {section === "shortcuts" && (
+                <section>
+                  {shortcutGroups().map((group) => (
+                    <Fragment key={group}>
+                      <h3>{group}</h3>
+                      <div className="appearance-controls">
+                        {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
+                          <div key={`${entry.keys}-${entry.what}`} className="appearance-row">
+                            <span className="settings-label">
+                              <b>{entry.what}</b>
+                            </span>
+                            <kbd className="settings-key">{keyName(entry.keys)}</kbd>
+                          </div>
+                        ))}
+                      </div>
+                    </Fragment>
                   ))}
-                </div>
-                {/* Sharing the archive is the decision; there is no reader
-                    role to pick afterwards. What one member takes back from
-                    another is a note or a passage, from the note itself. */}
+                </section>
+              )}
 
-                {invites.length > 0 && (
-                  <>
-                    <h3>Waiting to be claimed</h3>
-                    <div className="member-role-list">
-                      {invites.map((invite) => (
-                        <div key={invite.id}>
-                          <span>
-                            <b>{invite.email}</b>
-                            <small>{expiresIn(invite.expiresAt)}</small>
-                          </span>
-                          {canManageMembers && (
-                            <button
-                              type="button"
-                              className="invite-withdraw"
-                              disabled={inviteBusy}
-                              onClick={() => void withdrawInvite(invite.id)}
-                            >
-                              <Undo2 size={16} />
-                              Withdraw
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                <h3>Invite someone</h3>
-                {!canManageMembers ? (
+              {section === "security" && (
+                <section>
                   <dl className="settings-facts">
                     <div>
                       <span className="settings-lead" aria-hidden="true">
                         <ShieldCheck size={16} />
                       </span>
                       <span className="settings-label">
-                        <dt>Editors only</dt>
-                        <dd>An editor in this archive can invite the other person.</dd>
+                        <dt>Storage</dt>
+                        <dd>Protected by your account</dd>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="settings-lead" aria-hidden="true">
+                        <BookOpen size={16} />
+                      </span>
+                      <span className="settings-label">
+                        <dt>Reading</dt>
+                        <dd>{reading}</dd>
                       </span>
                     </div>
                   </dl>
-                ) : seatsFull ? (
+                  <h3>Signing out</h3>
+                  <div className="appearance-controls">
+                    <div className="appearance-row">
+                      <RowLead
+                        icon={<Timer size={16} />}
+                        label="Sign out when idle"
+                        hint="Require the account password again after a period of inactivity"
+                      />
+                    </div>
+                    <div className="appearance-row is-stacked">
+                      <Segmented
+                        label="Sign out when idle"
+                        value={String(autoLock)}
+                        options={AUTO_LOCK_CHOICES.map((minutes) => ({
+                          id: String(minutes),
+                          name: AUTO_LOCK_LABELS[minutes],
+                        }))}
+                        onChange={(id) => onAutoLockChange(Number(id) as AutoLockMinutes)}
+                      />
+                    </div>
+                  </div>
+
+                  <h3>Privacy</h3>
+                  <div className="appearance-controls">
+                    {/* Two switches, and they are not two halves of one thing.
+                      This one is the archive-wide roster: the mark on a face
+                      that says somebody is here at all. It is mutual, because
+                      the channel is joined only while publishing. */}
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Users size={16} />}
+                        label="Show me in the roster"
+                        hint="Others see you are here, and you see who else is"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={presenceEnabled}
+                        onChange={(event) => onPresenceEnabledChange(event.target.checked)}
+                      />
+                    </label>
+
+                    {/* And this one is the note you have open. Being on a note
+                      both of you may write is not a disclosure, so it is on by
+                      default and it is about what you are shown rather than
+                      about what you give away. */}
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<MousePointer2 size={16} />}
+                        label="Collaborators in notes"
+                        hint="Show who else has this note open, and their cursor"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={collaboratorsVisible}
+                        onChange={(event) => onCollaboratorsVisibleChange(event.target.checked)}
+                      />
+                    </label>
+
+                    {/* The one row here that is not a preference. Postgres reads
+                      this column back when the other member's client asks for
+                      notes, so switching it on withholds the rows rather than
+                      hiding them after they arrive. */}
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Archive size={16} />}
+                        label="Keep archived notes private"
+                        hint="Archived notes stay visible only to you"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={profile.hideArchived}
+                        onChange={(event) => onHideArchivedChange(event.target.checked)}
+                      />
+                    </label>
+                  </div>
+                </section>
+              )}
+
+              {section === "members" && (
+                <section>
+                  <h3>Seats</h3>
                   <dl className="settings-facts">
                     <div>
                       <span className="settings-lead" aria-hidden="true">
-                        <UserPlus size={16} />
+                        <Users size={16} />
                       </span>
                       <span className="settings-label">
-                        <dt>No seat free</dt>
-                        <dd>Withdraw an invitation nobody claimed and its seat comes back.</dd>
+                        <dt>Occupied</dt>
+                        <dd>
+                          {seatsTaken} of {seatLimit}
+                          {invites.length > 0 && ` · ${invites.length} waiting to be claimed`}
+                        </dd>
                       </span>
                     </div>
                   </dl>
-                ) : (
-                  <>
-                    <div className="invite-form">
-                      <label>
-                        <span>Email address</span>
-                        <input
-                          type="email"
-                          value={inviteEmail}
-                          placeholder="person@example.com"
-                          disabled={inviteBusy}
-                          onChange={(event) => {
-                            setInviteEmail(event.target.value);
-                            setInviteLink("");
-                            setInviteStatus("");
-                          }}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={inviteBusy || !inviteEmail.trim()}
-                        onClick={() => void createInvite()}
-                      >
-                        <UserPlus size={16} />
-                        {inviteBusy ? "Creating…" : "Create invitation"}
-                      </button>
-                    </div>
-                  </>
-                )}
 
-                {/* Both ways out of here carry the same one-time token, and
+                  <h3>Members</h3>
+                  <div className="member-role-list">
+                    {members.map((member) => (
+                      <div key={member.userId}>
+                        <span>
+                          <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
+                          <small>Can read and write every note</small>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Sharing the archive is the decision; there is no reader
+                    role to pick afterwards. What one member takes back from
+                    another is a note or a passage, from the note itself. */}
+
+                  {invites.length > 0 && (
+                    <>
+                      <h3>Waiting to be claimed</h3>
+                      <div className="member-role-list">
+                        {invites.map((invite) => (
+                          <div key={invite.id}>
+                            <span>
+                              <b>{invite.email}</b>
+                              <small>{expiresIn(invite.expiresAt)}</small>
+                            </span>
+                            {canManageMembers && (
+                              <button
+                                type="button"
+                                className="invite-withdraw"
+                                disabled={inviteBusy}
+                                onClick={() => void withdrawInvite(invite.id)}
+                              >
+                                <Undo2 size={16} />
+                                Withdraw
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <h3>Invite someone</h3>
+                  {!canManageMembers ? (
+                    <dl className="settings-facts">
+                      <div>
+                        <span className="settings-lead" aria-hidden="true">
+                          <ShieldCheck size={16} />
+                        </span>
+                        <span className="settings-label">
+                          <dt>Editors only</dt>
+                          <dd>An editor in this archive can invite the other person.</dd>
+                        </span>
+                      </div>
+                    </dl>
+                  ) : seatsFull ? (
+                    <dl className="settings-facts">
+                      <div>
+                        <span className="settings-lead" aria-hidden="true">
+                          <UserPlus size={16} />
+                        </span>
+                        <span className="settings-label">
+                          <dt>No seat free</dt>
+                          <dd>Withdraw an invitation nobody claimed and its seat comes back.</dd>
+                        </span>
+                      </div>
+                    </dl>
+                  ) : (
+                    <>
+                      <div className="invite-form">
+                        <label>
+                          <span>Email address</span>
+                          <input
+                            type="email"
+                            value={inviteEmail}
+                            placeholder="person@example.com"
+                            disabled={inviteBusy}
+                            onChange={(event) => {
+                              setInviteEmail(event.target.value);
+                              setInviteLink("");
+                              setInviteStatus("");
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={inviteBusy || !inviteEmail.trim()}
+                          onClick={() => void createInvite()}
+                        >
+                          <UserPlus size={16} />
+                          {inviteBusy ? "Creating…" : "Create invitation"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Both ways out of here carry the same one-time token, and
                     neither of them hands it to a third party: the link is
                     copied by you, and the message is composed and sent by your
                     own mail app. */}
-                {inviteLink && (
-                  <div className="invite-ready">
-                    <div className="invite-link-row">
-                      <input aria-label="Invitation link" readOnly value={inviteLink} />
-                      <button
-                        type="button"
-                        aria-label="Copy invitation link"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(inviteLink).then(() => {
-                            setInviteStatus("Copied. The link expires in 7 days.");
-                          });
-                        }}
-                      >
-                        <Copy size={16} />
-                      </button>
+                  {inviteLink && (
+                    <div className="invite-ready">
+                      <div className="invite-link-row">
+                        <input aria-label="Invitation link" readOnly value={inviteLink} />
+                        <button
+                          type="button"
+                          aria-label="Copy invitation link"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(inviteLink).then(() => {
+                              setInviteStatus("Copied. The link expires in 7 days.");
+                            });
+                          }}
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                      <a className="invite-mail" href={inviteMailto(inviteEmail, inviteLink)}>
+                        <Mail size={16} />
+                        Send it by email
+                      </a>
                     </div>
-                    <a className="invite-mail" href={inviteMailto(inviteEmail, inviteLink)}>
-                      <Mail size={16} />
-                      Send it by email
-                    </a>
-                  </div>
-                )}
-                {inviteStatus && (
-                  <p className="profile-note" role="status">
-                    {inviteStatus}
-                  </p>
-                )}
-              </section>
-            )}
+                  )}
+                  {inviteStatus && (
+                    <p className="profile-note" role="status">
+                      {inviteStatus}
+                    </p>
+                  )}
+                </section>
+              )}
+            </div>
           </div>
         </div>
       </section>
