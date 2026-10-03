@@ -69,7 +69,8 @@ interface Props {
   onSettings: () => void;
   onLock: () => void;
   /** The archive switch, which belongs above the destinations it re-points. */
-  archiveSwitch: React.ReactNode;
+  /** The people this archive is shared between, as faces to switch between. */
+  peopleShelf: React.ReactNode;
   scopeLabel: string;
 }
 
@@ -356,7 +357,7 @@ export function Sidebar({
   onClose,
   onSettings,
   onLock,
-  archiveSwitch,
+  peopleShelf,
   scopeLabel,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -514,12 +515,9 @@ export function Sidebar({
           end are 32 each: the strip is what `SIDEBAR_MIN` is measured from,
           rather than the other way round. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
-        <div className="sidebar-scope">
-          {archiveSwitch}
-          <span className="sidebar-scope-name" title={scopeLabel}>
-            {scopeLabel}
-          </span>
-        </div>
+        {/* The strip holds the window's own acts and nothing else: the faces
+            moved down into the column, where they have room to be faces. */}
+        <span className="flex-1" />
         {/* Back in the strip, at the end of it, which is where the Finder and
             Notes both keep it — beside the control that hides the column
             rather than on the heading of the section it fills. It was moved
@@ -549,7 +547,8 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pt-3 pb-2">
+      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {peopleShelf}
         {all && (
           <Row
             scope={all}

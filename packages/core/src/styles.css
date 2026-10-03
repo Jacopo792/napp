@@ -7956,3 +7956,239 @@ text.ink-stroke {
   box-shadow: none;
   outline: none;
 }
+
+/* ── The people shelf ────────────────────────────────────────────────────────
+   The faces the archive is shared between, at the head of the sidebar, the
+   way iMessage holds the conversations you pinned. Large enough to be a
+   person; the chosen one lifts and takes a ring in that person's colour
+   (`--face`, set per button). It scrolls sideways and snaps to a face, so a
+   roster of eight is as easy as two.
+
+   It sticks to the top of the column and shrinks as the folders scroll under
+   it — the faces go from 52 to 30 and the names fade — the way a large title
+   collapses into a bar. A scroll-driven animation, so it costs no script and
+   simply holds still where the browser has none. */
+.people-shelf {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  margin: 0 -8px 6px;
+  padding: 10px 10px 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  background: var(--paper);
+  --face-size: 52px;
+}
+
+.people-shelf::-webkit-scrollbar {
+  display: none;
+}
+
+.has-translucent-sidebar .people-shelf,
+[data-shell="mac"] .people-shelf {
+  background: transparent;
+}
+
+@supports (animation-timeline: scroll()) {
+  .people-shelf {
+    animation: people-shelf-collapse linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: 0 72px;
+  }
+}
+
+@property --face-size {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 52px;
+}
+
+@keyframes people-shelf-collapse {
+  to {
+    --face-size: 30px;
+    padding-bottom: 6px;
+    box-shadow: 0 1px 0 var(--rule-soft);
+  }
+}
+
+.people-face {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 64px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  scroll-snap-align: start;
+  border-radius: var(--radius-md);
+  padding: 4px 6px;
+  color: var(--ink-3);
+}
+
+.people-face-portrait {
+  position: relative;
+  display: grid;
+  width: var(--face-size);
+  height: var(--face-size);
+  place-items: center;
+  border-radius: 50%;
+  transition:
+    transform var(--dur-slow) var(--ease-bounce),
+    box-shadow var(--dur-base) var(--ease);
+}
+
+.people-face-portrait .avatar {
+  width: 100%;
+  height: 100%;
+  font-size: calc(var(--face-size) * 0.32);
+}
+
+.people-face:hover .people-face-portrait {
+  transform: scale(1.05);
+}
+
+.people-face:active .people-face-portrait {
+  transform: scale(0.94);
+  transition-duration: var(--dur-press);
+}
+
+.people-face.is-active .people-face-portrait {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 2.5px var(--paper),
+    0 0 0 4.5px var(--face);
+}
+
+.people-face-name {
+  max-width: 72px;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: clamp(0, calc((var(--face-size) - 34px) / 18px), 1);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.people-face.is-active .people-face-name {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+/* Here now: the system's green, because "available" is a fact the eye has
+   learned from every other app and the reader's accent would make it a
+   preference. */
+.people-face-here {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(var(--face-size) * 0.24);
+  height: calc(var(--face-size) * 0.24);
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 50%;
+  background: #34c759;
+  box-shadow: 0 0 0 2px var(--paper);
+  animation: people-here-in var(--dur-base) var(--ease-spring) backwards;
+}
+
+@keyframes people-here-in {
+  from {
+    transform: scale(0);
+  }
+}
+
+/* Writing, in this note, now — the bubble a phone shows when somebody is
+   typing to you, because it is the one everybody already reads that way. */
+.people-face-typing {
+  position: absolute;
+  top: -4px;
+  right: -12px;
+  display: flex;
+  gap: 2.5px;
+  border-radius: var(--radius-pill);
+  background: var(--glass);
+  padding: 5px 7px;
+  box-shadow:
+    0 0 0 1px var(--glass-border),
+    0 2px 6px rgb(0 0 0 / 0.3);
+  animation: people-here-in var(--dur-base) var(--ease-spring) backwards;
+}
+
+.people-face-typing i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-2);
+  animation: people-typing 1.2s var(--ease-in-out) infinite;
+}
+
+.people-face-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.people-face-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes people-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* The list travels toward the person chosen: their notes come in from the
+   side their face is on, so the order of the faces is the order of the
+   pages. Replaces the list's upward entrance only when the scope changed. */
+.pane-frame[data-scope-direction="next"] .list-in {
+  animation-name: list-in-next;
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease);
+}
+
+.pane-frame[data-scope-direction="previous"] .list-in {
+  animation-name: list-in-previous;
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease);
+}
+
+@keyframes list-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
+@keyframes list-in-previous {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-shelf,
+  .people-face-here,
+  .people-face-typing,
+  .people-face-typing i {
+    animation: none;
+  }
+
+  .people-face-portrait {
+    transition: none;
+  }
+
+  .pane-frame[data-scope-direction] .list-in {
+    animation: none;
+  }
+}

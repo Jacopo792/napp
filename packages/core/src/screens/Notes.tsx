@@ -326,6 +326,7 @@ export default function NotesPage() {
   const writingPreferences = useWritingPreferences();
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
+  const [scopeDirection, setScopeDirection] = useState<"next" | "previous" | null>(null);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const typingOffRef = useRef<number | undefined>(undefined);
   const typingRef = useRef(false);
@@ -2256,6 +2257,11 @@ export default function NotesPage() {
   }
 
   function handleViewChange(v: string) {
+    /* Which way the list travels: toward the person chosen, so the order of
+       the faces is the order of the pages. */
+    const ordered = [...members].sort((a, b) => Number(b.isSelf) - Number(a.isSelf));
+    const place = (id: string) => ordered.findIndex((member) => member.userId === id);
+    setScopeDirection(place(v) > place(viewAs) ? "next" : "previous");
     saveNow();
     setViewAs(v);
     setSelectedId(null);
@@ -2939,6 +2945,75 @@ export default function NotesPage() {
     </div>
   );
 
+  /* ── Whose notes, on the desktop ─────────────────────────────────────────
+     The switch above fits a phone's header and a title bar, and that was the
+     trouble with it in the window: two faces at twenty pixels, squeezed beside
+     the traffic lights, which is a control and not a person. The sidebar has
+     the room to show the people this archive is shared between, so it does —
+     the way iMessage shows the conversations you pinned: a face large enough
+     to recognise, a name under it, whether they are here, and whether they
+     are writing in the note in front of you. The ring is the person's colour:
+     yours is the accent, everybody else's the presence colour their caret
+     already wears in the note, so one colour means one person throughout.
+
+     Typing is read from the note's own awareness, so the bubble means "in
+     this note, now" and never a guess about some other page. */
+  const presenceColor = presencePaletteFor(writingPreferences.presencePalette).color;
+  const typingIds = new Set(notePeers.filter((peer) => peer.typing).map((peer) => peer.userId));
+  const hereIds = new Set(notePeers.map((peer) => peer.userId));
+  const peopleShelf = (
+    <div role="group" aria-label="Whose notes" className="people-shelf">
+      {roster.map((member) => {
+        const active = viewAs === member.userId;
+        const online =
+          !member.isSelf &&
+          ((flags.presence && onlineMemberIds.has(member.userId)) || hereIds.has(member.userId));
+        const typing = !member.isSelf && flags.collaborators && typingIds.has(member.userId);
+        return (
+          <button
+            key={member.userId}
+            type="button"
+            onClick={() => {
+              if (heldRef.current) return void (heldRef.current = false);
+              handleViewChange(member.userId);
+            }}
+            onPointerDown={(event) => holdStart(event, member.userId)}
+            onPointerUp={holdEnd}
+            onPointerLeave={holdEnd}
+            onPointerCancel={holdEnd}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              holdEnd();
+              setMemberCard({ x: event.clientX, y: event.clientY, userId: member.userId });
+            }}
+            aria-pressed={active}
+            aria-label={notesOf(member)}
+            title={notesOf(member)}
+            className={`people-face ${active ? "is-active" : ""}`}
+            style={
+              {
+                "--face": member.isSelf ? "var(--accent)" : presenceColor,
+              } as React.CSSProperties
+            }
+          >
+            <span className="people-face-portrait">
+              <Avatar url={avatarUrls[member.userId] ?? null} name={nameOf(member)} email="" />
+              {online && <span className="people-face-here" aria-label="Here now" />}
+              {typing && (
+                <span className="people-face-typing" aria-label="Writing">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+            </span>
+            <span className="people-face-name">{member.isSelf ? "You" : nameOf(member)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   /* Who that is. Grown out of the point the hand asked from — see
      `.member-card-panel` in the stylesheet — rather than faded in, because a
      card that answers a gesture should look like it came from it. */
@@ -2998,7 +3073,7 @@ export default function NotesPage() {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
-      archiveSwitch={archiveSwitch}
+      peopleShelf={peopleShelf}
       scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
     />
   );
@@ -3377,7 +3452,11 @@ export default function NotesPage() {
                 defaultValue={SIDEBAR_DEFAULT}
                 onChange={setSidebarWidth}
               />
-              <div className="pane-frame" style={{ width: listShown }}>
+              <div
+                className="pane-frame"
+                data-scope-direction={scopeDirection ?? undefined}
+                style={{ width: listShown }}
+              >
                 {/* Keyed on the scope, so changing whose notes these are re-runs
                     the list's own entrance instead of swapping the rows in
                     place. Nothing is lost by the remount: `handleViewChange`
