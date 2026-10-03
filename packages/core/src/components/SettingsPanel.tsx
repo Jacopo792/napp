@@ -21,6 +21,9 @@ import {
   Timer,
   Type,
   ArrowDownAZ,
+  Folder as FolderGlyph,
+  Highlighter,
+  NotebookText,
   ArrowDownUp,
   CalendarDays,
   ChevronRight,
@@ -67,6 +70,9 @@ import type { AvatarCrop } from "@/lib/image";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE,
+  ICON_STYLES,
+  SYSTEM_COLOURS,
+  type IconStyle,
   setAppearance,
   setTheme,
   setWallpaper,
@@ -200,6 +206,82 @@ function AppearanceSlider({
   );
 }
 
+/** A colour that may also be left to the app: Automatic, then the system's
+ *  hues, as the Mac offers its highlight and folder colours. */
+function SwatchRow({
+  icon,
+  label,
+  value,
+  onChange,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="appearance-row swatch-row">
+      <RowLead icon={icon} label={label} />
+      <span className="swatch-choices" role="radiogroup" aria-label={label}>
+        {[{ id: "auto", name: "Automatic" }, ...SYSTEM_COLOURS].map((colour) => (
+          <button
+            key={colour.id}
+            type="button"
+            role="radio"
+            aria-checked={value === colour.id}
+            aria-label={colour.name}
+            title={colour.name}
+            className={`swatch press ${colour.id === "auto" ? "is-auto" : ""} ${
+              value === colour.id ? "is-active" : ""
+            }`}
+            style={
+              colour.id === "auto" ? undefined : ({ "--swatch": colour.id } as React.CSSProperties)
+            }
+            onClick={() => onChange(colour.id)}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** Liquid Glass, drawn the way the Mac draws it: a white capsule on a bare
+ *  track between a clear pane and a tinted one, with no number — how much
+ *  glass is a thing to see, not to read. */
+function GlassSlider({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const valueText = value < 34 ? "Clear" : value > 66 ? "Tinted" : "Balanced";
+  return (
+    <div className="appearance-row glass-row">
+      <RowLead icon={<Layers size={16} />} label="Liquid Glass" />
+      <span className="glass-slider">
+        <Copy size={18} aria-hidden="true" />
+        <span className="glass-slider-track">
+          <input
+            type="range"
+            className="glass-range"
+            min={0}
+            max={100}
+            value={value}
+            aria-label="Liquid Glass"
+            aria-valuetext={valueText}
+            onChange={(event) => onChange(Number(event.target.value))}
+          />
+          <i style={{ left: "calc(15px + (100% - 30px) / 3)" }} />
+          <i style={{ left: "calc(15px + (100% - 30px) * 2 / 3)" }} />
+        </span>
+        <Copy size={18} weight="fill" aria-hidden="true" />
+      </span>
+    </div>
+  );
+}
+
+const ICON_STYLE_NAMES: Record<IconStyle, string> = {
+  default: "Default",
+  dark: "Dark",
+  clear: "Clear",
+  tinted: "Tinted",
+};
+
 /** A row of mutually exclusive choices, the shape the platform uses for four
  *  or fewer options that fit on one line. */
 function Segmented({
@@ -244,6 +326,7 @@ const SETTINGS_SECTIONS = [
     group: "Interface",
     items: [
       { id: "appearance", tone: "violet", name: "Appearance", icon: <Palette size={16} /> },
+      { id: "style", tone: "pink", name: "Style", icon: <Layers size={16} /> },
       { id: "reading", tone: "orange", name: "Reading", icon: <BookOpen size={16} /> },
       { id: "writing", tone: "teal", name: "Writing", icon: <Type size={16} /> },
       { id: "shortcuts", tone: "gray", name: "Shortcuts", icon: <Keyboard size={16} /> },
@@ -854,22 +937,6 @@ export function SettingsPanel({
                       </label>
                     ))}
 
-                    <label className="appearance-row">
-                      <RowLead
-                        icon={<Layers size={16} />}
-                        label="Translucency"
-                        hint="Rails, bars and menus let what is behind them through"
-                      />
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        checked={appearance.translucentSidebar}
-                        onChange={(event) =>
-                          setAppearance({ ...appearance, translucentSidebar: event.target.checked })
-                        }
-                      />
-                    </label>
-
                     <AppearanceSlider
                       icon={<Contrast size={16} />}
                       label="Contrast"
@@ -963,6 +1030,87 @@ export function SettingsPanel({
                   >
                     Reset appearance
                   </button>
+                </section>
+              )}
+
+              {section === "style" && (
+                <section>
+                  <h3>Icon style</h3>
+                  <div className="icon-style-picker" role="radiogroup" aria-label="Icon style">
+                    {ICON_STYLES.map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        role="radio"
+                        aria-checked={appearance.iconStyle === style}
+                        className={appearance.iconStyle === style ? "is-active" : ""}
+                        onClick={() => setAppearance({ ...appearance, iconStyle: style })}
+                      >
+                        <span className="icon-style-preview" data-preview={style}>
+                          <span data-tone="notes">
+                            <NotebookText size={14} />
+                          </span>
+                          <span data-tone="folder">
+                            <FolderGlyph size={14} />
+                          </span>
+                          <span data-tone="trash">
+                            <Trash2 size={14} />
+                          </span>
+                        </span>
+                        {ICON_STYLE_NAMES[style]}
+                      </button>
+                    ))}
+                  </div>
+
+                  <h3>Colour</h3>
+                  <div className="appearance-controls">
+                    {appearance.iconStyle === "tinted" && (
+                      <SwatchRow
+                        icon={<Palette size={16} />}
+                        label="Tint colour"
+                        value={appearance.iconTint}
+                        onChange={(iconTint) => setAppearance({ ...appearance, iconTint })}
+                      />
+                    )}
+                    <SwatchRow
+                      icon={<FolderGlyph size={16} />}
+                      label="Folder colour"
+                      value={appearance.folderColour}
+                      onChange={(folderColour) => setAppearance({ ...appearance, folderColour })}
+                    />
+                    <SwatchRow
+                      icon={<Highlighter size={16} />}
+                      label="Text highlight colour"
+                      value={appearance.highlight}
+                      onChange={(highlight) => setAppearance({ ...appearance, highlight })}
+                    />
+                  </div>
+
+                  <h3>Material</h3>
+                  <div className="appearance-controls">
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Layers size={16} />}
+                        label="Translucency"
+                        hint="Rails, bars and menus let what is behind them through"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={appearance.translucentSidebar}
+                        onChange={(event) =>
+                          setAppearance({ ...appearance, translucentSidebar: event.target.checked })
+                        }
+                      />
+                    </label>
+
+                    {appearance.translucentSidebar && (
+                      <GlassSlider
+                        value={appearance.glass}
+                        onChange={(glass) => setAppearance({ ...appearance, glass })}
+                      />
+                    )}
+                  </div>
                 </section>
               )}
 

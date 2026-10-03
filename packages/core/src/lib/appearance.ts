@@ -2,6 +2,25 @@ import { useSyncExternalStore } from "react";
 
 export type ThemeMode = "system" | "dark" | "light";
 
+/** How the sidebar's glyphs are drawn, after the Mac's own Icon & widget
+ *  style: a coloured tile, a dark tile with a coloured glyph, the bare glyph,
+ *  or one tile tinted with the accent. */
+export type IconStyle = "default" | "dark" | "clear" | "tinted";
+export const ICON_STYLES: readonly IconStyle[] = ["default", "dark", "clear", "tinted"];
+
+/** The system's own hues, offered wherever a colour is a choice rather than a
+ *  palette: the text highlight and the folders. */
+export const SYSTEM_COLOURS = [
+  { id: "#0a84ff", name: "Blue" },
+  { id: "#bf5af2", name: "Purple" },
+  { id: "#ff375f", name: "Pink" },
+  { id: "#ff453a", name: "Red" },
+  { id: "#ff9f0a", name: "Orange" },
+  { id: "#ffd60a", name: "Yellow" },
+  { id: "#30d158", name: "Green" },
+  { id: "#8e8e93", name: "Graphite" },
+] as const;
+
 export interface Appearance {
   theme: ThemeMode;
   accent: string;
@@ -21,6 +40,16 @@ export interface Appearance {
   wallpaperDim: number;
   wallpaperBlur: number;
   wallpaperFit: "cover" | "contain";
+  /** Liquid Glass, from clear (0) to tinted (100): how much of the palette a
+   *  translucent surface carries over what is behind it. */
+  glass: number;
+  /** `"auto"` or a hex colour. */
+  highlight: string;
+  iconStyle: IconStyle;
+  /** The one hue a Tinted icon style uses: `"auto"` (the accent) or a hex. */
+  iconTint: string;
+  /** `"auto"` or a hex colour. */
+  folderColour: string;
 }
 
 /* A new account opens on Graphite: the grey a Mac window is, and the system's
@@ -39,6 +68,11 @@ export const DEFAULT_APPEARANCE: Appearance = {
   wallpaperDim: 42,
   wallpaperBlur: 0,
   wallpaperFit: "cover",
+  glass: 72,
+  highlight: "auto",
+  iconStyle: "clear",
+  iconTint: "auto",
+  folderColour: "auto",
 };
 
 /* Nine starting points, each a ground, an ink and one colour to act with.
@@ -148,6 +182,10 @@ function validHex(value: unknown, fallback: string): string {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
 }
 
+function autoOrHex(value: unknown): string {
+  return value === "auto" ? "auto" : validHex(value, "auto");
+}
+
 function clamp(value: unknown, min: number, max: number, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, value))
@@ -172,6 +210,13 @@ function read(): Appearance {
       wallpaperDim: clamp(parsed.wallpaperDim, 0, 80, DEFAULT_APPEARANCE.wallpaperDim),
       wallpaperBlur: clamp(parsed.wallpaperBlur, 0, 20, DEFAULT_APPEARANCE.wallpaperBlur),
       wallpaperFit: parsed.wallpaperFit === "contain" ? "contain" : "cover",
+      glass: clamp(parsed.glass, 0, 100, DEFAULT_APPEARANCE.glass),
+      highlight: autoOrHex(parsed.highlight),
+      iconStyle: ICON_STYLES.includes(parsed.iconStyle as IconStyle)
+        ? (parsed.iconStyle as IconStyle)
+        : DEFAULT_APPEARANCE.iconStyle,
+      iconTint: autoOrHex(parsed.iconTint),
+      folderColour: autoOrHex(parsed.folderColour),
     };
   } catch {
     return DEFAULT_APPEARANCE;
@@ -355,6 +400,15 @@ export function applyAppearance(config = current): void {
   root.style.setProperty("--accent", accent);
   root.style.setProperty("--accent-strong", legibleOn(config.accent, paper, 4.5));
   root.style.setProperty("--accent-wash", `${accent}24`);
+  /* Tinted icons take the accent unless the reader gave them a hue of their
+     own, lifted to the same floors the accent is so a dark tint stays a
+     visible glyph. */
+  const tint = autoOrHex(config.iconTint);
+  root.style.setProperty("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
+  root.style.setProperty(
+    "--icon-tint-strong",
+    tint === "auto" ? legibleOn(config.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
+  );
   root.style.setProperty("--on-accent", onAccent);
   root.style.setProperty(
     "--glass",
@@ -362,6 +416,26 @@ export function applyAppearance(config = current): void {
   );
   root.style.setProperty("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
   root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
+  /* Liquid Glass: the share of the palette laid over a translucent surface.
+     Two ranges, because the Mac's own material is already a tint and a CSS
+     backdrop blur is not — the same "clear" is a lighter coat over vibrancy. */
+  const glass = clamp(config.glass, 0, 100, DEFAULT_APPEARANCE.glass);
+  root.style.setProperty("--glass-tint", `${40 + glass / 2}%`);
+  root.style.setProperty("--glass-tint-native", `${20 + glass / 2}%`);
+  root.style.setProperty("--glass-tint-menu", `${70 + glass / 4}%`);
+  root.dataset.iconStyle = config.iconStyle;
+  const folder = autoOrHex(config.folderColour);
+  if (folder === "auto") root.style.removeProperty("--folder-tint");
+  else root.style.setProperty("--folder-tint", folder);
+  const highlight = autoOrHex(config.highlight);
+  root.style.setProperty(
+    "--selection",
+    highlight !== "auto"
+      ? `${highlight}59`
+      : dark
+        ? "rgb(255 255 255 / 0.22)"
+        : "rgb(0 0 0 / 0.14)",
+  );
   root.classList.toggle("has-wallpaper", config.wallpaper && Boolean(wallpaperUrl));
   root.style.setProperty(
     "--wallpaper",

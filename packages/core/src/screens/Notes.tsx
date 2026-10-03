@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   Archive,
   ChevronLeft,
@@ -256,15 +257,6 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
-  /* True only while the navigation is actually opening or closing.
-     The slide has to be a state and not a property of the pane, because the
-     pane's width is *also* driven by `PaneResizer` — which writes a new width
-     on every `pointermove`. A transition sitting permanently on that width
-     made dragging a divider lag a quarter of a second behind the pointer and
-     arrive on an easing curve, which is the one thing a drag handle must never
-     do. Raised beside every change to `navigationOpen`, lowered by the pane's
-     own `transitionend`. */
-  const [navigationSliding, setNavigationSliding] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(() => {
     try {
       return localStorage.getItem("napp:navigation") !== "closed";
@@ -1344,33 +1336,44 @@ export default function NotesPage() {
      rail's own open state is remembered across the trip, because whether you
      had it open is a different question from whether you are focusing. */
   const restoreNavigation = useRef(true);
-  const changeNavigation = useCallback((next: boolean | ((current: boolean) => boolean)) => {
-    setNavigationSliding(true);
-    setNavigationOpen(next);
-  }, []);
-
-  /* The backstop under `transitionend`. A pane in a background tab never runs
-     its transition, so the event that lowers this flag never arrives — and a
-     flag left raised puts the lag back on the resize handle, which is the
-     whole thing this state exists to prevent. Longer than the slide, so it
-     never cuts one short. */
-  useEffect(() => {
-    if (!navigationSliding) return;
-    const timer = window.setTimeout(() => setNavigationSliding(false), 700);
-    return () => window.clearTimeout(timer);
-  }, [navigationSliding]);
+  /* The slide is a view transition: the new layout is worked out once, and
+     what travels for the next 360ms is two pictures of it on the compositor.
+     It was a transition on the slot's `width`, which re-laid the whole note —
+     and re-ran its container queries — on every frame of the way, and could
+     not leave the width alone while `PaneResizer` was dragging it either.
+     `also` is for a change that has to land in the same frame, so the
+     picture taken after it is the finished one. */
+  const changeNavigation = useCallback(
+    (next: boolean | ((current: boolean) => boolean), also?: () => void) => {
+      const apply = () =>
+        flushSync(() => {
+          setNavigationOpen(next);
+          also?.();
+        });
+      if (
+        !document.startViewTransition ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        apply();
+        return;
+      }
+      const root = document.documentElement;
+      root.classList.add("is-sliding-navigation");
+      document
+        .startViewTransition(apply)
+        .finished.finally(() => root.classList.remove("is-sliding-navigation"));
+    },
+    [],
+  );
 
   const toggleFocus = useCallback(() => {
-    setFocusMode((current) => {
-      if (current) {
-        changeNavigation(restoreNavigation.current);
-        return false;
-      }
-      restoreNavigation.current = navigationOpen;
-      changeNavigation(false);
-      return true;
-    });
-  }, [navigationOpen, changeNavigation]);
+    if (focusMode) {
+      changeNavigation(restoreNavigation.current, () => setFocusMode(false));
+      return;
+    }
+    restoreNavigation.current = navigationOpen;
+    changeNavigation(false, () => setFocusMode(true));
+  }, [focusMode, navigationOpen, changeNavigation]);
 
   useEffect(
     () => () => {
@@ -2279,7 +2282,25 @@ export default function NotesPage() {
 
   const handleSelectNote = useCallback(
     (id: string) => {
-      setSelectedId(id);
+      /* The note being left fades out while the new one settles in, instead
+         of vanishing in the frame the click lands. A view transition, so the
+         old page is a picture and costs nothing to fade; the new one is live
+         and runs its own `page-in` underneath. */
+      const root = document.documentElement;
+      if (
+        !compact &&
+        id !== selectedIdRef.current &&
+        document.startViewTransition &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+        !root.classList.contains("is-sliding-navigation")
+      ) {
+        root.classList.add("is-opening-note");
+        document
+          .startViewTransition(() => flushSync(() => setSelectedId(id)))
+          .finished.finally(() => root.classList.remove("is-opening-note"));
+      } else {
+        setSelectedId(id);
+      }
       /* Opening the note *is* having read what was said on it — a remark
          written on it while it is open is still news the next time. */
       markRemarksSeen(id);
@@ -3308,6 +3329,7 @@ export default function NotesPage() {
                   toolbarActions={collectionActions}
                   filters={activeFilters}
                   meta={activeMeta}
+                  showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
                   selectedId={selectedId}
                   query={query}
                   loading={loading}
@@ -3434,11 +3456,9 @@ export default function NotesPage() {
               and the next — and because there is nothing to animate on the way
               out of a component that no longer exists, no amount of easing
               could have softened it. Mounted always, the pair slides as one
-              piece: the slot's width carries the note page across, and the
-              track inside it travels the same distance in the same time so the
-              columns leave to the left rather than being squeezed flat. The
-              inner width never changes, which is what stops every folder name
-              and every note title reflowing while it goes.
+              piece — see `changeNavigation` for how. The track's width never
+              changes, which is what stops every folder name and every note
+              title reflowing while it goes.
 
               Clipped only while it is away. The sidebar's own menu is wider
               than the column it hangs in — 14.5rem against a 248px minimum —
@@ -3447,15 +3467,10 @@ export default function NotesPage() {
               cut; opening, the track is off to the left of the window and the
               window clips it for us. */}
           <div
-            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"} ${
-              navigationSliding ? "is-sliding" : ""
-            }`}
+            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
             style={{ width: navigationOpen ? sidebarShown + listShown + 2 : 0 }}
             aria-hidden={!navigationOpen}
             inert={!navigationOpen}
-            onTransitionEnd={(event) => {
-              if (event.propertyName === "width") setNavigationSliding(false);
-            }}
           >
             <div
               className="pane-slide-track flex h-full min-h-0"
@@ -3489,6 +3504,7 @@ export default function NotesPage() {
                   toolbarActions={collectionActions}
                   filters={activeFilters}
                   meta={activeMeta}
+                  showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
                   selectedId={selectedId}
                   query={query}
                   loading={loading}

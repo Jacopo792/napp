@@ -155,10 +155,14 @@
      box lands on x.4 is an icon drawn across two device columns, which is the
      whole of why line glyphs look sanded down on a 1× display.
 
-     rail = twisty (16) + inset (2) = 18px from the row's own left edge. */
+     rail = 8px from the row's own left edge. The disclosure arrow used to hold
+     a 16px column open at the head of every row, filled or not, which pushed
+     every glyph that far in from the edge for the sake of the one folder in
+     ten that has subfolders. It stands at the row's tail now, after the count,
+     where a Mac sidebar keeps its disclosure. */
   --rail-twisty: 16px;
-  --rail-inset: 2px;
-  --rail-offset: 18px;
+  --rail-inset: 8px;
+  --rail-offset: 8px;
   --rail-gap: 8px;
   --row-pad-y: 7px;
   --row-line: 20px;
@@ -284,7 +288,7 @@
      needs to be visible is the one moment it was not. A wash the words show
      through says "selected" perfectly well, and lets them keep their own ink. */
   ::selection {
-    background: rgb(255 255 255 / 0.22);
+    background: var(--selection, rgb(255 255 255 / 0.22));
   }
 
   /* Toward the ink, for the same reason the selected row goes that way and
@@ -455,7 +459,7 @@
 }
 
 .has-translucent-sidebar .pane-glass {
-  background: color-mix(in srgb, var(--paper) 78%, transparent);
+  background: color-mix(in srgb, var(--paper) var(--glass-tint, 78%), transparent);
   -webkit-backdrop-filter: blur(22px) saturate(1.08);
   backdrop-filter: blur(22px) saturate(1.08);
 }
@@ -470,11 +474,29 @@
   background: transparent;
 }
 
+/* The blur is on a layer behind the column, never on the column itself. An
+   element carrying `backdrop-filter` is the backdrop root of everything inside
+   it, so a menu opened in a blurred column could blur only the column's own
+   paint — the notes under the menu came through it sharp, at whatever the
+   glass let through, and read as two lists printed over each other. Never
+   `isolation: isolate` here either: Chromium makes an isolated group a
+   backdrop root too, which is the same wall by another name. */
 .has-wallpaper .sidebar-column,
 .has-wallpaper .collection-column {
+  position: relative;
+  background: transparent;
+}
+
+.has-wallpaper .sidebar-column::before,
+.has-wallpaper .collection-column::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: color-mix(in srgb, var(--paper) 88%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.06);
   backdrop-filter: blur(18px) saturate(1.06);
+  content: "";
+  pointer-events: none;
 }
 
 /* A band inside a pane that is already tinted and already blurred takes
@@ -1768,24 +1790,93 @@
   flex: 0 0 auto;
 }
 
-/* **Only while it is actually moving**, and never otherwise. This same width
-   is written by `PaneResizer` on every `pointermove`, so a transition living
-   permanently on it made dragging a divider lag a quarter-second behind the
-   pointer and land on an easing curve — a drag handle that argues with the
-   hand holding it. `notes.tsx` raises this class beside every change to
-   `navigationOpen` and drops it on the pane's own `transitionend`.
+/* The slide is a view transition, raised by `changeNavigation` in
+   `Notes.tsx`. The layout changes once; what moves is a picture of each side.
+   It was a transition on the slot's `width`, which laid the whole note out
+   again — container queries and all — sixty times a second, and crossed the
+   editor's 700px query halfway, so the page changed shape mid-glide.
 
-   Slower than `--dur-base`, because this is most of the width of the window
-   rather than a button: the same curve over a longer distance needs longer to
-   read as gliding rather than as snapping. */
-.pane-slide.is-sliding {
-  transition: width var(--dur-slow) var(--ease);
-  will-change: width;
+   The columns' picture is pinned to its group's right edge and the group
+   narrows, so they leave to the left rather than being squeezed — and they do
+   not fade, because a sheet is solid while it moves. The page
+   is not one picture: a column of a different width wraps its words
+   differently, so two pictures of it crossfaded read as a double exposure.
+   The body shows only where it is going, centred in a group that slides and
+   widens — the text column is centred in both, so it glides from where it was
+   to where it lands. The three toolbar clusters are pictures of their own,
+   each unchanged by the move, so they travel instead of ghosting. */
+.is-sliding-navigation .pane-slide {
+  view-transition-name: navigation;
 }
 
-.pane-slide.is-sliding > .pane-slide-track {
-  transition: transform var(--dur-slow) var(--ease);
-  will-change: transform;
+.is-sliding-navigation .pane-slide + .pane-page .editor-body {
+  view-transition-name: note-body;
+}
+
+.is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar > :first-child {
+  view-transition-name: note-toolbar-start;
+}
+
+.is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar > .justify-self-center {
+  view-transition-name: note-toolbar-tools;
+}
+
+.is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar > :last-child {
+  view-transition-name: note-toolbar-end;
+}
+
+.is-sliding-navigation .split-seam + .pane-page {
+  view-transition-name: note-split;
+}
+
+.is-sliding-navigation::view-transition-old(root),
+.is-sliding-navigation::view-transition-new(root) {
+  animation: none;
+}
+
+.is-sliding-navigation::view-transition-group(*) {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease);
+}
+
+.is-sliding-navigation::view-transition-group(navigation),
+.is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-split) {
+  overflow: clip;
+}
+
+.is-sliding-navigation::view-transition-old(*),
+.is-sliding-navigation::view-transition-new(*) {
+  width: auto;
+  height: auto;
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease);
+}
+
+.is-sliding-navigation::view-transition-old(navigation),
+.is-sliding-navigation::view-transition-new(navigation),
+.is-sliding-navigation::view-transition-old(note-toolbar-end),
+.is-sliding-navigation::view-transition-new(note-toolbar-end) {
+  right: 0;
+  left: auto;
+}
+
+.is-sliding-navigation::view-transition-old(navigation),
+.is-sliding-navigation::view-transition-new(navigation),
+.is-sliding-navigation::view-transition-new(note-body),
+.is-sliding-navigation::view-transition-new(note-split) {
+  animation: none;
+}
+
+.is-sliding-navigation::view-transition-new(note-body),
+.is-sliding-navigation::view-transition-new(note-split) {
+  left: 50%;
+  translate: -50% 0;
+}
+
+.is-sliding-navigation::view-transition-old(note-body),
+.is-sliding-navigation::view-transition-old(note-split) {
+  display: none;
 }
 
 /* Only while it is away — see the note at the call site: the sidebar's own
@@ -1800,13 +1891,6 @@
    names — a sheet is solid while it moves. */
 .pane-slide.is-collapsed > .pane-slide-track {
   transform: translateX(-100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pane-slide.is-sliding,
-  .pane-slide.is-sliding > .pane-slide-track {
-    transition: none;
-  }
 }
 
 /* The seam between two flush columns, which is the divider and the handle at
@@ -2407,10 +2491,31 @@
     var(--shadow-popover);
 }
 
-.has-translucent-sidebar :is(.glass-toolbar, .popover, .glass-sheet) {
-  background: color-mix(in srgb, var(--glass) 76%, transparent);
+.has-translucent-sidebar :is(.popover, .glass-sheet) {
+  background: color-mix(in srgb, var(--glass) var(--glass-tint-menu, 82%), transparent);
   -webkit-backdrop-filter: blur(30px) saturate(1.7);
   backdrop-filter: blur(30px) saturate(1.7);
+}
+
+/* A toolbar pill holds the menus it opens, so its glass is a layer behind it
+   rather than a filter on it — see the columns above for why. The menus also
+   keep a floor of their own (`--glass-tint-menu`): a bar may go nearly clear,
+   but a list of words over a list of words has to stay readable. */
+.has-translucent-sidebar .glass-toolbar {
+  position: relative;
+  background: transparent;
+}
+
+.has-translucent-sidebar .glass-toolbar::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--glass) var(--glass-tint, 76%), transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  backdrop-filter: blur(30px) saturate(1.7);
+  content: "";
+  pointer-events: none;
 }
 
 .glass-toolbar {
@@ -2619,7 +2724,9 @@
 @media (prefers-reduced-motion: reduce) {
   .note-group-body,
   .note-group-body > *,
-  .note-group-twisty {
+  .note-group-twisty,
+  .note-row-list,
+  .note-row-list::after {
     transition: none;
   }
 }
@@ -2771,6 +2878,26 @@
   border-radius: var(--radius-sm);
 }
 
+/* Two motions on one row, on two properties with two curves. `transform` is
+   the swipe letting go, which wants the spring: a card thrown at the edge
+   comes back with some weight in it. The wash is the pointer, and it is
+   uneven on purpose — it arrives at once and leaves slowly, as a list on the
+   Mac does, so a pointer drawn down the column leaves a short fading trail
+   instead of a row flicking on and off under it. */
+.note-row-list {
+  --row-wash: 240ms;
+  transition:
+    transform var(--dur-swipe) var(--ease-bounce),
+    background-color var(--row-wash) var(--ease);
+}
+
+@media (hover: hover) {
+  .note-row-list:hover,
+  .note-row-list:has(+ .note-row-list:hover) {
+    --row-wash: 70ms;
+  }
+}
+
 @media (hover: hover) {
   .note-row-list:hover:not(.is-selected):not(.is-swiped) {
     background: color-mix(in srgb, var(--ink) 5%, transparent);
@@ -2820,6 +2947,68 @@
   content: "";
 }
 
+/* ── A row in Notes' shape ───────────────────────────────────────────────────
+   Title, then when and how it begins, then where it is filed — three lines
+   the eye reads top to bottom without a glyph to step over first. The glyph
+   for the kind of document said the same thing on every row ("a document"),
+   so it was a column of identical marks pushing every title right. A note
+   with a picture of its own, or a drawing, shows it as a thumbnail at the
+   trailing edge, where Notes shows an attachment. */
+.note-row .is-thumb {
+  order: 2;
+  width: 40px;
+  height: 40px;
+  align-self: center;
+  margin: 0;
+  border-radius: 7px;
+}
+
+.note-row-glyph.is-sketch.is-thumb {
+  padding: 4px;
+}
+
+/* Mail's unread dot, in the margin the row keeps for it. */
+.note-row-dot {
+  position: absolute;
+  top: calc(0.625rem + 6px);
+  left: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+}
+
+.note-row-pin {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -1px;
+  color: var(--ink-3);
+}
+
+.note-row-folder {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  line-height: 14px;
+}
+
+.note-row-folder > svg {
+  flex-shrink: 0;
+  color: var(--folder-tint, var(--ink-4));
+}
+
+.note-row-folder > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* One hairline between two rows, not an underline under each. The rows used
    to carry a bottom border and four pixels of margin under it, which draws a
    line and then a gap — a row with a rule below it rather than two rows with a
@@ -2830,17 +3019,21 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  left: 2rem;
+  left: 1rem;
   /* `--rule`, not `--rule-soft`. The soft one is four values off the paper it
      is drawn on — a line that is only there in the stylesheet. This is the
      most repeated hairline in the application and it still has to be seen. */
   border-bottom: 1px solid var(--rule);
   content: "";
+  transition: opacity var(--row-wash) var(--ease);
 }
 
 /* Not under the last one, and not against a row that is already a filled
    shape: a hairline running into the corner of the selection is the one place
    the eye reads it as an edge of the selection rather than as a divider. */
+/* Faded, not removed. A hairline that blinked out the frame the pointer
+   arrived made a quick pass down the list flicker like a bad contact; on the
+   same curve as the wash it reads as the wash pushing the line aside. */
 .note-row-list:last-child::after,
 .note-row-list[aria-selected="true"]::after,
 .note-row-list:has(+ .note-row-list[aria-selected="true"])::after,
@@ -2848,7 +3041,7 @@
 .note-row-list:has(+ .note-row-list:hover)::after,
 .note-row-list.is-swiped::after,
 .note-row-list:has(+ .note-row-list.is-swiped)::after {
-  display: none;
+  opacity: 0;
 }
 
 /* What is left of a checklist, in the line that already says when. */
@@ -3201,6 +3394,9 @@
 .settings-nav-tile[data-tone="orange"] {
   --tile: #f08a24;
 }
+.settings-nav-tile[data-tone="pink"] {
+  --tile: #ff375f;
+}
 .settings-nav-tile[data-tone="teal"] {
   --tile: #14a3a3;
 }
@@ -3504,6 +3700,124 @@
   color: var(--ink);
 }
 
+/* Icon style: four tiles of the same three places, each drawn the way that
+   style draws them — the choice is shown, not described. The previews carry
+   their own rules rather than reading the root's, or every tile would show
+   whichever style is chosen now. */
+.icon-style-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.icon-style-picker > button {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.icon-style-picker > button.is-active {
+  color: var(--ink);
+}
+
+.icon-style-preview {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.icon-style-picker > button.is-active .icon-style-preview {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.icon-style-preview > span {
+  --tone: #8e8e93;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6.5px;
+}
+
+.icon-style-preview > [data-tone="notes"] {
+  --tone: #f5b80f;
+}
+.icon-style-preview > [data-tone="folder"] {
+  --tone: var(--folder-tint, #2f7cf6);
+}
+.icon-style-preview > [data-tone="trash"] {
+  --tone: #ff453a;
+}
+
+.icon-style-preview[data-preview="default"] > span {
+  background: var(--tone);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
+  color: #fff;
+}
+
+.icon-style-preview[data-preview="dark"] > span {
+  background: color-mix(in srgb, var(--ink) 10%, var(--surface));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--tone);
+}
+
+.icon-style-preview[data-preview="clear"] > span {
+  color: var(--ink-3);
+}
+
+.icon-style-preview[data-preview="clear"] > [data-tone="folder"] {
+  color: var(--folder-tint, var(--ink-3));
+}
+
+.icon-style-preview[data-preview="tinted"] > span {
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 22%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--icon-tint, var(--accent)) 30%, transparent);
+  color: var(--icon-tint-strong, var(--accent-strong));
+}
+
+/* Automatic, then the system's hues: a dot each, the chosen one ringed in
+   its own colour with a gap of ground between, as the Mac rings it. */
+.swatch-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 0.2);
+  transition: box-shadow var(--dur-fast) var(--ease);
+}
+
+.swatch.is-auto {
+  --swatch: var(--accent);
+  background: conic-gradient(#ff453a, #ffd60a, #30d158, #0a84ff, #bf5af2, #ff453a);
+}
+
+.swatch.is-active {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 3.5px var(--swatch);
+}
+
 .theme-preview {
   position: relative;
   display: block;
@@ -3618,6 +3932,12 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
   overflow: hidden;
+}
+
+/* Two groups in a row are two groups, with the air System Settings leaves
+   between them — not one card with a doubled rule across its middle. */
+.appearance-controls + .appearance-controls {
+  margin-top: 16px;
 }
 
 /* 46, not 62. A System Settings row is in the mid forties even carrying two
@@ -4747,9 +5067,17 @@
   }
 
   .glass-toolbar,
+  .has-translucent-sidebar .glass-toolbar,
   .popover,
   .glass-sheet {
     background: var(--paper);
+  }
+
+  .glass-toolbar::before,
+  .sidebar-column::before,
+  .collection-column::before {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
@@ -4898,6 +5226,90 @@
 }
 .axis-range:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+/* Liquid Glass. The thumb is the Mac's: a white capsule wider than it is
+   tall, standing on a bare track with a shadow under it, and the track has no
+   fill — the panes at either end say which way is which. Two dots mark the
+   thirds, under the track, where the readout used to stand. */
+.glass-slider {
+  display: flex;
+  width: min(20rem, 55%);
+  margin-left: auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-3);
+}
+
+.glass-slider-track {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+.glass-slider-track > i {
+  position: absolute;
+  top: calc(50% + 9px);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.glass-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.glass-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.glass-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 20px;
+  margin-top: -7px;
+  border-radius: var(--radius-pill);
+  background: #f4f4f4;
+  box-shadow:
+    0 0.5px 0 rgb(255 255 255 / 0.6) inset,
+    0 1px 3px rgb(0 0 0 / 0.35),
+    0 0 0 0.5px rgb(0 0 0 / 0.12);
+  transition: scale var(--dur-press) var(--ease-press);
+}
+
+.glass-range:active::-webkit-slider-thumb {
+  scale: 1.08;
+}
+
+.glass-range:focus-visible {
+  outline: none;
+}
+
+.glass-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.35),
+    0 0 0 3px var(--accent-wash);
+}
+
+/* The glass follows the thumb on a short curve rather than in steps: a drag
+   still tracks the hand, and a click on the track glides instead of cutting. */
+.has-translucent-sidebar .glass-toolbar::before,
+.has-translucent-sidebar :is(.popover, .glass-sheet),
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper) .sidebar-column {
+  transition: background-color var(--dur-base) var(--ease);
 }
 
 /* ══ Motion ═══════════════════════════════════════════════════════════════════
@@ -5051,6 +5463,39 @@
     opacity: 1;
     transform: none;
   }
+}
+
+/* Opening another note, raised by `handleSelectNote`. The page being left is
+   a picture that fades in 160ms over the new one, which arrives through its
+   own `page-in` underneath — so the old words leave rather than being cut.
+   `normal`, not the default `plus-lighter`: that blend assumes the two
+   opacities add up to one, and here the new page is whole the entire time,
+   so the dark ground under both would flash brighter. */
+.is-opening-note .pane-slide + .pane-page .editor-body {
+  view-transition-name: note-body;
+}
+
+.is-opening-note::view-transition-old(root),
+.is-opening-note::view-transition-new(root),
+.is-opening-note::view-transition-new(note-body) {
+  animation: none;
+}
+
+.is-opening-note::view-transition-group(note-body) {
+  animation-duration: 160ms;
+}
+
+.is-opening-note::view-transition-old(note-body) {
+  animation: fade-out 160ms var(--ease-out) both;
+  mix-blend-mode: normal;
+}
+
+/* The body that waited behind the skeleton arrives the way the rest of the
+   page did, rather than replacing three grey bars in a single frame. When it
+   was there from the first frame this runs inside `page-in` and reads as the
+   same entrance. */
+.editor-scroll .rich-text-editor {
+  animation: page-in 280ms var(--ease-out) backwards;
 }
 
 /* On the scrolling column, not on the pane — see NoteEditor. Shorter and
@@ -5308,6 +5753,7 @@
   .list-in.is-cascading .note-row-list,
   .list-in.is-cascading .note-group-heading,
   .page-in > *,
+  .editor-scroll .rich-text-editor,
   .popover,
   .context-menu,
   .note-page-cover {
@@ -5525,11 +5971,18 @@
 
 /* The disclosure column is always there, occupied or not, so every name in the
    tree starts on the same vertical line whatever its depth. */
+/* At the tail of the row, after the count: the ⋯ that comes up on hover takes
+   the count's place to the left of it, so the arrow never goes under it. */
 .sidebar-twisty {
   display: inline-flex;
   flex-shrink: 0;
   width: var(--rail-twisty);
+  margin-right: 6px;
   justify-content: center;
+}
+
+.sidebar-twisty + .sidebar-actions {
+  right: calc(var(--rail-twisty) + 6px);
 }
 
 .sidebar-disclosure {
@@ -5630,6 +6083,164 @@
 
 .sidebar-row.is-active .sidebar-glyph {
   color: var(--accent-strong);
+}
+
+/* ── Icon style ──────────────────────────────────────────────────────────────
+   Settings → Appearance → Icon style, after the Mac's Icon & widget style.
+   `clear` is the bare glyph above and stays the default; the other three put
+   each destination on a tile, the way the Settings rail already does. Every
+   place has a hue of its own — yellow for the notes, as the platform's own
+   notebook is, and the swipe's red and purple for the bin and the shelf, so
+   an act and its place wear one colour. A folder takes `--folder-tint` when
+   the reader has chosen one.
+
+   Tiles are 20px on a 16px slot's centre, held by a negative margin so the
+   names do not move when the style changes. The glyph inside drops to 13px:
+   a 16px glyph in a 20px tile has no room to be a picture on a ground. */
+.sidebar-glyph[data-tone],
+.settings-nav-tile {
+  --tone: #8e8e93;
+}
+
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="notes"] {
+  --tone: #f5b80f;
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="folder"] {
+  --tone: var(--folder-tint, #2f7cf6);
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="pin"] {
+  --tone: #f08a24;
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="remarks"] {
+  --tone: #34a853;
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="archive"] {
+  --tone: #a970ff;
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="trash"] {
+  --tone: #ff453a;
+}
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="lock"] {
+  --tone: #5e6b7d;
+}
+
+/* The Settings rail's tiles answer to the same choice, with their own hues. */
+.settings-nav-tile {
+  --tone: var(--tile, #8e8e93);
+}
+
+/* Bare glyphs keep the ink — except a folder somebody gave a colour. */
+:root[data-icon-style="clear"] .sidebar-glyph[data-tone="folder"] {
+  color: var(--folder-tint, var(--ink-3));
+}
+
+:root[data-icon-style="clear"] .sidebar-row.is-active .sidebar-glyph[data-tone="folder"] {
+  color: var(--folder-tint, var(--accent-strong));
+}
+
+:root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
+  .sidebar-glyph[data-tone] {
+  width: 20px;
+  height: 20px;
+  margin: -2px;
+  border-radius: 5.5px;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+:root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
+  .sidebar-glyph[data-tone]
+  svg {
+  width: 13px;
+  height: 13px;
+  color: inherit;
+}
+
+:root[data-icon-style="default"] .sidebar-glyph[data-tone] {
+  background: var(--tone);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
+  color: #fff;
+}
+
+/* A dark tile is the ground lifted one step, and the hue moves to the glyph. */
+:root[data-icon-style="dark"] .sidebar-glyph[data-tone],
+:root[data-icon-style="dark"] .settings-nav-tile {
+  background: color-mix(in srgb, var(--ink) 10%, var(--surface));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--tone);
+}
+
+/* Tinted is one hue for every place: the accent, washed into the tile. */
+:root[data-icon-style="tinted"] .sidebar-glyph[data-tone],
+:root[data-icon-style="tinted"] .settings-nav-tile {
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 22%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--icon-tint, var(--accent)) 30%, transparent);
+  color: var(--icon-tint-strong, var(--accent-strong));
+}
+
+:root[data-icon-style="clear"] .settings-nav-tile {
+  background: transparent;
+  box-shadow: none;
+  color: var(--tone);
+}
+
+/* ── Icon style, past the sidebar ────────────────────────────────────────────
+   The choice is the whole app's, not the rail's. A toolbar keeps its glyphs
+   bare — a tile in a 32px button is a button inside a button — so there the
+   styles differ by colour alone: Default and Dark give every act a hue of its
+   own, Tinted gives them all the accent, Clear leaves them in the ink. The hue
+   is read off the button's own label, which is also what a screen reader
+   reads, so the two cannot name different buttons. Menus and the Settings
+   rows follow Tinted only: a menu is a list of words, and a column of eight
+   colours down its left edge would be the loudest thing on the screen. */
+:is(.toolbar-button, .editor-tool-button)[aria-label="New note"] {
+  --tone: #f5b80f;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Text formatting"] {
+  --tone: #0a84ff;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Draw"] {
+  --tone: #ff375f;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Lists"] {
+  --tone: #ff9f0a;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Tables"] {
+  --tone: #30d158;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Attachments"] {
+  --tone: #bf5af2;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Outline"] {
+  --tone: #14a3a3;
+}
+:is(.toolbar-button, .editor-tool-button)[aria-label="Comments"] {
+  --tone: #34a853;
+}
+:is(.toolbar-button, .editor-tool-button):is(
+  [aria-label="Find in note"],
+  [aria-label="Search"],
+  [aria-label="Find a note"]
+) {
+  --tone: #5e5ce6;
+}
+
+:root:is([data-icon-style="default"], [data-icon-style="dark"])
+  :is(.toolbar-button, .editor-tool-button) {
+  color: var(--tone, var(--ink-3));
+}
+
+:root[data-icon-style="default"] .note-row-glyph:not(:has(img)),
+:root[data-icon-style="dark"] .note-row-glyph:not(:has(img)) {
+  color: #f5b80f;
+}
+
+:root[data-icon-style="tinted"] :is(.toolbar-button, .editor-tool-button),
+:root[data-icon-style="tinted"] .note-row-glyph,
+:root[data-icon-style="tinted"] .menu-row > svg:first-child,
+:root[data-icon-style="tinted"] .settings-lead {
+  color: var(--icon-tint-strong, var(--accent-strong));
 }
 
 /* Colour alone carries the active glyph. It used to scale to 1.06, which put a
@@ -5761,10 +6372,29 @@
   }
 }
 
+/* And the press, which the hover cannot stand in for: a click is the one
+   moment the hand wants an answer, and on a phone it is the only one there is.
+   `scale`, the standalone property, so it composes with whichever hover move
+   is mid-flight rather than replacing its `transform`. */
+.sidebar-glyph svg,
+.sidebar-footer-button svg {
+  transition: scale var(--dur-press) var(--ease-press);
+}
+
+.sidebar-row:active .sidebar-glyph svg,
+.sidebar-footer-button:active svg {
+  scale: 0.86;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sidebar-row:hover .sidebar-glyph svg,
   .sidebar-footer-button:hover svg {
     animation: none;
+  }
+
+  .sidebar-glyph svg,
+  .sidebar-footer-button svg {
+    transition: none;
   }
 }
 
@@ -5928,7 +6558,9 @@
   width: 16px;
   height: 16px;
   color: var(--ink-3);
-  transition: color var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    scale var(--dur-press) var(--ease-press);
 }
 
 .sidebar-footer-button:hover svg {
@@ -7966,7 +8598,7 @@
      The backdrop filter comes off rather than stacking with it: a CSS blur over
      a region whose backdrop is a native material blurs nothing the compositor
      can see and still costs a full pass per frame. */
-  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  background: color-mix(in srgb, var(--paper) var(--glass-tint-native, 55%), transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }

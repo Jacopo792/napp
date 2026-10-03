@@ -14,6 +14,7 @@ import {
   ArchiveRestore,
   ChevronRight,
   FileText,
+  Folder as FolderGlyph,
   Image as ImageIcon,
   ImageOff,
   ListChecks,
@@ -92,6 +93,10 @@ interface Props {
   busy: boolean;
   canWrite: boolean;
   folderLabel: string;
+  /** Whether a row names its folder: yes wherever the list spans folders —
+   *  All notes, Remarks, Archive, Trash — and no inside one, where every row
+   *  would name the folder the header already names. */
+  showFolder?: boolean;
   /** Whose notes these are, when they are not yours. The switch is portraits
    *  now and says no names, so the tally under the folder carries the member —
    *  a readout, which is what that line already is. */
@@ -157,6 +162,7 @@ const Row = memo(function Row({
   meta,
   selected,
   unread,
+  showFolder,
   onSelect,
   trashMode,
   archiveMode,
@@ -175,6 +181,7 @@ const Row = memo(function Row({
   meta: Meta;
   selected: boolean;
   unread: boolean;
+  showFolder: boolean;
   trashMode: boolean;
   archiveMode: boolean;
   canWrite: boolean;
@@ -400,6 +407,9 @@ const Row = memo(function Row({
 
   const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
+  const folderName = noteMeta?.folderId
+    ? indexOf(meta).byFolder.get(noteMeta.folderId)?.name
+    : undefined;
   const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
   /* A note with a sketch in it shows the sketch where the glyph goes — the
@@ -444,31 +454,36 @@ const Row = memo(function Row({
            and simply stops carrying the property keeps the last one it was
            given. */
         transform: slid === 0 ? "" : `translateX(${slid}px)`,
-        /* Two motions on one row, so they are kept on two properties and given
-           two curves. `transform` is the swipe letting go, which wants the
-           spring: a card thrown at the edge should come back with some weight
-           in it. `translate` — the standalone property, not the function — is
-           the pointer arriving, which wants none of that: a row that overshoots
-           under the cursor reads as the list twitching. Sharing one property
-           would mean sharing one curve, and the inline value here wins over any
-           stylesheet, so the hover could not have had its own. */
+        /* A hand on the row takes the curves off, so it follows the finger
+           frame for frame. A pointer list's own curves are in the stylesheet
+           (`.note-row-list`); the phone's rows keep the swipe's spring here. */
         transition: dragging
           ? "none"
-          : "transform var(--dur-swipe) var(--ease-bounce), background-color var(--dur-fast) var(--ease)",
+          : mobile || gallery
+            ? "transform var(--dur-swipe) var(--ease-bounce), background-color var(--dur-fast) var(--ease)"
+            : undefined,
       }}
-      className={`note-row group relative cursor-pointer transition-colors ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
+      className={`note-row group relative cursor-pointer ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
-            : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-2"
+            : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-4"
       } ${selected ? "is-selected" : ""}`}
     >
       {/* The note's own picture stands where its kind-of-document glyph
           stands: one place in the row says what you are about to open. */}
+      {/* A list row is Notes' shape: no kind-of-document glyph — the title says
+          what it is — and the note's own picture or drawing, when it has one,
+          as a thumbnail at the trailing edge. A gallery card keeps its glyph,
+          because a card without one is a blank square. What is unread is a dot
+          in the leading margin, where Mail keeps it. */}
+      {!gallery && unread && <span className="note-row-dot" aria-label="Unread remarks" />}
       {entry.note.photo ? (
         <span
-          className={`note-photo is-row ${gallery ? "is-gallery" : ""} ${unread ? "has-unread" : ""}`}
+          className={`note-photo is-row ${gallery ? "is-gallery" : "is-thumb"} ${
+            gallery && unread ? "has-unread" : ""
+          }`}
         >
           {photoUrl && <img src={photoUrl} alt="" draggable={false} />}
         </span>
@@ -477,8 +492,8 @@ const Row = memo(function Row({
           title="Has a drawing"
           aria-label="Has a drawing"
           role="img"
-          className={`note-row-glyph is-sketch ${gallery ? "is-gallery" : ""} ${
-            unread ? "has-unread" : ""
+          className={`note-row-glyph is-sketch ${gallery ? "is-gallery" : "is-thumb"} ${
+            gallery && unread ? "has-unread" : ""
           }`}
         >
           <svg
@@ -520,7 +535,7 @@ const Row = memo(function Row({
             )}
           </svg>
         </span>
-      ) : (
+      ) : gallery ? (
         <span
           title={glyph.label}
           aria-label={glyph.label}
@@ -531,7 +546,7 @@ const Row = memo(function Row({
         >
           <Glyph size={16} />
         </span>
-      )}
+      ) : null}
 
       <div className="min-w-0 flex-1">
         <p
@@ -539,7 +554,7 @@ const Row = memo(function Row({
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13.5px] leading-[18px]"} ${
+          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
             entry.note.title ? "text-ink" : "text-ink-4 italic"
           }`}
           /* One line in the column, and that is the whole of why the list
@@ -550,13 +565,14 @@ const Row = memo(function Row({
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
           style={{
-            fontWeight: 520,
+            fontWeight: gallery ? 520 : 650,
             display: "-webkit-box",
             WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}
         >
+          {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
           {entry.note.title || "Untitled"}
         </p>
 
@@ -573,6 +589,13 @@ const Row = memo(function Row({
           )}
           {preview && <span className="note-row-preview">{preview}</span>}
         </p>
+
+        {!gallery && showFolder && folderName && (
+          <p className="note-row-folder">
+            <FolderGlyph size={12} aria-hidden="true" />
+            <span>{folderName}</span>
+          </p>
+        )}
       </div>
 
       {/* What is under the row. Each panel is parked just outside the edge it
@@ -772,6 +795,7 @@ export function NoteList({
   busy,
   canWrite,
   folderLabel,
+  showFolder = false,
   scopeLabel,
   trashMode,
   archiveMode,
@@ -1037,6 +1061,7 @@ export function NoteList({
                 meta={meta}
                 selected={selectedId === entry.note.id}
                 unread={unreadIds?.has(entry.note.id) ?? false}
+                showFolder={showFolder}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
                 canWrite={canWrite}

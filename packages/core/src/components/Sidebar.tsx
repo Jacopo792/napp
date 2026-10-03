@@ -84,7 +84,7 @@ const EXPANDED_KEY = "napp:folders-open";
    were blurrier than the icons at depth one, for no reason anybody could name.
    RAIL matches --rail-offset in the stylesheet. */
 const INDENT = 14;
-const RAIL = 18;
+const RAIL = 8;
 
 function loadExpanded(): Set<string> {
   try {
@@ -260,7 +260,7 @@ function NameField({
     /* An editing row has no disclosure column, so it pays the rail out of its
        own padding to keep its glyph on the same line as every other one. */
     <div className="sidebar-row is-editing" style={{ paddingLeft: `${RAIL + depth * INDENT}px` }}>
-      <span className="sidebar-glyph">
+      <span className="sidebar-glyph" data-tone="folder">
         <Folder size={16} />
       </span>
       <input
@@ -323,9 +323,8 @@ function Row({
       style={{ paddingLeft: `${depth * INDENT}px` }}
       onContextMenu={onContextMenu}
     >
-      <span className="sidebar-twisty">{disclosure}</span>
       <button type="button" className="sidebar-target press" onClick={onSelect}>
-        <span className="sidebar-glyph" data-motion={motion}>
+        <span className="sidebar-glyph" data-motion={motion} data-tone={motion}>
           {glyph}
         </span>
         <span className="sidebar-name">{scope.label}</span>
@@ -340,6 +339,7 @@ function Row({
           <span className="sidebar-count">{scope.count || ""}</span>
         )}
       </button>
+      {disclosure && <span className="sidebar-twisty">{disclosure}</span>}
       {actions && <span className="sidebar-actions">{actions}</span>}
     </div>
   );
@@ -562,17 +562,13 @@ export function Sidebar({
                 key={note.id}
                 className={`sidebar-row ${selectedNoteId === note.id ? "is-active" : ""}`}
               >
-                {/* The empty twisty is the folder rows' own alignment: without
-                    it a pinned note's glyph sits where a folder's disclosure
-                    arrow does, and the column has two left edges. */}
-                <span className="sidebar-twisty" />
                 <button
                   type="button"
                   aria-current={selectedNoteId === note.id ? "true" : undefined}
                   className="sidebar-target press"
                   onClick={() => onSelectNote(note.id)}
                 >
-                  <span className="sidebar-glyph" data-motion="pin">
+                  <span className="sidebar-glyph" data-motion="pin" data-tone="pin">
                     <Pin size={16} />
                   </span>
                   <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
@@ -690,7 +686,9 @@ export function Sidebar({
           data-motion="settings"
           onClick={onSettings}
         >
-          <Settings size={16} />
+          <span className="sidebar-glyph" data-tone="settings">
+            <Settings size={16} />
+          </span>
           <span>Settings</span>
         </button>
         <button
@@ -699,7 +697,9 @@ export function Sidebar({
           data-motion="lock"
           onClick={onLock}
         >
-          <Lock size={16} />
+          <span className="sidebar-glyph" data-tone="lock">
+            <Lock size={16} />
+          </span>
           <span>Lock &amp; sign out</span>
         </button>
       </div>
