@@ -454,23 +454,15 @@ const Row = memo(function Row({
            stylesheet, so the hover could not have had its own. */
         transition: dragging
           ? "none"
-          : "transform var(--dur-swipe) var(--ease-bounce), translate var(--dur-base) var(--ease)",
+          : "transform var(--dur-swipe) var(--ease-bounce), background-color var(--dur-fast) var(--ease)",
       }}
       className={`note-row group relative cursor-pointer transition-colors ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
           ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
-            : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-1"
-      } ${
-        selected
-          ? mobile
-            ? "bg-accent-wash"
-            : "bg-accent-wash"
-          : mobile
-            ? "hover:bg-page"
-            : "hover:bg-page"
-      }`}
+            : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-2"
+      } ${selected ? "is-selected" : ""}`}
     >
       {/* The note's own picture stands where its kind-of-document glyph
           stands: one place in the row says what you are about to open. */}

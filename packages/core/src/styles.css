@@ -2685,8 +2685,8 @@
    at nothing while the row travels. */
 .note-row-action {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
+  top: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -2720,30 +2720,65 @@
    is what it does. The two are separate because every scope has the same pair
    of directions and a different pair of acts — Trash restores where the list
    archives, and both of them delete. */
+/* Tucked a corner's width under the row, so the row's own rounded corners
+   show the colour behind them: the row reads as a card lifted off a coloured
+   track, one object, rather than a card and a separate button side by side. */
 .note-row-action.is-left {
-  left: 100%;
-  border-start-end-radius: var(--radius-md);
-  border-end-end-radius: var(--radius-md);
+  left: calc(100% - var(--radius-sm));
+  padding-left: var(--radius-sm);
+  border-start-end-radius: var(--radius-sm);
+  border-end-end-radius: var(--radius-sm);
 }
 
 .note-row-action.is-right {
-  right: 100%;
-  border-start-start-radius: var(--radius-md);
-  border-end-start-radius: var(--radius-md);
+  right: calc(100% - var(--radius-sm));
+  padding-right: var(--radius-sm);
+  border-start-start-radius: var(--radius-sm);
+  border-end-start-radius: var(--radius-sm);
 }
 
+/* The system's own red and purple, as Mail paints these two acts. `--danger`
+   is a colour for words on a dark page — a pale pink that, as a fill, said
+   nothing about destroying anything. Fixed rather than themed: what an act
+   does is not a preference. */
 .note-row-action.is-trash {
-  background: var(--danger);
+  background: #ff453a;
 }
 
 .note-row-action.is-archive {
-  background: var(--accent);
+  background: #a970ff;
 }
 
 /* A travelling row has to be opaque, or the panel it is uncovering is read
    through it. The list column's own surface, so a row at rest is unchanged. */
 .note-row.is-swiped {
+  z-index: 1;
   background: var(--paper);
+}
+
+/* ── One shape for a row ─────────────────────────────────────────────────────
+   Hover, selection and the swipe are the same rounded shape inset from the
+   column, so the list has one silhouette in every state. Hover was `--page`,
+   the darkest plane in the window: a row went black under the pointer, which
+   read as a fault rather than an answer. Selection was a rectangle running
+   into both edges. */
+.note-row-list {
+  border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+  .note-row-list:hover:not(.is-selected):not(.is-swiped) {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+  }
+}
+
+.note-row-list.is-selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.mobile-note-row.is-selected,
+.note-gallery-item.is-selected {
+  background: var(--accent-wash);
 }
 
 /* ── Which note is the one waiting ───────────────────────────────────────────
@@ -2799,7 +2834,11 @@
    the eye reads it as an edge of the selection rather than as a divider. */
 .note-row-list:last-child::after,
 .note-row-list[aria-selected="true"]::after,
-.note-row-list:has(+ .note-row-list[aria-selected="true"])::after {
+.note-row-list:has(+ .note-row-list[aria-selected="true"])::after,
+.note-row-list:hover::after,
+.note-row-list:has(+ .note-row-list:hover)::after,
+.note-row-list.is-swiped::after,
+.note-row-list:has(+ .note-row-list.is-swiped)::after {
   display: none;
 }
 
@@ -7602,25 +7641,11 @@
      answering, and the words stay exactly the size they were. The row already
      carries the spring on its transform — the swipe gesture puts it there
      inline — so this only has to say where to go. */
-  .note-row:hover {
-    translate: 4px;
-  }
-
-  .sidebar-target:hover,
-  .sidebar-footer-button:hover,
-  .filter-chip:hover {
-    transform: translateX(3px);
-  }
-
-  /* Small, round and isolated: these can afford to grow, which a row cannot. */
-  .icon-button:hover:not(:disabled),
-  .toolbar-button:not(.editor-tool-button):hover:not(:disabled) {
-    transform: scale(1.06);
-  }
-
-  .new-note-button:hover:not(:disabled) {
-    transform: scale(1.04);
-  }
+  /* Nothing travels under a pointer that is only passing. Rows stepping
+     sideways and buttons swelling as the cursor crossed them made the window
+     ripple while you moved across it to get somewhere else; a Mac answers a
+     hover with a wash and keeps its motion for what the hand actually did —
+     the press below, the swipe, the switch of person. */
 
   /* The press wins over the hover — a finger going down is more recent news
      than a pointer arriving — and it lands on the short flat curve rather than
@@ -7979,13 +8004,12 @@ text.ink-stroke {
   z-index: 3;
   top: 0;
   display: flex;
-  /* Centred while the faces fit, and `safe` so a roster wider than the
-     column starts at its left edge and scrolls rather than being cut off on
-     both sides. */
-  justify-content: safe center;
-  gap: 12px;
+  gap: 10px;
   margin: 0 -8px 4px;
-  padding: 8px 10px 10px;
+  /* The first face starts where the sidebar's rows start their fill, so the
+     shelf stands on the column's left edge like everything under it rather
+     than floating in the middle of it. */
+  padding: 8px 14px 10px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
