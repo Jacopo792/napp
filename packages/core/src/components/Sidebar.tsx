@@ -503,39 +503,11 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
-      {/* The window's own strip, and what the column is about. The switch used
-          to have a band of its own directly under this one, as wide as the
-          pane and touching the first row — two slabs of identical width, one a
-          pill and one a rectangle, which is what made the row under them
-          unreadable however the fill was coloured. Shrunk to two faces it fits
-          in here beside the traffic lights, and the column is back to one band
-          of chrome over its rows.
-
-          On macOS the gutter is 88, the switch is 70, and the two acts at the
-          end are 32 each: the strip is what `SIDEBAR_MIN` is measured from,
-          rather than the other way round. */}
+      {/* The window's own strip, and the one act in it that is about the
+          window: hiding this column, beside the traffic lights, where Notes
+          keeps it. The people moved down into the column, where they have room
+          to be faces, and New folder onto the Folders heading. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
-        {/* The strip holds the window's own acts and nothing else: the faces
-            moved down into the column, where they have room to be faces. */}
-        <span className="flex-1" />
-        {/* Back in the strip, at the end of it, which is where the Finder and
-            Notes both keep it — beside the control that hides the column
-            rather than on the heading of the section it fills. It was moved
-            down to that heading because the strip was thought too narrow to
-            hold it; the answer to a strip that cannot hold what belongs in it
-            is a wider minimum, and `SIDEBAR_MIN` is now the width of what
-            stands here. */}
-        {canWrite && (
-          <button
-            type="button"
-            onClick={() => setAdding("")}
-            aria-label="New folder"
-            title="New folder"
-            className="toolbar-button press shrink-0"
-          >
-            <FolderPlus size={16} />
-          </button>
-        )}
         <button
           type="button"
           onClick={onClose}
@@ -600,10 +572,26 @@ export function Sidebar({
             The act that makes one lives in the strip above, where the window
             keeps the acts that are about the column rather than about a row
             in it. */}
-        <p className="sidebar-heading">
+        {/* New folder stands on the heading of the folders it adds to. It
+            was in the window strip, beside the button that hides the column —
+            two unrelated acts side by side above the people, and the one that
+            makes a folder nowhere near the folders. */}
+        <div className="sidebar-heading">
           Folders
-          <span>{folders.length || ""}</span>
-        </p>
+          {canWrite ? (
+            <button
+              type="button"
+              onClick={() => setAdding("")}
+              aria-label="New folder"
+              title="New folder"
+              className="sidebar-heading-add press"
+            >
+              <FolderPlus size={16} />
+            </button>
+          ) : (
+            <span>{folders.length || ""}</span>
+          )}
+        </div>
 
         {tree.length === 0 && adding === null && <p className="sidebar-empty">No folders yet.</p>}
 

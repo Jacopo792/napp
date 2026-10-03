@@ -1784,8 +1784,10 @@
 }
 
 .pane-slide.is-sliding > .pane-slide-track {
-  transition: transform var(--dur-slow) var(--ease);
-  will-change: transform;
+  transition:
+    transform var(--dur-slow) var(--ease),
+    opacity var(--dur-slow) var(--ease);
+  will-change: transform, opacity;
 }
 
 /* Only while it is away — see the note at the call site: the sidebar's own
@@ -1795,8 +1797,12 @@
   overflow: hidden;
 }
 
+/* It fades as it goes, so the columns leave the way a sheet is put away
+   rather than being cut off by the window's edge with their words still at
+   full strength. */
 .pane-slide.is-collapsed > .pane-slide-track {
   transform: translateX(-100%);
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5036,7 +5042,7 @@
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -5047,8 +5053,15 @@
 /* On the scrolling column, not on the pane — see NoteEditor. Shorter and
    smaller than it was: 360ms of travel is an entrance for a screen, and this
    is a column of text being replaced inside a frame that never moved. */
-.page-in {
-  animation: page-in var(--dur-base) var(--ease) backwards;
+/* The page arrives in the order it is read: the cover, then the title, then
+   the words, each 45ms behind the one above. One fade over the whole column
+   said "something changed"; this says "here is the note", and the eye lands
+   on the title because it is the first thing that settles. `sibling-index()`
+   numbers them; where a browser has no such function the delay is dropped
+   and they arrive together, which is what they did before. */
+.page-in > * {
+  animation: page-in 320ms var(--ease-out) backwards;
+  animation-delay: calc(min(sibling-index() - 1, 3) * 45ms);
 }
 
 /* Phone screens push and pop the way the platform does: the incoming screen
@@ -5229,6 +5242,45 @@
   animation: list-in var(--dur-base) var(--ease-out) backwards;
 }
 
+/* Opening a folder deals its notes in rather than swapping them under you:
+   each row 22ms behind the one above, the first eight only, so a long list
+   is not a long wait. Not while searching — the list is rebuilt on every
+   keystroke there, and a cascade per letter is a list that never holds
+   still. */
+@property --group-delay {
+  syntax: "<time>";
+  inherits: true;
+  initial-value: 0s;
+}
+
+/* Rows are numbered inside their day, so the day itself carries a delay of
+   its own and the rows add theirs to it: the cascade runs down the whole list
+   rather than restarting under every heading. Registered as a <time> so it
+   is worked out on the section, not re-read on each row. */
+.list-in.is-cascading > .note-group {
+  --group-delay: calc(min(sibling-index() - 1, 4) * 70ms);
+}
+
+.list-in.is-cascading .note-group-heading,
+.list-in.is-cascading .note-row-list {
+  animation: row-in 280ms var(--ease-out) backwards;
+}
+
+.list-in.is-cascading .note-group-heading {
+  animation-delay: var(--group-delay);
+}
+
+.list-in.is-cascading .note-row-list {
+  animation-delay: calc(var(--group-delay) + min(sibling-index(), 6) * 22ms);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 .collection-column [role="option"],
 .sidebar-row,
 .note-row-glyph {
@@ -5250,6 +5302,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .list-in,
+  .list-in.is-cascading .note-row-list,
+  .list-in.is-cascading .note-group-heading,
+  .page-in > *,
   .popover,
   .context-menu,
   .note-page-cover {
@@ -5315,6 +5370,25 @@
 
    The thin overlay treatment this column used to declare for itself is now the
    base rule for every scrolling region, so there is nothing left to say here. */
+
+.sidebar-heading-add {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  margin: -4px -6px -4px 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.sidebar-heading-add:hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+}
 
 .sidebar-heading {
   display: flex;

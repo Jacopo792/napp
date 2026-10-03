@@ -1241,7 +1241,9 @@ export function NoteList({
         key={`${folderLabel}:${query.trim()}`}
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
-        className="list-in flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-2"
+        className={`list-in flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-2 ${
+          query.trim() ? "is-searching" : "is-cascading"
+        }`}
       >
         {loading ? (
           <Skeletons />
