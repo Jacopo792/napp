@@ -198,7 +198,7 @@ function createWindow() {
        spelled again because the main process cannot import the renderer. Only
        the first frame is painted with it: the page sends its real palette
        through `napp:frame-theme` as soon as it applies one. */
-    backgroundColor: isMac ? "#00000000" : "#030202",
+    backgroundColor: isMac ? "#00000000" : "#1c1c1e",
     ...(isMac ? { vibrancy: "sidebar", transparent: true } : {}),
     /* Windows owns one small native control strip, painted in the same ground
        colour as the active Napp palette. It replaces both the blue system
@@ -207,7 +207,7 @@ function createWindow() {
     ...(isWindows
       ? {
           titleBarOverlay: {
-            color: "#030202",
+            color: "#1c1c1e",
             symbolColor: "#e8e8e8",
             height: 40,
           },

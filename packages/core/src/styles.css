@@ -3703,9 +3703,10 @@
   height: 20px;
   appearance: none;
   border-radius: var(--radius-pill);
-  background: var(--rule);
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
   padding: 2px;
   cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
 }
 
 .appearance-row input[role="switch"]::before {
@@ -3714,8 +3715,11 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--ink);
-  transition: transform var(--dur-fast) var(--ease);
+  /* The knob is white in every palette, on and off, as a Mac's is: it is a
+     physical thing sitting on a track, not a colour of the theme. */
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  transition: transform var(--dur-base) var(--ease-spring);
 }
 
 .appearance-row input[role="switch"]:checked {
@@ -3724,7 +3728,6 @@
 
 .appearance-row input[role="switch"]:checked::before {
   transform: translateX(14px);
-  background: var(--on-accent);
 }
 
 .appearance-row.is-slider input[type="range"] {

@@ -23,16 +23,15 @@ export interface Appearance {
   wallpaperFit: "cover" | "contain";
 }
 
-/* The palette the archive's own reader settled on, and so the one a new
-   account opens to: near-black paper, one grey accent, no colour anywhere the
-   words are not. The accent is deliberately darker than it can be drawn — the
-   derivation below lifts it to the contrast floor rather than taking it
-   literally, which is how a value this low is safe to ship as a default. */
+/* A new account opens on Graphite: the grey a Mac window is, and the system's
+   own blue for the one thing that can be acted on. Ink — near-black and no
+   colour at all — is still a press away; it was the default once, and a
+   toggle drawn grey on grey is a toggle nobody can read the state of. */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "dark",
-  accent: "#151313",
-  background: "#030202",
-  foreground: "#e8e8e8",
+  accent: "#0a84ff",
+  background: "#1c1c1e",
+  foreground: "#ececec",
   contrast: 50,
   translucentSidebar: false,
   wallpaper: false,
@@ -43,6 +42,14 @@ export const DEFAULT_APPEARANCE: Appearance = {
 };
 
 export const APPEARANCE_PRESETS = [
+  {
+    id: "graphite",
+    name: "Graphite",
+    theme: "dark" as const,
+    accent: "#0a84ff",
+    background: "#1c1c1e",
+    foreground: "#ececec",
+  },
   {
     id: "ink",
     name: "Ink",
@@ -55,17 +62,17 @@ export const APPEARANCE_PRESETS = [
     id: "midnight",
     name: "Midnight",
     theme: "dark" as const,
-    accent: "#75c7ff",
-    background: "#18232e",
-    foreground: "#edf5fa",
+    accent: "#5eb4ff",
+    background: "#121b25",
+    foreground: "#e8f0f7",
   },
   {
     id: "aubergine",
     name: "Aubergine",
     theme: "dark" as const,
-    accent: "#d9abff",
-    background: "#2a2230",
-    foreground: "#f3edf5",
+    accent: "#c58ef5",
+    background: "#221a28",
+    foreground: "#f2ebf5",
   },
   {
     id: "paper",
@@ -87,14 +94,6 @@ export const APPEARANCE_PRESETS = [
     background: "#2e3440",
     foreground: "#eceff4",
   },
-  {
-    id: "indigo",
-    name: "Indigo",
-    theme: "dark" as const,
-    accent: "#7f7bff",
-    background: "#1a1a26",
-    foreground: "#eeeef5",
-  },
   /* Three warmths the six above do not have between them: lamplight, a green
      that is a colour and not a signal, and a rose. Each background carries the
      accent's own hue at a fraction of its saturation, which is what keeps a
@@ -103,17 +102,17 @@ export const APPEARANCE_PRESETS = [
     id: "amber",
     name: "Amber",
     theme: "dark" as const,
-    accent: "#e5975c",
-    background: "#1c1714",
-    foreground: "#f2e8df",
+    accent: "#f39b52",
+    background: "#1b1612",
+    foreground: "#f3e8dc",
   },
   {
     id: "sage",
     name: "Sage",
     theme: "dark" as const,
-    accent: "#a3c9a8",
-    background: "#1a201c",
-    foreground: "#e8eee9",
+    accent: "#7fcf93",
+    background: "#161c18",
+    foreground: "#e6eee8",
   },
   {
     id: "rosewood",
