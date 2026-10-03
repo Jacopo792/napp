@@ -1784,10 +1784,8 @@
 }
 
 .pane-slide.is-sliding > .pane-slide-track {
-  transition:
-    transform var(--dur-slow) var(--ease),
-    opacity var(--dur-slow) var(--ease);
-  will-change: transform, opacity;
+  transition: transform var(--dur-slow) var(--ease);
+  will-change: transform;
 }
 
 /* Only while it is away — see the note at the call site: the sidebar's own
@@ -1797,12 +1795,11 @@
   overflow: hidden;
 }
 
-/* It fades as it goes, so the columns leave the way a sheet is put away
-   rather than being cut off by the window's edge with their words still at
-   full strength. */
+/* Opaque all the way: the columns tried fading as they slid, and a column
+   half see-through over the note shows the note's words through the folder
+   names — a sheet is solid while it moves. */
 .pane-slide.is-collapsed > .pane-slide-track {
   transform: translateX(-100%);
-  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1967,7 +1964,9 @@
   min-width: 2rem;
   min-height: 2rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  /* A Mac toolbar button's corner, not a card's: at 12 a 32px square of wash
+     was a blob under the pointer. */
+  border-radius: var(--radius-sm);
   color: var(--ink-3);
   transition:
     color var(--dur-fast) var(--ease),
@@ -5337,6 +5336,29 @@
   z-index: 30;
   container-type: inline-size;
   container-name: sidebar-header;
+}
+
+/* Gone unless it is holding something: the phone sheet's close button, or —
+   below, in the desktop shell — the traffic lights. */
+.sidebar-topbar:not(.has-close) {
+  display: none;
+}
+
+/* A Mac window keeps the room the traffic lights stand in, unruled and empty,
+   and the window is dragged by it. Full screen takes the lights away and the
+   room with them. 40px: the lights are 12 tall at y 20 in the window, and the
+   people start under them. */
+[data-shell="mac"]:not([data-fullscreen]) .sidebar-topbar:not(.has-close) {
+  display: flex;
+  height: 40px;
+  box-shadow: none;
+}
+
+/* With no band above it the shelf is the top of the column, so it takes the
+   strip's 52px as its own first line: the faces' centre-line falls under the
+   list's title rather than floating above or below it. */
+.sidebar-topbar:not(.has-close) + .sidebar-scroll .people-shelf {
+  padding-top: 14px;
 }
 
 .sidebar-scope {

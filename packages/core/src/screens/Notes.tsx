@@ -3572,20 +3572,45 @@ export default function NotesPage() {
               navigationAction={
                 !navigationOpen ? (
                   <>
-                    {/* The one control here, and it is about the window
-                        rather than about the note. Settings used to stand
-                        beside it as a rescue for the row lost at the foot of
-                        the collapsed column — the app's preferences inside the
-                        note's own chrome, one click from the button that gives
-                        that row back, and already on ⌘, and in ⌘K. */}
-                    <button
-                      type="button"
-                      onClick={() => changeNavigation(true)}
-                      aria-label="Show the notes list"
-                      className="toolbar-button press"
-                    >
-                      <PanelLeftOpen size={16} />
-                    </button>
+                    {/* With the columns away this strip is the only chrome in
+                        the window, so it carries what the columns did: getting
+                        them back, a new note, and finding one — the three acts
+                        nobody should have to reopen a column for. One capsule,
+                        like every group of toolbar items here. */}
+                    <span className="editor-tool-group glass-toolbar flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => changeNavigation(true)}
+                        aria-label="Show the sidebar"
+                        title={"Show the sidebar · ⌘\\"}
+                        className="toolbar-button press"
+                      >
+                        <PanelLeftOpen size={18} />
+                      </button>
+                      {canWriteArchive && (
+                        <button
+                          type="button"
+                          onClick={handleNew}
+                          aria-label="New note"
+                          title="New note · ⌘N"
+                          className="toolbar-button press"
+                        >
+                          <SquarePen size={18} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteQuery("");
+                          setPaletteOpen(true);
+                        }}
+                        aria-label="Search notes"
+                        title="Search · ⌘K"
+                        className="toolbar-button press"
+                      >
+                        <Search size={18} />
+                      </button>
+                    </span>
                   </>
                 ) : null
               }

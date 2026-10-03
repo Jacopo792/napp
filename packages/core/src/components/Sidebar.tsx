@@ -507,12 +507,19 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
-      {/* The window's own strip: on a Mac the traffic lights stand in it and it
-          is what the window is dragged by, so it is kept, empty, and continues
-          the one band of chrome across the window. The people are below it,
-          New folder is on the Folders heading, and hiding the columns is in
-          the list's own group beside its ⋯. */}
-      <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
+      {/* No band of its own. Mail and Notes draw the sidebar as one column
+          from the top of the window to the bottom, with the traffic lights
+          standing in it and the toolbar's hairline starting where the content
+          does; an empty strip here was a shelf of nothing over the people, and
+          in full screen the one thing in the window off its axis. The element
+          stays for the two places it holds something: the traffic lights'
+          room on a Mac window (see the stylesheet), and the close button on
+          the phone's folders sheet. */}
+      <div
+        className={`sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2 ${
+          closeInStrip ? "has-close" : ""
+        }`}
+      >
         {closeInStrip && (
           <button
             type="button"
