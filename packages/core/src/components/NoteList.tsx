@@ -1197,30 +1197,28 @@ export function NoteList({
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged
             into the search field where it covered the text being typed. */}
-        {canWrite && !trashMode && (
-          <button
-            onClick={onNew}
-            disabled={busy || loading}
-            title="New note · N"
-            className="new-note-button press shrink-0"
-          >
-            <SquarePen size={16} />
-            <span>New note</span>
-          </button>
-        )}
-        <span className="flex shrink-0 items-center gap-1">{toolbarActions}</span>
+        <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
+          {canWrite && !trashMode && (
+            <button
+              onClick={onNew}
+              disabled={busy || loading}
+              title="New note · N"
+              aria-label="New note"
+              className="toolbar-button press shrink-0"
+            >
+              <SquarePen size={18} />
+            </button>
+          )}
+          {toolbarActions}
+        </span>
       </header>
 
       {filterStrip}
 
-      {/* 42, not 40: the scope switch in the column beside this one is 34 of
-          button inside 4 of padding, and these two are the second row of their
-          columns. They meet at the switch's height rather than the switch
-          being cut down to this one's, which squeezed the faces in it. 44 and
-          not 42, because the switch is a pill with a border and the border is
-          two of those pixels. */}
-      <div className="glass-search mx-3 mt-3 flex h-11 shrink-0 items-center gap-2 px-3">
-        <Search size={16} className="shrink-0 text-ink-4" />
+      {/* 32, the height of a Mac search field: a recess you type into, not a
+          slab the width of the column. */}
+      <div className="glass-search mx-3 mt-2 mb-1 flex h-8 shrink-0 items-center gap-2 px-2.5">
+        <Search size={14} className="shrink-0 text-ink-4" />
         <input
           ref={searchRef}
           value={query}
@@ -1234,7 +1232,7 @@ export function NoteList({
           }}
           placeholder="Search"
           aria-label="Search notes"
-          className="readout min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
+          className="min-w-0 text-sm flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
         />
         {hasQuery && (
           <button
