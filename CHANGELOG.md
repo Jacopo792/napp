@@ -3,6 +3,39 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.6.0 — 2026-10-03
+
+Smoother motion, a Style section in Settings, and note rows shaped like Notes.
+
+### Added
+
+- **Settings → Style**, under Appearance. Icon style — Default, Dark, Clear or
+  Tinted, with a tint colour of your choosing — applies to the sidebar, the
+  toolbars, the note list and the menus. Folder colour and text highlight
+  colour take Automatic or one of the system's hues. Translucency moved here,
+  with a Liquid Glass slider from clear to tinted.
+
+### Changed
+
+- **The sidebar slides without stutter.** Showing and hiding the columns no
+  longer lays the note out again on every frame of the slide.
+- **Opening a note fades the previous one out** instead of cutting to the new
+  one, and a note's text that arrives after the loading bars fades in.
+- **Note rows look like Notes.** No document icon on every row: the title, then
+  the date and the first words, then the folder wherever the list spans
+  several. A note's photo or drawing is a thumbnail at the right, and an unread
+  remark is a dot in the margin.
+- Hovering the list no longer flickers: the wash arrives at once and fades out,
+  and the dividers fade with it. Sidebar icons answer a click.
+- Sidebar icons start further left; a folder's disclosure arrow is at the end
+  of its row.
+
+### Fixed
+
+- Menus over the note list blur what is behind them again. With translucency
+  on, the list showed through a menu sharp, and nearly unreadable on a clear
+  setting.
+
 ## 0.5.0 — 2026-10-03
 
 A redesign toward a Mac application rather than a web page in a window.
