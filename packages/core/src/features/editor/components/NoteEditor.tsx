@@ -98,16 +98,19 @@ interface Props {
 /* The toolbar's three groups — the mode label, the format cluster, the save
    readout and its actions — need about this much room side by side. Under it
    the cluster takes a row of its own, the way the phone already gives it one.
-   Measured, not guessed: the cluster is 210px and the actions 184px, and a
-   desktop window of 1024px leaves the editor 334px to hold both. */
-const TOOLBAR_ROOM = 810;
+   Measured, not guessed: the cluster is 174px and the readout with the
+   actions 233px — 455 on one strip with its padding — and centring the one needs that much on either side.
+   It was 810 while the presence pill stood at the left of the strip; the
+   faces moved to the sidebar's shelf and took that room back. */
+const TOOLBAR_ROOM = 700;
 
 /* Under TOOLBAR_ROOM the cluster can no longer be centred on the pane, but it
    still fits on the one strip beside the other two groups — and a strip that
    stays 52px is a hairline that stays level with the two columns beside it.
    A 1280px window with both navigation columns open leaves the editor about
-   650px, which is here, and used to be two rows. */
-const TOOLBAR_ROW_ROOM = 640;
+   650px, which is here; a second row is kept for a pane narrower than any
+   window with both columns open can make. */
+const TOOLBAR_ROW_ROOM = 460;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;

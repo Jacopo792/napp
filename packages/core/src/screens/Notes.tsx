@@ -3570,7 +3570,10 @@ export default function NotesPage() {
                 ) : null
               }
               headerStatus={noteStatus}
-              headerPresence={notePresence}
+              /* The faces on the sidebar's shelf already say who is here and
+                 who is writing, so the note's header carries them only while
+                 the sidebar is hidden and the shelf with it. */
+              headerPresence={navigationOpen ? null : notePresence}
               headerActions={noteActions}
               synced={collaborative.ready}
               session={session}
