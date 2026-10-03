@@ -760,8 +760,10 @@
    the pointer rather than fenced in a pill. */
 .editor-empty-invite {
   position: relative;
-  color: var(--ink-3);
-  font-size: clamp(1.3rem, 3.2vw, 1.85rem);
+  /* The size of a line, not of a headline: an empty pane is quiet, and a
+     30px sentence in the middle of it was the loudest thing in the window. */
+  color: var(--ink-4);
+  font-size: var(--text-lg);
   font-weight: var(--weight-regular);
   transition: color var(--dur-fast) var(--ease);
 }
@@ -7692,6 +7694,40 @@
    writes this attribute from the window's own `enter-full-screen`. */
 [data-shell="mac"][data-fullscreen] {
   --titlebar-inset: 0px;
+}
+
+/* ── Two habits of the web that a window does not have ─────────────────────
+   A Mac application points with the arrow. The hand is the web's way of
+   saying "this is a link", and on every button it says the window is a page.
+   Links in a note keep the hand, because a link is what it means there.
+
+   And the chrome is not text. Dragging across the sidebar in Mail selects
+   nothing; here it painted a blue selection over folder names and counts,
+   which no native list allows. What is typed into keeps its selection. */
+[data-shell]
+  :is(
+    button,
+    [role="button"],
+    [role="option"],
+    [role="menuitem"],
+    [role="tab"],
+    [role="switch"],
+    summary,
+    label,
+    select
+  ) {
+  cursor: default;
+}
+
+[data-shell]
+  :is(.sidebar-column, .collection-column, .settings-nav, .settings-header, .menu-popover) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-shell] :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* The window's own edge. `transparent: true` is what lets the vibrancy through

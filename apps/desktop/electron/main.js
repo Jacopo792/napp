@@ -396,6 +396,29 @@ app.whenReady().then(() => {
   });
   installMenu(isDev);
   createWindow();
+  /* The Dock's own menu, which every Mac notes app has: a new note without
+     bringing the window forward first and finding the button. It presses the
+     same chord the menu bar's New Note does, so it has no logic of its own. */
+  if (process.platform === "darwin") {
+    app.dock.setMenu(
+      Menu.buildFromTemplate([
+        {
+          label: "New Note",
+          click: () => {
+            const existing = BrowserWindow.getAllWindows()[0];
+            const window = existing ?? createWindow();
+            const press = () =>
+              window.webContents.send("napp:command", { key: "n", metaKey: true });
+            window.show();
+            window.focus();
+            /* A window made just now has no page to hear the key yet. */
+            if (existing) press();
+            else window.webContents.once("did-finish-load", press);
+          },
+        },
+      ]),
+    );
+  }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
