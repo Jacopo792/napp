@@ -1586,11 +1586,18 @@ of a narrow window spent on air.
 - **Shadows are contact, not atmosphere.** `--shadow-soft` is a hairline plus a
   negatively spread pass, so it stays under the card. A wide even blur reads as
   soot ringing a card once there is a wallpaper behind it.
-- Every settings row is one shape: a 34 px lead glyph, a name with a line of
-  explanation, a control flush right. The profile picture is a row like any
-  other, so the labels share a left edge and the values share a right one.
-  Settings is a rail and one column of cards; the standing summary column that
-  used to sit opposite is gone, because everything it said the form said too.
+- Settings is System Settings' shape: coloured tiles in the rail, the pane
+  titled with its section, rows with no glyph — a name, one line at most, the
+  control flush right — in recessed groups with no shadow. The profile opens on
+  the face, name and address centred. The standing summary column that used to
+  sit opposite is gone, because everything it said the form said too.
+- **Every glyph comes from `components/icons.ts`**, which re-exports Phosphor
+  under the names the call sites use. Never import an icon library directly.
+  Lucide was retired because its stroke had been forced to 1px to land on the
+  pixel grid, which is what made every icon read thin.
+- **The desktop shell points with the arrow and its chrome is not text.**
+  `[data-shell]` takes the hand cursor off buttons and rows and the selection
+  off the sidebar, list, settings rail and menus. Links in a note keep the hand.
 - **A capped measure in a wider column has to be centred in it.** Otherwise the
   cap that stops a label and its control drifting apart just moves the
   imbalance to the other side — which is what a 64 rem Settings panel with a

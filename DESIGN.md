@@ -37,7 +37,9 @@ the same hairlines. A theme repaints the interface; it never rearranges it.
 - The editor is visually dominant. Its page surface is the quietest layer and its content is centred on the active reading measure, so collapsing the navigation moves title and text together instead of stranding them against the left edge. The measure counts characters of the reading face, and the frontispiece resolves `ch` against that same face so title and body share one column edge. The sidebar and catalogue share a slightly more recessive paper surface; the app background sits on the furthest surface. Both navigation panes can be collapsed together for a full-page writing focus.
 - The sidebar is the column of destinations, top to bottom: the scope switch, the scopes and folder tree, then the archive and the wastebasket together at the foot, then Settings and the lock. Both feet are places a note leaves the folders for, and the one you can come back from stands first. The switch is built from the archive's roster — your notes, and each other member by nickname — and each account opens on its own scope. Both navigation panes can be hidden together for focused writing. The reading axes live in Settings, next to a specimen that changes under the slider; they are not a bar across the bottom of the note.
 - Controls are rounded throughout: pills for identity, rounded rectangles for inputs and actions, and circular slider thumbs. Use borders and surface shifts before adding shadow or saturated colour.
-- Settings has one row shape and every row uses it: a 34 px lead glyph, the name with a line of explanation, the control flush right. The profile picture is a row like the rest, so all four labels start at one x and all four values end at another. A card of rows and a paragraph of prose are different levels and may start at different insets; two cards of rows may not.
+- Settings is drawn the way System Settings is. The rail names each section with a coloured tile — the only saturated thing in the panel, fixed hues rather than the reader's accent, because they name places rather than state. The pane is titled with the section it shows. Rows carry no glyph: the name, at most one line naming it further, the control flush right. Groups of rows are a recess a step off the pane, a fill and a hairline and never a shadow. Profile opens on the face, the name and the address, centred, with the picture's actions under them. The chosen segment of a segmented control is raised, not ringed. A card of rows and a paragraph of prose are different levels and may start at different insets; two cards of rows may not.
+- Toolbar items are capsule groups: the group is the glass, each button inside it is a circle of wash, and no button grows a border under the pointer. New note is an icon in the list's group. The search field is a 32 px recess, not floating chrome.
+- Glyphs are Phosphor, chosen in one place (`components/icons.ts`) under the names the call sites use. They are filled outlines, so a 16 px glyph sits on whole device pixels without a stroke correction.
 
 ## Surface and colour system
 
@@ -97,8 +99,9 @@ on a note row are `--ink-3` and visible without the pointer, not revealed by it.
 
 **Theme.** `system`, `dark` or `light`, and `color-scheme` follows it so
 scrollbars, form controls and browser chrome stay aligned. Nine presets ship —
-Ink, Graphite, Midnight, Aubergine, Paper, Fjord, Moss, Indigo, Solar — and
-eight of the nine are dark, because `setTheme()` still replaces a reader's three
+Graphite (the default: a Mac window's grey and the system blue), Ink (no
+colour at all), Midnight, Aubergine, Paper, Fjord, Amber, Sage and Rosewood —
+and eight of the nine are dark, because `setTheme()` still replaces a reader's three
 colours whenever the THEME segment is touched, so a light preset is wiped by the
 click that selects its own theme. Each is only a starting point for the
 three values the reader actually sets: accent, background and foreground. A
@@ -115,7 +118,7 @@ it cannot be one of these.
 
 - The native system sans-serif carries display and interface text with grayscale antialiasing for crisp rendering on dark surfaces.
 - The note itself — title, headings and body — is set in **Literata**, a variable serif drawn for long reading on screens and shipped with the app (`@fontsource-variable/literata`, latin subsets loaded on demand). The system face was two faces, SF Pro and Segoe UI, and Segoe UI has no variable weight, so the reading Weight axis moved nothing on Windows. Settings → Reading → Face switches the note back to the system sans; it is a reading axis, synced with the account like the other four, and the presets leave it alone.
-- The native system monospace is reserved for genuine readouts and code.
+- The native system monospace is reserved for code and colour values. Counts, dates and states are set in the system face with tabular figures, the way a Mac sets them; section labels are sentence case, never tracked capitals.
 - Weight is expressed through normal CSS `font-weight`; Literata's optical-size axis follows the size on its own (`font-optical-sizing: auto`), so the title gets the display cut and the body the text cut from one file.
 - Long titles are a first-class layout case. Catalogue titles wrap for up to three lines instead of collapsing to a single ellipsis. The editor title wraps freely and its textarea auto-grows to its content; it must never become a fixed-height or horizontally scrolling field.
 
