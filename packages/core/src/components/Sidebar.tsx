@@ -66,6 +66,9 @@ interface Props {
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
   onClose: () => void;
+  /** On the phone the column is a sheet and this is how it is put away; on
+   *  the desktop hiding the columns lives in the list's own group. */
+  closeInStrip?: boolean;
   onSettings: () => void;
   onLock: () => void;
   /** The archive switch, which belongs above the destinations it re-points. */
@@ -355,6 +358,7 @@ export function Sidebar({
   onRenameFolder,
   onDeleteFolder,
   onClose,
+  closeInStrip = false,
   onSettings,
   onLock,
   peopleShelf,
@@ -503,20 +507,23 @@ export function Sidebar({
 
   return (
     <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
-      {/* The window's own strip, and the one act in it that is about the
-          window: hiding this column, beside the traffic lights, where Notes
-          keeps it. The people moved down into the column, where they have room
-          to be faces, and New folder onto the Folders heading. */}
+      {/* The window's own strip: on a Mac the traffic lights stand in it and it
+          is what the window is dragged by, so it is kept, empty, and continues
+          the one band of chrome across the window. The people are below it,
+          New folder is on the Folders heading, and hiding the columns is in
+          the list's own group beside its ⋯. */}
       <div className="sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Hide the sidebar"
-          title="Hide the sidebar"
-          className="toolbar-button press shrink-0"
-        >
-          <PanelLeftClose size={16} />
-        </button>
+        {closeInStrip && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Hide the sidebar"
+            title="Hide the sidebar"
+            className="toolbar-button press shrink-0"
+          >
+            <PanelLeftClose size={16} />
+          </button>
+        )}
       </div>
 
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">

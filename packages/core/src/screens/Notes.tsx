@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Minimize2,
   NotebookText,
+  PanelLeftClose,
   PanelLeftOpen,
   Search,
   Settings,
@@ -2817,37 +2818,55 @@ export default function NotesPage() {
   })();
 
   const collectionActions = (
-    <CollectionMenu
-      preferences={activeListPreferences}
-      onChange={handleListPreferencesChange}
-      onExportAll={() => void handleExportAll()}
-      onOpenPalette={() => {
-        setPaletteQuery("");
-        setPaletteOpen(true);
-      }}
-      onOpenShortcuts={() => setShortcutsOpen(true)}
-      bulk={
-        !canWriteArchive
-          ? undefined
-          : selectedFolderId === TRASH
-            ? {
-                label: "Delete all",
-                confirm: "Yes, delete them now",
-                danger: true,
-                count: trashedEntries.length,
-                run: handleEmptyTrash,
-              }
-            : selectedFolderId === ARCHIVE
+    <>
+      <CollectionMenu
+        preferences={activeListPreferences}
+        onChange={handleListPreferencesChange}
+        onExportAll={() => void handleExportAll()}
+        onOpenPalette={() => {
+          setPaletteQuery("");
+          setPaletteOpen(true);
+        }}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+        bulk={
+          !canWriteArchive
+            ? undefined
+            : selectedFolderId === TRASH
               ? {
-                  label: "Remove all from Archive",
-                  confirm: "Yes, move them back",
-                  danger: false,
-                  count: archivedEntries.length,
-                  run: handleEmptyArchive,
+                  label: "Delete all",
+                  confirm: "Yes, delete them now",
+                  danger: true,
+                  count: trashedEntries.length,
+                  run: handleEmptyTrash,
                 }
-              : undefined
-      }
-    />
+              : selectedFolderId === ARCHIVE
+                ? {
+                    label: "Remove all from Archive",
+                    confirm: "Yes, move them back",
+                    danger: false,
+                    count: archivedEntries.length,
+                    run: handleEmptyArchive,
+                  }
+                : undefined
+        }
+      />
+      {/* Hiding the columns, at the end of the list's group: beside the ⋯, in
+        the one strip that is always there when they are. It stood alone in
+        the sidebar's strip, which left that strip a single icon floating in
+        a band — and in full screen, with no traffic lights to stand beside,
+        the one thing in the window that was off its axis. */}
+      {!compact && (
+        <button
+          type="button"
+          onClick={() => changeNavigation(false)}
+          aria-label="Hide the sidebar"
+          title={"Hide the sidebar · ⌘\\"}
+          className="toolbar-button press shrink-0"
+        >
+          <PanelLeftClose size={18} />
+        </button>
+      )}
+    </>
   );
 
   /* One roster, ordered with yourself first, and it is local on purpose:
@@ -3068,6 +3087,7 @@ export default function NotesPage() {
       onRenameFolder={handleRenameFolder}
       onDeleteFolder={handleDeleteFolder}
       onClose={() => (compact ? setFoldersOpen(false) : changeNavigation(false))}
+      closeInStrip={compact}
       onSettings={() => {
         setFoldersOpen(false);
         setSettingsOpen(true);
@@ -3570,10 +3590,9 @@ export default function NotesPage() {
                 ) : null
               }
               headerStatus={noteStatus}
-              /* The faces on the sidebar's shelf already say who is here and
-                 who is writing, so the note's header carries them only while
-                 the sidebar is hidden and the shelf with it. */
-              headerPresence={navigationOpen ? null : notePresence}
+              /* The faces on the sidebar's shelf say who is here and who is
+                 writing; the header does not say it a second time. */
+              headerPresence={null}
               headerActions={noteActions}
               synced={collaborative.ready}
               session={session}

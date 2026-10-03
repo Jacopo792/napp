@@ -24,9 +24,9 @@ export interface Appearance {
 }
 
 /* A new account opens on Graphite: the grey a Mac window is, and the system's
-   own blue for the one thing that can be acted on. Ink — near-black and no
-   colour at all — is still a press away; it was the default once, and a
-   toggle drawn grey on grey is a toggle nobody can read the state of. */
+   own blue for the one thing that can be acted on. Ink — near-black with a
+   grey accent — was the default once and is gone from the presets: a toggle
+   drawn grey on grey is a toggle nobody can read the state of. */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "dark",
   accent: "#0a84ff",
@@ -41,7 +41,15 @@ export const DEFAULT_APPEARANCE: Appearance = {
   wallpaperFit: "cover",
 };
 
+/* Nine starting points, each a ground, an ink and one colour to act with.
+   Every ground carries a little of its accent's hue — a palette whose ground
+   is neutral grey reads as one colour dropped onto a grey app — and every
+   accent is a colour somebody would choose on purpose, not a tint of the
+   ground. Fjord and Rosewood are the reader's own favourites and are kept
+   exactly as they were. They are starting points only: what is stored is the
+   three colours, so a reader who chose one keeps it when this list changes. */
 export const APPEARANCE_PRESETS = [
+  /* A Mac window's grey and the system blue. */
   {
     id: "graphite",
     name: "Graphite",
@@ -50,42 +58,34 @@ export const APPEARANCE_PRESETS = [
     background: "#1c1c1e",
     foreground: "#ececec",
   },
+  /* Near-black and the yellow every notebook app on the platform is lit by. */
   {
-    id: "ink",
-    name: "Ink",
+    id: "night",
+    name: "Night",
     theme: "dark" as const,
-    accent: "#151313",
-    background: "#030202",
-    foreground: "#e8e8e8",
+    accent: "#ffd60a",
+    background: "#121214",
+    foreground: "#ececea",
+  },
+  /* The one light ground: warm paper and an ink-blue. `setTheme()` replaces
+     the three colours whenever the THEME segment is touched, so a second
+     light preset would be wiped by the click that selects its own theme. */
+  {
+    id: "paper",
+    name: "Paper",
+    theme: "light" as const,
+    accent: "#2f6fd6",
+    background: "#f8f5ee",
+    foreground: "#28241e",
   },
   {
     id: "midnight",
     name: "Midnight",
     theme: "dark" as const,
-    accent: "#5eb4ff",
-    background: "#121b25",
-    foreground: "#e8f0f7",
+    accent: "#64d2ff",
+    background: "#0f1724",
+    foreground: "#e6eef7",
   },
-  {
-    id: "aubergine",
-    name: "Aubergine",
-    theme: "dark" as const,
-    accent: "#c58ef5",
-    background: "#221a28",
-    foreground: "#f2ebf5",
-  },
-  {
-    id: "paper",
-    name: "Paper",
-    theme: "light" as const,
-    accent: "#28708c",
-    background: "#f7f3ea",
-    foreground: "#29251f",
-  },
-  /* The rest, and all of them dark on purpose. `setTheme()` below still
-     replaces the three colours whenever the THEME segment is touched, so a
-     light preset added here would be wiped by the click that selects its own
-     theme. */
   {
     id: "fjord",
     name: "Fjord",
@@ -94,25 +94,29 @@ export const APPEARANCE_PRESETS = [
     background: "#2e3440",
     foreground: "#eceff4",
   },
-  /* Three warmths the six above do not have between them: lamplight, a green
-     that is a colour and not a signal, and a rose. Each background carries the
-     accent's own hue at a fraction of its saturation, which is what keeps a
-     palette from reading as one colour dropped onto neutral grey. */
   {
-    id: "amber",
-    name: "Amber",
+    id: "plum",
+    name: "Plum",
     theme: "dark" as const,
-    accent: "#f39b52",
-    background: "#1b1612",
-    foreground: "#f3e8dc",
+    accent: "#d6a4ff",
+    background: "#1d1622",
+    foreground: "#f2eaf6",
   },
   {
-    id: "sage",
-    name: "Sage",
+    id: "espresso",
+    name: "Espresso",
     theme: "dark" as const,
-    accent: "#7fcf93",
-    background: "#161c18",
-    foreground: "#e6eee8",
+    accent: "#ff9f43",
+    background: "#1c1612",
+    foreground: "#f3e9de",
+  },
+  {
+    id: "moss",
+    name: "Moss",
+    theme: "dark" as const,
+    accent: "#5fd88a",
+    background: "#131a15",
+    foreground: "#e5eee7",
   },
   {
     id: "rosewood",

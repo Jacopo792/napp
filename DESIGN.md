@@ -99,8 +99,10 @@ on a note row are `--ink-3` and visible without the pointer, not revealed by it.
 
 **Theme.** `system`, `dark` or `light`, and `color-scheme` follows it so
 scrollbars, form controls and browser chrome stay aligned. Nine presets ship —
-Graphite (the default: a Mac window's grey and the system blue), Ink (no
-colour at all), Midnight, Aubergine, Paper, Fjord, Amber, Sage and Rosewood —
+Graphite (the default: a Mac window's grey and the system blue), Night
+(near-black and the notebook yellow), Paper, Midnight, Fjord, Plum, Espresso,
+Moss and Rosewood — every ground carrying a little of its accent's hue, and
+Fjord and Rosewood never to be changed —
 and eight of the nine are dark, because `setTheme()` still replaces a reader's three
 colours whenever the THEME segment is touched, so a light preset is wiped by the
 click that selects its own theme. Each is only a starting point for the

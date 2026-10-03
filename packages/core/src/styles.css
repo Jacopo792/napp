@@ -2779,7 +2779,11 @@
 }
 
 .note-row-list.is-selected {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+.note-row-list.is-selected .note-row-glyph {
+  color: var(--accent-strong);
 }
 
 .mobile-note-row.is-selected,
@@ -5476,8 +5480,12 @@
   background: var(--accent-wash);
 }
 
+/* The chosen row is grey and its glyph takes the accent, as Notes draws it.
+   An accent laid at a third of its strength over a dark ground is a mud for
+   half the colours anybody picks — yellow comes out olive, orange comes out
+   brown — and a selection has to read the same in every palette. */
 .sidebar-row.is-active {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
 }
 
 /* The folder a note is being dragged onto says so before it is dropped. */
@@ -5599,7 +5607,7 @@
 }
 
 .sidebar-row.is-active .sidebar-glyph {
-  color: var(--ink);
+  color: var(--accent-strong);
 }
 
 /* Colour alone carries the active glyph. It used to scale to 1.06, which put a
