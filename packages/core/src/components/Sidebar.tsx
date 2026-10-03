@@ -16,7 +16,7 @@ import {
   Settings,
   Trash2,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";

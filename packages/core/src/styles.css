@@ -198,35 +198,11 @@
     box-sizing: border-box;
   }
 
-  /* ── Line glyphs ──────────────────────────────────────────────────────────
-     Why the icons looked sanded down.
-
-     lucide draws every glyph on a 24-unit grid with a 2-unit stroke, and the
-     SVG is then scaled to the size it is asked for. A 16px icon therefore
-     renders its stroke at 16/24 × 1.8 = 1.2 device pixels: never a column of
-     pixels, always a smear across two of them. On a 2× display the second
-     pixel hides it; on a 1× display it is the whole appearance of the icon.
-
-     `non-scaling-stroke` lifts the stroke out of the glyph's own coordinate
-     space and into the screen's, so the width below is read as CSS pixels
-     rather than 24ths. One pixel for interface glyphs, two for the few drawn
-     at 20px and up, and both land on whole device columns at 1× and 2× alike.
-
-     The `strokeWidth` props still on the call sites are inert: a CSS rule
-     outranks an SVG presentation attribute. Sizes are even numbers for the
-     matching reason — an odd box centres its contents on a half pixel. */
-  svg.lucide {
-    stroke-width: 1;
-  }
-
-  svg.lucide > * {
-    vector-effect: non-scaling-stroke;
-  }
-
-  svg.lucide[width="20"],
-  svg.lucide[width="24"] {
-    stroke-width: 2;
-  }
+  /* ── Glyphs ───────────────────────────────────────────────────────────────
+     Phosphor draws filled outlines, not strokes, so there is no stroke width
+     to correct and nothing here forces one. Sizes stay even numbers: an odd
+     box centres its contents on a half pixel. `components/icons.ts` is the
+     one place a glyph is chosen. */
 
   html,
   body,
@@ -2574,7 +2550,7 @@
 }
 
 /* Rotation, not a scale: a chevron is a shape, and turning one costs nothing.
-   Scaling a 14px glyph is what `svg.lucide` at the top of this file forbids. */
+   Scaling a 14px glyph blurs it off the pixel grid. */
 .note-group-twisty {
   flex-shrink: 0;
   color: var(--ink-4);
@@ -5407,7 +5383,7 @@
    row would do on every reload, and on the phone every time the drawer opens.
 
    **The whole glyph moves, never a stroke inside it.** Reaching in for a
-   lucide path by position would put the bin's lid animation on whatever stroke
+   glyph's path by position would put the bin's lid animation on whatever stroke
    that library happens to draw first next version, and nothing would fail —
    the wrong line would simply start moving.
 

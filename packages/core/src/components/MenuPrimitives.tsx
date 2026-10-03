@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "@/components/icons";
 import { findItem, type MenuItem } from "@/lib/menuShape";
 
 export function MenuButton({

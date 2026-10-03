@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListTree, X } from "lucide-react";
+import { ListTree, X } from "@/components/icons";
 
 interface Heading {
   id: string;

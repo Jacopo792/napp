@@ -22,7 +22,7 @@ import {
   Trash2,
   UserRound,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   DndContext,
   DragEndEvent,

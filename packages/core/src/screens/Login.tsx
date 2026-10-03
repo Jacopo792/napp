@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "@/components/icons";
 import {
   authenticate,
   chooseArchive,

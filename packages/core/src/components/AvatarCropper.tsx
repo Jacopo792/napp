@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Loader2, Move, ZoomIn } from "lucide-react";
+import { Loader2, Move, ZoomIn } from "@/components/icons";
 import { avatarCropRect, avatarDragBound, type AvatarCrop } from "@/lib/image";
 
 /* Where the square sits was the file's business until now: the picture was cut

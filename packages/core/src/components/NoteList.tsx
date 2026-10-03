@@ -26,7 +26,7 @@ import {
   Table2,
   Trash2,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
@@ -653,7 +653,7 @@ const Row = memo(function Row({
                 pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
               }`}
             >
-              <Pin size={16} fill={pinned ? "currentColor" : "none"} />
+              <Pin size={16} weight={pinned ? "fill" : "regular"} />
             </button>
           )}
           {trashMode && (

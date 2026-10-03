@@ -47,7 +47,7 @@ import {
   MousePointer2,
   Users,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
 import {

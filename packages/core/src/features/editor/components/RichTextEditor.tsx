@@ -42,7 +42,7 @@ import {
   Trash2,
   Type,
   Undo2,
-} from "lucide-react";
+} from "@/components/icons";
 import { createPortal } from "react-dom";
 import {
   forwardRef,

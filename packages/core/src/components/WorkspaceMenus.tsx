@@ -44,7 +44,7 @@ import {
   UserPlus,
   Users,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AXIS_SPECS,

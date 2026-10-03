@@ -3,7 +3,7 @@
    to be reached without the pointer. */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Search } from "lucide-react";
+import { Search } from "@/components/icons";
 import { fold } from "@/lib/format";
 import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
 

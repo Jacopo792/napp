@@ -1,4 +1,4 @@
-import { FolderInput, Lock, LockOpen, Pin } from "lucide-react";
+import { FolderInput, Lock, LockOpen, Pin } from "@/components/icons";
 import type { MenuItem } from "@/lib/menuShape";
 import type { NoteLock } from "@/lib/types";
 

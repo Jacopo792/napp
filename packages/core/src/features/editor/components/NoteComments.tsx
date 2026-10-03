@@ -28,7 +28,15 @@
  * It loads for itself. Comments are not part of the catalogue and must not be
  * on the way to opening a note — the panel is closed until somebody asks for
  * it, and the note is readable long before this has finished. */
-import { Check, ChevronDown, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  MessageSquare,
+  Pencil,
+  RotateCcw,
+  Trash2,
+  X,
+} from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
 import {

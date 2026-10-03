@@ -1,4 +1,4 @@
-import { Clock3, ShieldCheck, UserRound } from "lucide-react";
+import { Clock3, ShieldCheck, UserRound } from "@/components/icons";
 import { useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { MemberCard } from "@/components/MemberCard";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpCircle } from "lucide-react";
+import { ArrowUpCircle } from "@/components/icons";
 
 /* ── There is a newer one ────────────────────────────────────────────────────
    A tab reloads a dozen times a day and is always the version that was last

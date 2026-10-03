@@ -28,7 +28,7 @@ import {
   Strikethrough,
   Table2,
   Trash2,
-} from "lucide-react";
+} from "@/components/icons";
 import { TEXT_COLORS, type TextColor } from "@/features/editor/lib/content";
 import { keyName } from "@/lib/shortcuts";
 import type { FormatAction } from "./RichTextEditor";

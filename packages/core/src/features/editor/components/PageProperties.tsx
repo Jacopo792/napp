@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Upload } from "lucide-react";
+import { Image as ImageIcon, Upload } from "@/components/icons";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useDismiss } from "@/components/useDismiss";
 import { useStoredImage } from "@/lib/media";

@@ -1,4 +1,12 @@
-import { ChevronDown, ChevronUp, Link2, ListTree, MessageSquare, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Link2,
+  ListTree,
+  MessageSquare,
+  Search,
+  X,
+} from "@/components/icons";
 import {
   forwardRef,
   useCallback,
