@@ -338,6 +338,7 @@ export function SettingsPanel({
   const appearance = useAppearance();
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>("profile");
+  const [closing, setClosing] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while
      the panel is up is the button below, which sets it itself. */
@@ -432,6 +433,7 @@ export function SettingsPanel({
 
   useEffect(() => {
     if (!open) {
+      setClosing(false);
       setTuning(false);
       setSection("profile");
       setInviteEmail("");
@@ -522,14 +524,28 @@ export function SettingsPanel({
       (item) => item.id === section,
     )?.name ?? "Settings";
 
+  /* The sheet leaves the way it came, rather than vanishing between two
+     frames: a window that only ever animates in reads as one that was
+     interrupted on the way out. The timer is the duration of the exit in the
+     stylesheet; reduced motion closes at once. */
+  function close() {
+    if (closing) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    window.setTimeout(onClose, 160);
+  }
+
   if (!open) return null;
   return (
-    <div className="settings-layer" role="presentation">
+    <div className={`settings-layer ${closing ? "is-closing" : ""}`} role="presentation">
       <button
         type="button"
         aria-label="Close settings"
         className="settings-scrim"
-        onClick={onClose}
+        onClick={close}
       />
       <section
         role="dialog"
@@ -602,7 +618,7 @@ export function SettingsPanel({
                 type="button"
                 aria-label="Close"
                 className="icon-button press ml-auto h-8 w-8"
-                onClick={onClose}
+                onClick={close}
               >
                 <X size={18} />
               </button>
