@@ -441,7 +441,9 @@ function initialsOf(name: string, email: string): string {
   const source = name.trim() || email.split("@")[0]?.replace(/[._-]+/g, " ") || "";
   const words = source.split(/\s+/).filter(Boolean);
   if (words.length === 0) return "?";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  /* One name, one letter, as Contacts draws it. Two letters of one word —
+     "PR" for Preview — is an abbreviation, not a monogram. */
+  if (words.length === 1) return words[0][0].toUpperCase();
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 

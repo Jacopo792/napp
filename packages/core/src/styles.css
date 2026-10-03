@@ -3203,12 +3203,18 @@
   width: 34px;
   height: 34px;
   border-radius: var(--radius-pill);
-  background: var(--accent-wash);
-  color: var(--accent-strong);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.02em;
+  /* A face nobody has given a picture is a monogram, drawn the way Contacts
+     draws one: a grey disc lit from above and a white letter. It was the
+     accent's wash with the accent's ink — a pale tinted coin with a bold
+     coloured code on it, which read as a badge rather than as a person. The
+     shading is the disc's own material, two stops of one grey, not a wash
+     laid behind the interface. */
+  background: linear-gradient(180deg, #a6abb6, #80858f);
+  color: #fff;
+  font-family: ui-rounded, "SF Pro Rounded", var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
   user-select: none;
 }
 
@@ -3257,13 +3263,13 @@
 .avatar.is-large {
   width: 72px;
   height: 72px;
-  font-size: 24px;
+  font-size: 30px;
 }
 
 .avatar.is-compact {
   width: 24px;
   height: 24px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .archive-switch button {
@@ -3278,7 +3284,7 @@
 .archive-switch .avatar.is-compact {
   width: 24px;
   height: 24px;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 /* No width rule of its own any more. It was one because two names in a slot
@@ -3306,7 +3312,7 @@
   width: 76px;
   height: 76px;
   margin-bottom: 10px;
-  font-size: 26px;
+  font-size: 32px;
 }
 
 .profile-portrait b {
@@ -7973,9 +7979,13 @@ text.ink-stroke {
   z-index: 3;
   top: 0;
   display: flex;
-  gap: 4px;
-  margin: 0 -8px 6px;
-  padding: 10px 10px 12px;
+  /* Centred while the faces fit, and `safe` so a roster wider than the
+     column starts at its left edge and scrolls rather than being cut off on
+     both sides. */
+  justify-content: safe center;
+  gap: 12px;
+  margin: 0 -8px 4px;
+  padding: 8px 10px 10px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
@@ -8021,7 +8031,7 @@ text.ink-stroke {
   min-width: 64px;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   scroll-snap-align: start;
   border-radius: var(--radius-md);
   padding: 4px 6px;
@@ -8037,17 +8047,19 @@ text.ink-stroke {
   border-radius: 50%;
   transition:
     transform var(--dur-slow) var(--ease-bounce),
+    opacity var(--dur-base) var(--ease),
     box-shadow var(--dur-base) var(--ease);
 }
 
 .people-face-portrait .avatar {
   width: 100%;
   height: 100%;
-  font-size: calc(var(--face-size) * 0.32);
+  font-size: calc(var(--face-size) * 0.42);
 }
 
 .people-face:hover .people-face-portrait {
-  transform: scale(1.05);
+  transform: scale(1.04);
+  opacity: 1;
 }
 
 .people-face:active .people-face-portrait {
@@ -8055,11 +8067,17 @@ text.ink-stroke {
   transition-duration: var(--dur-press);
 }
 
+/* The ring sits two pixels off the face and is two pixels wide: a thick
+   ring tight on a disc is a bezel, and a bezel is what made the chosen face
+   look like a button rather than somebody. */
 .people-face.is-active .people-face-portrait {
-  transform: scale(1.06);
   box-shadow:
-    0 0 0 2.5px var(--paper),
-    0 0 0 4.5px var(--face);
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--face);
+}
+
+.people-face:not(.is-active) .people-face-portrait {
+  opacity: 0.82;
 }
 
 .people-face-name {
