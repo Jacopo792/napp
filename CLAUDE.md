@@ -1123,9 +1123,13 @@ bug in this area came out of that.
 
 The **archive** question is `presence.ts`: the client joins
 `presence:<archiveId>` with `config.private = true` only while broadcasting its
-own `{ userId, onlineAt }`, so there is no listen-only mode. It is off by
-default and it draws exactly one thing — the ring on a face in the scope
-switch. Nothing else may depend on it.
+own `{ userId, onlineAt, noteId }`, so there is no listen-only mode. It is off
+by default and it draws two things — the dot on a face in the scope switch, and
+the waving dot on the row of a note somebody else has open. That second one is
+the only use of `noteId`, and it exists because awareness cannot answer it: you
+are connected only to the notes you have open. For the note open here the row
+dot comes from awareness, not from this channel. Nothing inside a note may
+depend on it.
 
 The **note** question is Yjs awareness, in `collab.ts`. A peer in
 `useCollaborationPeers` is connected to this note's document by construction,

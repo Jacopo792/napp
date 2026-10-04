@@ -2,18 +2,32 @@ import type { AppSession } from "./session.mock";
 import { PREVIEW_U2 } from "./fixture";
 
 export type PreviewPresenceChannel = { timer: number };
+export type Presence = Map<string, string | null>;
 
-/* The channel answers one question now — who is in the archive — so the
-   stand-in is one set with the other member in it. Whether she is *writing* is
-   a fact about the document, and `collab.mock.ts` is where that is pretended. */
+/* Who is in the archive, and the note each has open. The other member sits on
+   a note of her own — `n2` — so the list has a row to show her on that is not
+   the one you open. Whether she is *writing* is a fact about the document, and
+   `collab.mock.ts` is where that is pretended. */
 export function subscribeToPresence(
   session: AppSession,
-  onChange: (online: Set<string>) => void,
+  onChange: (present: Presence) => void,
+  noteId: () => string | null,
 ): PreviewPresenceChannel {
   const channel: PreviewPresenceChannel = { timer: 0 };
-  channel.timer = window.setTimeout(() => onChange(new Set([session.userId, PREVIEW_U2])), 80);
+  channel.timer = window.setTimeout(
+    () =>
+      onChange(
+        new Map([
+          [session.userId, noteId()],
+          [PREVIEW_U2, "n2"],
+        ]),
+      ),
+    80,
+  );
   return channel;
 }
+
+export async function announceNote(): Promise<void> {}
 
 export async function unsubscribeFromPresence(channel: PreviewPresenceChannel): Promise<void> {
   window.clearTimeout(channel.timer);

@@ -1,6 +1,18 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "@/components/icons";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Image,
+  ListChecks,
+  MailCheck,
+  MessageSquare,
+  NotebookPen,
+  NotebookText,
+  Pencil,
+  Table2 as Table,
+} from "@/components/icons";
 import {
   authenticate,
   chooseArchive,
@@ -25,18 +37,16 @@ type Mode = "sign-in" | "sign-up";
    email confirmation turned off: whether it appears is decided by whether
    Supabase hands back a session, which is a server fact. Configure SMTP and
    turn confirmations back on and it is correct again. */
-const COPY: Record<Mode, { title: string; lede: string; action: string; footnote: string }> = {
+const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": {
-    title: "Sign in to your notes",
-    lede: "Your account opens the archive it belongs to.",
+    title: "Sign in",
+    lede: "Welcome back.",
     action: "Sign in",
-    footnote: "Signed in on this device until you sign out or the session times out.",
   },
   "sign-up": {
-    title: "Start an archive",
-    lede: "The account and the archive are made together, in one step.",
+    title: "Create account",
+    lede: "Your archive is made with it.",
     action: "Create account",
-    footnote: "At least 8 characters. Nobody can reset a password you have not written down.",
   },
 };
 
@@ -344,7 +354,6 @@ export default function Login() {
           {error}
         </p>
       )}
-      <p className="login-note login-footnote">{copy.footnote}</p>
     </LoginFrame>
   );
 }
@@ -355,30 +364,89 @@ function plantOfTheDay(): ReturnType<typeof flowerFor> {
   return flowerFor(new Date().toDateString());
 }
 
-function LoginFrame({ children }: { children: React.ReactNode }) {
-  const plant = plantOfTheDay();
+/* What goes in the archive, in the colour its tool takes in the toolbar — the
+   pill on the door and the glyph under the pointer are the same hue for the
+   same thing, so the colour means something before anybody has signed in. */
+const KINDS = [
+  { word: "notes", tone: "var(--tint-yellow)", Icon: NotebookText },
+  { word: "drawings", tone: "var(--tint-pink)", Icon: Pencil },
+  { word: "remarks", tone: "var(--tint-mint)", Icon: MessageSquare },
+  { word: "pictures", tone: "var(--tint-blue)", Icon: Image },
+  { word: "checklists", tone: "var(--tint-orange)", Icon: ListChecks },
+  { word: "tables", tone: "var(--tint-purple)", Icon: Table },
+] as const;
+
+/* Glossa's door, in this app's words: the pitch on the pastel of a word that
+   turns every few seconds, the field behind it following, and a dot per word
+   below that lights in turn. The word swaps with a blur rather than a slide,
+   and the pill it sits in measures what is coming and travels to that width,
+   so the line never jumps. */
+function Pitch() {
+  const [at, setAt] = useState(0);
+  const [width, setWidth] = useState<number>();
+  const word = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setAt((i) => (i + 1) % KINDS.length), 2400);
+    return () => window.clearInterval(timer);
+  }, []);
+  useLayoutEffect(() => {
+    const node = word.current;
+    if (!node) return;
+    // The headline is set in `vw`, so the word changes width with the window too.
+    const measure = new ResizeObserver(() => setWidth(node.offsetWidth));
+    measure.observe(node);
+    setWidth(node.offsetWidth);
+    return () => measure.disconnect();
+  }, [at]);
+  const { word: text, tone, Icon } = KINDS[at];
+
   return (
-    <div className="login-shell flex min-h-screen flex-col">
-      {/* Two plates of one plant: the near one climbing the right of the
-          window, a smaller one behind the shoulder of the card. They are the
-          ground the card sits on, never a layer over it.
-
-          Which flower it is turns with the date — a lotus, a narcissus, a
-          lycoris or a peony. Seeded by the day and not by chance, so a door
-          that changes never changes while you are standing in it. The plain
-          sprig that used to take every other day is gone: this is the one
-          surface in the app that gets to be a drawing, and a twig was not
-          spending it. */}
+    <section className="login-pitch" style={{ "--tone": tone } as React.CSSProperties}>
       <div className="login-garden" aria-hidden="true">
-        <BotanicalFlower flower={plant} className="is-near" />
-        <BotanicalFlower flower={plant} className="is-far" />
+        <BotanicalFlower flower={plantOfTheDay()} className="is-near" />
       </div>
+      <span className="login-wordmark">
+        <img src={logoUrl} alt="" width={28} height={28} />
+        Napp
+      </span>
+      <p className="login-headline">
+        Two people.
+        <br />
+        One archive of
+        <br />
+        <span className="login-pill" style={{ width }}>
+          <span key={text} ref={word} className="login-pill-word">
+            <Icon size="0.62em" weight="bold" />
+            {text}
+          </span>
+        </span>
+      </p>
+      <div className="login-kinds">
+        <span className="login-dots">
+          {KINDS.map((kind, i) => (
+            <button
+              key={kind.word}
+              type="button"
+              aria-label={kind.word}
+              aria-pressed={i === at}
+              onClick={() => setAt(i)}
+              style={{ "--tone": kind.tone } as React.CSSProperties}
+            />
+          ))}
+        </span>
+        <span className="login-eyebrow">Shared notes, written by two</span>
+      </div>
+    </section>
+  );
+}
 
+function LoginFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="login-shell">
+      <Pitch />
       <main className="login-main">
-        <div className="login-card">
-          <img className="login-brand" src={logoUrl} alt="Notes" width={96} height={96} />
-          {children}
-        </div>
+        <div className="login-card">{children}</div>
       </main>
     </div>
   );

@@ -70,7 +70,12 @@ import {
   type RemarksSeen,
   type ArchiveComment,
 } from "@/lib/comments";
-import { subscribeToPresence, unsubscribeFromPresence } from "@/lib/presence";
+import {
+  announceNote,
+  subscribeToPresence,
+  unsubscribeFromPresence,
+  type Presence,
+} from "@/lib/presence";
 import {
   DEFAULT_FLAGS,
   flagsOf,
@@ -318,7 +323,8 @@ export default function NotesPage() {
   }, [session]);
   const writingPreferences = useWritingPreferences();
   const [preferencesReady, setPreferencesReady] = useState(false);
-  const [onlineMemberIds, setOnlineMemberIds] = useState<Set<string>>(() => new Set());
+  const [present, setPresent] = useState<Presence>(() => new Map());
+  const onlineMemberIds = useMemo(() => new Set(present.keys()), [present]);
   const [scopeDirection, setScopeDirection] = useState<"next" | "previous" | null>(null);
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const typingOffRef = useRef<number | undefined>(undefined);
@@ -771,16 +777,23 @@ export default function NotesPage() {
 
   useEffect(() => {
     if (!session || !preferencesReady || !flags.presence) {
-      setOnlineMemberIds(new Set());
+      setPresent(new Map());
       return;
     }
-    const channel = subscribeToPresence(session, setOnlineMemberIds);
+    const channel = subscribeToPresence(session, setPresent, () => selectedIdRef.current);
     presenceChannelRef.current = channel;
     return () => {
       presenceChannelRef.current = null;
       void unsubscribeFromPresence(channel);
     };
   }, [session, preferencesReady, flags.presence]);
+
+  /* Which note this tab has open, for the other member's list. Only once the
+     channel is up: the first announcement is made by the subscription itself. */
+  useEffect(() => {
+    const channel = presenceChannelRef.current;
+    if (channel && session) void announceNote(channel, session, selectedId).catch(() => {});
+  }, [selectedId, session]);
 
   /* Writing is a fact about the note, so it is announced on the note's own
      document rather than on the archive's presence channel — the same place
@@ -3001,8 +3014,31 @@ export default function NotesPage() {
   const presenceColor = presencePaletteFor(writingPreferences.presencePalette).color;
   const typingIds = new Set(notePeers.filter((peer) => peer.typing).map((peer) => peer.userId));
   const hereIds = new Set(notePeers.map((peer) => peer.userId));
+  /* The notes somebody else has open, for the dot on their rows. The note
+     open here is answered by awareness, which is certain; every other note by
+     the presence channel, which is the only thing that can see it. */
+  const peerNoteIds = new Set<string>();
+  if (flags.collaborators) {
+    for (const [userId, noteId] of present)
+      if (noteId && userId !== session?.userId) peerNoteIds.add(noteId);
+    if (selectedId && hereIds.size > 0) peerNoteIds.add(selectedId);
+  }
   const peopleShelf = (
-    <div role="group" aria-label="Whose notes" className="people-shelf">
+    <div
+      role="group"
+      aria-label="Whose notes"
+      className="people-shelf"
+      style={
+        {
+          "--count": roster.length,
+          "--index": Math.max(
+            0,
+            roster.findIndex((member) => member.userId === viewAs),
+          ),
+        } as React.CSSProperties
+      }
+    >
+      <span className="people-thumb" aria-hidden="true" />
       {roster.map((member) => {
         const active = viewAs === member.userId;
         const online =
@@ -3039,15 +3075,15 @@ export default function NotesPage() {
             <span className="people-face-portrait">
               <Avatar url={avatarUrls[member.userId] ?? null} name={nameOf(member)} email="" />
               {online && <span className="people-face-here" aria-label="Here now" />}
-              {typing && (
-                <span className="people-face-typing" aria-label="Writing">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              )}
             </span>
             <span className="people-face-name">{member.isSelf ? "You" : nameOf(member)}</span>
+            {typing && (
+              <span className="people-face-typing" aria-label="Writing">
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
           </button>
         );
       })}
@@ -3339,6 +3375,8 @@ export default function NotesPage() {
                   scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
+                  peerNoteIds={peerNoteIds}
+                  peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
@@ -3514,6 +3552,8 @@ export default function NotesPage() {
                   scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
+                  peerNoteIds={peerNoteIds}
+                  peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}

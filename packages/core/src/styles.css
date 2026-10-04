@@ -547,7 +547,9 @@
   margin: 0;
   border: 0;
   padding: 0;
-  font-size: clamp(1.5rem, 6.5cqi, 2.5rem);
+  /* Two steps above the body, not four: at 40px a title of ordinary length
+     ran to three lines and was the loudest thing in the window. */
+  font-size: clamp(1.4rem, 5cqi, 2rem);
   line-height: 1.14;
   letter-spacing: -0.028em;
   font-weight: var(--weight-bold);
@@ -682,14 +684,169 @@
    The only screen in the app with nothing of the reader's on it yet, which is
    the one place it may say what kind of place this is. It says it with a drawn
    plate and a ruled form, not with a floating grey box. ────────────────────── */
+/* Glossa's shape: the pitch on the left on a field of colour, the form on
+   the right on the plain ground, with nothing framing it. Stacked on a narrow
+   window, the pitch first and shorter. */
 .login-shell {
   position: relative;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
   /* Clipped sideways so the plate may bleed off both edges, but never
      vertically: on a short laptop window the sign-up card is taller than the
      viewport, and `overflow: hidden` would have cut its head and feet off with
      no way to reach either. */
   overflow-x: clip;
   background: var(--surface);
+}
+
+@media (min-width: 1024px) {
+  .login-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+
+/* The field takes the colour of the word in the pill, at a seventh of its
+   strength, and follows it when the word turns. */
+.login-pitch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3rem;
+  overflow: clip;
+  background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  color: var(--ink);
+  transition: background-color 700ms var(--ease-in-out);
+}
+
+[data-shell="mac"]:not([data-fullscreen]) .login-pitch {
+  padding-top: calc(52px + 1rem);
+}
+
+.login-pitch .botanical-plate.is-near {
+  opacity: 0.09;
+}
+
+.login-pitch > :not(.login-garden) {
+  position: relative;
+}
+
+.login-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  align-self: flex-start;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.03em;
+}
+
+.login-wordmark img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.login-headline {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5.4vw, 5rem);
+  font-weight: var(--weight-bold);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+/* The one inverted surface on the door, as Glossa's white pill is: ink for a
+   ground, the page for letters, whatever the palette. Its width travels to the
+   word arriving rather than snapping to it. */
+.login-pill {
+  display: inline-flex;
+  box-sizing: content-box;
+  overflow: hidden;
+  margin-top: 0.08em;
+  border-radius: 0.2em;
+  background: var(--ink);
+  padding: 0.02em 0.3em 0.14em;
+  color: var(--surface);
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 8px 30px -12px rgb(0 0 0 / 0.45);
+  transition: width 300ms var(--ease-out);
+}
+
+.login-pill-word {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.22em;
+  animation: login-word var(--dur-base) var(--ease-out) backwards;
+}
+
+.login-pill-word svg {
+  translate: 0 0.04em;
+  color: color-mix(in oklab, var(--tone) 70%, var(--surface));
+}
+
+@keyframes login-word {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+    filter: blur(6px);
+  }
+}
+
+.login-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.login-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-dots button {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tone);
+  opacity: 0.35;
+  filter: grayscale(1);
+  transition:
+    opacity var(--dur-base) var(--ease),
+    filter var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.login-dots button:hover {
+  opacity: 0.9;
+  filter: none;
+}
+
+.login-dots button[aria-pressed="true"] {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.3);
+}
+
+.login-eyebrow {
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1023px) {
+  .login-headline {
+    font-size: clamp(2.1rem, 9vw, 3.4rem);
+  }
 }
 
 /* Clipped to the shell it decorates. The plates are drawn past their own box
@@ -1346,37 +1503,18 @@
   flex: 1;
   align-items: center;
   justify-content: center;
-  padding: 1rem 1.25rem 3.5rem;
+  padding: 3rem 1.5rem;
 }
 
 /* No drop shadow. A 90px black blur over a near-black ground did not read as
    lift, it read as a smudge ringing the card. The hairline and the paper step
    already separate it; the inset highlight catches the top edge. */
+/* No frame: the form stands on the ground, as Glossa's does. The column is
+   the frame. */
 .login-card {
   width: 100%;
-  max-width: 27rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
-  background: var(--paper);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    var(--shadow-soft);
-  padding: clamp(1.75rem, 4vw, 2.4rem);
+  max-width: 24rem;
   animation: login-settle var(--dur-slow) var(--ease-out) backwards;
-}
-
-.login-brand {
-  display: block;
-  box-sizing: border-box;
-  width: 96px;
-  height: 96px;
-  margin: -0.35rem auto 1.45rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--rule));
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
-  padding: 6px;
-  object-fit: contain;
-  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 @keyframes login-settle {
@@ -1432,7 +1570,7 @@
   margin-top: 1.6rem;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 1.9rem;
+  font-size: 1.75rem;
   font-weight: var(--weight-bold);
   line-height: 1.12;
   letter-spacing: -0.035em;
@@ -1461,6 +1599,8 @@
 
 .login-form {
   margin-top: 1.75rem;
+  display: grid;
+  gap: 1rem;
 }
 
 /* Ruled, not boxed: a rule under a field is what a form on paper looks like,
@@ -1472,10 +1612,6 @@
   gap: 0.35rem;
 }
 
-.login-field + .login-field {
-  margin-top: 1.5rem;
-}
-
 .login-field .label {
   display: flex;
   align-items: baseline;
@@ -1483,13 +1619,15 @@
   color: var(--ink-3);
 }
 
+/* Boxed now, as Glossa's are: with the card's frame gone, a ruled line was
+   a field with nothing round it. */
 .login-input {
   width: 100%;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  border-radius: 0;
-  background: transparent;
-  padding: 0.45rem 0 0.55rem;
+  height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 0 0.85rem;
   color: var(--ink);
   font-size: 0.95rem;
   outline: none;
@@ -1504,17 +1642,17 @@
 
 .login-input:focus {
   border-color: var(--accent);
-  box-shadow: inset 0 -1px 0 var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .login-secret .login-input {
-  padding-right: 2.5rem;
+  padding-right: 2.75rem;
 }
 
 .login-reveal {
   position: absolute;
-  right: -0.25rem;
-  bottom: 0;
+  right: 5px;
+  bottom: 5px;
   display: flex;
   width: 34px;
   height: 34px;
@@ -1544,7 +1682,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin-top: 1.9rem;
+  margin-top: 0.75rem;
   border: 1px solid var(--accent);
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -1624,13 +1762,27 @@
   margin-top: 1.25rem;
 }
 
-.login-footnote {
-  margin-top: 1.4rem;
-}
-
+/* Said, and shaken once, as Glossa's is: the line arrives from the side it
+   would be refused from. */
 .login-error {
   margin-top: 0.9rem;
   color: var(--danger);
+  animation: login-refuse 400ms var(--ease-out);
+}
+
+@keyframes login-refuse {
+  0% {
+    transform: translateX(-6px);
+  }
+  33% {
+    transform: translateX(6px);
+  }
+  66% {
+    transform: translateX(-4px);
+  }
+  85% {
+    transform: translateX(2px);
+  }
 }
 
 .login-invite-note {
@@ -1645,7 +1797,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-card {
+  .login-card,
+  .login-pill-word,
+  .login-error {
     animation: none;
   }
 
@@ -2632,6 +2786,14 @@
   line-height: 18px;
 }
 
+/* Over a wallpaper or the window's material the column is see-through, and an
+   opaque sticky heading was a solid band across a translucent list — the list
+   read as striped. There it is a line of text that scrolls with its notes. */
+:root:is(.has-wallpaper, .has-translucent-sidebar) .note-group-heading {
+  position: static;
+  background: transparent;
+}
+
 .note-group-heading.is-first {
   padding-top: 8px;
 }
@@ -3165,12 +3327,32 @@
   color: var(--accent-strong);
 }
 
+/* Glyphs at the size a Mac toolbar draws them. They were 16px in 32px buttons
+   and 13px inside the sidebar's tiles, which next to 14px labels read as
+   punctuation rather than pictures. Set here, not at each call site, so every
+   button in a strip is the same size by construction. */
+.editor-tool-button svg,
+.sidebar-glyph svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toolbar-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.glass-search svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* The one button in the row whose glyph is letters. It is set to read at the
    size of the icons beside it rather than at its own — a 17px `Aa` next to a
    16px icon is the letters shouting. */
 .editor-tool-letters {
   font-family: var(--font-display);
-  font-size: var(--text-md);
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -5615,6 +5797,22 @@
   display: flex;
 }
 
+/* The header's capsules are a fill and nothing else. They wore a popover's
+   material — a hairline frame, the glass ground, a highlight along the top —
+   which is a thing floating in front of the page, and three of those in one
+   strip read as three toolbars parked on the window rather than one toolbar
+   in it. A wash of ink is enough to say "these belong together"; a frame
+   round each group was saying it three times. */
+:is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow: none;
+}
+
+.has-translucent-sidebar :is(.editor-tool-group, .editor-tool-cluster).glass-toolbar::before {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .press,
   .press:active,
@@ -5804,7 +6002,7 @@
    strip's 52px as its own first line: the faces' centre-line falls under the
    list's title rather than floating above or below it. */
 .sidebar-topbar:not(.has-close) + .sidebar-scroll .people-shelf {
-  padding-top: 14px;
+  margin-top: 10px;
 }
 
 .sidebar-scope {
@@ -6063,8 +6261,8 @@
 
 .sidebar-glyph {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
@@ -6140,10 +6338,10 @@
 
 :root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
   .sidebar-glyph[data-tone] {
-  width: 20px;
-  height: 20px;
-  margin: -2px;
-  border-radius: 5.5px;
+  width: 24px;
+  height: 24px;
+  margin: -3px;
+  border-radius: 6.5px;
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -6152,8 +6350,8 @@
 :root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
   .sidebar-glyph[data-tone]
   svg {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   color: inherit;
 }
 
@@ -6189,51 +6387,64 @@
    The choice is the whole app's, not the rail's. A toolbar keeps its glyphs
    bare — a tile in a 32px button is a button inside a button — so there the
    styles differ by colour alone: Default and Dark give every act a hue of its
-   own, Tinted gives them all the accent, Clear leaves them in the ink. The hue
+   own, Tinted gives them all the accent, Clear leaves them in the ink.
+
+   The hue is a state, not a livery. Nine saturated system colours standing in
+   a row at rest read as a messaging app's tray, and said nothing — every
+   button was equally loud, so none of them was. At rest a tool is ink, as in
+   Glossa; it takes its own colour when the pointer is on it and while it is
+   open, so the one coloured glyph in the bar is the one you are using. And the
+   colour is the palette's own `--tint-*`, matched in lightness to the page,
+   never a system blue at full saturation over a dark ground. The hue
    is read off the button's own label, which is also what a screen reader
    reads, so the two cannot name different buttons. Menus and the Settings
    rows follow Tinted only: a menu is a list of words, and a column of eight
    colours down its left edge would be the loudest thing on the screen. */
 :is(.toolbar-button, .editor-tool-button)[aria-label="New note"] {
-  --tone: #f5b80f;
+  --tone: var(--tint-yellow);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Text formatting"] {
-  --tone: #0a84ff;
+  --tone: var(--tint-blue);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Draw"] {
-  --tone: #ff375f;
+  --tone: var(--tint-pink);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Lists"] {
-  --tone: #ff9f0a;
+  --tone: var(--tint-orange);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Tables"] {
-  --tone: #30d158;
+  --tone: var(--tint-mint);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Attachments"] {
-  --tone: #bf5af2;
+  --tone: var(--tint-purple);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Outline"] {
-  --tone: #14a3a3;
+  --tone: var(--tint-blue);
 }
 :is(.toolbar-button, .editor-tool-button)[aria-label="Comments"] {
-  --tone: #34a853;
+  --tone: var(--tint-mint);
 }
 :is(.toolbar-button, .editor-tool-button):is(
   [aria-label="Find in note"],
   [aria-label="Search"],
   [aria-label="Find a note"]
 ) {
-  --tone: #5e5ce6;
+  --tone: var(--tint-purple);
 }
 
 :root:is([data-icon-style="default"], [data-icon-style="dark"])
-  :is(.toolbar-button, .editor-tool-button) {
-  color: var(--tone, var(--ink-3));
+  :is(.toolbar-button, .editor-tool-button):is(
+    :hover,
+    :focus-visible,
+    .is-active,
+    [aria-expanded="true"]
+  ) {
+  color: var(--tone, var(--ink));
 }
 
 :root[data-icon-style="default"] .note-row-glyph:not(:has(img)),
 :root[data-icon-style="dark"] .note-row-glyph:not(:has(img)) {
-  color: #f5b80f;
+  color: var(--tint-yellow);
 }
 
 :root[data-icon-style="tinted"] :is(.toolbar-button, .editor-tool-button),
@@ -6305,6 +6516,37 @@
 
   .sidebar-footer-button[data-motion="lock"]:hover svg {
     animation: glyph-refuse var(--dur-base) var(--ease-press);
+  }
+}
+
+/* ── Leaning toward where it goes ────────────────────────────────────────────
+   Glossa's rule for a glyph whose control moves something: it leans that way
+   while the pointer is on it, and comes back when it leaves. The sidebar's
+   handle says which way the columns are about to travel before they do. A
+   transition and not a keyframe, because the lean is held for as long as the
+   hover is — and two pixels, a whole number, so the held glyph is still on the
+   grid. */
+:is(.toolbar-button, .icon-button):is(
+    [aria-label="Hide the sidebar"],
+    [aria-label="Show the sidebar"]
+  )
+  svg {
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.toolbar-button, .icon-button)[aria-label="Hide the sidebar"]:hover svg {
+    transform: translateX(-2px);
+  }
+
+  :is(.toolbar-button, .icon-button)[aria-label="Show the sidebar"]:hover svg {
+    transform: translateX(2px);
+  }
+
+  /* New: the plus turns, as Glossa's does. */
+  .sidebar-heading-add:hover svg {
+    transition: transform var(--dur-base) var(--ease-spring);
+    transform: rotate(90deg);
   }
 }
 
@@ -6555,8 +6797,8 @@
 
 .sidebar-footer-button svg {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   color: var(--ink-3);
   transition:
     color var(--dur-fast) var(--ease),
@@ -7391,7 +7633,9 @@
   position: relative;
   animation: cover-in var(--dur-slow) var(--ease-out) backwards;
   width: 100%;
-  height: 240px;
+  /* A band, not a poster: at 240 it took a third of the window before the
+     title had said what the note was. */
+  height: 168px;
   flex-shrink: 0;
   background-repeat: no-repeat;
   touch-action: none;
@@ -7558,7 +7802,7 @@
    optical correction against a text edge. */
 @media (max-width: 700px) {
   .note-page-cover {
-    height: 160px;
+    height: 128px;
   }
 
   .note-cover-actions {
@@ -8740,120 +8984,142 @@ text.ink-stroke {
   z-index: 3;
   top: 0;
   display: flex;
-  gap: 10px;
-  margin: 0 -8px 4px;
-  /* The first face starts where the sidebar's rows start their fill, so the
-     shelf stands on the column's left edge like everything under it rather
-     than floating in the middle of it. */
-  padding: 8px 14px 10px;
+  margin: 0 0 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper));
+  padding: 3px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
   scrollbar-width: none;
-  background: var(--paper);
-  --face-size: 52px;
+  --face-size: 22px;
 }
 
 .people-shelf::-webkit-scrollbar {
   display: none;
 }
 
-.has-translucent-sidebar .people-shelf,
-[data-shell="mac"] .people-shelf {
-  background: transparent;
-}
-
-@supports (animation-timeline: scroll()) {
-  .people-shelf {
-    animation: people-shelf-collapse linear both;
-    animation-timeline: scroll(nearest block);
-    animation-range: 0 72px;
-  }
-}
-
-@property --face-size {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 52px;
-}
-
-@keyframes people-shelf-collapse {
-  to {
-    --face-size: 30px;
-    padding-bottom: 6px;
-    box-shadow: 0 1px 0 var(--rule-soft);
-  }
-}
-
+/* A segment of a switch, not a contact card. The faces were 52px discs with a
+   name under each — a third of the column's first screen spent on a choice
+   between two things, and the largest objects in the window were two grey
+   initials. Now it is the control it is: a face the size of a line of text,
+   the name beside it, and one thumb that travels to the one you choose, as
+   Glossa's nav pill does. */
 .people-face {
+  position: relative;
   display: flex;
-  flex: 0 0 auto;
-  min-width: 64px;
-  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
   align-items: center;
   gap: 7px;
-  scroll-snap-align: start;
-  border-radius: var(--radius-md);
-  padding: 4px 6px;
+  border-radius: 6px;
+  padding: 4px 8px 4px 4px;
   color: var(--ink-3);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.people-face:hover {
+  color: var(--ink);
+}
+
+/* One thumb for the whole switch, under the segments, moved by a transform:
+   the segments are equal, so where it stands is its index times its own
+   width, and a transform is the one property the compositor can move on its
+   own. It was a view transition, which left the old thumb's picture painted
+   over the names in the desktop window whenever one did not finish. */
+.people-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--count, 2));
+  border-radius: 6px;
+  background: var(--page);
+  box-shadow:
+    0 0 0 0.5px var(--rule),
+    0 1px 2px rgb(0 0 0 / 0.18);
+  transform: translateX(calc(var(--index, 0) * 100%));
+  transition: transform var(--dur-base) var(--ease);
+  pointer-events: none;
 }
 
 .people-face-portrait {
   position: relative;
   display: grid;
+  flex-shrink: 0;
   width: var(--face-size);
   height: var(--face-size);
   place-items: center;
   border-radius: 50%;
-  transition:
-    transform var(--dur-slow) var(--ease-bounce),
-    opacity var(--dur-base) var(--ease),
-    box-shadow var(--dur-base) var(--ease);
+  transition: transform var(--dur-base) var(--ease-spring);
 }
 
 .people-face-portrait .avatar {
   width: 100%;
   height: 100%;
-  font-size: calc(var(--face-size) * 0.42);
-}
-
-.people-face:hover .people-face-portrait {
-  transform: scale(1.04);
-  opacity: 1;
+  font-size: calc(var(--face-size) * 0.46);
 }
 
 .people-face:active .people-face-portrait {
-  transform: scale(0.94);
+  transform: scale(0.92);
   transition-duration: var(--dur-press);
 }
 
-/* The ring sits two pixels off the face and is two pixels wide: a thick
-   ring tight on a disc is a bezel, and a bezel is what made the chosen face
-   look like a button rather than somebody. */
-.people-face.is-active .people-face-portrait {
-  box-shadow:
-    0 0 0 2px var(--paper),
-    0 0 0 4px var(--face);
+/* The other member is in this note. A dot in her colour, the size of the
+   pin beside it, with a wave leaving it every two seconds — the one moving
+   thing in a list that otherwise holds still, which is what makes it findable
+   at a glance. */
+.note-row-peer {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--face, var(--ok));
+  vertical-align: 0.08em;
 }
 
-.people-face:not(.is-active) .people-face-portrait {
-  opacity: 0.82;
+.note-row-peer::after {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--face, var(--ok));
+  content: "";
+  animation: peer-wave 2s var(--ease-out) infinite;
+}
+
+@keyframes peer-wave {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  70%,
+  to {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-row-peer::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 .people-face-name {
-  max-width: 72px;
+  min-width: 0;
   overflow: hidden;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
-  opacity: clamp(0, calc((var(--face-size) - 34px) / 18px), 1);
-  transition: color var(--dur-fast) var(--ease);
 }
 
-.people-face.is-active .people-face-name {
+.people-face.is-active {
   color: var(--ink);
-  font-weight: var(--weight-semibold);
 }
 
 /* Here now: the system's green, because "available" is a fact the eye has
@@ -8863,10 +9129,10 @@ text.ink-stroke {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: calc(var(--face-size) * 0.24);
-  height: calc(var(--face-size) * 0.24);
-  min-width: 8px;
-  min-height: 8px;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #34c759;
   box-shadow: 0 0 0 2px var(--paper);
@@ -8882,17 +9148,13 @@ text.ink-stroke {
 /* Writing, in this note, now — the bubble a phone shows when somebody is
    typing to you, because it is the one everybody already reads that way. */
 .people-face-typing {
-  position: absolute;
-  top: -4px;
-  right: -12px;
   display: flex;
+  flex-shrink: 0;
   gap: 2.5px;
+  margin-left: auto;
   border-radius: var(--radius-pill);
-  background: var(--glass);
-  padding: 5px 7px;
-  box-shadow:
-    0 0 0 1px var(--glass-border),
-    0 2px 6px rgb(0 0 0 / 0.3);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  padding: 4px 5px;
   animation: people-here-in var(--dur-base) var(--ease-spring) backwards;
 }
 
@@ -8955,7 +9217,6 @@ text.ink-stroke {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .people-shelf,
   .people-face-here,
   .people-face-typing,
   .people-face-typing i {

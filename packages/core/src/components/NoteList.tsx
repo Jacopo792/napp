@@ -108,6 +108,9 @@ interface Props {
    *  is a number with nothing under it, and the honest answer to "I have read
    *  them all" is a note nobody could find. */
   unreadIds?: Set<string>;
+  /** Notes the other member has open right now, and the colour she wears. */
+  peerNoteIds?: Set<string>;
+  peerColor?: string;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
@@ -162,6 +165,8 @@ const Row = memo(function Row({
   meta,
   selected,
   unread,
+  peerHere,
+  peerColor,
   showFolder,
   onSelect,
   trashMode,
@@ -181,6 +186,8 @@ const Row = memo(function Row({
   meta: Meta;
   selected: boolean;
   unread: boolean;
+  peerHere: boolean;
+  peerColor?: string;
   showFolder: boolean;
   trashMode: boolean;
   archiveMode: boolean;
@@ -572,6 +579,16 @@ const Row = memo(function Row({
             overflow: "hidden",
           }}
         >
+          {/* Somebody else is in this note right now: a dot in her colour,
+              and a wave leaving it, before the title it belongs to. */}
+          {peerHere && (
+            <span
+              className="note-row-peer"
+              role="img"
+              aria-label="Open by the other member now"
+              style={{ "--face": peerColor } as React.CSSProperties}
+            />
+          )}
           {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
           {entry.note.title || "Untitled"}
         </p>
@@ -800,6 +817,8 @@ export function NoteList({
   trashMode,
   archiveMode,
   unreadIds,
+  peerNoteIds,
+  peerColor,
   searchRef,
   onQueryChange,
   onSelect,
@@ -1061,6 +1080,8 @@ export function NoteList({
                 meta={meta}
                 selected={selectedId === entry.note.id}
                 unread={unreadIds?.has(entry.note.id) ?? false}
+                peerHere={peerNoteIds?.has(entry.note.id) ?? false}
+                peerColor={peerColor}
                 showFolder={showFolder}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
