@@ -3,6 +3,34 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.7.0 — 2026-10-04
+
+A new sign-in page, quieter toolbars, larger icons, and a sign of where the
+other member is.
+
+### Added
+
+- **You can see which note the other member has open.** Its row in the list
+  carries a dot in their colour, with a wave leaving it. It needs presence on
+  for both of you, and follows "Collaborators in notes".
+
+### Changed
+
+- **A new sign-in page.** The pitch on the left, on a colour that follows the
+  word turning in its pill — notes, drawings, remarks, pictures, checklists,
+  tables — and the form on the right in boxed fields.
+- **Toolbar icons are grey at rest** and take their tool's colour only under
+  the pointer or while open. The colours are the palette's own, matched to the
+  page, and the toolbar groups lose their frame.
+- **Whose notes you are reading is a compact switch** at the top of the
+  sidebar — a small face and a name — instead of two large portraits.
+- **Larger icons** in the toolbars and the sidebar.
+- **A lower cover and a smaller note title**, so the text starts sooner.
+- Over a wallpaper or translucency, the day headings in the list are plain
+  text rather than solid bands.
+- The sidebar handle leans the way the columns are about to go, and the
+  new-folder plus turns under the pointer.
+
 ## 0.6.0 — 2026-10-03
 
 Smoother motion, a Style section in Settings, and note rows shaped like Notes.
