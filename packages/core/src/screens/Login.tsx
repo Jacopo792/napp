@@ -100,9 +100,10 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
+      let result;
       if (mode === "sign-up") {
         if (password.length < 8) throw new Error("Use at least 8 characters");
-        const result = await registerAccount(email.trim(), password);
+        result = await registerAccount(email.trim(), password);
         if (result.confirmationRequired) {
           setConfirmation(email.trim());
           setPassword("");
@@ -111,13 +112,13 @@ export default function Login() {
         }
       } else {
         const inviteToken = platform().inviteToken();
-        const result = await authenticate(email.trim(), password, inviteToken);
-        if (!result.session) {
-          setArchiveChoice({ account: result.account, archives: result.archives });
-          setPassword("");
-          setLoading(false);
-          return;
-        }
+        result = await authenticate(email.trim(), password, inviteToken);
+      }
+      if (!result.session) {
+        setArchiveChoice({ account: result.account, archives: result.archives });
+        setPassword("");
+        setLoading(false);
+        return;
       }
       setPassword("");
       navigate({ to: "/notes" });

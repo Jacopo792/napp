@@ -18,10 +18,9 @@ export type { AppSession } from "./sessionRestore";
 
 type StoredSession = AppSession;
 
-export interface RegistrationResult {
-  session: AppSession | null;
-  confirmationRequired: boolean;
-}
+export type RegistrationResult =
+  | { session: null; confirmationRequired: true }
+  | (AuthenticationResult & { confirmationRequired: false });
 
 export interface ArchiveOption {
   archiveId: string;
@@ -169,8 +168,8 @@ export async function registerAccount(
   if (error) throw new Error(error.message);
 
   if (data.session && data.user) {
-    const result = await openAccount(data.user.id, data.user.email ?? email);
-    return { session: result.session, confirmationRequired: false };
+    const result = await openAccount(data.user.id, data.user.email ?? email, inviteToken);
+    return { ...result, confirmationRequired: false };
   }
 
   localStorage.removeItem(SESSION_KEY);
