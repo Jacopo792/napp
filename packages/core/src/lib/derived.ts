@@ -83,3 +83,17 @@ export function linksTo(document: unknown, noteId: string): boolean {
     return true;
   return Array.isArray(node.content) && node.content.some((child) => linksTo(child, noteId));
 }
+
+/** Every note this document links to, in the order the links first appear —
+ *  the other direction of `linksTo`, for the note sheet's "Links to". */
+export function linkedNoteIds(document: unknown, found = new Set<string>()): Set<string> {
+  if (!document || typeof document !== "object") return found;
+  const node = document as {
+    marks?: { type?: string; attrs?: { noteId?: string } }[];
+    content?: unknown[];
+  };
+  for (const mark of node.marks ?? [])
+    if (mark.type === "noteLink" && mark.attrs?.noteId) found.add(mark.attrs.noteId);
+  for (const child of node.content ?? []) linkedNoteIds(child, found);
+  return found;
+}

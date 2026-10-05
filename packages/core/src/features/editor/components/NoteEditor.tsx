@@ -29,6 +29,7 @@ import { imageAltFromFilename } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
 import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
+import { NoteHistory } from "./NoteHistory";
 import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
 import { TitleField } from "./TitleField";
@@ -114,6 +115,9 @@ const TOOLBAR_ROW_ROOM = 460;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
+  /** With a version id, that version is opened in the list. */
+  openHistory: (versionId?: string) => void;
+  openComments: () => void;
   openLink: () => void;
   drawOnPage: () => void;
   focus: () => void;
@@ -201,6 +205,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [failure, setFailure] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(startWithComments);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  /* The comments' column, not a second one beside it: one panel at a time. */
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyFocus, setHistoryFocus] = useState<string | null>(null);
+  useEffect(() => {
+    if (commentsOpen) setHistoryOpen(false);
+  }, [commentsOpen]);
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -234,6 +244,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   }, []);
 
   useImperativeHandle(ref, () => ({
+    openHistory(versionId) {
+      setCommentsOpen(false);
+      setHistoryFocus(versionId ?? null);
+      setHistoryOpen(true);
+    },
+    openComments() {
+      setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+      setCommentsOpen(true);
+    },
     openFind(query = "") {
       setFindOpen(true);
       if (query) {
@@ -527,7 +546,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <input
         ref={imageRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
         className="hidden"
         onChange={(event) => void handleImage(event.target.files?.[0])}
       />
@@ -933,6 +952,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         </div>
 
         {outlineOpen && <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />}
+
+        {historyOpen && session && (
+          <NoteHistory
+            key={`${entry.note.id}:${historyFocus ?? ""}`}
+            initialOpenId={historyFocus}
+            session={session}
+            noteId={entry.note.id}
+            canEdit={canEdit}
+            authors={commentAuthors ?? new Map()}
+            current={() => {
+              const content = editorRef.current?.getContent();
+              const title = collaboration?.document.getText(TITLE_TEXT).toString();
+              return content && title !== undefined ? { title, content } : null;
+            }}
+            onRestore={({ title, content }) => {
+              const yTitle = collaboration?.document.getText(TITLE_TEXT);
+              if (yTitle && yTitle.toString() !== title)
+                collaboration!.document.transact(() => {
+                  yTitle.delete(0, yTitle.length);
+                  yTitle.insert(0, title);
+                });
+              editorRef.current?.replaceContent(content);
+              onEdited();
+            }}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
 
         {commentsOpen && session && commentAuthors && (
           <NoteComments

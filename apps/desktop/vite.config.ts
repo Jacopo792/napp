@@ -86,7 +86,9 @@ function contentSecurityPolicy(env: Record<string, string | undefined>): Plugin 
     .join(" ");
   const policy = [
     "default-src 'self'",
-    "script-src 'self'",
+    /* Compiling WebAssembly, not evaluating strings: libheif decodes the
+       iPhone's HEIC photographs, and Chromium decodes none of them itself. */
+    "script-src 'self' 'wasm-unsafe-eval'",
     /* The interface sets a style attribute from React on a great many
        elements, and a style attribute is what 'unsafe-inline' governs. */
     "style-src 'self' 'unsafe-inline'",

@@ -231,6 +231,20 @@ async function collectWallpaper(session: AppSession, objectId: string | null): P
  *  recognised and dropped rather than re-applied. */
 let settled = "";
 
+/* Every blob written and not yet heard back. Realtime announces each write
+   separately and in order, so six palettes picked a second apart are six
+   echoes arriving after the sixth was already on screen — and `settled`, which
+   holds only the last, waved the first five through as somebody else's
+   change. The palette then replayed every click on its own until the queue
+   ran dry. An echo found here is ours: it and everything before it is
+   dropped. Capped, because a channel that hears nothing would grow it. */
+const unheard: string[] = [];
+
+/* The one shape both sides are compared in: our writes carry every field, so
+   the fallback never decides anything and key order is the constructor's. */
+const canonical = (stored: unknown) =>
+  JSON.stringify(mergeAccountPreferences(stored, localPreferences()));
+
 export async function pullAccountPreferences(session: AppSession): Promise<AccountPreferences> {
   const result = await supabase
     .from("profile_preferences")
@@ -280,10 +294,15 @@ async function write(session: AppSession, preferences: AccountPreferences): Prom
      Its failure must not take the row with it — a wallpaper that did not
      upload is not a reason to lose a palette. */
   await shareWallpaper(session).catch(() => undefined);
+  const heard = canonical(preferences);
+  unheard.push(heard);
+  if (unheard.length > 20) unheard.shift();
   const result = await supabase
     .from("profile_preferences")
     .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
   if (!result.error) return;
+  const written = unheard.lastIndexOf(heard);
+  if (written >= 0) unheard.splice(written, 1);
   /* Nothing landed, so nothing is settled: the next change has to try again
      rather than be waved through by a guard that believes this was written. */
   settled = "";
@@ -333,6 +352,11 @@ export function subscribeToAccountPreferences(
       },
       (payload) => {
         const stored = (payload.new as { preferences?: unknown } | null)?.preferences;
+        const own = unheard.indexOf(canonical(stored));
+        if (own >= 0) {
+          unheard.splice(0, own + 1);
+          return;
+        }
         const preferences = mergeAccountPreferences(
           stored,
           localPreferences(heldRemarksSeen(session.userId)),

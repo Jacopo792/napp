@@ -303,6 +303,60 @@ archive. They arrive together and are answered together.
 table in `subscribeToArchive`'s list: that subscription's caller reloads the
 whole archive snapshot and already fires on every save either member makes.
 
+## What a note used to say
+
+`note_versions` is the readable history the Yjs binary is not. The binary knows
+every keystroke and not who typed one; the collaboration server knows who,
+because it authorised every update. `versions.ts` collects the account of each
+update that arrived **over a connection** — one relayed through Redis is the
+other instance's to record — and writes a row when a stretch of writing has run
+ten minutes or the note leaves memory. The row is the projection, so a version
+is read, compared and restored with no Yjs decoder in the browser, and it
+carries `author_ids` and the `+added −removed` words against the version
+before it (`versionDiff.ts`, the one diff the server and the panel share).
+
+A member may name a moment; that is the only row a browser writes, and the
+policy holds it to the caller's own name. Reading a version is reading the
+note: the select policy asks `notes` under the caller's own RLS, so a hidden
+archived note keeps its history hidden by the same rule.
+
+**Restoring is an edit.** The panel writes the old title and body back through
+the editor's own binding, after keeping the present as a named version — and if
+that keep fails, nothing is replaced. Locked passages stay the other member's;
+the server puts them back like any other write.
+
+A version is a convenience over a document already saved: a failure to write
+one is logged, never thrown into the store.
+
+The **note sheet** is its sibling, opened by holding a row still (a finger
+keeps the row's menu on its long press, and "Note info" is in that menu). It
+gathers what was spread over the row menu, the page ⋯, the history panel and
+the page's foot — owner, folder, states, words, versions, open remarks, who
+wrote in it, the latest versions, links both ways, dates — and every name in it
+is a door. Both sheets share `Sheet.tsx`, whose header says why it is the face
+or the glyph that flies and never the sheet: a spring on a surface that size is
+the window bouncing, and an animated corner is a repaint per frame.
+
+The **person sheet** reads the same rows (`loadContributions`, `author_ids`
+contains the person), so its "+120" and the history panel's are one number. It
+grows out of the face that was held and closes back into it. It shows where
+somebody is only as presence or awareness already says so — there is no stored
+last access, deliberately: being seen is opt-in.
+
+The **folder sheet** is the third, held on a folder's row or "Folder info" in
+its right-click menu. It counts the folder and everything under it, as the
+sidebar counts a closed one, and reads the versions of all those notes in one
+query (`loadFolderVersions`).
+
+**The sheets are a stack, not three states.** A name in one sheet pushes
+another, and Back stands where Close does, on the other side. Every sheet in
+the stack stays mounted under one backdrop (`SheetStack`): the one underneath
+keeps what it loaded, and the face that was pressed is still there, so Back
+flies it home. Covered, a sheet only fades where it stands and is `inert`.
+Back fades the one underneath in _while_ the top one leaves, so it reads as
+one gesture rather than two. The key carries the place in the stack, because a
+folder can push its parent's sheet when that sheet is already underneath it.
+
 ## A drawing in the note
 
 A `drawing` node whose strokes are its own attribute: no Storage object, no
@@ -978,6 +1032,32 @@ every new account, through `private.bootstrap_personal_archive()` behind
 `ensure_personal_archive()`, under an advisory lock so two tabs cannot make two
 archives. An account belonging to several archives picks one at sign-in; "not
 connected" only means this account has no row for _this_ archive yet.
+
+## Spaces
+
+A space is an archive, and an account may be in several. The switch at the
+top of the sidebar (`SpaceSwitch.tsx`) names the archive the window is on and
+goes to another without signing out; held, it opens the archive's sheet
+(members, seats, invitations, leaving), and Settings → Archives lists them all
+and makes new ones. **It sits above the people shelf and never replaces it.**
+You / Partner — whose notes, inside this archive — is the app; the switch
+only says which archive. Do not propose flattening the per-person scopes.
+
+`create_archive(name)` is the only way a client makes a second archive:
+`archives_editor_insert` cannot recognise a member of an archive that has none
+yet. The same migration drops `archives_editor_delete` — any member could
+delete the whole archive — and refuses a `seat_limit` under the members already
+seated (`archives_seats_hold_members`).
+
+**Switching remounts the screen rather than resetting it.** `NotesPage` keys
+`ArchiveScreen` on a counter, so every channel, provider and cache of the old
+archive is torn down by the effects that made it, including ones added later.
+A remount is also every entrance at once — the list cascading, the plate
+drawing, the switch and faces arriving late and pushing the column down — and
+played in the open that read as the window bouncing. So the old screen fades
+out, the new one mounts under `data-arriving` at opacity 0, and once it has
+its archive every finite animation in it is finished and it fades in once.
+`knownSpaces` survives the remount so the switch is there on the first frame.
 
 ## Two people in one note
 

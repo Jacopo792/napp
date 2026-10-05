@@ -862,4 +862,62 @@ describe("the collaboration server", { skip }, () => {
     mine.provider.destroy();
     theirs.provider.destroy();
   });
+
+  it("records who wrote a note as a version, readable by members only", async () => {
+    const noteId = await newNote("Capitolo uno", "Paolo");
+    const mine = connect(noteId, editor.token);
+    const theirs = connect(noteId, mate.token);
+    await until(() => mine.provider.isSynced && theirs.provider.isSynced);
+
+    const write = (doc: Y.Doc, words: string) => {
+      const paragraph = new Y.XmlElement("paragraph");
+      paragraph.insert(0, [new Y.XmlText(words)]);
+      doc.transact(() => doc.getXmlFragment("default").push([paragraph]));
+    };
+    write(mine.doc, "Lenin del passato");
+    await sleep(300);
+    write(theirs.doc, "e il pensiero militante");
+    await sleep(600);
+    mine.provider.destroy();
+    theirs.provider.destroy();
+
+    let rows: { author_ids: string[]; words_added: number; title: string }[] = [];
+    for (let attempt = 0; attempt < 40 && rows.length === 0; attempt++) {
+      const read = await mate.client
+        .from("note_versions")
+        .select("author_ids, words_added, title")
+        .eq("note_id", noteId);
+      assert.equal(read.error, null, read.error?.message);
+      rows = read.data ?? [];
+      if (!rows.length) await sleep(200);
+    }
+    assert.equal(rows.length, 1, "closing the note did not leave one version");
+    assert.deepEqual([...rows[0].author_ids].sort(), [editor.userId, mate.userId].sort());
+    assert.equal(rows[0].words_added, 7);
+    assert.equal(rows[0].title, "Capitolo uno");
+
+    const hidden = await outsider.client.from("note_versions").select("id").eq("note_id", noteId);
+    assert.deepEqual(hidden.data, []);
+
+    /* A named moment goes in under the caller's own name, and no other. */
+    const named = {
+      archive_id: archiveId,
+      note_id: noteId,
+      title: "Capitolo uno",
+      content: { type: "doc", content: [] },
+      label: "Sent to the supervisor",
+    };
+    const ok = await mate.client
+      .from("note_versions")
+      .insert({ ...named, author_ids: [mate.userId] });
+    assert.equal(ok.error, null, ok.error?.message);
+    const forged = await mate.client
+      .from("note_versions")
+      .insert({ ...named, author_ids: [editor.userId] });
+    assert.notEqual(forged.error, null, "a member named a version in somebody else's name");
+    const stranger = await outsider.client
+      .from("note_versions")
+      .insert({ ...named, author_ids: [outsider.userId] });
+    assert.notEqual(stranger.error, null, "an outsider named a version");
+  });
 });

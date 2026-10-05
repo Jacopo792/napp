@@ -17,6 +17,7 @@ import {
   Folder as FolderGlyph,
   Image as ImageIcon,
   ImageOff,
+  Info,
   ListChecks,
   Paperclip,
   Pin,
@@ -49,6 +50,23 @@ import { useContextMenu } from "@/lib/contextMenu";
 import { MenuItems } from "./MenuPrimitives";
 import { pinItem, lockItems, moveItem } from "./menuNoteItems";
 import type { MenuItem } from "@/lib/menuShape";
+import type { SheetOrigin } from "./Sheet";
+
+/* How long a press has to stay still to become a hold — the note sheet. */
+const HOLD_MS = 450;
+
+/** Where a row's note is drawn: its photo or glyph when it has one, or a
+ *  glyph-sized square at its leading edge — what the sheet's glyph flies out
+ *  of and back into. */
+function rowOrigin(row: HTMLElement): SheetOrigin {
+  const lead = row.querySelector(".note-photo, .note-row-glyph");
+  if (lead) {
+    const { x, y, width, height } = lead.getBoundingClientRect();
+    return { x, y, width, height };
+  }
+  const box = row.getBoundingClientRect();
+  return { x: box.x + 12, y: box.y + box.height / 2 - 14, width: 28, height: 28 };
+}
 
 /** A row that has just been pushed open says so, and every other row closes.
  *  Announced rather than lifted into the list's state: this is a fact about a
@@ -80,6 +98,10 @@ interface Props {
   groups?: NoteGroup[];
   view?: ListView;
   toolbarActions?: ReactNode;
+  /** Before the title, at the strip's leading edge: the sidebar toggle. */
+  leading?: ReactNode;
+  /** The note's sheet, flown out of where the note is drawn in its row. */
+  onInfo?: (noteId: string, origin: SheetOrigin) => void;
   /** Row above the collection header — the archive switch, the pane toggle. */
   topBar?: ReactNode;
   /** Row below the list — where Settings and the lock stand. */
@@ -178,6 +200,7 @@ const Row = memo(function Row({
   onDeleteForever,
   onTogglePin,
   onContextMenu,
+  onHold,
   resolveImage,
 }: {
   mobile: boolean;
@@ -201,6 +224,8 @@ const Row = memo(function Row({
   onDeleteForever: (entry: NoteEntry) => void;
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
+  /** A still press — the note sheet. */
+  onHold?: (entry: NoteEntry, origin: SheetOrigin) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -381,6 +406,36 @@ const Row = memo(function Row({
     };
   }, [gesturable, mobile]);
 
+  /* ── The hold ─────────────────────────────────────────────────────────────
+     A pointer pressed and kept still opens the note's sheet. Moving cancels
+     it — that is a drag to a folder, or a scroll — and the click that ends a
+     hold is not an open. A finger keeps the row's menu on its long press,
+     where the system already puts one; the sheet is in that menu. */
+  const hold = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  function holdStart(event: React.PointerEvent) {
+    if (!onHold || event.pointerType !== "mouse" || event.button !== 0) return;
+    window.clearTimeout(hold.current?.timer);
+    const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
+    press.timer = window.setTimeout(() => {
+      press.fired = true;
+      if (rowRef.current) onHold(entry, rowOrigin(rowRef.current));
+    }, HOLD_MS);
+    hold.current = press;
+  }
+  function holdMove(event: React.PointerEvent) {
+    const press = hold.current;
+    if (press && !press.fired && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6)
+      holdEnd();
+  }
+  function holdEnd() {
+    const press = hold.current;
+    if (press && !press.fired) {
+      window.clearTimeout(press.timer);
+      hold.current = null;
+    }
+  }
+  useEffect(() => () => window.clearTimeout(hold.current?.timer), []);
+
   function swipeStart(event: React.PointerEvent) {
     if (!swipeable || event.pointerType === "mouse") return;
     swipe.current = { x: event.clientX, y: event.clientY, from: slid, live: false };
@@ -449,12 +504,34 @@ const Row = memo(function Row({
       aria-selected={selected}
       /* A row standing open is showing a question, and the answer to it is
          either the button beside it or "never mind" — never the note. */
-      onClick={() => (slid === 0 ? onSelect(entry) : setSlid(0))}
+      data-note-row={entry.note.id}
+      onClick={() => {
+        if (hold.current?.fired) return void (hold.current = null);
+        if (slid === 0) onSelect(entry);
+        else setSlid(0);
+      }}
       onContextMenu={(event) => onContextMenu(event, entry)}
-      onPointerDown={swipeStart}
-      onPointerMove={swipeMove}
-      onPointerUp={swipeEnd}
-      onPointerCancel={swipeEnd}
+      /* The drag's own listener is called here rather than spread: an
+         `onPointerDown` written after the spread replaces it, which is how
+         dragging a row to a folder had quietly stopped starting at all. */
+      onPointerDown={(event) => {
+        if (!mobile && canWrite) listeners?.onPointerDown?.(event);
+        swipeStart(event);
+        holdStart(event);
+      }}
+      onPointerMove={(event) => {
+        swipeMove(event);
+        holdMove(event);
+      }}
+      onPointerUp={() => {
+        swipeEnd();
+        holdEnd();
+      }}
+      onPointerLeave={holdEnd}
+      onPointerCancel={() => {
+        swipeEnd();
+        holdEnd();
+      }}
       style={{
         opacity: isDragging ? 0.4 : 1,
         /* Written even when it is nothing: a row that comes back from a swipe
@@ -802,6 +879,8 @@ export function NoteList({
   groups = [{ id: "notes", label: "Notes", entries }],
   view = "list",
   toolbarActions,
+  leading,
+  onInfo,
   topBar,
   footer,
   filters = [],
@@ -874,6 +953,31 @@ export function NoteList({
   const photoNoteRef = useRef<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const closeRowMenu = useCallback(() => rowMenu.close(), [rowMenu]);
+  /* Through a ref, so the memoised rows are handed one function for the life
+     of the list rather than a new one whenever the page re-renders. */
+  const onInfoRef = useRef(onInfo);
+  onInfoRef.current = onInfo;
+  const holdEntry = useCallback(
+    (entry: NoteEntry, origin: SheetOrigin) => onInfoRef.current?.(entry.note.id, origin),
+    [],
+  );
+  const infoItem = (entry: NoteEntry): MenuItem[] =>
+    onInfo
+      ? [
+          {
+            kind: "item",
+            id: "info",
+            label: "Note info",
+            icon: <Info size={16} />,
+            run: () => {
+              const row = document.querySelector<HTMLElement>(
+                `[data-note-row="${CSS.escape(entry.note.id)}"]`,
+              );
+              if (row) onInfo(entry.note.id, rowOrigin(row));
+            },
+          },
+        ]
+      : [];
   const openRowMenu = useCallback(
     (event: ReactMouseEvent, entry: NoteEntry) => rowMenu.open(event, entry),
     [rowMenu],
@@ -912,9 +1016,10 @@ export function NoteList({
       icon: <FileText size={16} />,
       run: () => onSelect(entry.note.id),
     };
-    if (!canWrite) return [open];
+    if (!canWrite) return [open, ...infoItem(entry)];
     if (trashMode)
       return [
+        ...infoItem(entry),
         {
           kind: "item",
           id: "restore",
@@ -944,6 +1049,7 @@ export function NoteList({
     if (archiveMode)
       return [
         open,
+        ...infoItem(entry),
         {
           kind: "item",
           id: "unarchive",
@@ -963,6 +1069,7 @@ export function NoteList({
       ];
     return [
       open,
+      ...infoItem(entry),
       pinItem(menuPinned, () => onTogglePin(entry.note.id)),
       ...lockItems(lockOf?.(entry.note.id)),
       {
@@ -1093,6 +1200,7 @@ export function NoteList({
                 onDeleteForever={onDeleteForever}
                 onTogglePin={togglePinEntry}
                 onContextMenu={openRowMenu}
+                onHold={holdEntry}
                 resolveImage={resolveImage}
               />
             ))}
@@ -1217,6 +1325,7 @@ export function NoteList({
     >
       {topBar}
       <header className="collection-toolbar flex min-h-13 shrink-0 items-center gap-2 px-4">
+        {leading}
         {/* One line, on the band's own baseline. Stacked, the name sat above
             the strip's middle and the tally below it, so nothing in this
             column shared a line with the sidebar's name or the note's — which
@@ -1236,6 +1345,7 @@ export function NoteList({
         {/* The compose control belongs beside the thing it adds to, not wedged
             into the search field where it covered the text being typed. */}
         <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
+          {toolbarActions}
           {canWrite && !trashMode && (
             <button
               onClick={onNew}
@@ -1247,7 +1357,6 @@ export function NoteList({
               <SquarePen size={18} />
             </button>
           )}
-          {toolbarActions}
         </span>
       </header>
 

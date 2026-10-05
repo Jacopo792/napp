@@ -1,5 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   Archive,
@@ -19,10 +28,8 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
-  ShieldCheck,
   SquarePen,
   Trash2,
-  UserRound,
   X,
 } from "@/components/icons";
 import {
@@ -35,7 +42,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { restoreSession, clearSession, type AppSession } from "@/lib/session";
+import { chooseArchive, restoreSession, clearSession, type AppSession } from "@/lib/session";
+import { createSpace, loadSpaces, renameSpace, setSpaceSeats, type Space } from "@/lib/spaces";
 import {
   createNote,
   createArchiveInvite,
@@ -93,9 +101,9 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { fold, formatDateTime, formatStamp, memberSince } from "@/lib/format";
+import { fold, formatDateTime, formatStamp } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
-import { derivedOf, indexOf, linksTo } from "@/lib/derived";
+import { derivedOf, indexOf, linkedNoteIds, linksTo } from "@/lib/derived";
 import {
   clearDrafts,
   dropDraft,
@@ -146,7 +154,32 @@ const SettingsPanel = lazy(() =>
 );
 import type { MenuPoint } from "@/lib/contextMenu";
 import { ContextMenu } from "@/components/ContextMenu";
-import { MemberCard } from "@/components/MemberCard";
+import { PersonSheet } from "@/components/PersonSheet";
+import { SheetStack, type SheetOrigin } from "@/components/Sheet";
+import { NoteSheet } from "@/components/NoteSheet";
+import { FolderSheet } from "@/components/FolderSheet";
+import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
+import { SpaceSwitch } from "@/components/SpaceSwitch";
+
+/** One sheet in the stack: what it is about, and where it grew out of. */
+type SheetEntry = SheetOrigin &
+  (
+    | { kind: "note"; noteId: string }
+    | { kind: "person"; userId: string }
+    | { kind: "folder"; folderId: string }
+    | { kind: "archive" }
+    | { kind: "new-archive" }
+  );
+
+/** Where a held face is on screen — the portrait in it, when it has one, so
+ *  the face that flies into a sheet starts exactly over the face that was
+ *  held. */
+function faceOrigin(element: Element): SheetOrigin {
+  const { x, y, width, height } = (
+    element.querySelector(".avatar") ?? element
+  ).getBoundingClientRect();
+  return { x, y, width, height };
+}
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
@@ -221,7 +254,45 @@ function metaShape(meta: Meta): string {
   return shape;
 }
 
+/* Switching archive is this whole screen starting again on another one, and
+   it is done by remounting it rather than by resetting it. Every channel,
+   provider, timer and cache below belongs to one archive; a reset would have
+   to name each of them and would forget the next one somebody adds. The
+   session underneath is the same account, so nobody signs in again.
+
+   A remount is also every entrance the screen has, at once: the list cascading
+   in, the plate drawing itself, the switch and the faces missing until their
+   rows arrive and then pushing the column down. Played in the open that is
+   the window bouncing. So the way across is one motion and nothing else: the
+   old screen fades, the new one mounts under `data-arriving` with nothing
+   showing, and once it has its archive every entrance is brought to its end
+   and the screen fades in already settled. Opacity only, on one layer. */
+const SWITCH_OUT = { duration: 140, easing: "cubic-bezier(0.4, 0, 1, 1)" };
+const SWITCH_IN = { duration: 200, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+const shellElement = () =>
+  document.querySelector<HTMLElement>(".workspace-shell, .mobile-workspace");
+const stillMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Fades the screen out, and resolves even in a window too hidden to animate. */
+function leaveScreen(): Promise<void> {
+  const shell = shellElement();
+  if (!shell || stillMotion()) return Promise.resolve();
+  const fade = shell.animate([{ opacity: 1 }, { opacity: 0 }], { ...SWITCH_OUT, fill: "forwards" });
+  return Promise.race([
+    fade.finished.then(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, SWITCH_OUT.duration + 100)),
+  ]);
+}
+
+/** The archives seen last, so a remount draws the switch from its first frame
+ *  instead of making room for it when the list comes back. */
+let knownSpaces: Space[] = [];
 export default function NotesPage() {
+  const [opened, setOpened] = useState(0);
+  return <ArchiveScreen key={opened} onReopen={() => setOpened((count) => count + 1)} />;
+}
+
+function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Direction contract: an opaque three-pane graphite workspace on desktop;
      a notes-first gallery on phone; neutral emphasis for ordinary interaction;
      translucency belongs only to temporary overlays. */
@@ -238,6 +309,8 @@ export default function NotesPage() {
    *  rather than with the archive: nothing outside that panel asks. */
   const [seatLimit, setSeatLimit] = useState(2);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
+  /** Every archive this account is in, for the switch and its sheet. */
+  const [spaces, setSpaces] = useState<Space[]>(knownSpaces);
 
   const [entries, setEntries] = useState<NoteEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -331,9 +404,18 @@ export default function NotesPage() {
   const typingRef = useRef(false);
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
-  /** Whose card the switch is showing, and where the finger was when it was
-   *  asked for — the card grows out of that point rather than fading in. */
-  const [memberCard, setMemberCard] = useState<(MenuPoint & { userId: string }) | null>(null);
+  /** The sheets that are up, the last on top, each with where the thing it
+   *  grew out of was. A name in a sheet pushes another; Back pops it. */
+  const [sheets, setSheets] = useState<SheetEntry[]>([]);
+  const openSheet = (entry: SheetEntry) => setSheets([entry]);
+  const pushSheet = (entry: SheetEntry) => setSheets((stack) => [...stack, entry]);
+  /* A note opened from somebody's work opens with its history beside it —
+     once the editor for it exists, which is a render after it was chosen. */
+  const [openThen, setOpenThen] = useState<{
+    noteId: string;
+    history?: string | true;
+    comments?: boolean;
+  } | null>(null);
 
   /* A hold, and the two refs it needs. The timer is one, because it has to be
      cancelled by a hand that moved away; and whether it fired is the other,
@@ -344,12 +426,12 @@ export default function NotesPage() {
 
   function holdStart(event: React.PointerEvent, userId: string) {
     if (event.button !== 0 && event.pointerType === "mouse") return;
-    const { clientX: x, clientY: y } = event;
+    const face = event.currentTarget;
     heldRef.current = false;
     window.clearTimeout(holdRef.current);
     holdRef.current = window.setTimeout(() => {
       heldRef.current = true;
-      setMemberCard({ x, y, userId });
+      openSheet({ ...faceOrigin(face), kind: "person", userId });
     }, HOLD_MS);
   }
 
@@ -377,6 +459,18 @@ export default function NotesPage() {
   const splitTitleRef = useRef<HTMLTextAreaElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
+  useEffect(() => {
+    if (!openThen || selectedId !== openThen.noteId) return;
+    const frame = requestAnimationFrame(() => {
+      if (openThen.history)
+        noteEditorRef.current?.openHistory(
+          openThen.history === true ? undefined : openThen.history,
+        );
+      else if (openThen.comments) noteEditorRef.current?.openComments();
+      setOpenThen(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [openThen, selectedId]);
 
   const collaborationIdentity = useMemo(
     () =>
@@ -2373,9 +2467,54 @@ export default function NotesPage() {
     }
   }, [session]);
 
+  const archiveSheetOpen = sheets.some((sheet) => sheet.kind === "archive");
   useEffect(() => {
-    if (settingsOpen) void refreshInvites();
-  }, [settingsOpen, refreshInvites]);
+    if (settingsOpen || archiveSheetOpen) void refreshInvites();
+  }, [settingsOpen, archiveSheetOpen, refreshInvites]);
+
+  async function inviteLink(email: string): Promise<string> {
+    if (!session) throw new Error("Sign in again first");
+    const token = await createArchiveInvite(session, email);
+    const link = new URL(platform().webOrigin());
+    link.searchParams.set("invite", token);
+    await refreshInvites();
+    return link.toString();
+  }
+
+  async function withdrawInvite(inviteId: string) {
+    await revokeArchiveInvite(inviteId);
+    await refreshInvites();
+  }
+
+  /* The switch is asked for once a session; a missing answer only means the
+     switch is not drawn, never that the archive fails to open. */
+  const refreshSpaces = useCallback(async () => {
+    if (!session) return;
+    try {
+      knownSpaces = await loadSpaces(session);
+      setSpaces(knownSpaces);
+    } catch {
+      /* Nothing to switch to is a quiet state, not an error. */
+    }
+  }, [session]);
+  useEffect(() => {
+    void refreshSpaces();
+  }, [refreshSpaces]);
+  /* The archive on screen answers from the live roster rather than from the
+     list the switch loaded, so somebody joining appears at once. */
+  const spacesView: Space[] = spaces.map((space) =>
+    space.archiveId === session?.archiveId && members.length > 0
+      ? {
+          ...space,
+          seatLimit,
+          members: members.map((member) => ({
+            userId: member.userId,
+            nickname: member.nickname,
+            avatarObject: member.avatarObject,
+          })),
+        }
+      : space,
+  );
 
   async function handleAvatarPick(file: File, crop?: AvatarCrop) {
     if (!session) return;
@@ -2433,10 +2572,58 @@ export default function NotesPage() {
 
     await leaveArchive(current);
     clearDrafts();
+    /* Another archive to go to is where the window goes; none is the door. */
+    const remaining = (await loadSpaces(current).catch(() => [])).filter(
+      (space) => space.archiveId !== current.archiveId,
+    );
+    if (remaining.length > 0) {
+      await chooseArchive(current, remaining[0].archiveId);
+      setSheets([]);
+      await leaveScreen();
+      document.documentElement.dataset.arriving = "";
+      onReopen();
+      return;
+    }
     await clearSession();
     setSession(null);
     navigate({ to: "/" });
-  }, [drain, navigate]);
+  }, [drain, navigate, onReopen]);
+
+  /* Writes waiting here belong to this archive, so they land before the
+     window leaves it — and if they cannot, it does not leave. */
+  const handleSwitchArchive = useCallback(
+    async (archiveId: string) => {
+      const current = sessionRef.current;
+      if (!current || current.archiveId === archiveId) return;
+      await drain();
+      if (hasPending() || pendingMetaRef.current.size > 0)
+        throw new Error("Your latest changes are still saving. Try again in a moment.");
+      await chooseArchive(current, archiveId);
+      setSheets([]);
+      await leaveScreen();
+      document.documentElement.dataset.arriving = "";
+      onReopen();
+    },
+    [drain, onReopen],
+  );
+
+  /* Arrived: everything the archive needs is here. Each entrance is finished
+     where it stands — it would otherwise play out under the fade — and the
+     screen comes in once. */
+  const arrived = !loading && !!session && spaces.length > 0;
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (!arrived || !("arriving" in root.dataset)) return;
+    const shell = shellElement();
+    delete root.dataset.arriving;
+    if (!shell || stillMotion()) return;
+    for (const animation of shell.getAnimations({ subtree: true }))
+      if (animation.effect?.getComputedTiming().endTime !== Infinity) animation.finish();
+    shell.animate([{ opacity: 0 }, { opacity: 1 }], SWITCH_IN);
+  }, [arrived]);
+
+  const switchArchive = (archiveId: string) =>
+    void handleSwitchArchive(archiveId).catch((error: Error) => setStatusFlash(error.message));
 
   /* Who else is on this page right now, asked of the note's own document: a
      peer in this list is connected to it by construction, so there is no note
@@ -2851,6 +3038,21 @@ export default function NotesPage() {
     ];
   })();
 
+  /* Hiding the columns opens the list's strip, at its leading edge, the way
+     Notes and Mail put it: the control that moves the columns stands where
+     they are. Compose goes to the trailing edge. */
+  const sidebarToggle = !compact && (
+    <button
+      type="button"
+      onClick={() => changeNavigation(false)}
+      aria-label="Hide the sidebar"
+      title={"Hide the sidebar · ⌘\\"}
+      className="toolbar-button press shrink-0"
+    >
+      <PanelLeftClose size={18} />
+    </button>
+  );
+
   const collectionActions = (
     <>
       <CollectionMenu
@@ -2884,22 +3086,6 @@ export default function NotesPage() {
                 : undefined
         }
       />
-      {/* Hiding the columns, at the end of the list's group: beside the ⋯, in
-        the one strip that is always there when they are. It stood alone in
-        the sidebar's strip, which left that strip a single icon floating in
-        a band — and in full screen, with no traffic lights to stand beside,
-        the one thing in the window that was off its axis. */}
-      {!compact && (
-        <button
-          type="button"
-          onClick={() => changeNavigation(false)}
-          aria-label="Hide the sidebar"
-          title={"Hide the sidebar · ⌘\\"}
-          className="toolbar-button press shrink-0"
-        >
-          <PanelLeftClose size={18} />
-        </button>
-      )}
     </>
   );
 
@@ -2979,7 +3165,11 @@ export default function NotesPage() {
           onContextMenu={(event) => {
             event.preventDefault();
             holdEnd();
-            setMemberCard({ x: event.clientX, y: event.clientY, userId: member.userId });
+            openSheet({
+              ...faceOrigin(event.currentTarget),
+              kind: "person",
+              userId: member.userId,
+            });
           }}
           aria-pressed={viewAs === member.userId}
           aria-label={notesOf(member)}
@@ -3060,7 +3250,11 @@ export default function NotesPage() {
             onContextMenu={(event) => {
               event.preventDefault();
               holdEnd();
-              setMemberCard({ x: event.clientX, y: event.clientY, userId: member.userId });
+              openSheet({
+                ...faceOrigin(event.currentTarget),
+                kind: "person",
+                userId: member.userId,
+              });
             }}
             aria-pressed={active}
             aria-label={notesOf(member)}
@@ -3090,41 +3284,263 @@ export default function NotesPage() {
     </div>
   );
 
-  /* Who that is. Grown out of the point the hand asked from — see
-     `.member-card-panel` in the stylesheet — rather than faded in, because a
-     card that answers a gesture should look like it came from it. */
-  const memberCardPanel = (() => {
-    if (!memberCard) return null;
-    const member = roster.find((one) => one.userId === memberCard.userId);
-    if (!member) return null;
-    const here = flags.presence && onlineMemberIds.has(member.userId);
-    return (
-      <ContextMenu
-        point={memberCard}
-        onClose={() => setMemberCard(null)}
-        width="17.5rem"
-        className="member-card-panel"
-      >
-        <MemberCard
-          avatarUrl={avatarUrls[member.userId] ?? null}
-          name={nameOf(member)}
-          status={here ? { label: "Here now", active: true } : undefined}
-          facts={[
-            {
-              icon: <UserRound size={16} />,
-              label: "Archive member since",
-              value: memberSince(member.joinedAt),
-            },
-            {
-              icon: <ShieldCheck size={16} />,
-              label: "Access",
-              value: member.role === "editor" ? "Can edit" : "View only",
-            },
-          ]}
-        />
-      </ContextMenu>
+  /* A door out of a sheet: the note, in whoever's scope it sits, and then
+     its history or its conversation if that is what was pressed. */
+  function openFromSheet(noteId: string, then?: { history?: string | true; comments?: boolean }) {
+    const entry = entries.find((one) => one.note.id === noteId);
+    if (!entry) return;
+    setSheets([]);
+    if (entry.note.ownerId && entry.note.ownerId !== viewAs) handleViewChange(entry.note.ownerId);
+    handleOpenRecent(noteId);
+    if (then) setOpenThen({ noteId, ...then });
+  }
+
+  const personOf = (userId: string) => {
+    const member = members.find((one) => one.userId === userId);
+    return member ? { userId, name: nameOf(member), avatarUrl: avatarUrls[userId] ?? null } : null;
+  };
+
+  function renderNoteSheet(sheet: SheetOrigin & { noteId: string }, key: string) {
+    if (!session) return null;
+    const entry = entries.find((one) => one.note.id === sheet.noteId);
+    if (!entry) return null;
+    const index = indexOf(activeMeta);
+    const meta = index.byNote.get(entry.note.id);
+    const folder = meta?.folderId ? index.byFolder.get(meta.folderId) : undefined;
+    const titled = (id: string) => ({
+      id,
+      title: entries.find((one) => one.note.id === id)?.note.title ?? "",
+    });
+    const linksOut = [...linkedNoteIds(entry.note.content)].filter(
+      (id) => id !== entry.note.id && entries.some((one) => one.note.id === id),
     );
-  })();
+    return (
+      <NoteSheet
+        key={key}
+        session={session}
+        origin={sheet}
+        resolveImage={resolveImage}
+        personOf={personOf}
+        note={{
+          id: entry.note.id,
+          title: entry.note.title,
+          photoObjectId: entry.note.photo?.objectId ?? null,
+          folder: folder ? { id: folder.id, name: folder.name } : null,
+          owner: entry.note.ownerId ? personOf(entry.note.ownerId) : null,
+          pinned: meta?.pinned === true,
+          archived: archivedIds.has(entry.note.id),
+          trashed: trashedIds.has(entry.note.id),
+          lockedBy: lockHolders.get(entry.note.id) ?? null,
+          words: derivedOf(entry.note).words,
+          openRemarks: new Set(
+            archiveComments
+              .filter((remark) => remark.noteId === entry.note.id && !remark.resolvedAt)
+              .map((remark) => remark.threadId),
+          ).size,
+          createdAt: entry.note.createdAt,
+          updatedAt: entry.note.updatedAt,
+          linkedFrom: entries
+            .filter(
+              (one) =>
+                one.note.id !== entry.note.id &&
+                !trashedIds.has(one.note.id) &&
+                linksTo(one.note.content, entry.note.id),
+            )
+            .map((one) => titled(one.note.id)),
+          linksTo: linksOut.map(titled),
+        }}
+        onOpenNote={openFromSheet}
+        onOpenFolder={(folderId) => {
+          setSheets([]);
+          if (entry.note.ownerId && entry.note.ownerId !== viewAs)
+            handleViewChange(entry.note.ownerId);
+          handleSelectFolder(folderId);
+        }}
+        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+      />
+    );
+  }
+
+  /* A folder and everything under it, counted the way the sidebar counts a
+     closed one. */
+  function renderFolderSheet(sheet: SheetOrigin & { folderId: string }, key: string) {
+    if (!session) return null;
+    const folders = activeMeta.folders;
+    const folder = folders.find((one) => one.id === sheet.folderId);
+    if (!folder) return null;
+    const within = new Set([folder.id]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const one of folders)
+        if (one.parentId && within.has(one.parentId) && !within.has(one.id)) {
+          within.add(one.id);
+          grew = true;
+        }
+    }
+    const index = indexOf(activeMeta);
+    const notes = ownedEntries.filter((entry) => {
+      const meta = index.byNote.get(entry.note.id);
+      return !!meta?.folderId && within.has(meta.folderId) && !meta.trashedAt && !meta.archivedAt;
+    });
+    const threads = new Map<string, Set<string>>();
+    for (const remark of archiveComments)
+      if (!remark.resolvedAt && notes.some((entry) => entry.note.id === remark.noteId))
+        threads.set(remark.noteId, (threads.get(remark.noteId) ?? new Set()).add(remark.threadId));
+    const parent = folder.parentId ? folders.find((one) => one.id === folder.parentId) : undefined;
+    const pushFolder = (folderId: string, from: Element) =>
+      pushSheet({ ...faceOrigin(from), kind: "folder", folderId });
+    return (
+      <FolderSheet
+        key={key}
+        session={session}
+        origin={sheet}
+        personOf={personOf}
+        folder={{
+          id: folder.id,
+          name: folder.name,
+          parent: parent ? { id: parent.id, name: parent.name } : null,
+          children: folders
+            .filter((one) => one.parentId === folder.id)
+            .map((one) => ({ id: one.id, name: one.name })),
+          notes: notes.map((entry) => ({
+            id: entry.note.id,
+            title: entry.note.title,
+            updatedAt: entry.note.updatedAt,
+            words: derivedOf(entry.note).words,
+          })),
+          remarks: [...threads].map(([noteId, ids]) => ({
+            noteId,
+            title: entries.find((entry) => entry.note.id === noteId)?.note.title ?? "",
+            threads: ids.size,
+          })),
+        }}
+        onShowFolder={(folderId) => {
+          setSheets([]);
+          handleSelectFolder(folderId);
+        }}
+        onOpenFolder={pushFolder}
+        onOpenNote={openFromSheet}
+        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+      />
+    );
+  }
+
+  /* The archive on screen: its people, its seats, who is waiting to come in.
+     The current archive's faces come from the live roster rather than the
+     list the switch loaded, so somebody joining appears here at once. */
+  function renderArchiveSheet(sheet: SheetOrigin, key: string) {
+    const space = spacesView.find((one) => one.archiveId === session?.archiveId);
+    if (!session || !space) return null;
+    const live = entries.filter((entry) => !trashedIds.has(entry.note.id));
+    return (
+      <ArchiveSheet
+        key={key}
+        origin={sheet}
+        space={space}
+        selfId={session.userId}
+        avatarUrls={avatarUrls}
+        notes={live.length}
+        words={live.reduce((sum, entry) => sum + derivedOf(entry.note).words, 0)}
+        invites={invites}
+        onRename={async (name) => {
+          await renameSpace(session, name);
+          await refreshSpaces();
+        }}
+        onSeats={async (seats) => {
+          await setSpaceSeats(session, seats);
+          setSeatLimit(seats);
+          await refreshSpaces();
+        }}
+        onCreateInvite={inviteLink}
+        onRevokeInvite={withdrawInvite}
+        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+        onLeave={handleLeaveArchive}
+      />
+    );
+  }
+
+  /* Who that is, and what they have been doing. Grown out of the face the
+     hand held — see `.person-sheet` in the stylesheet — because a sheet that
+     answers a gesture should look like it came from it. */
+  function renderPersonSheet(sheet: SheetOrigin & { userId: string }, key: string) {
+    if (!session) return null;
+    const member = roster.find((one) => one.userId === sheet.userId);
+    if (!member) return null;
+    /* Where they are: the note open here is answered by awareness, which is
+       certain; any other by the presence channel, which is opt-in. */
+    const inHere = !member.isSelf && hereIds.has(member.userId) && selectedId;
+    const elsewhere = flags.presence ? present.get(member.userId) : null;
+    const nowId = member.isSelf ? null : inHere ? selectedId : (elsewhere ?? null);
+    const nowEntry = nowId ? entries.find((entry) => entry.note.id === nowId) : undefined;
+    return (
+      <PersonSheet
+        key={key}
+        session={session}
+        userId={member.userId}
+        name={nameOf(member)}
+        avatarUrl={avatarUrls[member.userId] ?? null}
+        isSelf={member.isSelf}
+        joinedAt={member.joinedAt}
+        color={member.isSelf ? "var(--accent)" : presenceColor}
+        noteCount={
+          entries.filter(
+            (entry) => entry.note.ownerId === member.userId && !trashedIds.has(entry.note.id),
+          ).length
+        }
+        now={
+          nowEntry
+            ? {
+                noteId: nowEntry.note.id,
+                title: nowEntry.note.title,
+                typing: flags.collaborators && typingIds.has(member.userId),
+              }
+            : null
+        }
+        origin={sheet}
+        titleOf={(noteId) => entries.find((entry) => entry.note.id === noteId)?.note.title ?? null}
+        onOpenNote={(noteId, withHistory) =>
+          openFromSheet(noteId, withHistory ? { history: true } : undefined)
+        }
+      />
+    );
+  }
+
+  const sheetStack = session && sheets.length > 0 && (
+    <SheetStack
+      onBack={() => setSheets((stack) => stack.slice(0, -1))}
+      onClose={() => setSheets([])}
+    >
+      {sheets.map((sheet, index) => {
+        /* The place in the stack is part of the key: a folder's sheet can
+           push its parent's, which may already be under it. */
+        const key = `${index}:${sheet.kind}`;
+        if (sheet.kind === "note") return renderNoteSheet(sheet, `${key}:${sheet.noteId}`);
+        if (sheet.kind === "folder") return renderFolderSheet(sheet, `${key}:${sheet.folderId}`);
+        if (sheet.kind === "archive") return renderArchiveSheet(sheet, key);
+        if (sheet.kind === "new-archive")
+          return (
+            <NewArchiveSheet
+              key={key}
+              origin={sheet}
+              onCreate={async (name) => {
+                await handleSwitchArchive(await createSpace(name));
+              }}
+            />
+          );
+        return renderPersonSheet(sheet, `${key}:${sheet.userId}`);
+      })}
+    </SheetStack>
+  );
+
+  const spaceSwitch = session && (
+    <SpaceSwitch
+      spaces={spacesView}
+      currentId={session.archiveId}
+      onSwitch={switchArchive}
+      onInfo={(origin) => openSheet({ ...origin, kind: "archive" })}
+      onCreate={(origin) => openSheet({ ...origin, kind: "new-archive" })}
+    />
+  );
 
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
@@ -3143,6 +3559,7 @@ export default function NotesPage() {
       onCreateFolder={handleCreateFolder}
       onRenameFolder={handleRenameFolder}
       onDeleteFolder={handleDeleteFolder}
+      onFolderInfo={(folderId, origin) => openSheet({ ...origin, kind: "folder", folderId })}
       onClose={() => (compact ? setFoldersOpen(false) : changeNavigation(false))}
       closeInStrip={compact}
       onSettings={() => {
@@ -3150,6 +3567,7 @@ export default function NotesPage() {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
+      spaceSwitch={spaceSwitch}
       peopleShelf={peopleShelf}
       scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
     />
@@ -3204,17 +3622,21 @@ export default function NotesPage() {
         onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
         onAvatarRemove={() => void handleAvatarRemove()}
         onCreateInvite={async (email) => {
-          const token = await createArchiveInvite(session, email);
-          const link = new URL(platform().webOrigin());
-          link.searchParams.set("invite", token);
-          await refreshInvites();
-          return link.toString();
+          return inviteLink(email);
         }}
-        onRevokeInvite={async (inviteId) => {
-          await revokeArchiveInvite(inviteId);
-          await refreshInvites();
-        }}
+        onRevokeInvite={withdrawInvite}
         onLeaveArchive={handleLeaveArchive}
+        spaces={spacesView}
+        currentArchiveId={session.archiveId}
+        onSwitchArchive={async (archiveId) => {
+          setSettingsOpen(false);
+          await handleSwitchArchive(archiveId);
+        }}
+        onCreateArchive={async (name) => {
+          const archiveId = await createSpace(name);
+          setSettingsOpen(false);
+          await handleSwitchArchive(archiveId);
+        }}
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
         proofreaderEnabled={proofreaderEnabled}
@@ -3283,6 +3705,7 @@ export default function NotesPage() {
           onPrint={() => void platform().print()}
           onTogglePin={() => handleTogglePin(selected.note.id)}
           onFind={() => noteEditorRef.current?.openFind()}
+          onHistory={() => noteEditorRef.current?.openHistory()}
           onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
           onRecent={handleOpenRecent}
           onDelete={() => handleMoveToTrash(selected)}
@@ -3313,6 +3736,7 @@ export default function NotesPage() {
         onPrint={() => void platform().print()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
+        onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}
         onDelete={() => handleMoveToTrash(selected)}
@@ -3388,6 +3812,7 @@ export default function NotesPage() {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
+                  onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -3470,6 +3895,7 @@ export default function NotesPage() {
         )}
         {settingsPanel}
         {keyboardSheets}
+        {sheetStack}
       </div>
     );
   }
@@ -3539,6 +3965,7 @@ export default function NotesPage() {
                   entries={visible}
                   groups={noteGroups}
                   view="list"
+                  leading={sidebarToggle}
                   toolbarActions={collectionActions}
                   filters={activeFilters}
                   meta={activeMeta}
@@ -3565,6 +3992,7 @@ export default function NotesPage() {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
+                  onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -3749,7 +4177,7 @@ export default function NotesPage() {
       {settingsPanel}
       {keyboardSheets}
       {editorMenu}
-      {memberCardPanel}
+      {sheetStack}
       {/* The editor's attachment menu opens this; a file input is the only way
           a browser lets a page read a file the reader chose. */}
       <input

@@ -25,12 +25,14 @@ export interface AuthenticationResult {
 const ARCHIVE_ID = "00000000-0000-4000-8000-000000000001";
 const EMAIL = "preview@example.invalid";
 let signedOut = false;
+/* The archive chosen last, so switching from the sidebar reopens on it. */
+let currentArchive = ARCHIVE_ID;
 
 async function previewSession(email = EMAIL): Promise<AppSession> {
   return {
     userId: PREVIEW_U1,
     email,
-    archiveId: ARCHIVE_ID,
+    archiveId: currentArchive,
   };
 }
 
@@ -58,6 +60,7 @@ export async function chooseArchive(
   account: { userId: string; email: string },
   archiveId: string,
 ): Promise<AppSession> {
+  currentArchive = archiveId;
   return { userId: account.userId, email: account.email, archiveId };
 }
 

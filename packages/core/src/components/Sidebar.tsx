@@ -6,6 +6,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Info,
   Lock,
   MessageSquare,
   MoreHorizontal,
@@ -23,6 +24,7 @@ import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { UpdateNotice } from "./UpdateNotice";
 import { MenuButton } from "./MenuPrimitives";
+import type { SheetOrigin } from "./Sheet";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -65,6 +67,8 @@ interface Props {
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
+  /** The folder's sheet, growing out of its glyph. */
+  onFolderInfo: (id: string, origin: SheetOrigin) => void;
   onClose: () => void;
   /** On the phone the column is a sheet and this is how it is put away; on
    *  the desktop hiding the columns lives in the list's own group. */
@@ -72,12 +76,25 @@ interface Props {
   onSettings: () => void;
   onLock: () => void;
   /** The archive switch, which belongs above the destinations it re-points. */
+  /** Which archive, above whose notes inside it. */
+  spaceSwitch: React.ReactNode;
   /** The people this archive is shared between, as faces to switch between. */
   peopleShelf: React.ReactNode;
   scopeLabel: string;
 }
 
 const EXPANDED_KEY = "napp:folders-open";
+
+/* How long a press has to stay still to become a hold — the folder's sheet,
+   the way a note row's hold is the note's. */
+const HOLD_MS = 450;
+
+function glyphOrigin(row: Element): SheetOrigin {
+  const { x, y, width, height } = (
+    row.querySelector(".sidebar-glyph") ?? row
+  ).getBoundingClientRect();
+  return { x, y, width, height };
+}
 
 /* Whole pixels, both of them. 0.85rem is 13.6px, so every level of nesting used
    to push its glyph another 0.6px off the device grid — the icons at depth two
@@ -301,6 +318,7 @@ function Row({
   actions,
   onSelect,
   onContextMenu,
+  onHold,
 }: {
   scope: Scope;
   glyph: React.ReactNode;
@@ -314,16 +332,58 @@ function Row({
   actions?: React.ReactNode;
   onSelect: () => void;
   onContextMenu?: (event: React.MouseEvent) => void;
+  /** A mouse pressed and kept still; the click that ends it is not a select. */
+  onHold?: (row: Element) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: scope.id, disabled: !droppable });
+  const hold = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  function holdEnd() {
+    const press = hold.current;
+    if (press && !press.fired) {
+      window.clearTimeout(press.timer);
+      hold.current = null;
+    }
+  }
+  useEffect(() => () => window.clearTimeout(hold.current?.timer), []);
   return (
     <div
       ref={setNodeRef}
       className={`sidebar-row ${active ? "is-active" : ""} ${isOver ? "is-over" : ""}`}
+      data-folder-row={onHold ? scope.id : undefined}
       style={{ paddingLeft: `${depth * INDENT}px` }}
       onContextMenu={onContextMenu}
     >
-      <button type="button" className="sidebar-target press" onClick={onSelect}>
+      <button
+        type="button"
+        className="sidebar-target press"
+        onClick={() => {
+          if (hold.current?.fired) return void (hold.current = null);
+          onSelect();
+        }}
+        onPointerDown={(event) => {
+          if (!onHold || event.pointerType !== "mouse" || event.button !== 0) return;
+          window.clearTimeout(hold.current?.timer);
+          const row = event.currentTarget;
+          const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
+          press.timer = window.setTimeout(() => {
+            press.fired = true;
+            onHold(row);
+          }, HOLD_MS);
+          hold.current = press;
+        }}
+        onPointerMove={(event) => {
+          const press = hold.current;
+          if (
+            press &&
+            !press.fired &&
+            Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6
+          )
+            holdEnd();
+        }}
+        onPointerUp={holdEnd}
+        onPointerLeave={holdEnd}
+        onPointerCancel={holdEnd}
+      >
         <span className="sidebar-glyph" data-motion={motion} data-tone={motion}>
           {glyph}
         </span>
@@ -357,10 +417,12 @@ export function Sidebar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
+  onFolderInfo,
   onClose,
   closeInStrip = false,
   onSettings,
   onLock,
+  spaceSwitch,
   peopleShelf,
   scopeLabel,
 }: Props) {
@@ -467,14 +529,11 @@ export function Sidebar({
             ) : undefined
           }
           onSelect={() => onSelect(node.folder.id)}
-          onContextMenu={
-            canWrite
-              ? (event) => {
-                  setConfirmDelete(false);
-                  folderMenu.open(event, node.folder);
-                }
-              : undefined
-          }
+          onHold={(row) => onFolderInfo(node.folder.id, glyphOrigin(row))}
+          onContextMenu={(event) => {
+            setConfirmDelete(false);
+            folderMenu.open(event, node.folder);
+          }}
         />
 
         {open && hasChildren && (
@@ -534,6 +593,7 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {spaceSwitch}
         {peopleShelf}
         {all && (
           <Row
@@ -704,38 +764,54 @@ export function Sidebar({
         </button>
       </div>
 
-      {canWrite && folderMenu.target && (
+      {folderMenu.target && (
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
           <MenuButton
             onClick={() => {
-              setRenaming(folderMenu.target!.item.id);
+              const id = folderMenu.target!.item.id;
+              const row = document.querySelector(`[data-folder-row="${CSS.escape(id)}"]`);
+              if (row) onFolderInfo(id, glyphOrigin(row));
               closeFolderMenu();
             }}
           >
-            <Pencil size={16} />
-            Rename folder
+            <Info size={16} />
+            Folder info
           </MenuButton>
-          <MenuButton
-            onClick={() => {
-              startSubfolder(folderMenu.target!.item.id);
-              closeFolderMenu();
-            }}
-          >
-            <FolderPlus size={16} />
-            New folder inside
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton
-            danger
-            onClick={() => {
-              if (!confirmDelete) return setConfirmDelete(true);
-              onDeleteFolder(folderMenu.target!.item.id);
-              closeFolderMenu();
-            }}
-          >
-            <Trash2 size={16} />
-            {confirmDelete ? "Delete — click to confirm" : "Delete folder"}
-          </MenuButton>
+          {canWrite && (
+            <>
+              <div className="menu-separator" />
+              <MenuButton
+                onClick={() => {
+                  setRenaming(folderMenu.target!.item.id);
+                  closeFolderMenu();
+                }}
+              >
+                <Pencil size={16} />
+                Rename folder
+              </MenuButton>
+              <MenuButton
+                onClick={() => {
+                  startSubfolder(folderMenu.target!.item.id);
+                  closeFolderMenu();
+                }}
+              >
+                <FolderPlus size={16} />
+                New folder inside
+              </MenuButton>
+              <div className="menu-separator" />
+              <MenuButton
+                danger
+                onClick={() => {
+                  if (!confirmDelete) return setConfirmDelete(true);
+                  onDeleteFolder(folderMenu.target!.item.id);
+                  closeFolderMenu();
+                }}
+              >
+                <Trash2 size={16} />
+                {confirmDelete ? "Delete — click to confirm" : "Delete folder"}
+              </MenuButton>
+            </>
+          )}
         </ContextMenu>
       )}
     </nav>

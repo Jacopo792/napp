@@ -9231,3 +9231,920 @@ text.ink-stroke {
     animation: none;
   }
 }
+
+/* ── The passage padlock ─────────────────────────────────────────────────────
+   It is the state, so it moves only when the state does: shut, the body drops
+   onto the shackle; opened, it lifts off it. Never on the bubble appearing. */
+.rich-bubble-menu .toolbar-button svg.is-latching {
+  animation: glyph-shut var(--dur-base) var(--ease-spring);
+}
+
+.rich-bubble-menu .toolbar-button[aria-pressed="false"] svg.is-latching {
+  animation-name: glyph-open;
+}
+
+@keyframes glyph-shut {
+  45% {
+    transform: translateY(1.5px) scale(0.92);
+  }
+}
+
+@keyframes glyph-open {
+  45% {
+    transform: translateY(-1.5px) rotate(-8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rich-bubble-menu .toolbar-button svg.is-latching {
+    animation: none;
+  }
+}
+
+/* ── The note's history ──────────────────────────────────────────────────────
+   The comments' column, wearing the same frame; only what is inside differs.
+   An addition goes toward the accent and a removal toward the danger ink, so
+   the diff reads in every palette without a green that belongs to none. */
+.note-history-name {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.note-history-name > button,
+.note-history-name form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.note-history-name > button:hover,
+.note-history-name form button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.note-history-name form {
+  display: flex;
+  gap: 6px;
+}
+
+.note-history-name input {
+  min-width: 0;
+  flex: 1;
+  border-radius: 8px;
+  background: var(--page);
+  padding: 5px 9px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.note-history-name form button:disabled {
+  opacity: 0.45;
+}
+
+.note-version-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.note-version-day {
+  padding: 6px 8px 4px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.note-version {
+  border-radius: 10px;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.note-version.is-open {
+  background: var(--page);
+}
+
+.note-version-head {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 8px;
+  text-align: left;
+}
+
+.note-version:not(.is-open) .note-version-head:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+/* Faces overlap the way a group of people does on a Mac: each a ring of the
+   ground it sits on, so two are two and not a smudge. */
+.note-version-faces {
+  display: flex;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.note-version-faces > * + * {
+  margin-left: -7px;
+}
+
+.note-version-faces > * {
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--surface) 72%, var(--paper));
+}
+
+.note-version.is-open .note-version-faces > * {
+  box-shadow: 0 0 0 2px var(--page);
+}
+
+.note-version-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-sans);
+}
+
+.note-version-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-strong);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.note-version-who {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-version-meta {
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-version-meta .is-added {
+  color: var(--accent-strong);
+}
+
+.note-version-meta .is-removed {
+  color: var(--danger);
+}
+
+.note-version-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 10px 10px;
+  animation: fade-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.note-version-switch {
+  display: flex;
+  align-self: flex-start;
+  gap: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 2px;
+}
+
+.note-version-switch button {
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.note-version-switch button.is-active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.note-version-diff,
+.note-version-page {
+  max-height: 22rem;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 10px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.note-version-page {
+  white-space: normal;
+  color: var(--ink-2);
+}
+
+.note-version-page h3 {
+  margin-bottom: 0.5em;
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+
+.note-version-diff ins {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.note-version-diff del {
+  color: var(--danger);
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+
+.note-version-restore {
+  align-self: flex-start;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  padding: 6px 12px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.note-version-restore.is-confirming {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.note-version-restore:disabled {
+  opacity: 0.5;
+}
+
+/* ── A sheet, out of the thing that was held ─────────────────────────────────
+   The frame both sheets wear. The motion is in `Sheet.tsx`, written with the
+   Web Animations API because where the flyer starts is measured; nothing here
+   animates a corner, a size or a shadow, so no frame of it repaints. Fixed
+   height: rows that arrive after the sheet has opened fill it rather than
+   resizing it under the eye. */
+.sheet-backdrop {
+  position: fixed;
+  z-index: 95;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.38);
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  width: min(26rem, 100%);
+  height: min(40rem, calc(100vh - 32px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  background: var(--glass);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 30px 80px rgb(0 0 0 / 0.45);
+  will-change: transform, opacity;
+}
+
+.sheet-backdrop > .sheet {
+  grid-area: 1 / 1;
+}
+
+.sheet-close,
+.sheet-back {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+}
+
+.sheet-back {
+  right: auto;
+  left: 12px;
+}
+
+.sheet-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* The bands after the hero arrive a beat apart, in reading order. The hero
+   itself does not fade: the flyer is in it, and is already arriving. */
+.sheet-body > :not(.sheet-hero) {
+  animation: sheet-band-in var(--dur-slow) var(--ease-out) backwards;
+}
+
+.sheet-body > :nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.sheet-body > :nth-child(n + 3) {
+  animation-delay: 140ms;
+}
+
+@keyframes sheet-band-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.sheet-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 28px 24px 18px;
+  text-align: center;
+}
+
+.sheet-portrait {
+  position: relative;
+  margin-bottom: 8px;
+  will-change: transform;
+}
+
+.sheet-portrait.is-round {
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 3px var(--glass),
+    0 0 0 5px var(--person, var(--accent));
+}
+
+.sheet-portrait .avatar.is-large {
+  width: 84px;
+  height: 84px;
+  font-size: 34px;
+}
+
+.sheet-hero h2 {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.sheet-hero p {
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.sheet-hero p button {
+  color: var(--ink-2);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-hero p button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.sheet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sheet-chip,
+.sheet-now {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 4px 10px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-now {
+  margin-top: 10px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--person, var(--accent)) 16%, transparent);
+  padding: 5px 12px;
+  font-size: var(--text-xs);
+  font-weight: normal;
+}
+
+.sheet-now strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.sheet-chip:hover,
+.sheet-now:hover {
+  background: color-mix(in srgb, var(--person, var(--ink)) 22%, transparent);
+}
+
+.sheet-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.sheet-dots {
+  display: inline-flex;
+  gap: 2.5px;
+}
+
+.sheet-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-2);
+  animation: people-typing 1.2s var(--ease-in-out) infinite;
+}
+
+.sheet-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.sheet-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.sheet-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 16px;
+}
+
+.sheet-stats > * {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.sheet-stats > button:hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.sheet-stats dd,
+.sheet-stats strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-stats dt,
+.sheet-stats small {
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+}
+
+.sheet-work {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  padding: 18px 12px 14px;
+}
+
+.sheet-work h3,
+.sheet-day > p {
+  padding: 0 8px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-work h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.sheet-work h3:first-child {
+  margin-top: 0;
+}
+
+.sheet-work h3 button {
+  color: var(--accent-strong);
+  font-size: var(--text-2xs);
+}
+
+.sheet-day {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+}
+
+.sheet-day > p {
+  margin-bottom: 2px;
+}
+
+.sheet-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.sheet-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px 3px 3px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.sheet-face:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.sheet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  border-radius: 10px;
+  padding: 7px 8px;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.sheet-row:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.sheet-row:disabled {
+  opacity: 0.55;
+}
+
+/* A block, not a flex box: `text-overflow` reaches only the box's own line,
+   and in a flex box the words are an anonymous item it never applies to. */
+.sheet-row-title {
+  display: block;
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-row-meta {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sheet-row-title svg {
+  display: inline;
+  vertical-align: -2px;
+}
+
+/* Where the line under the title is long, it goes under the title. */
+.sheet-row.is-stacked .sheet-row-meta {
+  flex-basis: 100%;
+  order: 4;
+  margin-left: 0;
+}
+
+.sheet-row-meta .is-added {
+  color: var(--accent-strong);
+}
+
+.sheet-row-meta .is-removed {
+  color: var(--danger);
+}
+
+.sheet-label {
+  display: inline-flex;
+  flex-basis: 100%;
+  order: 3;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent-strong);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 4px 8px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.sheet-facts dt {
+  color: var(--ink-4);
+}
+
+.sheet-facts dd {
+  color: var(--ink-2);
+  text-align: right;
+}
+
+.sheet-quiet {
+  padding: 4px 8px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.sheet-quiet.is-failure {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-body > * {
+    animation: none;
+  }
+}
+
+/* The note's own glyph, or its photograph: a square with the row's corner,
+   because it is the row's glyph that flew here. */
+.sheet-note-glyph {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-2);
+}
+
+.sheet-note-glyph img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Which archive ───────────────────────────────────────────────────────────
+   The accounts row of Mail's sidebar, small on purpose: the people shelf
+   under it is the large thing, and says whose notes inside this archive. */
+.space-switch-wrap {
+  position: relative;
+  margin: 0 0 6px;
+}
+
+.space-switch {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px 5px 6px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-align: left;
+}
+
+.space-switch:hover,
+.space-switch[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.space-switch-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-switch-chevron {
+  flex: none;
+  color: var(--ink-4);
+}
+
+.space-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  min-width: 15rem;
+  padding: 6px;
+}
+
+/* Faces overlapping by a third, each with an edge of the ground so the one
+   behind reads as behind rather than as a bite out of the one in front. */
+.face-stack {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.face-stack > span:not(.face-stack-more) {
+  position: relative;
+  z-index: calc(3 - var(--i));
+  margin-left: -6px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+.face-stack > span:first-child {
+  margin-left: 0;
+}
+
+.face-stack .avatar.is-compact {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+.face-stack-more {
+  margin-left: 4px;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.face-stack.is-large > span:not(.face-stack-more) {
+  margin-left: -16px;
+  box-shadow: 0 0 0 3px var(--glass);
+}
+
+.face-stack.is-large > span:first-child {
+  margin-left: 0;
+}
+
+.face-stack.is-large .avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+}
+
+/* ── The archive's sheet ───────────────────────────────────────────────────── */
+.sheet-title-field {
+  width: 100%;
+  border-radius: 8px;
+  background: transparent;
+  padding: 2px 6px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  text-align: center;
+  outline: none;
+}
+
+.sheet-title-field:hover,
+.sheet-title-field:focus {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.sheet-stepper > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sheet-stepper button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-2);
+}
+
+.sheet-stepper button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
+}
+
+.sheet-stepper button:disabled {
+  opacity: 0.35;
+}
+
+.sheet-invitations .invite-form {
+  margin-top: 4px;
+}
+
+.sheet-leave {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 6px;
+  margin: 18px auto 4px;
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  color: var(--danger);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-leave:hover:not(:disabled),
+.sheet-leave.is-confirm {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.sheet-leave:disabled {
+  color: var(--ink-4);
+}
+
+.sheet.is-short {
+  height: auto;
+}
+
+/* The archives in Settings: the member list's rows, with the faces kept as a
+   stack rather than laid out by the row's own grid of text. */
+.member-role-list .face-stack,
+.member-role-list .face-stack > span {
+  display: inline-flex;
+}
+
+.space-list > div {
+  justify-content: flex-start;
+}
+
+.space-list-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.space-list-current {
+  flex: none;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.invite-withdraw.is-neutral:hover:not(:disabled) {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+.settings-nav-tile[data-tone="indigo"] {
+  --tile: #5b5bd6;
+}
+
+/* Between two archives: the new screen is mounted and not yet shown. See
+   `NotesPage` for why the way across is a single fade. */
+[data-arriving] .workspace-shell,
+[data-arriving] .mobile-workspace {
+  opacity: 0;
+}

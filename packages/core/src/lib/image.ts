@@ -7,6 +7,24 @@ const ACCEPTED_IMAGE_TYPES = new Set([
   "image/gif",
   "image/avif",
 ]);
+
+/* What an iPhone shoots and what a Mac copies out of Finder. Chromium decodes
+   none of it, in the browser or in the desktop window, so it goes through
+   libheif — loaded only when one arrives, because it is 3 MB of WebAssembly
+   that a note without an iPhone photo never needs. The `csp` build compiles
+   the module without `eval`, which the desktop policy refuses. */
+const HEIF_TYPES = new Set([
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
+
+async function decode(file: Blob): Promise<ImageBitmap> {
+  if (!HEIF_TYPES.has(file.type)) return createImageBitmap(file);
+  const { heicTo } = await import("heic-to/csp");
+  return heicTo({ blob: file, type: "bitmap" });
+}
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_EDGE = 2560;
@@ -28,14 +46,14 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
  * the wallpaper arrives from IndexedDB rather than from a file input.
  */
 export async function prepareImageForNote(file: Blob): Promise<Blob> {
-  if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Use a JPG, PNG, WebP, GIF or AVIF image");
+  if (!ACCEPTED_IMAGE_TYPES.has(file.type) && !HEIF_TYPES.has(file.type)) {
+    throw new Error("Use a JPG, PNG, WebP, GIF, AVIF or HEIC image");
   }
   if (file.size > MAX_SOURCE_BYTES) {
     throw new Error("Image is too large (20 MB maximum)");
   }
 
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await decode(file);
   try {
     let scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     let quality = 0.86;

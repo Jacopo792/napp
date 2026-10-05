@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { linksTo } from "./derived.ts";
+import { linkedNoteIds, linksTo } from "./derived.ts";
 
 /* Backlinks are read by walking the document rather than by querying a column,
    so this walk is the whole of the feature: miss a nesting level and a note
@@ -59,4 +59,31 @@ test("a link is found however deeply it is nested, and only the right one", () =
     ),
     false,
   );
+});
+
+const link = (noteId: string, text: string) => ({
+  type: "text",
+  text,
+  marks: [{ type: "noteLink", attrs: { noteId } }],
+});
+
+test("lists the notes a document links to, once each, in order", () => {
+  const doc = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [link("b", "Capitolo 2"), { type: "text", text: " e " }] },
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [link("a", "Intro"), link("b", "di nuovo")] }],
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual([...linkedNoteIds(doc)], ["b", "a"]);
+  assert.equal(linksTo(doc, "a"), true);
+  assert.deepEqual([...linkedNoteIds({ type: "doc", content: [] })], []);
 });

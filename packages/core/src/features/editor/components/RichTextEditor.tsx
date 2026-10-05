@@ -18,6 +18,7 @@ import {
   NodeViewWrapper,
   ReactNodeViewRenderer,
   useEditor,
+  useEditorState,
   type NodeViewProps,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -33,6 +34,7 @@ import {
   GripVertical,
   Highlighter,
   Lock,
+  LockOpen,
   MessageSquarePlus,
   Minus,
   Move,
@@ -146,6 +148,10 @@ export interface RichTextEditorHandle {
   /** Take the anchor away — used when a thread is deleted, so no passage is
    *  left underlined with nothing behind it. */
   removeComment: (threadId: string) => void;
+  /** The body as it reads now, for a version somebody names or keeps. */
+  getContent: () => JSONContent | null;
+  /** Write an earlier version back, as one ordinary edit through the binding. */
+  replaceContent: (content: JSONContent) => void;
   setSearch: (query: string) => SearchStatus;
   findNext: () => SearchStatus;
   findPrevious: () => SearchStatus;
@@ -2027,6 +2033,24 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     [collaboration?.document, collaboration?.provider],
   );
 
+  /* What the selection's passage lock is, so the bubble's padlock can say it.
+     The editor does not re-render per transaction; this re-renders only when
+     the answer changes, which is when the selection crosses a lock edge. */
+  const passageLock = useEditorState({
+    editor,
+    selector: ({ editor: current }) =>
+      !current || !writeLockOwner
+        ? "none"
+        : current.isActive(WRITE_LOCK_MARK, { owner: writeLockOwner })
+          ? "mine"
+          : current.isActive(WRITE_LOCK_MARK)
+            ? "theirs"
+            : "none",
+  });
+  /* Bumped by the press and nothing else, so the shackle moves when the hand
+     moved it — not every time the bubble appears over a locked passage. */
+  const [latched, setLatched] = useState(0);
+
   const format = useCallback(
     (action: FormatAction) => {
       if (!editor || readOnly) return;
@@ -2108,6 +2132,13 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   useImperativeHandle(
     ref,
     () => ({
+      getContent() {
+        return editor ? editor.getJSON() : null;
+      },
+      replaceContent(content) {
+        if (!editor || readOnly) return;
+        editor.chain().setContent(content, { emitUpdate: true }).run();
+      },
       async exportNote(format, title) {
         if (!editor) return;
         const { saveNoteExport } = await import("@/features/editor/lib/exportNote");
@@ -2350,16 +2381,26 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
             {writeLockOwner && (
               <button
                 type="button"
-                className="toolbar-button press"
-                aria-label="Only I may write this passage"
-                title="Only I may write this passage"
+                className={`toolbar-button press${passageLock === "mine" ? " is-active" : ""}`}
+                aria-pressed={passageLock === "mine"}
+                disabled={passageLock === "theirs"}
+                aria-label={
+                  passageLock === "mine"
+                    ? "Let them write this passage"
+                    : "Only I may write this passage"
+                }
+                title={
+                  passageLock === "mine"
+                    ? "Let them write this passage"
+                    : "Only I may write this passage"
+                }
                 onMouseDown={(event) => event.preventDefault()}
-                /* Decided here rather than at render: the editor deliberately
-                   does not re-render per transaction, so nothing drawn above
-                   knows what the selection carries. A locked passage is tinted,
-                   which is what says the state; this says what the press does
-                   to it, and leaves the other member's lock alone. */
+                onAnimationEnd={() => setLatched(0)}
+                /* The padlock is the state, the way Bold is: shut over a
+                   passage that is locked, open over one that is not. The other
+                   member's lock is theirs to lift, so the press is refused. */
                 onClick={() => {
+                  setLatched((count) => count + 1);
                   if (!editor) return;
                   const chain = editor.chain().focus();
                   if (editor.isActive(WRITE_LOCK_MARK, { owner: writeLockOwner })) {
@@ -2369,7 +2410,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                   }
                 }}
               >
-                <Lock size={16} />
+                {passageLock === "none" ? (
+                  <LockOpen
+                    key={latched}
+                    size={16}
+                    className={latched ? "is-latching" : undefined}
+                  />
+                ) : (
+                  <Lock key={latched} size={16} className={latched ? "is-latching" : undefined} />
+                )}
               </button>
             )}
             <span className="menu-separator rich-bubble-separator" />

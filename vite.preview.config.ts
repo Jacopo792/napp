@@ -40,6 +40,8 @@ export default defineConfig({
       },
       { find: /^@\/lib\/collab$/, replacement: here("./preview/collab.mock.ts") },
       { find: /^@\/lib\/comments$/, replacement: here("./preview/comments.mock.ts") },
+      { find: /^@\/lib\/history$/, replacement: here("./preview/history.mock.ts") },
+      { find: /^@\/lib\/spaces$/, replacement: here("./preview/spaces.mock.ts") },
     ],
   },
   plugins: [react(), tailwindcss(), tsConfigPaths({ root: here(".") })],

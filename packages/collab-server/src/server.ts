@@ -31,6 +31,7 @@ import { importImage } from "./importImage.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";
+import { versionKeeper } from "./versions.ts";
 
 export interface CollaborationConfig {
   supabaseUrl: string;
@@ -51,6 +52,8 @@ export interface CollaborationConfig {
   redisUrl?: string;
   /** Names this instance on that bus. */
   instanceName?: string;
+  /** The longest stretch of writing one version covers. Ten minutes. */
+  versionStretch?: number;
 }
 
 /** Answer a probe and stop Hocuspocus from handling the request itself. A
@@ -136,6 +139,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
   const service = createClient(config.supabaseUrl, config.serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const versions = versionKeeper(service, config.versionStretch);
 
   /** The caller, as Postgres sees them. */
   const asCaller = (token: string) =>
@@ -323,12 +327,28 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     },
 
     async onLoadDocument({ documentName, document }) {
-      await loadDocument(service, noteIdOf(documentName)!, document);
+      const noteId = noteIdOf(documentName)!;
+      await loadDocument(service, noteId, document);
+      versions.loaded(noteId, document);
       return document;
     },
 
+    /* Who wrote what is known here and nowhere else: an update that came in
+       over a connection was authorised as that connection's account. */
+    async onChange({ documentName, connection }) {
+      const context = connection?.context;
+      if (!connection || connection.readOnly || !context?.userId || !context.archiveId) return;
+      versions.touched(noteIdOf(documentName)!, context.archiveId, context.userId);
+    },
+
     async onStoreDocument({ documentName, document }) {
-      await storeDocument(service, noteIdOf(documentName)!, document);
+      const noteId = noteIdOf(documentName)!;
+      await storeDocument(service, noteId, document);
+      await versions.settle(noteId, document);
+    },
+
+    async beforeUnloadDocument({ documentName, document }) {
+      await versions.settle(noteIdOf(documentName)!, document, true);
     },
 
     /* Two probes, and the difference between them is the whole point.

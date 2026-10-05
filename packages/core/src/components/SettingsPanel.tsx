@@ -14,8 +14,8 @@ import {
   Copy,
   Image,
   Layers,
+  Plus,
   LogOut,
-  Mail,
   Palette,
   ShieldCheck,
   Timer,
@@ -43,14 +43,15 @@ import {
   SpellCheck,
   Sun,
   Trash2,
-  Undo2,
   UserRound,
-  UserPlus,
   Wand2,
   MousePointer2,
   Users,
   X,
 } from "@/components/icons";
+import { Invitations } from "@/components/Invitations";
+import { FaceStack } from "@/components/SpaceSwitch";
+import type { Space } from "@/lib/spaces";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
 import {
@@ -124,33 +125,6 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
  *  reuse: a leading glyph, the name of the thing with a line saying what it
  *  does, and the control itself flush right. Naming the row is what lets the
  *  control stop explaining itself. */
-/** Seven days is the invitation's whole life, so what is left of it is said in
- *  days rather than as a date nobody can subtract at a glance. */
-function expiresIn(expiresAt: string): string {
-  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
-  if (days <= 0) return "expires today";
-  if (days === 1) return "expires tomorrow";
-  return `expires in ${days} days`;
-}
-
-/** The message is composed and sent by the member's own mail app: the token
- *  reaches the invited address without passing through anything of ours, and
- *  there is no server here to send it with. */
-function inviteMailto(email: string, link: string): string {
-  const subject = "An invitation to a shared notes archive";
-  const body = [
-    "You have been invited to a private notes archive.",
-    "",
-    "Open this link, then create an account with this address (or sign in, if you already have one):",
-    link,
-    "",
-    "The link works once and expires in seven days.",
-  ].join("\n");
-  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(
-    subject,
-  )}&body=${encodeURIComponent(body)}`;
-}
-
 function RowLead({ icon, label, hint }: { icon: ReactNode; label: string; hint?: string }) {
   return (
     <>
@@ -319,6 +293,7 @@ const SETTINGS_SECTIONS = [
     items: [
       { id: "profile", tone: "blue", name: "Profile", icon: <UserRound size={16} /> },
       { id: "members", tone: "green", name: "Members", icon: <Users size={16} /> },
+      { id: "spaces", tone: "indigo", name: "Archives", icon: <Layers size={16} /> },
       { id: "security", tone: "slate", name: "Security", icon: <ShieldCheck size={16} /> },
     ],
   },
@@ -362,6 +337,10 @@ export function SettingsPanel({
   onCreateInvite,
   onRevokeInvite,
   onLeaveArchive,
+  spaces,
+  currentArchiveId,
+  onSwitchArchive,
+  onCreateArchive,
   onPresenceEnabledChange,
   onCollaboratorsVisibleChange,
   onProofreaderEnabledChange,
@@ -406,6 +385,11 @@ export function SettingsPanel({
   onCreateInvite: (email: string) => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
   onLeaveArchive: () => Promise<void>;
+  /** Every archive this account is in; the window is open on one of them. */
+  spaces: Space[];
+  currentArchiveId: string;
+  onSwitchArchive: (archiveId: string) => Promise<void>;
+  onCreateArchive: (name: string) => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onCollaboratorsVisibleChange: (visible: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
@@ -430,14 +414,13 @@ export function SettingsPanel({
     if (open) setLearned(learnedSpellings().length);
   }, [open]);
   const [nickname, setNickname] = useState(profile.nickname);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteLink, setInviteLink] = useState("");
-  const [inviteStatus, setInviteStatus] = useState("");
-  const [inviteBusy, setInviteBusy] = useState(false);
   /** The file waits here while its square is chosen; nothing is uploaded until
    *  the cropper is confirmed. */
   const [cropping, setCropping] = useState<File | null>(null);
   const [leaveConfirm, setLeaveConfirm] = useState(false);
+  const [newArchive, setNewArchive] = useState("");
+  const [spaceStatus, setSpaceStatus] = useState("");
+  const [spaceBusy, setSpaceBusy] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveStatus, setLeaveStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
@@ -519,9 +502,6 @@ export function SettingsPanel({
       setClosing(false);
       setTuning(false);
       setSection("profile");
-      setInviteEmail("");
-      setInviteLink("");
-      setInviteStatus("");
       setLeaveConfirm(false);
       setLeaveBusy(false);
       setLeaveStatus("");
@@ -541,40 +521,22 @@ export function SettingsPanel({
     onNicknameSave(trimmed);
   }
 
-  async function createInvite() {
-    const target = inviteEmail.trim();
-    if (!target) return;
-    setInviteBusy(true);
-    setInviteStatus("");
-    try {
-      setInviteLink(await onCreateInvite(target));
-      setInviteStatus("Invitation ready. Copy the link or send it by email.");
-    } catch (reason) {
-      setInviteStatus(reason instanceof Error ? reason.message : "Invitation failed");
-    } finally {
-      setInviteBusy(false);
-    }
-  }
-
-  async function withdrawInvite(inviteId: string) {
-    setInviteBusy(true);
-    setInviteStatus("");
-    try {
-      await onRevokeInvite(inviteId);
-      setInviteLink("");
-      setInviteStatus("Invitation withdrawn. Its link no longer works.");
-    } catch (reason) {
-      setInviteStatus(reason instanceof Error ? reason.message : "Could not withdraw it");
-    } finally {
-      setInviteBusy(false);
-    }
-  }
-
   /* A seat is held by a member or by an invitation waiting to be claimed. The
      same arithmetic the database enforces, so the form is closed before the
      write is refused rather than after. */
   const seatsTaken = members.length + invites.length;
   const seatsFull = seatsTaken >= seatLimit;
+
+  async function spaceAct(work: () => Promise<void>) {
+    setSpaceBusy(true);
+    setSpaceStatus("");
+    try {
+      await work();
+    } catch (reason) {
+      setSpaceStatus(reason instanceof Error ? reason.message : "That did not work");
+      setSpaceBusy(false);
+    }
+  }
 
   async function leaveArchive() {
     if (!leaveConfirm) {
@@ -1380,6 +1342,72 @@ export function SettingsPanel({
                 </section>
               )}
 
+              {section === "spaces" && (
+                <section>
+                  <h3>Your archives</h3>
+                  <div className="member-role-list space-list">
+                    {spaces.map((space) => (
+                      <div key={space.archiveId}>
+                        <FaceStack members={space.members} />
+                        <span className="space-list-text">
+                          <b>{space.name}</b>
+                          <small>
+                            {space.members.length === 1
+                              ? "1 member"
+                              : `${space.members.length} members`}
+                            {" · "}
+                            {space.seatLimit} seats
+                          </small>
+                        </span>
+                        {space.archiveId === currentArchiveId ? (
+                          <small className="space-list-current">Open now</small>
+                        ) : (
+                          <button
+                            type="button"
+                            className="invite-withdraw is-neutral"
+                            disabled={spaceBusy}
+                            onClick={() => void spaceAct(() => onSwitchArchive(space.archiveId))}
+                          >
+                            Open
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <h3>New archive</h3>
+                  <div className="invite-form">
+                    <label>
+                      <span>Name</span>
+                      <input
+                        value={newArchive}
+                        maxLength={80}
+                        placeholder="Thesis, Study group…"
+                        disabled={spaceBusy}
+                        onChange={(event) => setNewArchive(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && newArchive.trim())
+                            void spaceAct(() => onCreateArchive(newArchive.trim()));
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={spaceBusy || !newArchive.trim()}
+                      onClick={() => void spaceAct(() => onCreateArchive(newArchive.trim()))}
+                    >
+                      <Plus size={16} />
+                      {spaceBusy ? "Making…" : "Make archive"}
+                    </button>
+                  </div>
+                  {spaceStatus && (
+                    <p className="profile-note text-danger" role="alert">
+                      {spaceStatus}
+                    </p>
+                  )}
+                </section>
+              )}
+
               {section === "members" && (
                 <section>
                   <h3>Seats</h3>
@@ -1413,118 +1441,13 @@ export function SettingsPanel({
                     role to pick afterwards. What one member takes back from
                     another is a note or a passage, from the note itself. */}
 
-                  {invites.length > 0 && (
-                    <>
-                      <h3>Waiting to be claimed</h3>
-                      <div className="member-role-list">
-                        {invites.map((invite) => (
-                          <div key={invite.id}>
-                            <span>
-                              <b>{invite.email}</b>
-                              <small>{expiresIn(invite.expiresAt)}</small>
-                            </span>
-                            {canManageMembers && (
-                              <button
-                                type="button"
-                                className="invite-withdraw"
-                                disabled={inviteBusy}
-                                onClick={() => void withdrawInvite(invite.id)}
-                              >
-                                <Undo2 size={16} />
-                                Withdraw
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  <h3>Invite someone</h3>
-                  {!canManageMembers ? (
-                    <dl className="settings-facts">
-                      <div>
-                        <span className="settings-lead" aria-hidden="true">
-                          <ShieldCheck size={16} />
-                        </span>
-                        <span className="settings-label">
-                          <dt>Editors only</dt>
-                          <dd>An editor in this archive can invite the other person.</dd>
-                        </span>
-                      </div>
-                    </dl>
-                  ) : seatsFull ? (
-                    <dl className="settings-facts">
-                      <div>
-                        <span className="settings-lead" aria-hidden="true">
-                          <UserPlus size={16} />
-                        </span>
-                        <span className="settings-label">
-                          <dt>No seat free</dt>
-                          <dd>Withdraw an invitation nobody claimed and its seat comes back.</dd>
-                        </span>
-                      </div>
-                    </dl>
-                  ) : (
-                    <>
-                      <div className="invite-form">
-                        <label>
-                          <span>Email address</span>
-                          <input
-                            type="email"
-                            value={inviteEmail}
-                            placeholder="person@example.com"
-                            disabled={inviteBusy}
-                            onChange={(event) => {
-                              setInviteEmail(event.target.value);
-                              setInviteLink("");
-                              setInviteStatus("");
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          disabled={inviteBusy || !inviteEmail.trim()}
-                          onClick={() => void createInvite()}
-                        >
-                          <UserPlus size={16} />
-                          {inviteBusy ? "Creating…" : "Create invitation"}
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Both ways out of here carry the same one-time token, and
-                    neither of them hands it to a third party: the link is
-                    copied by you, and the message is composed and sent by your
-                    own mail app. */}
-                  {inviteLink && (
-                    <div className="invite-ready">
-                      <div className="invite-link-row">
-                        <input aria-label="Invitation link" readOnly value={inviteLink} />
-                        <button
-                          type="button"
-                          aria-label="Copy invitation link"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(inviteLink).then(() => {
-                              setInviteStatus("Copied. The link expires in 7 days.");
-                            });
-                          }}
-                        >
-                          <Copy size={16} />
-                        </button>
-                      </div>
-                      <a className="invite-mail" href={inviteMailto(inviteEmail, inviteLink)}>
-                        <Mail size={16} />
-                        Send it by email
-                      </a>
-                    </div>
-                  )}
-                  {inviteStatus && (
-                    <p className="profile-note" role="status">
-                      {inviteStatus}
-                    </p>
-                  )}
+                  <Invitations
+                    invites={invites}
+                    seatsFull={seatsFull}
+                    canManage={canManageMembers}
+                    onCreate={onCreateInvite}
+                    onRevoke={onRevokeInvite}
+                  />
                 </section>
               )}
             </div>

@@ -2,6 +2,7 @@ import {
   Archive,
   ArchiveRestore,
   ClipboardCopy,
+  History,
   Columns2,
   Keyboard,
   Maximize2,
@@ -249,6 +250,7 @@ function noteMenuItems({
   recent,
   onTogglePin,
   onFind,
+  onHistory,
   onToggleFocus,
   focusMode,
   onAddCover,
@@ -264,6 +266,7 @@ function noteMenuItems({
     pinItem(pinned, onTogglePin),
     ...lockItems(lock),
     { kind: "item", id: "find", label: "Find in note", icon: <Search size={16} />, run: onFind },
+    { kind: "item", id: "history", label: "History", icon: <History size={16} />, run: onHistory },
     {
       kind: "item",
       id: "focus",
@@ -366,6 +369,7 @@ interface NoteMenuActions {
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
   onFind: () => void;
+  onHistory: () => void;
   onToggleFocus: () => void;
   focusMode: boolean;
   /** Absent where there already is one, or where this reader cannot write. */

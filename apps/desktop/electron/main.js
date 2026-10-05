@@ -249,6 +249,47 @@ function createWindow() {
     tellFullScreen();
   });
 
+  /* The text's own menu. A browser draws one in every field; a BrowserWindow
+     draws nothing at all, so a right-click inside a note did nothing and Copy,
+     Paste and the spelling suggestions were reachable only by keyboard. Where
+     the page draws its own menu it has already called preventDefault, and this
+     event never fires — so this is only ever the menu the words would have had
+     in a tab. */
+  window.webContents.on("context-menu", (_event, params) => {
+    const { editFlags, isEditable, selectionText, misspelledWord } = params;
+    if (!isEditable && !selectionText.trim()) return;
+    const template = [];
+    if (misspelledWord) {
+      for (const suggestion of params.dictionarySuggestions.slice(0, 5))
+        template.push({
+          label: suggestion,
+          click: () => window.webContents.replaceMisspelling(suggestion),
+        });
+      template.push({
+        label: "Learn Spelling",
+        click: () => window.webContents.session.addWordToSpellCheckerDictionary(misspelledWord),
+      });
+      template.push({ type: "separator" });
+    }
+    if (process.platform === "darwin" && selectionText.trim())
+      template.push(
+        {
+          label: `Look Up “${selectionText.trim().slice(0, 24)}”`,
+          click: () => window.webContents.showDefinitionForSelection(),
+        },
+        { type: "separator" },
+      );
+    if (isEditable) template.push({ role: "cut", enabled: editFlags.canCut });
+    template.push({ role: "copy", enabled: editFlags.canCopy });
+    if (isEditable)
+      template.push(
+        { role: "paste", enabled: editFlags.canPaste },
+        { role: "pasteAndMatchStyle", enabled: editFlags.canPaste },
+      );
+    template.push({ type: "separator" }, { role: "selectAll", enabled: editFlags.canSelectAll });
+    Menu.buildFromTemplate(template).popup({ window });
+  });
+
   /* On close, not on every move: a resize sends a great many events and this
      is a fact worth exactly one write. `getNormalBounds` and not `getBounds`,
      or a window closed while full-screen is remembered as the whole screen and
