@@ -3,6 +3,38 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.8.0 — 2026-10-05
+
+A note's history, sheets for a note, a person and a folder, and more than one
+archive per account.
+
+### Added
+
+- **What a note used to say.** The collaboration server keeps versions of each
+  note, with who wrote them and how many words came and went. A version can be
+  named, compared with the present and restored — restoring keeps the present
+  as a named version first.
+- **Sheets.** Hold a note's row still for its sheet: owner, folder, words,
+  versions, remarks, links and dates. A face opens a person's sheet, a folder's
+  row its own. A name inside a sheet opens the next one, and Back returns.
+- **Spaces.** An account can belong to several archives and switch between them
+  without signing out. Settings → Archives lists them, makes new ones and turns
+  on the switch at the top of the sidebar, which is off by default. Each archive
+  keeps its own sort, recents and folded groups.
+- HEIC photos can be added to a note.
+
+### Changed
+
+- The desktop app uses the system's own menu for cutting, copying and pasting
+  text.
+- The sidebar toggle sits on the left of the note list.
+
+### Security
+
+- No member can delete a whole archive any more, and an archive's seats can no
+  longer be set below the members already in it.
+- An invitation is claimed while the account is being registered.
+
 ## 0.7.0 — 2026-10-04
 
 A new sign-in page, quieter toolbars, larger icons, and a sign of where the
