@@ -163,8 +163,10 @@ Technical constraints that outlive any design:
   live unclaimed invitations before issuing. Settings closes the form on the same
   arithmetic as a courtesy, not as the boundary.
 - RLS authorizes every archive row through `archive_members`; `owner` is never a
-  security boundary. Members may select, insert, update and delete `archives`,
-  `notes`, `folders`, `tags`, `note_tags` and `note-images` objects via
+  security boundary. Members may select, insert and update `archives` — no
+  member may delete one, a new one is made only through `create_archive()`, and
+  `seat_limit` never drops below the members already seated — and select,
+  insert, update and delete `notes`, `folders`, `tags`, `note_tags` and `note-images` objects via
   `private.can_write_archive(archive_id)`, and `notes` additionally through
   `private.note_lock_open(locked_by)`, which keeps a locked note to its holder
   and stops anybody locking one in somebody else's name — direct writes to

@@ -17,7 +17,12 @@ for two people who keep things together: partners, friends, siblings, whoever.
 - Folders, pins, search, Archive and Trash so notes do not get lost as they pile up.
 - Live editing when two people are in the same note, plus comments on a specific
   sentence or paragraph.
-- Separate **My notes** and shared views inside one archive.
+- Separate **My notes** and shared views inside one archive, and more than one
+  archive per account, switched without signing out.
+- A history for every note: who wrote what, words added and removed, named
+  versions, and a restore that keeps the present first.
+- Sheets for a note, a person and a folder — hold a row still to see everything
+  about it in one place.
 - Covers, avatars, themes and reading settings that each person can make their own.
 - Markdown import and export, PDF text import, and local translation and proofreading
   tools.
@@ -52,8 +57,35 @@ Intel Macs and Windows have their own file on the same release page.
 
 Start with a ready-made palette or choose your own colours, theme and wallpaper. You
 can also change the reading width, text size, line spacing and weight until longer
-notes feel right. Your settings stay on your device, so the person sharing the archive
-does not have to look at it the way you do.
+notes feel right. Your settings follow your account to every browser and to the
+desktop app, and stay yours: the person sharing the archive does not have to look at
+it the way you do.
+
+## Every version of a note
+
+![Note history](docs/history-preview.png)
+
+A note keeps its own history: who wrote each stretch, how many words came and went,
+and the moments you chose to name. Any version can be compared with the present and
+restored, and restoring keeps the present as a named version first, so nothing is lost
+by trying.
+
+## Everything about a note in one place
+
+![Note sheet](docs/note-sheet-preview.png)
+
+Hold a note's row still, or choose **Note info** from its menu, and its sheet opens:
+folder, owner, words, versions, open remarks, who wrote in it and when. A person's face
+and a folder open sheets of their own, and every name inside one leads to the next.
+
+## More than one archive
+
+![Archive switch](docs/spaces-preview.png)
+
+One account can belong to several archives — your notes with a partner, a study group,
+a thesis — and move between them without signing out. Each archive keeps its own
+members, folders and list order. Make new ones and turn on the switch at the top of
+the sidebar from **Settings → Archives**.
 
 ## Accounts and shared archives
 
