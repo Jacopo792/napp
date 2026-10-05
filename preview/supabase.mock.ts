@@ -8,7 +8,8 @@
 import type { NoteEntry } from "@/lib/entries";
 import type { AppSession } from "@/lib/session";
 import { EMPTY_META, type Meta, type Note, type NoteMeta } from "@/lib/types";
-import { FIXTURE_META, FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { FIXTURE_META, FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { spaceMembers, spaceSeats } from "./spaces.mock";
 
 export interface ArchiveMember {
   userId: string;
@@ -43,24 +44,10 @@ export interface PendingInvite {
    look good on its own. A picture added from Settings still works. */
 const avatars = new Map<string, Blob>();
 
-const MEMBERS: ArchiveMember[] = [
-  {
-    userId: PREVIEW_U1,
-    nickname: "Preview",
-    avatarObject: null,
-    joinedAt: "2026-05-18T09:00:00.000Z",
-    role: "editor",
-    isSelf: true,
-  },
-  {
-    userId: PREVIEW_U2,
-    nickname: "Partner",
-    avatarObject: null,
-    joinedAt: "2026-06-02T09:00:00.000Z",
-    role: "editor",
-    isSelf: false,
-  },
-];
+const JOINED: Record<string, string> = {
+  [PREVIEW_U1]: "2026-05-18T09:00:00.000Z",
+  [PREVIEW_U2]: "2026-06-02T09:00:00.000Z",
+};
 
 /* The profile the preview edits, kept in memory like everything else here so
    the page can be worked on without an account. */
@@ -84,25 +71,60 @@ export const supabase = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const notes = new Map<string, NoteEntry>(
-  FIXTURE_NOTES.map((note) => [note.id, { note: { ...note }, version: 1 }]),
-);
-const metas: Record<string, Meta> = {
-  [PREVIEW_U1]: structuredClone(FIXTURE_META),
-  [PREVIEW_U2]: { ...structuredClone(EMPTY_META), partnerName: FIXTURE_META.partnerName },
-};
-const images = new Map<string, Blob>();
+/* One store per archive, as Postgres keeps one per `archive_id`: the fixture
+   is the preview archive's, every other archive starts empty. Switching from
+   the sidebar has to show that what was written in one is not in the other. */
+interface ArchiveStore {
+  notes: Map<string, NoteEntry>;
+  metas: Record<string, Meta>;
+}
+const stores = new Map<string, ArchiveStore>();
 
-export async function loadArchive(_session: AppSession): Promise<ArchiveSnapshot> {
+function storeOf(session: AppSession): ArchiveStore {
+  const existing = stores.get(session.archiveId);
+  if (existing) return existing;
+  const store: ArchiveStore =
+    session.archiveId === PREVIEW_ARCHIVE
+      ? {
+          notes: new Map(
+            FIXTURE_NOTES.map((note) => [note.id, { note: { ...note }, version: 1 }]),
+          ),
+          metas: {
+            [PREVIEW_U1]: structuredClone(FIXTURE_META),
+            [PREVIEW_U2]: {
+              ...structuredClone(EMPTY_META),
+              partnerName: FIXTURE_META.partnerName,
+            },
+          },
+        }
+      : { notes: new Map(), metas: { [session.userId]: structuredClone(EMPTY_META) } };
+  stores.set(session.archiveId, store);
+  return store;
+}
+
+function membersOf(session: AppSession): ArchiveMember[] {
+  return spaceMembers(session.archiveId).map((member) => ({
+    ...member,
+    ...(member.userId === session.userId
+      ? { nickname: profile.nickname, avatarObject: profile.avatarObject }
+      : {}),
+    joinedAt: JOINED[member.userId] ?? "2026-08-29T09:00:00.000Z",
+    role: "editor",
+    isSelf: member.userId === session.userId,
+  }));
+}
+
+export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot> {
   await sleep(240);
+  const { notes, metas } = storeOf(session);
   return {
     entries: [...notes.values()]
       .map((entry) => ({ note: { ...entry.note }, version: entry.version }))
       .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
     // A fresh array, the way the real loader builds one: handing back the same
     // object made every roster change invisible to React.
-    members: MEMBERS.map((member) => ({ ...member })),
-    seatLimit: 2,
+    members: membersOf(session),
+    seatLimit: spaceSeats(session.archiveId),
     metas: structuredClone(metas),
   };
 }
@@ -117,33 +139,34 @@ export class NoteConflict extends Error {
 }
 
 export async function createNote(
-  _session: AppSession,
+  session: AppSession,
   note: Note,
   _metadata: NoteMeta,
 ): Promise<NoteEntry> {
   await sleep(260);
   const entry: NoteEntry = { note: { ...note }, version: 1 };
-  notes.set(note.id, entry);
+  storeOf(session).notes.set(note.id, entry);
   return { note: { ...note }, version: 1 };
 }
 
 export async function updateNoteProperties(
-  _session: AppSession,
+  session: AppSession,
   noteId: string,
   values: Pick<Note, "photo" | "cover">,
 ): Promise<void> {
   await sleep(120);
-  const entry = notes.get(noteId);
+  const entry = storeOf(session).notes.get(noteId);
   if (!entry) return;
   entry.note = { ...entry.note, ...structuredClone(values) };
 }
 
 export async function saveNote(
-  _session: AppSession,
+  session: AppSession,
   note: Note,
   expectedVersion: number,
 ): Promise<number> {
   await sleep(420);
+  const { notes } = storeOf(session);
   const current = notes.get(note.id);
   if (!current) throw new NoteConflict(null);
   // Faithful to the archive: a version that has moved is a conflict, not a
@@ -158,20 +181,21 @@ export async function deleteNote(session: AppSession, noteId: string): Promise<v
   return deleteNotes(session, [noteId]);
 }
 
-export async function deleteNotes(_session: AppSession, noteIds: string[]): Promise<void> {
+export async function deleteNotes(session: AppSession, noteIds: string[]): Promise<void> {
   if (noteIds.length === 0) return;
   await sleep(200);
+  const { notes } = storeOf(session);
   for (const id of noteIds) notes.delete(id);
 }
 
 export async function persistMetaDiff(
-  _session: AppSession,
+  session: AppSession,
   owner: string,
   _before: Meta,
   after: Meta,
 ): Promise<void> {
   await sleep(220);
-  metas[owner] = structuredClone(after);
+  storeOf(session).metas[owner] = structuredClone(after);
 }
 
 /* Storage, in memory. The preview never encrypts, so an object is stored as the
@@ -212,11 +236,6 @@ export async function loadProfile(_session: AppSession): Promise<Profile> {
 export async function saveProfile(_session: AppSession, next: Profile): Promise<void> {
   await sleep(200);
   profile = { ...next };
-  const self = MEMBERS.find((member) => member.isSelf);
-  if (self) {
-    self.nickname = next.nickname;
-    self.avatarObject = next.avatarObject;
-  }
 }
 
 export async function uploadAvatar(_session: AppSession, file: Blob): Promise<string> {
@@ -239,29 +258,34 @@ export async function deleteAvatar(_session: AppSession, objectId: string): Prom
   avatars.delete(objectId);
 }
 
-let invites: PendingInvite[] = [];
+const invitesByArchive = new Map<string, PendingInvite[]>();
 
-export async function createArchiveInvite(_session: AppSession, email: string): Promise<string> {
+export async function createArchiveInvite(session: AppSession, email: string): Promise<string> {
   await sleep(180);
-  invites = [
+  const invites = invitesByArchive.get(session.archiveId) ?? [];
+  invitesByArchive.set(session.archiveId, [
     ...invites.filter((invite) => invite.email !== email),
     {
       id: `preview-invite-${invites.length + 1}`,
       email,
       expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     },
-  ];
+  ]);
   return "a".repeat(64);
 }
 
-export async function loadPendingInvites(_session: AppSession): Promise<PendingInvite[]> {
+export async function loadPendingInvites(session: AppSession): Promise<PendingInvite[]> {
   await sleep(80);
-  return invites.map((invite) => ({ ...invite }));
+  return (invitesByArchive.get(session.archiveId) ?? []).map((invite) => ({ ...invite }));
 }
 
 export async function revokeArchiveInvite(inviteId: string): Promise<void> {
   await sleep(120);
-  invites = invites.filter((invite) => invite.id !== inviteId);
+  for (const [archiveId, invites] of invitesByArchive)
+    invitesByArchive.set(
+      archiveId,
+      invites.filter((invite) => invite.id !== inviteId),
+    );
 }
 
 /** The fixture archive is the only one there is, so leaving it is a no-op that

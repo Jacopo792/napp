@@ -94,17 +94,43 @@ export function parseListPreferences(raw: string | null, owner: string): ListPre
   }
 }
 
-export function loadListPreferences(owner: string): ListPreferencesV1 {
+/* Keyed by archive as well as by member. Sorting, recents and each folder's
+   own order are facts about one archive: a thesis archive opened on the same
+   account must not arrive sorted by title because the main one is, nor carry
+   its recents. The member stays in the key because You / Partner are two
+   scopes inside one archive. */
+const storageKey = (archiveId: string, owner: string) => `${STORAGE_PREFIX}:${archiveId}:${owner}`;
+
+/**
+ * Reads `key`, taking over `legacyKey` the first time — the value written
+ * before the key carried the archive. It moves rather than copies, so it is
+ * adopted by the first archive opened after the change, which on an account
+ * with one archive is the only one there is.
+ */
+export function readAdopting(key: string, legacyKey: string): string | null {
+  const current = localStorage.getItem(key);
+  if (current !== null) return current;
+  const legacy = localStorage.getItem(legacyKey);
+  if (legacy === null) return null;
+  localStorage.setItem(key, legacy);
+  localStorage.removeItem(legacyKey);
+  return legacy;
+}
+
+export function loadListPreferences(archiveId: string, owner: string): ListPreferencesV1 {
   try {
-    return parseListPreferences(localStorage.getItem(`${STORAGE_PREFIX}:${owner}`), owner);
+    return parseListPreferences(
+      readAdopting(storageKey(archiveId, owner), `${STORAGE_PREFIX}:${owner}`),
+      owner,
+    );
   } catch {
     return createListPreferences(owner);
   }
 }
 
-export function saveListPreferences(preferences: ListPreferencesV1): void {
+export function saveListPreferences(archiveId: string, preferences: ListPreferencesV1): void {
   try {
-    localStorage.setItem(`${STORAGE_PREFIX}:${preferences.owner}`, JSON.stringify(preferences));
+    localStorage.setItem(storageKey(archiveId, preferences.owner), JSON.stringify(preferences));
   } catch {
     // Preferences are optional; the archive remains fully usable.
   }

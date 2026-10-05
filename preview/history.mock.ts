@@ -1,8 +1,9 @@
 /* Versions against an in-memory archive, so the history panel can be opened,
-   named into and restored from with no network. Seeded with a few stretches
-   by both members on whatever note is opened first. */
+   named into and restored from with no network. The fixture's notes are
+   seeded with a few stretches by both members; a note made in the preview, in
+   any archive, starts with no history, as it would. */
 import type { AppSession } from "./session.mock";
-import { FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { Contribution, FolderVersion, NoteVersion, VersionBody } from "@/lib/history";
 
 type JSONContent = VersionBody["content"];
@@ -21,6 +22,11 @@ const doc = (...paragraphs: string[]): JSONContent => ({
 function seed(noteId: string): NoteVersion[] {
   const existing = lists.get(noteId);
   if (existing) return existing;
+  if (!FIXTURE_NOTES.some((note) => note.id === noteId)) {
+    const empty: NoteVersion[] = [];
+    lists.set(noteId, empty);
+    return empty;
+  }
   const hour = 3_600_000;
   const stages = [
     { ago: 30 * hour, authors: [PREVIEW_U1], added: null, removed: null, label: null,
@@ -86,8 +92,9 @@ export async function nameVersion(
 
 /** A week of somebody's work spread over the fixture's notes, so the person
  *  sheet has days and notes to group. */
-export async function loadContributions(_session: AppSession, userId: string): Promise<Contribution[]> {
+export async function loadContributions(session: AppSession, userId: string): Promise<Contribution[]> {
   await sleep(180);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return [];
   const hour = 3_600_000;
   const notes = FIXTURE_NOTES.slice(0, 5);
   const shift = userId === PREVIEW_U1 ? 1 : 0;

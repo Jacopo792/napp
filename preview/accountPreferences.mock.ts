@@ -24,6 +24,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   proofreader: true,
   autocorrect: true,
   autoLock: 0,
+  spaceSwitch: false,
 };
 
 export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {

@@ -44,7 +44,7 @@ import {
   isDrawingText,
 } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
-import type { ListView, NoteGroup } from "@/lib/listPreferences";
+import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuItems } from "./MenuPrimitives";
@@ -93,6 +93,8 @@ export interface ActiveFilter {
 }
 
 interface Props {
+  /** Which archive the folded date groups are remembered for. */
+  archiveId: string;
   mobile?: boolean;
   entries: NoteEntry[];
   groups?: NoteGroup[];
@@ -158,9 +160,13 @@ interface Props {
    so the two read as one interface. ──────────────────────────────────────── */
 const COLLAPSED_GROUPS_KEY = "napp:note-groups-closed";
 
-function loadCollapsedGroups(): Set<string> {
+/* Per archive: a bucket id is a month or a year, which every archive has, so a
+   key without the archive folded September shut in all of them at once. */
+const collapsedGroupsKey = (archiveId: string) => `${COLLAPSED_GROUPS_KEY}:${archiveId}`;
+
+function loadCollapsedGroups(archiveId: string): Set<string> {
   try {
-    const raw = localStorage.getItem(COLLAPSED_GROUPS_KEY);
+    const raw = readAdopting(collapsedGroupsKey(archiveId), COLLAPSED_GROUPS_KEY);
     return new Set(raw ? (JSON.parse(raw) as string[]) : []);
   } catch {
     return new Set();
@@ -874,6 +880,7 @@ function Skeletons() {
 }
 
 export function NoteList({
+  archiveId,
   mobile = false,
   entries,
   groups = [{ id: "notes", label: "Notes", entries }],
@@ -932,15 +939,15 @@ export function NoteList({
      a bucket that appears for the first time — a new month, a new year — opens
      rather than arriving already hidden. Same shape as the folder tree's
      `napp:folders-open`, one key over. */
-  const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsedGroups);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsedGroups(archiveId));
 
   useEffect(() => {
     try {
-      localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...collapsed]));
+      localStorage.setItem(collapsedGroupsKey(archiveId), JSON.stringify([...collapsed]));
     } catch {
       /* The preference is optional; the groups still fold without storage. */
     }
-  }, [collapsed]);
+  }, [collapsed, archiveId]);
 
   const toggleGroup = useCallback((id: string) => {
     setCollapsed((current) => {

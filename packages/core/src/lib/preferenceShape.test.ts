@@ -74,6 +74,7 @@ test("the flags come away without the appearance riding along", () => {
     "collaborators",
     "presence",
     "proofreader",
+    "spaceSwitch",
   ]);
   assert.equal(flags.presence, true);
   assert.equal(flags.autoLock, 15);
@@ -142,5 +143,15 @@ test("a row with no line at all leaves this device's alone", () => {
   assert.deepEqual(
     mergeAccountPreferences({ remarksSeen: "nonsense" }, local).remarksSeen,
     local.remarksSeen,
+  );
+});
+
+test("the archive switch is off until the row says otherwise", () => {
+  assert.equal(DEFAULT_FLAGS.spaceSwitch, false);
+  assert.equal(mergeAccountPreferences({}, local).spaceSwitch, local.spaceSwitch);
+  assert.equal(mergeAccountPreferences({ spaceSwitch: true }, local).spaceSwitch, true);
+  assert.equal(
+    mergeAccountPreferences({ spaceSwitch: "on" }, local).spaceSwitch,
+    local.spaceSwitch,
   );
 });

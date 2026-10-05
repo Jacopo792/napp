@@ -287,6 +287,10 @@ function leaveScreen(): Promise<void> {
 /** The archives seen last, so a remount draws the switch from its first frame
  *  instead of making room for it when the list comes back. */
 let knownSpaces: Space[] = [];
+/** The switches as last known, for the same reason: a remount that started
+ *  from the defaults would take the archive switch away until the row came
+ *  back, and the window would grow it again a moment after arriving. */
+let knownFlags: AccountFlags = DEFAULT_FLAGS;
 export default function NotesPage() {
   const [opened, setOpened] = useState(0);
   return <ArchiveScreen key={opened} onReopen={() => setOpened((count) => count + 1)} />;
@@ -383,7 +387,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      row on sign-in, pushed back when any of them moves, and re-applied when
      the other browser moves one. `writingPreferences`, the appearance and the
      axes ride along in `accountPreferences.ts`, which watches their stores. */
-  const [flags, setFlags] = useState<AccountFlags>(DEFAULT_FLAGS);
+  const [flags, setFlags] = useState<AccountFlags>(knownFlags);
+  useEffect(() => {
+    knownFlags = flags;
+  }, [flags]);
   /* Which conversations this account has read, note by note. Held here beside
      the flags because it travels in the same blob and is pushed by the same
      effect; the archive-wide reading of it is further down. */
@@ -548,25 +555,28 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [sidebarWidth, listWidth]);
 
   useEffect(() => {
-    for (const preferences of Object.values(listPreferences)) saveListPreferences(preferences);
-  }, [listPreferences]);
+    if (!session) return;
+    for (const preferences of Object.values(listPreferences))
+      saveListPreferences(session.archiveId, preferences);
+  }, [listPreferences, session]);
 
   /* Preferences are per member and stored locally, so they are read as the
      roster arrives rather than at mount, when nobody is known yet. */
   useEffect(() => {
-    if (members.length === 0) return;
+    if (members.length === 0 || !session) return;
+    const archiveId = session.archiveId;
     setListPreferences((current) => {
       const next = { ...current };
       let changed = false;
       for (const member of members) {
         if (!next[member.userId]) {
-          next[member.userId] = loadListPreferences(member.userId);
+          next[member.userId] = loadListPreferences(archiveId, member.userId);
           changed = true;
         }
       }
       return changed ? next : current;
     });
-  }, [members]);
+  }, [members, session]);
 
   /* The signed-in account's own profile, read once the session exists. */
   useEffect(() => {
@@ -3532,15 +3542,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     </SheetStack>
   );
 
-  const spaceSwitch = session && (
-    <SpaceSwitch
-      spaces={spacesView}
-      currentId={session.archiveId}
-      onSwitch={switchArchive}
-      onInfo={(origin) => openSheet({ ...origin, kind: "archive" })}
-      onCreate={(origin) => openSheet({ ...origin, kind: "new-archive" })}
-    />
-  );
+  /* Asked for in Settings, or the window is on an archive that is not the
+     first — the one an account starts with. Away from it, the switch is the
+     only thing on screen saying which archive this is, and the way back. */
+  const spaceSwitch = session &&
+    (flags.spaceSwitch ||
+      (spacesView.length > 0 && spacesView[0].archiveId !== session.archiveId)) && (
+      <SpaceSwitch
+        spaces={spacesView}
+        currentId={session.archiveId}
+        onSwitch={switchArchive}
+        onInfo={(origin) => openSheet({ ...origin, kind: "archive" })}
+        onCreate={(origin) => openSheet({ ...origin, kind: "new-archive" })}
+      />
+    );
 
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
@@ -3639,6 +3654,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         }}
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
+        spaceSwitchShown={flags.spaceSwitch}
+        onSpaceSwitchShownChange={(spaceSwitch) => changeFlags({ spaceSwitch })}
         proofreaderEnabled={proofreaderEnabled}
         autocorrectEnabled={autocorrectEnabled}
         writingPreferences={writingPreferences}
@@ -3782,6 +3799,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     already clears the query, the folder and the selection. */}
                 <NoteList
                   key={viewAs}
+                  archiveId={session.archiveId}
                   mobile
                   entries={visible}
                   groups={noteGroups}
@@ -3962,6 +3980,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     already clears the query, the folder and the selection. */}
                 <NoteList
                   key={viewAs}
+                  archiveId={session.archiveId}
                   entries={visible}
                   groups={noteGroups}
                   view="list"

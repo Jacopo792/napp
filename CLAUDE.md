@@ -1059,6 +1059,24 @@ out, the new one mounts under `data-arriving` at opacity 0, and once it has
 its archive every finite animation in it is finished and it fades in once.
 `knownSpaces` survives the remount so the switch is there on the first frame.
 
+**The switch is asked for.** `spaceSwitch` is an account flag, off by
+default and set in Settings → Archives, where every archive can be opened
+anyway. It is drawn regardless when the window is on an archive that is not
+the account's first, because away from it the switch is the only thing on
+screen that says which archive this is. `knownFlags` survives the remount
+for the reason `knownSpaces` does.
+
+**What one archive holds stays in it.** Notes, folders, remarks, versions,
+the IndexedDB caches and presence are keyed by archive on the server side
+already. What leaked was this browser's own storage: the list's sort, recents
+and per-folder order (`napp:list-preferences:v1:<archive>:<member>`) and the
+folded date groups (`napp:note-groups-closed:<archive>`) — a month bucket
+exists in every archive. `readAdopting()` moves the old unscoped key into the
+first archive opened after the change. Keys holding only uuids — the open
+folders, the remarks-seen stamps — need no archive. The preview keeps one
+in-memory store per archive in `supabase.mock.ts`: the fixture is the first,
+every other opens empty.
+
 ## Two people in one note
 
 Title and content are one Yjs document. The browser holds it in memory and in

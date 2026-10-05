@@ -2,7 +2,7 @@
    in and resolved with no credentials and no network. Threads live for as long
    as the tab, like everything else in the preview. */
 import type { AppSession } from "./session.mock";
-import { FIXTURE_NOTES, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { ArchiveComment, NoteComment } from "@/lib/commentThreads";
 
 export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "@/lib/commentThreads";
@@ -10,6 +10,9 @@ export type { ArchiveComment, NoteComment, CommentThread } from "@/lib/commentTh
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const store = new Map<string, NoteComment[]>();
+/* Which archive a note's remarks belong to, the way `note_comments` carries an
+   `archive_id`: the archive-wide read must not count another archive's. */
+const archiveOf = new Map<string, string>([[FIXTURE_NOTES[0].id, PREVIEW_ARCHIVE]]);
 
 /** One conversation, on the first note in the fixture and there from the
  *  start — so both readers of this store have something to show: the panel
@@ -63,6 +66,7 @@ export async function addComment(
     resolvedAt: null,
   };
   store.set(noteId, [...(store.get(noteId) ?? []), saved]);
+  archiveOf.set(noteId, session.archiveId);
   return saved;
 }
 
@@ -112,7 +116,9 @@ export async function updateComment(
 
 /** The archive-wide read, from the same in-memory store. The seed lands on
  *  whichever note is opened first, so this is empty until one has been. */
-export async function loadArchiveComments(_session: AppSession): Promise<ArchiveComment[]> {
+export async function loadArchiveComments(session: AppSession): Promise<ArchiveComment[]> {
   await sleep(90);
-  return [...store].flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId })));
+  return [...store]
+    .filter(([noteId]) => archiveOf.get(noteId) === session.archiveId)
+    .flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId })));
 }

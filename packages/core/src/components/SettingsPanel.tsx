@@ -339,6 +339,8 @@ export function SettingsPanel({
   onLeaveArchive,
   spaces,
   currentArchiveId,
+  spaceSwitchShown,
+  onSpaceSwitchShownChange,
   onSwitchArchive,
   onCreateArchive,
   onPresenceEnabledChange,
@@ -388,6 +390,8 @@ export function SettingsPanel({
   /** Every archive this account is in; the window is open on one of them. */
   spaces: Space[];
   currentArchiveId: string;
+  spaceSwitchShown: boolean;
+  onSpaceSwitchShownChange: (shown: boolean) => void;
   onSwitchArchive: (archiveId: string) => Promise<void>;
   onCreateArchive: (name: string) => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
@@ -1344,6 +1348,22 @@ export function SettingsPanel({
 
               {section === "spaces" && (
                 <section>
+                  <div className="appearance-controls">
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Layers size={16} />}
+                        label="Archive switch"
+                        hint="At the top of the sidebar"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={spaceSwitchShown}
+                        onChange={(event) => onSpaceSwitchShownChange(event.target.checked)}
+                      />
+                    </label>
+                  </div>
+
                   <h3>Your archives</h3>
                   <div className="member-role-list space-list">
                     {spaces.map((space) => (

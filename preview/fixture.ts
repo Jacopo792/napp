@@ -12,6 +12,7 @@ import {
    switching the real archive does. */
 export const PREVIEW_U1 = "preview-member-1";
 export const PREVIEW_U2 = "preview-member-2";
+export const PREVIEW_ARCHIVE = "00000000-0000-4000-8000-000000000001";
 
 const F_STUDIO = "f-studio";
 const F_APPUNTI = "f-appunti";

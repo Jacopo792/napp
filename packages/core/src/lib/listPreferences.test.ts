@@ -5,8 +5,10 @@ import {
   DEFAULT_LIST_PREFERENCES,
   dateBucket,
   groupEntries,
+  loadListPreferences,
   parseListPreferences,
   rememberRecent,
+  saveListPreferences,
 } from "./listPreferences.ts";
 
 function entry(id: string, updatedAt: string, createdAt = updatedAt, title = id): NoteEntry {
@@ -59,4 +61,34 @@ test("date buckets use the requested calendar bands", () => {
   assert.equal(dateBucket("2026-08-10T08:00:00", now).label, "Previous 30 Days");
   assert.equal(dateBucket("2026-05-10T08:00:00", now).label, "May");
   assert.equal(dateBucket("2025-05-10T08:00:00", now).label, "2025");
+});
+
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => void values.delete(key),
+    setItem: (key, value) => void values.set(key, String(value)),
+  };
+}
+
+test("each archive keeps its own list preferences, and the old key moves into the first", () => {
+  const storage = memoryStorage();
+  Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
+  const legacy = parseListPreferences(null, "u1");
+  legacy.defaults.sortBy = "title";
+  storage.setItem("napp:list-preferences:v1:u1", JSON.stringify(legacy));
+
+  assert.equal(loadListPreferences("main", "u1").defaults.sortBy, "title");
+  assert.equal(storage.getItem("napp:list-preferences:v1:u1"), null);
+  assert.equal(loadListPreferences("thesis", "u1").defaults.sortBy, "updated");
+
+  saveListPreferences("thesis", rememberRecent(loadListPreferences("thesis", "u1"), "n1"));
+  assert.deepEqual(loadListPreferences("thesis", "u1").recentNoteIds, ["n1"]);
+  assert.deepEqual(loadListPreferences("main", "u1").recentNoteIds, []);
 });

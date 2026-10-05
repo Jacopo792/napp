@@ -1,4 +1,4 @@
-import { PREVIEW_U1 } from "./fixture";
+import { PREVIEW_ARCHIVE, PREVIEW_U1 } from "./fixture";
 
 /* Preview-only stand-in for src/lib/session.ts. The archive is already open, so
    the notes surface can be inspected without credentials. There is no key of any
@@ -22,7 +22,7 @@ export interface AuthenticationResult {
   archives: ArchiveOption[];
 }
 
-const ARCHIVE_ID = "00000000-0000-4000-8000-000000000001";
+const ARCHIVE_ID = PREVIEW_ARCHIVE;
 const EMAIL = "preview@example.invalid";
 let signedOut = false;
 /* The archive chosen last, so switching from the sidebar reopens on it. */

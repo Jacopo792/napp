@@ -30,6 +30,10 @@ export interface AccountFlags {
    *  is a switch somebody can find. */
   autocorrect: boolean;
   autoLock: AutoLockMinutes;
+  /** The archive switch at the top of the sidebar. Off until asked for: an
+   *  account with one archive has nothing to switch, and one with several
+   *  still reaches every archive from Settings → Archives. */
+  spaceSwitch: boolean;
 }
 
 export interface AccountPreferences extends AccountFlags {
@@ -73,6 +77,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   proofreader: true,
   autocorrect: true,
   autoLock: 0,
+  spaceSwitch: false,
 };
 
 /**
@@ -83,7 +88,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
  * the appearance, the axes and the palette along inside it — and the push
  * spreads that state *last*, over a fresh reading of the live stores. The
  * effect is that changing a colour writes back the colour from the last pull:
- * the account never hears about a palette anybody chose. Take the four.
+ * the account never hears about a palette anybody chose. Take the switches.
  */
 export function flagsOf(preferences: AccountFlags): AccountFlags {
   return {
@@ -92,6 +97,7 @@ export function flagsOf(preferences: AccountFlags): AccountFlags {
     proofreader: preferences.proofreader,
     autocorrect: preferences.autocorrect,
     autoLock: preferences.autoLock,
+    spaceSwitch: preferences.spaceSwitch,
   };
 }
 
@@ -152,6 +158,7 @@ export function mergeAccountPreferences(
       proofreader: typeof row.proofreader === "boolean" ? row.proofreader : local.proofreader,
       autocorrect: typeof row.autocorrect === "boolean" ? row.autocorrect : local.autocorrect,
       autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
+      spaceSwitch: typeof row.spaceSwitch === "boolean" ? row.spaceSwitch : local.spaceSwitch,
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
   );

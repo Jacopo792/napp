@@ -1,8 +1,9 @@
 /* Spaces against memory: the preview archive and a second one, so the switcher
-   has somewhere to go and the archive sheet has seats to count. Switching
-   reopens the same fixture — the preview has one archive's worth of notes. */
+   has somewhere to go and the archive sheet has seats to count. Each archive
+   has its own notes in supabase.mock.ts — the fixture is the first one's, and
+   every other archive opens empty. */
 import type { AppSession } from "./session.mock";
-import { PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { Space } from "@/lib/spaces";
 
 export type { Space, SpaceMember } from "@/lib/spaces";
@@ -11,7 +12,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const spaces: Space[] = [
   {
-    archiveId: "00000000-0000-4000-8000-000000000001",
+    archiveId: PREVIEW_ARCHIVE,
     name: "Preview archive",
     seatLimit: 2,
     members: [
@@ -30,6 +31,18 @@ const spaces: Space[] = [
     ],
   },
 ];
+
+/** The roster supabase.mock.ts hands `loadArchive`, so the archive sheet and
+ *  the people shelf name the same people. */
+export function spaceMembers(archiveId: string): Space["members"] {
+  return (spaces.find((space) => space.archiveId === archiveId)?.members ?? []).map(
+    (member) => ({ ...member }),
+  );
+}
+
+export function spaceSeats(archiveId: string): number {
+  return spaces.find((space) => space.archiveId === archiveId)?.seatLimit ?? 2;
+}
 
 export async function loadSpaces(_session: AppSession): Promise<Space[]> {
   await sleep(120);
