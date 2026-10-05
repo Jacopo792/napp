@@ -49,7 +49,9 @@ one has two real implementations from the day it was written: `webOrigin`,
 `inviteToken`, `saveFile`, `saveFolder`, `openFile`, `print`. Each shell calls
 `setPlatform()` before mounting.
 
-And two more that are **optional**, which is a different kind of member.
+And three more that are **optional**, which is a different kind of member.
+`savePdf` is the simplest: Electron's `printToPDF` writes the print layout
+with real text, and no web API writes a PDF without the print dialog.
 `popUpMenu` hands a menu to the window manager: an `NSMenu` is painted by the
 window server over the window, in the material the system is wearing that year,
 and a `<div>` reaches only what is behind it in the page. There is no browser
@@ -1707,13 +1709,29 @@ of a narrow window spent on air.
 - **A `1fr` grid track is floored at its content's min-content width.** Use
   `minmax(0, 1fr)`. The phone's Settings column ran off the side of the panel
   and took every control with it for exactly this reason.
-- **Printing is one of the two PDF exports.** The ⋯ menu's "Print or save as
-  PDF" is every browser's own print-to-PDF, so the whole of it is one
-  `@media print` block deciding what is _not_ the note — and giving the scroll
-  box back its height and overflow, or the printer is handed one screenful and
-  told the rest is off-page. The Attachments menu's "Export as PDF" is a
-  second, unrelated path that never opens the print dialog at all; see
-  _Attachments and exports_ below for why it needed one.
+- **Print and Save as PDF are two items, not one.** "Print…" in the ⋯ menu is
+  the system print dialog, and the whole of it is one `@media print` block
+  deciding what is _not_ the note. Four things in that block are load-bearing,
+  and each one was a blank or one-page PDF before it was there:
+  - **Animations off.** A printed page starts every animation from its first
+    frame, and the entrances start at opacity 0: the note was in the PDF and
+    invisible.
+  - **`.pane-slide` hidden**, not only the columns inside it, or its width
+    stands empty and the note prints off the right edge.
+  - **The flex chain made blocks**, with `html`, `body` and `#root` unclipped,
+    or the window's height is the document's and the PDF stops after a page.
+  - **`useIsCompact` asks only of `screen`.** An A4 sheet is narrower than
+    767px, so without it printing re-rendered the app as the phone layout and
+    the PDF was the note list.
+
+  "Save as PDF" (also under the Attachments menu) prints those same pages to a
+  file on the desktop, through `platform().savePdf` → `printToPDF` — real
+  text, the cover kept with `printBackground`. A tab has no such API, so the
+  member is absent there and `exportPdf()` rasterises instead. Its copy is
+  laid out in an iframe carrying only the `@font-face` rules, so the page
+  breaks are measured on the layout html2canvas draws, and a break is halfway
+  across the gap between two lines, never on a line's edge.
+
 - **The toolbar does not magnify, and that was a decision rather than a gap.**
   The two pills were a dock: the icon under the pointer grew, its neighbours
   grew less, the rest stepped aside. It is gone at the reader's request, and

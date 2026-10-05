@@ -53,6 +53,10 @@ export interface Platform {
   openFile(name: string, load: () => Promise<Blob>): Promise<string | null>;
 
   print(): Promise<void>;
+  /** Write the page, as the print stylesheet lays it out, to a PDF the reader
+   *  names. Absent in a tab: no web API writes a PDF without the print dialog,
+   *  so the browser rasterises the note itself (`exportPdf`). */
+  savePdf?(name: string): Promise<void>;
   /** Native rich clipboard fallback, read only in response to Paste. */
   readClipboard?(): Promise<{ html: string; text: string; image?: File }>;
 

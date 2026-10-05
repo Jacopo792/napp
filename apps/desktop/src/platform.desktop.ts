@@ -10,6 +10,7 @@ interface Bridge {
   ): Promise<SavedAs | undefined>;
   open(name: string, bytes: Uint8Array): Promise<string | null>;
   print(): Promise<void>;
+  savePdf(name: string): Promise<void>;
   readClipboard(): Promise<{
     html: string;
     text: string;
@@ -60,6 +61,7 @@ export const desktopPlatform: Platform = {
   print: () => bridge.print(),
   ...(bridge
     ? {
+        savePdf: (name: string) => bridge.savePdf(name),
         readClipboard: async () => {
           const data = await bridge.readClipboard();
           return {

@@ -3720,6 +3720,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           onCopyMarkdown={() => void handleCopyMarkdown(selected)}
           onExportMarkdown={() => handleExportMarkdown(selected)}
           onPrint={() => void platform().print()}
+          onSavePdf={() => noteEditorRef.current?.savePdf()}
           onTogglePin={() => handleTogglePin(selected.note.id)}
           onFind={() => noteEditorRef.current?.openFind()}
           onHistory={() => noteEditorRef.current?.openHistory()}
@@ -3751,6 +3752,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onCopyMarkdown={() => void handleCopyMarkdown(selected)}
         onExportMarkdown={() => handleExportMarkdown(selected)}
         onPrint={() => void platform().print()}
+        onSavePdf={() => noteEditorRef.current?.savePdf()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
         onHistory={() => noteEditorRef.current?.openHistory()}

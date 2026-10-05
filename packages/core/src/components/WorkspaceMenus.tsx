@@ -35,6 +35,7 @@ import {
   Moon,
   Pin,
   Printer,
+  FileText,
   Search,
   Settings,
   SpellCheck,
@@ -260,6 +261,7 @@ function noteMenuItems({
   onCopyMarkdown,
   onExportMarkdown,
   onPrint,
+  onSavePdf,
   onDelete,
 }: NoteMenuActions): MenuItem[] {
   return [
@@ -339,13 +341,19 @@ function noteMenuItems({
       icon: <FileDown size={16} />,
       run: onExportMarkdown,
     },
-    /* The third door, and the one that keeps the cover and the typesetting:
-       every browser prints to PDF, so a paged copy of the note costs a
-       stylesheet rather than a PDF writer in the bundle. */
+    /* Two doors, not one: a PDF wanted as a file should not have to be
+       found inside a print dialog. */
+    {
+      kind: "item",
+      id: "pdf",
+      label: "Save as PDF",
+      icon: <FileText size={16} />,
+      run: onSavePdf,
+    },
     {
       kind: "item",
       id: "print",
-      label: "Print or save as PDF",
+      label: "Print…",
       icon: <Printer size={16} />,
       run: onPrint,
     },
@@ -380,6 +388,7 @@ interface NoteMenuActions {
   onCopyMarkdown: () => void;
   onExportMarkdown: () => void;
   onPrint: () => void;
+  onSavePdf: () => void;
   onDelete: () => void;
 }
 

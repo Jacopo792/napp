@@ -364,6 +364,16 @@ ipcMain.handle("napp:print", (event) => {
   event.sender.print({});
 });
 
+/* The page as the print stylesheet lays it out, written as a PDF with real
+   text in it — the same pages "Print…" would send to the printer, without the
+   print dialog in between. The browser has no equivalent and rasterises. */
+ipcMain.handle("napp:pdf", async (event, name) => {
+  const data = await event.sender.printToPDF({ preferCSSPageSize: true, printBackground: true });
+  await chooseAndWrite(BrowserWindow.fromWebContents(event.sender), [
+    { name: path.basename(String(name)), data },
+  ]);
+});
+
 /* ── The menu the system draws ───────────────────────────────────────────────
    The page describes a menu; macOS draws it. That is the whole of why this
    exists: an `NSMenu` is painted by the window server over the window, in the

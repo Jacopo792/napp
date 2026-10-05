@@ -6,6 +6,7 @@ import {
   isDrawingText,
   type DrawingMark,
 } from "./content";
+import { exportFileName } from "./exchange";
 import { platform } from "@/platform";
 
 type Resolve = (id: string) => Promise<Blob>;
@@ -71,10 +72,11 @@ export async function exportDocx(
   } = await import("docx");
   const inline = (
     node: JSONContent,
+    mono = false,
   ): (InstanceType<typeof TextRun> | InstanceType<typeof ExternalHyperlink>)[] =>
     (node.content ?? []).flatMap((child) => {
       if (child.type === "hardBreak") return [new TextRun({ break: 1 })];
-      if (child.type !== "text") return inline(child);
+      if (child.type !== "text") return inline(child, mono);
       const marks = child.marks ?? [];
       const style = marks.find((m) => m.type === "textStyle")?.attrs;
       const color = String(style?.color ?? "").replace("#", "");
@@ -86,6 +88,7 @@ export async function exportDocx(
         underline: marks.some((m) => m.type === "underline") ? {} : undefined,
         color: /^[0-9a-f]{6}$/i.test(color) ? color : undefined,
         size: style?.fontSize ? Math.round(parseFloat(String(style.fontSize)) * 1.5) : undefined,
+        font: mono || marks.some((m) => m.type === "code") ? "Courier New" : undefined,
       });
       const link = marks.find((m) => m.type === "link")?.attrs?.href;
       return [
@@ -136,6 +139,16 @@ export async function exportDocx(
         }),
       ];
     if (node.type === "table") {
+      /* A percentage alone is a width Word honours and Pages, LibreOffice and
+         Quick Look do not: with no grid they squeezed every column to one
+         letter. 9026 twips is the text width of A4 at the default margins. */
+      const columns = Math.max(
+        1,
+        ...(node.content ?? []).map((row) =>
+          (row.content ?? []).reduce((sum, cell) => sum + Number(cell.attrs?.colspan ?? 1), 0),
+        ),
+      );
+      const column = Math.floor(9026 / columns);
       const rows = await Promise.all(
         (node.content ?? []).map(
           async (row) =>
@@ -148,6 +161,10 @@ export async function exportDocx(
                         await Promise.all((cell.content ?? []).map((child) => blocks(child)))
                       ).flat(),
                       columnSpan: Number(cell.attrs?.colspan ?? 1),
+                      width: {
+                        size: column * Number(cell.attrs?.colspan ?? 1),
+                        type: WidthType.DXA,
+                      },
                       rowSpan: Number(cell.attrs?.rowspan ?? 1),
                     }),
                 ),
@@ -155,12 +172,21 @@ export async function exportDocx(
             }),
         ),
       );
-      return [new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } })];
+      return [
+        new Table({
+          rows,
+          width: { size: 9026, type: WidthType.DXA },
+          columnWidths: Array(columns).fill(column),
+        }),
+      ];
     }
     if (["paragraph", "heading", "codeBlock"].includes(node.type ?? ""))
       return [
         new Paragraph({
-          children: [...(prefix ? [new TextRun(prefix)] : []), ...inline(node)],
+          children: [
+            ...(prefix ? [new TextRun(prefix)] : []),
+            ...inline(node, node.type === "codeBlock"),
+          ],
           spacing: { after: 140 },
           ...(node.type === "heading"
             ? {
@@ -216,7 +242,9 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
     import("jspdf"),
   ]);
   const root = document.createElement("div");
-  root.style.cssText = `position:fixed;left:-20000px;top:0;width:${Math.max(400, source.clientWidth)}px;background:#fff;color:#202020;padding:0;`;
+  const rootWidth = Math.max(400, source.clientWidth);
+  // The bottom padding is room for the last line's descenders; see the breaks below.
+  root.style.cssText = `width:${rootWidth}px;background:#fff;color:#202020;padding:0 0 16px;`;
   const heading = document.createElement("h1");
   heading.textContent = title;
   heading.style.cssText = "font: bold 28px Arial;margin:0 0 24px;color:#202020";
@@ -294,26 +322,62 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
   clone.style.margin = "0";
   clone.style.width = "100%";
   root.append(clone);
-  document.body.append(root);
+  /* Laid out in a document of its own, with no stylesheet but the fonts.
+     Measured in this page, the copy still answered to every global rule on
+     `p`, `li` and `ul`, while html2canvas drew it without them — so the page
+     breaks were worked out on one layout and cut through the lines of
+     another. */
+  const frame = document.createElement("iframe");
+  frame.style.cssText = `position:fixed;left:-20000px;top:0;width:${rootWidth}px;height:100px;border:0`;
+  document.body.append(frame);
+  const doc = frame.contentDocument!;
+  const fonts = doc.createElement("style");
+  fonts.textContent = Array.from(document.styleSheets)
+    .flatMap((sheet) => {
+      try {
+        return Array.from(sheet.cssRules)
+          .filter((rule) => rule.type === CSSRule.FONT_FACE_RULE)
+          .map((rule) => rule.cssText);
+      } catch {
+        return [];
+      }
+    })
+    .join("\n");
+  doc.head.append(fonts);
+  doc.body.style.margin = "0";
+  doc.body.append(root);
   try {
+    root.getBoundingClientRect(); // a layout, so the faces it uses start loading
+    await doc.fonts.ready;
     await Promise.all(Array.from(root.querySelectorAll("img")).map((img) => img.decode()));
+    frame.style.height = `${root.scrollHeight}px`;
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     const width = 170,
       pageHeight = 257;
     const scale = width / root.clientWidth;
     const pagePixels = pageHeight / scale;
     const bounds = root.getBoundingClientRect();
-    const breaks = new Set<number>([root.scrollHeight]);
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    /* A page ends in the gap between two lines (or a line and a picture),
+       halfway across it: html2canvas sets the glyphs a few pixels off the box
+       the range reports, so a cut on the box's edge still clips a descender. */
+    const boxes: [number, number][] = [];
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
-      const range = document.createRange();
+      const range = doc.createRange();
       range.selectNodeContents(walker.currentNode);
-      for (const rect of range.getClientRects())
-        breaks.add(Math.ceil(rect.bottom - bounds.top + 3));
+      for (const rect of range.getClientRects()) boxes.push([rect.top, rect.bottom]);
     }
     for (const img of root.querySelectorAll("img")) {
       const rect = img.getBoundingClientRect();
-      breaks.add(Math.ceil(rect.bottom - bounds.top));
+      boxes.push([rect.top, rect.bottom]);
+    }
+    boxes.sort((a, b) => a[0] - b[0]);
+    const breaks = new Set<number>([root.scrollHeight]);
+    let reached = -Infinity;
+    for (const [boxTop, boxBottom] of boxes) {
+      if (boxTop >= reached && reached > -Infinity)
+        breaks.add(Math.round((reached + boxTop) / 2 - bounds.top));
+      reached = Math.max(reached, boxBottom);
     }
     const ordered = [...breaks].sort((a, b) => a - b);
     let top = 0;
@@ -326,10 +390,6 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
         y: top,
         height: end - top,
         logging: false,
-        onclone(doc) {
-          for (const sheet of Array.from(doc.querySelectorAll('style,link[rel="stylesheet"]')))
-            sheet.remove();
-        },
       });
       if (top) pdf.addPage();
       pdf.addImage(canvas, "PNG", 20, 20, width, (end - top) * scale);
@@ -337,7 +397,7 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
     }
     return pdf.output("blob");
   } finally {
-    root.remove();
+    frame.remove();
   }
 }
 
@@ -348,10 +408,10 @@ export async function saveNoteExport(
   element: HTMLElement,
   resolve: Resolve,
 ): Promise<void> {
+  const name = exportFileName(title).replace(/\.md$/, `.${format}`);
+  const { savePdf } = platform();
+  if (format === "pdf" && savePdf) return savePdf(name);
   const blob =
     format === "docx" ? await exportDocx(title, content, resolve) : await exportPdf(title, element);
-  await platform().saveFile(
-    `${(title || "Untitled").replace(/[\\/:*?"<>|]/g, "-")}.${format}`,
-    blob,
-  );
+  await platform().saveFile(name, blob);
 }

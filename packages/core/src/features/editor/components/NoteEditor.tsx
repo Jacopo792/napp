@@ -115,6 +115,7 @@ const TOOLBAR_ROW_ROOM = 460;
 
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
+  savePdf: () => void;
   /** With a version id, that version is opened in the list. */
   openHistory: (versionId?: string) => void;
   openComments: () => void;
@@ -243,7 +244,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     return () => observer.disconnect();
   }, []);
 
+  const exportAs = async (format: "pdf" | "docx") => {
+    if (!entry) return;
+    setFailure("");
+    setStatus("Exporting…");
+    try {
+      await editorRef.current?.exportNote(
+        format,
+        readDraft(entry.note.id)?.title ?? entry.note.title,
+      );
+      report("Note exported");
+    } catch (error) {
+      setStatus("");
+      setFailure(error instanceof Error ? error.message : "Could not export note");
+    }
+  };
+
   useImperativeHandle(ref, () => ({
+    savePdf() {
+      void exportAs("pdf");
+    },
     openHistory(versionId) {
       setCommentsOpen(false);
       setHistoryFocus(versionId ?? null);
@@ -475,21 +495,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onImportMarkdown={onImportMarkdown}
       onImportPdfText={() => importPdfRef.current?.click()}
       onChoosePhoto={() => imageRef.current?.click()}
-      onExport={async (format) => {
-        if (!entry) return;
-        setFailure("");
-        setStatus("Exporting…");
-        try {
-          await editorRef.current?.exportNote(
-            format,
-            readDraft(entry.note.id)?.title ?? entry.note.title,
-          );
-          report("Note exported");
-        } catch (error) {
-          setStatus("");
-          setFailure(error instanceof Error ? error.message : "Could not export note");
-        }
-      }}
+      onExport={(format) => void exportAs(format)}
       proofreaderEnabled={proofreaderEnabled}
       onProofread={() => void handleProofread()}
       linkForm={linkForm}

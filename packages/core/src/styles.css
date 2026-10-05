@@ -8508,6 +8508,20 @@
    The scroll box has to give up both its height and its overflow, or the
    printer is handed one screenful and told the rest is off-page. */
 @media print {
+  /* A printed page starts every animation from its first frame, and the
+     entrances start at opacity 0 — so with them on, the note was in the PDF
+     and invisible. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* The sidebar and the list live inside the sliding pair now: hiding the
+     columns alone left the pair's 600-odd pixels standing empty, and the note
+     was printed off the right edge of a blank sheet. */
+  .pane-slide,
   .sidebar-column,
   .collection-column,
   .editor-toolbar,
@@ -8526,9 +8540,22 @@
   html,
   body,
   #root {
-    height: auto;
+    height: auto !important;
+    overflow: visible !important;
     background: #fff;
     color: #000;
+  }
+
+  /* Blocks, not flex: a flex chain sized to the window keeps the window's
+     height however tall the note is, and the PDF stopped after one page. */
+  .workspace-shell,
+  .workspace-grid,
+  .editor-shell,
+  .editor-body {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
   }
 
   .editor-shell,

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("napp", {
   open: (name, bytes) => ipcRenderer.invoke("napp:open", name, bytes),
   readClipboard: () => ipcRenderer.invoke("napp:clipboard"),
   print: () => ipcRenderer.invoke("napp:print"),
+  savePdf: (name) => ipcRenderer.invoke("napp:pdf", name),
   /* Colour is deliberately a one-way cosmetic message, not a privileged
    * capability. The main process validates it before painting the frame. */
   setFrameTheme: (color, symbolColor) => ipcRenderer.send("napp:frame-theme", color, symbolColor),

@@ -1,6 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-const COMPACT = "(max-width: 767px), (max-height: 520px)";
+/* `screen`, so a page being printed is not a phone: an A4 sheet is narrower
+   than 767px, and without it printing re-rendered the whole app as the mobile
+   workspace and the PDF was the note list. */
+const COMPACT = "screen and (max-width: 767px), screen and (max-height: 520px)";
 
 function subscribe(onChange: () => void) {
   const query = window.matchMedia(COMPACT);
