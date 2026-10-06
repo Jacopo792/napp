@@ -2457,7 +2457,18 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         const found = editor.storage.findAndReplace.results.length > 0;
         if (found) editor.commands.goToNextResult();
         editor.commands.clearSearch();
-        if (found) editor.commands.focus(undefined, { scrollIntoView: false });
+        if (found) {
+          /* The caret at the start, not the words selected: a heading left
+             highlighted reads as something about to be replaced. */
+          editor.commands.setTextSelection(editor.state.selection.from);
+          editor.commands.focus(undefined, { scrollIntoView: false });
+          /* To the top of the page, not just inside it: a heading pulled
+             only as far as the bottom edge reads as nothing having moved. */
+          const { node } = editor.view.domAtPos(editor.state.selection.from);
+          (node instanceof Element ? node : node.parentElement)
+            ?.closest("h1, h2, h3, h4, p, li")
+            ?.scrollIntoView({ block: "start", behavior: "smooth" });
+        }
         return found;
       },
       focus() {

@@ -33,18 +33,18 @@ export const RELEASES: Release[] = [
   {
     version: "0.9.0",
     date: "2026-10-06",
-    headline: "Write a thesis or a book, with footnotes, captions and cross-references",
+    headline: "Write a book, with footnotes, captions and cross-references",
     sections: [
       {
         heading: "Documents",
         items: [
           {
             title: "A new kind of archive",
-            text: "New archive now offers Notes, Thesis or Book. A document is one piece of writing in chapters, and a notes archive works exactly as before.",
+            text: "New archive now offers Notes or Book. A book is one piece of writing in chapters, and a notes archive works exactly as before.",
           },
           {
             title: "Chapters and parts",
-            text: "The structure takes the place of the list: drag chapters into order, group them in parts, and keep loose pages in the notebook.",
+            text: "Chapters take the place of the list: drag them into order, group them in parts from a chapter's right-click menu, and keep loose pages under Notes.",
           },
           {
             title: "A page you can print",
@@ -86,7 +86,7 @@ export const RELEASES: Release[] = [
         items: [
           {
             title: "Numbered headings and contents",
-            text: "Headings can be numbered 2.1, 2.1.1. The contents sit on the title page, and a contents block can go anywhere in the text.",
+            text: "Headings can be numbered 2.1, 2.1.1. A chapter's headings are listed under it in the sidebar, and a contents block can go anywhere in the text.",
           },
           {
             title: "Spotlight on ⌘K",
@@ -240,6 +240,27 @@ function parts(version: string): number[] {
 }
 
 /** Negative when `a` is older than `b`. An empty version is older than any. */
+/* This device's copy of what has been read, so a remount or a closed window
+   that beats the account's debounced write does not bring "New" back. The
+   account row is still the authority; the two merge to the later. */
+const SEEN_KEY = "napp:whats-new-seen";
+
+export function localWhatsNewSeen(): string {
+  try {
+    return localStorage.getItem(SEEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function rememberWhatsNewSeen(version: string): void {
+  try {
+    localStorage.setItem(SEEN_KEY, version);
+  } catch {
+    /* Private window: the account row still carries it. */
+  }
+}
+
 export function compareVersions(a: string, b: string): number {
   if (!a || !b) return a ? 1 : b ? -1 : 0;
   const left = parts(a);

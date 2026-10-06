@@ -66,7 +66,6 @@ import {
   targetsOf,
   type ChapterTargets,
 } from "@/lib/references";
-import { ContentsList } from "@/components/ContentsList";
 import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
   DndContext,
@@ -206,6 +205,7 @@ import { SheetStack, type SheetOrigin } from "@/components/Sheet";
 import { NoteSheet } from "@/components/NoteSheet";
 import { FolderSheet } from "@/components/FolderSheet";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
+import { TrashSheet } from "@/components/TrashSheet";
 import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
 import { MenuButton as WritingMenuButton, PageSetupButton } from "@/components/WritingMenus";
 import type { MenuItem } from "@/lib/menuShape";
@@ -219,6 +219,7 @@ import {
   topLevel,
 } from "@/lib/manuscript";
 import {
+  ARCHIVE_PRESETS,
   DEFAULT_FEATURES,
   DEFAULT_PAGE,
   pageStyle,
@@ -229,6 +230,9 @@ import {
 import { keyName } from "@/lib/shortcuts";
 import { SpaceSwitch } from "@/components/SpaceSwitch";
 
+const BOOK_PRESET = ARCHIVE_PRESETS.find((preset) => preset.id === "book")!;
+const SWITCH_KEYS = ["numbering", "footnotes", "citations", "review"] as const;
+
 /** One sheet in the stack: what it is about, and where it grew out of. */
 type SheetEntry = SheetOrigin &
   (
@@ -237,39 +241,8 @@ type SheetEntry = SheetOrigin &
     | { kind: "folder"; folderId: string }
     | { kind: "archive" }
     | { kind: "new-archive" }
+    | { kind: "trash" }
   );
-
-/** A document's Trash, as a menu: each page a section with its two acts,
- *  the second of which destroys and so takes the second press. */
-function trashItems(
-  trashed: { id: string; title: string }[],
-  onRestore: (id: string) => void,
-  onDelete: (id: string) => void,
-): MenuItem[] {
-  if (trashed.length === 0) return [{ kind: "label", label: "The Trash is empty" }];
-  return trashed.map((item) => ({
-    kind: "item" as const,
-    id: `trash-${item.id}`,
-    label: item.title || "Untitled",
-    icon: <Trash2 size={16} />,
-    submenu: [
-      {
-        kind: "item" as const,
-        id: `restore-${item.id}`,
-        label: "Put back",
-        run: () => onRestore(item.id),
-      },
-      { kind: "separator" as const },
-      {
-        kind: "item" as const,
-        id: `delete-${item.id}`,
-        label: "Delete forever",
-        danger: true,
-        run: () => onDelete(item.id),
-      },
-    ],
-  }));
-}
 
 /** Where a held face is on screen — the portrait in it, when it has one, so
  *  the face that flies into a sheet starts exactly over the face that was
@@ -284,7 +257,12 @@ import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
 import { WhatsNewButton } from "@/components/WhatsNewButton";
-import { CURRENT_RELEASE, compareVersions, laterVersion } from "@/lib/whatsNew";
+import {
+  CURRENT_RELEASE,
+  compareVersions,
+  laterVersion,
+  rememberWhatsNewSeen,
+} from "@/lib/whatsNew";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
 import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
 import {
@@ -1006,7 +984,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       });
     const channel = subscribeToAccountPreferences(session, (preferences) => {
       if (!live) return;
-      setFlags(flagsOf(preferences));
+      /* A row that arrives late never un-reads a release read here. */
+      setFlags((current) => ({
+        ...flagsOf(preferences),
+        whatsNewSeen: laterVersion(current.whatsNewSeen, preferences.whatsNewSeen),
+      }));
       setRemarksSeen((current) => mergeRemarksSeen(current, preferences.remarksSeen));
     });
     return () => {
@@ -1413,6 +1395,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : null;
 
   const selected = docMode ? docSelected : (visible.find((e) => e.note.id === selectedId) ?? null);
+
+  /* A book opens on the chapter last written in. It had a title page with a
+     Continue button, which was one more press between the window and the
+     writing and said nothing the structure beside it did not. */
+  useEffect(() => {
+    if (!docMode || !manuscript || docSelected || loading) return;
+    const updated = (id: string) =>
+      Date.parse(entries.find((entry) => entry.note.id === id)?.note.updatedAt ?? "") || 0;
+    const last = [...manuscript.chapters].sort((a, b) => updated(b.id) - updated(a.id))[0];
+    if (last && last.id !== selectedId) setSelectedId(last.id);
+  }, [docMode, manuscript, docSelected, loading, entries, selectedId]);
 
   /* The window is named after what is open in it. A Mac window's title is not
      decoration — it is what Mission Control, the Window menu and ⌘Tab's preview
@@ -2825,15 +2818,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     setNoteRow(manuscriptOwner, id, next);
   }
 
-  function handleNewPart() {
+  function handleNewPart(chapterId: string) {
     const count = manuscript?.parts.size ?? 0;
+    const id = crypto.randomUUID();
     handleMetaChangeFor(manuscriptOwner, (prev) => ({
       ...prev,
-      folders: [
-        ...prev.folders,
-        { id: crypto.randomUUID(), name: `Part ${count + 1}`, parentId: null },
-      ],
+      folders: [...prev.folders, { id, name: `Part ${count + 1}`, parentId: null }],
     }));
+    /* The chapter stays where it is in the order; the part begins at it. */
+    setNoteRow(manuscriptOwner, chapterId, { folderId: id });
   }
 
   function handleRenamePart(id: string, name: string) {
@@ -3073,6 +3066,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         }
       : space,
   );
+  /* The archive an account starts with — the first it joined. It stays
+     notes and is never deleted from here; Postgres refuses the last one. */
+  const defaultArchiveId = spaces[0]?.archiveId;
 
   async function handleAvatarPick(file: File, crop?: AvatarCrop) {
     if (!session) return;
@@ -3112,22 +3108,28 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* What's New: open by itself once a release this account has not read
      is here — only after the row has been pulled, or every device would
-     announce a release already read on another — and read once closed. */
+     announce a release already read on another — and read the moment it is
+     open, so the New on the sidebar row goes with it. The sheet still marks
+     what was new, from the reading it was opened with. */
   const whatsNewUnseen =
     preferencesReady && compareVersions(CURRENT_RELEASE, flags.whatsNewSeen) > 0;
-  useEffect(() => {
-    if (!whatsNewUnseen || loading || whatsNewShown) return;
-    whatsNewShown = true;
-    setWhatsNewOpen(true);
-  }, [whatsNewUnseen, loading]);
-  const closeWhatsNew = useCallback(() => {
-    setWhatsNewOpen(false);
+  const [whatsNewFrom, setWhatsNewFrom] = useState("");
+  const openWhatsNew = useCallback(() => {
+    setWhatsNewFrom(flags.whatsNewSeen);
+    rememberWhatsNewSeen(laterVersion(flags.whatsNewSeen, CURRENT_RELEASE));
     setFlags((current) =>
       compareVersions(CURRENT_RELEASE, current.whatsNewSeen) > 0
         ? { ...current, whatsNewSeen: laterVersion(current.whatsNewSeen, CURRENT_RELEASE) }
         : current,
     );
-  }, []);
+    setWhatsNewOpen(true);
+  }, [flags.whatsNewSeen]);
+  useEffect(() => {
+    if (!whatsNewUnseen || loading || whatsNewShown) return;
+    whatsNewShown = true;
+    openWhatsNew();
+  }, [whatsNewUnseen, loading, openWhatsNew]);
+  const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
 
   function handleLock() {
     saveNow();
@@ -3175,12 +3177,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [goElsewhere]);
 
   /* Its last member only; `deleteSpace` asks Postgres first and refuses
-     before anything is removed. */
-  const handleDeleteArchive = useCallback(async () => {
-    const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before deleting this archive");
-    await goElsewhere(current, () => deleteSpace(current));
-  }, [goElsewhere]);
+     before anything is removed. Another archive than this one goes without
+     the window moving. */
+  const handleDeleteArchive = useCallback(
+    async (archiveId: string) => {
+      const current = sessionRef.current;
+      if (!current) throw new Error("Sign in again before deleting this archive");
+      if (archiveId !== current.archiveId) {
+        await deleteSpace(archiveId);
+        await refreshSpaces();
+        return;
+      }
+      await goElsewhere(current, () => deleteSpace(archiveId));
+    },
+    [goElsewhere, refreshSpaces],
+  );
 
   /* Writes waiting here belong to this archive, so they land before the
      window leaves it — and if they cannot, it does not leave. */
@@ -3817,7 +3828,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         group: "Do",
         name: "What's New",
         icon: <Sparkle size={16} />,
-        run: () => setWhatsNewOpen(true),
+        run: openWhatsNew,
       },
       {
         id: "shortcuts",
@@ -4291,12 +4302,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSeatLimit(seats);
           await refreshSpaces();
         }}
+        isDefault={space.archiveId === defaultArchiveId}
+        onKind={saveArchiveKind}
         onOptions={saveDocumentOptions}
         onCreateInvite={inviteLink}
         onRevokeInvite={withdrawInvite}
         onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
         onLeave={handleLeaveArchive}
-        onDelete={handleDeleteArchive}
+        onDelete={() => handleDeleteArchive(space.archiveId)}
       />
     );
   }
@@ -4360,6 +4373,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         if (sheet.kind === "note") return renderNoteSheet(sheet, `${key}:${sheet.noteId}`);
         if (sheet.kind === "folder") return renderFolderSheet(sheet, `${key}:${sheet.folderId}`);
         if (sheet.kind === "archive") return renderArchiveSheet(sheet, key);
+        if (sheet.kind === "trash")
+          return (
+            <TrashSheet
+              key={key}
+              origin={sheet}
+              items={docTrash.map((entry) => ({ id: entry.note.id, title: entry.note.title }))}
+              canWrite={canWriteArchive}
+              onRestore={handleRestoreDocNote}
+              onDelete={(id) => {
+                const entry = docTrash.find((one) => one.note.id === id);
+                if (entry) void deleteForever([entry]);
+              }}
+            />
+          );
         if (sheet.kind === "new-archive")
           return (
             <NewArchiveSheet
@@ -4390,9 +4417,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       <SpaceSwitch
         spaces={spacesView}
         currentId={session.archiveId}
+        defaultId={defaultArchiveId}
         onSwitch={switchArchive}
         onInfo={(origin) => openSheet({ ...origin, kind: "archive" })}
+        onSettings={() => {
+          setFoldersOpen(false);
+          setSettingsSection(docMode ? "document" : "spaces");
+          setSettingsOpen(true);
+        }}
         onCreate={(origin) => openSheet({ ...origin, kind: "new-archive" })}
+        onDelete={(archiveId) =>
+          void handleDeleteArchive(archiveId).catch((reason) =>
+            setError(reason instanceof Error ? reason.message : "The archive could not be deleted"),
+          )
+        }
       />
     );
 
@@ -4401,7 +4439,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     <Sidebar
       onWhatsNew={() => {
         setFoldersOpen(false);
-        setWhatsNewOpen(true);
+        openWhatsNew();
       }}
       whatsNewUnseen={whatsNewUnseen}
       scopes={scopes}
@@ -4454,10 +4492,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
-  async function saveDocumentOptions(kind: ArchiveKind, features: DocumentFeatures) {
+  async function saveDocumentOptions(features: DocumentFeatures) {
     if (!session) return;
-    if (kind !== currentSpace?.kind) await setSpaceKind(session, kind);
     await setDocumentFeatures(session, features);
+    await refreshSpaces();
+  }
+
+  /* Notes into a book or back, from the archive's own sheet. A book that has
+     never had a tool switched on gets the book's set. */
+  async function saveArchiveKind(kind: ArchiveKind) {
+    if (!session || !currentSpace) return;
+    await setSpaceKind(session, kind);
+    const { features } = currentSpace;
+    if (kind === "document" && !SWITCH_KEYS.some((key) => features[key]))
+      await setDocumentFeatures(session, { ...BOOK_PRESET.features });
     await refreshSpaces();
   }
 
@@ -4478,7 +4526,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         kind={docMode ? "document" : "notes"}
         onClose={() => setShortcutsOpen(false)}
       />
-      <WhatsNewSheet open={whatsNewOpen} seen={flags.whatsNewSeen} onClose={closeWhatsNew} />
+      <WhatsNewSheet open={whatsNewOpen} seen={whatsNewFrom} onClose={closeWhatsNew} />
     </>
   );
 
@@ -4498,7 +4546,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 features: docFeatures,
                 page: currentSpace.page,
                 disabled: !canWriteArchive,
-                onOptions: (kind, features) => void saveDocumentOptions(kind, features),
+                onOptions: (features) => void saveDocumentOptions(features),
                 onPage: savePageSetup,
               }
             : undefined
@@ -4532,7 +4580,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsOpen(false);
           await handleSwitchArchive(archiveId);
         }}
-        onNewArchive={(from) => openSheet({ ...faceOrigin(from), kind: "new-archive" })}
+        onNewArchive={(from) => {
+          /* Settings stands over the sheets; the new archive is the next
+             thing in front of you, so Settings steps aside for it. */
+          const origin = faceOrigin(from);
+          setSettingsOpen(false);
+          openSheet({ ...origin, kind: "new-archive" });
+        }}
+        defaultArchiveId={defaultArchiveId}
+        onDeleteArchive={handleDeleteArchive}
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
         spaceSwitchShown={flags.spaceSwitch}
@@ -4657,7 +4713,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const chapter = manuscript.chapters[chapterAt];
     const partName = chapter?.folderId ? manuscript.parts.get(chapter.folderId) : undefined;
     const notebookName =
-      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notebook` : "Notebook";
+      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notes` : "Notes";
     const before = chapterAt > 0 ? manuscript.chapters[chapterAt - 1] : undefined;
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
@@ -4797,31 +4853,25 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         }
         footer={
           <div className="sidebar-footer">
-            <WritingMenuButton
-              label="Trash"
+            <button
+              type="button"
               className="sidebar-footer-button press"
-              icon={
-                <span className="sidebar-glyph" data-tone="trash">
-                  <Trash2 size={16} />
-                </span>
-              }
-              items={trashItems(
-                docTrash.map((entry) => ({ id: entry.note.id, title: entry.note.title })),
-                handleRestoreDocNote,
-                (id) => {
-                  const entry = docTrash.find((one) => one.note.id === id);
-                  if (entry) void deleteForever([entry]);
-                },
-              )}
+              onClick={(event) => {
+                setFoldersOpen(false);
+                openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
+              }}
             >
+              <span className="sidebar-glyph" data-tone="trash">
+                <Trash2 size={16} />
+              </span>
               <span>Trash</span>
               {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
-            </WritingMenuButton>
+            </button>
             <WhatsNewButton
               unseen={whatsNewUnseen}
               onOpen={() => {
                 setFoldersOpen(false);
-                setWhatsNewOpen(true);
+                openWhatsNew();
               }}
             />
             <button
@@ -4873,13 +4923,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       />
     );
 
-    /* What the page shows when no chapter is open: the title page, which
-       says what the document is and where you stopped. */
-    const lastChapter = [...manuscript.chapters].sort(
-      (a, b) =>
-        Date.parse(entries.find((e) => e.note.id === b.id)?.note.updatedAt ?? "") -
-        Date.parse(entries.find((e) => e.note.id === a.id)?.note.updatedAt ?? ""),
-    )[0];
+    /* No chapter is open only while there is none to open — see the effect
+       that opens the last one written in. The desk then offers the first. */
     const titlePage = (
       <section className="editor-shell manuscript-shell flex min-w-0 flex-1 flex-col">
         <div className="manuscript-bar shrink-0">
@@ -4904,47 +4949,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             </button>
           )}
         </div>
-        <div className="manuscript-desk min-h-0 flex-1">
-          <article
-            className="manuscript-sheet is-title-page"
-            style={pageStyle(page)}
-            data-tone={writingPreferences.sheetTone}
-          >
-            <h1>{currentSpace?.name}</h1>
-            <p>
-              {manuscript.chapters.length === 1
-                ? "1 chapter"
-                : `${manuscript.chapters.length} chapters`}
-              {" · "}
-              {manuscript.total.toLocaleString()}
-              {docFeatures.wordGoal ? ` of ${docFeatures.wordGoal.toLocaleString()}` : ""} words
-            </p>
-            {lastChapter ? (
-              <button
-                type="button"
-                className="manuscript-continue press"
-                onClick={() => openFromStructure(lastChapter.id)}
-              >
-                Continue “{lastChapter.title || "Untitled"}”
-              </button>
-            ) : (
-              canWriteArchive && (
-                <button
-                  type="button"
-                  className="manuscript-continue press"
-                  onClick={() => handleNewChapter(null)}
-                >
-                  Begin the first chapter
-                </button>
-              )
-            )}
-            {manuscript.chapters.length > 0 && (
-              <ContentsList
-                entries={contents}
-                onOpen={(noteId, text) => openPlace({ noteId, text })}
-              />
-            )}
-          </article>
+        <div className="manuscript-desk manuscript-empty min-h-0 flex-1">
+          {canWriteArchive && manuscript.chapters.length === 0 && (
+            <button
+              type="button"
+              className="manuscript-continue press"
+              onClick={() => handleNewChapter(null)}
+            >
+              Begin the first chapter
+            </button>
+          )}
         </div>
       </section>
     );

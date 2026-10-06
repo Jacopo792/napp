@@ -61,6 +61,7 @@ import {
 } from "./preferenceShape.ts";
 import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
+import { localWhatsNewSeen } from "./whatsNew.ts";
 import {
   currentWritingPreferences,
   setWritingPreferences,
@@ -94,6 +95,7 @@ export function localPreferences(seen: RemarksSeen = {}): AccountPreferences {
       proofreader: loadProofreaderPreference(),
       autocorrect: loadAutocorrectPreference(),
       autoLock: loadAutoLock(),
+      whatsNewSeen: localWhatsNewSeen(),
     },
     seen,
   );

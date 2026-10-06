@@ -238,7 +238,9 @@ export function StructurePane({
   canWrite: boolean;
   onOpen: (id: string) => void;
   onNewChapter: (folderId: string | null) => void;
-  onNewPart: () => void;
+  /** A part is made with a chapter already in it: an empty heading over
+   *  nothing was a thing nobody could tell the use of. */
+  onNewPart: (chapterId: string) => void;
   onNewNote: () => void;
   onRenamePart: (id: string, name: string) => void;
   onDeletePart: (id: string) => void;
@@ -335,23 +337,33 @@ export function StructurePane({
             label: "Move down",
             run: () => onMove(item.id, { kind: "after", id: chapters[at + 1].id }),
           });
-        if (parts.size > 0)
-          items.push({
-            kind: "item",
-            id: "part",
-            label: "Move to part",
-            submenu: [...parts].map(([folderId, name]) => ({
+        items.push({
+          kind: "item",
+          id: "part",
+          label: "Group in a part",
+          icon: <FolderPlus size={16} />,
+          submenu: [
+            ...[...parts].map(([folderId, name]) => ({
               kind: "item" as const,
               id: `part-${folderId}`,
               label: name || "Untitled part",
               checked: item.folderId === folderId,
               run: () => onMove(item.id, { kind: "part", folderId }),
             })),
-          });
+            ...(parts.size > 0 ? [{ kind: "separator" as const }] : []),
+            {
+              kind: "item" as const,
+              id: "part-new",
+              label: "New part",
+              icon: <Plus size={16} />,
+              run: () => onNewPart(item.id),
+            },
+          ],
+        });
         items.push({
           kind: "item",
           id: "unplace",
-          label: `Back to ${notebookName}`,
+          label: `Move to ${notebookName}`,
           icon: <NotebookText size={16} />,
           run: () => onMove(item.id, { kind: "notebook" }),
         });
@@ -426,23 +438,22 @@ export function StructurePane({
   return (
     <aside className="structure-pane" aria-label="Structure">
       {header}
-      <div className="structure-total">
-        <strong>{documentName}</strong>
+      <div className="structure-total" aria-label={documentName}>
         <span>
           {total.toLocaleString()}
-          {goal ? ` of ${goal.toLocaleString()} words` : " words"}
+          {goal ? ` / ${goal.toLocaleString()} words` : " words"}
         </span>
         {goal ? (
           <span className="structure-goal" aria-hidden="true">
             <i style={{ transform: `scaleX(${progress})` }} />
           </span>
         ) : null}
-        {stats && (
+        {stats && (stats.today || stats.session) ? (
           <span className="structure-stats">
-            {stats.today !== null && <span>Today {signed(stats.today)}</span>}
-            <span>This session {signed(stats.session)}</span>
+            {stats.today ? <span>Today {signed(stats.today)}</span> : null}
+            {stats.session ? <span>This session {signed(stats.session)}</span> : null}
           </span>
-        )}
+        ) : null}
       </div>
 
       <DndContext
@@ -458,18 +469,9 @@ export function StructurePane({
       >
         <div className="structure-scroll">
           <div className="structure-heading">
-            <span>Structure</span>
+            <span>Chapters</span>
             {canWrite && (
               <span className="structure-heading-actions">
-                <button
-                  type="button"
-                  className="toolbar-button press"
-                  aria-label="New part"
-                  title="New part"
-                  onClick={onNewPart}
-                >
-                  <FolderPlus size={15} />
-                </button>
                 <button
                   type="button"
                   className="toolbar-button press"
@@ -482,16 +484,6 @@ export function StructurePane({
               </span>
             )}
           </div>
-
-          {rows.length === 0 && canWrite && (
-            <button
-              type="button"
-              className="structure-empty press"
-              onClick={() => onNewChapter(null)}
-            >
-              Begin the first chapter
-            </button>
-          )}
 
           {rows
             .map((row) =>
@@ -536,8 +528,8 @@ export function StructurePane({
                   {headings.map((heading, at) => (
                     <li key={at} data-depth={heading.depth}>
                       <button type="button" onClick={() => onHeading?.(heading.text)}>
-                        {heading.number && <span>{heading.number}</span>}
-                        {heading.text}
+                        <span className="structure-heading-number">{heading.number}</span>
+                        <span className="structure-heading-text">{heading.text}</span>
                       </button>
                     </li>
                   ))}

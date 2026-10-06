@@ -156,9 +156,9 @@ export async function setPageSetup(session: AppSession, page: PageSetup): Promis
   await mergeSpaceSettings(session, { page });
 }
 
-export async function deleteSpace(session: AppSession): Promise<void> {
+export async function deleteSpace(archiveId: string): Promise<void> {
   await sleep(150);
-  const index = spaces.findIndex((one) => one.archiveId === session.archiveId);
+  const index = spaces.findIndex((one) => one.archiveId === archiveId);
   if (index < 0) throw new Error("You are not in this archive");
   if (spaces[index].members.length > 1) throw new Error("Somebody else is still in this archive");
   if (spaces.length === 1) throw new Error("This is your only archive");

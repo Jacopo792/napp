@@ -6,18 +6,21 @@
  * notes, inside this archive; this says which archive. So it is small — a
  * stack of faces, a name, a chevron — and the shelf stays the large thing.
  *
- * The menu is a list (`menuShape.ts`), so a Mac draws it as an `NSMenu` and a
- * tab as a popover. A press held still opens the archive's sheet, the way a
- * folder's row and a note's row do; it grows out of the faces. */
+ * The menu is drawn in the page and never handed to the window manager, the
+ * one decision the row menu also takes: an `NSMenu` has no right button, and
+ * each archive in it has a menu of its own — open it, its settings, delete
+ * it. A press held still opens the archive's sheet, the way a folder's row
+ * and a note's row do; it grows out of the faces. */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ChevronDown, Info, Plus } from "@/components/icons";
+import { ChevronDown, Info, Plus, Settings, Trash2 } from "@/components/icons";
 import type { SheetOrigin } from "@/components/Sheet";
 import { Avatar } from "@/components/WorkspaceMenus";
-import { MenuItems } from "@/components/MenuPrimitives";
+import { MenuButton, MenuItems } from "@/components/MenuPrimitives";
+import { ContextMenu } from "@/components/ContextMenu";
 import { useDismiss } from "@/components/useDismiss";
-import { useSystemMenu } from "@/components/useSystemMenu";
 import { acquireAvatarUrl } from "@/lib/avatarCache";
 import type { MenuItem } from "@/lib/menuShape";
+import type { MenuPoint } from "@/lib/contextMenu";
 import type { Space, SpaceMember } from "@/lib/spaces";
 
 const HOLD_MS = 450;
@@ -74,30 +77,28 @@ function spaceOrigin(element: Element): SheetOrigin {
   return { x, y, width, height };
 }
 
-function SpaceMenu({ items, close }: { items: MenuItem[]; close: () => void }) {
-  const system = useSystemMenu(items, close);
-  if (system) return null;
-  return (
-    <div role="menu" className="popover menu-popover space-menu">
-      <MenuItems items={items} close={close} />
-    </div>
-  );
-}
-
 export function SpaceSwitch({
   spaces,
   currentId,
+  defaultId,
   onSwitch,
   onInfo,
+  onSettings,
   onCreate,
+  onDelete,
 }: {
   spaces: Space[];
   currentId: string;
+  /** The archive an account starts with, which is never deleted. */
+  defaultId: string | undefined;
   onSwitch: (archiveId: string) => void;
   onInfo: (origin: SheetOrigin) => void;
+  onSettings: () => void;
   onCreate: (origin: SheetOrigin) => void;
+  onDelete: (archiveId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState<{ point: MenuPoint; items: MenuItem[] } | null>(null);
   const close = () => setOpen(false);
   const ref = useDismiss(open, close);
   const button = useRef<HTMLButtonElement>(null);
@@ -108,35 +109,50 @@ export function SpaceSwitch({
   if (!current) return null;
   const origin = () => (button.current ? spaceOrigin(button.current) : spaceOrigin(document.body));
 
-  const items: MenuItem[] = [
-    ...spaces.map(
-      (space): MenuItem => ({
-        kind: "item",
-        id: `space:${space.archiveId}`,
-        label: space.name,
-        checked: space.archiveId === currentId,
-        icon: <FaceStack members={space.members} />,
-        run: () => {
-          if (space.archiveId !== currentId) onSwitch(space.archiveId);
+  /** What can be done to one archive: the right button on it, here or in
+   *  the list. */
+  function spaceItems(space: Space): MenuItem[] {
+    const here = space.archiveId === currentId;
+    const items: MenuItem[] = here
+      ? [
+          {
+            kind: "item",
+            id: "space-info",
+            label: "Archive info",
+            icon: <Info size={16} />,
+            run: () => onInfo(origin()),
+          },
+          {
+            kind: "item",
+            id: "space-settings",
+            label: "Settings…",
+            icon: <Settings size={16} />,
+            run: onSettings,
+          },
+        ]
+      : [{ kind: "item", id: "space-open", label: "Open", run: () => onSwitch(space.archiveId) }];
+    if (space.archiveId !== defaultId)
+      items.push(
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "space-delete",
+          label: "Delete archive",
+          danger: true,
+          icon: <Trash2 size={16} />,
+          submenu: [
+            {
+              kind: "item",
+              id: "space-delete-yes",
+              label: `Delete “${space.name}” and every note in it`,
+              danger: true,
+              run: () => onDelete(space.archiveId),
+            },
+          ],
         },
-      }),
-    ),
-    { kind: "separator" },
-    {
-      kind: "item",
-      id: "space-info",
-      label: "Archive info",
-      icon: <Info size={16} />,
-      run: () => onInfo(origin()),
-    },
-    {
-      kind: "item",
-      id: "space-new",
-      label: "New archive…",
-      icon: <Plus size={16} />,
-      run: () => onCreate(origin()),
-    },
-  ];
+      );
+    return items;
+  }
 
   function holdEnd() {
     if (hold.current && !hold.current.fired) {
@@ -174,14 +190,64 @@ export function SpaceSwitch({
         onContextMenu={(event) => {
           event.preventDefault();
           holdEnd();
-          setOpen(true);
+          setOpen(false);
+          setMenu({ point: { x: event.clientX, y: event.clientY }, items: spaceItems(current) });
         }}
       >
         <FaceStack members={current.members} />
         <span className="space-switch-name">{current.name}</span>
         <ChevronDown size={14} className="space-switch-chevron" />
       </button>
-      {open && <SpaceMenu items={items} close={close} />}
+      {open && (
+        <div role="menu" className="popover menu-popover space-menu">
+          {spaces.map((space) => (
+            <div
+              key={space.archiveId}
+              className="space-menu-row"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                close();
+                setMenu({
+                  point: { x: event.clientX, y: event.clientY },
+                  items: spaceItems(space),
+                });
+              }}
+            >
+              <MenuButton
+                active={space.archiveId === currentId}
+                onClick={() => {
+                  close();
+                  if (space.archiveId !== currentId) onSwitch(space.archiveId);
+                }}
+              >
+                <FaceStack members={space.members} />
+                <span className="truncate">{space.name}</span>
+              </MenuButton>
+            </div>
+          ))}
+          <div className="menu-separator" />
+          <MenuItems
+            close={close}
+            items={[
+              ...spaceItems(current).filter(
+                (item) => item.kind === "item" && item.id !== "space-delete",
+              ),
+              {
+                kind: "item",
+                id: "space-new",
+                label: "New archive…",
+                icon: <Plus size={16} />,
+                run: () => onCreate(origin()),
+              },
+            ]}
+          />
+        </div>
+      )}
+      {menu && (
+        <ContextMenu point={menu.point} onClose={() => setMenu(null)}>
+          <MenuItems items={menu.items} close={() => setMenu(null)} />
+        </ContextMenu>
+      )}
     </div>
   );
 }

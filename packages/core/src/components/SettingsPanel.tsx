@@ -334,6 +334,8 @@ export function SettingsPanel({
   onSpaceSwitchShownChange,
   onSwitchArchive,
   onNewArchive,
+  defaultArchiveId,
+  onDeleteArchive,
   onPresenceEnabledChange,
   onCollaboratorsVisibleChange,
   onProofreaderEnabledChange,
@@ -356,7 +358,7 @@ export function SettingsPanel({
     features: DocumentFeatures;
     page: PageSetup;
     disabled?: boolean;
-    onOptions: (kind: ArchiveKind, features: DocumentFeatures) => void;
+    onOptions: (features: DocumentFeatures) => void;
     onPage: (page: PageSetup) => void;
   };
   /** The account signed in, which is not the same thing as the notes on screen. */
@@ -399,6 +401,9 @@ export function SettingsPanel({
   onSpaceSwitchShownChange: (shown: boolean) => void;
   onSwitchArchive: (archiveId: string) => Promise<void>;
   onNewArchive: (from: Element) => void;
+  /** The account's first archive, which is never offered for deletion. */
+  defaultArchiveId: string | undefined;
+  onDeleteArchive: (archiveId: string) => Promise<void>;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onCollaboratorsVisibleChange: (visible: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
@@ -429,6 +434,7 @@ export function SettingsPanel({
   const [leaveConfirm, setLeaveConfirm] = useState(false);
   const [spaceStatus, setSpaceStatus] = useState("");
   const [spaceBusy, setSpaceBusy] = useState(false);
+  const [deletingSpace, setDeletingSpace] = useState<string | null>(null);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveStatus, setLeaveStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
@@ -542,6 +548,7 @@ export function SettingsPanel({
       await work();
     } catch (reason) {
       setSpaceStatus(reason instanceof Error ? reason.message : "That did not work");
+    } finally {
       setSpaceBusy(false);
     }
   }
@@ -1176,8 +1183,6 @@ export function SettingsPanel({
                 <section>
                   <h3>Options</h3>
                   <ArchiveOptions
-                    withPresets
-                    kind={kind}
                     features={document.features}
                     disabled={document.disabled}
                     onChange={document.onOptions}
@@ -1504,46 +1509,67 @@ export function SettingsPanel({
                   </div>
 
                   <h3>Your archives</h3>
-                  <div className="member-role-list space-list">
-                    {spaces.map((space) => (
-                      <div key={space.archiveId}>
-                        <FaceStack members={space.members} />
-                        <span className="space-list-text">
-                          <b>{space.name}</b>
-                          <small>
-                            {space.members.length === 1
-                              ? "1 member"
-                              : `${space.members.length} members`}
-                            {" · "}
-                            {space.seatLimit} seats
-                          </small>
-                        </span>
-                        {space.archiveId === currentArchiveId ? (
-                          <small className="space-list-current">Open now</small>
-                        ) : (
-                          <button
-                            type="button"
-                            className="invite-withdraw is-neutral"
-                            disabled={spaceBusy}
-                            onClick={() => void spaceAct(() => onSwitchArchive(space.archiveId))}
-                          >
-                            Open
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="appearance-controls space-list">
+                    {spaces.map((space) => {
+                      const here = space.archiveId === currentArchiveId;
+                      const confirming = deletingSpace === space.archiveId;
+                      return (
+                        <div key={space.archiveId} className="appearance-row">
+                          <FaceStack members={space.members} />
+                          <span className="settings-label">
+                            <b>{space.name}</b>
+                            <small>
+                              {space.kind === "document" ? "Book" : "Notes"}
+                              {" · "}
+                              {space.members.length === 1
+                                ? "1 member"
+                                : `${space.members.length} members`}
+                            </small>
+                          </span>
+                          {here ? (
+                            <span className="space-list-current">Current</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="space-list-button press"
+                              disabled={spaceBusy}
+                              onClick={() => void spaceAct(() => onSwitchArchive(space.archiveId))}
+                            >
+                              Open
+                            </button>
+                          )}
+                          {space.archiveId !== defaultArchiveId && (
+                            <button
+                              type="button"
+                              className={`space-list-button is-danger press ${
+                                confirming ? "is-confirm" : ""
+                              }`}
+                              disabled={spaceBusy}
+                              aria-label={`Delete ${space.name}`}
+                              onBlur={() => confirming && setDeletingSpace(null)}
+                              onClick={() => {
+                                if (!confirming) return setDeletingSpace(space.archiveId);
+                                setDeletingSpace(null);
+                                void spaceAct(() => onDeleteArchive(space.archiveId));
+                              }}
+                            >
+                              {confirming ? "Delete" : <Trash2 size={15} />}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <div className="invite-form">
-                    <button
-                      type="button"
-                      disabled={spaceBusy}
-                      onClick={(event) => onNewArchive(event.currentTarget)}
-                    >
-                      <Plus size={16} />
-                      New archive…
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="space-list-new press"
+                    disabled={spaceBusy}
+                    onClick={(event) => onNewArchive(event.currentTarget)}
+                  >
+                    <Plus size={16} />
+                    New archive…
+                  </button>
                   {spaceStatus && (
                     <p className="profile-note text-danger" role="alert">
                       {spaceStatus}

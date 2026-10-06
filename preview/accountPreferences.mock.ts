@@ -14,6 +14,7 @@ import {
   type RemarksSeen,
 } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
+import { localWhatsNewSeen } from "@/lib/whatsNew";
 
 export { flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
@@ -39,7 +40,7 @@ export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {
 }
 
 export function localPreferences(seen: RemarksSeen = {}) {
-  return preferencesWith(DEFAULT_FLAGS, seen);
+  return preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
 }
 
 /* No account to read it off, so the preview simply has read everything. */

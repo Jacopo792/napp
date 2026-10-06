@@ -29,9 +29,9 @@ export interface DocumentFeatures {
   wordGoal?: number;
 }
 
-/** Where a new archive starts. Not a kind: a thesis and a book are the same
- *  structure with different switches on, and a third genre is a third row
- *  here, never a migration. */
+/** Where a new archive starts: notes, or a book with every tool on. A genre
+ *  is a row here, never a kind — a thesis is a book with switches turned
+ *  off in its settings. */
 export const ARCHIVE_PRESETS = [
   {
     id: "notes",
@@ -46,27 +46,14 @@ export const ARCHIVE_PRESETS = [
     },
   },
   {
-    id: "thesis",
-    name: "Thesis",
+    id: "book",
+    name: "Book",
     kind: "document",
     features: {
       manuscript: "shared",
       numbering: true,
       footnotes: true,
       citations: true,
-      review: true,
-      wordGoal: 40_000,
-    },
-  },
-  {
-    id: "book",
-    name: "Book",
-    kind: "document",
-    features: {
-      manuscript: "shared",
-      numbering: false,
-      footnotes: true,
-      citations: false,
       review: true,
       wordGoal: 80_000,
     },

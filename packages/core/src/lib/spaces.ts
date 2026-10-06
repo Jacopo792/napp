@@ -187,24 +187,24 @@ export async function setPageSetup(session: AppSession, page: PageSetup): Promis
  *  Postgres decides (`archive_deletion_refusal`); the pictures are removed in
  *  between, because Storage refuses a delete made from SQL — and only once
  *  the answer is yes, so a refused delete never costs an archive its images. */
-export async function deleteSpace(session: AppSession): Promise<void> {
+export async function deleteSpace(archiveId: string): Promise<void> {
   const refusal = await supabase.rpc("archive_deletion_refusal", {
-    target_archive_id: session.archiveId,
+    target_archive_id: archiveId,
   });
   fail(refusal.error);
   if (typeof refusal.data === "string") throw new Error(refusal.data);
 
   const bucket = supabase.storage.from("note-images");
   for (;;) {
-    const listed = await bucket.list(session.archiveId, { limit: 1000 });
+    const listed = await bucket.list(archiveId, { limit: 1000 });
     fail(listed.error);
-    const names = (listed.data ?? []).map((object) => `${session.archiveId}/${object.name}`);
+    const names = (listed.data ?? []).map((object) => `${archiveId}/${object.name}`);
     if (names.length === 0) break;
     const removed = await bucket.remove(names);
     fail(removed.error);
   }
 
-  const result = await supabase.rpc("delete_archive", { target_archive_id: session.archiveId });
+  const result = await supabase.rpc("delete_archive", { target_archive_id: archiveId });
   fail(result.error);
 }
 

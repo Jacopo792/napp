@@ -1082,12 +1082,22 @@ every other opens empty.
 ## A document archive
 
 `archives.kind` is `notes` or `document`, and it is the one option that changes
-the whole screen, which is why it is a column. Thesis and Book are **presets**
-of the options in `archives.settings.features` (`spaceShape.ts`), never kinds:
-a third genre is a row in `ARCHIVE_PRESETS`, not a migration. The page set-up
-is `settings.page`. Both are the document's, so they live in the archive and
-are written whole through `merge_archive_settings` — `||` merges one level, so
-a patch of one switch would take the others with it.
+the whole screen, which is why it is a column. A new archive is **Notes or
+Book** and nothing else; Book is a preset with every tool in
+`archives.settings.features` on (`spaceShape.ts`). A thesis is a book with some
+switched off — a third genre is a row in `ARCHIVE_PRESETS`, not a migration.
+The page set-up is `settings.page`. Both are the document's, so they live in
+the archive and are written whole through `merge_archive_settings` — `||`
+merges one level, so a patch of one switch would take the others with it.
+
+**The kind is changed in one place: Type in the archive's own sheet**, and
+never in the account's first archive. It was a switch among the book's options
+in Settings → Document, and switching it to notes took the Document section
+away with it — the book was still there, and there was no way back to it. A
+change of kind loses nothing either way: a chapter is a note with a position.
+Any archive but the first can be deleted, from Settings → Archives or the
+right button on the archive switch; Postgres still refuses one somebody else
+is in, and an account's last.
 
 A notes archive renders exactly what it always did. A document renders the
 branch at the end of `ArchiveScreen`: `StructurePane` where the sidebar and the
@@ -1409,7 +1419,8 @@ has been pulled, and is always at the foot of the sidebar (both kinds of
 archive) and in ⌘K. What has been read is `whatsNewSeen` in
 `profile_preferences`, merged to the later of two readings like the remarks'
 line, so the desktop app does not announce a release already read in the
-browser. Closing it any way is having read it.
+browser. Opening it is having read it, so the sidebar's New goes the moment
+the sheet is up; the sheet marks what was new from the reading it opened with.
 
 ## Preferences belong to the account
 
