@@ -157,6 +157,10 @@ export class NoteConflict extends Error {
   }
 }
 
+/** What a new note was made with, for the collaboration mock to seed from —
+ *  the server seeds a new document from the row in the same way. */
+export const createdNotes = new Map<string, Note>();
+
 export async function createNote(
   session: AppSession,
   note: Note,
@@ -165,6 +169,7 @@ export async function createNote(
   await sleep(260);
   const entry: NoteEntry = { note: { ...note }, version: 1 };
   storeOf(session).notes.set(note.id, entry);
+  createdNotes.set(note.id, note);
   return { note: { ...note }, version: 1 };
 }
 

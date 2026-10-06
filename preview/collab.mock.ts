@@ -11,6 +11,7 @@ import type {
   Peer,
 } from "@/lib/collab";
 import { FIXTURE_NOTES, PREVIEW_U2, THESIS_NOTES } from "./fixture";
+import { createdNotes } from "./supabase.mock";
 
 export { collaborationColor };
 export type { CollaborationIdentity, CollaborativeNote, ConnectionState, Peer } from "@/lib/collab";
@@ -29,7 +30,9 @@ export function useCollaborativeNote(
 
   useEffect(() => {
     if (noteId && !documents.has(noteId)) {
-      const note = [...FIXTURE_NOTES, ...THESIS_NOTES].find((candidate) => candidate.id === noteId);
+      const note =
+        [...FIXTURE_NOTES, ...THESIS_NOTES].find((candidate) => candidate.id === noteId) ??
+        createdNotes.get(noteId);
       documents.set(noteId, seedDocument(note?.title ?? "", note?.content));
       redraw((n) => n + 1);
     }

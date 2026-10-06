@@ -42,6 +42,34 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.6",
+    date: "2026-10-06",
+    headline: "Continue as note, and a book each",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Continue as note",
+            text: "Choose words in a chapter and press Continue as note, in the bubble or the right-click menu. A note opens under Notes with those words quoted at the top; press the quotation to go back to them, lit for a moment.",
+          },
+          {
+            title: "Comments are comments again",
+            text: "Comments keep their own name and live in the side panel, as in a notes archive. Notes in the sidebar are the book's own pages.",
+          },
+          {
+            title: "A book each",
+            text: "A new book gives each of you your own chapters, so You and Partner show two different books. One shared manuscript is a switch in Settings → Document.",
+          },
+          {
+            title: "Steadier side panel",
+            text: "Switching between Headings, Comments and Versions no longer flashes Loading.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.5",
     date: "2026-10-06",
     headline: "The writing bar works again, and notes you can find",

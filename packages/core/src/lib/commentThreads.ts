@@ -87,19 +87,6 @@ export function notesWithOpenRemarks(comments: ArchiveComment[]): Set<string> {
   return notes;
 }
 
-/** The opening remark of every thread still open, oldest first — what a
- *  document's structure lists as the notes left on its passages. */
-export function openingRemarks(comments: ArchiveComment[]): ArchiveComment[] {
-  const first = new Map<string, ArchiveComment>();
-  for (const comment of comments) {
-    const seen = first.get(comment.threadId);
-    if (!seen || comment.createdAt < seen.createdAt) first.set(comment.threadId, comment);
-  }
-  return [...first.values()]
-    .filter((comment) => !comment.resolvedAt)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
-
 /** When this browser last read each note's remarks, keyed by note. */
 export type RemarksSeen = Record<string, string>;
 

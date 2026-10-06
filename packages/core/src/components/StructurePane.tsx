@@ -5,9 +5,9 @@
  * and never by date, it numbers what it shows, and it counts words where a
  * list shows a line of the text. The parts are headings over stretches of the
  * one order (see `manuscript.ts`), and the notebook under it is everything
- * not placed yet. Under them, the notes left on passages: a remark made with
- * a right-click on the words, listed here so the way back to the words is one
- * press — the passage is lit for a moment and let go.
+ * not placed yet: the notes taken while writing. "Continue as note" on chosen
+ * words starts one with those words quoted at its top, and pressing the quote
+ * goes back to them — the passage is lit for a moment and let go.
  *
  * A row is dragged to move it. A press that does not travel opens the chapter
  * — five pixels of travel is what tells them apart, the same distance the
@@ -52,15 +52,6 @@ export interface ChapterItem {
   /** May this one be placed in the manuscript? A partner's notebook note in
    *  a shared manuscript is theirs — see `Notes.tsx`. */
   movable: boolean;
-}
-
-/** A note left on a passage — the opening remark of an open thread. */
-export interface PassageNote {
-  threadId: string;
-  noteId: string;
-  body: string;
-  /** Where it is: "Chapter 2", or the page's title. */
-  where: string;
 }
 
 export type StructureTarget =
@@ -210,8 +201,6 @@ export function StructurePane({
   parts,
   notebook,
   notebookName,
-  passageNotes = [],
-  onOpenPassage,
   selectedId,
   canWrite,
   onOpen,
@@ -235,8 +224,6 @@ export function StructurePane({
   parts: Map<string, string>;
   notebook: ChapterItem[];
   notebookName: string;
-  passageNotes?: PassageNote[];
-  onOpenPassage?: (note: PassageNote) => void;
   selectedId: string | null;
   canWrite: boolean;
   onOpen: (id: string) => void;
@@ -365,7 +352,7 @@ export function StructurePane({
         items.push({
           kind: "item",
           id: "unplace",
-          label: `Move to ${notebookName}`,
+          label: "Take out of the book",
           icon: <NotebookText size={16} />,
           run: () => onMove(item.id, { kind: "notebook" }),
         });
@@ -523,30 +510,8 @@ export function StructurePane({
               hand was heading for out from under it. */}
           {rows.length > 0 && <Zone id="end" className="structure-end" />}
 
-          {onOpenPassage && (
-            <section className="structure-passages" aria-label="Notes">
-              <div className="structure-heading">
-                <span>Notes</span>
-                <small>{passageNotes.length || ""}</small>
-              </div>
-              {passageNotes.length === 0 && <p className="structure-passages-empty">None yet</p>}
-              {passageNotes.map((note) => (
-                <button
-                  key={note.threadId}
-                  type="button"
-                  className="structure-passage press"
-                  onClick={() => onOpenPassage?.(note)}
-                >
-                  <span className="structure-passage-body">{note.body}</span>
-                  <span className="structure-passage-where">{note.where}</span>
-                </button>
-              ))}
-            </section>
-          )}
-
-          {/* Pages that are not chapters. Nothing makes one any more — a note
-              belongs on the words it is about — but a chapter can still be
-              taken out of the order, and what was put here before stays. */}
+          {/* Notes: pages that are not chapters. Made from chosen words with
+              Continue as note, or by taking a chapter out of the order. */}
           {(notebook.length > 0 || dragging) && (
             <Zone id="notebook" className="structure-notebook">
               <div className="structure-heading">

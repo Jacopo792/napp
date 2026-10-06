@@ -109,19 +109,21 @@ export interface PlaceTarget {
   index: number;
 }
 
-/** A passage somebody left a note on, by the thread that holds it. */
-export interface ThreadPlace {
-  thread: string;
+/** Words to go back to and light for a moment — the passage a note was
+ *  continued from. Found by its words, so an edit to them loses the light,
+ *  never the chapter. */
+export interface PassagePlace {
+  passage: string;
 }
 
-export type Place = string | PlaceTarget | ThreadPlace;
+export type Place = string | PlaceTarget | PassagePlace;
 
 export interface PlaceRequest {
   noteId: string;
   /** A heading to go to inside it. */
   text?: string;
   target?: PlaceTarget;
-  thread?: string;
+  passage?: string;
 }
 
 export function openPlace(request: PlaceRequest): void {

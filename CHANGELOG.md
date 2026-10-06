@@ -3,6 +3,27 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.6 — 2026-10-06
+
+Continue as note, and a book each.
+
+### Added
+
+- Continue as note: on chosen words in a chapter (bubble and right-click
+  menu), a notebook note opens with the words as a blockquote linked to the
+  chapter. Clicking the quotation opens the chapter and lights the passage
+  through a ProseMirror decoration (`flashPassage`, replacing `flashComment`).
+
+### Changed
+
+- 0.9.5's renaming of comments to "notes" in a book is undone, and open
+  comment threads are no longer listed in the structure; "Notes" is again the
+  book's non-chapter pages.
+- The Book preset makes `manuscript: "own"`: one manuscript per member.
+  Existing books keep what they stored.
+- The book inspector keeps its three panels mounted, so switching tab no
+  longer reloads them.
+
 ## 0.9.5 — 2026-10-06
 
 The writing bar works again, and notes you can find.

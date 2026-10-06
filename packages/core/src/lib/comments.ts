@@ -18,7 +18,7 @@ import {
   type NoteComment,
 } from "./commentThreads";
 
-export { notesWithOpenRemarks, openingRemarks, threadsOf, unreadRemarks } from "./commentThreads";
+export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
 export type { ArchiveComment, NoteComment, CommentThread, RemarksSeen } from "./commentThreads";
 
 export async function loadComments(session: AppSession, noteId: string): Promise<NoteComment[]> {

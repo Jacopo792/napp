@@ -7,7 +7,6 @@ import type { ArchiveComment, NoteComment } from "@/lib/commentThreads";
 
 export {
   notesWithOpenRemarks,
-  openingRemarks,
   threadsOf,
   unreadRemarks,
 } from "@/lib/commentThreads";

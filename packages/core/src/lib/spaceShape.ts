@@ -49,8 +49,12 @@ export const ARCHIVE_PRESETS = [
     id: "book",
     name: "Book",
     kind: "document",
+    /* A book each, like the notes archive's You / Partner: in a book that
+       was one manuscript for everybody the switch changed nothing above the
+       fold, and two people read that as no difference between them. One
+       shared manuscript is a switch in Settings → Document. */
     features: {
-      manuscript: "shared",
+      manuscript: "own",
       numbering: true,
       footnotes: true,
       citations: true,

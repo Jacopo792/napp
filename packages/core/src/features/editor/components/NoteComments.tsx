@@ -77,9 +77,6 @@ interface Props {
   onReveal: (threadId: string) => void;
   onRemoveAnchor: (threadId: string) => void;
   onResolveAnchor: (threadId: string, resolved: boolean) => void;
-  /** In a book they are notes left on the words, and say so: the same
-   *  threads, named the way the structure lists them. */
-  asNotes?: boolean;
   /** Something was said, resolved or taken back — so lists outside this
    *  panel can read again now rather than when Realtime gets round to it. */
   onChanged?: () => void;
@@ -103,7 +100,6 @@ export function NoteComments({
   onReveal,
   onRemoveAnchor,
   onResolveAnchor,
-  asNotes = false,
   onChanged,
 }: Props) {
   const [comments, setComments] = useState<NoteComment[]>([]);
@@ -293,7 +289,7 @@ export function NoteComments({
               disabled={!(draft[threadId] ?? "").trim()}
               onClick={() => void say(threadId)}
             >
-              {threadId === pendingThread ? (asNotes ? "Add note" : "Comment") : "Reply"}
+              {threadId === pendingThread ? "Comment" : "Reply"}
             </button>
           </div>
         )}
@@ -489,9 +485,7 @@ export function NoteComments({
 
       {!loading && shown.length === 0 && !pendingIsNew && (
         <p className="note-comments-empty">
-          {asNotes
-            ? "No notes in this chapter."
-            : "Nothing here yet. Select a passage and use the comment button to say something about it."}
+          Nothing here yet. Select a passage and use the comment button to say something about it.
         </p>
       )}
 
@@ -511,11 +505,7 @@ export function NoteComments({
           className="note-comment-thread is-pending is-active"
         >
           <p className="note-comment-quote">{quotes.get(pendingThread) || "This passage"}</p>
-          {composer(
-            pendingThread,
-            asNotes ? "A note on these words…" : "What about this passage?",
-            true,
-          )}
+          {composer(pendingThread, "What about this passage?", true)}
         </article>
       )}
     </>
@@ -532,14 +522,14 @@ export function NoteComments({
   const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
 
   return (
-    <aside className="note-comments" aria-label={asNotes ? "Notes" : "Comments on this note"}>
+    <aside className="note-comments" aria-label="Comments on this note">
       {lit && (
         <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
       )}
       <header className="note-comments-header">
         <MessageSquare size={16} />
         <span className="note-comments-title">
-          {asNotes ? "Notes" : "Comments"}
+          Comments
           {threads.length > 0 && <b className="note-comments-count">{threads.length}</b>}
         </span>
         {resolvedCount > 0 && (

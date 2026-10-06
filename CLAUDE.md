@@ -1107,21 +1107,31 @@ list were, and `NoteEditor` with `manuscript` — the same binding, comments,
 history and find, under a writing bar (`ManuscriptToolbar`) and on a sheet the
 size, margins and letter of the page set-up.
 
-- A chapter is a note with `notes.position`; the notebook ("Pages") is every
-  note without one. Nothing makes a new page any more: a note belongs on the
-  words it is about. Right-click on chosen words → **Add note** opens a comment
-  thread on them, and the structure lists every open thread under **Notes**;
-  pressing one opens the chapter and lights the passage for a moment
-  (`flashComment`) instead of leaving it selected. A research page opens as a
+- A chapter is a note with `notes.position`; the notebook ("Notes" in the
+  structure) is every note without one. A comment is a comment, as in a notes
+  archive, and lives in the inspector; it is not listed in the structure.
+  **Continue as note** — in the bubble on chosen words and in their
+  right-click menu — makes a notebook note that opens with the words as a
+  blockquote wrapped in a `noteLink` to the chapter. A note link inside a
+  blockquote carries its own words back (`handleClickOn`), so pressing the
+  quotation opens the chapter and `flashPassage` finds those words in one text
+  block (or their first 60 characters, if they were edited since), leaves the
+  caret at their end and lights them with a decoration from the
+  `passageFlash` plugin — never a class on the DOM, which ProseMirror redraws.
+  The note's content is in the row it is created with, and the collaboration
+  server seeds the Yjs document from that row. A research page opens as a
   plain note, never on the sheet, so the two never look alike. A part is a folder, drawn wherever the one order crosses into
   it (`manuscript.ts`), so a chapter can stand before the first part. A move
   writes one position, the midpoint of its neighbours.
-- **Manuscript shared** keeps the structure in the scope of the archive's
-  first member, so it is one for everybody, and You / Partner chooses whose
-  notebook is open. **One each** is the switch as it always was. A partner's
-  notebook page cannot be dragged into a shared manuscript: the folder foreign
-  key is per owner, and moving a note between owners is not a thing the
-  metadata path does.
+- **One each** is the Book preset's default: a manuscript per member, so
+  You / Partner changes the whole book the way it changes a notes archive. A
+  shared book read as no difference between the two. **Manuscript shared**
+  keeps the structure in the scope of the archive's first member, so it is one
+  for everybody, and You / Partner chooses whose notebook is open; an archive
+  that stored `shared` keeps it until Settings → Document changes it. A
+  partner's notebook page cannot be dragged into a shared manuscript: the
+  folder foreign key is per owner, and moving a note between owners is not a
+  thing the metadata path does.
 - The sheet is paper in every theme: the tokens are re-pointed inside
   `.manuscript-sheet`, so ink chosen there prints the colour it was chosen.
 - `ParagraphFormat`, `Superscript`, `Subscript` and `PageBreak` are in

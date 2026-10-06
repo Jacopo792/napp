@@ -10712,53 +10712,6 @@ button.sheet-chip:hover,
   color: var(--on-accent);
 }
 
-.structure-passages {
-  margin-top: 18px;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 6px;
-}
-
-.structure-passages .structure-heading small {
-  color: var(--ink-4);
-  font-weight: var(--weight-medium);
-}
-
-.structure-passages-empty {
-  padding: 2px 8px 6px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-}
-
-.structure-passage {
-  display: grid;
-  width: 100%;
-  gap: 1px;
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  text-align: left;
-}
-
-.structure-passage:hover {
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-}
-
-.structure-passage-body {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.structure-passage-where {
-  overflow: hidden;
-  color: var(--ink-4);
-  font-size: var(--text-2xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .structure-notebook {
   margin-top: 18px;
   border-radius: var(--radius-sm);
@@ -11701,6 +11654,17 @@ button.sheet-chip:hover,
   color: var(--ink);
 }
 
+.inspector-pane {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.inspector-pane[hidden] {
+  display: none;
+}
+
 .inspector-close {
   display: inline-flex;
   width: 28px;
@@ -12331,10 +12295,10 @@ button.sheet-chip:hover,
   }
 }
 
-/* A note on a passage, arrived at from the structure: the words are lit for
+/* A passage arrived at from a quotation in a note: the words are lit for
    a moment and let go, so the reader sees where they are and nothing stays
    selected under the next thing they type. */
-.rich-text-content span[data-comment-thread].is-flashing {
+.rich-text-content .is-flashing {
   animation: passage-flash 2.4s var(--ease);
 }
 
@@ -12349,7 +12313,7 @@ button.sheet-chip:hover,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rich-text-content span[data-comment-thread].is-flashing {
+  .rich-text-content .is-flashing {
     animation-duration: 1.2s;
   }
 }

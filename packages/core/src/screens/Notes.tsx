@@ -1,3 +1,4 @@
+import type { JSONContent } from "@tiptap/core";
 import { useNavigate } from "@tanstack/react-router";
 import {
   lazy,
@@ -120,7 +121,6 @@ import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from 
 import {
   loadArchiveComments,
   notesWithOpenRemarks,
-  openingRemarks,
   unreadRemarks,
   type RemarksSeen,
   type ArchiveComment,
@@ -2716,17 +2716,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     await drain();
   }
 
-  async function createDocNote(place: { folderId: string | null; position: number } | null) {
+  async function createDocNote(
+    place: { folderId: string | null; position: number } | null,
+    content: JSONContent = EMPTY_RICH_TEXT,
+  ) {
     if (!canWriteArchive) return;
     const s = sessionRef.current;
     if (!s) return;
     const owner = place ? manuscriptOwner : viewAs;
     const now = new Date().toISOString();
+    const body = richTextToPlainText(content);
     const note: Note = {
       id: crypto.randomUUID(),
       title: "",
-      body: "",
-      content: structuredClone(EMPTY_RICH_TEXT),
+      body,
+      content: structuredClone(content),
       contentVersion: RICH_TEXT_VERSION,
       legacyBody: null,
       photo: null,
@@ -2759,13 +2763,40 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       });
       setSelectedId(note.id);
       if (compact) setMobileScreen("note");
-      ensureDraft(note.id, { title: "", body: "", content: structuredClone(EMPTY_RICH_TEXT) }, now);
+      ensureDraft(note.id, { title: "", body, content: structuredClone(content) }, now);
       window.setTimeout(() => titleRef.current?.focus(), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create the chapter");
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Chosen words in a chapter, carried into a new note in the notebook: the
+   *  quotation is a link back to the chapter, and pressing it lights the
+   *  words there again. */
+  function continueAsNote(chapterId: string, quote: string) {
+    void createDocNote(null, {
+      type: "doc",
+      content: [
+        {
+          type: "blockquote",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: quote,
+                  marks: [{ type: "noteLink", attrs: { noteId: chapterId } }],
+                },
+              ],
+            },
+          ],
+        },
+        { type: "paragraph" },
+      ],
+    });
   }
 
   /** After the chapter open now, in its part — the way Word inserts a section
@@ -2940,9 +2971,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text, target, thread } = (event as CustomEvent<PlaceRequest>).detail;
+      const { noteId, text, target, passage } = (event as CustomEvent<PlaceRequest>).detail;
       handleSelectNote(noteId);
-      const reveal: Place | undefined = thread ? { thread } : (target ?? text);
+      const reveal: Place | undefined = passage ? { passage } : (target ?? text);
       if (reveal) setOpenThen({ noteId, reveal });
     };
     window.addEventListener(OPEN_PLACE, open);
@@ -2973,10 +3004,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [paletteOpen, session]);
 
-  function handleOpenRecent(id: string) {
+  /** A link to a note, pressed. One made by Continue as note carries the
+   *  words it was continued from, and those are what it goes back to. */
+  function handleOpenRecent(id: string, passage?: string) {
     setQuery("");
     setSelectedFolderId(ALL);
-    handleSelectNote(id);
+    if (passage) openPlace({ noteId: id, passage });
+    else handleSelectNote(id);
   }
 
   function handleMobileBack() {
@@ -3669,7 +3703,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             })),
             ...manuscript.notebook.map((item) => ({
               id: `note:${item.id}`,
-              group: "Pages",
+              group: "Notes",
               name: item.title || "Untitled",
               icon: <NotebookText size={16} />,
               run: open(item.id),
@@ -4714,25 +4748,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const chapter = manuscript.chapters[chapterAt];
     const partName = chapter?.folderId ? manuscript.parts.get(chapter.folderId) : undefined;
     const notebookName =
-      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s pages` : "Pages";
-    /* The notes left on passages, in the order of the book and then of
-       writing — a note about chapter one is read before one about three. */
-    const placeOf = new Map<string, { at: number; where: string }>();
-    manuscript.chapters.forEach((item, at) =>
-      placeOf.set(item.id, { at, where: `Chapter ${at + 1} · ${item.title || "Untitled"}` }),
-    );
-    manuscript.notebook.forEach((item) =>
-      placeOf.set(item.id, { at: Infinity, where: item.title || "Untitled" }),
-    );
-    const passageNotes = openingRemarks(archiveComments)
-      .filter((remark) => placeOf.has(remark.noteId))
-      .sort((a, b) => placeOf.get(a.noteId)!.at - placeOf.get(b.noteId)!.at)
-      .map((remark) => ({
-        threadId: remark.threadId,
-        noteId: remark.noteId,
-        body: remark.body,
-        where: placeOf.get(remark.noteId)!.where,
-      }));
+      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notes` : "Notes";
     const before = chapterAt > 0 ? manuscript.chapters[chapterAt - 1] : undefined;
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
@@ -4921,8 +4937,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onOpen={openFromStructure}
         onNewChapter={handleNewChapter}
         onNewPart={handleNewPart}
-        passageNotes={passageNotes}
-        onOpenPassage={(note) => openPlace({ noteId: note.noteId, thread: note.threadId })}
         onRenamePart={handleRenamePart}
         onDeletePart={handleDeletePart}
         onMove={handleMoveChapter}
@@ -5044,6 +5058,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           linkable={linkableNotes}
           onOpenNote={handleOpenRecent}
           onRemarksChanged={refreshRemarks}
+          onContinueAsNote={
+            chapterAt >= 0 && canWriteArchive
+              ? (quote) => continueAsNote(selected.note.id, quote)
+              : undefined
+          }
           /* Research is a note, not a page of the book: it opens as one, so
              the two kinds never look the same. */
           manuscript={

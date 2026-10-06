@@ -37,6 +37,7 @@ import {
   Lock,
   LockOpen,
   MessageSquarePlus,
+  NotebookPen,
   Minus,
   Move,
   PaintBucket,
@@ -178,9 +179,9 @@ export interface RichTextEditorHandle {
   reveal: (text: string) => boolean;
   /** Go to a footnote, a caption or a heading; a footnote opens to be read. */
   revealTarget: (target: PlaceTarget) => boolean;
-  /** Go to a commented passage and light it for a moment — the caret is left
-   *  at its end, not on the words, so nothing stays selected. */
-  flashComment: (threadId: string) => boolean;
+  /** Go to these words and light them for a moment — the caret is left at
+   *  their end, not on them, so nothing stays selected. */
+  flashPassage: (text: string) => boolean;
   /** Give this chapter's targets the ids references elsewhere cite them by. */
   adopt: (adoptions: Adoption[]) => void;
   focus: () => void;
@@ -202,7 +203,11 @@ interface Props {
   /** Every note `[[` can reach, and what to do when one is clicked. Absent in
    *  the preview and anywhere else without an archive behind it. */
   notes?: { id: string; title: string }[];
-  onOpenNote?: (noteId: string) => void;
+  /** A note link was pressed; `passage` is its words, for a link made by
+   *  Continue as note, which goes back to them. */
+  onOpenNote?: (noteId: string, passage?: string) => void;
+  /** Offered on chosen words in a book: carry them into a new note. */
+  onContinueAsNote?: (quote: string) => void;
   /** Clicking the underlined passage opens the conversation about it. */
   onOpenComment?: (threadId: string) => void;
   /** Open a comment on whatever is selected. Absent when the note cannot be
@@ -380,6 +385,63 @@ function writeLockGuardExtension(owner: { current: string | null }) {
       ];
     },
   });
+}
+
+/* A passage lit for a moment. A decoration, not a class on the DOM: the
+   view redraws the spans it owns and a class written there is lost or left
+   behind. The range follows edits until the light goes out. */
+const passageFlashKey = new PluginKey<DecorationSet>("passageFlash");
+const PassageFlash = Extension.create({
+  name: "passageFlash",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<DecorationSet>({
+        key: passageFlashKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply(transaction, set) {
+            const meta = transaction.getMeta(passageFlashKey) as
+              | { from: number; to: number }
+              | null
+              | undefined;
+            if (meta === null) return DecorationSet.empty;
+            if (meta)
+              return DecorationSet.create(transaction.doc, [
+                Decoration.inline(meta.from, meta.to, { class: "is-flashing" }),
+              ]);
+            return set.map(transaction.mapping, transaction.doc);
+          },
+        },
+        props: {
+          decorations: (state) => passageFlashKey.getState(state),
+        },
+      }),
+    ];
+  },
+});
+
+/** Where these words stand inside one block of text, or null. */
+function findPassage(doc: ProseMirrorNode, text: string): { from: number; to: number } | null {
+  let found: { from: number; to: number } | null = null;
+  doc.descendants((node, pos) => {
+    if (found) return false;
+    if (!node.isTextblock) return true;
+    const at = node.textContent.indexOf(text);
+    if (at < 0) return false;
+    /* Text offset to document position: walk the inline children, since a
+       footnote or a picture inside the block takes one position and no text. */
+    let offset = 0;
+    let from = -1;
+    node.forEach((child, childOffset) => {
+      const length = child.isText ? child.text!.length : 0;
+      if (from < 0 && child.isText && at < offset + length)
+        from = pos + 1 + childOffset + (at - offset);
+      offset += length;
+    });
+    if (from >= 0) found = { from, to: from + text.length };
+    return false;
+  });
+  return found;
 }
 
 function sentenceCapitalizeExtension() {
@@ -1937,6 +1999,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onPasteError,
     onOpenLink,
     onComment,
+    onContinueAsNote,
     writeLockOwner = null,
     notes,
     onOpenNote,
@@ -2000,6 +2063,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
      note added to the archive must not rebuild the editor. */
   const notesRef = useRef<{ id: string; title: string }[]>([]);
   notesRef.current = notes ?? [];
+  const flashTimer = useRef<number | undefined>(undefined);
   const onOpenNoteRef = useRef(onOpenNote);
   onOpenNoteRef.current = onOpenNote;
   const onOpenCommentRef = useRef(onOpenComment);
@@ -2060,6 +2124,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         slashMenu,
         noteLinks,
         writeLockGuard,
+        PassageFlash,
         sentenceCapitalize,
         autocorrect,
         ...(manuscript
@@ -2097,7 +2162,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           const noteId = anchor?.getAttribute("data-note");
           if (noteId && onOpenNoteRef.current) {
             event.preventDefault();
-            onOpenNoteRef.current(noteId);
+            /* A link inside a quotation is Continue as note's way back: it
+               goes to the words, not only to the chapter. */
+            onOpenNoteRef.current(
+              noteId,
+              anchor?.closest("blockquote") ? (anchor.textContent ?? undefined) : undefined,
+            );
             return true;
           }
 
@@ -2365,31 +2435,27 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
         return true;
       },
-      flashComment(threadId) {
+      flashPassage(text) {
         if (!editor) return false;
-        let end = -1;
-        editor.state.doc.descendants((node, pos) => {
-          if (
-            node.isText &&
-            node.marks.some((m) => m.type.name === "comment" && m.attrs.threadId === threadId)
-          )
-            end = pos + node.nodeSize;
-          return true;
+        const words = text.trim();
+        /* The quote may have been edited since it was carried out; its
+           opening is the likeliest part to have survived. */
+        const range =
+          findPassage(editor.state.doc, words) ??
+          (words.length > 60 ? findPassage(editor.state.doc, words.slice(0, 60)) : null);
+        if (!range) return false;
+        editor.chain().focus().setTextSelection(range.to).run();
+        editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, range));
+        const { node } = editor.view.domAtPos(range.from);
+        (node instanceof Element ? node : node.parentElement)?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
         });
-        if (end < 0) return false;
-        editor.chain().focus().setTextSelection(end).run();
-        const spans = editor.view.dom.querySelectorAll<HTMLElement>(
-          `span[data-comment-thread="${CSS.escape(threadId)}"]`,
-        );
-        spans[0]?.scrollIntoView({ block: "center", behavior: "smooth" });
-        /* Restarted, not stacked: a second press on the same note lights it
-           again rather than being swallowed by the animation still running. */
-        for (const span of spans) {
-          span.classList.remove("is-flashing");
-          void span.offsetWidth;
-          span.classList.add("is-flashing");
-          window.setTimeout(() => span.classList.remove("is-flashing"), 2600);
-        }
+        window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => {
+          if (!editor.isDestroyed)
+            editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, null));
+        }, 2600);
         return true;
       },
       commentQuotes() {
@@ -2551,7 +2617,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
               if (selection.empty) return false;
               /* A document formats from its bar, so the bubble keeps only
                  what the bar does not carry: the remark and the lock. */
-              if (manuscript && !onComment && !writeLockOwner) return false;
+              if (manuscript && !onComment && !onContinueAsNote && !writeLockOwner) return false;
               return !(
                 selection instanceof NodeSelection &&
                 ["privateImage", "privateFile", "drawing"].includes(selection.node.type.name)
@@ -2592,8 +2658,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
               <button
                 type="button"
                 className="toolbar-button press"
-                aria-label={manuscript ? "Add note" : "Comment on this passage"}
-                title={manuscript ? "Add note" : "Comment on this passage"}
+                aria-label="Comment on this passage"
+                title="Comment on this passage"
                 /* The selection must survive the click that acts on it: a
                    pressed button takes focus, and taking focus collapses the
                    very range being commented on. */
@@ -2601,6 +2667,22 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                 onClick={onComment}
               >
                 <MessageSquarePlus size={16} />
+              </button>
+            )}
+            {onContinueAsNote && (
+              <button
+                type="button"
+                className="toolbar-button press"
+                aria-label="Continue as note"
+                title="Continue as note"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  const { from, to } = editor.state.selection;
+                  const quote = editor.state.doc.textBetween(from, to, " ").trim();
+                  if (quote) onContinueAsNote(quote);
+                }}
+              >
+                <NotebookPen size={16} />
               </button>
             )}
             {writeLockOwner && (

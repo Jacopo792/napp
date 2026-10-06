@@ -7,6 +7,7 @@ import {
   ListTree,
   MessageSquare,
   MessageSquarePlus,
+  NotebookPen,
   Search,
   X,
 } from "@/components/icons";
@@ -133,7 +134,9 @@ interface Props {
    *  one. Both absent where there is no archive behind the page. */
   linkable?: { id: string; title: string }[];
   backlinks?: { id: string; title: string }[];
-  onOpenNote?: (noteId: string) => void;
+  onOpenNote?: (noteId: string, passage?: string) => void;
+  /** Start a note from the chosen words of this chapter. Book only. */
+  onContinueAsNote?: (quote: string) => void;
   /** A remark was added, resolved or deleted here. */
   onRemarksChanged?: () => void;
   /** A chapter of a document rather than a note: a page and a writing bar
@@ -246,6 +249,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     backlinks,
     onOpenNote,
     onRemarksChanged,
+    onContinueAsNote,
     manuscript,
   },
   ref,
@@ -284,8 +288,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const found =
         typeof place === "string"
           ? editorRef.current?.reveal(place)
-          : "thread" in place
-            ? editorRef.current?.flashComment(place.thread)
+          : "passage" in place
+            ? editorRef.current?.flashPassage(place.passage)
             : editorRef.current?.revealTarget(place);
       if (found || ++tries > 50) {
         revealing.current = null;
@@ -762,11 +766,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setCommentsOpen(true);
   }
 
-  /* A right-click on words already chosen offers to leave a note on them.
+  /* A right-click on words already chosen offers what can be done with them.
      Without a selection the system's own menu stays — spelling, paste —
-     because there is nothing for a note to be about. */
+     because there is nothing for a comment to be about. */
   const onPassageMenu = (event: ReactMouseEvent) => {
-    if (!canComment) return;
+    if (!canComment && !onContinueAsNote) return;
     const chosen = window.getSelection();
     if (!chosen || chosen.isCollapsed || !chosen.toString().trim()) return;
     if (!(event.target as HTMLElement).closest(".rich-text-content")) return;
@@ -774,13 +778,31 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setPassageMenu({ x: event.clientX, y: event.clientY });
   };
   const passageMenuItems: MenuItem[] = [
-    {
-      kind: "item",
-      id: "note",
-      label: "Add note",
-      icon: <MessageSquarePlus size={16} />,
-      run: startComment,
-    },
+    ...(canComment
+      ? [
+          {
+            kind: "item" as const,
+            id: "comment",
+            label: "Comment",
+            icon: <MessageSquarePlus size={16} />,
+            run: startComment,
+          },
+        ]
+      : []),
+    ...(onContinueAsNote
+      ? [
+          {
+            kind: "item" as const,
+            id: "continue",
+            label: "Continue as note",
+            icon: <NotebookPen size={16} />,
+            run: () => {
+              const quote = window.getSelection()?.toString().trim();
+              if (quote) onContinueAsNote(quote);
+            },
+          },
+        ]
+      : []),
     { kind: "separator" },
     {
       kind: "item",
@@ -891,10 +913,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     </div>
   );
 
-  const outlinePanel = outlineOpen && (
+  /* In a book the inspector keeps all three mounted while it is open and only
+     shows one: switching tabs used to unmount the others, so each switch read
+     its comments or versions again and the column jumped from "Loading…" to
+     the list every time. */
+  const keepPanels = Boolean(manuscript && (outlineOpen || commentsOpen || historyOpen));
+  const outlinePanel = (outlineOpen || keepPanels) && (
     <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />
   );
-  const historyPanel = historyOpen && session && (
+  const historyPanel = (historyOpen || keepPanels) && session && (
     <NoteHistory
       key={`${entry.note.id}:${historyFocus ?? ""}`}
       initialOpenId={historyFocus}
@@ -920,7 +947,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onClose={() => setHistoryOpen(false)}
     />
   );
-  const commentsPanel = commentsOpen && session && commentAuthors && (
+  const commentsPanel = (commentsOpen || keepPanels) && session && commentAuthors && (
     <NoteComments
       key={entry.note.id}
       session={session}
@@ -939,7 +966,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         setQuotes(editorRef.current?.commentQuotes() ?? new Map());
       }}
       onResolveAnchor={syncCommentResolution}
-      asNotes={Boolean(manuscript)}
       onChanged={onRemarksChanged}
     />
   );
@@ -984,7 +1010,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     { id: "headings", name: "Headings", shown: true },
     {
       id: "comments",
-      name: manuscript ? "Notes" : "Comments",
+      name: "Comments",
       shown: Boolean(session && commentAuthors),
     },
     { id: "versions", name: "Versions", shown: Boolean(session) },
@@ -1033,9 +1059,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               <button
                 type="button"
                 className={`ribbon-tool press ${inspectorTab === "comments" ? "is-active" : ""}`}
-                aria-label="Notes"
+                aria-label="Comments"
                 aria-pressed={inspectorTab === "comments"}
-                title="Notes"
+                title="Comments"
                 onClick={() => showTab(inspectorTab === "comments" ? null : "comments")}
               >
                 <MessageSquare size={16} />
@@ -1134,6 +1160,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   onPasteError={setFailure}
                   onOpenLink={openLinkForm}
                   onComment={canComment ? startComment : undefined}
+                  onContinueAsNote={onContinueAsNote}
                   writeLockOwner={canEdit && session ? session.userId : null}
                   mobile={mobile}
                   autocorrectOn={autocorrectEnabled}
@@ -1213,11 +1240,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   <X size={16} />
                 </button>
               </div>
-              {inspectorTab === "headings"
-                ? outlinePanel
-                : inspectorTab === "comments"
-                  ? commentsPanel
-                  : historyPanel}
+              <div className="inspector-pane" hidden={inspectorTab !== "headings"}>
+                {outlinePanel}
+              </div>
+              <div className="inspector-pane" hidden={inspectorTab !== "comments"}>
+                {commentsPanel}
+              </div>
+              <div className="inspector-pane" hidden={inspectorTab !== "versions"}>
+                {historyPanel}
+              </div>
             </aside>
           )}
         </div>
@@ -1424,6 +1455,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onPasteError={setFailure}
                 onOpenLink={openLinkForm}
                 onComment={canComment ? startComment : undefined}
+                onContinueAsNote={onContinueAsNote}
                 /* Locking a passage is the smaller half of locking the note,
                    and it is offered on the same terms: only where this account
                    may write at all. */
