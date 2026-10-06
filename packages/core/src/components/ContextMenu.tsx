@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { MenuPoint } from "@/lib/contextMenu";
+import type { MenuItem } from "@/lib/menuShape";
+import { MenuItems } from "@/components/MenuPrimitives";
+import { useSystemMenu } from "@/components/useSystemMenu";
 
 /* ── The right button ────────────────────────────────────────────────────────
    Every action this application offers already existed in a menu hanging off a
@@ -91,5 +94,25 @@ export function ContextMenu({
       {children}
     </div>,
     document.body,
+  );
+}
+
+/** A list of items opened where the pointer is — by the window manager where
+ *  the shell has one, by the page everywhere else. */
+export function PointMenu({
+  point,
+  items,
+  close,
+}: {
+  point: MenuPoint;
+  items: MenuItem[];
+  close: () => void;
+}) {
+  const taken = useSystemMenu(items, close);
+  if (taken) return null;
+  return (
+    <ContextMenu point={point} onClose={close}>
+      <MenuItems items={items} close={close} />
+    </ContextMenu>
   );
 }

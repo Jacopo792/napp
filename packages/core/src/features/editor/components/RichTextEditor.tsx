@@ -178,6 +178,9 @@ export interface RichTextEditorHandle {
   reveal: (text: string) => boolean;
   /** Go to a footnote, a caption or a heading; a footnote opens to be read. */
   revealTarget: (target: PlaceTarget) => boolean;
+  /** Go to a commented passage and light it for a moment — the caret is left
+   *  at its end, not on the words, so nothing stays selected. */
+  flashComment: (threadId: string) => boolean;
   /** Give this chapter's targets the ids references elsewhere cite them by. */
   adopt: (adoptions: Adoption[]) => void;
   focus: () => void;
@@ -2360,6 +2363,33 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         if (!found) return false;
         const { from, to } = found as { from: number; to: number };
         editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
+        return true;
+      },
+      flashComment(threadId) {
+        if (!editor) return false;
+        let end = -1;
+        editor.state.doc.descendants((node, pos) => {
+          if (
+            node.isText &&
+            node.marks.some((m) => m.type.name === "comment" && m.attrs.threadId === threadId)
+          )
+            end = pos + node.nodeSize;
+          return true;
+        });
+        if (end < 0) return false;
+        editor.chain().focus().setTextSelection(end).run();
+        const spans = editor.view.dom.querySelectorAll<HTMLElement>(
+          `span[data-comment-thread="${CSS.escape(threadId)}"]`,
+        );
+        spans[0]?.scrollIntoView({ block: "center", behavior: "smooth" });
+        /* Restarted, not stacked: a second press on the same note lights it
+           again rather than being swallowed by the animation still running. */
+        for (const span of spans) {
+          span.classList.remove("is-flashing");
+          void span.offsetWidth;
+          span.classList.add("is-flashing");
+          window.setTimeout(() => span.classList.remove("is-flashing"), 2600);
+        }
         return true;
       },
       commentQuotes() {

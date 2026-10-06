@@ -11,6 +11,7 @@ import {
   flagsOf,
   mergeRemarksSeen,
   type AccountFlags,
+  type AccountPreferences,
   type RemarksSeen,
 } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
@@ -39,20 +40,26 @@ export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {
   );
 }
 
-export function localPreferences(seen: RemarksSeen = {}) {
-  return preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
-}
-
 /* No account to read it off, so the preview simply has read everything. */
 export function heldRemarksSeen(): RemarksSeen {
   return {};
+}
+
+/* The row the preview does not have, kept for the life of the page — so a
+   switch flipped here survives the remount that changing archive is. */
+let held: AccountPreferences | null = null;
+
+export function localPreferences(seen: RemarksSeen = {}) {
+  return held ?? preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
 }
 
 export async function pullAccountPreferences() {
   return localPreferences();
 }
 
-export function pushAccountPreferences(): void {}
+export function pushAccountPreferences(_session: unknown, preferences: AccountPreferences): void {
+  held = preferences;
+}
 
 export function watchLocalStores(): () => void {
   return () => {};

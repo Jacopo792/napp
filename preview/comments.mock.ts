@@ -5,7 +5,12 @@ import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { ArchiveComment, NoteComment } from "@/lib/commentThreads";
 
-export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "@/lib/commentThreads";
+export {
+  notesWithOpenRemarks,
+  openingRemarks,
+  threadsOf,
+  unreadRemarks,
+} from "@/lib/commentThreads";
 export type { ArchiveComment, NoteComment, CommentThread } from "@/lib/commentThreads";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

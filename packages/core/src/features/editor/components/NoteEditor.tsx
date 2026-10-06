@@ -1,14 +1,20 @@
 import {
   ChevronDown,
   ChevronUp,
+  History,
   Link2,
+  Copy,
   ListTree,
   MessageSquare,
+  MessageSquarePlus,
   PanelRight,
   Search,
   X,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
+import { PointMenu } from "@/components/ContextMenu";
+import type { MenuPoint } from "@/lib/contextMenu";
+import type { MenuItem } from "@/lib/menuShape";
 import type { WritingFocusSettings } from "../lib/writingFocus";
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import {
@@ -19,6 +25,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -46,7 +53,7 @@ import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
 import type { Editor } from "@tiptap/core";
 import { pageStyle, type PageSetup } from "@/lib/spaceShape";
-import { setLiveTargets, useReferences, type PlaceTarget } from "@/lib/documentContents";
+import { setLiveTargets, useReferences, type Place } from "@/lib/documentContents";
 import { adoptionsFor, sheetCounters } from "@/lib/references";
 
 /** What a chapter of a document is framed by instead of a note's header:
@@ -161,7 +168,7 @@ export interface NoteEditorHandle {
   drawOnPage: () => void;
   /** Go to the first place these words occur — once they are there, which
    *  for a note just opened is after its document has arrived. */
-  reveal: (place: string | PlaceTarget) => void;
+  reveal: (place: Place) => void;
   focus: () => void;
 }
 
@@ -265,7 +272,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      opened is an empty editor until its document syncs. Tried every 150 ms
      and given up on after a few seconds, so a passage deleted in the
      meantime does not pull the caret away later. */
-  const revealing = useRef<string | PlaceTarget | null>(null);
+  const revealing = useRef<Place | null>(null);
   const [revealAsked, setRevealAsked] = useState(0);
   useEffect(() => {
     const place = revealing.current;
@@ -275,7 +282,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const found =
         typeof place === "string"
           ? editorRef.current?.reveal(place)
-          : editorRef.current?.revealTarget(place);
+          : "thread" in place
+            ? editorRef.current?.flashComment(place.thread)
+            : editorRef.current?.revealTarget(place);
       if (found || ++tries > 50) {
         revealing.current = null;
         window.clearInterval(timer);
@@ -305,6 +314,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      It exists in the document and not yet in the archive, which is why it is
      held here rather than being read back with the rest. */
   const [pendingThread, setPendingThread] = useState<string | null>(null);
+  const [passageMenu, setPassageMenu] = useState<MenuPoint | null>(null);
   /* The thread the panel should scroll to and outline, set by clicking the
      underlined passage it belongs to. Not the same thing as `pendingThread`,
      which is a thread that has been anchored and not yet said anything in. */
@@ -750,6 +760,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setCommentsOpen(true);
   }
 
+  /* A right-click on words already chosen offers to leave a note on them.
+     Without a selection the system's own menu stays — spelling, paste —
+     because there is nothing for a note to be about. */
+  const onPassageMenu = (event: ReactMouseEvent) => {
+    if (!canComment) return;
+    const chosen = window.getSelection();
+    if (!chosen || chosen.isCollapsed || !chosen.toString().trim()) return;
+    if (!(event.target as HTMLElement).closest(".rich-text-content")) return;
+    event.preventDefault();
+    setPassageMenu({ x: event.clientX, y: event.clientY });
+  };
+  const passageMenuItems: MenuItem[] = [
+    {
+      kind: "item",
+      id: "note",
+      label: "Add note",
+      icon: <MessageSquarePlus size={16} />,
+      run: startComment,
+    },
+    { kind: "separator" },
+    {
+      kind: "item",
+      id: "copy",
+      label: "Copy",
+      icon: <Copy size={16} />,
+      run: () => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? ""),
+    },
+  ];
+  const passageMenuLayer = passageMenu && (
+    <PointMenu point={passageMenu} items={passageMenuItems} close={() => setPassageMenu(null)} />
+  );
+
   const updatePageProperties = (values: PagePropertyValues) => {
     void onUpdatePageProperties?.(values).catch((reason) =>
       setFailure(reason instanceof Error ? reason.message : "Could not update this page"),
@@ -953,15 +995,51 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               page={manuscript.page}
               onLink={openLinkForm}
               onImage={() => imageRef.current?.click()}
-              onFind={() => {
-                setFindOpen(true);
-                window.setTimeout(() => findRef.current?.focus(), 0);
-              }}
             />
           ) : (
             <span className="manuscript-bar-quiet">{headerStatus}</span>
           )}
+          {/* What the chapter says about itself and the panels about it are
+              at the right, as a note's are: the formatting row is for the
+              words, and finding, remarks and versions are not formatting. */}
           <span className="manuscript-bar-end">
+            {canEdit && <span className="manuscript-bar-quiet">{headerStatus}</span>}
+            <button
+              type="button"
+              className={`ribbon-tool press ${findOpen ? "is-active" : ""}`}
+              aria-label="Find and replace"
+              title={`Find and replace · ${keyName("⌘F")}`}
+              onClick={() => {
+                setFindOpen(true);
+                window.setTimeout(() => findRef.current?.focus(), 0);
+              }}
+            >
+              <Search size={16} />
+            </button>
+            {session && commentAuthors && (
+              <button
+                type="button"
+                className={`ribbon-tool press ${inspectorTab === "comments" ? "is-active" : ""}`}
+                aria-label="Comments"
+                aria-pressed={inspectorTab === "comments"}
+                title="Comments"
+                onClick={() => showTab(inspectorTab === "comments" ? null : "comments")}
+              >
+                <MessageSquare size={16} />
+              </button>
+            )}
+            {session && (
+              <button
+                type="button"
+                className={`ribbon-tool press ${inspectorTab === "versions" ? "is-active" : ""}`}
+                aria-label="Versions"
+                aria-pressed={inspectorTab === "versions"}
+                title="Versions"
+                onClick={() => showTab(inspectorTab === "versions" ? null : "versions")}
+              >
+                <History size={16} />
+              </button>
+            )}
             <button
               type="button"
               className={`ribbon-tool press ${inspectorTab ? "is-active" : ""}`}
@@ -979,12 +1057,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
         {fileInputs}
         {findBar}
+        {passageMenuLayer}
 
         <div className="editor-body flex min-h-0 flex-1">
           {/* The desk, and the sheet on it. The sheet is the page the
               document is set on — its width, its margins, its letter — so
               what is written here is what prints. */}
-          <div ref={setScroller} className="manuscript-desk min-h-0 flex-1">
+          <div
+            ref={setScroller}
+            className="manuscript-desk min-h-0 flex-1"
+            onContextMenu={onPassageMenu}
+          >
             <article
               className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}
               data-top={manuscript.topLevel ?? 1}
@@ -1238,6 +1321,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {fileInputs}
 
       {findBar}
+      {passageMenuLayer}
 
       {/* The cover, the frontispiece and the text scroll as one column. The
           cover used to be pinned above the scrolling text, which on a laptop
@@ -1248,7 +1332,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           so the first frames of every note switch showed the reader's wallpaper
           through a hole where the page should be. */}
       <div className="editor-body flex min-h-0 flex-1">
-        <div ref={setScroller} className="editor-scroll page-in min-h-0 flex-1">
+        <div
+          ref={setScroller}
+          className="editor-scroll page-in min-h-0 flex-1"
+          onContextMenu={onPassageMenu}
+        >
           <PageCover
             cover={entry.note.cover}
             photo={entry.note.photo}

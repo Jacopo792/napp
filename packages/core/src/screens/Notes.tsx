@@ -55,7 +55,7 @@ import {
   setDocumentContents,
   setDocumentReferences,
   type PlaceRequest,
-  type PlaceTarget,
+  type Place,
 } from "@/lib/documentContents";
 import {
   EMPTY_TARGETS,
@@ -120,6 +120,7 @@ import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from 
 import {
   loadArchiveComments,
   notesWithOpenRemarks,
+  openingRemarks,
   unreadRemarks,
   type RemarksSeen,
   type ArchiveComment,
@@ -206,6 +207,7 @@ import { NoteSheet } from "@/components/NoteSheet";
 import { FolderSheet } from "@/components/FolderSheet";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
 import { TrashSheet } from "@/components/TrashSheet";
+import { UpdateNotice } from "@/components/UpdateNotice";
 import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
 import { MenuButton as WritingMenuButton, PageSetupButton } from "@/components/WritingMenus";
 import type { MenuItem } from "@/lib/menuShape";
@@ -393,10 +395,6 @@ let knownSpaces: Space[] = [];
 /** A note chosen in ⌘K from another archive: the switch remounts the screen,
  *  so what to open on arrival has to outlive this one. */
 let openOnArrival: string | null = null;
-/** How many words each document had when this window first opened it — what
- *  "this session" counts from. Kept across remounts, which switching archive
- *  is, so going to another archive and back does not restart the session. */
-const sessionStart = new Map<string, number>();
 /** The switches as last known, for the same reason: a remount that started
  *  from the defaults would take the archive switch away until the row came
  *  back, and the window would grow it again a moment after arriving. */
@@ -424,7 +422,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [members, setMembers] = useState<ArchiveMember[]>([]);
   /** Seats, and the invitations already holding one. Loaded with Settings
    *  rather than with the archive: nothing outside that panel asks. */
-  const [seatLimit, setSeatLimit] = useState(2);
+  const [seatLimit, setSeatLimit] = useState(8);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   /** Every archive this account is in, for the switch and its sheet. */
   const [spaces, setSpaces] = useState<Space[]>(knownSpaces);
@@ -542,7 +540,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     comments?: boolean;
     /** Words to go to once the note is open — a heading or a line ⌘K found —
      *  or a footnote, a caption, a cited heading. */
-    reveal?: string | PlaceTarget;
+    reveal?: Place;
   } | null>(null);
 
   /* A hold, and the two refs it needs. The timer is one, because it has to be
@@ -975,7 +973,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (!session) return;
     let live = true;
     void pullAccountPreferences(session)
-      .catch(() => localPreferences())
+      .catch(() => localPreferences({}, session.userId))
       .then((preferences) => {
         if (!live) return;
         setFlags(flagsOf(preferences));
@@ -1371,10 +1369,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       window.clearInterval(timer);
     };
   }, [statsShown, session]);
-  useEffect(() => {
-    if (manuscript && session && !loading && !sessionStart.has(session.archiveId))
-      sessionStart.set(session.archiveId, manuscript.total);
-  }, [manuscript, session, loading]);
 
   /* Trashed notes of either scope the document reads, for its own Trash. */
   const docTrash = useMemo(() => {
@@ -2491,8 +2485,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         /* Inside the text ⌘K is still "link these words" — that convention is
-           older than the palette's and the reader is holding a selection. */
-        if (canEdit && el?.closest(".rich-text-content")) {
+           older than the palette's — but only while words are chosen. With
+           the caret merely in the text it opened an empty link form, so in a
+           book, where the caret is always in the text, the palette could not
+           be reached at all. */
+        if (
+          canEdit &&
+          el?.closest(".rich-text-content") &&
+          !(window.getSelection()?.isCollapsed ?? true)
+        ) {
           noteEditorRef.current?.openLink();
           return;
         }
@@ -2939,9 +2940,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text, target } = (event as CustomEvent<PlaceRequest>).detail;
+      const { noteId, text, target, thread } = (event as CustomEvent<PlaceRequest>).detail;
       handleSelectNote(noteId);
-      if (target ?? text) setOpenThen({ noteId, reveal: target ?? text });
+      const reveal: Place | undefined = thread ? { thread } : (target ?? text);
+      if (reveal) setOpenThen({ noteId, reveal });
     };
     window.addEventListener(OPEN_PLACE, open);
     return () => window.removeEventListener(OPEN_PLACE, open);
@@ -3592,21 +3594,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Opening what was found. In a document the structure's own path — the
      notes list's scope and filter are not on screen there — and then, if a
      place inside it was found, going to that place. */
-  const openFound =
-    (id: string, then?: { reveal?: string | PlaceTarget; history?: string }) => () => {
-      if (docMode) {
-        handleSelectNote(id);
-        if (compact) {
-          setFoldersOpen(false);
-          setMobileScreen("note");
-        }
-      } else {
-        setQuery("");
-        setSelectedFolderId(ALL);
-        handleSelectNote(id);
+  const openFound = (id: string, then?: { reveal?: Place; history?: string }) => () => {
+    if (docMode) {
+      handleSelectNote(id);
+      if (compact) {
+        setFoldersOpen(false);
+        setMobileScreen("note");
       }
-      if (then) setOpenThen({ noteId: id, ...then });
-    };
+    } else {
+      setQuery("");
+      setSelectedFolderId(ALL);
+      handleSelectNote(id);
+    }
+    if (then) setOpenThen({ noteId: id, ...then });
+  };
   const middle = () => ({
     x: window.innerWidth / 2,
     y: window.innerHeight / 3,
@@ -3668,7 +3669,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             })),
             ...manuscript.notebook.map((item) => ({
               id: `note:${item.id}`,
-              group: "Notebook",
+              group: "Pages",
               name: item.title || "Untitled",
               icon: <NotebookText size={16} />,
               run: open(item.id),
@@ -4713,7 +4714,25 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const chapter = manuscript.chapters[chapterAt];
     const partName = chapter?.folderId ? manuscript.parts.get(chapter.folderId) : undefined;
     const notebookName =
-      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notes` : "Notes";
+      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s pages` : "Pages";
+    /* The notes left on passages, in the order of the book and then of
+       writing — a note about chapter one is read before one about three. */
+    const placeOf = new Map<string, { at: number; where: string }>();
+    manuscript.chapters.forEach((item, at) =>
+      placeOf.set(item.id, { at, where: `Chapter ${at + 1} · ${item.title || "Untitled"}` }),
+    );
+    manuscript.notebook.forEach((item) =>
+      placeOf.set(item.id, { at: Infinity, where: item.title || "Untitled" }),
+    );
+    const passageNotes = openingRemarks(archiveComments)
+      .filter((remark) => placeOf.has(remark.noteId))
+      .sort((a, b) => placeOf.get(a.noteId)!.at - placeOf.get(b.noteId)!.at)
+      .map((remark) => ({
+        threadId: remark.threadId,
+        noteId: remark.noteId,
+        body: remark.body,
+        where: placeOf.get(remark.noteId)!.where,
+      }));
     const before = chapterAt > 0 ? manuscript.chapters[chapterAt - 1] : undefined;
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
@@ -4847,26 +4866,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             </div>
             <div className="structure-people">
               {spaceSwitch}
-              {peopleShelf}
+              {roster.length > 1 && peopleShelf}
             </div>
           </>
         }
         footer={
           <div className="sidebar-footer">
-            <button
-              type="button"
-              className="sidebar-footer-button press"
-              onClick={(event) => {
-                setFoldersOpen(false);
-                openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
-              }}
-            >
-              <span className="sidebar-glyph" data-tone="trash">
-                <Trash2 size={16} />
-              </span>
-              <span>Trash</span>
-              {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
-            </button>
+            <UpdateNotice />
             <WhatsNewButton
               unseen={whatsNewUnseen}
               onOpen={() => {
@@ -4887,6 +4893,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               </span>
               <span>Settings</span>
             </button>
+            <button
+              type="button"
+              className="sidebar-footer-button press"
+              onClick={(event) => {
+                setFoldersOpen(false);
+                openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
+              }}
+            >
+              <span className="sidebar-glyph" data-tone="trash">
+                <Trash2 size={16} />
+              </span>
+              <span>Trash</span>
+              {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
+            </button>
           </div>
         }
         documentName={currentSpace?.name ?? ""}
@@ -4901,7 +4921,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onOpen={openFromStructure}
         onNewChapter={handleNewChapter}
         onNewPart={handleNewPart}
-        onNewNote={() => void createDocNote(null)}
+        passageNotes={passageNotes}
+        onOpenPassage={(note) => openPlace({ noteId: note.noteId, thread: note.threadId })}
         onRenamePart={handleRenamePart}
         onDeletePart={handleDeletePart}
         onMove={handleMoveChapter}
@@ -4910,15 +4931,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           openSheet({ x: point.x, y: point.y, width: 1, height: 1, kind: "note", noteId: id })
         }
         headings={contents.find((entry) => entry.id === selectedId)?.headings}
-        stats={
-          statsShown
-            ? {
-                today: wordsToday,
-                session:
-                  manuscript.total - (sessionStart.get(session.archiveId) ?? manuscript.total),
-              }
-            : undefined
-        }
+        stats={statsShown ? { today: wordsToday } : undefined}
         onHeading={(text) => selectedId && openPlace({ noteId: selectedId, text })}
       />
     );
@@ -5030,21 +5043,26 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           commentAuthors={commentAuthors}
           linkable={linkableNotes}
           onOpenNote={handleOpenRecent}
-          manuscript={{
-            page,
-            eyebrow:
-              chapterAt >= 0
-                ? [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · ")
-                : notebookName,
-            footer: turn,
-            footnotes: docFeatures.footnotes,
-            numbered: docFeatures.numbering && chapterAt >= 0 ? chapterAt + 1 : null,
-            writing: {
-              focus: focusMode ? writingPreferences.focusScope : "off",
-              typewriter: writingPreferences.typewriter,
-            },
-            topLevel: topLevel(headingsOf(selected.note.content).map((heading) => heading.level)),
-          }}
+          /* Research is a note, not a page of the book: it opens as one, so
+             the two kinds never look the same. */
+          manuscript={
+            chapterAt >= 0
+              ? {
+                  page,
+                  eyebrow: [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · "),
+                  footer: turn,
+                  footnotes: docFeatures.footnotes,
+                  numbered: docFeatures.numbering ? chapterAt + 1 : null,
+                  writing: {
+                    focus: focusMode ? writingPreferences.focusScope : "off",
+                    typewriter: writingPreferences.typewriter,
+                  },
+                  topLevel: topLevel(
+                    headingsOf(selected.note.content).map((heading) => heading.level),
+                  ),
+                }
+              : undefined
+          }
         />
       </Suspense>
     ) : (

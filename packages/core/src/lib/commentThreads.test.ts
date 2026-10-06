@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   notesWithOpenRemarks,
+  openingRemarks,
   threadsOf,
   unreadRemarks,
   type ArchiveComment,
@@ -115,5 +116,23 @@ test("having read one note's remarks leaves the others unread", () => {
   assert.deepEqual(
     unreadRemarks(rows, ME, { n1: "2026-09-02T00:00:00Z" }).map((r) => r.id),
     ["unread"],
+  );
+});
+
+test("a document lists each open thread once, by its first remark", () => {
+  const on = (over: Partial<ArchiveComment>): ArchiveComment => ({
+    ...comment(over),
+    noteId: "n",
+    ...over,
+  });
+  const notes = openingRemarks([
+    on({ id: "a2", threadId: "a", body: "reply", createdAt: "2026-09-01T11:00:00Z" }),
+    on({ id: "a1", threadId: "a", body: "check tomorrow", createdAt: "2026-09-01T10:00:00Z" }),
+    on({ id: "b1", threadId: "b", resolvedAt: "2026-09-02T00:00:00Z" }),
+  ]);
+  assert.deepEqual(
+    notes.map((note) => note.body),
+    ["check tomorrow"],
+    "a resolved thread leaves the list, and a reply is not a second note",
   );
 });

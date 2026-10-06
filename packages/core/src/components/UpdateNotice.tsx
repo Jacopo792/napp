@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUpCircle } from "@/components/icons";
+import { DOWNLOADS } from "@/lib/whatsNew";
 
 /* ── There is a newer one ────────────────────────────────────────────────────
    A tab reloads a dozen times a day and is always the version that was last
@@ -20,8 +21,6 @@ import { ArrowUpCircle } from "@/components/icons";
    in a tab this is an ordinary link. So there is no bridge to add, and no way
    for the page to start a download of its own. */
 
-const LATEST_RELEASE = "https://github.com/Jacopo792/napp/releases/latest";
-
 export function UpdateNotice() {
   const [version, setVersion] = useState<string | null>(null);
 
@@ -38,7 +37,7 @@ export function UpdateNotice() {
   return (
     <a
       className="sidebar-footer-button is-update press"
-      href={LATEST_RELEASE}
+      href={DOWNLOADS.page}
       target="_blank"
       rel="noreferrer"
     >

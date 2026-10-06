@@ -88,7 +88,20 @@ export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}): Ac
 
 /** What this browser holds right now: what a field the row does not carry
  *  falls back to, and what a fresh account's first change writes. */
-export function localPreferences(seen: RemarksSeen = {}): AccountPreferences {
+/* What this window last knew — pulled, or chosen here — and whether the
+   choosing has reached the row yet. Switching archive remounts the screen,
+   and the remount pulls again: inside the push's debounce that read found
+   the row from *before* the switch was flipped and put it back, so turning
+   the archive switch on and changing archive turned it off again. */
+let held: AccountPreferences | null = null;
+let unsent: AccountPreferences | null = null;
+/** Whose they are: a window signed out and into another account keeps none
+ *  of the first one's. */
+let heldFor: string | null = null;
+
+export function localPreferences(seen: RemarksSeen = {}, userId?: string): AccountPreferences {
+  if (held && userId && userId === heldFor)
+    return { ...held, remarksSeen: { ...held.remarksSeen, ...seen } };
   return preferencesWith(
     {
       ...DEFAULT_FLAGS,
@@ -248,6 +261,9 @@ const canonical = (stored: unknown) =>
   JSON.stringify(mergeAccountPreferences(stored, localPreferences()));
 
 export async function pullAccountPreferences(session: AppSession): Promise<AccountPreferences> {
+  if (heldFor !== session.userId) held = unsent = null;
+  heldFor = session.userId;
+  if (unsent) return unsent;
   const result = await supabase
     .from("profile_preferences")
     .select("preferences")
@@ -257,8 +273,10 @@ export async function pullAccountPreferences(session: AppSession): Promise<Accou
   const stored = (result.data as { preferences: unknown } | null)?.preferences;
   const preferences = mergeAccountPreferences(
     stored,
-    localPreferences(heldRemarksSeen(session.userId)),
+    localPreferences(heldRemarksSeen(session.userId), session.userId),
   );
+  if (unsent) return unsent;
+  held = preferences;
   settled = JSON.stringify(preferences);
   apply(preferences);
   holdRemarksSeen(session.userId, preferences.remarksSeen);
@@ -276,9 +294,16 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   const blob = JSON.stringify(preferences);
   if (blob === settled) return;
   settled = blob;
+  held = unsent = preferences;
   holdRemarksSeen(session.userId, preferences.remarksSeen);
   window.clearTimeout(pending);
-  pending = window.setTimeout(() => void write(session, preferences), 500);
+  pending = window.setTimeout(
+    () =>
+      void write(session, preferences).finally(() => {
+        if (unsent === preferences) unsent = null;
+      }),
+    500,
+  );
 }
 
 /* **The `await` is the request.** A PostgREST builder is lazy: it is a

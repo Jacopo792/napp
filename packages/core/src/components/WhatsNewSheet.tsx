@@ -7,8 +7,8 @@
  * Closing it, any way at all, is having read it: a sheet that has to be
  * dismissed twice is a sheet people learn to dismiss without reading. */
 import { useEffect, useState } from "react";
-import { Sparkle, X } from "@/components/icons";
-import { RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
+import { Download, Sparkle, X } from "@/components/icons";
+import { DOWNLOADS, RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
 
 export function WhatsNewSheet({
   open,
@@ -112,7 +112,37 @@ export function WhatsNewSheet({
           </article>
         </div>
 
+        {/* The installers, from the same sheet that says what is in them: the
+            newest release on GitHub, whichever page of the history is open. */}
         <footer className="whats-new-foot">
+          <span className="whats-new-downloads">
+            <a
+              className="whats-new-download press"
+              href={DOWNLOADS.mac}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download size={15} />
+              Mac
+            </a>
+            <a
+              className="whats-new-download press"
+              href={DOWNLOADS.windows}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download size={15} />
+              Windows
+            </a>
+            <a
+              className="whats-new-download is-quiet press"
+              href={DOWNLOADS.macIntel}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Intel Mac
+            </a>
+          </span>
           <button type="button" className="whats-new-done press" onClick={onClose}>
             Got it
           </button>

@@ -42,7 +42,6 @@ import {
   PageBreak,
   Plus,
   Redo2,
-  Search,
   Strikethrough,
   Subscript,
   Superscript,
@@ -280,7 +279,6 @@ export function ManuscriptToolbar({
   page,
   onLink,
   onImage,
-  onFind,
 }: {
   editor: Editor | null;
   /** The chapter, so a cross-reference says "in chapter 2" only of others. */
@@ -291,7 +289,6 @@ export function ManuscriptToolbar({
   page: Pick<PageSetup, "tableCaption">;
   onLink: () => void;
   onImage: () => void;
-  onFind: () => void;
 }) {
   const [citing, setCiting] = useState(false);
   const citeRoot = useRef<HTMLSpanElement>(null);
@@ -748,12 +745,6 @@ export function ManuscriptToolbar({
             />
           )}
         </span>
-      </div>
-
-      <div className="ribbon-group">
-        <Tool label="Find and replace" shortcut="⌘F" disabled={!editor} onPress={onFind}>
-          <Search size={16} />
-        </Tool>
       </div>
     </div>
   );

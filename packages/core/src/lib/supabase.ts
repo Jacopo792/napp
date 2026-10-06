@@ -313,7 +313,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   return {
     entries: entries.sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt)),
     members,
-    seatLimit: (archiveResult.data?.seat_limit as number | null) ?? 2,
+    seatLimit: (archiveResult.data?.seat_limit as number | null) ?? 8,
     metas,
   };
 }

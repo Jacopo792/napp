@@ -983,7 +983,9 @@ other order.
 The archive is built for two people, and that is a database rule, not a message
 in the interface:
 
-- `archives.seat_limit` is `2` by default (`1`–`8` allowed).
+- `archives.seat_limit` is `8` by default (`1`–`8` allowed). A new archive is
+  made with everybody the maker already shares an archive with, up to the seats
+  (`private.create_archive`) — nobody is invited twice.
 - `archive_members` carries a `before insert` trigger,
   `private.enforce_archive_seats()`, which refuses a row once the archive holds
   its limit. That is the boundary — every path in, bootstrap and invitation
@@ -1105,8 +1107,13 @@ list were, and `NoteEditor` with `manuscript` — the same binding, comments,
 history and find, under a writing bar (`ManuscriptToolbar`) and on a sheet the
 size, margins and letter of the page set-up.
 
-- A chapter is a note with `notes.position`; the notebook is every note
-  without one. A part is a folder, drawn wherever the one order crosses into
+- A chapter is a note with `notes.position`; the notebook ("Pages") is every
+  note without one. Nothing makes a new page any more: a note belongs on the
+  words it is about. Right-click on chosen words → **Add note** opens a comment
+  thread on them, and the structure lists every open thread under **Notes**;
+  pressing one opens the chapter and lights the passage for a moment
+  (`flashComment`) instead of leaving it selected. A research page opens as a
+  plain note, never on the sheet, so the two never look alike. A part is a folder, drawn wherever the one order crosses into
   it (`manuscript.ts`), so a chapter can stand before the first part. A move
   writes one position, the midpoint of its neighbours.
 - **Manuscript shared** keeps the structure in the scope of the archive's

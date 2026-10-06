@@ -109,11 +109,19 @@ export interface PlaceTarget {
   index: number;
 }
 
+/** A passage somebody left a note on, by the thread that holds it. */
+export interface ThreadPlace {
+  thread: string;
+}
+
+export type Place = string | PlaceTarget | ThreadPlace;
+
 export interface PlaceRequest {
   noteId: string;
   /** A heading to go to inside it. */
   text?: string;
   target?: PlaceTarget;
+  thread?: string;
 }
 
 export function openPlace(request: PlaceRequest): void {

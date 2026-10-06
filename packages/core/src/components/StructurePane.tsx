@@ -5,7 +5,9 @@
  * and never by date, it numbers what it shows, and it counts words where a
  * list shows a line of the text. The parts are headings over stretches of the
  * one order (see `manuscript.ts`), and the notebook under it is everything
- * not placed yet — sources, fragments, what might become a chapter.
+ * not placed yet. Under them, the notes left on passages: a remark made with
+ * a right-click on the words, listed here so the way back to the words is one
+ * press — the passage is lit for a moment and let go.
  *
  * A row is dragged to move it. A press that does not travel opens the chapter
  * — five pixels of travel is what tells them apart, the same distance the
@@ -35,12 +37,11 @@ import {
   Plus,
   Trash2,
 } from "@/components/icons";
-import { ContextMenu } from "@/components/ContextMenu";
-import { MenuItems } from "@/components/MenuPrimitives";
-import { useSystemMenu } from "@/components/useSystemMenu";
+import { PointMenu } from "@/components/ContextMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { ContentsHeading, StructureRow } from "@/lib/manuscript";
+import { keyName } from "@/lib/shortcuts";
 
 export interface ChapterItem {
   id: string;
@@ -51,6 +52,15 @@ export interface ChapterItem {
   /** May this one be placed in the manuscript? A partner's notebook note in
    *  a shared manuscript is theirs — see `Notes.tsx`. */
   movable: boolean;
+}
+
+/** A note left on a passage — the opening remark of an open thread. */
+export interface PassageNote {
+  threadId: string;
+  noteId: string;
+  body: string;
+  /** Where it is: "Chapter 2", or the page's title. */
+  where: string;
 }
 
 export type StructureTarget =
@@ -187,16 +197,6 @@ function Zone({
   );
 }
 
-function Menu({ point, items, close }: { point: MenuPoint; items: MenuItem[]; close: () => void }) {
-  const taken = useSystemMenu(items, close);
-  if (taken) return null;
-  return (
-    <ContextMenu point={point} onClose={close}>
-      <MenuItems items={items} close={close} />
-    </ContextMenu>
-  );
-}
-
 const signed = (words: number) =>
   `${words > 0 ? "+" : words < 0 ? "−" : ""}${Math.abs(words).toLocaleString()}`;
 
@@ -210,12 +210,13 @@ export function StructurePane({
   parts,
   notebook,
   notebookName,
+  passageNotes = [],
+  onOpenPassage,
   selectedId,
   canWrite,
   onOpen,
   onNewChapter,
   onNewPart,
-  onNewNote,
   onRenamePart,
   onDeletePart,
   onMove,
@@ -234,6 +235,8 @@ export function StructurePane({
   parts: Map<string, string>;
   notebook: ChapterItem[];
   notebookName: string;
+  passageNotes?: PassageNote[];
+  onOpenPassage?: (note: PassageNote) => void;
   selectedId: string | null;
   canWrite: boolean;
   onOpen: (id: string) => void;
@@ -241,7 +244,6 @@ export function StructurePane({
   /** A part is made with a chapter already in it: an empty heading over
    *  nothing was a thing nobody could tell the use of. */
   onNewPart: (chapterId: string) => void;
-  onNewNote: () => void;
   onRenamePart: (id: string, name: string) => void;
   onDeletePart: (id: string) => void;
   onMove: (id: string, target: StructureTarget) => void;
@@ -251,9 +253,9 @@ export function StructurePane({
    *  long document, numbered as the page numbers them. */
   headings?: ContentsHeading[];
   onHeading?: (text: string) => void;
-  /** Words written today (yours, from the versions) and the net change since
-   *  this window opened. Absent when the reader switched them off. */
-  stats?: { today: number | null; session: number };
+  /** Words written today (yours, from the versions). Absent when the reader
+   *  switched it off. */
+  stats?: { today: number | null };
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [dragging, setDragging] = useState<string | null>(null);
@@ -438,24 +440,6 @@ export function StructurePane({
   return (
     <aside className="structure-pane" aria-label="Structure">
       {header}
-      <div className="structure-total" aria-label={documentName}>
-        <span>
-          {total.toLocaleString()}
-          {goal ? ` / ${goal.toLocaleString()} words` : " words"}
-        </span>
-        {goal ? (
-          <span className="structure-goal" aria-hidden="true">
-            <i style={{ transform: `scaleX(${progress})` }} />
-          </span>
-        ) : null}
-        {stats && (stats.today || stats.session) ? (
-          <span className="structure-stats">
-            {stats.today ? <span>Today {signed(stats.today)}</span> : null}
-            {stats.session ? <span>This session {signed(stats.session)}</span> : null}
-          </span>
-        ) : null}
-      </div>
-
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
@@ -470,19 +454,6 @@ export function StructurePane({
         <div className="structure-scroll">
           <div className="structure-heading">
             <span>Chapters</span>
-            {canWrite && (
-              <span className="structure-heading-actions">
-                <button
-                  type="button"
-                  className="toolbar-button press"
-                  aria-label="New chapter"
-                  title="New chapter · ⌘N"
-                  onClick={() => onNewChapter(null)}
-                >
-                  <Plus size={15} />
-                </button>
-              </span>
-            )}
           </div>
 
           {rows
@@ -540,45 +511,68 @@ export function StructurePane({
               starts: a target that appears with the drag pushes the one the
               hand was heading for out from under it. */}
           {rows.length > 0 && <Zone id="end" className="structure-end" />}
+          {canWrite && (
+            <button
+              type="button"
+              className="structure-add press"
+              title={`New chapter · ${keyName("⌘N")}`}
+              onClick={() => onNewChapter(null)}
+            >
+              <Plus size={14} />
+              New chapter
+            </button>
+          )}
 
-          <Zone id="notebook" className="structure-notebook">
-            <div className="structure-heading">
-              <button
-                type="button"
-                className="structure-fold press"
-                aria-expanded={notebookOpen}
-                onClick={() => setNotebookOpen((open) => !open)}
-              >
-                <ChevronDown size={13} className={notebookOpen ? "" : "-rotate-90"} />
-                {notebookName}
-                <small>{notebook.length || ""}</small>
-              </button>
-              {canWrite && (
-                <span className="structure-heading-actions">
-                  <button
-                    type="button"
-                    className="toolbar-button press"
-                    aria-label={`New page in ${notebookName}`}
-                    title={`New page in ${notebookName}`}
-                    onClick={onNewNote}
-                  >
-                    <Plus size={15} />
-                  </button>
-                </span>
-              )}
-            </div>
-            {notebookOpen &&
-              notebook.map((item) => (
-                <Row
-                  key={item.id}
-                  item={item}
-                  selected={item.id === selectedId}
-                  over={null}
-                  onOpen={() => onOpen(item.id)}
-                  onMenu={(point) => chapterMenu(item, point, false)}
-                />
+          {passageNotes.length > 0 && (
+            <section className="structure-passages" aria-label="Notes">
+              <div className="structure-heading">
+                <span>Notes</span>
+                <small>{passageNotes.length}</small>
+              </div>
+              {passageNotes.map((note) => (
+                <button
+                  key={note.threadId}
+                  type="button"
+                  className="structure-passage press"
+                  onClick={() => onOpenPassage?.(note)}
+                >
+                  <span className="structure-passage-body">{note.body}</span>
+                  <span className="structure-passage-where">{note.where}</span>
+                </button>
               ))}
-          </Zone>
+            </section>
+          )}
+
+          {/* Pages that are not chapters. Nothing makes one any more — a note
+              belongs on the words it is about — but a chapter can still be
+              taken out of the order, and what was put here before stays. */}
+          {(notebook.length > 0 || dragging) && (
+            <Zone id="notebook" className="structure-notebook">
+              <div className="structure-heading">
+                <button
+                  type="button"
+                  className="structure-fold press"
+                  aria-expanded={notebookOpen}
+                  onClick={() => setNotebookOpen((open) => !open)}
+                >
+                  <ChevronDown size={13} className={notebookOpen ? "" : "-rotate-90"} />
+                  {notebookName}
+                  <small>{notebook.length || ""}</small>
+                </button>
+              </div>
+              {notebookOpen &&
+                notebook.map((item) => (
+                  <Row
+                    key={item.id}
+                    item={item}
+                    selected={item.id === selectedId}
+                    over={null}
+                    onOpen={() => onOpen(item.id)}
+                    onMenu={(point) => chapterMenu(item, point, false)}
+                  />
+                ))}
+            </Zone>
+          )}
         </div>
 
         <DragOverlay dropAnimation={null}>
@@ -588,8 +582,22 @@ export function StructurePane({
         </DragOverlay>
       </DndContext>
 
+      {/* The count is a glance, not a heading: it sits under the work, where
+          the eye arrives having finished with the structure. */}
+      <div className="structure-total" aria-label={documentName}>
+        <span>
+          {total.toLocaleString()}
+          {goal ? ` / ${goal.toLocaleString()} words` : " words"}
+          {stats?.today ? ` · today ${signed(stats.today)}` : ""}
+        </span>
+        {goal ? (
+          <span className="structure-goal" aria-hidden="true">
+            <i style={{ transform: `scaleX(${progress})` }} />
+          </span>
+        ) : null}
+      </div>
       {footer}
-      {menu && <Menu point={menu.point} items={menu.items} close={() => setMenu(null)} />}
+      {menu && <PointMenu point={menu.point} items={menu.items} close={() => setMenu(null)} />}
     </aside>
   );
 }

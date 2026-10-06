@@ -29,7 +29,76 @@ export interface Release {
   sections: ReleaseSection[];
 }
 
+const LATEST = "https://github.com/Jacopo792/napp/releases/latest";
+
+/** Where the newest installers are. The names carry no version (see
+ *  `electron-builder.yml`), so these never go stale. */
+export const DOWNLOADS = {
+  page: LATEST,
+  mac: `${LATEST}/download/Napp-mac-arm64.dmg`,
+  macIntel: `${LATEST}/download/Napp-mac-x64.dmg`,
+  windows: `${LATEST}/download/Napp-windows-setup.exe`,
+};
+
 export const RELEASES: Release[] = [
+  {
+    version: "0.9.2",
+    date: "2026-10-06",
+    headline: "Notes on the words, a quieter book, and eight seats",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "A note on a passage",
+            text: "Select some words, right-click, Add note. Every open note is listed under Notes in the sidebar; pressing one takes you back to the words and lights them for a moment.",
+          },
+          {
+            title: "Research is gone",
+            text: "Notes now live on the words they are about. Pages made before are still there, under Pages, and open as plain notes rather than as a page of the book.",
+          },
+          {
+            title: "Comments and versions in reach",
+            text: "Find, Comments and Versions have their own buttons at the right of the chapter bar, beside when it was last edited.",
+          },
+          {
+            title: "A tidier sidebar",
+            text: "The word count sits at the foot, New chapter is a row at the end of the chapters, and You / Partner only appears when somebody else is in the archive.",
+          },
+        ],
+      },
+      {
+        heading: "Archives",
+        items: [
+          {
+            title: "Eight seats",
+            text: "An archive holds up to eight people.",
+          },
+          {
+            title: "New archives are shared already",
+            text: "Whoever already shares an archive with you is in a new one from the start, without another invitation.",
+          },
+          {
+            title: "The archive switch stays on",
+            text: "Turning it on and then changing archive no longer turns it off again.",
+          },
+        ],
+      },
+      {
+        heading: "Everywhere",
+        items: [
+          {
+            title: "Search from inside the text",
+            text: "⌘K (Ctrl+K on Windows) opens search even while writing. With words selected it still makes a link.",
+          },
+          {
+            title: "Download from here",
+            text: "What's New has buttons for the Mac and Windows apps, and the desktop app says in the sidebar when a newer version is out — in a book too.",
+          },
+        ],
+      },
+    ],
+  },
   {
     version: "0.9.1",
     date: "2026-10-06",

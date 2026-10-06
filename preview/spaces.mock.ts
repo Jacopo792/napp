@@ -88,7 +88,7 @@ export function spaceMembers(archiveId: string): Space["members"] {
 }
 
 export function spaceSeats(archiveId: string): number {
-  return spaces.find((space) => space.archiveId === archiveId)?.seatLimit ?? 2;
+  return spaces.find((space) => space.archiveId === archiveId)?.seatLimit ?? 8;
 }
 
 export async function loadSpaces(_session: AppSession): Promise<Space[]> {

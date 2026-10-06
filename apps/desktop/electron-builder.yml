@@ -52,9 +52,16 @@ mac:
   identity: null
   target: dmg
 
+# Names without the version in them, so `/releases/latest/download/<name>` is
+# always the newest installer — What's New links straight to it. The version
+# is the release's tag and the app's own About box.
+dmg:
+  artifactName: Napp-mac-${arch}.${ext}
+
 win:
   target: nsis
 
 nsis:
+  artifactName: Napp-windows-setup.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
