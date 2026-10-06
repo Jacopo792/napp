@@ -25,6 +25,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autocorrect: true,
   autoLock: 0,
   spaceSwitch: false,
+  whatsNewSeen: "",
 };
 
 export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {

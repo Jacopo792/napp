@@ -1395,6 +1395,22 @@ A refusal is **said**, not left as a wait. `onAuthenticationFailed` sets
 `refusal`, and the status line used to go on reading "Connecting" — a wait the
 reader has no way to end, for a door that was already answered and shut.
 
+## What's New
+
+Every release says what changed, in English and in the words of somebody using
+Napp: `RELEASES` in `packages/core/src/lib/whatsNew.ts`, newest first. **A
+release is not finished until it has an entry there**, and its version is the
+one in `apps/web` and `apps/desktop`'s `package.json` — `whatsNew.test.ts`
+fails otherwise, so a version bump without its notes does not pass the
+healthcheck.
+
+The sheet opens by itself once after an update, only after the account's row
+has been pulled, and is always at the foot of the sidebar (both kinds of
+archive) and in ⌘K. What has been read is `whatsNewSeen` in
+`profile_preferences`, merged to the later of two readings like the remarks'
+line, so the desktop app does not announce a release already read in the
+browser. Closing it any way is having read it.
+
 ## Preferences belong to the account
 
 `profile_preferences` is one row per account with one jsonb column, and

@@ -22,6 +22,7 @@ import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu } from "./ContextMenu";
 import { useContextMenu } from "@/lib/contextMenu";
+import { WhatsNewButton } from "./WhatsNewButton";
 import { UpdateNotice } from "./UpdateNotice";
 import { MenuButton } from "./MenuPrimitives";
 import type { SheetOrigin } from "./Sheet";
@@ -75,6 +76,9 @@ interface Props {
   closeInStrip?: boolean;
   onSettings: () => void;
   onLock: () => void;
+  /** What changed in Napp, and whether there is a release not read yet. */
+  onWhatsNew: () => void;
+  whatsNewUnseen: boolean;
   /** The archive switch, which belongs above the destinations it re-points. */
   /** Which archive, above whose notes inside it. */
   spaceSwitch: React.ReactNode;
@@ -422,6 +426,8 @@ export function Sidebar({
   closeInStrip = false,
   onSettings,
   onLock,
+  onWhatsNew,
+  whatsNewUnseen,
   spaceSwitch,
   peopleShelf,
   scopeLabel,
@@ -740,6 +746,7 @@ export function Sidebar({
           only the lock came back. */}
       <div className="sidebar-footer">
         <UpdateNotice />
+        <WhatsNewButton unseen={whatsNewUnseen} onOpen={onWhatsNew} />
         <button
           type="button"
           className="sidebar-footer-button press"

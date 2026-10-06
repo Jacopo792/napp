@@ -42,6 +42,7 @@ import {
   Layers,
   Pilcrow,
   Footnote,
+  Sparkle,
   UserRound,
 } from "@/components/icons";
 import type { SettingsSection } from "@/components/settingsSections";
@@ -281,6 +282,9 @@ function faceOrigin(element: Element): SheetOrigin {
 }
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
+import { WhatsNewSheet } from "@/components/WhatsNewSheet";
+import { WhatsNewButton } from "@/components/WhatsNewButton";
+import { CURRENT_RELEASE, compareVersions, laterVersion } from "@/lib/whatsNew";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
 import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
 import {
@@ -419,6 +423,9 @@ const sessionStart = new Map<string, number>();
  *  from the defaults would take the archive switch away until the row came
  *  back, and the window would grow it again a moment after arriving. */
 let knownFlags: AccountFlags = DEFAULT_FLAGS;
+/* What's New opens by itself once per window, not once per archive: an
+   archive switch remounts this screen. */
+let whatsNewShown = false;
 export default function NotesPage() {
   const [opened, setOpened] = useState(0);
   return <ArchiveScreen key={opened} onReopen={() => setOpened((count) => count + 1)} />;
@@ -488,6 +495,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      given rarely and the list is a request the archive's own load does not make. */
   const [namedVersions, setNamedVersions] = useState<NamedVersion[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   /* Focus is the two panes put away and the page's own controls stepping back
      while you write. It is not a third layout: the workspace already knows how
      to run without the rail and the list, so this is that state plus a way in
@@ -3102,6 +3110,25 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     setFlags((current) => ({ ...current, ...patch }));
   }
 
+  /* What's New: open by itself once a release this account has not read
+     is here — only after the row has been pulled, or every device would
+     announce a release already read on another — and read once closed. */
+  const whatsNewUnseen =
+    preferencesReady && compareVersions(CURRENT_RELEASE, flags.whatsNewSeen) > 0;
+  useEffect(() => {
+    if (!whatsNewUnseen || loading || whatsNewShown) return;
+    whatsNewShown = true;
+    setWhatsNewOpen(true);
+  }, [whatsNewUnseen, loading]);
+  const closeWhatsNew = useCallback(() => {
+    setWhatsNewOpen(false);
+    setFlags((current) =>
+      compareVersions(CURRENT_RELEASE, current.whatsNewSeen) > 0
+        ? { ...current, whatsNewSeen: laterVersion(current.whatsNewSeen, CURRENT_RELEASE) }
+        : current,
+    );
+  }, []);
+
   function handleLock() {
     saveNow();
     clearDrafts();
@@ -3786,6 +3813,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         run: () => void handleExportAll(),
       },
       {
+        id: "whats-new",
+        group: "Do",
+        name: "What's New",
+        icon: <Sparkle size={16} />,
+        run: () => setWhatsNewOpen(true),
+      },
+      {
         id: "shortcuts",
         group: "Do",
         name: "Keyboard shortcuts",
@@ -4365,6 +4399,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
     <Sidebar
+      onWhatsNew={() => {
+        setFoldersOpen(false);
+        setWhatsNewOpen(true);
+      }}
+      whatsNewUnseen={whatsNewUnseen}
       scopes={scopes}
       folders={activeMeta.folders}
       selectedId={selectedFolderId}
@@ -4439,6 +4478,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         kind={docMode ? "document" : "notes"}
         onClose={() => setShortcutsOpen(false)}
       />
+      <WhatsNewSheet open={whatsNewOpen} seen={flags.whatsNewSeen} onClose={closeWhatsNew} />
     </>
   );
 
@@ -4777,6 +4817,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               <span>Trash</span>
               {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
             </WritingMenuButton>
+            <WhatsNewButton
+              unseen={whatsNewUnseen}
+              onOpen={() => {
+                setFoldersOpen(false);
+                setWhatsNewOpen(true);
+              }}
+            />
             <button
               type="button"
               className="sidebar-footer-button press"

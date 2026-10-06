@@ -75,6 +75,7 @@ test("the flags come away without the appearance riding along", () => {
     "presence",
     "proofreader",
     "spaceSwitch",
+    "whatsNewSeen",
   ]);
   assert.equal(flags.presence, true);
   assert.equal(flags.autoLock, 15);
@@ -154,4 +155,11 @@ test("the archive switch is off until the row says otherwise", () => {
     mergeAccountPreferences({ spaceSwitch: "on" }, local).spaceSwitch,
     local.spaceSwitch,
   );
+});
+
+test("What's New read on one device stays read on the other", () => {
+  const read = { ...local, whatsNewSeen: "0.9.0" };
+  assert.equal(mergeAccountPreferences({ whatsNewSeen: "0.8.0" }, read).whatsNewSeen, "0.9.0");
+  assert.equal(mergeAccountPreferences({ whatsNewSeen: "0.9.0" }, local).whatsNewSeen, "0.9.0");
+  assert.equal(mergeAccountPreferences({ whatsNewSeen: 9 }, read).whatsNewSeen, "0.9.0");
 });

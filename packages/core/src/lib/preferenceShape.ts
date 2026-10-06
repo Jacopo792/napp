@@ -10,6 +10,7 @@ import { DEFAULT_APPEARANCE, type Appearance } from "./appearance.ts";
 import { AUTO_LOCK_CHOICES, type AutoLockMinutes } from "./autoLock.ts";
 import { DEFAULT_AXES, type Axes } from "./axes.ts";
 import { writingPreferencesFrom, type WritingPreferences } from "./writingPreferences.ts";
+import { laterVersion } from "./whatsNew.ts";
 export type { RemarksSeen } from "./commentThreads.ts";
 import type { RemarksSeen } from "./commentThreads.ts";
 
@@ -34,6 +35,11 @@ export interface AccountFlags {
    *  account with one archive has nothing to switch, and one with several
    *  still reaches every archive from Settings → Archives. */
   spaceSwitch: boolean;
+  /** The last release whose What's New this person has read. A watermark
+   *  like the remarks' — merged to the later of two readings, never
+   *  last-write-wins — so a device that has read nothing cannot announce
+   *  again what another one already showed. */
+  whatsNewSeen: string;
 }
 
 export interface AccountPreferences extends AccountFlags {
@@ -78,6 +84,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autocorrect: true,
   autoLock: 0,
   spaceSwitch: false,
+  whatsNewSeen: "",
 };
 
 /**
@@ -98,6 +105,7 @@ export function flagsOf(preferences: AccountFlags): AccountFlags {
     autocorrect: preferences.autocorrect,
     autoLock: preferences.autoLock,
     spaceSwitch: preferences.spaceSwitch,
+    whatsNewSeen: preferences.whatsNewSeen,
   };
 }
 
@@ -155,6 +163,10 @@ export function mergeAccountPreferences(
       autocorrect: typeof row.autocorrect === "boolean" ? row.autocorrect : local.autocorrect,
       autoLock: isAutoLock(row.autoLock) ? row.autoLock : local.autoLock,
       spaceSwitch: typeof row.spaceSwitch === "boolean" ? row.spaceSwitch : local.spaceSwitch,
+      whatsNewSeen: laterVersion(
+        local.whatsNewSeen ?? "",
+        typeof row.whatsNewSeen === "string" ? row.whatsNewSeen : "",
+      ),
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
   );

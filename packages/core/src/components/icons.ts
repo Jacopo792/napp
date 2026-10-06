@@ -20,6 +20,7 @@ export {
   Books,
   Article as Chapters,
   Subtitles as Caption,
+  Sparkle,
   ArrowBendDownRight as CrossReference,
   TextSuperscript as Footnote,
   CalendarBlank as CalendarDays,
