@@ -43,7 +43,16 @@ import {
 } from "@dnd-kit/core";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { chooseArchive, restoreSession, clearSession, type AppSession } from "@/lib/session";
-import { createSpace, loadSpaces, renameSpace, setSpaceSeats, type Space } from "@/lib/spaces";
+import {
+  createSpace,
+  setDocumentFeatures,
+  setSpaceKind,
+  deleteSpace,
+  loadSpaces,
+  renameSpace,
+  setSpaceSeats,
+  type Space,
+} from "@/lib/spaces";
 import {
   createNote,
   createArchiveInvite,
@@ -2569,35 +2578,51 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     navigate({ to: "/" });
   }
 
+  /* Leaving an archive and deleting one end the same way: whatever is still
+     waiting lands first, the act runs, and the window goes to another
+     archive — or, with none left, to the door. */
+  const goElsewhere = useCallback(
+    async (current: AppSession, act: () => Promise<void>) => {
+      /* Membership removal revokes the right to finish a write, so flush first
+         and fail closed if any note or metadata is still waiting locally. */
+      await drain();
+      if (hasPending() || pendingMetaRef.current.size > 0) {
+        throw new Error("Your latest changes could not be saved. Try again before leaving.");
+      }
+
+      await act();
+      clearDrafts();
+      const remaining = (await loadSpaces(current).catch(() => [])).filter(
+        (space) => space.archiveId !== current.archiveId,
+      );
+      if (remaining.length > 0) {
+        await chooseArchive(current, remaining[0].archiveId);
+        setSheets([]);
+        await leaveScreen();
+        document.documentElement.dataset.arriving = "";
+        onReopen();
+        return;
+      }
+      await clearSession();
+      setSession(null);
+      navigate({ to: "/" });
+    },
+    [drain, navigate, onReopen],
+  );
+
   const handleLeaveArchive = useCallback(async () => {
     const current = sessionRef.current;
     if (!current) throw new Error("Sign in again before leaving this archive");
+    await goElsewhere(current, () => leaveArchive(current));
+  }, [goElsewhere]);
 
-    /* Membership removal revokes the right to finish a write, so flush first
-       and fail closed if any note or metadata is still waiting locally. */
-    await drain();
-    if (hasPending() || pendingMetaRef.current.size > 0) {
-      throw new Error("Your latest changes could not be saved. Try again before leaving.");
-    }
-
-    await leaveArchive(current);
-    clearDrafts();
-    /* Another archive to go to is where the window goes; none is the door. */
-    const remaining = (await loadSpaces(current).catch(() => [])).filter(
-      (space) => space.archiveId !== current.archiveId,
-    );
-    if (remaining.length > 0) {
-      await chooseArchive(current, remaining[0].archiveId);
-      setSheets([]);
-      await leaveScreen();
-      document.documentElement.dataset.arriving = "";
-      onReopen();
-      return;
-    }
-    await clearSession();
-    setSession(null);
-    navigate({ to: "/" });
-  }, [drain, navigate, onReopen]);
+  /* Its last member only; `deleteSpace` asks Postgres first and refuses
+     before anything is removed. */
+  const handleDeleteArchive = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) throw new Error("Sign in again before deleting this archive");
+    await goElsewhere(current, () => deleteSpace(current));
+  }, [goElsewhere]);
 
   /* Writes waiting here belong to this archive, so they land before the
      window leaves it — and if they cannot, it does not leave. */
@@ -3367,6 +3392,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           handleSelectFolder(folderId);
         }}
         onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+        onSetPhoto={
+          canWriteArchive &&
+          !trashedIds.has(entry.note.id) &&
+          (lockHolders.get(entry.note.id) ?? session.userId) === session.userId
+            ? (file, crop) => void handleNotePhoto(entry.note.id, file, crop)
+            : undefined
+        }
       />
     );
   }
@@ -3461,10 +3493,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSeatLimit(seats);
           await refreshSpaces();
         }}
+        onOptions={async (kind, features) => {
+          if (kind !== space.kind) await setSpaceKind(session, kind);
+          await setDocumentFeatures(session, features);
+          await refreshSpaces();
+        }}
         onCreateInvite={inviteLink}
         onRevokeInvite={withdrawInvite}
         onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
         onLeave={handleLeaveArchive}
+        onDelete={handleDeleteArchive}
       />
     );
   }
@@ -3511,6 +3549,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onOpenNote={(noteId, withHistory) =>
           openFromSheet(noteId, withHistory ? { history: true } : undefined)
         }
+        onSetAvatar={member.isSelf ? (file, crop) => void handleAvatarPick(file, crop) : undefined}
       />
     );
   }
@@ -3532,8 +3571,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             <NewArchiveSheet
               key={key}
               origin={sheet}
-              onCreate={async (name) => {
-                await handleSwitchArchive(await createSpace(name));
+              onCreate={async (name, kind, features) => {
+                const archiveId = await createSpace(
+                  name,
+                  kind,
+                  kind === "document" ? features : undefined,
+                );
+                setSettingsOpen(false);
+                await handleSwitchArchive(archiveId);
               }}
             />
           );
@@ -3647,11 +3692,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsOpen(false);
           await handleSwitchArchive(archiveId);
         }}
-        onCreateArchive={async (name) => {
-          const archiveId = await createSpace(name);
-          setSettingsOpen(false);
-          await handleSwitchArchive(archiveId);
-        }}
+        onNewArchive={(from) => openSheet({ ...faceOrigin(from), kind: "new-archive" })}
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
         spaceSwitchShown={flags.spaceSwitch}

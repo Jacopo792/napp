@@ -9,6 +9,14 @@
  * membership again before it stores anything. */
 import type { AppSession } from "./sessionRestore";
 import { fail, supabase } from "./supabaseClient";
+import {
+  archiveKind,
+  documentFeatures,
+  type ArchiveKind,
+  type DocumentFeatures,
+} from "./spaceShape";
+
+export { archiveKind, documentFeatures, type ArchiveKind, type DocumentFeatures };
 
 export interface SpaceMember {
   userId: string;
@@ -20,6 +28,8 @@ export interface Space {
   archiveId: string;
   name: string;
   seatLimit: number;
+  kind: ArchiveKind;
+  features: DocumentFeatures;
   members: SpaceMember[];
 }
 
@@ -34,7 +44,7 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
   if (ids.length === 0) return [];
 
   const [archives, members] = await Promise.all([
-    supabase.from("archives").select("id, name, seat_limit").in("id", ids),
+    supabase.from("archives").select("id, name, seat_limit, kind, settings").in("id", ids),
     supabase
       .from("archive_members")
       .select("archive_id, user_id")
@@ -59,10 +69,15 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
     ).map((row) => [row.user_id, row]),
   );
   const byId = new Map(
-    ((archives.data ?? []) as { id: string; name: string; seat_limit: number }[]).map((row) => [
-      row.id,
-      row,
-    ]),
+    (
+      (archives.data ?? []) as {
+        id: string;
+        name: string;
+        seat_limit: number;
+        kind: string;
+        settings: unknown;
+      }[]
+    ).map((row) => [row.id, row]),
   );
   return ids.flatMap((archiveId) => {
     const archive = byId.get(archiveId);
@@ -72,6 +87,8 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
         archiveId,
         name: archive.name,
         seatLimit: archive.seat_limit,
+        kind: archiveKind(archive.kind),
+        features: documentFeatures(archive.settings),
         members: memberRows
           .filter((row) => row.archive_id === archiveId)
           .map((row) => ({
@@ -84,10 +101,24 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
   });
 }
 
-export async function createSpace(name: string): Promise<string> {
-  const result = await supabase.rpc("create_archive", { archive_name: name });
+/** Made, then given its options. Two calls rather than a wider
+ *  `create_archive`: the options are `settings`, which the archive's own
+ *  member writes like any other time, under the same policy. */
+export async function createSpace(
+  name: string,
+  kind: ArchiveKind = "notes",
+  features?: DocumentFeatures,
+): Promise<string> {
+  const result = await supabase.rpc("create_archive", { archive_name: name, archive_kind: kind });
   fail(result.error);
   if (typeof result.data !== "string") throw new Error("The archive could not be made");
+  if (features) {
+    const merged = await supabase.rpc("merge_archive_settings", {
+      target_archive_id: result.data,
+      patch: { features },
+    });
+    fail(merged.error);
+  }
   return result.data;
 }
 
@@ -108,5 +139,56 @@ export async function setSpaceSeats(session: AppSession, seats: number): Promise
     .from("archives")
     .update({ seat_limit: seats })
     .eq("id", session.archiveId);
+  fail(result.error);
+}
+
+export async function setSpaceKind(session: AppSession, kind: ArchiveKind): Promise<void> {
+  const result = await supabase.from("archives").update({ kind }).eq("id", session.archiveId);
+  fail(result.error);
+}
+
+/** One key of `archives.settings` changed, the rest left as they are. */
+export async function mergeSpaceSettings(
+  session: AppSession,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const result = await supabase.rpc("merge_archive_settings", {
+    target_archive_id: session.archiveId,
+    patch,
+  });
+  fail(result.error);
+}
+
+/** The whole of `features`, because `||` merges one level deep: a patch of
+ *  one switch would replace the object and take the others with it. */
+export async function setDocumentFeatures(
+  session: AppSession,
+  features: DocumentFeatures,
+): Promise<void> {
+  await mergeSpaceSettings(session, { features });
+}
+
+/** Gone for good: only by its last member, never an account's last archive.
+ *  Postgres decides (`archive_deletion_refusal`); the pictures are removed in
+ *  between, because Storage refuses a delete made from SQL — and only once
+ *  the answer is yes, so a refused delete never costs an archive its images. */
+export async function deleteSpace(session: AppSession): Promise<void> {
+  const refusal = await supabase.rpc("archive_deletion_refusal", {
+    target_archive_id: session.archiveId,
+  });
+  fail(refusal.error);
+  if (typeof refusal.data === "string") throw new Error(refusal.data);
+
+  const bucket = supabase.storage.from("note-images");
+  for (;;) {
+    const listed = await bucket.list(session.archiveId, { limit: 1000 });
+    fail(listed.error);
+    const names = (listed.data ?? []).map((object) => `${session.archiveId}/${object.name}`);
+    if (names.length === 0) break;
+    const removed = await bucket.remove(names);
+    fail(removed.error);
+  }
+
+  const result = await supabase.rpc("delete_archive", { target_archive_id: session.archiveId });
   fail(result.error);
 }

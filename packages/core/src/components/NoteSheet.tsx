@@ -28,7 +28,9 @@ import {
   Trash2,
 } from "@/components/icons";
 import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
+import type { AvatarCrop } from "@/lib/image";
 import { loadVersions, type NoteVersion } from "@/lib/history";
 import { formatDateTime } from "@/lib/format";
 import { useStoredImage } from "@/lib/media";
@@ -68,6 +70,8 @@ interface Props {
   onOpenFolder: (folderId: string) => void;
   /** The face that was pressed, for the person sheet to fly out of. */
   onOpenPerson: (userId: string, from: Element) => void;
+  /** Absent where this reader cannot change the note. */
+  onSetPhoto?: (file: File, crop: AvatarCrop) => void;
 }
 
 const RECENT = 8;
@@ -81,6 +85,7 @@ export function NoteSheet({
   onOpenNote,
   onOpenFolder,
   onOpenPerson,
+  onSetPhoto,
 }: Props) {
   const [versions, setVersions] = useState<NoteVersion[] | null>(null);
   const [failure, setFailure] = useState("");
@@ -118,9 +123,14 @@ export function NoteSheet({
     <Sheet label={note.title || "Untitled"} origin={origin}>
       <div className="sheet-body">
         <header className="sheet-hero">
-          <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>
+          <SheetPortrait
+            className="sheet-portrait sheet-note-glyph"
+            image={photoUrl}
+            label={onSetPhoto ? "Change photo" : "Show photo"}
+            onPick={onSetPhoto}
+          >
             {photoUrl ? <img src={photoUrl} alt="" draggable={false} /> : glyph}
-          </span>
+          </SheetPortrait>
           <h2>{note.title || "Untitled"}</h2>
           <p>
             {note.folder ? (

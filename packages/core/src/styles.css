@@ -5007,7 +5007,8 @@
    box-shadow spread far enough to reach every corner of the stage — cheaper
    and crisper than a second element with a radial gradient in it. */
 .cropper-layer {
-  z-index: 90;
+  /* Above the sheets, which a picture can be changed from. */
+  z-index: 100;
 }
 
 .cropper-panel {
@@ -9618,9 +9619,62 @@ text.ink-stroke {
 
 .sheet-portrait.is-round {
   border-radius: 999px;
-  box-shadow:
-    0 0 0 3px var(--glass),
-    0 0 0 5px var(--person, var(--accent));
+  /* An outline stood off the face, not a shadow painted in the sheet's
+     colour: the sheet is translucent, and a gap painted with it over itself
+     came out as a darker ring between the picture and its colour. */
+  outline: 2px solid var(--person, var(--accent));
+  outline-offset: 3px;
+}
+
+.sheet-portrait.is-pressable {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.sheet-portrait.is-pressable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Held: the picture large, over everything, and gone at the next press. */
+.portrait-zoom {
+  position: fixed;
+  z-index: 110;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.6);
+  cursor: zoom-out;
+  animation: portrait-zoom-fade var(--dur-base) var(--ease-out) backwards;
+}
+
+.portrait-zoom img {
+  width: min(70vmin, 420px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
+  animation: portrait-zoom-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.portrait-zoom.is-round img {
+  border-radius: 999px;
+}
+
+@keyframes portrait-zoom-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes portrait-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
 }
 
 .sheet-portrait .avatar.is-large {
@@ -10024,9 +10078,39 @@ button.sheet-chip:hover,
 .face-stack > span:not(.face-stack-more) {
   position: relative;
   z-index: calc(3 - var(--i));
+  display: flex;
   margin-left: -6px;
   border-radius: 999px;
-  box-shadow: 0 0 0 2px var(--paper);
+}
+
+/* Each face behind is cut where the one in front of it sits, a little wider
+   than it. The gap used to be a ring painted in --paper, which on a
+   translucent sidebar is a different colour from what is behind it. The
+   centre is the front face's: one face's width back, less the overlap. */
+.face-stack > span:not(.face-stack-more, :first-child) {
+  --cut: calc(var(--face) / 2 + var(--gap));
+  -webkit-mask: radial-gradient(
+    circle var(--cut) at calc(var(--overlap) - var(--face) / 2) 50%,
+    transparent calc(var(--cut) - 0.5px),
+    #000 var(--cut)
+  );
+  mask: radial-gradient(
+    circle var(--cut) at calc(var(--overlap) - var(--face) / 2) 50%,
+    transparent calc(var(--cut) - 0.5px),
+    #000 var(--cut)
+  );
+}
+
+.face-stack {
+  --face: 20px;
+  --overlap: 6px;
+  --gap: 2px;
+}
+
+.face-stack.is-large {
+  --face: 56px;
+  --overlap: 16px;
+  --gap: 3px;
 }
 
 .face-stack > span:first-child {
@@ -10049,7 +10133,6 @@ button.sheet-chip:hover,
 
 .face-stack.is-large > span:not(.face-stack-more) {
   margin-left: -16px;
-  box-shadow: 0 0 0 3px var(--glass);
 }
 
 .face-stack.is-large > span:first-child {
@@ -10145,6 +10228,12 @@ button.sheet-chip:hover,
   display: inline-flex;
 }
 
+/* The row's own gap would push each face 2px further than the cut made for
+   the one in front of it. */
+.member-role-list .face-stack {
+  gap: 0;
+}
+
 .space-list > div {
   justify-content: flex-start;
 }
@@ -10174,4 +10263,44 @@ button.sheet-chip:hover,
 [data-arriving] .workspace-shell,
 [data-arriving] .mobile-workspace {
   opacity: 0;
+}
+
+/* ── An archive's options ─────────────────────────────────────────────────
+   The rows of Settings, inside a sheet: the same switches, the same groups,
+   so making an archive reads as setting something rather than filling in a
+   form. */
+.archive-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.archive-options .appearance-controls + .appearance-controls {
+  margin-top: 0;
+}
+
+.archive-options .settings-label {
+  flex: 1;
+}
+
+.settings-segment.is-inline {
+  grid-auto-columns: auto;
+  padding: 2px;
+}
+
+.settings-segment.is-inline button {
+  min-height: 26px;
+  padding: 2px 10px;
+  font-size: var(--text-sm);
+}
+
+.archive-goal {
+  width: 96px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 4px 8px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }

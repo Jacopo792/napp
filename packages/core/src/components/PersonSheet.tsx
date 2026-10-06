@@ -18,7 +18,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Bookmark } from "@/components/icons";
 import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
+import type { AvatarCrop } from "@/lib/image";
 import { loadContributions, type Contribution } from "@/lib/history";
 import { memberSince } from "@/lib/format";
 import { dateBucket } from "@/lib/listPreferences";
@@ -48,6 +50,8 @@ interface Props {
   origin: SheetOrigin;
   titleOf: (noteId: string) => string | null;
   onOpenNote: (noteId: string, withHistory: boolean) => void;
+  /** Only on your own sheet: a face is its owner's to change. */
+  onSetAvatar?: (file: File, crop: AvatarCrop) => void;
 }
 
 interface NoteWork {
@@ -71,6 +75,7 @@ export function PersonSheet({
   origin,
   titleOf,
   onOpenNote,
+  onSetAvatar,
 }: Props) {
   const [work, setWork] = useState<Contribution[] | null>(null);
   const [failure, setFailure] = useState("");
@@ -114,9 +119,14 @@ export function PersonSheet({
     <Sheet label={name} origin={origin}>
       <div className="sheet-body" style={{ "--person": color } as CSSProperties}>
         <header className="sheet-hero">
-          <span className="sheet-portrait is-round" data-sheet-flyer>
+          <SheetPortrait
+            className="sheet-portrait is-round"
+            image={avatarUrl}
+            label={onSetAvatar ? "Change picture" : "Show picture"}
+            onPick={onSetAvatar}
+          >
             <Avatar url={avatarUrl} name={name} email="" large />
-          </span>
+          </SheetPortrait>
           <h2>{isSelf ? `${name} (you)` : name}</h2>
           <p>Member since {memberSince(joinedAt)}</p>
           {now && (

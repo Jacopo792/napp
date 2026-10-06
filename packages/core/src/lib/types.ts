@@ -55,6 +55,9 @@ export interface NoteMeta {
   folderId: string | null;
   /** Optional for backward compatibility with metadata written before pinning existed. */
   pinned?: boolean;
+  /** Where a chapter stands in a document, shared by every member. Absent is
+   *  "not placed yet", after the placed ones. Nothing outside a document reads it. */
+  position?: number;
   /** Soft-deleted notes remain recoverable in Postgres until removed from Trash. */
   trashedAt?: string;
   /**

@@ -8,7 +8,16 @@
 import type { NoteEntry } from "@/lib/entries";
 import type { AppSession } from "@/lib/session";
 import { EMPTY_META, type Meta, type Note, type NoteMeta } from "@/lib/types";
-import { FIXTURE_META, FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import {
+  FIXTURE_META,
+  FIXTURE_NOTES,
+  PREVIEW_ARCHIVE,
+  PREVIEW_THESIS,
+  PREVIEW_U1,
+  PREVIEW_U2,
+  THESIS_META,
+  THESIS_NOTES,
+} from "./fixture";
 import { spaceMembers, spaceSeats } from "./spaces.mock";
 
 export interface ArchiveMember {
@@ -97,7 +106,17 @@ function storeOf(session: AppSession): ArchiveStore {
             },
           },
         }
-      : { notes: new Map(), metas: { [session.userId]: structuredClone(EMPTY_META) } };
+      : session.archiveId === PREVIEW_THESIS
+        ? {
+            notes: new Map(
+              THESIS_NOTES.map((note) => [note.id, { note: { ...note }, version: 1 }]),
+            ),
+            metas: {
+              [PREVIEW_U1]: structuredClone(THESIS_META),
+              [PREVIEW_U2]: { ...structuredClone(EMPTY_META), partnerName: "Lucile" },
+            },
+          }
+        : { notes: new Map(), metas: { [session.userId]: structuredClone(EMPTY_META) } };
   stores.set(session.archiveId, store);
   return store;
 }

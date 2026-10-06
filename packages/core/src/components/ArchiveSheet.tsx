@@ -11,12 +11,14 @@
  * stops before either refuses. Leaving is here too, at the foot, and takes
  * two presses, because the way back in is somebody else's invitation. */
 import { useState } from "react";
-import { LogOut, Minus, Plus } from "@/components/icons";
+import { LogOut, Minus, Plus, Trash2 } from "@/components/icons";
 import { Sheet, type SheetOrigin } from "@/components/Sheet";
 import { Invitations } from "@/components/Invitations";
 import { FaceStack } from "@/components/SpaceSwitch";
 import { Avatar } from "@/components/WorkspaceMenus";
+import { ArchiveOptions } from "@/components/ArchiveOptions";
 import type { Space } from "@/lib/spaces";
+import { DEFAULT_FEATURES, type ArchiveKind, type DocumentFeatures } from "@/lib/spaceShape";
 
 const MAX_SEATS = 8;
 
@@ -30,10 +32,12 @@ export function ArchiveSheet({
   invites,
   onRename,
   onSeats,
+  onOptions,
   onCreateInvite,
   onRevokeInvite,
   onOpenPerson,
   onLeave,
+  onDelete,
 }: {
   origin: SheetOrigin;
   space: Space;
@@ -44,15 +48,18 @@ export function ArchiveSheet({
   invites: { id: string; email: string; expiresAt: string }[];
   onRename: (name: string) => Promise<void>;
   onSeats: (seats: number) => Promise<void>;
+  onOptions: (kind: ArchiveKind, features: DocumentFeatures) => Promise<void>;
   onCreateInvite: (email: string) => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
   onOpenPerson: (userId: string, from: Element) => void;
   onLeave: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const [name, setName] = useState(space.name);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const taken = space.members.length + invites.length;
   const alone = space.members.length <= 1;
 
@@ -137,6 +144,20 @@ export function ArchiveSheet({
         </div>
 
         <div className="sheet-work">
+          {/* Only a document carries options. A notes archive is the app as it
+              has always been, and its sheet stays as it was. */}
+          {space.kind === "document" && (
+            <>
+              <h3>Document</h3>
+              <ArchiveOptions
+                kind={space.kind}
+                features={space.features}
+                disabled={busy}
+                onChange={(kind, features) => void act(() => onOptions(kind, features))}
+              />
+            </>
+          )}
+
           <h3>Members</h3>
           <div className="sheet-faces">
             {space.members.map((member) => (
@@ -186,22 +207,41 @@ export function ArchiveSheet({
             <LogOut size={14} />
             {leaving ? "Leave — press again" : "Leave this archive"}
           </button>
+
+          {/* Where Leave cannot go, Delete can: an archive with nobody else in
+              it takes nothing from anybody. Postgres says the same thing. */}
+          {alone && (
+            <button
+              type="button"
+              className={`sheet-leave press ${deleting ? "is-confirm" : ""}`}
+              disabled={busy}
+              onClick={() => {
+                if (!deleting) return setDeleting(true);
+                void act(onDelete);
+              }}
+            >
+              <Trash2 size={14} />
+              {deleting ? "Delete every note in it — press again" : "Delete this archive"}
+            </button>
+          )}
         </div>
       </div>
     </Sheet>
   );
 }
 
-/** A name, and the archive exists: everything else about it is set from its
- *  own sheet once the window is open on it. */
+/** A name and what it is for. Members, seats and invitations are set from
+ *  its own sheet once the window is open on it. */
 export function NewArchiveSheet({
   origin,
   onCreate,
 }: {
   origin: SheetOrigin;
-  onCreate: (name: string) => Promise<void>;
+  onCreate: (name: string, kind: ArchiveKind, features: DocumentFeatures) => Promise<void>;
 }) {
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<ArchiveKind>("notes");
+  const [features, setFeatures] = useState<DocumentFeatures>({ ...DEFAULT_FEATURES });
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -210,7 +250,7 @@ export function NewArchiveSheet({
     setBusy(true);
     setStatus("");
     try {
-      await onCreate(name.trim());
+      await onCreate(name.trim(), kind, features);
     } catch (reason) {
       setStatus(reason instanceof Error ? reason.message : "The archive could not be made");
       setBusy(false);
@@ -218,7 +258,7 @@ export function NewArchiveSheet({
   }
 
   return (
-    <Sheet label="New archive" origin={origin} className="is-short">
+    <Sheet label="New archive" origin={origin}>
       <div className="sheet-body">
         <header className="sheet-hero">
           <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>
@@ -233,13 +273,25 @@ export function NewArchiveSheet({
               <input
                 value={name}
                 maxLength={80}
-                placeholder="Thesis, Study group…"
+                placeholder="Study group, Thesis…"
                 disabled={busy}
                 autoFocus
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && void create()}
               />
             </label>
+          </div>
+          <ArchiveOptions
+            withPresets
+            kind={kind}
+            features={features}
+            disabled={busy}
+            onChange={(nextKind, nextFeatures) => {
+              setKind(nextKind);
+              setFeatures(nextFeatures);
+            }}
+          />
+          <div className="invite-form">
             <button type="button" disabled={busy || !name.trim()} onClick={() => void create()}>
               <Plus size={16} />
               {busy ? "Making…" : "Make archive"}

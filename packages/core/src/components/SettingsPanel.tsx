@@ -342,7 +342,7 @@ export function SettingsPanel({
   spaceSwitchShown,
   onSpaceSwitchShownChange,
   onSwitchArchive,
-  onCreateArchive,
+  onNewArchive,
   onPresenceEnabledChange,
   onCollaboratorsVisibleChange,
   onProofreaderEnabledChange,
@@ -393,7 +393,7 @@ export function SettingsPanel({
   spaceSwitchShown: boolean;
   onSpaceSwitchShownChange: (shown: boolean) => void;
   onSwitchArchive: (archiveId: string) => Promise<void>;
-  onCreateArchive: (name: string) => Promise<void>;
+  onNewArchive: (from: Element) => void;
   onPresenceEnabledChange: (enabled: boolean) => void;
   onCollaboratorsVisibleChange: (visible: boolean) => void;
   onProofreaderEnabledChange: (enabled: boolean) => void;
@@ -422,7 +422,6 @@ export function SettingsPanel({
    *  the cropper is confirmed. */
   const [cropping, setCropping] = useState<File | null>(null);
   const [leaveConfirm, setLeaveConfirm] = useState(false);
-  const [newArchive, setNewArchive] = useState("");
   const [spaceStatus, setSpaceStatus] = useState("");
   const [spaceBusy, setSpaceBusy] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -1395,29 +1394,14 @@ export function SettingsPanel({
                     ))}
                   </div>
 
-                  <h3>New archive</h3>
                   <div className="invite-form">
-                    <label>
-                      <span>Name</span>
-                      <input
-                        value={newArchive}
-                        maxLength={80}
-                        placeholder="Thesis, Study group…"
-                        disabled={spaceBusy}
-                        onChange={(event) => setNewArchive(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && newArchive.trim())
-                            void spaceAct(() => onCreateArchive(newArchive.trim()));
-                        }}
-                      />
-                    </label>
                     <button
                       type="button"
-                      disabled={spaceBusy || !newArchive.trim()}
-                      onClick={() => void spaceAct(() => onCreateArchive(newArchive.trim()))}
+                      disabled={spaceBusy}
+                      onClick={(event) => onNewArchive(event.currentTarget)}
                     >
                       <Plus size={16} />
-                      {spaceBusy ? "Making…" : "Make archive"}
+                      New archive…
                     </button>
                   </div>
                   {spaceStatus && (

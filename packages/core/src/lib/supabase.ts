@@ -45,6 +45,7 @@ interface NoteRow {
   archived_at: string | null;
   locked_by: string | null;
   pinned: boolean;
+  position: number | null;
   folder_id: string | null;
   version: number;
   content_version: number;
@@ -102,7 +103,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase
       .from("notes")
       .select(
-        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, folder_id, version, content_version, page_icon, cover",
+        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, position, folder_id, version, content_version, page_icon, cover",
       )
       .eq("archive_id", archiveId),
     supabase
@@ -282,6 +283,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       id: row.id,
       folderId: row.folder_id,
       pinned: row.pinned || undefined,
+      position: row.position ?? undefined,
       trashedAt: row.trashed_at ?? undefined,
       archivedAt: row.archived_at ?? undefined,
       lockedBy: row.locked_by ?? undefined,
@@ -531,7 +533,10 @@ export async function persistMetaDiff(
 
   await all([
     ...(folderRows.length ? [supabase.from("folders").upsert(folderRows)] : []),
-    ...(settings ? [supabase.from("archives").update({ settings }).eq("id", archiveId)] : []),
+    /* Merged, never written whole: the column also holds a document's options. */
+    ...(settings
+      ? [supabase.rpc("merge_archive_settings", { target_archive_id: archiveId, patch: settings })]
+      : []),
   ]);
 
   // ── 2. Note placement ───────────────────────────────────────────────────
@@ -541,6 +546,7 @@ export async function persistMetaDiff(
       !previous ||
       previous.folderId !== metadata.folderId ||
       previous.pinned !== metadata.pinned ||
+      previous.position !== metadata.position ||
       previous.trashedAt !== metadata.trashedAt ||
       previous.archivedAt !== metadata.archivedAt ||
       previous.lockedBy !== metadata.lockedBy
@@ -555,6 +561,7 @@ export async function persistMetaDiff(
         .update({
           folder_id: metadata.folderId,
           pinned: metadata.pinned ?? false,
+          position: metadata.position ?? null,
           trashed_at: metadata.trashedAt ?? null,
           archived_at: metadata.archivedAt ?? null,
           locked_by: metadata.lockedBy ?? null,

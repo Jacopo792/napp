@@ -13,6 +13,8 @@ import {
 export const PREVIEW_U1 = "preview-member-1";
 export const PREVIEW_U2 = "preview-member-2";
 export const PREVIEW_ARCHIVE = "00000000-0000-4000-8000-000000000001";
+/** A thesis archive, so the document outline has chapters to show. */
+export const PREVIEW_THESIS = "00000000-0000-4000-8000-000000000003";
 
 const F_STUDIO = "f-studio";
 const F_APPUNTI = "f-appunti";
@@ -240,5 +242,89 @@ export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
     ownerId: PREVIEW_U1,
     createdAt: iso(seed.days + 30),
     updatedAt: iso(seed.days),
+  };
+});
+
+/* ── The thesis archive ─────────────────────────────────────────────────────
+   Two parts and five chapters with an explicit order, and one note not yet
+   placed, which the outline keeps after the placed ones. */
+const P_ONE = "t-part-1";
+const P_TWO = "t-part-2";
+
+const paragraph = (sentence: string, times: number) =>
+  Array.from({ length: times }, () => sentence).join(" ");
+
+const CHAPTERS: { title: string; folder: string | null; position?: number; body: string }[] = [
+  {
+    title: "Introduzione",
+    folder: null,
+    position: 1,
+    body: paragraph(
+      "Questa tesi legge le Enneadi come un unico argomento sulla causa che non si esaurisce in ciò che causa.",
+      14,
+    ),
+  },
+  {
+    title: "L'Uno e la processione",
+    folder: P_ONE,
+    position: 2,
+    body: `## La sovrabbondanza\n\n${paragraph("L'Uno produce senza diminuire, come una sorgente che non si svuota nei fiumi che alimenta.", 22)}\n\n## Il limite del linguaggio\n\n${paragraph("Di ciò che è al di là dell'essere si può dire soltanto ciò che non è.", 12)}`,
+  },
+  {
+    title: "L'Intelletto e le idee",
+    folder: P_ONE,
+    position: 3,
+    body: paragraph(
+      "Nell'Intelletto pensare ed essere coincidono, e ogni idea contiene tutte le altre.",
+      30,
+    ),
+  },
+  {
+    title: "L'anima e il corpo",
+    folder: P_TWO,
+    position: 4,
+    body: paragraph("L'anima non è nel corpo come in un luogo: è il corpo a essere nell'anima.", 26),
+  },
+  {
+    title: "Il ritorno",
+    folder: P_TWO,
+    position: 5,
+    body: paragraph("Il ritorno all'Uno è un togliere, non un aggiungere: aphele panta.", 9),
+  },
+  {
+    title: "Appunti sparsi su Porfirio",
+    folder: null,
+    body: "Da rileggere la Vita di Plotino, capitoli 3 e 14.",
+  },
+];
+
+export const THESIS_META: Meta = {
+  v: 1,
+  partnerName: "Lucile",
+  folders: [
+    { id: P_ONE, name: "Parte I — Le ipostasi" },
+    { id: P_TWO, name: "Parte II — L'anima" },
+  ],
+  notes: CHAPTERS.map((chapter, index) => ({
+    id: `t${index}`,
+    folderId: chapter.folder,
+    ...(chapter.position === undefined ? {} : { position: chapter.position }),
+  })),
+};
+
+export const THESIS_NOTES: Note[] = CHAPTERS.map((chapter, index) => {
+  const content = legacyMarkdownToRichText(chapter.body);
+  return {
+    id: `t${index}`,
+    title: chapter.title,
+    body: richTextToPlainText(content),
+    content,
+    contentVersion: 0,
+    legacyBody: chapter.body,
+    photo: null,
+    cover: null,
+    ownerId: PREVIEW_U1,
+    createdAt: iso(20 - index),
+    updatedAt: iso(index),
   };
 });
