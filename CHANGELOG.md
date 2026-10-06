@@ -3,6 +3,96 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.4 — 2026-10-06
+
+Documentation brought up to the 0.9 releases.
+
+### Changed
+
+- README, DESKTOP, PRODUCT and SECURITY describe book archives, eight seats,
+  new archives seated with existing co-members, the version-free installer
+  names and their direct download links, and a release on every push to
+  `main`. This changelog gains 0.9.0–0.9.3.
+
+## 0.9.3 — 2026-10-06
+
+A chapter bar on one line.
+
+### Changed
+
+- The chapter bar never wraps onto a second row. In a narrow window the least
+  used tools step aside first — the text's own font, indents, undo and redo,
+  then spacing and size, then alignment — and Insert always stays.
+- The "Edited" time and the inspector button are gone from the bar (the
+  inspector is still ⌥⌘I). New chapter is the + beside Chapters.
+
+## 0.9.2 — 2026-10-06
+
+Notes on the words, a quieter book, and eight seats.
+
+### Added
+
+- **A note on a passage.** Select words, right-click, Add note. Open notes are
+  listed under Notes in a book's sidebar; pressing one opens the chapter and
+  lights the passage for a moment.
+- Find, Comments and Versions have their own buttons in the chapter bar.
+- What's New links the Mac and Windows installers, and a book's sidebar says
+  when a newer desktop version is out.
+
+### Changed
+
+- A book no longer makes research pages. Pages made before stay under Pages
+  and open as plain notes, never on the sheet.
+- The word count sits at the foot of the structure; You / Partner is shown only
+  when somebody else is in the archive.
+- ⌘K / Ctrl+K opens search from inside the text; with words selected it still
+  makes a link.
+- Installers have version-free names (`Napp-mac-arm64.dmg`,
+  `Napp-mac-x64.dmg`, `Napp-windows-setup.exe`), so
+  `/releases/latest/download/<name>` is always the newest.
+
+### Fixed
+
+- Turning on the archive switch and changing archive no longer turns it off.
+
+### Security
+
+- `archives.seat_limit` defaults to 8 (was 2), and every archive on the old
+  default was raised. `create_archive` seats everyone the maker already shares
+  an archive with, up to the limit — still through the seat trigger.
+
+## 0.9.1 — 2026-10-06
+
+Notes or Book, archives you can delete, and a clearer book.
+
+### Added
+
+- New archive asks for a name and whether it is notes or a book; Archive info →
+  Type changes it either way without losing anything.
+- Any archive but an account's first can be deleted, by its last member.
+- A book opens on the chapter last written in, and has its own Trash with Put
+  back and Delete forever.
+
+### Fixed
+
+- What's New stays read; avatars fill their circle.
+
+## 0.9.0 — 2026-10-06
+
+Write a book, with footnotes, captions and cross-references.
+
+### Added
+
+- **Document archives.** `archives.kind` is `notes` or `document`. A book is
+  chapters in one order, grouped into parts, written on a sheet with the
+  document's page set-up and a Word-like writing bar.
+- Footnotes, numbered figure and table captions, and cross-references across
+  chapters; no number is stored, every one is counted.
+- Numbered headings, a contents block, ⌘K spotlight over headings, lines,
+  footnotes, people, versions and settings, an inspector (⌥⌘I), focus and
+  typewriter modes, a word goal.
+- Print and Save as PDF as two items; What's New.
+
 ## 0.8.0 — 2026-10-05
 
 A note's history, sheets for a note, a person and a folder, and more than one

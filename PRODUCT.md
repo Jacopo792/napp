@@ -12,21 +12,21 @@ shell may fork it — the lint config forbids the core from importing a shell, a
 `packages/core/src/platform.ts` is the six-member interface each shell answers
 instead. A feature is never available in one and not the other.
 
-The macOS build is distributed for **Apple Silicon** as an unsigned `.dmg`;
-Windows gets an NSIS installer. Both are built on a tag by
+The macOS build is distributed for Apple Silicon and Intel as ad-hoc-signed
+`.dmg` files; Windows gets an NSIS installer. Both are built on a tag by
 `.github/workflows/release.yml`.
 
 ## Users
 
-Everyone holding a row in `archive_members`. The archive is built for two —
-`archives.seat_limit` defaults to `2` and the database refuses the row past it —
-and the column accepts `1`–`8`, so a larger group is a value change rather than
-a rewrite. Each member has a separate Supabase email/password account and a
+Everyone holding a row in `archive_members`. `archives.seat_limit` defaults to
+`8` (it was `2` until 0.9.2) and accepts `1`–`8`; the database refuses the row
+past it. A new archive is created with everyone its maker already shares an
+archive with, up to the limit. Each member has a separate Supabase email/password account and a
 confirmed address. Every member reads and writes every note and list in the
 archive and uses the `viewAs` switch. `archive_members.role` still exists and
 still defaults to `editor`, and `set_archive_member_role()` still works, but the
-interface no longer offers the choice: in an archive built for two writers the
-only honest answer to which of them is the reader was neither. The account is
+interface no longer offers the choice: in an archive of writers the only honest
+answer to which of them is the reader was neither. The account is
 the only access boundary; there is no separate archive key or passphrase.
 
 What one member takes back from another is narrower than the archive.
@@ -47,7 +47,7 @@ first scope rather than disappearing.
 The retired `u1` / `u2` labels are the shape this replaced. The seat limit is not
 a return to them: `u1` and `u2` were two fixed slots baked into every row and
 policy, while `seat_limit` is one number counting members of a roster that is
-otherwise general. Two people is the current policy; two slots was the old
+otherwise general. Eight people is the current policy; two slots was the old
 architecture.
 
 Creating a Supabase Auth account does not join the archive. Until the

@@ -1,6 +1,6 @@
 # Napp
 
-A private place for your notes, shared with one other person if you want it.
+A private place for your notes and your writing, shared with the people you choose.
 
 ![App preview](docs/app-preview.png)
 
@@ -8,7 +8,7 @@ A private place for your notes, shared with one other person if you want it.
 
 I wanted an ordinary notes app that did not slowly turn into a project-management
 tool. Somewhere calm for quick lists and long writing alike, with just enough sharing
-for two people who keep things together: partners, friends, siblings, whoever.
+for the few people who keep things together: partners, friends, a study group.
 
 ## What is in it
 
@@ -26,6 +26,9 @@ for two people who keep things together: partners, friends, siblings, whoever.
 - Covers, avatars, themes and reading settings that each person can make their own.
 - Markdown import and export, PDF text import, and local translation and proofreading
   tools.
+- A **Book** archive for long writing — a thesis, a novel: chapters and parts on a
+  printable page, footnotes, numbered captions, cross-references, and notes left on
+  a passage with a right-click.
 
 It is for keeping notes, not for running a team. The useful collaboration is there
 when you need it; the rest stays out of the way while you write.
@@ -38,9 +41,12 @@ window, there is a desktop app too.
 
 ![Sign-in screen](docs/sign-in-preview.png)
 
-**[Download it for macOS, Apple Silicon](https://github.com/Jacopo792/napp/releases/latest)**
+**Download:
+[Mac, Apple Silicon](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-arm64.dmg) ·
+[Mac, Intel](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-x64.dmg) ·
+[Windows](https://github.com/Jacopo792/napp/releases/latest/download/Napp-windows-setup.exe)**
 
-The Mac version is the same app, with its own menu bar, shortcuts and Dock badge for
+The desktop version is the same app, with its own menu bar, shortcuts and Dock badge for
 unread comments. Notes already open keep working if the connection drops.
 
 The first launch needs one extra step, because the app is not signed with an
@@ -84,16 +90,17 @@ and a folder open sheets of their own, and every name inside one leads to the ne
 
 One account can belong to several archives — your notes with a partner, a study group,
 a thesis — and move between them without signing out. Each archive keeps its own
-members, folders and list order. Make new ones and turn on the switch at the top of
+members, folders and list order, and a new archive starts with everyone you already
+share one with. Make new ones and turn on the switch at the top of
 the sidebar from **Settings → Archives**.
 
 ## Accounts and shared archives
 
 Everyone has their own account. On first sign-in, you get a private archive; to share
-one, send an invitation from **Settings → Members**. It works for two people by
-default, and invitations expire after seven days.
+one, send an invitation from **Settings → Members**. An archive holds up to
+eight people, and invitations expire after seven days.
 
-Both members can read and edit the shared archive. If a note needs to stay yours, you
+Every member can read and edit the shared archive. If a note needs to stay yours, you
 can lock the whole thing or just a passage. Accounts outside the archive cannot see its
 notes or files.
 
@@ -197,12 +204,13 @@ repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
 `VITE_COLLAB_URL`.
 
 Desktop installers are built on a tag, from a matrix of macOS and Windows
-runners, because electron-builder cannot cross-compile them. Bump the version in
-`apps/desktop/package.json` to match, then:
+runners, because electron-builder cannot cross-compile them. Every push to `main` is a release: bump
+the version in `apps/web` and `apps/desktop`'s `package.json`, add its entry to
+`RELEASES` in `packages/core/src/lib/whatsNew.ts` (the test fails otherwise), then:
 
 ```bash
-git tag v0.8.0
-git push origin v0.8.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 The workflow publishes both installers to the repository's Releases.

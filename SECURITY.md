@@ -70,6 +70,13 @@ could never be redeemed is never created; `revoke_archive_invite()` deletes an
 unclaimed row, which destroys the stored digest and invalidates the link
 immediately.
 
+Making an archive is also a way in, and it is deliberate. `create_archive`
+seats, beside its maker, everyone the maker already shares an archive with (up
+to the limit, through the same trigger). Somebody who shares one archive with
+you therefore sees every archive you make afterwards; to keep one to yourself,
+make it and then have them leave it, or make it from an account that shares
+nothing. It never adds anybody to an archive that already exists.
+
 Invitation tokens exist in plaintext only in the browser that created them.
 They are shown once, stored as a SHA-256 digest, and delivered by the member
 either through the clipboard or through their own mail client — the application

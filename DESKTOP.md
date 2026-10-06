@@ -15,13 +15,19 @@ what is different about running it in a window.
 
 ## Get it
 
-**[Download the latest release](https://github.com/Jacopo792/napp/releases)**
+**[Download the latest release](https://github.com/Jacopo792/napp/releases/latest)** —
+or straight from What's New inside the app.
 
-| Platform           | File                       |
-| ------------------ | -------------------------- |
-| Mac, Apple Silicon | `Napp-<version>-arm64.dmg` |
-| Mac, Intel         | `Napp-<version>.dmg`       |
-| Windows, 64-bit    | `Napp Setup <version>.exe` |
+| Platform           | File                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Mac, Apple Silicon | [`Napp-mac-arm64.dmg`](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-arm64.dmg)         |
+| Mac, Intel         | [`Napp-mac-x64.dmg`](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-x64.dmg)             |
+| Windows, 64-bit    | [`Napp-windows-setup.exe`](https://github.com/Jacopo792/napp/releases/latest/download/Napp-windows-setup.exe) |
+
+The names carry no version (`artifactName` in `electron-builder.yml`, from
+0.9.2), so these links always fetch the newest. The app checks GitHub at launch
+and every six hours, on both platforms, and says in the sidebar when a newer
+version is out.
 
 Open the `.dmg` and drag Napp to Applications.
 
@@ -209,14 +215,17 @@ runner. `pnpm build:desktop` builds only for the machine you are standing at.
 
 ## Cutting a release
 
+Every push to `main` is a release — version bumped in both shells'
+`package.json`, an entry in `whatsNew.ts`, then:
+
 ```bash
-git tag v0.8.0
-git push origin v0.8.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 The tag has to match the version in `apps/desktop/package.json`, because that
-is what electron-builder puts in the filename and a `.dmg` called 0.0.0 hanging
-under a tag called v0.8.0 is a question somebody will have to answer later.
+is the version the app reports and compares against the latest release when it
+decides whether to say a newer one is out.
 
 `.github/workflows/release.yml` builds the installers from a matrix of
 `macos-latest` and `windows-latest` – electron-builder cannot cross-compile

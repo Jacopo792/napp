@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.4",
+    date: "2026-10-06",
+    headline: "Up-to-date guides and download links",
+    sections: [
+      {
+        heading: "Getting the app",
+        items: [
+          {
+            title: "Direct downloads",
+            text: "The project page links straight to the newest Mac (Apple silicon and Intel) and Windows installers, the same ones as the buttons below.",
+          },
+          {
+            title: "Guides brought up to date",
+            text: "The guides now describe books, eight seats per archive, and how new archives are shared.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.3",
     date: "2026-10-06",
     headline: "A chapter bar on one line",

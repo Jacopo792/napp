@@ -978,10 +978,10 @@ land first, and pushing to `main` is the deploy. Adding a column is safe for the
 old build — it never asks for it — so there is no reason to do these in the
 other order.
 
-## Two seats
+## Seats
 
-The archive is built for two people, and that is a database rule, not a message
-in the interface:
+How many people an archive holds is a database rule, not a message in the
+interface:
 
 - `archives.seat_limit` is `8` by default (`1`–`8` allowed). A new archive is
   made with everybody the maker already shares an archive with, up to the seats
@@ -1414,6 +1414,10 @@ reader has no way to end, for a door that was already answered and shut.
 
 ## What's New
 
+**Every push to `main` is a release**, and nobody asks first: bump, entry
+here, healthcheck, commit, push `main`, tag `vX.Y.Z`, `git push origin main:PP`.
+`CHANGELOG.md` gets the same release in engineering words.
+
 Every release says what changed, in English and in the words of somebody using
 Napp: `RELEASES` in `packages/core/src/lib/whatsNew.ts`, newest first. **A
 release is not finished until it has an entry there**, and its version is the
@@ -1428,6 +1432,13 @@ archive) and in ⌘K. What has been read is `whatsNewSeen` in
 line, so the desktop app does not announce a release already read in the
 browser. Opening it is having read it, so the sidebar's New goes the moment
 the sheet is up; the sheet marks what was new from the reading it opened with.
+
+Its foot links the newest installers, `DOWNLOADS` beside `RELEASES`. They are
+`/releases/latest/download/<name>` and work because the installers' names carry
+no version (`artifactName` in `electron-builder.yml`) — put a version back in
+the name and every one of those links is a 404. The desktop sidebar's
+`UpdateNotice` (both kinds of archive) is the other way to the same page:
+`main.js` asks GitHub at launch and every six hours, on macOS and Windows alike.
 
 ## Preferences belong to the account
 
