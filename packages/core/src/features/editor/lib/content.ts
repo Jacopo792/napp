@@ -822,6 +822,36 @@ export const PageBreak = Node.create({
   parseMarkdown: () => ({ type: "pageBreak" }),
 });
 
+/** The table of contents, where somebody chose to put it. It carries
+ * nothing: what it lists is the document's structure, read when it is drawn,
+ * so it is never out of date and never written to by anybody's edit. In the
+ * editor a node view draws the list; anywhere else — the server, an export
+ * that does not know the document — it is an empty block. Markdown writes it
+ * as `[TOC]`, which several Markdown tools read the same way. */
+export const TableOfContents = Node.create({
+  name: "tableOfContents",
+  group: "block",
+  atom: true,
+  selectable: true,
+  parseHTML: () => [{ tag: "div[data-contents]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    mergeAttributes(HTMLAttributes, { "data-contents": "", class: "contents-block" }),
+  ],
+  renderMarkdown: () => `[TOC]`,
+  markdownTokenName: "tableOfContents",
+  markdownTokenizer: {
+    name: "tableOfContents",
+    level: "block",
+    start: "[TOC]",
+    tokenize(src) {
+      const match = /^\[TOC\][^\S\n]*(?:\n|$)/.exec(src);
+      return match ? { type: "tableOfContents", raw: match[0] } : undefined;
+    },
+  },
+  parseMarkdown: () => ({ type: "tableOfContents" }),
+});
+
 export const BASE_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -850,6 +880,7 @@ export const BASE_EXTENSIONS = [
   Superscript,
   Subscript,
   PageBreak,
+  TableOfContents,
 ];
 
 /** The persisted document schema, whole. */

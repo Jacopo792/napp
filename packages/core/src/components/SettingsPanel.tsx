@@ -48,9 +48,15 @@ import {
   MousePointer2,
   Users,
   X,
+  AlignCenter,
+  Target,
 } from "@/components/icons";
+import { ArchiveOptions } from "@/components/ArchiveOptions";
+import { PageSetupFields } from "@/components/WritingMenus";
+import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
-import { SETTINGS_SECTIONS, type SettingsSection } from "@/components/settingsSections";
+import type { SettingsSection } from "@/components/settingsSections";
+import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -66,7 +72,7 @@ import {
   type Axes,
 } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
-import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
+import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
@@ -87,7 +93,12 @@ import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { MenuButton } from "./MenuPrimitives";
 import { useDismiss } from "./useDismiss";
-import { PRESENCE_PALETTES, type WritingPreferences } from "@/lib/writingPreferences";
+import {
+  PRESENCE_PALETTES,
+  type FocusScope,
+  type SheetTone,
+  type WritingPreferences,
+} from "@/lib/writingPreferences";
 import { Avatar } from "./WorkspaceMenus";
 /* Settings, in a chunk of its own.
  *
@@ -291,6 +302,8 @@ function Segmented({
 export function SettingsPanel({
   open,
   initialSection,
+  kind = "notes",
+  document,
   email,
   reading,
   autoLock,
@@ -334,6 +347,18 @@ export function SettingsPanel({
   open: boolean;
   /** The section to open on; Settings otherwise opens on the profile. */
   initialSection?: SettingsSection;
+  /** What kind of archive the window is on: Settings shows that kind the
+   *  sections and rows it has, and nothing else. */
+  kind?: ArchiveKind;
+  /** The document's own options and page — the archive's, written for every
+   *  member, so they arrive with the way to write them. */
+  document?: {
+    features: DocumentFeatures;
+    page: PageSetup;
+    disabled?: boolean;
+    onOptions: (kind: ArchiveKind, features: DocumentFeatures) => void;
+    onPage: (page: PageSetup) => void;
+  };
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
   /** Whose notes the window is currently pointed at. */
@@ -547,10 +572,15 @@ export function SettingsPanel({
     { id: "dark", name: "Dark", icon: <Moon size={20} /> },
   ];
 
+  const sections = settingsSectionsFor(kind);
+  const isDocument = kind === "document";
+  const setWriting = (patch: Partial<WritingPreferences>) =>
+    onWritingPreferencesChange({ ...writingPreferences, ...patch });
+
   const sectionName =
-    SETTINGS_SECTIONS.flatMap((group): readonly { id: string; name: string }[] => group.items).find(
-      (item) => item.id === section,
-    )?.name ?? "Settings";
+    sections
+      .flatMap((group): readonly { id: string; name: string }[] => group.items)
+      .find((item) => item.id === section)?.name ?? "Settings";
 
   /* The sheet leaves the way it came, rather than vanishing between two
      frames: a window that only ever animates in reads as one that was
@@ -604,7 +634,7 @@ export function SettingsPanel({
                   style={{ transform: `translateY(${marker.top}px)`, height: marker.height }}
                 />
               )}
-              {SETTINGS_SECTIONS.map((group) => (
+              {sections.map((group) => (
                 <Fragment key={group.group}>
                   <p className="settings-nav-group">{group.group}</p>
                   {group.items.map((item) => (
@@ -966,6 +996,41 @@ export function SettingsPanel({
                     )}
                   </div>
 
+                  {isDocument && (
+                    <>
+                      <h3>Sheet</h3>
+                      <div className="appearance-controls">
+                        <div className="appearance-row is-stacked">
+                          <Segmented
+                            label="Sheet"
+                            value={writingPreferences.sheetTone}
+                            options={[
+                              { id: "theme", name: "Follow the theme" },
+                              { id: "paper", name: "Always paper" },
+                              { id: "dark", name: "Always dark" },
+                            ]}
+                            onChange={(id) => setWriting({ sheetTone: id as SheetTone })}
+                          />
+                        </div>
+                        {writingPreferences.sheetTone !== "paper" && (
+                          <label className="appearance-row">
+                            <RowLead
+                              icon={<Contrast size={16} />}
+                              label="Adapt text colours"
+                              hint="On a dark sheet, as Word does"
+                            />
+                            <input
+                              type="checkbox"
+                              role="switch"
+                              checked={writingPreferences.adaptInk}
+                              onChange={(event) => setWriting({ adaptInk: event.target.checked })}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                   <button
                     type="button"
                     className="settings-reset"
@@ -1017,12 +1082,14 @@ export function SettingsPanel({
                         onChange={(iconTint) => setAppearance({ ...appearance, iconTint })}
                       />
                     )}
-                    <SwatchRow
-                      icon={<FolderGlyph size={16} />}
-                      label="Folder colour"
-                      value={appearance.folderColour}
-                      onChange={(folderColour) => setAppearance({ ...appearance, folderColour })}
-                    />
+                    {!isDocument && (
+                      <SwatchRow
+                        icon={<FolderGlyph size={16} />}
+                        label="Folder colour"
+                        value={appearance.folderColour}
+                        onChange={(folderColour) => setAppearance({ ...appearance, folderColour })}
+                      />
+                    )}
                     <SwatchRow
                       icon={<Highlighter size={16} />}
                       label="Text highlight colour"
@@ -1105,6 +1172,27 @@ export function SettingsPanel({
                 </section>
               )}
 
+              {section === "document" && document && (
+                <section>
+                  <h3>Options</h3>
+                  <ArchiveOptions
+                    withPresets
+                    kind={kind}
+                    features={document.features}
+                    disabled={document.disabled}
+                    onChange={document.onOptions}
+                  />
+                  <h3>Page</h3>
+                  <div className="appearance-controls settings-page-setup">
+                    <PageSetupFields
+                      page={document.page}
+                      disabled={document.disabled}
+                      onChange={document.onPage}
+                    />
+                  </div>
+                </section>
+              )}
+
               {section === "writing" && (
                 <section>
                   <div className="appearance-controls">
@@ -1169,6 +1257,59 @@ export function SettingsPanel({
                     </label>
                   </div>
 
+                  {isDocument && (
+                    <>
+                      <h3>While writing</h3>
+                      <div className="appearance-controls">
+                        <div className="appearance-row">
+                          <RowLead
+                            icon={<Target size={16} />}
+                            label="Focus"
+                            hint="What stays lit in focus mode"
+                          />
+                        </div>
+                        <div className="appearance-row is-stacked">
+                          <Segmented
+                            label="Focus"
+                            value={writingPreferences.focusScope}
+                            options={[
+                              { id: "paragraph", name: "Paragraph" },
+                              { id: "sentence", name: "Sentence" },
+                              { id: "off", name: "Everything" },
+                            ]}
+                            onChange={(id) => setWriting({ focusScope: id as FocusScope })}
+                          />
+                        </div>
+                        <label className="appearance-row">
+                          <RowLead
+                            icon={<AlignCenter size={16} />}
+                            label="Typewriter scrolling"
+                            hint="The line you write stays mid-window"
+                          />
+                          <input
+                            type="checkbox"
+                            role="switch"
+                            checked={writingPreferences.typewriter}
+                            onChange={(event) => setWriting({ typewriter: event.target.checked })}
+                          />
+                        </label>
+                        <label className="appearance-row">
+                          <RowLead
+                            icon={<Clock3 size={16} />}
+                            label="Words today"
+                            hint="Today and this session, under the goal"
+                          />
+                          <input
+                            type="checkbox"
+                            role="switch"
+                            checked={writingPreferences.writingStats}
+                            onChange={(event) => setWriting({ writingStats: event.target.checked })}
+                          />
+                        </label>
+                      </div>
+                    </>
+                  )}
+
                   <h3>Live presence</h3>
                   <div
                     className="presence-palette-picker"
@@ -1204,18 +1345,20 @@ export function SettingsPanel({
                 copies of this would be one copy and one lie. */}
               {section === "shortcuts" && (
                 <section>
-                  {shortcutGroups().map((group) => (
+                  {shortcutGroups(kind).map((group) => (
                     <Fragment key={group}>
                       <h3>{group}</h3>
                       <div className="appearance-controls">
-                        {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
-                          <div key={`${entry.keys}-${entry.what}`} className="appearance-row">
-                            <span className="settings-label">
-                              <b>{entry.what}</b>
-                            </span>
-                            <kbd className="settings-key">{keyName(entry.keys)}</kbd>
-                          </div>
-                        ))}
+                        {shortcutsFor(kind)
+                          .filter((entry) => entry.group === group)
+                          .map((entry) => (
+                            <div key={`${entry.keys}-${entry.what}`} className="appearance-row">
+                              <span className="settings-label">
+                                <b>{entry.what}</b>
+                              </span>
+                              <kbd className="settings-key">{keyName(entry.keys)}</kbd>
+                            </div>
+                          ))}
                       </div>
                     </Fragment>
                   ))}
@@ -1293,8 +1436,14 @@ export function SettingsPanel({
                     <label className="appearance-row">
                       <RowLead
                         icon={<MousePointer2 size={16} />}
-                        label="Collaborators in notes"
-                        hint="Show who else has this note open, and their cursor"
+                        label={
+                          isDocument ? "Collaborators in the document" : "Collaborators in notes"
+                        }
+                        hint={
+                          isDocument
+                            ? "Show who else is in this chapter, and their cursor"
+                            : "Show who else has this note open, and their cursor"
+                        }
                       />
                       <input
                         type="checkbox"
@@ -1308,19 +1457,21 @@ export function SettingsPanel({
                       this column back when the other member's client asks for
                       notes, so switching it on withholds the rows rather than
                       hiding them after they arrive. */}
-                    <label className="appearance-row">
-                      <RowLead
-                        icon={<Archive size={16} />}
-                        label="Keep archived notes private"
-                        hint="Archived notes stay visible only to you"
-                      />
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        checked={profile.hideArchived}
-                        onChange={(event) => onHideArchivedChange(event.target.checked)}
-                      />
-                    </label>
+                    {!isDocument && (
+                      <label className="appearance-row">
+                        <RowLead
+                          icon={<Archive size={16} />}
+                          label="Keep archived notes private"
+                          hint="Archived notes stay visible only to you"
+                        />
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          checked={profile.hideArchived}
+                          onChange={(event) => onHideArchivedChange(event.target.checked)}
+                        />
+                      </label>
+                    )}
                   </div>
                 </section>
               )}

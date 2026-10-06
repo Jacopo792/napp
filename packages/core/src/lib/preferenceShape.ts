@@ -9,7 +9,7 @@
 import { DEFAULT_APPEARANCE, type Appearance } from "./appearance.ts";
 import { AUTO_LOCK_CHOICES, type AutoLockMinutes } from "./autoLock.ts";
 import { DEFAULT_AXES, type Axes } from "./axes.ts";
-import { PRESENCE_PALETTES, type WritingPreferences } from "./writingPreferences.ts";
+import { writingPreferencesFrom, type WritingPreferences } from "./writingPreferences.ts";
 export type { RemarksSeen } from "./commentThreads.ts";
 import type { RemarksSeen } from "./commentThreads.ts";
 
@@ -146,11 +146,7 @@ export function mergeAccountPreferences(
   return accountPreferences(
     { ...DEFAULT_APPEARANCE, ...local.appearance, ...(row.appearance ?? {}) },
     { ...DEFAULT_AXES, ...local.axes, ...(row.axes ?? {}) },
-    {
-      presencePalette: PRESENCE_PALETTES.some((palette) => palette.id === writing?.presencePalette)
-        ? writing!.presencePalette!
-        : local.writing.presencePalette,
-    },
+    writingPreferencesFrom(writing, local.writing),
     {
       presence: typeof row.presence === "boolean" ? row.presence : local.presence,
       collaborators:

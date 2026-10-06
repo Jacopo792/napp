@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "@/components/icons";
 import { fold } from "@/lib/format";
 import type { Snippet } from "@/lib/spotlight";
-import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
+import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 
 export interface Command {
   id: string;
@@ -230,7 +230,15 @@ export function CommandPalette({
 /* The `?` sheet: the same list Settings shows, over the window instead of
    inside a section, because the question "what were the keys again" is asked
    in the middle of doing something else. */
-export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ShortcutSheet({
+  open,
+  kind = "notes",
+  onClose,
+}: {
+  open: boolean;
+  kind?: "notes" | "document";
+  onClose: () => void;
+}) {
   useEffect(() => {
     if (!open) return;
     const escape = (event: KeyboardEvent) => {
@@ -242,7 +250,7 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   if (!open) return null;
 
-  const groups = shortcutGroups();
+  const groups = shortcutGroups(kind);
   return (
     <div className="palette-layer is-shortcuts" role="presentation">
       <button type="button" aria-label="Close" className="settings-scrim" onClick={onClose} />
@@ -260,12 +268,14 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
           {groups.map((group) => (
             <section key={group}>
               <p className="palette-group-label">{group}</p>
-              {SHORTCUTS.filter((entry) => entry.group === group).map((entry) => (
-                <div key={`${entry.keys}-${entry.what}`} className="shortcut-row">
-                  <span>{entry.what}</span>
-                  <kbd>{keyName(entry.keys)}</kbd>
-                </div>
-              ))}
+              {shortcutsFor(kind)
+                .filter((entry) => entry.group === group)
+                .map((entry) => (
+                  <div key={`${entry.keys}-${entry.what}`} className="shortcut-row">
+                    <span>{entry.what}</span>
+                    <kbd>{keyName(entry.keys)}</kbd>
+                  </div>
+                ))}
             </section>
           ))}
         </div>

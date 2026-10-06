@@ -4,9 +4,13 @@ import {
   Link2,
   ListTree,
   MessageSquare,
+  PanelRight,
   Search,
   X,
 } from "@/components/icons";
+import { keyName } from "@/lib/shortcuts";
+import type { WritingFocusSettings } from "../lib/writingFocus";
+import { useWritingPreferences } from "@/lib/writingPreferences";
 import {
   forwardRef,
   useCallback,
@@ -14,6 +18,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -44,12 +49,21 @@ import { pageStyle, type PageSetup } from "@/lib/spaceShape";
 
 /** What a chapter of a document is framed by instead of a note's header:
  *  the page it is set on, the line over its title, and what comes after it. */
+type InspectorTab = "headings" | "comments" | "versions";
+
 export interface ManuscriptFrame {
   page: PageSetup;
   /** "Chapter 3", "Part II · Chapter 3". */
   eyebrow?: string;
   /** Previous and next chapter, under the last line. */
   footer?: ReactNode;
+  /** The chapter's number when the document numbers its headings: they are
+   *  drawn as 2.1, 2.1.1 by the stylesheet's counters, starting from it. */
+  numbered?: number | null;
+  /** The heading level the chapter's sections are written in. */
+  topLevel?: number;
+  /** Focus mode and typewriter scrolling, as the reader set them. */
+  writing?: WritingFocusSettings;
 }
 
 interface Props {
@@ -98,6 +112,9 @@ interface Props {
    *  the window navigation rather than either group of note actions. */
   headerPresence?: ReactNode;
   headerActions?: ReactNode;
+  /** A document's bar only: what stands before the formatting — the way back
+   *  to the structure, where a hand looks for it first. */
+  headerLead?: ReactNode;
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
   onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
@@ -209,6 +226,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     headerStatus,
     headerPresence,
     headerActions,
+    headerLead,
     onContextMenu,
     onUpdatePageProperties,
     collaboration = null,
@@ -220,6 +238,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   ref,
 ) {
   const [instance, setInstance] = useState<Editor | null>(null);
+  /** The colour of a document's sheet is the reader's, like the theme. */
+  const sheet = useWritingPreferences();
+  /** The inspector reopens on the tab it was closed on. */
+  const lastTab = useRef<InspectorTab>("headings");
+  /* ⌥⌘I, Pages' key for its inspector. Read by `code`, because ⌥I is a dead
+     key on a Mac keyboard and `key` arrives as a circumflex. */
+  const toggleInspector = useRef(() => {});
+  const isManuscript = Boolean(manuscript);
+  useEffect(() => {
+    if (!isManuscript) return;
+    const press = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyI") {
+        event.preventDefault();
+        toggleInspector.current();
+      }
+    };
+    window.addEventListener("keydown", press);
+    return () => window.removeEventListener("keydown", press);
+  }, [isManuscript]);
   /* Words asked for from ⌘K. Held until the document holds them: a note just
      opened is an empty editor until its document syncs. Tried every 150 ms
      and given up on after a few seconds, so a passage deleted in the
@@ -781,60 +818,94 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     </div>
   );
 
+  const outlinePanel = outlineOpen && (
+    <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />
+  );
+  const historyPanel = historyOpen && session && (
+    <NoteHistory
+      key={`${entry.note.id}:${historyFocus ?? ""}`}
+      initialOpenId={historyFocus}
+      session={session}
+      noteId={entry.note.id}
+      canEdit={canEdit}
+      authors={commentAuthors ?? new Map()}
+      current={() => {
+        const content = editorRef.current?.getContent();
+        const title = collaboration?.document.getText(TITLE_TEXT).toString();
+        return content && title !== undefined ? { title, content } : null;
+      }}
+      onRestore={({ title, content }) => {
+        const yTitle = collaboration?.document.getText(TITLE_TEXT);
+        if (yTitle && yTitle.toString() !== title)
+          collaboration!.document.transact(() => {
+            yTitle.delete(0, yTitle.length);
+            yTitle.insert(0, title);
+          });
+        editorRef.current?.replaceContent(content);
+        onEdited();
+      }}
+      onClose={() => setHistoryOpen(false)}
+    />
+  );
+  const commentsPanel = commentsOpen && session && commentAuthors && (
+    <NoteComments
+      key={entry.note.id}
+      session={session}
+      noteId={entry.note.id}
+      canEdit={canEdit}
+      authors={commentAuthors}
+      quotes={quotes}
+      pendingThread={pendingThread}
+      onPendingHandled={() => setPendingThread(null)}
+      focusThread={focusThread}
+      onFocusHandled={() => setFocusThread(null)}
+      onClose={closeComments}
+      onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
+      onRemoveAnchor={(threadId) => {
+        editorRef.current?.removeComment(threadId);
+        setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+      }}
+      onResolveAnchor={syncCommentResolution}
+    />
+  );
   const sidePanels = (
     <>
-      {outlineOpen && <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />}
-
-      {historyOpen && session && (
-        <NoteHistory
-          key={`${entry.note.id}:${historyFocus ?? ""}`}
-          initialOpenId={historyFocus}
-          session={session}
-          noteId={entry.note.id}
-          canEdit={canEdit}
-          authors={commentAuthors ?? new Map()}
-          current={() => {
-            const content = editorRef.current?.getContent();
-            const title = collaboration?.document.getText(TITLE_TEXT).toString();
-            return content && title !== undefined ? { title, content } : null;
-          }}
-          onRestore={({ title, content }) => {
-            const yTitle = collaboration?.document.getText(TITLE_TEXT);
-            if (yTitle && yTitle.toString() !== title)
-              collaboration!.document.transact(() => {
-                yTitle.delete(0, yTitle.length);
-                yTitle.insert(0, title);
-              });
-            editorRef.current?.replaceContent(content);
-            onEdited();
-          }}
-          onClose={() => setHistoryOpen(false)}
-        />
-      )}
-
-      {commentsOpen && session && commentAuthors && (
-        <NoteComments
-          key={entry.note.id}
-          session={session}
-          noteId={entry.note.id}
-          canEdit={canEdit}
-          authors={commentAuthors}
-          quotes={quotes}
-          pendingThread={pendingThread}
-          onPendingHandled={() => setPendingThread(null)}
-          focusThread={focusThread}
-          onFocusHandled={() => setFocusThread(null)}
-          onClose={closeComments}
-          onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
-          onRemoveAnchor={(threadId) => {
-            editorRef.current?.removeComment(threadId);
-            setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-          }}
-          onResolveAnchor={syncCommentResolution}
-        />
-      )}
+      {outlinePanel}
+      {historyPanel}
+      {commentsPanel}
     </>
   );
+
+  /* A document's inspector: the three panels as tabs of one column, as a
+     long piece of writing keeps them — Word's navigation, comments and
+     versions in one place, one press away, one at a time. A note keeps its
+     separate panels. Which tab is open is simply which panel is: the handle's
+     `openHistory` and `openComments` open their tab without knowing there is
+     an inspector at all. */
+  const inspectorTab: InspectorTab | null = historyOpen
+    ? "versions"
+    : commentsOpen
+      ? "comments"
+      : outlineOpen
+        ? "headings"
+        : null;
+  const showTab = (tab: InspectorTab | null) => {
+    if (tab) lastTab.current = tab;
+    if (tab !== "comments" && commentsOpen) closeComments();
+    setOutlineOpen(tab === "headings");
+    setHistoryOpen(tab === "versions");
+    if (tab === "versions") setHistoryFocus(null);
+    if (tab === "comments" && !commentsOpen) {
+      setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+      setCommentsOpen(true);
+    }
+  };
+  toggleInspector.current = () => showTab(inspectorTab ? null : lastTab.current);
+  const inspectorTabs: { id: InspectorTab; name: string; shown: boolean }[] = [
+    { id: "headings", name: "Headings", shown: true },
+    { id: "comments", name: "Comments", shown: Boolean(session && commentAuthors) },
+    { id: "versions", name: "Versions", shown: Boolean(session) },
+  ];
 
   if (manuscript)
     return (
@@ -844,6 +915,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         className={`editor-shell manuscript-shell flex min-w-0 flex-1 flex-col ${mobile ? "is-mobile" : ""}`}
       >
         <div className="manuscript-bar relative shrink-0">
+          {headerLead}
           {canEdit ? (
             <ManuscriptToolbar
               editor={instance}
@@ -858,31 +930,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             <span className="manuscript-bar-quiet">{headerStatus}</span>
           )}
           <span className="manuscript-bar-end">
-            {session && commentAuthors && (
-              <button
-                type="button"
-                className={`ribbon-tool press ${commentsOpen ? "is-active" : ""}`}
-                aria-label="Comments"
-                aria-pressed={commentsOpen}
-                title="Comments"
-                onClick={() => {
-                  if (commentsOpen) return closeComments();
-                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-                  setCommentsOpen(true);
-                }}
-              >
-                <MessageSquare size={16} />
-              </button>
-            )}
             <button
               type="button"
-              className={`ribbon-tool press ${outlineOpen ? "is-active" : ""}`}
-              aria-label="Headings in this chapter"
-              aria-pressed={outlineOpen}
-              title="Headings in this chapter"
-              onClick={() => setOutlineOpen((open) => !open)}
+              className={`ribbon-tool press ${inspectorTab ? "is-active" : ""}`}
+              aria-label="Inspector"
+              aria-pressed={Boolean(inspectorTab)}
+              title={`Inspector · ${keyName("⌥⌘I")}`}
+              onClick={() => showTab(inspectorTab ? null : lastTab.current)}
             >
-              <ListTree size={16} />
+              <PanelRight size={16} />
             </button>
             {headerActions}
           </span>
@@ -897,7 +953,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               document is set on — its width, its margins, its letter — so
               what is written here is what prints. */}
           <div ref={setScroller} className="manuscript-desk min-h-0 flex-1">
-            <article className="manuscript-sheet" style={pageStyle(manuscript.page)}>
+            <article
+              className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}
+              data-top={manuscript.topLevel ?? 1}
+              data-tone={sheet.sheetTone}
+              data-ink={sheet.adaptInk ? "adapt" : "keep"}
+              style={{
+                ...pageStyle(manuscript.page),
+                ...(manuscript.numbered
+                  ? ({ "--chapter": manuscript.numbered } as CSSProperties)
+                  : {}),
+              }}
+            >
               {manuscript.eyebrow && <p className="manuscript-eyebrow">{manuscript.eyebrow}</p>}
               <TitleField
                 mobile={mobile}
@@ -922,6 +989,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   key={entry.note.id}
                   ref={editorRef}
                   manuscript
+                  writing={manuscript.writing}
                   onEditor={setInstance}
                   value={readDraft(entry.note.id)?.content ?? entry.note.content}
                   revision={syncRevision}
@@ -964,7 +1032,39 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </article>
             {manuscript.footer}
           </div>
-          {sidePanels}
+          {inspectorTab && (
+            <aside className="manuscript-inspector" aria-label="Inspector">
+              <div className="inspector-tabs" role="tablist">
+                {inspectorTabs
+                  .filter((tab) => tab.shown)
+                  .map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={inspectorTab === tab.id}
+                      className={`press ${inspectorTab === tab.id ? "is-active" : ""}`}
+                      onClick={() => showTab(tab.id)}
+                    >
+                      {tab.name}
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  className="inspector-close press"
+                  aria-label="Close the inspector"
+                  onClick={() => showTab(null)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {inspectorTab === "headings"
+                ? outlinePanel
+                : inspectorTab === "comments"
+                  ? commentsPanel
+                  : historyPanel}
+            </aside>
+          )}
         </div>
       </section>
     );

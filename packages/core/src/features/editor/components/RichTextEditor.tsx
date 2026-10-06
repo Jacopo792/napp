@@ -56,6 +56,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { ContentsView } from "./ContentsView";
+import { WRITING_FOCUS, WritingFocus, type WritingFocusSettings } from "../lib/writingFocus";
 import {
   BASE_EXTENSIONS,
   DRAWING_BOX,
@@ -63,6 +65,7 @@ import {
   Drawing,
   PrivateFile,
   PrivateImage,
+  TableOfContents,
   TEXT_COLOR_VALUE,
   WRITE_LOCK_MARK,
   DRAWING_TEXT_FONT,
@@ -203,6 +206,9 @@ interface Props {
   /** A chapter of a document: the paragraph keys Word has, which a note
    *  never needed and does not get. */
   manuscript?: boolean;
+  /** A document only: what focus mode leaves lit, and whether the line being
+   *  written is kept mid-window. */
+  writing?: WritingFocusSettings;
 }
 
 /* Word's paragraph keys, on the paragraphs and headings the selection
@@ -1799,6 +1805,14 @@ function drawingExtension() {
   });
 }
 
+/* Declared once, outside the component: an extension object made per render
+   is a new schema member every time Tiptap compares its list. */
+const ContentsWithView = TableOfContents.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(ContentsView);
+  },
+});
+
 function privateFileExtension(resolve: Resolver) {
   return PrivateFile.extend<PrivateFileOptions>({
     addOptions: () => ({ resolve }),
@@ -1890,9 +1904,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     collaboration = null,
     onEditor,
     manuscript = false,
+    writing,
   },
   ref,
 ) {
+  /* Read by the plugin on every transaction, so a change of setting needs no
+     new editor — only the empty transaction below, to draw it again. */
+  const writingRef = useRef<WritingFocusSettings>(writing ?? { focus: "off", typewriter: false });
+  writingRef.current = writing ?? { focus: "off", typewriter: false };
   const [preview, setPreview] = useState<ImagePreview | null>(null);
   const onChangeRef = useRef(onChange);
   const onLocalEditRef = useRef(onLocalEdit);
@@ -1952,7 +1971,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const editor = useEditor(
     {
       extensions: [
-        ...BASE_EXTENSIONS,
+        ...BASE_EXTENSIONS.filter((extension) => extension.name !== "tableOfContents"),
+        ContentsWithView,
         ...(collaboration
           ? [
               Collaboration.configure({ document: collaboration.document, field: BODY_FRAGMENT }),
@@ -1983,7 +2003,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         writeLockGuard,
         sentenceCapitalize,
         autocorrect,
-        ...(manuscript ? [ManuscriptKeys] : []),
+        ...(manuscript
+          ? [ManuscriptKeys, WritingFocus.configure({ read: () => writingRef.current })]
+          : []),
       ],
       content: collaboration ? undefined : value,
       editable: !readOnly,
@@ -2347,6 +2369,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     if (editor && editor.isEditable !== !readOnly) editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
+  const focusSetting = writing?.focus ?? "off";
+  useEffect(() => {
+    if (editor && !editor.isDestroyed)
+      editor.view.dispatch(editor.state.tr.setMeta(WRITING_FOCUS, focusSetting));
+  }, [editor, focusSetting]);
+
   useEffect(() => {
     if (!editor || collaboration || appliedRevision.current === revision) return;
     appliedRevision.current = revision;
@@ -2378,39 +2406,45 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
             shouldShow={({ state }) => {
               const { selection } = state;
               if (selection.empty) return false;
+              /* A document formats from its bar, so the bubble keeps only
+                 what the bar does not carry: the remark and the lock. */
+              if (manuscript && !onComment && !writeLockOwner) return false;
               return !(
                 selection instanceof NodeSelection &&
                 ["privateImage", "privateFile", "drawing"].includes(selection.node.type.name)
               );
             }}
           >
-            {(["bold", "italic", "strike", "code"] as const).map((action) => (
+            {!manuscript &&
+              (["bold", "italic", "strike", "code"] as const).map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  className="toolbar-button press"
+                  aria-label={action}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format(action)}
+                >
+                  {action === "bold"
+                    ? "B"
+                    : action === "italic"
+                      ? "I"
+                      : action === "strike"
+                        ? "S"
+                        : "‹›"}
+                </button>
+              ))}
+            {!manuscript && (
               <button
-                key={action}
                 type="button"
                 className="toolbar-button press"
-                aria-label={action}
+                aria-label="Link"
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => format(action)}
+                onClick={onOpenLink}
               >
-                {action === "bold"
-                  ? "B"
-                  : action === "italic"
-                    ? "I"
-                    : action === "strike"
-                      ? "S"
-                      : "‹›"}
+                ↗
               </button>
-            ))}
-            <button
-              type="button"
-              className="toolbar-button press"
-              aria-label="Link"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={onOpenLink}
-            >
-              ↗
-            </button>
+            )}
             {onComment && (
               <button
                 type="button"
@@ -2469,21 +2503,22 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                 )}
               </button>
             )}
-            <span className="menu-separator rich-bubble-separator" />
-            {(["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[]).map(
-              (color) => (
-                <button
-                  key={color}
-                  type="button"
-                  className={`menu-swatch is-${color}`}
-                  aria-label={`${color} text`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => format(`color-${color}`)}
-                >
-                  A
-                </button>
-              ),
-            )}
+            {!manuscript && <span className="menu-separator rich-bubble-separator" />}
+            {(manuscript
+              ? []
+              : (["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[])
+            ).map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`menu-swatch is-${color}`}
+                aria-label={`${color} text`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format(`color-${color}`)}
+              >
+                A
+              </button>
+            ))}
           </BubbleMenu>
           {!mobile && (
             <DragHandle editor={editor} className="rich-drag-handle">

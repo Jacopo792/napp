@@ -9,13 +9,63 @@ export const PRESENCE_PALETTES = [
 
 export type PresencePalette = (typeof PRESENCE_PALETTES)[number]["id"];
 
+/* The four below are a document's: they are offered only in an archive of
+   that kind, and an archive of notes never reads them. They are the account's
+   all the same, because how somebody likes to write travels with them. */
+export const FOCUS_SCOPES = ["off", "paragraph", "sentence"] as const;
+export type FocusScope = (typeof FOCUS_SCOPES)[number];
+/** The sheet a document is written on: following the theme, as Word's dark
+ *  mode does, or always one or the other. */
+export const SHEET_TONES = ["theme", "paper", "dark"] as const;
+export type SheetTone = (typeof SHEET_TONES)[number];
+
 export interface WritingPreferences {
   presencePalette: PresencePalette;
+  /** Focus mode in a document dims everything but this much of the text. */
+  focusScope: FocusScope;
+  /** The line being written stays in the middle of the window. */
+  typewriter: boolean;
+  /** Words today and this session, under the document's goal. */
+  writingStats: boolean;
+  sheetTone: SheetTone;
+  /** On a dark sheet, the colours chosen for the text are turned to keep
+   *  their hue and lose their darkness — Word's behaviour — or left alone. */
+  adaptInk: boolean;
 }
 
 export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   presencePalette: "amber",
+  focusScope: "paragraph",
+  typewriter: false,
+  writingStats: true,
+  sheetTone: "theme",
+  adaptInk: true,
 };
+
+/** Whatever was stored, read field by field: a field that is missing or
+ *  malformed keeps `fallback`'s value, never the default, so a row written by
+ *  an older client does not undo what this device chose. */
+export function writingPreferencesFrom(
+  value: Partial<WritingPreferences> | undefined,
+  fallback: WritingPreferences,
+): WritingPreferences {
+  const one = <T>(list: readonly T[], candidate: unknown, otherwise: T): T =>
+    list.includes(candidate as T) ? (candidate as T) : otherwise;
+  const flag = (candidate: unknown, otherwise: boolean) =>
+    typeof candidate === "boolean" ? candidate : otherwise;
+  return {
+    presencePalette: one(
+      PRESENCE_PALETTES.map((palette) => palette.id),
+      value?.presencePalette,
+      fallback.presencePalette,
+    ),
+    focusScope: one(FOCUS_SCOPES, value?.focusScope, fallback.focusScope),
+    typewriter: flag(value?.typewriter, fallback.typewriter),
+    writingStats: flag(value?.writingStats, fallback.writingStats),
+    sheetTone: one(SHEET_TONES, value?.sheetTone, fallback.sheetTone),
+    adaptInk: flag(value?.adaptInk, fallback.adaptInk),
+  };
+}
 
 const KEY = "napp:writing-preferences:v1";
 const listeners = new Set<() => void>();
@@ -25,12 +75,10 @@ function read(): WritingPreferences {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT_WRITING_PREFERENCES };
-    const value = JSON.parse(raw) as Partial<WritingPreferences>;
-    return {
-      presencePalette: PRESENCE_PALETTES.some((palette) => palette.id === value.presencePalette)
-        ? value.presencePalette!
-        : DEFAULT_WRITING_PREFERENCES.presencePalette,
-    };
+    return writingPreferencesFrom(
+      JSON.parse(raw) as Partial<WritingPreferences>,
+      DEFAULT_WRITING_PREFERENCES,
+    );
   } catch {
     return { ...DEFAULT_WRITING_PREFERENCES };
   }

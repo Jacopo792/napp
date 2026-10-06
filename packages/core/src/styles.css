@@ -10849,6 +10849,71 @@ button.sheet-chip:hover,
   animation: sheet-in var(--dur-base) var(--ease) backwards;
 }
 
+/* The sheet in the dark, as Word's dark mode has it: following the theme
+   unless the reader said always paper or always dark (`data-tone`). Only on
+   screen — a printed page is paper whatever the window looked like. The ink
+   chosen for words is turned with it unless the reader said otherwise
+   (`data-ink`): inverted and turned back round the colour wheel, so a dark
+   red becomes a light red and a yellow highlight a deep yellow — the hue
+   kept, the darkness given up. */
+@media screen {
+  [data-theme="dark"] .manuscript-sheet[data-tone="theme"],
+  .manuscript-sheet[data-tone="dark"] {
+    --ink: #ececee;
+    --ink-2: #cfcfd3;
+    --ink-3: #9d9da3;
+    --ink-4: #707076;
+    --rule: #3b3b40;
+    --rule-soft: #2f2f33;
+    --accent: #5aa0ff;
+    --accent-strong: #8dbdff;
+    --accent-wash: rgb(90 160 255 / 0.16);
+    --page: #1f1f22;
+    --paper: #1f1f22;
+    --tint-yellow: #e8c547;
+    --tint-purple: #b49cf7;
+    --tint-pink: #f283ad;
+    --tint-orange: #ff9f66;
+    --tint-mint: #6fd08c;
+    --tint-blue: #6aa9ff;
+
+    background: var(--paper);
+    color-scheme: dark;
+  }
+
+  :is([data-theme="dark"] .manuscript-sheet[data-tone="theme"], .manuscript-sheet[data-tone="dark"])
+    ::selection {
+    background: rgb(90 160 255 / 0.3);
+  }
+
+  :is(
+      [data-theme="dark"] .manuscript-sheet[data-tone="theme"],
+      .manuscript-sheet[data-tone="dark"]
+    )[data-ink="adapt"]
+    .rich-text-content
+    :is([style*="color"], mark) {
+    filter: invert(1) hue-rotate(180deg);
+  }
+
+  /* A highlight carries no ink of its own, so its letters are the sheet's —
+     already light — and the inversion would darken them onto the darkened
+     marker. Set them as they would be on paper, and they come out light. */
+  :is(
+      [data-theme="dark"] .manuscript-sheet[data-tone="theme"],
+      .manuscript-sheet[data-tone="dark"]
+    )[data-ink="adapt"]
+    .rich-text-content
+    [style*="background-color"] {
+    color: #1d1d1f;
+  }
+
+  :is([data-theme="dark"] .manuscript-sheet[data-tone="theme"], .manuscript-sheet[data-tone="dark"])
+    .manuscript-continue {
+    background: #ececee;
+    color: #1d1d1f;
+  }
+}
+
 @keyframes sheet-in {
   from {
     opacity: 0;
@@ -10905,6 +10970,54 @@ button.sheet-chip:hover,
   letter-spacing: 0;
 }
 
+/* Numbered headings, counted where they stand: nothing is written into the
+   document, so a heading moved, added or deleted renumbers itself and the
+   other member's copy agrees. Counted from the highest level the chapter
+   uses (`data-top`), because the chapter's own title is the level above.
+   `headingNumbers()` in manuscript.ts counts the same way for the contents —
+   a deeper heading before any section is 2.0.1 in both. */
+.manuscript-sheet.is-numbered {
+  counter-reset: chapter var(--chapter) s1 s2 s3;
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h1,
+.manuscript-sheet.is-numbered[data-top="2"] .rich-text-content h2,
+.manuscript-sheet.is-numbered[data-top="3"] .rich-text-content h3 {
+  counter-increment: s1;
+  counter-set: s2 0 s3 0;
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h2,
+.manuscript-sheet.is-numbered[data-top="2"] .rich-text-content h3 {
+  counter-increment: s2;
+  counter-set: s3 0;
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h3 {
+  counter-increment: s3;
+}
+
+.manuscript-sheet.is-numbered .rich-text-content :is(h1, h2, h3)::before {
+  margin-right: 0.6em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h1::before,
+.manuscript-sheet.is-numbered[data-top="2"] .rich-text-content h2::before,
+.manuscript-sheet.is-numbered[data-top="3"] .rich-text-content h3::before {
+  content: counter(chapter) "." counter(s1);
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h2::before,
+.manuscript-sheet.is-numbered[data-top="2"] .rich-text-content h3::before {
+  content: counter(chapter) "." counter(s1) "." counter(s2);
+}
+
+.manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h3::before {
+  content: counter(chapter) "." counter(s1) "." counter(s2) "." counter(s3);
+}
+
 .manuscript-sheet .rich-text-content blockquote {
   margin: 0.8em 0 0.8em 1.25cm;
   border: 0;
@@ -10928,7 +11041,7 @@ button.sheet-chip:hover,
   top: -0.7em;
   left: 50%;
   padding: 0 8px;
-  background: #ffffff;
+  background: var(--paper);
   color: var(--ink-4);
   content: "Page break";
   font-family: var(--font-sans);
@@ -10959,6 +11072,260 @@ button.sheet-chip:hover,
 .manuscript-sheet.is-title-page p {
   color: var(--ink-3);
   font-size: var(--sheet-size, 12pt);
+}
+
+.structure-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus in a document: everything but the paragraph being written steps
+   back, and in sentence focus the paragraph itself steps back but for the
+   sentence. Colour rather than opacity inside the paragraph, because a child
+   cannot be more opaque than the block it is in. */
+.ProseMirror[data-writing-focus] > * {
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.ProseMirror[data-writing-focus] > :not(.is-writing-focus) {
+  opacity: 0.25;
+}
+
+.ProseMirror[data-writing-focus="sentence"] > .is-writing-focus {
+  color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.ProseMirror[data-writing-focus="sentence"] .is-writing-sentence {
+  color: var(--ink);
+}
+
+/* The open chapter's headings, under its row in the structure. */
+.structure-headings {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.structure-headings button {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px 3px 30px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structure-headings [data-depth="2"] button {
+  padding-left: 42px;
+}
+
+.structure-headings [data-depth="3"] button {
+  padding-left: 54px;
+}
+
+.structure-headings button:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+.structure-headings span {
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The document's inspector: one column beside the sheet, its panels as
+   tabs. The panels inside it are the notes' own, so their own frame — width,
+   rule, ground, title and close — gives way to the inspector's. */
+.manuscript-inspector {
+  display: flex;
+  width: 320px;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  border-left: 1px solid var(--rule-soft);
+  background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+}
+
+@container editor (max-width: 700px) {
+  .manuscript-inspector {
+    position: absolute;
+    z-index: 45;
+    inset: 0 0 0 auto;
+    width: min(340px, 100%);
+    box-shadow: -18px 0 40px rgb(0 0 0 / 0.28);
+  }
+}
+
+.inspector-tabs {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px 10px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.inspector-tabs [role="tab"] {
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.inspector-tabs [role="tab"]:hover {
+  color: var(--ink);
+}
+
+.inspector-tabs [role="tab"].is-active {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+}
+
+.inspector-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+
+.manuscript-inspector :is(.note-comments, .note-outline) {
+  position: static;
+  width: auto;
+  flex: 1;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.manuscript-inspector :is(.note-comments-header > svg, .note-comments-title),
+.manuscript-inspector .note-comments-header [aria-label^="Close"] {
+  display: none;
+}
+
+/* Outline and history have nothing left in their header; comments keep the
+   one control theirs carries, the resolved threads. */
+.manuscript-inspector :is(.note-outline, .note-history) > .note-comments-header {
+  display: none;
+}
+
+.manuscript-inspector .note-comments-header:not(:has(.note-comments-toggle)) {
+  display: none;
+}
+
+.manuscript-inspector .note-outline-list {
+  padding-top: 8px;
+}
+
+/* The contents: on the title page under the document's name, and wherever a
+   `[TOC]` block was put. Set in the sheet's own letter, as Word sets its
+   table, with the numbers in a column of their own. */
+.toc {
+  width: 100%;
+  font-family: var(--sheet-font, var(--font-display));
+  font-size: var(--sheet-size, 12pt);
+  text-align: left;
+}
+
+.manuscript-sheet.is-title-page .toc {
+  align-self: stretch;
+  margin-top: 64px;
+}
+
+/* The title page sets its own lines grey and centred; the contents are a
+   list under it, not one of those lines. */
+.manuscript-sheet.is-title-page .toc p.toc-title {
+  color: var(--ink);
+  font-size: 1.25em;
+}
+
+.toc-title {
+  margin-bottom: 0.6em;
+  color: var(--ink);
+  font-size: 1.25em;
+  font-weight: var(--weight-semibold);
+}
+
+.toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-part {
+  margin: 1em 0 0.3em;
+  color: var(--ink-3);
+  font-size: 0.82em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.toc button {
+  display: flex;
+  width: 100%;
+  gap: 0.7em;
+  border-radius: var(--radius-xs);
+  padding: 0.15em 0.3em;
+  color: var(--ink);
+  text-align: left;
+}
+
+.toc button:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.toc-chapter > button {
+  font-weight: var(--weight-semibold);
+}
+
+.toc-chapter li > button {
+  color: var(--ink-2);
+}
+
+.toc li[data-level="1"] {
+  padding-left: 1.2em;
+}
+
+.toc li[data-level="2"] {
+  padding-left: 2.4em;
+}
+
+.toc li[data-level="3"] {
+  padding-left: 3.6em;
+}
+
+.toc-number {
+  min-width: 2.2em;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.toc-empty {
+  color: var(--ink-3);
+}
+
+.contents-block {
+  margin: 1em 0;
+  border-radius: var(--radius-sm);
+  user-select: none;
+}
+
+.contents-block.is-selected {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .manuscript-continue {
@@ -11068,6 +11435,31 @@ button.sheet-chip:hover,
 
 .page-setup-row input[role="switch"]:checked::before {
   transform: translateX(14px);
+}
+
+/* The same fields in Settings, as Settings' own rows: the heading above the
+   card already says "Page", and the second label opens its own group. */
+.settings-page-setup .page-setup-row {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+
+.settings-page-setup .page-setup-row + .page-setup-row {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.settings-page-setup .menu-label:first-child {
+  display: none;
+}
+
+.settings-page-setup .menu-separator {
+  height: 1px;
+  margin: 0;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.settings-page-setup .menu-label {
+  padding: 14px 14px 2px;
 }
 
 .writing-menu {

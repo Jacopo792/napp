@@ -9,46 +9,83 @@ export interface Shortcut {
   group: string;
   keys: string;
   what: string;
+  /** Which kind of archive answers to it; both when absent. A document has
+   *  no list to walk and a notes archive has no chapters, so each is shown
+   *  the keys it has and nothing else. */
+  kind?: "notes" | "document";
 }
 
+const NOTES = "notes" as const;
+const DOC = "document" as const;
+
 export const SHORTCUTS: Shortcut[] = [
-  { group: "Anywhere", keys: "\u2318K", what: "Search notes and commands" },
-  { group: "Anywhere", keys: "\u2318N", what: "New note" },
+  { group: "Anywhere", keys: "\u2318K", what: "Search everything" },
+  { group: "Anywhere", keys: "\u2318N", what: "New note", kind: NOTES },
+  { group: "Anywhere", keys: "\u2318N", what: "New chapter", kind: DOC },
   { group: "Anywhere", keys: "\u2318S", what: "Save now" },
   { group: "Anywhere", keys: "\u2318,", what: "Settings" },
   { group: "Anywhere", keys: "\u2318.", what: "Focus mode" },
-  { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the folders" },
+  { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the folders", kind: NOTES },
+  { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the structure", kind: DOC },
   { group: "Anywhere", keys: "\u2318/", what: "This list" },
   { group: "Anywhere", keys: "Esc", what: "Leave focus mode" },
-  { group: "The list", keys: "/", what: "Jump to the search field" },
-  { group: "The list", keys: "N", what: "New note" },
-  { group: "The list", keys: "\u2191 \u2193", what: "Move between notes" },
-  { group: "The list", keys: "J K", what: "Move between notes" },
-  { group: "The list", keys: "\u2325 \u2191 \u2193", what: "Move between days" },
-  { group: "The list", keys: "\u21b5", what: "Open the title of the selected note" },
-  { group: "In a note", keys: "\u2325D", what: "Draw on the page" },
-  { group: "In a note", keys: "\u2318F", what: "Find in this note" },
-  { group: "In a note", keys: "\u2318K", what: "Link the selected words" },
-  { group: "In a note", keys: "/", what: "Formatting and blocks" },
-  { group: "In a note", keys: "[[", what: "Link another note in this archive" },
-  { group: "In a note", keys: "Esc", what: "Leave the text" },
+  { group: "The list", keys: "/", what: "Jump to the search field", kind: NOTES },
+  { group: "The list", keys: "N", what: "New note", kind: NOTES },
+  { group: "The list", keys: "\u2191 \u2193", what: "Move between notes", kind: NOTES },
+  { group: "The list", keys: "J K", what: "Move between notes", kind: NOTES },
+  { group: "The list", keys: "\u2325 \u2191 \u2193", what: "Move between days", kind: NOTES },
   {
-    group: "In a document archive",
+    group: "The list",
+    keys: "\u21b5",
+    what: "Open the title of the selected note",
+    kind: NOTES,
+  },
+  {
+    group: "The document",
     keys: "\u2325\u2318\u2191 \u2325\u2318\u2193",
     what: "Previous or next chapter",
+    kind: DOC,
   },
-  { group: "In a document archive", keys: "\u2318U", what: "Underline" },
   {
-    group: "In a document archive",
+    group: "The document",
+    keys: "\u2325\u2318I",
+    what: "Inspector: headings, comments, versions",
+    kind: DOC,
+  },
+  { group: "In a note", keys: "\u2325D", what: "Draw on the page", kind: NOTES },
+  { group: "In a note", keys: "\u2318F", what: "Find in this note", kind: NOTES },
+  { group: "In a note", keys: "\u2318K", what: "Link the selected words", kind: NOTES },
+  { group: "In a note", keys: "/", what: "Formatting and blocks", kind: NOTES },
+  { group: "In a note", keys: "[[", what: "Link another note in this archive", kind: NOTES },
+  { group: "In a note", keys: "Esc", what: "Leave the text", kind: NOTES },
+  {
+    group: "In the text",
+    keys: "\u2318B \u2318I \u2318U",
+    what: "Bold, italic, underline",
+    kind: DOC,
+  },
+  {
+    group: "In the text",
     keys: "\u21e7\u2318L E R J",
     what: "Align left, centre, right, justify",
+    kind: DOC,
   },
-  { group: "In a document archive", keys: "\u2318\u21b5", what: "Page break" },
+  { group: "In the text", keys: "\u2318\u21b5", what: "Page break", kind: DOC },
+  { group: "In the text", keys: "\u2318F", what: "Find and replace", kind: DOC },
+  { group: "In the text", keys: "\u2318K", what: "Link the selected words", kind: DOC },
+  { group: "In the text", keys: "/", what: "Formatting and blocks", kind: DOC },
+  { group: "In the text", keys: "[[", what: "Link a chapter or a note", kind: DOC },
+  { group: "In the text", keys: "Esc", what: "Leave the text", kind: DOC },
 ];
 
+/** The keys an archive of this kind answers to. */
+export function shortcutsFor(kind: "notes" | "document"): Shortcut[] {
+  return SHORTCUTS.filter((entry) => !entry.kind || entry.kind === kind);
+}
+
 /** The groups, in the order they were written. */
-export function shortcutGroups(): string[] {
-  return [...new Set(SHORTCUTS.map((entry) => entry.group))];
+export function shortcutGroups(kind: "notes" | "document"): string[] {
+  return [...new Set(shortcutsFor(kind).map((entry) => entry.group))];
 }
 
 /* Whether the keys go by their Apple names. `Notes.tsx` has always answered

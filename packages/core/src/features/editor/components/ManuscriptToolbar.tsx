@@ -24,6 +24,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Chapters,
   Eraser,
   Highlighter,
   ImagePlus,
@@ -648,6 +649,14 @@ export function ManuscriptToolbar({
                 onPress={() => {
                   close();
                   chain().setHorizontalRule().run();
+                }}
+              />
+              <MenuRow
+                icon={<Chapters size={16} />}
+                label="Contents"
+                onPress={() => {
+                  close();
+                  chain().insertContent({ type: "tableOfContents" }).run();
                 }}
               />
               <MenuRow

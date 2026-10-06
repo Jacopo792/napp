@@ -43,9 +43,17 @@ import {
   Pilcrow,
   UserRound,
 } from "@/components/icons";
-import { SETTINGS_SECTIONS, type SettingsSection } from "@/components/settingsSections";
+import type { SettingsSection } from "@/components/settingsSections";
+import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
-import { loadNamedVersions, type NamedVersion } from "@/lib/history";
+import {
+  OPEN_PLACE,
+  openPlace,
+  setDocumentContents,
+  type PlaceRequest,
+} from "@/lib/documentContents";
+import { ContentsList } from "@/components/ContentsList";
+import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
   DndContext,
   DragEndEvent,
@@ -193,8 +201,17 @@ import {
   positionBetween,
   splitManuscript,
   structureRows,
+  contentsOf,
+  topLevel,
 } from "@/lib/manuscript";
-import { DEFAULT_FEATURES, DEFAULT_PAGE, pageStyle } from "@/lib/spaceShape";
+import {
+  DEFAULT_FEATURES,
+  DEFAULT_PAGE,
+  pageStyle,
+  type ArchiveKind,
+  type DocumentFeatures,
+  type PageSetup,
+} from "@/lib/spaceShape";
 import { keyName } from "@/lib/shortcuts";
 import { SpaceSwitch } from "@/components/SpaceSwitch";
 
@@ -359,6 +376,10 @@ let knownSpaces: Space[] = [];
 /** A note chosen in ⌘K from another archive: the switch remounts the screen,
  *  so what to open on arrival has to outlive this one. */
 let openOnArrival: string | null = null;
+/** How many words each document had when this window first opened it — what
+ *  "this session" counts from. Kept across remounts, which switching archive
+ *  is, so going to another archive and back does not restart the session. */
+const sessionStart = new Map<string, number>();
 /** The switches as last known, for the same reason: a remount that started
  *  from the defaults would take the archive switch away until the row came
  *  back, and the window would grow it again a moment after arriving. */
@@ -706,11 +727,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       for (const lease of leases) lease.release();
     };
   }, [members]);
-
-  const setActiveMeta = useCallback(
-    (m: Meta) => setMetas((current) => ({ ...current, [viewAs]: m })),
-    [viewAs],
-  );
 
   // ── Bootstrap ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1245,6 +1261,53 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       total: own.chapters.reduce((sum, item) => sum + item.words, 0),
     };
   }, [docMode, metas, entries, manuscriptOwner, viewAs]);
+
+  /* The table of contents, from the same rows the structure draws, with each
+     chapter's headings read out of its document. Handed to the `[TOC]` block
+     through `documentContents.ts`, because the block is drawn inside the
+     editor where nothing from here reaches it as a prop. */
+  const contents = useMemo(() => {
+    if (!manuscript) return [];
+    const byId = new Map(entries.map((entry) => [entry.note.id, entry.note]));
+    return contentsOf(
+      manuscript.rows,
+      manuscript.parts,
+      (id) => headingsOf(byId.get(id)?.content),
+      docFeatures.numbering,
+    );
+  }, [manuscript, entries, docFeatures.numbering]);
+  useEffect(() => setDocumentContents(contents), [contents]);
+
+  /* Words today: yours, from the versions the server writes after each
+     stretch of writing, so it counts what was written on any device — and
+     runs up to ten minutes behind, which is how often a stretch is closed.
+     ponytail: a version two people wrote in counts whole for each of them. */
+  const [wordsToday, setWordsToday] = useState<number | null>(null);
+  const statsShown = docMode && writingPreferences.writingStats;
+  useEffect(() => {
+    if (!statsShown || !session) return;
+    let current = true;
+    const read = () =>
+      loadContributions(session, session.userId)
+        .then((rows) => {
+          const midnight = new Date().setHours(0, 0, 0, 0);
+          const today = rows
+            .filter((row) => Date.parse(row.createdAt) >= midnight)
+            .reduce((sum, row) => sum + (row.wordsAdded ?? 0), 0);
+          if (current) setWordsToday(today);
+        })
+        .catch(() => undefined);
+    void read();
+    const timer = window.setInterval(read, 5 * 60_000);
+    return () => {
+      current = false;
+      window.clearInterval(timer);
+    };
+  }, [statsShown, session]);
+  useEffect(() => {
+    if (manuscript && session && !loading && !sessionStart.has(session.archiveId))
+      sessionStart.set(session.archiveId, manuscript.total);
+  }, [manuscript, session, loading]);
 
   /* Trashed notes of either scope the document reads, for its own Trash. */
   const docTrash = useMemo(() => {
@@ -2790,6 +2853,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [compact, markRemarksSeen, viewAs],
   );
 
+  /* A line of the contents was pressed — on the title page or in a `[TOC]`
+     block — so open its chapter and go to the heading. */
+  useEffect(() => {
+    const open = (event: Event) => {
+      const { noteId, text } = (event as CustomEvent<PlaceRequest>).detail;
+      handleSelectNote(noteId);
+      if (text) setOpenThen({ noteId, reveal: text });
+    };
+    window.addEventListener(OPEN_PLACE, open);
+    return () => window.removeEventListener(OPEN_PLACE, open);
+  }, [handleSelectNote]);
+
   /* Arrived from ⌘K in another archive: open what was chosen there, in the
      scope it sits in, once this archive's notes are here. */
   useEffect(() => {
@@ -3644,20 +3719,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         run: () => handleLock(),
       },
       /* Every section of Settings, by its name and by the rows inside it. */
-      ...SETTINGS_SECTIONS.flatMap(
-        (group): readonly (typeof group.items)[number][] => group.items,
-      ).map((item) => ({
-        id: `settings:${item.id}`,
-        group: "Settings",
-        searchOnly: true,
-        name: item.name,
-        keywords: `settings ${item.keywords}`,
-        icon: item.icon,
-        run: () => {
-          setSettingsSection(item.id);
-          setSettingsOpen(true);
-        },
-      })),
+      ...settingsSectionsFor(docMode ? "document" : "notes")
+        .flatMap((group) => group.items)
+        .map((item) => ({
+          id: `settings:${item.id}`,
+          group: "Settings",
+          searchOnly: true,
+          name: item.name,
+          keywords: `settings ${item.keywords}`,
+          icon: item.icon,
+          run: () => {
+            setSettingsSection(item.id);
+            setSettingsOpen(true);
+          },
+        })),
     ];
   })();
 
@@ -4082,11 +4157,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSeatLimit(seats);
           await refreshSpaces();
         }}
-        onOptions={async (kind, features) => {
-          if (kind !== space.kind) await setSpaceKind(session, kind);
-          await setDocumentFeatures(session, features);
-          await refreshSpaces();
-        }}
+        onOptions={saveDocumentOptions}
         onCreateInvite={inviteLink}
         onRevokeInvite={withdrawInvite}
         onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
@@ -4230,6 +4301,27 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      possessive the switch just stopped saying. */
   const scopeTag = viewedMember && !viewedMember.isSelf ? nameOf(viewedMember) : undefined;
 
+  /* The document's page and options are the archive's: written for every
+     member, from the bar, from the archive's sheet or from Settings alike. */
+  function savePageSetup(next: PageSetup) {
+    if (!session) return;
+    setSpaces((current) =>
+      current.map((space) =>
+        space.archiveId === session.archiveId ? { ...space, page: next } : space,
+      ),
+    );
+    void setPageSetup(session, next).catch((reason) =>
+      setError(reason instanceof Error ? reason.message : "Could not set up the page"),
+    );
+  }
+
+  async function saveDocumentOptions(kind: ArchiveKind, features: DocumentFeatures) {
+    if (!session) return;
+    if (kind !== currentSpace?.kind) await setSpaceKind(session, kind);
+    await setDocumentFeatures(session, features);
+    await refreshSpaces();
+  }
+
   /* Both keyboard sheets travel with the settings panel, because both layouts
      mount that and neither wants a second copy of this. */
   const keyboardSheets = (
@@ -4242,7 +4334,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         initialQuery={paletteQuery}
         onClose={() => setPaletteOpen(false)}
       />
-      <ShortcutSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ShortcutSheet
+        open={shortcutsOpen}
+        kind={docMode ? "document" : "notes"}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </>
   );
 
@@ -4255,6 +4351,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       <SettingsPanel
         open={settingsOpen}
         initialSection={settingsSection}
+        kind={docMode ? "document" : "notes"}
+        document={
+          docMode && currentSpace
+            ? {
+                features: docFeatures,
+                page: currentSpace.page,
+                disabled: !canWriteArchive,
+                onOptions: (kind, features) => void saveDocumentOptions(kind, features),
+                onPage: savePageSetup,
+              }
+            : undefined
+        }
         email={session.email}
         reading={readingLabel}
         autoLock={autoLock}
@@ -4517,20 +4625,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
     const docActions = selected ? (
       <>
-        <PageSetupButton
-          page={page}
-          disabled={!canWriteArchive}
-          onChange={(next) => {
-            setSpaces((current) =>
-              current.map((space) =>
-                space.archiveId === session.archiveId ? { ...space, page: next } : space,
-              ),
-            );
-            void setPageSetup(session, next).catch((reason) =>
-              setError(reason instanceof Error ? reason.message : "Could not set up the page"),
-            );
-          }}
-        />
+        <PageSetupButton page={page} disabled={!canWriteArchive} onChange={savePageSetup} />
         <WritingMenuButton label="Chapter actions" items={chapterItems} />
       </>
     ) : null;
@@ -4618,6 +4713,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onInfo={(id, point) =>
           openSheet({ x: point.x, y: point.y, width: 1, height: 1, kind: "note", noteId: id })
         }
+        headings={contents.find((entry) => entry.id === selectedId)?.headings}
+        stats={
+          statsShown
+            ? {
+                today: wordsToday,
+                session:
+                  manuscript.total - (sessionStart.get(session.archiveId) ?? manuscript.total),
+              }
+            : undefined
+        }
+        onHeading={(text) => selectedId && openPlace({ noteId: selectedId, text })}
       />
     );
 
@@ -4653,7 +4759,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           )}
         </div>
         <div className="manuscript-desk min-h-0 flex-1">
-          <article className="manuscript-sheet is-title-page" style={pageStyle(page)}>
+          <article
+            className="manuscript-sheet is-title-page"
+            style={pageStyle(page)}
+            data-tone={writingPreferences.sheetTone}
+          >
             <h1>{currentSpace?.name}</h1>
             <p>
               {manuscript.chapters.length === 1
@@ -4681,6 +4791,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   Begin the first chapter
                 </button>
               )
+            )}
+            {manuscript.chapters.length > 0 && (
+              <ContentsList
+                entries={contents}
+                onOpen={(noteId, text) => openPlace({ noteId, text })}
+              />
             )}
           </article>
         </div>
@@ -4719,7 +4835,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               : null
           }
           headerStatus={noteStatus}
-          headerActions={
+          headerLead={
             <>
               {compact ? (
                 <button
@@ -4746,9 +4862,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   </button>
                 )
               )}
-              {docActions}
             </>
           }
+          headerActions={<>{docActions}</>}
           synced={collaborative.ready}
           session={session}
           commentAuthors={commentAuthors}
@@ -4761,6 +4877,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 ? [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · ")
                 : notebookName,
             footer: turn,
+            numbered: docFeatures.numbering && chapterAt >= 0 ? chapterAt + 1 : null,
+            writing: {
+              focus: focusMode ? writingPreferences.focusScope : "off",
+              typewriter: writingPreferences.typewriter,
+            },
+            topLevel: topLevel(headingsOf(selected.note.content).map((heading) => heading.level)),
           }}
         />
       </Suspense>

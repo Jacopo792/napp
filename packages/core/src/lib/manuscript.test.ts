@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { intoPart, moveTo, positionBetween, splitManuscript, structureRows } from "./manuscript.ts";
+import {
+  contentsOf,
+  headingNumbers,
+  intoPart,
+  moveTo,
+  positionBetween,
+  splitManuscript,
+  structureRows,
+} from "./manuscript.ts";
 
 const items = [
   { id: "intro", folderId: null, position: 1 },
@@ -40,4 +48,48 @@ test("a move writes one position between its neighbours", () => {
   assert.deepEqual(moveTo(chapters, "intro", 2), { position: 3.5, folderId: "p1" });
   assert.deepEqual(intoPart(chapters, "intro", "p2"), { position: 3.5, folderId: "p2" });
   assert.deepEqual(intoPart(chapters, "c2", "p3"), { position: 5, folderId: "p3" });
+});
+
+test("headings are numbered under their chapter, deeper ones reset", () => {
+  assert.deepEqual(headingNumbers(2, [1, 2, 2, 1, 3, 2]), [
+    "2.1",
+    "2.1.1",
+    "2.1.2",
+    "2.2",
+    "2.2.0.1",
+    "2.2.1",
+  ]);
+  assert.deepEqual(headingNumbers(1, [3, 2]), ["1.0.1", "1.1"]);
+  // A chapter divided by Title 2 is counted from Title 2.
+  assert.deepEqual(headingNumbers(2, [2, 3, 2]), ["2.1", "2.1.1", "2.2"]);
+});
+
+test("the contents follow the structure, skipping empty and continued parts", () => {
+  const chapters = [
+    { id: "a", title: "Intro", folderId: null, position: 1 },
+    { id: "b", title: "Uno", folderId: "p1", position: 2 },
+  ];
+  const rows = structureRows(chapters, ["p1", "p2"]);
+  const contents = contentsOf(
+    rows,
+    new Map([
+      ["p1", "Parte I"],
+      ["p2", "Vuota"],
+    ]),
+    (id) => (id === "b" ? [{ text: "La sovrabbondanza", level: 1 }] : []),
+    true,
+  );
+  assert.deepEqual(
+    contents.map((entry) => [entry.kind, entry.title, entry.number]),
+    [
+      ["chapter", "Intro", 1],
+      ["part", "Parte I", null],
+      ["chapter", "Uno", 2],
+    ],
+  );
+  assert.equal(contents[2].headings[0].number, "2.1");
+  assert.equal(
+    contentsOf(rows, new Map(), () => [{ text: "x", level: 1 }], false)[0].headings[0].number,
+    null,
+  );
 });

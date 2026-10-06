@@ -264,3 +264,19 @@ test("a writing archive's paragraph settings leave the words and nothing else", 
   const back = richTextToMarkdown(markdownToNote("x.md", `# T\n\n${markdown}`).content);
   assert.equal(back, markdown);
 });
+
+test("a table of contents leaves as [TOC] and comes back as the block", () => {
+  const document = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "Indice:" }] },
+      { type: "tableOfContents" },
+      { type: "paragraph", content: [{ type: "text", text: "Dopo." }] },
+    ],
+  };
+  const markdown = richTextToMarkdown(document);
+  assert.match(markdown, /^\[TOC\]$/m);
+  const note = markdownToNote("x.md", `# T\n\n${markdown}`);
+  assert.ok(note.content.content?.some((node) => node.type === "tableOfContents"));
+  assert.equal(richTextToMarkdown(note.content), markdown);
+});

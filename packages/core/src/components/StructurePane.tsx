@@ -40,7 +40,7 @@ import { MenuItems } from "@/components/MenuPrimitives";
 import { useSystemMenu } from "@/components/useSystemMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
-import type { StructureRow } from "@/lib/manuscript";
+import type { ContentsHeading, StructureRow } from "@/lib/manuscript";
 
 export interface ChapterItem {
   id: string;
@@ -197,6 +197,9 @@ function Menu({ point, items, close }: { point: MenuPoint; items: MenuItem[]; cl
   );
 }
 
+const signed = (words: number) =>
+  `${words > 0 ? "+" : words < 0 ? "−" : ""}${Math.abs(words).toLocaleString()}`;
+
 export function StructurePane({
   header,
   footer,
@@ -218,6 +221,9 @@ export function StructurePane({
   onMove,
   onTrash,
   onInfo,
+  headings = [],
+  onHeading,
+  stats,
 }: {
   header?: ReactNode;
   footer?: ReactNode;
@@ -239,6 +245,13 @@ export function StructurePane({
   onMove: (id: string, target: StructureTarget) => void;
   onTrash: (id: string) => void;
   onInfo: (id: string, point: MenuPoint) => void;
+  /** The open chapter's headings, under its row — the navigation pane of a
+   *  long document, numbered as the page numbers them. */
+  headings?: ContentsHeading[];
+  onHeading?: (text: string) => void;
+  /** Words written today (yours, from the versions) and the net change since
+   *  this window opened. Absent when the reader switched them off. */
+  stats?: { today: number | null; session: number };
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [dragging, setDragging] = useState<string | null>(null);
@@ -424,6 +437,12 @@ export function StructurePane({
             <i style={{ transform: `scaleX(${progress})` }} />
           </span>
         ) : null}
+        {stats && (
+          <span className="structure-stats">
+            {stats.today !== null && <span>Today {signed(stats.today)}</span>}
+            <span>This session {signed(stats.session)}</span>
+          </span>
+        )}
       </div>
 
       <DndContext
@@ -474,38 +493,57 @@ export function StructurePane({
             </button>
           )}
 
-          {rows.map((row) =>
-            row.kind === "part" ? (
-              <PartHeading
-                key={`part:${row.folderId}:${row.continued}`}
-                id={row.folderId}
-                name={parts.get(row.folderId) ?? ""}
-                continued={row.continued}
-                over={over?.kind === "part" && over.folderId === row.folderId}
-                canWrite={canWrite}
-                editing={renaming === row.folderId && !row.continued}
-                setEditing={(on) => setRenaming(on ? row.folderId : null)}
-                onRename={(name) => onRenamePart(row.folderId, name)}
-                onMenu={(point) => partMenu(row.folderId, point)}
-              />
-            ) : (
-              <Row
-                key={row.item.id}
-                item={row.item}
-                number={row.number}
-                selected={row.item.id === selectedId}
-                over={
-                  over &&
-                  (over.kind === "before" || over.kind === "after") &&
-                  over.id === row.item.id
-                    ? over.kind
-                    : null
-                }
-                onOpen={() => onOpen(row.item.id)}
-                onMenu={(point) => chapterMenu(row.item, point, true)}
-              />
-            ),
-          )}
+          {rows
+            .map((row) =>
+              row.kind === "part" ? (
+                <PartHeading
+                  key={`part:${row.folderId}:${row.continued}`}
+                  id={row.folderId}
+                  name={parts.get(row.folderId) ?? ""}
+                  continued={row.continued}
+                  over={over?.kind === "part" && over.folderId === row.folderId}
+                  canWrite={canWrite}
+                  editing={renaming === row.folderId && !row.continued}
+                  setEditing={(on) => setRenaming(on ? row.folderId : null)}
+                  onRename={(name) => onRenamePart(row.folderId, name)}
+                  onMenu={(point) => partMenu(row.folderId, point)}
+                />
+              ) : (
+                <Row
+                  key={row.item.id}
+                  item={row.item}
+                  number={row.number}
+                  selected={row.item.id === selectedId}
+                  over={
+                    over &&
+                    (over.kind === "before" || over.kind === "after") &&
+                    over.id === row.item.id
+                      ? over.kind
+                      : null
+                  }
+                  onOpen={() => onOpen(row.item.id)}
+                  onMenu={(point) => chapterMenu(row.item, point, true)}
+                />
+              ),
+            )
+            .flatMap((element, index) => {
+              const row = rows[index];
+              if (row.kind !== "chapter" || row.item.id !== selectedId || headings.length === 0)
+                return [element];
+              return [
+                element,
+                <ol key={`headings:${row.item.id}`} className="structure-headings">
+                  {headings.map((heading, at) => (
+                    <li key={at} data-depth={heading.depth}>
+                      <button type="button" onClick={() => onHeading?.(heading.text)}>
+                        {heading.number && <span>{heading.number}</span>}
+                        {heading.text}
+                      </button>
+                    </li>
+                  ))}
+                </ol>,
+              ];
+            })}
           {/* Always there, so nothing moves under the hand when a drag
               starts: a target that appears with the drag pushes the one the
               hand was heading for out from under it. */}

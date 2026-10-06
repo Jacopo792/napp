@@ -152,7 +152,16 @@ function template(isDev) {
         { role: "zoomOut" },
         { type: "separator" },
         { role: "togglefullscreen" },
-        ...(isDev ? [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }] : []),
+        ...(isDev
+          ? [
+              { type: "separator" },
+              {
+                role: "reload",
+              } /* ⌥⌘I is the document's inspector, as it is in Pages; the developer
+             tools step aside to ⌥⇧⌘I rather than take it from the page. */,
+              { role: "toggleDevTools", accelerator: "Alt+Shift+CmdOrCtrl+I" },
+            ]
+          : []),
       ],
     },
     { label: "Window", role: "windowMenu" },
