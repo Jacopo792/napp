@@ -50,6 +50,7 @@ import {
   X,
 } from "@/components/icons";
 import { Invitations } from "@/components/Invitations";
+import { SETTINGS_SECTIONS, type SettingsSection } from "@/components/settingsSections";
 import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -287,32 +288,9 @@ function Segmented({
   );
 }
 
-const SETTINGS_SECTIONS = [
-  {
-    group: "Account",
-    items: [
-      { id: "profile", tone: "blue", name: "Profile", icon: <UserRound size={16} /> },
-      { id: "members", tone: "green", name: "Members", icon: <Users size={16} /> },
-      { id: "spaces", tone: "indigo", name: "Archives", icon: <Layers size={16} /> },
-      { id: "security", tone: "slate", name: "Security", icon: <ShieldCheck size={16} /> },
-    ],
-  },
-  {
-    group: "Interface",
-    items: [
-      { id: "appearance", tone: "violet", name: "Appearance", icon: <Palette size={16} /> },
-      { id: "style", tone: "pink", name: "Style", icon: <Layers size={16} /> },
-      { id: "reading", tone: "orange", name: "Reading", icon: <BookOpen size={16} /> },
-      { id: "writing", tone: "teal", name: "Writing", icon: <Type size={16} /> },
-      { id: "shortcuts", tone: "gray", name: "Shortcuts", icon: <Keyboard size={16} /> },
-    ],
-  },
-] as const;
-
-type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["items"][number]["id"];
-
 export function SettingsPanel({
   open,
+  initialSection,
   email,
   reading,
   autoLock,
@@ -354,6 +332,8 @@ export function SettingsPanel({
   onLock,
 }: {
   open: boolean;
+  /** The section to open on; Settings otherwise opens on the profile. */
+  initialSection?: SettingsSection;
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
   /** Whose notes the window is currently pointed at. */
@@ -408,7 +388,7 @@ export function SettingsPanel({
   const preset = matchingPreset(axes);
   const appearance = useAppearance();
   const [tuning, setTuning] = useState(false);
-  const [section, setSection] = useState<SettingsSection>("profile");
+  const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
   const [closing, setClosing] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while

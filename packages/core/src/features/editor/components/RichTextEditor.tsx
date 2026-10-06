@@ -157,6 +157,9 @@ export interface RichTextEditorHandle {
   findNext: () => SearchStatus;
   findPrevious: () => SearchStatus;
   closeSearch: () => void;
+  /** Select the first place these words occur and scroll to it, leaving no
+   *  search behind. False when they are not (yet) in the document. */
+  reveal: (text: string) => boolean;
   focus: () => void;
 }
 
@@ -2323,6 +2326,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       },
       closeSearch() {
         editor?.commands.clearSearch();
+      },
+      reveal(text) {
+        if (!editor) return false;
+        editor.commands.setSearchTerm(text);
+        const found = editor.storage.findAndReplace.results.length > 0;
+        if (found) editor.commands.goToNextResult();
+        editor.commands.clearSearch();
+        if (found) editor.commands.focus(undefined, { scrollIntoView: false });
+        return found;
       },
       focus() {
         editor?.commands.focus();

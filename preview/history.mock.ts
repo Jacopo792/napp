@@ -120,3 +120,13 @@ export async function loadFolderVersions(_session: AppSession, noteIds: string[]
     .flatMap((noteId) => seed(noteId).map((version) => ({ ...version, noteId })))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+export async function loadNamedVersions(session: AppSession) {
+  await sleep(140);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return [];
+  return FIXTURE_NOTES.slice(0, 3).flatMap((note) =>
+    seed(note.id)
+      .filter((version) => version.label)
+      .map((version) => ({ ...version, noteId: note.id, title: note.title })),
+  );
+}

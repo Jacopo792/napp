@@ -138,6 +138,9 @@ export interface NoteEditorHandle {
   openComments: () => void;
   openLink: () => void;
   drawOnPage: () => void;
+  /** Go to the first place these words occur — once they are there, which
+   *  for a note just opened is after its document has arrived. */
+  reveal: (text: string) => void;
   focus: () => void;
 }
 
@@ -217,6 +220,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   ref,
 ) {
   const [instance, setInstance] = useState<Editor | null>(null);
+  /* Words asked for from ⌘K. Held until the document holds them: a note just
+     opened is an empty editor until its document syncs. Tried every 150 ms
+     and given up on after a few seconds, so a passage deleted in the
+     meantime does not pull the caret away later. */
+  const revealing = useRef<string | null>(null);
+  const [revealAsked, setRevealAsked] = useState(0);
+  useEffect(() => {
+    const text = revealing.current;
+    if (!text) return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      if (editorRef.current?.reveal(text) || ++tries > 50) {
+        revealing.current = null;
+        window.clearInterval(timer);
+      }
+    }, 150);
+    return () => window.clearInterval(timer);
+  }, [revealAsked]);
   const [replaceTerm, setReplaceTerm] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkLabel, setLinkLabel] = useState("");
@@ -315,6 +336,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
        wrong. */
     drawOnPage() {
       editorRef.current?.format("drawing-page");
+    },
+    reveal(text) {
+      revealing.current = text;
+      setRevealAsked((count) => count + 1);
     },
     focus() {
       editorRef.current?.focus();

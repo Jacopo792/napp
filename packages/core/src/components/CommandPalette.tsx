@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "@/components/icons";
 import { fold } from "@/lib/format";
+import type { Snippet } from "@/lib/spotlight";
 import { SHORTCUTS, shortcutGroups, keyName } from "@/lib/shortcuts";
 
 export interface Command {
@@ -17,6 +18,16 @@ export interface Command {
   icon: ReactNode;
   /** Words that should find this and are not in its name. */
   keywords?: string;
+  /** Set by a search that has already decided how well this answers the
+   *  query — a heading, a line of text. It is ranked as given. */
+  rank?: number;
+  /** When it last changed, in milliseconds: the last tiebreak. */
+  at?: number;
+  /** Found by a query, never listed at rest: a resting palette is where you
+   *  were going, not an index of the archive. */
+  searchOnly?: boolean;
+  /** The words around the match, shown in place of the hint. */
+  snippet?: Snippet;
   run: () => void;
 }
 
@@ -25,25 +36,41 @@ export interface Command {
  *  have on screen. */
 const RESTING_LIMIT = 5;
 
+/* One scale for everything the palette holds, so a chapter, a heading and a
+   line of text can be put in one order: the start of a name, the start of a
+   word in it, anywhere in it, a heading (3, given by the search), the words
+   behind a name, its second line, and last the running text (6). */
 function score(command: Command, query: string): number {
+  if (command.rank !== undefined) return command.rank;
   const name = fold(command.name);
   if (name.startsWith(query)) return 0;
   const word = name.split(/\s+/).some((part) => part.startsWith(query));
   if (word) return 1;
   if (name.includes(query)) return 2;
-  if (command.keywords && fold(command.keywords).includes(query)) return 3;
-  if (command.hint && fold(command.hint).includes(query)) return 4;
+  if (command.keywords && fold(command.keywords).includes(query)) return 4;
+  if (command.hint && fold(command.hint).includes(query)) return 5;
   return -1;
 }
+
+/** How many characters a query needs before other archives are asked. */
+const REMOTE_FROM = 3;
 
 export function CommandPalette({
   open,
   commands,
   initialQuery = "",
+  search,
+  remote,
   onClose,
 }: {
   open: boolean;
   commands: Command[];
+  /** What only a typed query can find — headings and running text — already
+   *  ranked. Asked on every keystroke, from memory. */
+  search?: (query: string) => Command[];
+  /** What is not in memory: asked once the reader has paused, and only for a
+   *  query long enough to be worth a request. */
+  remote?: (query: string) => Promise<Command[]>;
   /** What the field already holds when it opens. A menu item that means one
    *  group of the palette opens it standing in that group, rather than opening
    *  the whole thing and leaving the reader to guess the word. */
@@ -53,24 +80,53 @@ export function CommandPalette({
   const [query, setQuery] = useState(initialQuery);
   const [cursor, setCursor] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const [far, setFar] = useState<{ query: string; items: Command[] }>({ query: "", items: [] });
+
+  useEffect(() => {
+    const q = fold(query.trim());
+    if (!open || !remote || q.length < REMOTE_FROM) return;
+    let current = true;
+    const timer = window.setTimeout(() => {
+      remote(query.trim())
+        .then((items) => current && setFar({ query: q, items }))
+        .catch(() => current && setFar({ query: q, items: [] }));
+    }, 250);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, query, remote]);
 
   useEffect(() => {
     setQuery(open ? initialQuery : "");
     setCursor(0);
   }, [open, initialQuery]);
 
-  /* Ranked, then grouped in the order the groups were handed over — so the
-     order of a resting palette is the caller's editorial decision and not
-     whatever the sort happened to produce. */
+  /* At rest, grouped in the order the groups were handed over — the order of
+     a resting palette is the caller's editorial decision. With a query, by
+     how well each answers it, then by the kind of thing (the caller's order
+     again), then by how recently it changed; and the groups follow their best
+     row, so the heading that starts with the word is above the line of text
+     that merely contains it. */
   const matches = useMemo(() => {
     const q = fold(query.trim());
+    const pool = q
+      ? [...commands, ...(search?.(q) ?? []), ...(far.query === q ? far.items : [])]
+      : commands.filter((command) => !command.searchOnly);
+    const order = new Map<string, number>();
+    for (const command of pool) if (!order.has(command.group)) order.set(command.group, order.size);
     const ranked = q
-      ? commands
+      ? pool
           .map((command) => ({ command, rank: score(command, q) }))
           .filter((entry) => entry.rank >= 0)
-          .sort((a, b) => a.rank - b.rank)
+          .sort(
+            (a, b) =>
+              a.rank - b.rank ||
+              order.get(a.command.group)! - order.get(b.command.group)! ||
+              (b.command.at ?? 0) - (a.command.at ?? 0),
+          )
           .map((entry) => entry.command)
-      : commands;
+      : pool;
 
     const groups: { group: string; items: Command[] }[] = [];
     for (const command of ranked) {
@@ -79,7 +135,7 @@ export function CommandPalette({
       else groups.push({ group: command.group, items: [command] });
     }
     return q ? groups : groups.map((g) => ({ ...g, items: g.items.slice(0, RESTING_LIMIT) }));
-  }, [commands, query]);
+  }, [commands, search, far, query]);
 
   const flat = useMemo(() => matches.flatMap((group) => group.items), [matches]);
   const active = flat[Math.min(cursor, flat.length - 1)];
@@ -111,8 +167,8 @@ export function CommandPalette({
             autoFocus
             type="text"
             value={query}
-            placeholder="Search notes and commands…"
-            aria-label="Search notes and commands"
+            placeholder="Search everything…"
+            aria-label="Search everything"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") return onClose();
@@ -151,7 +207,15 @@ export function CommandPalette({
                   <span className="palette-row-icon">{command.icon}</span>
                   <span className="min-w-0">
                     <b>{command.name}</b>
-                    {command.hint && <small>{command.hint}</small>}
+                    {command.snippet ? (
+                      <small>
+                        {command.snippet.before}
+                        <mark>{command.snippet.match}</mark>
+                        {command.snippet.after}
+                      </small>
+                    ) : (
+                      command.hint && <small>{command.hint}</small>
+                    )}
                   </span>
                 </button>
               ))}

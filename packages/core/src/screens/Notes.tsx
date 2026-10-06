@@ -37,7 +37,15 @@ import {
   History,
   Printer,
   Structure,
+  Chapters,
+  Heading2,
+  Layers,
+  Pilcrow,
+  UserRound,
 } from "@/components/icons";
+import { SETTINGS_SECTIONS, type SettingsSection } from "@/components/settingsSections";
+import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
+import { loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
   DndContext,
   DragEndEvent,
@@ -58,6 +66,7 @@ import {
   loadSpaces,
   renameSpace,
   setSpaceSeats,
+  findInOtherArchives,
   type Space,
 } from "@/lib/spaces";
 import {
@@ -347,6 +356,9 @@ function leaveScreen(): Promise<void> {
 /** The archives seen last, so a remount draws the switch from its first frame
  *  instead of making room for it when the list comes back. */
 let knownSpaces: Space[] = [];
+/** A note chosen in ⌘K from another archive: the switch remounts the screen,
+ *  so what to open on arrival has to outlive this one. */
+let openOnArrival: string | null = null;
 /** The switches as last known, for the same reason: a remount that started
  *  from the defaults would take the archive switch away until the row came
  *  back, and the window would grow it again a moment after arriving. */
@@ -413,8 +425,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     loadPaneWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX),
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
+  /* Named versions, for ⌘K: read when the palette opens, because a name is
+     given rarely and the list is a request the archive's own load does not make. */
+  const [namedVersions, setNamedVersions] = useState<NamedVersion[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   /* Focus is the two panes put away and the page's own controls stepping back
      while you write. It is not a third layout: the workspace already knows how
@@ -482,6 +498,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     noteId: string;
     history?: string | true;
     comments?: boolean;
+    /** Words to go to once the note is open — a heading or a line ⌘K found. */
+    reveal?: string;
   } | null>(null);
 
   /* A hold, and the two refs it needs. The timer is one, because it has to be
@@ -528,14 +546,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const noteEditorRef = useRef<NoteEditorHandle>(null);
   useEffect(() => {
     if (!openThen || selectedId !== openThen.noteId) return;
-    const frame = requestAnimationFrame(() => {
+    /* The editor is a lazy chunk, so on the first note of a visit it is not
+       there yet a frame after the choice: wait for it, for a couple of
+       seconds at most, rather than dropping what was asked for. */
+    let frame = 0;
+    let tries = 0;
+    const run = () => {
+      const editor = noteEditorRef.current;
+      if (!editor && tries++ < 120) {
+        frame = requestAnimationFrame(run);
+        return;
+      }
       if (openThen.history)
-        noteEditorRef.current?.openHistory(
-          openThen.history === true ? undefined : openThen.history,
-        );
-      else if (openThen.comments) noteEditorRef.current?.openComments();
+        editor?.openHistory(openThen.history === true ? undefined : openThen.history);
+      else if (openThen.comments) editor?.openComments();
+      else if (openThen.reveal) editor?.reveal(openThen.reveal);
       setOpenThen(null);
-    });
+    };
+    frame = requestAnimationFrame(run);
     return () => cancelAnimationFrame(frame);
   }, [openThen, selectedId]);
 
@@ -2762,6 +2790,30 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [compact, markRemarksSeen, viewAs],
   );
 
+  /* Arrived from ⌘K in another archive: open what was chosen there, in the
+     scope it sits in, once this archive's notes are here. */
+  useEffect(() => {
+    if (!openOnArrival || loading) return;
+    const entry = entries.find((candidate) => candidate.note.id === openOnArrival);
+    openOnArrival = null;
+    if (!entry) return;
+    if (!docMode && entry.note.ownerId && entry.note.ownerId !== viewAs)
+      setViewAs(entry.note.ownerId);
+    setSelectedFolderId(ALL);
+    handleSelectNote(entry.note.id);
+  }, [loading, entries, docMode, viewAs, handleSelectNote]);
+
+  useEffect(() => {
+    if (!paletteOpen || !session) return;
+    let current = true;
+    loadNamedVersions(session)
+      .then((versions) => current && setNamedVersions(versions))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [paletteOpen, session]);
+
   function handleOpenRecent(id: string) {
     setQuery("");
     setSelectedFolderId(ALL);
@@ -3259,143 +3311,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      things the window itself does. The notes come from the same entries and
      the same `derivedOf` haystack the list searches, so a note found here and
      a note found in the list are found by the same rule. */
-  const paletteCommands: Command[] = ((): Command[] => {
-    if (!paletteOpen) return [];
-    const open = (id: string) => () => {
-      setQuery("");
-      setSelectedFolderId(ALL);
-      handleSelectNote(id);
-    };
-    return [
-      ...scopes.map((scope) => ({
-        id: `scope:${scope.id}`,
-        group: "Go to",
-        name: scope.label,
-        icon:
-          scope.id === TRASH ? (
-            <Trash2 size={16} />
-          ) : scope.id === REMARKS ? (
-            <MessageSquare size={16} />
-          ) : scope.id === ARCHIVE ? (
-            <Archive size={16} />
-          ) : scope.id === ALL ? (
-            <NotebookText size={16} />
-          ) : (
-            <Folder size={16} />
-          ),
-        run: () => handleSelectFolder(scope.id),
-      })),
-      ...ownedEntries.map((entry) => ({
-        id: `note:${entry.note.id}`,
-        group: "Notes",
-        name: entry.note.title || "Untitled",
-        hint: derivedOf(entry.note).preview || undefined,
-        keywords: derivedOf(entry.note).haystack,
-        icon: <FileText size={16} />,
-        run: open(entry.note.id),
-      })),
-      /* What was said, searchable with everything else. A remark is the one
-         thing in this archive that was not reachable from here — and it is
-         the kind of thing you go looking for by its words rather than by the
-         note it is on. Opening one is opening its note in the scope that
-         opens conversations with it, which is the path that already exists. */
-      ...archiveComments.flatMap((remark) => {
-        const entry = ownedEntries.find((candidate) => candidate.note.id === remark.noteId);
-        if (!entry) return [];
-        const title = entry.note.title || "Untitled";
-        return [
-          {
-            id: `remark:${remark.id}`,
-            group: "Remarks",
-            name: remark.body,
-            hint: title,
-            keywords: `${remark.body} ${title}`.toLowerCase(),
-            icon: <MessageSquare size={16} />,
-            run: () => {
-              setQuery("");
-              setSelectedFolderId(REMARKS);
-              handleSelectNote(remark.noteId);
-            },
-          },
-        ];
-      }),
-      {
-        id: "new",
-        group: "Do",
-        name: "New note",
-        hint: "⌘N",
-        icon: <SquarePen size={16} />,
-        run: () => void handleNew(),
-      },
-      ...(selectedId
-        ? ownedEntries
-            .filter(
-              (entry) =>
-                entry.note.id !== selectedId &&
-                entry.note.id !== splitId &&
-                !trashedIds.has(entry.note.id),
-            )
-            .map((entry) => ({
-              id: `split:${entry.note.id}`,
-              group: "Open beside",
-              name: entry.note.title || "Untitled",
-              keywords: `split side by side beside ${derivedOf(entry.note).haystack}`,
-              icon: <Columns2 size={16} />,
-              run: () => setSplitId(entry.note.id),
-            }))
-        : []),
-      ...(splitEntry
-        ? [
-            {
-              id: "unsplit",
-              group: "Do",
-              name: "Close the second note",
-              icon: <Columns2 size={16} />,
-              run: () => setSplitId(null),
-            },
-          ]
-        : []),
-      {
-        id: "focus",
-        group: "Do",
-        name: focusMode ? "Leave focus" : "Focus mode",
-        hint: focusMode ? "Esc" : "One column, nothing else",
-        keywords: "zen distraction free writing",
-        icon: focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />,
-        run: toggleFocus,
-      },
-      {
-        id: "settings",
-        group: "Do",
-        name: "Settings",
-        icon: <Settings size={16} />,
-        run: () => setSettingsOpen(true),
-      },
-      {
-        id: "export",
-        group: "Do",
-        name: "Export all as Markdown",
-        icon: <FolderDown size={16} />,
-        run: () => void handleExportAll(),
-      },
-      {
-        id: "shortcuts",
-        group: "Do",
-        name: "Keyboard shortcuts",
-        hint: "\u2318/",
-        icon: <Keyboard size={16} />,
-        run: () => setShortcutsOpen(true),
-      },
-      {
-        id: "lock",
-        group: "Do",
-        name: "Lock & sign out",
-        icon: <Lock size={16} />,
-        run: () => handleLock(),
-      },
-    ];
-  })();
-
   /* Hiding the columns opens the list's strip, at its leading edge, the way
      Notes and Mail put it: the control that moves the columns stands where
      they are. Compose goes to the trailing edge. */
@@ -3465,6 +3380,357 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : member.nickname || "Member";
   const notesOf = (member: ArchiveMember) =>
     member.isSelf ? "Your notes" : `${member.nickname || "Another member"}'s notes`;
+
+  /* What a document finds is its own: chapters and the notebook, in whoever's
+     scope the structure keeps them; a notes archive finds the scope on screen,
+     as it always has. */
+  const searchable = !paletteOpen
+    ? []
+    : docMode && manuscript
+      ? (() => {
+          const ids = new Set(
+            [...manuscript.chapters, ...manuscript.notebook].map((item) => item.id),
+          );
+          return entries.filter((entry) => ids.has(entry.note.id));
+        })()
+      : ownedEntries;
+
+  /* Opening what was found. In a document the structure's own path — the
+     notes list's scope and filter are not on screen there — and then, if a
+     place inside it was found, going to that place. */
+  const openFound = (id: string, then?: { reveal?: string; history?: string }) => () => {
+    if (docMode) {
+      handleSelectNote(id);
+      if (compact) {
+        setFoldersOpen(false);
+        setMobileScreen("note");
+      }
+    } else {
+      setQuery("");
+      setSelectedFolderId(ALL);
+      handleSelectNote(id);
+    }
+    if (then) setOpenThen({ noteId: id, ...then });
+  };
+  const middle = () => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 3,
+    width: 1,
+    height: 1,
+  });
+
+  const paletteCommands: Command[] = ((): Command[] => {
+    if (!paletteOpen) return [];
+    const open = (id: string) => openFound(id);
+    const stamp = (entry: NoteEntry) => Date.parse(entry.note.updatedAt);
+    const chapters = manuscript?.chapters ?? [];
+    return [
+      ...(docMode && manuscript
+        ? [
+            {
+              id: "go:title",
+              group: "Go to",
+              name: "Title page",
+              keywords: "cover front document",
+              icon: <Chapters size={16} />,
+              run: () => setSelectedId(null),
+            },
+          ]
+        : scopes.map((scope) => ({
+            id: `scope:${scope.id}`,
+            group: "Go to",
+            name: scope.label,
+            icon:
+              scope.id === TRASH ? (
+                <Trash2 size={16} />
+              ) : scope.id === REMARKS ? (
+                <MessageSquare size={16} />
+              ) : scope.id === ARCHIVE ? (
+                <Archive size={16} />
+              ) : scope.id === ALL ? (
+                <NotebookText size={16} />
+              ) : (
+                <Folder size={16} />
+              ),
+            run: () => handleSelectFolder(scope.id),
+          }))),
+      /* The running text is found by the Text group below, with the line it
+         is in; here a note is found by its name. */
+      ...(docMode && manuscript
+        ? [
+            ...chapters.map((item, index) => ({
+              id: `note:${item.id}`,
+              group: "Chapters",
+              name: item.title || "Untitled",
+              hint: [
+                `Chapter ${index + 1}`,
+                item.folderId ? manuscript.parts.get(item.folderId) : undefined,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              icon: <FileText size={16} />,
+              run: open(item.id),
+            })),
+            ...manuscript.notebook.map((item) => ({
+              id: `note:${item.id}`,
+              group: "Notebook",
+              name: item.title || "Untitled",
+              icon: <NotebookText size={16} />,
+              run: open(item.id),
+            })),
+            ...[...manuscript.parts].flatMap(([partId, name]) => {
+              const first = chapters.find((item) => item.folderId === partId);
+              return first
+                ? [
+                    {
+                      id: `part:${partId}`,
+                      group: "Parts",
+                      searchOnly: true,
+                      name,
+                      hint: first.title || "Untitled",
+                      icon: <Folder size={16} />,
+                      run: open(first.id),
+                    },
+                  ]
+                : [];
+            }),
+          ]
+        : ownedEntries.map((entry) => ({
+            id: `note:${entry.note.id}`,
+            group: "Notes",
+            name: entry.note.title || "Untitled",
+            hint: derivedOf(entry.note).preview || undefined,
+            at: stamp(entry),
+            icon: <FileText size={16} />,
+            run: open(entry.note.id),
+          }))),
+      /* What was said, searchable with everything else. A remark is the one
+         thing in this archive that was not reachable from here — and it is
+         the kind of thing you go looking for by its words rather than by the
+         note it is on. Opening one is opening its note in the scope that
+         opens conversations with it, which is the path that already exists. */
+      ...archiveComments.flatMap((remark) => {
+        const entry = searchable.find((candidate) => candidate.note.id === remark.noteId);
+        if (!entry) return [];
+        const title = entry.note.title || "Untitled";
+        return [
+          {
+            id: `remark:${remark.id}`,
+            group: "Remarks",
+            name: remark.body,
+            hint: title,
+            keywords: `${remark.body} ${title}`.toLowerCase(),
+            icon: <MessageSquare size={16} />,
+            run: docMode
+              ? () => {
+                  openFound(remark.noteId)();
+                  setOpenThen({ noteId: remark.noteId, comments: true });
+                }
+              : () => {
+                  setQuery("");
+                  setSelectedFolderId(REMARKS);
+                  handleSelectNote(remark.noteId);
+                },
+          },
+        ];
+      }),
+      ...roster.map((member) => ({
+        id: `person:${member.userId}`,
+        group: "People",
+        searchOnly: true,
+        name: nameOf(member),
+        icon: <UserRound size={16} />,
+        run: () => openSheet({ ...middle(), kind: "person", userId: member.userId }),
+      })),
+      ...namedVersions.flatMap((version) => {
+        const entry = entries.find((candidate) => candidate.note.id === version.noteId);
+        if (!entry || !version.label) return [];
+        return [
+          {
+            id: `version:${version.id}`,
+            group: "Versions",
+            searchOnly: true,
+            name: version.label,
+            hint: `${entry.note.title || "Untitled"} · ${formatDateTime(version.createdAt)}`,
+            at: Date.parse(version.createdAt),
+            icon: <History size={16} />,
+            run: openFound(version.noteId, { history: version.id }),
+          },
+        ];
+      }),
+      ...spaces
+        .filter((space) => space.archiveId !== session?.archiveId)
+        .map((space) => ({
+          id: `archive:${space.archiveId}`,
+          group: "Archives",
+          searchOnly: true,
+          name: space.name,
+          keywords: "archive space switch",
+          icon: <Layers size={16} />,
+          run: () => switchArchive(space.archiveId),
+        })),
+      {
+        id: "new",
+        group: "Do",
+        name: docMode ? "New chapter" : "New note",
+        hint: "⌘N",
+        icon: <SquarePen size={16} />,
+        run: () => (docMode ? handleNewChapter(null) : void handleNew()),
+      },
+      ...(selectedId && !docMode
+        ? ownedEntries
+            .filter(
+              (entry) =>
+                entry.note.id !== selectedId &&
+                entry.note.id !== splitId &&
+                !trashedIds.has(entry.note.id),
+            )
+            .map((entry) => ({
+              id: `split:${entry.note.id}`,
+              group: "Open beside",
+              name: entry.note.title || "Untitled",
+              keywords: `split side by side beside ${derivedOf(entry.note).haystack}`,
+              icon: <Columns2 size={16} />,
+              run: () => setSplitId(entry.note.id),
+            }))
+        : []),
+      ...(splitEntry
+        ? [
+            {
+              id: "unsplit",
+              group: "Do",
+              name: "Close the second note",
+              icon: <Columns2 size={16} />,
+              run: () => setSplitId(null),
+            },
+          ]
+        : []),
+      {
+        id: "focus",
+        group: "Do",
+        name: focusMode ? "Leave focus" : "Focus mode",
+        hint: focusMode ? "Esc" : "One column, nothing else",
+        keywords: "zen distraction free writing",
+        icon: focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />,
+        run: toggleFocus,
+      },
+      {
+        id: "settings",
+        group: "Do",
+        name: "Settings",
+        icon: <Settings size={16} />,
+        run: () => setSettingsOpen(true),
+      },
+      {
+        id: "export",
+        group: "Do",
+        name: "Export all as Markdown",
+        icon: <FolderDown size={16} />,
+        run: () => void handleExportAll(),
+      },
+      {
+        id: "shortcuts",
+        group: "Do",
+        name: "Keyboard shortcuts",
+        hint: "\u2318/",
+        icon: <Keyboard size={16} />,
+        run: () => setShortcutsOpen(true),
+      },
+      {
+        id: "lock",
+        group: "Do",
+        name: "Lock & sign out",
+        icon: <Lock size={16} />,
+        run: () => handleLock(),
+      },
+      /* Every section of Settings, by its name and by the rows inside it. */
+      ...SETTINGS_SECTIONS.flatMap(
+        (group): readonly (typeof group.items)[number][] => group.items,
+      ).map((item) => ({
+        id: `settings:${item.id}`,
+        group: "Settings",
+        searchOnly: true,
+        name: item.name,
+        keywords: `settings ${item.keywords}`,
+        icon: item.icon,
+        run: () => {
+          setSettingsSection(item.id);
+          setSettingsOpen(true);
+        },
+      })),
+    ];
+  })();
+
+  /* What only a typed query finds: the headings a note is divided by and the
+     line a word occurs in. From memory, on every keystroke — `haystack` is
+     already folded, so a note that does not hold the word costs one
+     `includes`. */
+  const paletteSearch = (q: string): Command[] => {
+    const found: Command[] = [];
+    let lines = 0;
+    for (const entry of searchable) {
+      const id = entry.note.id;
+      const title = entry.note.title || "Untitled";
+      const at = Date.parse(entry.note.updatedAt);
+      if (!derivedOf(entry.note).haystack.includes(q)) continue;
+      headingsOf(entry.note.content).forEach((heading, index) => {
+        if (!fold(heading.text).includes(q)) return;
+        found.push({
+          id: `section:${id}:${index}`,
+          group: "Sections",
+          name: heading.text,
+          hint: title,
+          rank: 3,
+          at,
+          icon: <Heading2 size={16} />,
+          run: openFound(id, { reveal: heading.text }),
+        });
+      });
+      // ponytail: the first thirty notes that hold the word; a ranked cap if an archive outgrows it.
+      const snippet = lines < 30 ? snippetOf(entry.note.body, q) : null;
+      if (snippet) {
+        lines += 1;
+        found.push({
+          id: `text:${id}`,
+          group: "Text",
+          name: title,
+          snippet,
+          rank: 6,
+          at,
+          icon: <Pilcrow size={16} />,
+          run: openFound(id, { reveal: snippet.match }),
+        });
+      }
+    }
+    return found;
+  };
+
+  /* The titles in the other archives, which are not in memory. Choosing one
+     is changing archive, and the note is opened when the new one arrives. */
+  const paletteRemote = async (q: string): Promise<Command[]> => {
+    const others = spaces.filter((space) => space.archiveId !== session?.archiveId);
+    const far = await findInOtherArchives(
+      others.map((space) => space.archiveId),
+      q,
+    );
+    const folded = fold(q);
+    return far.map((note) => {
+      const match = nameMatch(note.title, folded);
+      return {
+        id: `far:${note.noteId}`,
+        group: "Other archives",
+        name: note.title || "Untitled",
+        hint: others.find((space) => space.archiveId === note.archiveId)?.name,
+        rank: match < 0 ? 2 : match,
+        at: Date.parse(note.updatedAt),
+        icon: <FileText size={16} />,
+        run: () => {
+          openOnArrival = note.noteId;
+          switchArchive(note.archiveId);
+        },
+      };
+    });
+  };
 
   /* ── Whose notes ───────────────────────────────────────────────────────────
      Faces, and no names. It carried both, side by side, for each member: two
@@ -3971,6 +4237,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       <CommandPalette
         open={paletteOpen}
         commands={paletteCommands}
+        search={paletteSearch}
+        remote={paletteRemote}
         initialQuery={paletteQuery}
         onClose={() => setPaletteOpen(false)}
       />
@@ -3986,6 +4254,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     <Suspense fallback={null}>
       <SettingsPanel
         open={settingsOpen}
+        initialSection={settingsSection}
         email={session.email}
         reading={readingLabel}
         autoLock={autoLock}
@@ -4030,7 +4299,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
          and Postgres reads it back to decide what the other member may fetch. */
         onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
         onAutoLockChange={(autoLock) => changeFlags({ autoLock })}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => {
+          setSettingsOpen(false);
+          setSettingsSection(undefined);
+        }}
         onLock={handleLock}
       />
     </Suspense>

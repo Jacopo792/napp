@@ -3,8 +3,15 @@
    has its own notes in supabase.mock.ts — the fixture is the first one's, and
    every other archive opens empty. */
 import type { AppSession } from "./session.mock";
-import { PREVIEW_ARCHIVE, PREVIEW_THESIS, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
-import type { Space } from "@/lib/spaces";
+import {
+  FIXTURE_NOTES,
+  PREVIEW_ARCHIVE,
+  PREVIEW_THESIS,
+  PREVIEW_U1,
+  PREVIEW_U2,
+  THESIS_NOTES,
+} from "./fixture";
+import type { FarNote, Space } from "@/lib/spaces";
 import {
   DEFAULT_FEATURES,
   DEFAULT_PAGE,
@@ -13,7 +20,14 @@ import {
   type PageSetup,
 } from "@/lib/spaceShape";
 
-export type { ArchiveKind, Space, SpaceMember, DocumentFeatures, PageSetup } from "@/lib/spaces";
+export type {
+  ArchiveKind,
+  FarNote,
+  Space,
+  SpaceMember,
+  DocumentFeatures,
+  PageSetup,
+} from "@/lib/spaces";
 export { archiveKind, documentFeatures, pageSetup } from "@/lib/spaceShape";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -149,4 +163,23 @@ export async function deleteSpace(session: AppSession): Promise<void> {
   if (spaces[index].members.length > 1) throw new Error("Somebody else is still in this archive");
   if (spaces.length === 1) throw new Error("This is your only archive");
   spaces.splice(index, 1);
+}
+
+/* The titles the fixture opened with — a note written in the preview since is
+   not found from another archive, which is a smaller lie than a second store. */
+export async function findInOtherArchives(archiveIds: string[], query: string): Promise<FarNote[]> {
+  await sleep(160);
+  const wanted = query.toLowerCase();
+  return [
+    ...FIXTURE_NOTES.map((note) => ({ note, archiveId: PREVIEW_ARCHIVE })),
+    ...THESIS_NOTES.map((note) => ({ note, archiveId: PREVIEW_THESIS })),
+  ]
+    .filter(({ note, archiveId }) => archiveIds.includes(archiveId) && note.title.toLowerCase().includes(wanted))
+    .slice(0, 20)
+    .map(({ note, archiveId }) => ({
+      archiveId,
+      noteId: note.id,
+      title: note.title,
+      updatedAt: note.updatedAt,
+    }));
 }

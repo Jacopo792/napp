@@ -163,3 +163,23 @@ export async function loadFolderVersions(
     noteId: row.note_id,
   }));
 }
+
+export type NamedVersion = NoteVersion & { noteId: string };
+
+/** Every moment somebody named, across the archive — what ⌘K finds by its
+ *  label. Read under the same policy as the notes, so a hidden archived note
+ *  keeps its named versions hidden too. */
+export async function loadNamedVersions(session: AppSession): Promise<NamedVersion[]> {
+  const result = await supabase
+    .from("note_versions")
+    .select(`note_id, ${LIST}`)
+    .eq("archive_id", session.archiveId)
+    .not("label", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  fail(result.error);
+  return ((result.data ?? []) as (VersionRow & { note_id: string })[]).map((row) => ({
+    ...toVersion(row),
+    noteId: row.note_id,
+  }));
+}

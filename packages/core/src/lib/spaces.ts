@@ -207,3 +207,38 @@ export async function deleteSpace(session: AppSession): Promise<void> {
   const result = await supabase.rpc("delete_archive", { target_archive_id: session.archiveId });
   fail(result.error);
 }
+
+export interface FarNote {
+  archiveId: string;
+  noteId: string;
+  title: string;
+  updatedAt: string;
+}
+
+/** Notes in the caller's other archives whose title holds `query` — titles
+ *  only, because the rest of another archive is not in memory and is not
+ *  worth a request per keystroke. Row level security decides which archives
+ *  answer; the list only says which ones to ask.
+ *  ponytail: `ilike` does not fold accents, so "perche" misses "perché" here
+ *  while it finds it in this archive; `unaccent` in a view if that matters. */
+export async function findInOtherArchives(archiveIds: string[], query: string): Promise<FarNote[]> {
+  if (archiveIds.length === 0) return [];
+  const pattern = `%${query.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  const result = await supabase
+    .from("notes")
+    .select("id, archive_id, title, updated_at")
+    .in("archive_id", archiveIds)
+    .is("trashed_at", null)
+    .ilike("title", pattern)
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  fail(result.error);
+  return (
+    (result.data ?? []) as { id: string; archive_id: string; title: string; updated_at: string }[]
+  ).map((row) => ({
+    archiveId: row.archive_id,
+    noteId: row.id,
+    title: row.title,
+    updatedAt: row.updated_at,
+  }));
+}
