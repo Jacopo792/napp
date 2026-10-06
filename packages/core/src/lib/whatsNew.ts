@@ -31,6 +31,64 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.1",
+    date: "2026-10-06",
+    headline: "Notes or Book, archives you can delete, and a clearer book",
+    sections: [
+      {
+        heading: "Archives",
+        items: [
+          {
+            title: "Notes or Book",
+            text: "New archive asks for a name and whether it is notes or a book. A book starts with every tool switched on.",
+          },
+          {
+            title: "Change the type, both ways",
+            text: "Archive info → Type turns notes into a book or back, and nothing is lost either way.",
+          },
+          {
+            title: "Delete an archive",
+            text: "Any archive but your first can be deleted, from Settings → Archives or by right-clicking the archive at the top of the sidebar.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Straight to the writing",
+            text: "A book opens on the chapter you last wrote in.",
+          },
+          {
+            title: "Chapters, parts and notes",
+            text: "Right-click a chapter → Group in a part to start a part there. Pages that are not chapters live under Notes.",
+          },
+          {
+            title: "A real Trash",
+            text: "Trash lists what you threw away, with Put back and Delete forever.",
+          },
+          {
+            title: "Headings that take you there",
+            text: "Pressing a heading under a chapter brings it to the top of the page.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "What's New stays read",
+            text: "Once opened, New no longer comes back on the sidebar.",
+          },
+          {
+            title: "Profile pictures",
+            text: "A picture fills its circle without a grey edge.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-10-06",
     headline: "Write a book, with footnotes, captions and cross-references",
