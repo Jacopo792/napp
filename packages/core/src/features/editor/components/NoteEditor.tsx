@@ -7,7 +7,6 @@ import {
   ListTree,
   MessageSquare,
   MessageSquarePlus,
-  PanelRight,
   Search,
   X,
 } from "@/components/icons";
@@ -999,11 +998,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           ) : (
             <span className="manuscript-bar-quiet">{headerStatus}</span>
           )}
-          {/* What the chapter says about itself and the panels about it are
-              at the right, as a note's are: the formatting row is for the
-              words, and finding, remarks and versions are not formatting. */}
+          {/* Finding, remarks and versions at the right: the formatting row
+              is for the words. Nothing that reads as a status stands here —
+              the bar is tools, and a line of text in it pushed the ribbon
+              onto a second row. Headings are in the structure, and the whole
+              inspector is still ⌥⌘I. */}
           <span className="manuscript-bar-end">
-            {canEdit && <span className="manuscript-bar-quiet">{headerStatus}</span>}
             <button
               type="button"
               className={`ribbon-tool press ${findOpen ? "is-active" : ""}`}
@@ -1040,16 +1040,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <History size={16} />
               </button>
             )}
-            <button
-              type="button"
-              className={`ribbon-tool press ${inspectorTab ? "is-active" : ""}`}
-              aria-label="Inspector"
-              aria-pressed={Boolean(inspectorTab)}
-              title={`Inspector · ${keyName("⌥⌘I")}`}
-              onClick={() => showTab(inspectorTab ? null : lastTab.current)}
-            >
-              <PanelRight size={16} />
-            </button>
             {headerActions}
           </span>
           {linkOpen && <div className="manuscript-link">{linkForm}</div>}

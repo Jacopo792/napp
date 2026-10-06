@@ -454,6 +454,17 @@ export function StructurePane({
         <div className="structure-scroll">
           <div className="structure-heading">
             <span>Chapters</span>
+            {canWrite && (
+              <button
+                type="button"
+                className="structure-new press"
+                aria-label="New chapter"
+                title={`New chapter · ${keyName("⌘N")}`}
+                onClick={() => onNewChapter(null)}
+              >
+                <Plus size={13} weight="bold" />
+              </button>
+            )}
           </div>
 
           {rows
@@ -511,17 +522,6 @@ export function StructurePane({
               starts: a target that appears with the drag pushes the one the
               hand was heading for out from under it. */}
           {rows.length > 0 && <Zone id="end" className="structure-end" />}
-          {canWrite && (
-            <button
-              type="button"
-              className="structure-add press"
-              title={`New chapter · ${keyName("⌘N")}`}
-              onClick={() => onNewChapter(null)}
-            >
-              <Plus size={14} />
-              New chapter
-            </button>
-          )}
 
           {passageNotes.length > 0 && (
             <section className="structure-passages" aria-label="Notes">

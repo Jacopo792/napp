@@ -10692,24 +10692,24 @@ button.sheet-chip:hover,
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
-/* Making a chapter is a row at the end of the chapters, where the next one
-   will stand — not a glyph in the corner of a heading. */
-.structure-add {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+/* Making a chapter: a small filled key on the heading it adds to — a
+   control with a ground, not a bare glyph floating in the corner. */
+.structure-new {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
   border-radius: var(--radius-sm);
-  padding: 6px 8px 6px 14px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  text-align: left;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-2);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
-.structure-add:hover {
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-  color: var(--ink);
+.structure-new:hover {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .structure-passages {
@@ -10818,13 +10818,22 @@ button.sheet-chip:hover,
    a wheel scrolls vertically and nothing else. So the groups wrap onto a
    second row rather than run off the edge, and before they do, the controls
    that carry words give some of their width back. Nothing is hidden. */
+/* One row, always. A ribbon that wrapped left the bar twice the height of
+   the sidebar's strip, broke its groups across the two rows and stranded the
+   tools at the right halfway between them. What does not fit is put away,
+   least-used first, by the container queries below — never a second row. */
 .ribbon {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px 4px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.ribbon-cluster {
+  display: contents;
 }
 
 .ribbon-group {
@@ -10932,6 +10941,36 @@ button.sheet-chip:hover,
   height: 3px;
   margin-top: 2px;
   border-radius: var(--radius-pill);
+}
+
+/* Put away in this order: the text's own face (the page's is in Page set-up),
+   indents, undo and redo (⌘Z), line spacing and size, then alignment and
+   clearing — so Insert, at the end, is never the one cut off. */
+@container manuscript-bar (max-width: 1000px) {
+  .ribbon-select.is-font,
+  .ribbon-cluster.is-indent {
+    display: none;
+  }
+}
+
+@container manuscript-bar (max-width: 880px) {
+  .ribbon-group.is-history {
+    display: none;
+  }
+}
+
+@container manuscript-bar (max-width: 760px) {
+  .ribbon-select-wrap,
+  .ribbon-select.is-size {
+    display: none;
+  }
+}
+
+@container manuscript-bar (max-width: 700px) {
+  .ribbon-cluster.is-align,
+  .ribbon-cluster.is-clear {
+    display: none;
+  }
 }
 
 @container manuscript-bar (max-width: 1080px) {

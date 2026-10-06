@@ -42,6 +42,30 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.3",
+    date: "2026-10-06",
+    headline: "A chapter bar on one line",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "One row of tools",
+            text: "The chapter bar no longer wraps onto a second line. In a narrow window the tools used least step aside first — the text's own font, indents, undo and redo — and Insert always stays.",
+          },
+          {
+            title: "Nothing but tools up there",
+            text: "The “Edited” time is gone from the bar.",
+          },
+          {
+            title: "New chapter at the top",
+            text: "The + beside Chapters makes a new one.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.2",
     date: "2026-10-06",
     headline: "Notes on the words, a quieter book, and eight seats",

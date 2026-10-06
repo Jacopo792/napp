@@ -336,7 +336,7 @@ export function ManuscriptToolbar({
 
   return (
     <div className="ribbon" role="toolbar" aria-label="Formatting">
-      <div className="ribbon-group">
+      <div className="ribbon-group is-history">
         <Tool
           label="Undo"
           shortcut="⌘Z"
@@ -539,40 +539,44 @@ export function ManuscriptToolbar({
             />
           )}
         </Drop>
-        <Tool
-          label="Clear formatting"
-          disabled={off}
-          onPress={() => {
-            chain().unsetAllMarks().clearNodes().run();
-            setBlock(editor!, { textAlign: null, indent: null, lineHeight: null });
-          }}
-        >
-          <Eraser size={16} />
-        </Tool>
+        <span className="ribbon-cluster is-clear">
+          <Tool
+            label="Clear formatting"
+            disabled={off}
+            onPress={() => {
+              chain().unsetAllMarks().clearNodes().run();
+              setBlock(editor!, { textAlign: null, indent: null, lineHeight: null });
+            }}
+          >
+            <Eraser size={16} />
+          </Tool>
+        </span>
       </div>
 
       <div className="ribbon-group">
-        <Drop
-          label="Alignment"
-          disabled={off}
-          face={ALIGNS.find(([align]) => align === (state?.align ?? "left"))![2]}
-        >
-          {(close) =>
-            ALIGNS.map(([align, label, icon, shortcut]) => (
-              <MenuRow
-                key={align}
-                icon={icon}
-                label={label}
-                hint={keyName(shortcut)}
-                checked={state?.align === align}
-                onPress={() => {
-                  setBlock(editor!, { textAlign: align === "left" ? null : align });
-                  close();
-                }}
-              />
-            ))
-          }
-        </Drop>
+        <span className="ribbon-cluster is-align">
+          <Drop
+            label="Alignment"
+            disabled={off}
+            face={ALIGNS.find(([align]) => align === (state?.align ?? "left"))![2]}
+          >
+            {(close) =>
+              ALIGNS.map(([align, label, icon, shortcut]) => (
+                <MenuRow
+                  key={align}
+                  icon={icon}
+                  label={label}
+                  hint={keyName(shortcut)}
+                  checked={state?.align === align}
+                  onPress={() => {
+                    setBlock(editor!, { textAlign: align === "left" ? null : align });
+                    close();
+                  }}
+                />
+              ))
+            }
+          </Drop>
+        </span>
         <label className="ribbon-select-wrap" title="Line spacing">
           <LineSpacing size={15} />
           <select
@@ -594,20 +598,22 @@ export function ManuscriptToolbar({
             ))}
           </select>
         </label>
-        <Tool
-          label="Decrease indent"
-          disabled={off || !state?.indent}
-          onPress={() => setBlock(editor!, { indent: (state?.indent ?? 0) - 1 || null })}
-        >
-          <Outdent size={16} />
-        </Tool>
-        <Tool
-          label="Increase indent"
-          disabled={off || (state?.indent ?? 0) >= 8}
-          onPress={() => setBlock(editor!, { indent: Math.min(8, (state?.indent ?? 0) + 1) })}
-        >
-          <Indent size={16} />
-        </Tool>
+        <span className="ribbon-cluster is-indent">
+          <Tool
+            label="Decrease indent"
+            disabled={off || !state?.indent}
+            onPress={() => setBlock(editor!, { indent: (state?.indent ?? 0) - 1 || null })}
+          >
+            <Outdent size={16} />
+          </Tool>
+          <Tool
+            label="Increase indent"
+            disabled={off || (state?.indent ?? 0) >= 8}
+            onPress={() => setBlock(editor!, { indent: Math.min(8, (state?.indent ?? 0) + 1) })}
+          >
+            <Indent size={16} />
+          </Tool>
+        </span>
         <Tool
           label="Bulleted list"
           active={state?.bullets}
