@@ -5,10 +5,16 @@
 import type { AppSession } from "./session.mock";
 import { PREVIEW_ARCHIVE, PREVIEW_THESIS, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { Space } from "@/lib/spaces";
-import { DEFAULT_FEATURES, type ArchiveKind, type DocumentFeatures } from "@/lib/spaceShape";
+import {
+  DEFAULT_FEATURES,
+  DEFAULT_PAGE,
+  type ArchiveKind,
+  type DocumentFeatures,
+  type PageSetup,
+} from "@/lib/spaceShape";
 
-export type { ArchiveKind, Space, SpaceMember, DocumentFeatures } from "@/lib/spaces";
-export { archiveKind, documentFeatures } from "@/lib/spaceShape";
+export type { ArchiveKind, Space, SpaceMember, DocumentFeatures, PageSetup } from "@/lib/spaces";
+export { archiveKind, documentFeatures, pageSetup } from "@/lib/spaceShape";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -19,6 +25,7 @@ const spaces: Space[] = [
     seatLimit: 2,
     kind: "notes",
     features: { ...DEFAULT_FEATURES },
+    page: { ...DEFAULT_PAGE },
     members: [
       { userId: PREVIEW_U1, nickname: "Preview", avatarObject: null },
       { userId: PREVIEW_U2, nickname: "Partner", avatarObject: null },
@@ -30,6 +37,7 @@ const spaces: Space[] = [
     seatLimit: 5,
     kind: "notes",
     features: { ...DEFAULT_FEATURES },
+    page: { ...DEFAULT_PAGE },
     members: [
       { userId: PREVIEW_U1, nickname: "Preview", avatarObject: null },
       { userId: "preview-member-3", nickname: "Giulia", avatarObject: null },
@@ -49,6 +57,7 @@ const spaces: Space[] = [
       review: true,
       wordGoal: 40000,
     },
+    page: { ...DEFAULT_PAGE },
     members: [
       { userId: PREVIEW_U1, nickname: "Preview", avatarObject: null },
       { userId: PREVIEW_U2, nickname: "Partner", avatarObject: null },
@@ -86,6 +95,7 @@ export async function createSpace(
     seatLimit: 2,
     kind,
     features: { ...features },
+    page: { ...DEFAULT_PAGE },
     members: [{ userId: PREVIEW_U1, nickname: "Preview", avatarObject: null }],
   });
   return archiveId;
@@ -118,6 +128,7 @@ export async function mergeSpaceSettings(
   await sleep(100);
   const space = spaces.find((one) => one.archiveId === session.archiveId);
   if (space && patch.features) space.features = { ...(patch.features as DocumentFeatures) };
+  if (space && patch.page) space.page = { ...(patch.page as PageSetup) };
 }
 
 export async function setDocumentFeatures(
@@ -125,6 +136,10 @@ export async function setDocumentFeatures(
   features: DocumentFeatures,
 ): Promise<void> {
   await mergeSpaceSettings(session, { features });
+}
+
+export async function setPageSetup(session: AppSession, page: PageSetup): Promise<void> {
+  await mergeSpaceSettings(session, { page });
 }
 
 export async function deleteSpace(session: AppSession): Promise<void> {

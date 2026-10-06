@@ -10304,3 +10304,833 @@ button.sheet-chip:hover,
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+/* ── The writing screen ──────────────────────────────────────────────────────
+   A document archive's window: the structure on the left, a desk in the
+   middle with the page on it, one band of chrome across the top. The band is
+   the writing bar; the structure carries the document's name and count, so
+   there is no second header saying the same thing. */
+
+.structure-pane {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink-2);
+}
+
+.structure-people {
+  padding: 0 8px;
+}
+
+.structure-people .people-shelf {
+  margin-top: 10px;
+}
+
+.structure-total {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.structure-total strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-lg, 17px);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structure-total > span:not(.structure-goal) {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A bar and not a ring: it fills on `scaleX`, which the compositor does on
+   its own, where a ring would repaint its stroke on every word. */
+.structure-goal {
+  display: block;
+  height: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.structure-goal i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.structure-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px 16px;
+}
+
+.structure-heading {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 2px 8px;
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.structure-heading-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.structure-heading-actions .toolbar-button {
+  width: 26px;
+  height: 26px;
+}
+
+.structure-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  font: inherit;
+}
+
+.structure-fold small {
+  margin-left: 4px;
+  color: var(--ink-4);
+  font-weight: var(--weight-medium);
+}
+
+.structure-fold svg {
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.structure-part {
+  position: relative;
+  margin: 12px 0 2px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.structure-part.is-continued {
+  color: var(--ink-3);
+  font-weight: var(--weight-medium);
+}
+
+.structure-part.is-over {
+  background: var(--accent-wash);
+}
+
+.structure-part-field {
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 2px 4px;
+  margin: -2px -4px;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
+.structure-row {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--ink-2);
+  font-size: var(--text-md);
+  text-align: left;
+  touch-action: none;
+}
+
+.structure-row:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.structure-row.is-selected {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  color: var(--ink);
+}
+
+.structure-row.is-lifted {
+  opacity: 0.35;
+}
+
+/* Where the row will land, drawn before it lands: a line at the edge it will
+   take, the same mark a Finder list draws. */
+.structure-row.is-over-before::before,
+.structure-row.is-over-after::after {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  content: "";
+}
+
+.structure-row.is-over-before::before {
+  top: -1px;
+}
+
+.structure-row.is-over-after::after {
+  bottom: -1px;
+}
+
+.structure-number {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.structure-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structure-words {
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.structure-empty {
+  width: 100%;
+  margin: 8px 0;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 14px 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.structure-end {
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.structure-end.is-over {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.structure-notebook {
+  margin-top: 18px;
+  border-radius: var(--radius-sm);
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 6px;
+}
+
+.structure-notebook.is-over {
+  background: var(--accent-wash);
+}
+
+.structure-chip {
+  max-width: 16rem;
+  overflow: hidden;
+  padding: 6px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── The writing bar ── */
+.manuscript-shell {
+  min-width: 0;
+  background: var(--surface);
+}
+
+.manuscript-bar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  background: var(--paper);
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.manuscript-bar-end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.manuscript-bar-quiet {
+  min-width: 0;
+  padding-left: 6px;
+}
+
+.manuscript-link {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+}
+
+.manuscript-link > .popover {
+  position: static;
+}
+
+.ribbon {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ribbon::-webkit-scrollbar {
+  display: none;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 1px;
+  padding: 0 3px;
+}
+
+.ribbon-word {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.ribbon-tool:has(.ribbon-word) {
+  padding: 0 8px 0 6px;
+}
+
+.ribbon-group + .ribbon-group {
+  border-left: 1px solid var(--rule-soft);
+}
+
+.ribbon-tool {
+  display: inline-flex;
+  min-width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.ribbon-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+
+.ribbon-tool.is-active {
+  background: color-mix(in srgb, var(--ink) 15%, transparent);
+  color: var(--ink);
+}
+
+.ribbon-tool:disabled {
+  opacity: 0.35;
+}
+
+.ribbon-select {
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 0 6px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.ribbon-select:disabled {
+  opacity: 0.45;
+}
+
+.ribbon-select.is-style {
+  width: 108px;
+}
+
+.ribbon-select.is-font {
+  width: 122px;
+}
+
+.ribbon-select.is-size {
+  width: 54px;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ribbon-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px 0 6px;
+  color: var(--ink-3);
+}
+
+.ribbon-select.is-spacing {
+  width: 64px;
+}
+
+/* The letter or the marker, with the colour it will lay down under it — the
+   way Word shows what a press of the button will do before it is pressed. */
+.ribbon-ink {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
+.ribbon-ink i {
+  display: block;
+  width: 16px;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.ribbon-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  width: 13.5rem;
+  padding: 8px;
+}
+
+.ribbon-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 2px 2px 8px;
+}
+
+.ribbon-swatch {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-xs);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
+}
+
+.ribbon-swatch.is-other {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(#e03131, #f59f00, #2f9e44, #1c7ed6, #7048e8, #e03131);
+  color: #fff;
+}
+
+.ribbon-swatch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.find-replace {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 6px;
+  padding-left: 24px;
+}
+
+.find-bar:has(.find-replace) {
+  flex-wrap: wrap;
+}
+
+/* ── The desk and the sheet ── */
+.manuscript-desk {
+  overflow: auto;
+  padding: 32px 24px 96px;
+  background: var(--surface);
+}
+
+/* The page is paper whatever the window is wearing: a document is written on
+   the sheet it will be printed on, and ink chosen on a dark page is ink that
+   disappears on a white one. The tokens are re-pointed here, so every rule
+   the editor already has — tables, quotes, comments, links — lands on paper
+   without a second stylesheet. */
+.manuscript-sheet {
+  --ink: #1d1d1f;
+  --ink-2: #333336;
+  --ink-3: #66666b;
+  --ink-4: #98989d;
+  --rule: #dcdcdf;
+  --rule-soft: #ececef;
+  --accent: #1c64c6;
+  --accent-strong: #154d99;
+  --accent-wash: rgb(28 100 198 / 0.12);
+  --page: #ffffff;
+  --paper: #ffffff;
+  --tint-yellow: #9c7a00;
+  --tint-purple: #6741d9;
+  --tint-pink: #c2255c;
+  --tint-orange: #d9480f;
+  --tint-mint: #2b8a3e;
+  --tint-blue: #1c64c6;
+
+  position: relative;
+  width: var(--sheet-width, 210mm);
+  max-width: 100%;
+  min-height: calc(var(--sheet-width, 210mm) * 1.414);
+  margin: 0 auto;
+  padding: var(--sheet-margin, 25.4mm);
+  border-radius: 0;
+  background: #ffffff;
+  color: var(--ink);
+  color-scheme: light;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 1px 3px rgb(0 0 0 / 0.18),
+    0 12px 32px -16px rgb(0 0 0 / 0.45);
+  animation: sheet-in var(--dur-base) var(--ease) backwards;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.manuscript-sheet ::selection {
+  background: rgb(28 100 198 / 0.22);
+}
+
+.manuscript-eyebrow {
+  margin: 0 0 6px;
+  color: var(--ink-3);
+  font-family: var(--sheet-font, var(--font-reading));
+  font-size: 0.8em;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.08em;
+}
+
+.manuscript-sheet .note-title {
+  margin-bottom: 1.2em;
+  color: var(--ink);
+  font-family: var(--sheet-font, var(--font-display));
+  font-size: calc(var(--sheet-size, 12pt) * 2);
+  line-height: 1.15;
+}
+
+.manuscript-status {
+  margin: -0.8em 0 1em;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.manuscript-sheet .rich-text-content {
+  max-width: none;
+  min-height: 0;
+  padding: 0;
+  font-family: var(--sheet-font, var(--font-reading));
+  font-size: var(--sheet-size, 12pt);
+  line-height: var(--sheet-leading, 1.5);
+  caret-color: var(--ink);
+  hyphens: auto;
+}
+
+.manuscript-sheet .rich-text-content p {
+  min-height: 1em;
+  margin: 0 0 0.6em;
+  text-indent: var(--sheet-first-line, 0);
+}
+
+.manuscript-sheet .rich-text-content :is(h1, h2, h3) {
+  font-family: var(--sheet-font, var(--font-display));
+  letter-spacing: 0;
+}
+
+.manuscript-sheet .rich-text-content blockquote {
+  margin: 0.8em 0 0.8em 1.25cm;
+  border: 0;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 0.92em;
+  font-style: normal;
+}
+
+/* A rule across the sheet with the words that say what it is: on screen the
+   page goes on, on paper it ends here. */
+.page-break {
+  position: relative;
+  height: 1.6em;
+  margin: 1em calc(var(--sheet-margin, 25.4mm) * -1);
+  border-top: 1px dashed var(--rule);
+}
+
+.page-break::after {
+  position: absolute;
+  top: -0.7em;
+  left: 50%;
+  padding: 0 8px;
+  background: #ffffff;
+  color: var(--ink-4);
+  content: "Page break";
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  transform: translateX(-50%);
+}
+
+.page-break.ProseMirror-selectednode {
+  border-top-color: var(--accent);
+}
+
+.manuscript-sheet.is-title-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.manuscript-sheet.is-title-page h1 {
+  font-family: var(--sheet-font, var(--font-display));
+  font-size: calc(var(--sheet-size, 12pt) * 2.4);
+  line-height: 1.15;
+}
+
+.manuscript-sheet.is-title-page p {
+  color: var(--ink-3);
+  font-size: var(--sheet-size, 12pt);
+}
+
+.manuscript-continue {
+  margin-top: 24px;
+  border-radius: var(--radius-pill);
+  background: #1d1d1f;
+  padding: 9px 18px;
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* Previous and next, under the sheet rather than on it: they are about the
+   document, and nothing that is not the text belongs on the page. */
+.manuscript-turn {
+  display: flex;
+  width: var(--sheet-width, 210mm);
+  max-width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px auto 0;
+}
+
+.manuscript-turn button {
+  display: inline-flex;
+  max-width: 48%;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.manuscript-turn button.is-next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.manuscript-turn button:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+.manuscript-turn span {
+  display: grid;
+  min-width: 0;
+}
+
+.manuscript-turn small {
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+}
+
+.page-setup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 19rem;
+  padding: 8px 10px 10px;
+}
+
+.page-setup-row {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.page-setup-row select {
+  width: 11rem;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 0 6px;
+  color: var(--ink);
+}
+
+.page-setup-row input[role="switch"] {
+  width: 34px;
+  height: 20px;
+  appearance: none;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  padding: 2px;
+}
+
+.page-setup-row input[role="switch"]::before {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.page-setup-row input[role="switch"]:checked {
+  background: var(--accent);
+}
+
+.page-setup-row input[role="switch"]:checked::before {
+  transform: translateX(14px);
+}
+
+.writing-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 15rem;
+  padding: 6px;
+}
+
+.sidebar-footer .writing-menu {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+}
+
+.sidebar-footer .relative {
+  width: 100%;
+}
+
+/* The window is dragged by its band of chrome, and only by the parts of it
+   that are not something to press. */
+[data-shell] .manuscript-bar {
+  -webkit-app-region: drag;
+}
+
+[data-shell]
+  .manuscript-bar
+  :is(button, a, input, select, textarea, label, [role], [tabindex], [contenteditable]) {
+  -webkit-app-region: no-drag;
+}
+
+[data-shell="mac"] .pane-slide.is-collapsed ~ .manuscript-shell .manuscript-bar {
+  padding-left: var(--titlebar-inset);
+}
+
+/* A phone: the sheet is the width of the screen and its margins are a
+   thumb's, because 25 mm on a 375-point screen is a third of the line. */
+@media (max-width: 767px) {
+  .manuscript-desk {
+    padding: 0;
+  }
+
+  .manuscript-sheet {
+    min-height: 100%;
+    padding: 20px 18px 40vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .manuscript-turn {
+    padding: 0 12px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manuscript-sheet {
+    animation-name: sheet-fade;
+  }
+
+  @keyframes sheet-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@media print {
+  .structure-pane,
+  .manuscript-bar,
+  .manuscript-turn {
+    display: none !important;
+  }
+
+  .manuscript-desk {
+    overflow: visible;
+    padding: 0;
+    background: none;
+  }
+
+  .manuscript-sheet {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .page-break {
+    height: 0;
+    margin: 0;
+    border: 0;
+    break-after: page;
+  }
+
+  .page-break::after {
+    display: none;
+  }
+}

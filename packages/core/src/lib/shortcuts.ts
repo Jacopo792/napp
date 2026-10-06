@@ -32,6 +32,18 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "In a note", keys: "/", what: "Formatting and blocks" },
   { group: "In a note", keys: "[[", what: "Link another note in this archive" },
   { group: "In a note", keys: "Esc", what: "Leave the text" },
+  {
+    group: "In a document archive",
+    keys: "\u2325\u2318\u2191 \u2325\u2318\u2193",
+    what: "Previous or next chapter",
+  },
+  { group: "In a document archive", keys: "\u2318U", what: "Underline" },
+  {
+    group: "In a document archive",
+    keys: "\u21e7\u2318L E R J",
+    what: "Align left, centre, right, justify",
+  },
+  { group: "In a document archive", keys: "\u2318\u21b5", what: "Page break" },
 ];
 
 /** The groups, in the order they were written. */

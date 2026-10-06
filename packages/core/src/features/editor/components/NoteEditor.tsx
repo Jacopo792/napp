@@ -32,12 +32,25 @@ import { NoteComments, type CommentAuthor } from "./NoteComments";
 import { NoteHistory } from "./NoteHistory";
 import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
+import { ManuscriptToolbar } from "./ManuscriptToolbar";
 import { TitleField } from "./TitleField";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
 import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
+import type { Editor } from "@tiptap/core";
+import { pageStyle, type PageSetup } from "@/lib/spaceShape";
+
+/** What a chapter of a document is framed by instead of a note's header:
+ *  the page it is set on, the line over its title, and what comes after it. */
+export interface ManuscriptFrame {
+  page: PageSetup;
+  /** "Chapter 3", "Part II · Chapter 3". */
+  eyebrow?: string;
+  /** Previous and next chapter, under the last line. */
+  footer?: ReactNode;
+}
 
 interface Props {
   mobile?: boolean;
@@ -94,6 +107,9 @@ interface Props {
   linkable?: { id: string; title: string }[];
   backlinks?: { id: string; title: string }[];
   onOpenNote?: (noteId: string) => void;
+  /** A chapter of a document rather than a note: a page and a writing bar
+   *  instead of a cover, a header and a foot of links. */
+  manuscript?: ManuscriptFrame;
 }
 
 /* The toolbar's three groups — the mode label, the format cluster, the save
@@ -116,6 +132,7 @@ const TOOLBAR_ROW_ROOM = 460;
 export interface NoteEditorHandle {
   openFind: (query?: string) => void;
   savePdf: () => void;
+  saveDocx: () => void;
   /** With a version id, that version is opened in the list. */
   openHistory: (versionId?: string) => void;
   openComments: () => void;
@@ -195,9 +212,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     linkable,
     backlinks,
     onOpenNote,
+    manuscript,
   },
   ref,
 ) {
+  const [instance, setInstance] = useState<Editor | null>(null);
+  const [replaceTerm, setReplaceTerm] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkLabel, setLinkLabel] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -263,6 +283,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   useImperativeHandle(ref, () => ({
     savePdf() {
       void exportAs("pdf");
+    },
+    saveDocx() {
+      void exportAs("docx");
     },
     openHistory(versionId) {
       setCommentsOpen(false);
@@ -642,6 +665,285 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     );
   };
 
+  const findBar = findOpen && (
+    <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
+      <Search size={16} className="shrink-0 text-ink-4" />
+      <input
+        ref={findRef}
+        value={findQuery}
+        onChange={(event) => {
+          const next = event.target.value;
+          setFindQuery(next);
+          setFindStatus(editorRef.current?.setSearch(next) ?? { current: 0, total: 0 });
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            setFindStatus(
+              event.shiftKey
+                ? (editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
+                : (editorRef.current?.findNext() ?? { current: 0, total: 0 }),
+            );
+          } else if (event.key === "Escape") closeFind();
+        }}
+        placeholder="Find in note"
+        aria-label="Find in note"
+        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
+      />
+      <span className="readout min-w-12 text-right text-ink-4">
+        {findStatus.total ? `${findStatus.current}/${findStatus.total}` : "0/0"}
+      </span>
+      <button
+        type="button"
+        aria-label="Previous result"
+        className="icon-button press h-8 w-8 text-ink-3"
+        onClick={() => setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })}
+      >
+        <ChevronUp size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="Next result"
+        className="icon-button press h-8 w-8 text-ink-3"
+        onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
+      >
+        <ChevronDown size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="Close find"
+        className="icon-button press h-8 w-8 text-ink-3"
+        onClick={closeFind}
+      >
+        <X size={16} />
+      </button>
+      {manuscript && canEdit && instance && (
+        <span className="find-replace">
+          <input
+            value={replaceTerm}
+            onChange={(event) => {
+              setReplaceTerm(event.target.value);
+              instance.commands.setReplaceTerm(event.target.value);
+            }}
+            placeholder="Replace with"
+            aria-label="Replace with"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
+          />
+          <button
+            type="button"
+            className="menu-small-button"
+            disabled={!findStatus.total}
+            onClick={() => {
+              instance.commands.replace();
+              setFindStatus(editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 });
+            }}
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            className="menu-small-button"
+            disabled={!findStatus.total}
+            onClick={() => {
+              instance.commands.replaceAll();
+              setFindStatus(editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 });
+            }}
+          >
+            All
+          </button>
+        </span>
+      )}
+    </div>
+  );
+
+  const sidePanels = (
+    <>
+      {outlineOpen && <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />}
+
+      {historyOpen && session && (
+        <NoteHistory
+          key={`${entry.note.id}:${historyFocus ?? ""}`}
+          initialOpenId={historyFocus}
+          session={session}
+          noteId={entry.note.id}
+          canEdit={canEdit}
+          authors={commentAuthors ?? new Map()}
+          current={() => {
+            const content = editorRef.current?.getContent();
+            const title = collaboration?.document.getText(TITLE_TEXT).toString();
+            return content && title !== undefined ? { title, content } : null;
+          }}
+          onRestore={({ title, content }) => {
+            const yTitle = collaboration?.document.getText(TITLE_TEXT);
+            if (yTitle && yTitle.toString() !== title)
+              collaboration!.document.transact(() => {
+                yTitle.delete(0, yTitle.length);
+                yTitle.insert(0, title);
+              });
+            editorRef.current?.replaceContent(content);
+            onEdited();
+          }}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+
+      {commentsOpen && session && commentAuthors && (
+        <NoteComments
+          key={entry.note.id}
+          session={session}
+          noteId={entry.note.id}
+          canEdit={canEdit}
+          authors={commentAuthors}
+          quotes={quotes}
+          pendingThread={pendingThread}
+          onPendingHandled={() => setPendingThread(null)}
+          focusThread={focusThread}
+          onFocusHandled={() => setFocusThread(null)}
+          onClose={closeComments}
+          onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
+          onRemoveAnchor={(threadId) => {
+            editorRef.current?.removeComment(threadId);
+            setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+          }}
+          onResolveAnchor={syncCommentResolution}
+        />
+      )}
+    </>
+  );
+
+  if (manuscript)
+    return (
+      <section
+        key={entry.note.id}
+        ref={shellRef}
+        className={`editor-shell manuscript-shell flex min-w-0 flex-1 flex-col ${mobile ? "is-mobile" : ""}`}
+      >
+        <div className="manuscript-bar relative shrink-0">
+          {canEdit ? (
+            <ManuscriptToolbar
+              editor={instance}
+              onLink={openLinkForm}
+              onImage={() => imageRef.current?.click()}
+              onFind={() => {
+                setFindOpen(true);
+                window.setTimeout(() => findRef.current?.focus(), 0);
+              }}
+            />
+          ) : (
+            <span className="manuscript-bar-quiet">{headerStatus}</span>
+          )}
+          <span className="manuscript-bar-end">
+            {session && commentAuthors && (
+              <button
+                type="button"
+                className={`ribbon-tool press ${commentsOpen ? "is-active" : ""}`}
+                aria-label="Comments"
+                aria-pressed={commentsOpen}
+                title="Comments"
+                onClick={() => {
+                  if (commentsOpen) return closeComments();
+                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                  setCommentsOpen(true);
+                }}
+              >
+                <MessageSquare size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`ribbon-tool press ${outlineOpen ? "is-active" : ""}`}
+              aria-label="Headings in this chapter"
+              aria-pressed={outlineOpen}
+              title="Headings in this chapter"
+              onClick={() => setOutlineOpen((open) => !open)}
+            >
+              <ListTree size={16} />
+            </button>
+            {headerActions}
+          </span>
+          {linkOpen && <div className="manuscript-link">{linkForm}</div>}
+        </div>
+
+        {fileInputs}
+        {findBar}
+
+        <div className="editor-body flex min-h-0 flex-1">
+          {/* The desk, and the sheet on it. The sheet is the page the
+              document is set on — its width, its margins, its letter — so
+              what is written here is what prints. */}
+          <div ref={setScroller} className="manuscript-desk min-h-0 flex-1">
+            <article className="manuscript-sheet" style={pageStyle(manuscript.page)}>
+              {manuscript.eyebrow && <p className="manuscript-eyebrow">{manuscript.eyebrow}</p>}
+              <TitleField
+                mobile={mobile}
+                noteId={entry.note.id}
+                canEdit={canEdit}
+                titleRef={titleRef}
+                onEdited={onEdited}
+                onDone={() => editorRef.current?.focus()}
+                yTitle={collaboration?.document.getText(TITLE_TEXT) ?? null}
+                synced={synced}
+              />
+              {(status || failure) && (
+                <p
+                  role={failure ? "alert" : "status"}
+                  className={`manuscript-status ${failure ? "text-danger" : ""}`}
+                >
+                  {failure || status}
+                </p>
+              )}
+              {collaboration ? (
+                <RichTextEditor
+                  key={entry.note.id}
+                  ref={editorRef}
+                  manuscript
+                  onEditor={setInstance}
+                  value={readDraft(entry.note.id)?.content ?? entry.note.content}
+                  revision={syncRevision}
+                  readOnly={!canEdit}
+                  placeholder="Begin the chapter…"
+                  onChange={(content, body) => {
+                    if (!canEdit) return;
+                    editBody(entry.note.id, body, content);
+                    onEdited();
+                  }}
+                  onLocalEdit={onEdited}
+                  onPasteImage={handlePastedImage}
+                  onPasteImageSource={async (src) =>
+                    handlePastedImage(await loadPastedImage(src, entry.note.id))
+                  }
+                  onPasteError={setFailure}
+                  onOpenLink={openLinkForm}
+                  onComment={canComment ? startComment : undefined}
+                  writeLockOwner={canEdit && session ? session.userId : null}
+                  mobile={mobile}
+                  autocorrectOn={autocorrectEnabled}
+                  resolveImage={resolveImage}
+                  resolveFile={resolveFile}
+                  collaboration={collaboration}
+                  notes={linkable}
+                  onOpenNote={onOpenNote}
+                  onOpenComment={(threadId) => {
+                    setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                    setCommentsOpen(true);
+                    setFocusThread(threadId);
+                  }}
+                />
+              ) : (
+                <div className="note-body-waiting" aria-hidden="true">
+                  <div className="skeleton" style={{ width: "92%" }} />
+                  <div className="skeleton" style={{ width: "78%" }} />
+                  <div className="skeleton" style={{ width: "45%" }} />
+                </div>
+              )}
+            </article>
+            {manuscript.footer}
+          </div>
+          {sidePanels}
+        </div>
+      </section>
+    );
+
   return (
     <section
       key={entry.note.id}
@@ -741,62 +1043,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
       {fileInputs}
 
-      {findOpen && (
-        <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
-          <Search size={16} className="shrink-0 text-ink-4" />
-          <input
-            ref={findRef}
-            value={findQuery}
-            onChange={(event) => {
-              const next = event.target.value;
-              setFindQuery(next);
-              setFindStatus(editorRef.current?.setSearch(next) ?? { current: 0, total: 0 });
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                setFindStatus(
-                  event.shiftKey
-                    ? (editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
-                    : (editorRef.current?.findNext() ?? { current: 0, total: 0 }),
-                );
-              } else if (event.key === "Escape") closeFind();
-            }}
-            placeholder="Find in note"
-            aria-label="Find in note"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
-          />
-          <span className="readout min-w-12 text-right text-ink-4">
-            {findStatus.total ? `${findStatus.current}/${findStatus.total}` : "0/0"}
-          </span>
-          <button
-            type="button"
-            aria-label="Previous result"
-            className="icon-button press h-8 w-8 text-ink-3"
-            onClick={() =>
-              setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
-            }
-          >
-            <ChevronUp size={16} />
-          </button>
-          <button
-            type="button"
-            aria-label="Next result"
-            className="icon-button press h-8 w-8 text-ink-3"
-            onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
-          >
-            <ChevronDown size={16} />
-          </button>
-          <button
-            type="button"
-            aria-label="Close find"
-            className="icon-button press h-8 w-8 text-ink-3"
-            onClick={closeFind}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
+      {findBar}
 
       {/* The cover, the frontispiece and the text scroll as one column. The
           cover used to be pinned above the scrolling text, which on a laptop
@@ -957,56 +1204,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           </div>
         </div>
 
-        {outlineOpen && <NoteOutline scroller={scroller} onClose={() => setOutlineOpen(false)} />}
-
-        {historyOpen && session && (
-          <NoteHistory
-            key={`${entry.note.id}:${historyFocus ?? ""}`}
-            initialOpenId={historyFocus}
-            session={session}
-            noteId={entry.note.id}
-            canEdit={canEdit}
-            authors={commentAuthors ?? new Map()}
-            current={() => {
-              const content = editorRef.current?.getContent();
-              const title = collaboration?.document.getText(TITLE_TEXT).toString();
-              return content && title !== undefined ? { title, content } : null;
-            }}
-            onRestore={({ title, content }) => {
-              const yTitle = collaboration?.document.getText(TITLE_TEXT);
-              if (yTitle && yTitle.toString() !== title)
-                collaboration!.document.transact(() => {
-                  yTitle.delete(0, yTitle.length);
-                  yTitle.insert(0, title);
-                });
-              editorRef.current?.replaceContent(content);
-              onEdited();
-            }}
-            onClose={() => setHistoryOpen(false)}
-          />
-        )}
-
-        {commentsOpen && session && commentAuthors && (
-          <NoteComments
-            key={entry.note.id}
-            session={session}
-            noteId={entry.note.id}
-            canEdit={canEdit}
-            authors={commentAuthors}
-            quotes={quotes}
-            pendingThread={pendingThread}
-            onPendingHandled={() => setPendingThread(null)}
-            focusThread={focusThread}
-            onFocusHandled={() => setFocusThread(null)}
-            onClose={closeComments}
-            onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
-            onRemoveAnchor={(threadId) => {
-              editorRef.current?.removeComment(threadId);
-              setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-            }}
-            onResolveAnchor={syncCommentResolution}
-          />
-        )}
+        {sidePanels}
       </div>
     </section>
   );

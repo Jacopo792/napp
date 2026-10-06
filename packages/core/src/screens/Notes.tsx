@@ -31,6 +31,12 @@ import {
   SquarePen,
   Trash2,
   X,
+  ChevronRight,
+  Copy,
+  FileDown,
+  History,
+  Printer,
+  Structure,
 } from "@/components/icons";
 import {
   DndContext,
@@ -46,6 +52,7 @@ import { chooseArchive, restoreSession, clearSession, type AppSession } from "@/
 import {
   createSpace,
   setDocumentFeatures,
+  setPageSetup,
   setSpaceKind,
   deleteSpace,
   loadSpaces,
@@ -168,6 +175,18 @@ import { SheetStack, type SheetOrigin } from "@/components/Sheet";
 import { NoteSheet } from "@/components/NoteSheet";
 import { FolderSheet } from "@/components/FolderSheet";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
+import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
+import { MenuButton as WritingMenuButton, PageSetupButton } from "@/components/WritingMenus";
+import type { MenuItem } from "@/lib/menuShape";
+import {
+  intoPart,
+  moveTo,
+  positionBetween,
+  splitManuscript,
+  structureRows,
+} from "@/lib/manuscript";
+import { DEFAULT_FEATURES, DEFAULT_PAGE, pageStyle } from "@/lib/spaceShape";
+import { keyName } from "@/lib/shortcuts";
 import { SpaceSwitch } from "@/components/SpaceSwitch";
 
 /** One sheet in the stack: what it is about, and where it grew out of. */
@@ -179,6 +198,38 @@ type SheetEntry = SheetOrigin &
     | { kind: "archive" }
     | { kind: "new-archive" }
   );
+
+/** A document's Trash, as a menu: each page a section with its two acts,
+ *  the second of which destroys and so takes the second press. */
+function trashItems(
+  trashed: { id: string; title: string }[],
+  onRestore: (id: string) => void,
+  onDelete: (id: string) => void,
+): MenuItem[] {
+  if (trashed.length === 0) return [{ kind: "label", label: "The Trash is empty" }];
+  return trashed.map((item) => ({
+    kind: "item" as const,
+    id: `trash-${item.id}`,
+    label: item.title || "Untitled",
+    icon: <Trash2 size={16} />,
+    submenu: [
+      {
+        kind: "item" as const,
+        id: `restore-${item.id}`,
+        label: "Put back",
+        run: () => onRestore(item.id),
+      },
+      { kind: "separator" as const },
+      {
+        kind: "item" as const,
+        id: `delete-${item.id}`,
+        label: "Delete forever",
+        danger: true,
+        run: () => onDelete(item.id),
+      },
+    ],
+  }));
+}
 
 /** Where a held face is on screen — the portrait in it, when it has one, so
  *  the face that flies into a sheet starts exactly over the face that was
@@ -1115,7 +1166,77 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [visible, activeMeta.notes, activeListPreferences]);
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
-  const selected = visible.find((e) => e.note.id === selectedId) ?? null;
+  /* ── A document ──────────────────────────────────────────────────────────
+     The same notes, read as one piece of writing: chapters in the order
+     `position` gives them, parts over stretches of it, and a notebook of
+     everything not placed. A shared manuscript lives in the scope of the
+     archive's first member, so the structure is one for everybody and the
+     switch beside the faces chooses whose notebook is open. Nothing here
+     changes what a notes archive reads or writes. */
+  const currentSpace = spaces.find((space) => space.archiveId === session?.archiveId);
+  const docMode = currentSpace?.kind === "document";
+  const docFeatures = currentSpace?.features ?? DEFAULT_FEATURES;
+  const manuscriptOwner =
+    docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
+
+  const manuscript = useMemo(() => {
+    if (!docMode) return null;
+    const metaOf = (owner: string) => metas[owner] ?? EMPTY_META;
+    const itemsOf = (owner: string): ChapterItem[] => {
+      const meta = metaOf(owner);
+      const byNote = new Map(meta.notes.map((note) => [note.id, note]));
+      const parts = new Set(meta.folders.map((folder) => folder.id));
+      return entries.flatMap((entry) => {
+        if (entry.note.ownerId !== owner) return [];
+        const row = byNote.get(entry.note.id);
+        if (row?.trashedAt || row?.archivedAt) return [];
+        return [
+          {
+            id: entry.note.id,
+            title: entry.note.title,
+            words: derivedOf(entry.note).words,
+            folderId: row?.folderId && parts.has(row.folderId) ? row.folderId : null,
+            position: row?.position ?? null,
+            movable: owner === manuscriptOwner,
+          },
+        ];
+      });
+    };
+    const own = splitManuscript(itemsOf(manuscriptOwner));
+    const notebook =
+      manuscriptOwner === viewAs ? own.notebook : splitManuscript(itemsOf(viewAs)).notebook;
+    const folders = metaOf(manuscriptOwner).folders.filter((folder) => !folder.parentId);
+    return {
+      chapters: own.chapters,
+      notebook,
+      rows: structureRows(
+        own.chapters,
+        folders.map((folder) => folder.id),
+      ),
+      parts: new Map(folders.map((folder) => [folder.id, folder.name])),
+      total: own.chapters.reduce((sum, item) => sum + item.words, 0),
+    };
+  }, [docMode, metas, entries, manuscriptOwner, viewAs]);
+
+  /* Trashed notes of either scope the document reads, for its own Trash. */
+  const docTrash = useMemo(() => {
+    if (!docMode) return [];
+    const owners = new Set([manuscriptOwner, viewAs]);
+    return entries.filter((entry) => {
+      if (!owners.has(entry.note.ownerId ?? "")) return false;
+      const row = (metas[entry.note.ownerId ?? ""] ?? EMPTY_META).notes.find(
+        (note) => note.id === entry.note.id,
+      );
+      return Boolean(row?.trashedAt);
+    });
+  }, [docMode, entries, metas, manuscriptOwner, viewAs]);
+
+  const docSelected =
+    docMode && selectedId && !docTrash.some((entry) => entry.note.id === selectedId)
+      ? (entries.find((entry) => entry.note.id === selectedId) ?? null)
+      : null;
+
+  const selected = docMode ? docSelected : (visible.find((e) => e.note.id === selectedId) ?? null);
 
   /* The window is named after what is open in it. A Mac window's title is not
      decoration — it is what Mission Control, the Window menu and ⌘Tab's preview
@@ -1144,7 +1265,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      decides nothing: what is drawn is a note in `entries`, and `entries` is
      the catalogue Postgres returned under row level security a moment ago, so
      somebody who has lost access is handed no row to draw. */
-  const lockHolder = selected ? (lockHolders.get(selected.note.id) ?? null) : null;
+  const lockHolder = selected
+    ? docMode
+      ? ((metas[selected.note.ownerId ?? ""] ?? EMPTY_META).notes.find(
+          (note) => note.id === selected.note.id,
+        )?.lockedBy ?? null)
+      : (lockHolders.get(selected.note.id) ?? null)
+    : null;
   const canEdit = selected
     ? selectedFolderId !== TRASH &&
       canWriteArchive &&
@@ -1630,11 +1757,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* The editor has already written the words into the draft store; the page
      only has to decide when they reach Postgres. */
 
-  const handleMetaChange = useCallback(
-    (next: Meta | ((prev: Meta) => Meta)) => {
+  /* One owner's metadata. A note's list writes the scope on screen; a
+     shared manuscript writes its owner's scope from whichever scope is on
+     screen, which is why the owner is a parameter and not `viewAs`. */
+  const handleMetaChangeFor = useCallback(
+    (owner: string, next: Meta | ((prev: Meta) => Meta)) => {
       if (!canWriteArchive) return;
-      const pending = pendingMetaRef.current.get(viewAs);
-      const base = pending?.after ?? metasRef.current[viewAs] ?? activeMeta ?? EMPTY_META;
+      const pending = pendingMetaRef.current.get(owner);
+      const base = pending?.after ?? metasRef.current[owner] ?? EMPTY_META;
       const proposed = typeof next === "function" ? (next as (prev: Meta) => Meta)(base) : next;
       /* A note somebody else has locked keeps the metadata it had. Every
          per-note change in this page — pinning, filing, trashing, shelving —
@@ -1658,14 +1788,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 ),
               ],
             };
-      pendingMetaRef.current.set(viewAs, {
+      pendingMetaRef.current.set(owner, {
         before: pending?.before ?? base,
         after: m,
       });
-      setActiveMeta(m);
+      setMetas((current) => ({ ...current, [owner]: m }));
       schedule();
     },
-    [viewAs, activeMeta, setActiveMeta, schedule, canWriteArchive, selfId],
+    [schedule, canWriteArchive, selfId],
+  );
+
+  const handleMetaChange = useCallback(
+    (next: Meta | ((prev: Meta) => Meta)) => handleMetaChangeFor(viewAs, next),
+    [handleMetaChangeFor, viewAs],
   );
 
   const handleTogglePin = useCallback(
@@ -2203,6 +2338,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         noteEditorRef.current?.drawOnPage();
         return;
       }
+      /* A document answers ⌘N with a chapter, and walks its chapters with
+         ⌥⌘↑ and ⌥⌘↓ — Word's "previous / next heading", one level up. */
+      if (docKeys.current.docMode && mod) {
+        if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+          e.preventDefault();
+          docKeys.current.step(e.key === "ArrowDown" ? 1 : -1);
+          return;
+        }
+        if (e.key.toLowerCase() === "n") {
+          e.preventDefault();
+          docKeys.current.newChapter();
+          return;
+        }
+      }
       if (mod && e.key.toLowerCase() === "n") {
         e.preventDefault();
         void handleNew();
@@ -2259,6 +2408,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         toggleFocus();
         return;
       }
+      /* The bare keys below walk a note list, and a document has none. */
+      if (docKeys.current.docMode) return;
 
       if (e.key === "n") {
         e.preventDefault();
@@ -2373,6 +2524,176 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (selectedFolderId !== ALL) setSelectedFolderId(folderId ?? ALL);
   }
 
+  const docKeys = useRef({ docMode: false, step: (_: 1 | -1) => {}, newChapter: () => {} });
+  docKeys.current = {
+    docMode,
+    step: (direction) => stepChapter(direction),
+    newChapter: () => handleNewChapter(null),
+  };
+
+  /* ── A document's own acts ──────────────────────────────────────────────
+     Each is one write to one owner's metadata, through the same path a note's
+     pinning and filing take; the structure is the manuscript owner's, the
+     notebook is the scope on screen. */
+  async function flushMeta() {
+    window.clearTimeout(timerRef.current);
+    window.clearTimeout(retryRef.current);
+    while (inFlightRef.current) await new Promise((resolve) => setTimeout(resolve, 30));
+    await drain();
+  }
+
+  async function createDocNote(place: { folderId: string | null; position: number } | null) {
+    if (!canWriteArchive) return;
+    const s = sessionRef.current;
+    if (!s) return;
+    const owner = place ? manuscriptOwner : viewAs;
+    const now = new Date().toISOString();
+    const note: Note = {
+      id: crypto.randomUUID(),
+      title: "",
+      body: "",
+      content: structuredClone(EMPTY_RICH_TEXT),
+      contentVersion: RICH_TEXT_VERSION,
+      legacyBody: null,
+      photo: null,
+      cover: null,
+      ownerId: owner,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setSaving(true);
+    setError("");
+    try {
+      /* A part made a moment ago is still only in the pending metadata, and
+         a chapter filed in it would break the folder's foreign key. */
+      if (
+        place?.folderId &&
+        pendingMetaRef.current.get(owner)?.after.folders.some((f) => f.id === place.folderId)
+      )
+        await flushMeta();
+      const metadata: NoteMeta = {
+        id: note.id,
+        folderId: place?.folderId ?? null,
+        ...(place ? { position: place.position } : {}),
+      };
+      const entry = await createNote(s, note, metadata);
+      entriesRef.current = [entry, ...entriesRef.current];
+      setEntries(entriesRef.current);
+      setMetas((current) => {
+        const base = current[owner] ?? metasRef.current[owner] ?? EMPTY_META;
+        return { ...current, [owner]: { ...base, notes: [...base.notes, metadata] } };
+      });
+      setSelectedId(note.id);
+      if (compact) setMobileScreen("note");
+      ensureDraft(note.id, { title: "", body: "", content: structuredClone(EMPTY_RICH_TEXT) }, now);
+      window.setTimeout(() => titleRef.current?.focus(), 0);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create the chapter");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** After the chapter open now, in its part — the way Word inserts a section
+   *  where you are rather than at the end of the file. */
+  function handleNewChapter(folderId: string | null) {
+    const chapters = manuscript?.chapters ?? [];
+    if (folderId) {
+      const last = chapters.map((item) => item.folderId).lastIndexOf(folderId);
+      const place =
+        last < 0
+          ? intoPart(chapters, "", folderId)
+          : {
+              position: positionBetween(chapters[last].position, chapters[last + 1]?.position),
+              folderId,
+            };
+      return void createDocNote(place);
+    }
+    const open = chapters.findIndex((item) => item.id === selectedId);
+    void createDocNote(moveTo(chapters, "", open < 0 ? chapters.length : open + 1));
+  }
+
+  function setNoteRow(owner: string, noteId: string, change: Partial<NoteMeta>) {
+    handleMetaChangeFor(owner, (prev) => {
+      const existing = prev.notes.some((note) => note.id === noteId);
+      return {
+        ...prev,
+        notes: existing
+          ? prev.notes.map((note) => (note.id === noteId ? { ...note, ...change } : note))
+          : [...prev.notes, { id: noteId, folderId: null, ...change }],
+      };
+    });
+  }
+
+  function handleMoveChapter(id: string, target: StructureTarget) {
+    const chapters = manuscript?.chapters ?? [];
+    const rest = chapters.filter((item) => item.id !== id);
+    const at = (other: string) => rest.findIndex((item) => item.id === other);
+    const next =
+      target.kind === "notebook"
+        ? { position: undefined, folderId: null }
+        : target.kind === "part"
+          ? intoPart(chapters, id, target.folderId)
+          : target.kind === "end"
+            ? moveTo(chapters, id, rest.length)
+            : {
+                /* Beside a chapter is in that chapter's part: the line the
+                   hand drew is next to it, whichever side. */
+                ...moveTo(chapters, id, at(target.id) + (target.kind === "after" ? 1 : 0)),
+                folderId: rest[at(target.id)]?.folderId ?? null,
+              };
+    setNoteRow(manuscriptOwner, id, next);
+  }
+
+  function handleNewPart() {
+    const count = manuscript?.parts.size ?? 0;
+    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+      ...prev,
+      folders: [
+        ...prev.folders,
+        { id: crypto.randomUUID(), name: `Part ${count + 1}`, parentId: null },
+      ],
+    }));
+  }
+
+  function handleRenamePart(id: string, name: string) {
+    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+      ...prev,
+      folders: prev.folders.map((folder) => (folder.id === id ? { ...folder, name } : folder)),
+    }));
+  }
+
+  /** The part goes and its chapters stay where they are in the order. */
+  function handleDeletePart(id: string) {
+    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+      ...prev,
+      folders: prev.folders.filter((folder) => folder.id !== id),
+      notes: prev.notes.map((note) => (note.folderId === id ? { ...note, folderId: null } : note)),
+    }));
+  }
+
+  function handleTrashDocNote(id: string) {
+    const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId ?? viewAs;
+    setNoteRow(owner, id, { trashedAt: new Date().toISOString() });
+    if (selectedId === id) {
+      setSelectedId(null);
+      if (compact) setMobileScreen("collection");
+    }
+  }
+
+  function handleRestoreDocNote(id: string) {
+    const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId ?? viewAs;
+    setNoteRow(owner, id, { trashedAt: undefined });
+  }
+
+  /** The chapter before or after the one open. */
+  function stepChapter(direction: 1 | -1) {
+    const chapters = manuscript?.chapters ?? [];
+    const at = chapters.findIndex((item) => item.id === selectedId);
+    const next = chapters[at < 0 ? 0 : at + direction];
+    if (next) handleSelectNote(next.id);
+  }
+
   function handleListPreferencesChange(next: ListPreferences) {
     setListPreferences((current) => ({
       ...current,
@@ -2394,7 +2715,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     setScopeDirection(place(v) > place(viewAs) ? "next" : "previous");
     saveNow();
     setViewAs(v);
-    setSelectedId(null);
+    /* In a shared manuscript the switch changes whose notebook is open, not
+       which document — the chapter in front of you is still the one. */
+    if (!(docMode && docFeatures.manuscript === "shared")) setSelectedId(null);
     setSelectedFolderId(ALL);
     setQuery("");
     setMobileScreen("collection");
@@ -3802,6 +4125,456 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onDelete={() => handleMoveToTrash(selected)}
       />
     ) : null;
+
+  /* ── The writing screen ───────────────────────────────────────────────────
+     A document archive draws this instead of the notes: the structure where
+     the folders and the list were, and the chapter on a page where the note
+     was. Settings, sheets and the palette are the same ones. */
+  if (docMode && manuscript) {
+    const chapterAt = selected
+      ? manuscript.chapters.findIndex((item) => item.id === selected.note.id)
+      : -1;
+    const chapter = manuscript.chapters[chapterAt];
+    const partName = chapter?.folderId ? manuscript.parts.get(chapter.folderId) : undefined;
+    const notebookName =
+      viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notebook` : "Notebook";
+    const page = currentSpace?.page ?? DEFAULT_PAGE;
+    const before = chapterAt > 0 ? manuscript.chapters[chapterAt - 1] : undefined;
+    const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
+
+    const openFromStructure = (id: string) => {
+      handleSelectNote(id);
+      if (compact) {
+        setFoldersOpen(false);
+        setMobileScreen("note");
+      }
+    };
+
+    const turn =
+      before || after ? (
+        <nav className="manuscript-turn" aria-label="Chapters">
+          {before ? (
+            <button type="button" className="press" onClick={() => handleSelectNote(before.id)}>
+              <ChevronLeft size={16} />
+              <span>
+                <small>Chapter {chapterAt}</small>
+                {before.title || "Untitled"}
+              </span>
+            </button>
+          ) : (
+            <span />
+          )}
+          {after ? (
+            <button
+              type="button"
+              className="press is-next"
+              onClick={() => handleSelectNote(after.id)}
+            >
+              <span>
+                <small>Chapter {chapterAt + 2}</small>
+                {after.title || "Untitled"}
+              </span>
+              <ChevronRight size={16} />
+            </button>
+          ) : null}
+        </nav>
+      ) : null;
+
+    const chapterItems: MenuItem[] = selected
+      ? [
+          {
+            kind: "item",
+            id: "history",
+            label: "Versions…",
+            icon: <History size={16} />,
+            run: () => noteEditorRef.current?.openHistory(),
+          },
+          {
+            kind: "item",
+            id: "focus",
+            label: focusMode ? "Leave focus mode" : "Focus mode",
+            hint: keyName("⌘."),
+            icon: <Maximize2 size={16} />,
+            run: toggleFocus,
+          },
+          { kind: "separator" },
+          { kind: "label", label: chapterAt >= 0 ? "This chapter" : "This page" },
+          {
+            kind: "item",
+            id: "pdf",
+            label: "Save as PDF",
+            icon: <FileDown size={16} />,
+            run: () => noteEditorRef.current?.savePdf(),
+          },
+          {
+            kind: "item",
+            id: "docx",
+            label: "Save as Word",
+            icon: <FileText size={16} />,
+            run: () => noteEditorRef.current?.saveDocx(),
+          },
+          {
+            kind: "item",
+            id: "print",
+            label: "Print…",
+            icon: <Printer size={16} />,
+            run: () => void platform().print(),
+          },
+          {
+            kind: "item",
+            id: "markdown",
+            label: "Copy as Markdown",
+            icon: <Copy size={16} />,
+            run: () => void handleCopyMarkdown(selected),
+          },
+          ...(canWriteArchive
+            ? [
+                { kind: "separator" as const },
+                {
+                  kind: "item" as const,
+                  id: "trash",
+                  label: "Move to Trash",
+                  danger: true,
+                  icon: <Trash2 size={16} />,
+                  run: () => handleTrashDocNote(selected.note.id),
+                },
+              ]
+            : []),
+        ]
+      : [];
+
+    const docActions = selected ? (
+      <>
+        <PageSetupButton
+          page={page}
+          disabled={!canWriteArchive}
+          onChange={(next) => {
+            setSpaces((current) =>
+              current.map((space) =>
+                space.archiveId === session.archiveId ? { ...space, page: next } : space,
+              ),
+            );
+            void setPageSetup(session, next).catch((reason) =>
+              setError(reason instanceof Error ? reason.message : "Could not set up the page"),
+            );
+          }}
+        />
+        <WritingMenuButton label="Chapter actions" items={chapterItems} />
+      </>
+    ) : null;
+
+    const structure = (
+      <StructurePane
+        header={
+          <>
+            <div
+              className={`sidebar-topbar flex h-13 shrink-0 items-center gap-2 px-2 ${
+                compact ? "has-close" : ""
+              }`}
+            >
+              {compact && (
+                <button
+                  type="button"
+                  onClick={() => setFoldersOpen(false)}
+                  aria-label="Close the structure"
+                  className="toolbar-button press shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            <div className="structure-people">
+              {spaceSwitch}
+              {peopleShelf}
+            </div>
+          </>
+        }
+        footer={
+          <div className="sidebar-footer">
+            <WritingMenuButton
+              label="Trash"
+              className="sidebar-footer-button press"
+              icon={
+                <span className="sidebar-glyph" data-tone="trash">
+                  <Trash2 size={16} />
+                </span>
+              }
+              items={trashItems(
+                docTrash.map((entry) => ({ id: entry.note.id, title: entry.note.title })),
+                handleRestoreDocNote,
+                (id) => {
+                  const entry = docTrash.find((one) => one.note.id === id);
+                  if (entry) void deleteForever([entry]);
+                },
+              )}
+            >
+              <span>Trash</span>
+              {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
+            </WritingMenuButton>
+            <button
+              type="button"
+              className="sidebar-footer-button press"
+              onClick={() => {
+                setFoldersOpen(false);
+                setSettingsOpen(true);
+              }}
+            >
+              <span className="sidebar-glyph" data-tone="settings">
+                <Settings size={16} />
+              </span>
+              <span>Settings</span>
+            </button>
+          </div>
+        }
+        documentName={currentSpace?.name ?? ""}
+        total={manuscript.total}
+        goal={docFeatures.wordGoal}
+        rows={manuscript.rows}
+        parts={manuscript.parts}
+        notebook={manuscript.notebook}
+        notebookName={notebookName}
+        selectedId={selectedId}
+        canWrite={canWriteArchive}
+        onOpen={openFromStructure}
+        onNewChapter={handleNewChapter}
+        onNewPart={handleNewPart}
+        onNewNote={() => void createDocNote(null)}
+        onRenamePart={handleRenamePart}
+        onDeletePart={handleDeletePart}
+        onMove={handleMoveChapter}
+        onTrash={handleTrashDocNote}
+        onInfo={(id, point) =>
+          openSheet({ x: point.x, y: point.y, width: 1, height: 1, kind: "note", noteId: id })
+        }
+      />
+    );
+
+    /* What the page shows when no chapter is open: the title page, which
+       says what the document is and where you stopped. */
+    const lastChapter = [...manuscript.chapters].sort(
+      (a, b) =>
+        Date.parse(entries.find((e) => e.note.id === b.id)?.note.updatedAt ?? "") -
+        Date.parse(entries.find((e) => e.note.id === a.id)?.note.updatedAt ?? ""),
+    )[0];
+    const titlePage = (
+      <section className="editor-shell manuscript-shell flex min-w-0 flex-1 flex-col">
+        <div className="manuscript-bar shrink-0">
+          {!navigationOpen && !compact && (
+            <button
+              type="button"
+              onClick={() => changeNavigation(true)}
+              aria-label="Show the structure"
+              className="ribbon-tool press"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+          )}
+          {compact && (
+            <button
+              type="button"
+              onClick={() => setFoldersOpen(true)}
+              aria-label="Structure"
+              className="ribbon-tool press"
+            >
+              <Structure size={18} />
+            </button>
+          )}
+        </div>
+        <div className="manuscript-desk min-h-0 flex-1">
+          <article className="manuscript-sheet is-title-page" style={pageStyle(page)}>
+            <h1>{currentSpace?.name}</h1>
+            <p>
+              {manuscript.chapters.length === 1
+                ? "1 chapter"
+                : `${manuscript.chapters.length} chapters`}
+              {" · "}
+              {manuscript.total.toLocaleString()}
+              {docFeatures.wordGoal ? ` of ${docFeatures.wordGoal.toLocaleString()}` : ""} words
+            </p>
+            {lastChapter ? (
+              <button
+                type="button"
+                className="manuscript-continue press"
+                onClick={() => openFromStructure(lastChapter.id)}
+              >
+                Continue “{lastChapter.title || "Untitled"}”
+              </button>
+            ) : (
+              canWriteArchive && (
+                <button
+                  type="button"
+                  className="manuscript-continue press"
+                  onClick={() => handleNewChapter(null)}
+                >
+                  Begin the first chapter
+                </button>
+              )
+            )}
+          </article>
+        </div>
+      </section>
+    );
+
+    const chapterEditor = selected ? (
+      <Suspense fallback={<div className="manuscript-shell min-w-0 flex-1" />}>
+        <NoteEditor
+          ref={noteEditorRef}
+          key={selected.note.id}
+          mobile={compact}
+          entry={selected}
+          syncRevision={syncRevision}
+          canEdit={canEdit}
+          lock={lockFor(selected.note.id)}
+          proofreaderEnabled={proofreaderEnabled}
+          autocorrectEnabled={autocorrectEnabled}
+          viewingAsPartner={false}
+          partnerName={partnerName}
+          titleRef={titleRef}
+          onEdited={handleEdited}
+          onNew={() => handleNewChapter(null)}
+          onImportMarkdown={() => importRef.current?.click()}
+          onUploadImage={handleUploadImage}
+          onUploadFile={handleUploadFile}
+          resolveImage={resolveImage}
+          resolveFile={resolveFile}
+          onUpdatePageProperties={handleUpdatePageProperties}
+          collaboration={
+            (collaborative.ready || collaborative.cached) && collaborative.doc
+              ? {
+                  document: collaborative.doc,
+                  provider: flags.collaborators ? collaborative.provider : null,
+                }
+              : null
+          }
+          headerStatus={noteStatus}
+          headerActions={
+            <>
+              {compact ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileScreen("collection");
+                    setFoldersOpen(true);
+                  }}
+                  aria-label="Structure"
+                  className="ribbon-tool press"
+                >
+                  <Structure size={18} />
+                </button>
+              ) : (
+                !navigationOpen && (
+                  <button
+                    type="button"
+                    onClick={() => changeNavigation(true)}
+                    aria-label="Show the structure"
+                    title={"Show the structure · ⌘\\"}
+                    className="ribbon-tool press"
+                  >
+                    <PanelLeftOpen size={16} />
+                  </button>
+                )
+              )}
+              {docActions}
+            </>
+          }
+          synced={collaborative.ready}
+          session={session}
+          commentAuthors={commentAuthors}
+          linkable={linkableNotes}
+          onOpenNote={handleOpenRecent}
+          manuscript={{
+            page,
+            eyebrow:
+              chapterAt >= 0
+                ? [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · ")
+                : notebookName,
+            footer: turn,
+          }}
+        />
+      </Suspense>
+    ) : (
+      titlePage
+    );
+
+    if (compact)
+      return (
+        <div
+          className="mobile-workspace writing-shell overflow-hidden"
+          style={{ height: "100dvh" }}
+        >
+          <main
+            className="h-full overflow-hidden"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          >
+            {chapterEditor}
+          </main>
+          {foldersOpen && (
+            <div className="mobile-nav-layer" role="presentation">
+              <button
+                type="button"
+                aria-label="Close the structure"
+                className="settings-scrim"
+                onClick={() => setFoldersOpen(false)}
+              />
+              <div className="mobile-nav-drawer">{structure}</div>
+            </div>
+          )}
+          {settingsPanel}
+          {keyboardSheets}
+          {sheetStack}
+        </div>
+      );
+
+    const structureWidth = Math.max(sidebarShown, 272);
+    return (
+      <div
+        className={`workspace-shell writing-shell h-screen overflow-hidden ${
+          focusMode ? "is-focus" : ""
+        } ${focusMode && quiet ? "is-quiet" : ""}`}
+      >
+        <div className="workspace-grid flex h-full min-h-0">
+          <div
+            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
+            style={{ width: navigationOpen ? structureWidth + 1 : 0 }}
+            aria-hidden={!navigationOpen}
+            inert={!navigationOpen}
+          >
+            <div
+              className="pane-slide-track flex h-full min-h-0"
+              style={{ width: structureWidth + 1 }}
+            >
+              <div className="pane-frame" style={{ width: structureWidth }}>
+                {structure}
+              </div>
+              <PaneResizer
+                label="Resize the structure"
+                value={structureWidth}
+                min={272}
+                max={sidebarMax}
+                defaultValue={SIDEBAR_DEFAULT}
+                onChange={setSidebarWidth}
+              />
+            </div>
+          </div>
+          {chapterEditor}
+        </div>
+        {settingsPanel}
+        {keyboardSheets}
+        {sheetStack}
+        <input
+          ref={importRef}
+          type="file"
+          accept=".md,.markdown,.txt,text/markdown,text/plain"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            void handleImportFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+      </div>
+    );
+  }
 
   if (compact) {
     return (

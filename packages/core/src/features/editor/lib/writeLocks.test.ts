@@ -84,8 +84,14 @@ test("writing inside somebody else's lock is put back, and the rest with it", ()
   assert.equal(broken(doc, before), false);
   assert.deepEqual([...lockedPassages(doc)], [[ANNA, "Mine to write."]]);
   /* Round-tripped through JSON on both sides: y-prosemirror builds attribute
-     bags with a null prototype and in its own key order. */
-  const plain = (value: unknown) => JSON.parse(JSON.stringify(value)) as unknown;
+     bags with a null prototype and in its own key order — and stores no null
+     attribute at all, where ProseMirror's JSON spells every default out. */
+  const plain = (value: unknown) =>
+    JSON.parse(JSON.stringify(value), (key, inner) => {
+      if (key !== "attrs" || !inner || typeof inner !== "object") return inner;
+      const kept = Object.fromEntries(Object.entries(inner).filter(([, v]) => v !== null));
+      return Object.keys(kept).length ? kept : undefined;
+    }) as unknown;
   assert.deepEqual(
     plain(projectDocument(doc).content),
     plain(noteSchema().nodeFromJSON(before.snapshot).toJSON()),

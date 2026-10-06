@@ -343,6 +343,7 @@ export async function createNote(
       locked_by: metadata.lockedBy ?? null,
       pinned: metadata.pinned ?? false,
       folder_id: metadata.folderId,
+      position: metadata.position ?? null,
     })
     .select("version")
     .single();

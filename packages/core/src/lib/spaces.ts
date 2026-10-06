@@ -12,11 +12,20 @@ import { fail, supabase } from "./supabaseClient";
 import {
   archiveKind,
   documentFeatures,
+  pageSetup,
   type ArchiveKind,
   type DocumentFeatures,
+  type PageSetup,
 } from "./spaceShape";
 
-export { archiveKind, documentFeatures, type ArchiveKind, type DocumentFeatures };
+export {
+  archiveKind,
+  documentFeatures,
+  pageSetup,
+  type ArchiveKind,
+  type DocumentFeatures,
+  type PageSetup,
+};
 
 export interface SpaceMember {
   userId: string;
@@ -30,6 +39,7 @@ export interface Space {
   seatLimit: number;
   kind: ArchiveKind;
   features: DocumentFeatures;
+  page: PageSetup;
   members: SpaceMember[];
 }
 
@@ -89,6 +99,7 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
         seatLimit: archive.seat_limit,
         kind: archiveKind(archive.kind),
         features: documentFeatures(archive.settings),
+        page: pageSetup(archive.settings),
         members: memberRows
           .filter((row) => row.archive_id === archiveId)
           .map((row) => ({
@@ -166,6 +177,10 @@ export async function setDocumentFeatures(
   features: DocumentFeatures,
 ): Promise<void> {
   await mergeSpaceSettings(session, { features });
+}
+
+export async function setPageSetup(session: AppSession, page: PageSetup): Promise<void> {
+  await mergeSpaceSettings(session, { page });
 }
 
 /** Gone for good: only by its last member, never an account's last archive.

@@ -701,6 +701,127 @@ export const NoteLink = Mark.create({
 
 /** Everything the schema holds except the two private-media nodes, which the
  *  editor supplies in an extended form. */
+/* What a writing archive asks of a paragraph that a note never did: where it
+ * sits on the line, how far it is set in, how far apart its lines are. Global
+ * attributes on the blocks that already exist rather than new block types, so
+ * every note written before them is still a paragraph, and a note that never
+ * uses them stores nothing. Markdown has no word for any of the three, so an
+ * export keeps the words and loses the setting — the honest half to lose. */
+const ALIGNMENTS = ["left", "center", "right", "justify"] as const;
+
+export const ParagraphFormat = Extension.create({
+  name: "paragraphFormat",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph", "heading"],
+        attributes: {
+          textAlign: {
+            default: null,
+            parseHTML: (element) => {
+              const value = element.style.textAlign;
+              return (ALIGNMENTS as readonly string[]).includes(value) ? value : null;
+            },
+            renderHTML: (attributes) =>
+              attributes.textAlign ? { style: `text-align: ${attributes.textAlign}` } : {},
+          },
+          /* Null, never 0, for the reason all three are: Yjs stores no null
+             attribute, so a paragraph nobody set stays exactly the
+             paragraph it was before these existed — in the document, in
+             the projection Postgres compares, in every export. */
+          indent: {
+            default: null,
+            parseHTML: (element) => {
+              const value = Number(element.getAttribute("data-indent"));
+              return Number.isInteger(value) && value > 0 && value <= 8 ? value : null;
+            },
+            renderHTML: (attributes) =>
+              attributes.indent
+                ? {
+                    "data-indent": attributes.indent,
+                    style: `margin-left: ${attributes.indent * 1.25}cm`,
+                  }
+                : {},
+          },
+          lineHeight: {
+            default: null,
+            parseHTML: (element) => {
+              const value = Number(element.getAttribute("data-line-height"));
+              return value >= 1 && value <= 3 ? value : null;
+            },
+            renderHTML: (attributes) =>
+              attributes.lineHeight
+                ? {
+                    "data-line-height": attributes.lineHeight,
+                    style: `line-height: ${attributes.lineHeight}`,
+                  }
+                : {},
+          },
+        },
+      },
+    ];
+  },
+});
+
+/* Raised and lowered text: an ordinal, a chemical formula, a note number typed
+ * by hand. They exclude each other, as a letter cannot be both. HTML is the
+ * only Markdown either has, and Obsidian renders it. */
+function raisedMark(name: "superscript" | "subscript", tag: "sup" | "sub") {
+  return Mark.create({
+    name,
+    excludes: name === "superscript" ? "subscript" : "superscript",
+    parseHTML: () => [{ tag }],
+    renderHTML: ({ HTMLAttributes }) => [tag, mergeAttributes(HTMLAttributes), 0],
+    renderMarkdown: (mark, helpers) => `<${tag}>${helpers.renderChildren(mark)}</${tag}>`,
+    /* Read back as well as written: the parser here has no DOM to hand an
+       inline tag to, so without a tokenizer of its own the tag came back as
+       its own letters. */
+    markdownTokenName: name,
+    markdownTokenizer: {
+      name,
+      level: "inline",
+      start: `<${tag}>`,
+      tokenize(src, _tokens, lexer) {
+        const match = new RegExp(`^<${tag}>([\\s\\S]+?)</${tag}>`).exec(src);
+        if (!match) return undefined;
+        return { type: name, raw: match[0], tokens: lexer.inlineTokens(match[1]) };
+      },
+    },
+    parseMarkdown: (token: MarkdownToken, helpers) =>
+      helpers.applyMark(name, helpers.parseInline(token.tokens ?? [])),
+  });
+}
+
+export const Superscript = raisedMark("superscript", "sup");
+export const Subscript = raisedMark("subscript", "sub");
+
+/* Where a page ends because the writer said so: before a chapter that must
+ * start on a fresh sheet, after a title page. On screen it is a rule; in
+ * print and in both exports it is the end of the sheet. */
+export const PageBreak = Node.create({
+  name: "pageBreak",
+  group: "block",
+  atom: true,
+  selectable: true,
+  parseHTML: () => [{ tag: "div[data-page-break]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    mergeAttributes(HTMLAttributes, { "data-page-break": "", class: "page-break" }),
+  ],
+  renderMarkdown: () => `<div data-page-break></div>`,
+  markdownTokenName: "pageBreak",
+  markdownTokenizer: {
+    name: "pageBreak",
+    level: "block",
+    start: "<div data-page-break>",
+    tokenize(src) {
+      const match = /^<div data-page-break><\/div>[^\S\n]*(?:\n|$)/.exec(src);
+      return match ? { type: "pageBreak", raw: match[0] } : undefined;
+    },
+  },
+  parseMarkdown: () => ({ type: "pageBreak" }),
+});
+
 export const BASE_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -725,6 +846,10 @@ export const BASE_EXTENSIONS = [
   CommentAnchor,
   WriteLock,
   NoteLink,
+  ParagraphFormat,
+  Superscript,
+  Subscript,
+  PageBreak,
 ];
 
 /** The persisted document schema, whole. */

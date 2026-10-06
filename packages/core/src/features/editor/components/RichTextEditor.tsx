@@ -2,6 +2,7 @@ import {
   Extension,
   mergeAttributes,
   Node,
+  type Editor,
   type FocusPosition,
   type JSONContent,
 } from "@tiptap/core";
@@ -193,7 +194,34 @@ interface Props {
   resolveImage: (objectId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
+  /** The instance itself, for a toolbar that has to read what the selection
+   *  is set in — a font menu that cannot say which font it is in is a guess. */
+  onEditor?: (editor: Editor | null) => void;
+  /** A chapter of a document: the paragraph keys Word has, which a note
+   *  never needed and does not get. */
+  manuscript?: boolean;
 }
+
+/* Word's paragraph keys, on the paragraphs and headings the selection
+   touches. Only in a document — a note keeps every key it had. */
+const ManuscriptKeys = Extension.create({
+  name: "manuscriptKeys",
+  addKeyboardShortcuts() {
+    const align = (textAlign: string | null) => () =>
+      this.editor
+        .chain()
+        .updateAttributes("paragraph", { textAlign })
+        .updateAttributes("heading", { textAlign })
+        .run();
+    return {
+      "Mod-Shift-l": align(null),
+      "Mod-Shift-e": align("center"),
+      "Mod-Shift-r": align("right"),
+      "Mod-Shift-j": align("justify"),
+      "Mod-Enter": () => this.editor.commands.insertContent({ type: "pageBreak" }),
+    };
+  },
+});
 
 interface ImagePreview {
   src: string;
@@ -1857,6 +1885,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     resolveImage,
     resolveFile,
     collaboration = null,
+    onEditor,
+    manuscript = false,
   },
   ref,
 ) {
@@ -1950,6 +1980,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         writeLockGuard,
         sentenceCapitalize,
         autocorrect,
+        ...(manuscript ? [ManuscriptKeys] : []),
       ],
       content: collaboration ? undefined : value,
       editable: !readOnly,
@@ -2128,6 +2159,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
      exactly where it was and nothing on screen changed. */
   const caretPlaced = useRef(false);
   const insertionPoint = useCallback((): FocusPosition => (caretPlaced.current ? null : "end"), []);
+
+  useEffect(() => {
+    onEditor?.(editor);
+    return () => onEditor?.(null);
+  }, [editor, onEditor]);
 
   useImperativeHandle(
     ref,

@@ -238,3 +238,29 @@ test("a stroke that is not a stroke is dropped rather than repaired", () => {
     { d: "M1,1L9,9", color: "#F4C550", width: 5 },
   ]);
 });
+
+test("a writing archive's paragraph settings leave the words and nothing else", () => {
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        attrs: { textAlign: "justify", indent: 2, lineHeight: 1.5 },
+        content: [
+          { type: "text", text: "H" },
+          { type: "text", text: "2", marks: [{ type: "subscript" }] },
+          { type: "text", text: "O e x" },
+          { type: "text", text: "2", marks: [{ type: "superscript" }] },
+        ],
+      },
+      { type: "pageBreak" },
+      { type: "paragraph", content: [{ type: "text", text: "Capitolo dopo." }] },
+    ],
+  };
+  const markdown = richTextToMarkdown(document);
+  assert.match(markdown, /H<sub>2<\/sub>O e x<sup>2<\/sup>/);
+  assert.match(markdown, /<div data-page-break><\/div>/);
+  assert.ok(!markdown.includes("justify"));
+  const back = richTextToMarkdown(markdownToNote("x.md", `# T\n\n${markdown}`).content);
+  assert.equal(back, markdown);
+});

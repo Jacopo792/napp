@@ -38,7 +38,7 @@ function Row({ icon, name, children }: { icon: ReactNode; name: string; children
   );
 }
 
-export function presetOf(kind: ArchiveKind, features: DocumentFeatures): ArchivePreset | null {
+function presetOf(kind: ArchiveKind, features: DocumentFeatures): ArchivePreset | null {
   const match = ARCHIVE_PRESETS.find(
     (preset) =>
       preset.kind === kind &&

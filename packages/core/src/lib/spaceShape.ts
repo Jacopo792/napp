@@ -93,3 +93,107 @@ export function documentFeatures(settings: unknown): DocumentFeatures {
   if (Number.isInteger(goal) && goal > 0 && goal <= 10_000_000) features.wordGoal = goal;
   return features;
 }
+
+/* ── The page ───────────────────────────────────────────────────────────────
+   How the document is set, the same for every member: it is the document's,
+   not a reader's preference. Kept in `archives.settings.page`. */
+
+/** The faces a document may be set in. Literata ships with the app; the rest
+ *  are the system's, each with a fallback, so a page set on a Mac still reads
+ *  as the same kind of letter on a machine without that face. */
+export const WRITING_FONTS = [
+  { id: "literata", name: "Literata", stack: '"Literata Variable", Literata, Georgia, serif' },
+  { id: "georgia", name: "Georgia", stack: "Georgia, serif" },
+  { id: "times", name: "Times New Roman", stack: '"Times New Roman", Times, serif' },
+  {
+    id: "palatino",
+    name: "Palatino",
+    stack: 'Palatino, "Palatino Linotype", "Book Antiqua", serif',
+  },
+  { id: "baskerville", name: "Baskerville", stack: 'Baskerville, "Baskerville Old Face", serif' },
+  {
+    id: "garamond",
+    name: "Garamond",
+    stack: 'Garamond, "EB Garamond", "Adobe Garamond Pro", serif',
+  },
+  { id: "helvetica", name: "Helvetica", stack: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+  { id: "arial", name: "Arial", stack: "Arial, Helvetica, sans-serif" },
+  { id: "avenir", name: "Avenir", stack: 'Avenir, "Avenir Next", "Segoe UI", sans-serif' },
+  { id: "courier", name: "Courier", stack: '"Courier New", Courier, monospace' },
+] as const;
+
+export type WritingFont = (typeof WRITING_FONTS)[number]["id"];
+
+/** Millimetres, portrait. */
+export const PAGE_SIZES = {
+  a4: { name: "A4", width: 210, height: 297 },
+  letter: { name: "Letter", width: 216, height: 279 },
+  a5: { name: "A5", width: 148, height: 210 },
+} as const;
+
+/** Millimetres on every side, the three Word offers first. */
+export const PAGE_MARGINS = {
+  narrow: { name: "Narrow", mm: 12.7 },
+  normal: { name: "Normal", mm: 25.4 },
+  wide: { name: "Wide", mm: 38.1 },
+} as const;
+
+export const LINE_SPACINGS = [1, 1.15, 1.5, 2] as const;
+
+export interface PageSetup {
+  size: keyof typeof PAGE_SIZES;
+  orientation: "portrait" | "landscape";
+  margins: keyof typeof PAGE_MARGINS;
+  font: WritingFont;
+  /** Points. */
+  fontSize: number;
+  lineHeight: (typeof LINE_SPACINGS)[number];
+  /** The first line of each paragraph set in, as a book sets it. */
+  firstLineIndent: boolean;
+}
+
+export const DEFAULT_PAGE: PageSetup = {
+  size: "a4",
+  orientation: "portrait",
+  margins: "normal",
+  font: "literata",
+  fontSize: 12,
+  lineHeight: 1.5,
+  firstLineIndent: false,
+};
+
+export function pageSetup(settings: unknown): PageSetup {
+  const raw = (settings as { page?: Record<string, unknown> } | null)?.page ?? {};
+  const page = { ...DEFAULT_PAGE };
+  if (typeof raw.size === "string" && raw.size in PAGE_SIZES)
+    page.size = raw.size as PageSetup["size"];
+  if (raw.orientation === "landscape") page.orientation = "landscape";
+  if (typeof raw.margins === "string" && raw.margins in PAGE_MARGINS)
+    page.margins = raw.margins as PageSetup["margins"];
+  if (WRITING_FONTS.some((font) => font.id === raw.font)) page.font = raw.font as WritingFont;
+  const size = Number(raw.fontSize);
+  if (Number.isInteger(size) && size >= 8 && size <= 24) page.fontSize = size;
+  if (LINE_SPACINGS.includes(raw.lineHeight as PageSetup["lineHeight"]))
+    page.lineHeight = raw.lineHeight as PageSetup["lineHeight"];
+  if (typeof raw.firstLineIndent === "boolean") page.firstLineIndent = raw.firstLineIndent;
+  return page;
+}
+
+export function fontStack(id: string | null | undefined): string | null {
+  return WRITING_FONTS.find((font) => font.id === id)?.stack ?? null;
+}
+
+/** The page as CSS: sizes in millimetres and points, which the browser
+ *  converts with the same 96 dpi Word assumes. */
+export function pageStyle(page: PageSetup): Record<string, string> {
+  const size = PAGE_SIZES[page.size];
+  const width = page.orientation === "landscape" ? size.height : size.width;
+  return {
+    "--sheet-width": `${width}mm`,
+    "--sheet-margin": `${PAGE_MARGINS[page.margins].mm}mm`,
+    "--sheet-font": fontStack(page.font) ?? "",
+    "--sheet-size": `${page.fontSize}pt`,
+    "--sheet-leading": String(page.lineHeight),
+    "--sheet-first-line": page.firstLineIndent ? "1.25cm" : "0",
+  };
+}

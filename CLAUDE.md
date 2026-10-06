@@ -1079,6 +1079,40 @@ folders, the remarks-seen stamps — need no archive. The preview keeps one
 in-memory store per archive in `supabase.mock.ts`: the fixture is the first,
 every other opens empty.
 
+## A document archive
+
+`archives.kind` is `notes` or `document`, and it is the one option that changes
+the whole screen, which is why it is a column. Thesis and Book are **presets**
+of the options in `archives.settings.features` (`spaceShape.ts`), never kinds:
+a third genre is a row in `ARCHIVE_PRESETS`, not a migration. The page set-up
+is `settings.page`. Both are the document's, so they live in the archive and
+are written whole through `merge_archive_settings` — `||` merges one level, so
+a patch of one switch would take the others with it.
+
+A notes archive renders exactly what it always did. A document renders the
+branch at the end of `ArchiveScreen`: `StructurePane` where the sidebar and the
+list were, and `NoteEditor` with `manuscript` — the same binding, comments,
+history and find, under a writing bar (`ManuscriptToolbar`) and on a sheet the
+size, margins and letter of the page set-up.
+
+- A chapter is a note with `notes.position`; the notebook is every note
+  without one. A part is a folder, drawn wherever the one order crosses into
+  it (`manuscript.ts`), so a chapter can stand before the first part. A move
+  writes one position, the midpoint of its neighbours.
+- **Manuscript shared** keeps the structure in the scope of the archive's
+  first member, so it is one for everybody, and You / Partner chooses whose
+  notebook is open. **One each** is the switch as it always was. A partner's
+  notebook page cannot be dragged into a shared manuscript: the folder foreign
+  key is per owner, and moving a note between owners is not a thing the
+  metadata path does.
+- The sheet is paper in every theme: the tokens are re-pointed inside
+  `.manuscript-sheet`, so ink chosen there prints the colour it was chosen.
+- `ParagraphFormat`, `Superscript`, `Subscript` and `PageBreak` are in
+  `BASE_EXTENSIONS`. The paragraph attributes default to **null**, never 0:
+  Yjs stores no null, so an untouched paragraph projects exactly as it did
+  before they existed and Postgres sees no edit. Word's paragraph keys
+  (⇧⌘L/E/R/J, ⌘↩) are a `manuscript`-only extension; a note keeps its keys.
+
 ## Two people in one note
 
 Title and content are one Yjs document. The browser holds it in memory and in
