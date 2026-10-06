@@ -1098,8 +1098,13 @@ in Settings → Document, and switching it to notes took the Document section
 away with it — the book was still there, and there was no way back to it. A
 change of kind loses nothing either way: a chapter is a note with a position.
 Any archive but the first can be deleted, from Settings → Archives or the
-right button on the archive switch; Postgres still refuses one somebody else
-is in, and an account's last.
+right button on the archive switch; Postgres refuses an account's last, and
+one somebody else is in unless the caller made it (`archives.created_by`,
+frozen by a trigger). **Whoever made an archive deletes it for everybody and
+is not offered Leave**: leaving kept the archive alive for the others with
+everything in it, which is not what somebody done with it meant. Everybody
+else may only leave. The Notes heading in a book's structure has its own
+right-click, which moves every page under it to the Trash.
 
 A notes archive renders exactly what it always did. A document renders the
 branch at the end of `ArchiveScreen`: `StructurePane` where the sidebar and the

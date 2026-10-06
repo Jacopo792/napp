@@ -2886,6 +2886,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
   }
 
+  function handleTrashDocNotes(ids: string[]) {
+    const trashedAt = new Date().toISOString();
+    const byOwner = new Map<string, Set<string>>();
+    for (const id of ids) {
+      const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId ?? viewAs;
+      byOwner.set(owner, (byOwner.get(owner) ?? new Set()).add(id));
+    }
+    for (const [owner, chosen] of byOwner)
+      handleMetaChangeFor(owner, (prev) => ({
+        ...prev,
+        notes: prev.notes.map((note) => (chosen.has(note.id) ? { ...note, trashedAt } : note)),
+      }));
+    if (selectedId && ids.includes(selectedId)) {
+      setSelectedId(null);
+      if (compact) setMobileScreen("collection");
+    }
+  }
+
   function handleRestoreDocNote(id: string) {
     const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId ?? viewAs;
     setNoteRow(owner, id, { trashedAt: undefined });
@@ -4941,6 +4959,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onDeletePart={handleDeletePart}
         onMove={handleMoveChapter}
         onTrash={handleTrashDocNote}
+        onTrashAll={handleTrashDocNotes}
         onInfo={(id, point) =>
           openSheet({ x: point.x, y: point.y, width: 1, height: 1, kind: "note", noteId: id })
         }

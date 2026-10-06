@@ -36,6 +36,7 @@ const spaces: Space[] = [
   {
     archiveId: PREVIEW_ARCHIVE,
     name: "Preview archive",
+    createdBy: PREVIEW_U1,
     seatLimit: 2,
     kind: "notes",
     features: { ...DEFAULT_FEATURES },
@@ -48,6 +49,7 @@ const spaces: Space[] = [
   {
     archiveId: "00000000-0000-4000-8000-000000000002",
     name: "Study group",
+    createdBy: "preview-member-3",
     seatLimit: 5,
     kind: "notes",
     features: { ...DEFAULT_FEATURES },
@@ -61,6 +63,7 @@ const spaces: Space[] = [
   {
     archiveId: PREVIEW_THESIS,
     name: "Tesi — Plotino",
+    createdBy: PREVIEW_U1,
     seatLimit: 2,
     kind: "document",
     features: {
@@ -106,6 +109,7 @@ export async function createSpace(
   spaces.push({
     archiveId,
     name: name.trim(),
+    createdBy: PREVIEW_U1,
     seatLimit: 2,
     kind,
     features: { ...features },
@@ -160,7 +164,8 @@ export async function deleteSpace(archiveId: string): Promise<void> {
   await sleep(150);
   const index = spaces.findIndex((one) => one.archiveId === archiveId);
   if (index < 0) throw new Error("You are not in this archive");
-  if (spaces[index].members.length > 1) throw new Error("Somebody else is still in this archive");
+  if (spaces[index].members.length > 1 && spaces[index].createdBy !== PREVIEW_U1)
+    throw new Error("Only whoever made this archive can delete it while others are in it");
   if (spaces.length === 1) throw new Error("This is your only archive");
   spaces.splice(index, 1);
 }

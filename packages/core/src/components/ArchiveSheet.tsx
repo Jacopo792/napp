@@ -106,6 +106,10 @@ export function ArchiveSheet({
   const [deleting, setDeleting] = useState(false);
   const taken = space.members.length + invites.length;
   const alone = space.members.length <= 1;
+  /* Whoever made it ends it, for everybody; leaving would keep it alive for
+     the others with everything in it. Everybody else may only leave. */
+  const maker = space.createdBy === selfId;
+  const deletable = alone || maker;
 
   async function act(work: () => Promise<void>) {
     setBusy(true);
@@ -247,7 +251,7 @@ export function ArchiveSheet({
             </p>
           )}
 
-          {!alone && (
+          {!alone && !(maker && !isDefault) && (
             <button
               type="button"
               className={`sheet-leave press ${leaving ? "is-confirm" : ""}`}
@@ -263,20 +267,26 @@ export function ArchiveSheet({
           )}
 
           {/* Any archive but the first. Postgres refuses one somebody else is
-              still in, and says so. */}
+              still in unless the caller made it, and says so. */}
           {!isDefault && (
             <button
               type="button"
               className={`sheet-leave press ${deleting ? "is-confirm" : ""}`}
-              disabled={busy || !alone}
-              title={alone ? undefined : "Somebody else is still in it"}
+              disabled={busy || !deletable}
+              title={deletable ? undefined : "Only whoever made it can delete it"}
               onClick={() => {
                 if (!deleting) return setDeleting(true);
                 void act(onDelete);
               }}
             >
               <Trash2 size={14} />
-              {deleting ? "Delete every note in it — press again" : "Delete this archive"}
+              {deleting
+                ? alone
+                  ? "Delete every note in it — press again"
+                  : "Delete it for everyone in it — press again"
+                : alone
+                  ? "Delete this archive"
+                  : "Delete for everyone"}
             </button>
           )}
         </div>

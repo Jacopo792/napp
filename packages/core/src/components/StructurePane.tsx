@@ -210,6 +210,7 @@ export function StructurePane({
   onDeletePart,
   onMove,
   onTrash,
+  onTrashAll,
   onInfo,
   headings = [],
   onHeading,
@@ -235,6 +236,8 @@ export function StructurePane({
   onDeletePart: (id: string) => void;
   onMove: (id: string, target: StructureTarget) => void;
   onTrash: (id: string) => void;
+  /** Every page under Notes, in one go. */
+  onTrashAll: (ids: string[]) => void;
   onInfo: (id: string, point: MenuPoint) => void;
   /** The open chapter's headings, under its row — the navigation pane of a
    *  long document, numbered as the page numbers them. */
@@ -514,7 +517,37 @@ export function StructurePane({
               Continue as note, or by taking a chapter out of the order. */}
           {(notebook.length > 0 || dragging) && (
             <Zone id="notebook" className="structure-notebook">
-              <div className="structure-heading">
+              <div
+                className="structure-heading"
+                onContextMenu={(event) => {
+                  if (!canWrite || notebook.length === 0) return;
+                  event.preventDefault();
+                  setMenu({
+                    point: { x: event.clientX, y: event.clientY },
+                    items: [
+                      {
+                        kind: "item",
+                        id: "trash-all",
+                        label: "Move all to Trash",
+                        danger: true,
+                        icon: <Trash2 size={16} />,
+                        submenu: [
+                          {
+                            kind: "item",
+                            id: "trash-all-yes",
+                            label:
+                              notebook.length === 1
+                                ? "Move 1 note to Trash"
+                                : `Move ${notebook.length} notes to Trash`,
+                            danger: true,
+                            run: () => onTrashAll(notebook.map((item) => item.id)),
+                          },
+                        ],
+                      },
+                    ],
+                  });
+                }}
+              >
                 <button
                   type="button"
                   className="structure-fold press"

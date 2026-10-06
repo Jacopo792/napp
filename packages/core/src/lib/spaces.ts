@@ -41,6 +41,8 @@ export interface Space {
   features: DocumentFeatures;
   page: PageSetup;
   members: SpaceMember[];
+  /** Who made it: the one account that may delete it while others are in it. */
+  createdBy: string | null;
 }
 
 export async function loadSpaces(session: AppSession): Promise<Space[]> {
@@ -54,7 +56,10 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
   if (ids.length === 0) return [];
 
   const [archives, members] = await Promise.all([
-    supabase.from("archives").select("id, name, seat_limit, kind, settings").in("id", ids),
+    supabase
+      .from("archives")
+      .select("id, name, seat_limit, kind, settings, created_by")
+      .in("id", ids),
     supabase
       .from("archive_members")
       .select("archive_id, user_id")
@@ -86,6 +91,7 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
         seat_limit: number;
         kind: string;
         settings: unknown;
+        created_by: string | null;
       }[]
     ).map((row) => [row.id, row]),
   );
@@ -100,6 +106,7 @@ export async function loadSpaces(session: AppSession): Promise<Space[]> {
         kind: archiveKind(archive.kind),
         features: documentFeatures(archive.settings),
         page: pageSetup(archive.settings),
+        createdBy: archive.created_by,
         members: memberRows
           .filter((row) => row.archive_id === archiveId)
           .map((row) => ({
@@ -183,7 +190,8 @@ export async function setPageSetup(session: AppSession, page: PageSetup): Promis
   await mergeSpaceSettings(session, { page });
 }
 
-/** Gone for good: only by its last member, never an account's last archive.
+/** Gone for good, for everybody in it: by its last member or by whoever
+ *  made it, never an account's last archive.
  *  Postgres decides (`archive_deletion_refusal`); the pictures are removed in
  *  between, because Storage refuses a delete made from SQL — and only once
  *  the answer is yes, so a refused delete never costs an archive its images. */

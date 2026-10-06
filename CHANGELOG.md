@@ -3,6 +3,22 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.7 — 2026-10-06
+
+Delete what you made, and clear Notes in one go.
+
+### Changed
+
+- `archives.created_by` (backfilled with each archive's first member, set by
+  a trigger on insert and frozen on update). `archive_deletion_refusal` lets
+  the maker delete an archive others are still in; the archive sheet offers
+  the maker "Delete for everyone" and no Leave.
+
+### Added
+
+- Right-click on Notes in a book's structure: move every page under it to
+  the Trash, confirmed in a submenu.
+
 ## 0.9.6 — 2026-10-06
 
 Continue as note, and a book each.

@@ -42,6 +42,31 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.7",
+    date: "2026-10-06",
+    headline: "Delete what you made, and clear Notes in one go",
+    sections: [
+      {
+        heading: "Archives",
+        items: [
+          {
+            title: "Delete for everyone",
+            text: "Whoever made an archive can delete it even while others are in it, and it goes for everybody. Leave is for the others: it no longer leaves your archive behind for them.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Clear Notes",
+            text: "Right-click Notes in the sidebar to move every note under it to the Trash.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.6",
     date: "2026-10-06",
     headline: "Continue as note, and a book each",
