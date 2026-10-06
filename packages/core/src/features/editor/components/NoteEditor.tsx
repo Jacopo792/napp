@@ -134,6 +134,8 @@ interface Props {
   linkable?: { id: string; title: string }[];
   backlinks?: { id: string; title: string }[];
   onOpenNote?: (noteId: string) => void;
+  /** A remark was added, resolved or deleted here. */
+  onRemarksChanged?: () => void;
   /** A chapter of a document rather than a note: a page and a writing bar
    *  instead of a cover, a header and a foot of links. */
   manuscript?: ManuscriptFrame;
@@ -243,6 +245,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     linkable,
     backlinks,
     onOpenNote,
+    onRemarksChanged,
     manuscript,
   },
   ref,
@@ -936,6 +939,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         setQuotes(editorRef.current?.commentQuotes() ?? new Map());
       }}
       onResolveAnchor={syncCommentResolution}
+      asNotes={Boolean(manuscript)}
+      onChanged={onRemarksChanged}
     />
   );
   const sidePanels = (
@@ -961,7 +966,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         : null;
   const showTab = (tab: InspectorTab | null) => {
     if (tab) lastTab.current = tab;
-    if (tab !== "comments" && commentsOpen) closeComments();
+    /* Closing the inspector cancels a note not yet written; looking at
+       another tab only puts it aside. It used to cancel it too, so a glance
+       at the headings meant choosing the words all over again. */
+    if (!tab) closeComments();
+    else if (tab !== "comments" && commentsOpen) setCommentsOpen(false);
     setOutlineOpen(tab === "headings");
     setHistoryOpen(tab === "versions");
     if (tab === "versions") setHistoryFocus(null);
@@ -973,7 +982,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   toggleInspector.current = () => showTab(inspectorTab ? null : lastTab.current);
   const inspectorTabs: { id: InspectorTab; name: string; shown: boolean }[] = [
     { id: "headings", name: "Headings", shown: true },
-    { id: "comments", name: "Comments", shown: Boolean(session && commentAuthors) },
+    {
+      id: "comments",
+      name: manuscript ? "Notes" : "Comments",
+      shown: Boolean(session && commentAuthors),
+    },
     { id: "versions", name: "Versions", shown: Boolean(session) },
   ];
 
@@ -1020,9 +1033,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               <button
                 type="button"
                 className={`ribbon-tool press ${inspectorTab === "comments" ? "is-active" : ""}`}
-                aria-label="Comments"
+                aria-label="Notes"
                 aria-pressed={inspectorTab === "comments"}
-                title="Comments"
+                title="Notes"
                 onClick={() => showTab(inspectorTab === "comments" ? null : "comments")}
               >
                 <MessageSquare size={16} />

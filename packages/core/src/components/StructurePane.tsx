@@ -523,12 +523,13 @@ export function StructurePane({
               hand was heading for out from under it. */}
           {rows.length > 0 && <Zone id="end" className="structure-end" />}
 
-          {passageNotes.length > 0 && (
+          {onOpenPassage && (
             <section className="structure-passages" aria-label="Notes">
               <div className="structure-heading">
                 <span>Notes</span>
-                <small>{passageNotes.length}</small>
+                <small>{passageNotes.length || ""}</small>
               </div>
+              {passageNotes.length === 0 && <p className="structure-passages-empty">None yet</p>}
               {passageNotes.map((note) => (
                 <button
                   key={note.threadId}

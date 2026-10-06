@@ -10723,6 +10723,12 @@ button.sheet-chip:hover,
   font-weight: var(--weight-medium);
 }
 
+.structure-passages-empty {
+  padding: 2px 8px 6px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+
 .structure-passage {
   display: grid;
   width: 100%;
@@ -10821,7 +10827,10 @@ button.sheet-chip:hover,
 /* One row, always. A ribbon that wrapped left the bar twice the height of
    the sidebar's strip, broke its groups across the two rows and stranded the
    tools at the right halfway between them. What does not fit is put away,
-   least-used first, by the container queries below — never a second row. */
+   least-used first, by the container queries below — never a second row.
+   Never `overflow: hidden` here either: every colour, alignment and Insert
+   menu opens inside the ribbon, and clipping it made every one of them open
+   invisibly — the whole bar read as dead. */
 .ribbon {
   display: flex;
   min-width: 0;
@@ -10829,7 +10838,6 @@ button.sheet-chip:hover,
   flex-wrap: nowrap;
   align-items: center;
   gap: 4px;
-  overflow: hidden;
 }
 
 .ribbon-cluster {

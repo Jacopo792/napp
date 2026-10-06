@@ -2592,8 +2592,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
               <button
                 type="button"
                 className="toolbar-button press"
-                aria-label="Comment on this passage"
-                title="Comment on this passage"
+                aria-label={manuscript ? "Add note" : "Comment on this passage"}
+                title={manuscript ? "Add note" : "Comment on this passage"}
                 /* The selection must survive the click that acts on it: a
                    pressed button takes focus, and taking focus collapses the
                    very range being commented on. */

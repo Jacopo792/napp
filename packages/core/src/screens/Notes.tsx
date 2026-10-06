@@ -5043,6 +5043,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           commentAuthors={commentAuthors}
           linkable={linkableNotes}
           onOpenNote={handleOpenRecent}
+          onRemarksChanged={refreshRemarks}
           /* Research is a note, not a page of the book: it opens as one, so
              the two kinds never look the same. */
           manuscript={
@@ -5283,6 +5284,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     linkable={linkableNotes}
                     backlinks={backlinks}
                     onOpenNote={handleOpenRecent}
+                    onRemarksChanged={refreshRemarks}
                   />
                 </Suspense>
               </section>
@@ -5517,6 +5519,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               linkable={linkableNotes}
               backlinks={backlinks}
               onOpenNote={handleOpenRecent}
+              onRemarksChanged={refreshRemarks}
             />
           </Suspense>
 
@@ -5557,6 +5560,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   session={session}
                   linkable={linkableNotes}
                   onOpenNote={handleOpenRecent}
+                  onRemarksChanged={refreshRemarks}
                   headerActions={
                     <button
                       type="button"

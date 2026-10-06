@@ -42,6 +42,39 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.5",
+    date: "2026-10-06",
+    headline: "The writing bar works again, and notes you can find",
+    sections: [
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Every menu in the writing bar opens",
+            text: "Colour, highlight, alignment, more effects and Insert opened invisibly since 0.9.3, so the bar seemed to do nothing. They open again.",
+          },
+          {
+            title: "A note in progress waits for you",
+            text: "Looking at Headings or Versions while writing a note no longer throws it away; come back to Notes and it is still there, on the same words. Closing the panel cancels it.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Notes, by name",
+            text: "In a book, comments are called notes everywhere: the button on selected words, the panel, and Add note.",
+          },
+          {
+            title: "Always in the sidebar",
+            text: "Notes is always listed under the chapters, and a note you add appears there at once.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.4",
     date: "2026-10-06",
     headline: "Up-to-date guides and download links",

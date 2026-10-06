@@ -3,6 +3,26 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.5 — 2026-10-06
+
+The writing bar works again, and notes you can find.
+
+### Fixed
+
+- 0.9.3 put `overflow: hidden` on the ribbon to keep it on one row, which
+  clipped every menu that opens inside it (colour, highlight, alignment, more
+  effects, Insert): the bar read as dead. The container queries alone keep it
+  on one row.
+- Switching the inspector to Headings or Versions cancelled a note not yet
+  written; only closing the inspector does now.
+- A note added, resolved or deleted refreshes the book's Notes list at once
+  instead of waiting for Realtime.
+
+### Changed
+
+- In a book, comments are named notes throughout, and the Notes section of
+  the structure is always shown ("None yet" when empty).
+
 ## 0.9.4 — 2026-10-06
 
 Documentation brought up to the 0.9 releases.
