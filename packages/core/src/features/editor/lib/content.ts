@@ -852,6 +852,207 @@ export const TableOfContents = Node.create({
   parseMarkdown: () => ({ type: "tableOfContents" }),
 });
 
+/* ── References ─────────────────────────────────────────────────────────────
+   A footnote, a numbered caption, and a cross-reference to either or to a
+   heading. None of them stores a number: the sheet counts them with CSS
+   counters and everything else asks `lib/references.ts`, so a footnote put
+   in above another renumbers both without a write. Every attribute defaults
+   to null, so nothing about a document written before them changes. */
+
+/** What a cited heading is called by: null until somebody cites it, so a
+ *  heading nobody points at stores nothing and projects as it always did. */
+export const ReferenceAnchor = Extension.create({
+  name: "referenceAnchor",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["heading"],
+        attributes: {
+          anchor: {
+            default: null,
+            parseHTML: (element) => element.getAttribute("data-anchor") || null,
+            renderHTML: (attributes) =>
+              attributes.anchor ? { "data-anchor": attributes.anchor } : {},
+          },
+        },
+      },
+    ];
+  },
+});
+
+/* Read while a Markdown file is parsed, and only then: the definitions sit at
+   the foot of the file and the marks that use them in the running text, so
+   they are taken out first and looked up as each mark is met. A `[^x]` with
+   no definition is somebody's literal text and stays text. */
+let footnoteDefinitions = new Map<string, string>();
+
+/** A footnote: the number in the text, with its words as an attribute. A
+ *  string, for the reason a drawing's strokes are one — Yjs stores and
+ *  compares it without knowing what is in it. The words are plain text; a
+ *  line break inside them is kept. Markdown is pandoc's, which Obsidian
+ *  reads: `[^1]` in the text and `[^1]: words` at the end. */
+export const Footnote = Node.create({
+  name: "footnote",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      text: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-footnote") || null,
+        renderHTML: (attributes) => ({ "data-footnote": attributes.text ?? "" }),
+      },
+      id: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-ref") || null,
+        renderHTML: (attributes) => (attributes.id ? { "data-ref": attributes.id } : {}),
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "sup[data-footnote]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "sup",
+    mergeAttributes(HTMLAttributes, { class: "footnote-ref" }),
+  ],
+  renderText: () => "",
+  /* `number` is not an attribute: `richTextToMarkdown` writes it onto its own
+     copy of the document, counting as it goes, and appends the definitions. */
+  renderMarkdown: (node: JSONContent) => `[^${String(node.attrs?.number ?? "")}]`,
+  markdownTokenName: "footnote",
+  markdownTokenizer: {
+    name: "footnote",
+    level: "inline",
+    start: "[^",
+    tokenize(src) {
+      const match = /^\[\^([^\]\s]+)\]/.exec(src);
+      if (!match || !footnoteDefinitions.has(match[1])) return undefined;
+      return { type: "footnote", raw: match[0], label: match[1] };
+    },
+  },
+  parseMarkdown: (token: MarkdownToken) => ({
+    type: "footnote",
+    attrs: { text: footnoteDefinitions.get(String(token.label)) || null },
+  }),
+});
+
+/** A numbered caption: Word's "Insert Caption", a paragraph in the Caption
+ *  style whose label ("Figura 2.1. ") the sheet draws in front of it. A
+ *  block of its own rather than an attribute on a paragraph, because
+ *  Markdown keeps a block and drops a paragraph's attributes, and a caption
+ *  has to come back as a caption. */
+export const Caption = Node.create({
+  name: "caption",
+  group: "block",
+  content: "inline*",
+  defining: true,
+  addAttributes() {
+    return {
+      kind: {
+        default: "figure",
+        parseHTML: (element) =>
+          element.getAttribute("data-caption") === "table" ? "table" : "figure",
+        renderHTML: (attributes) => ({ "data-caption": attributes.kind }),
+      },
+      id: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-ref") || null,
+        renderHTML: (attributes) => (attributes.id ? { "data-ref": attributes.id } : {}),
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "p[data-caption]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "p",
+    mergeAttributes(HTMLAttributes, { class: "caption-block" }),
+    0,
+  ],
+  addKeyboardShortcuts() {
+    return {
+      /* At its start, Backspace takes the caption back to a paragraph rather
+         than joining it into the block above — the way a list item leaves
+         its list before it merges. */
+      Backspace: ({ editor }) => {
+        const { $from, empty } = editor.state.selection;
+        if (!empty || $from.parent.type.name !== "caption" || $from.parentOffset > 0) return false;
+        return editor.commands.setParagraph();
+      },
+    };
+  },
+  /* HTML, as the page break is, with Markdown inside it: a Markdown tool
+     shows the words; this app reads the kind back. The id stays home. */
+  renderMarkdown: (node: JSONContent, helpers) =>
+    `<p data-caption="${node.attrs?.kind === "table" ? "table" : "figure"}">${helpers.renderChildren(
+      node.content ?? [],
+    )}</p>`,
+  markdownTokenName: "caption",
+  markdownTokenizer: {
+    name: "caption",
+    level: "block",
+    start: "<p data-caption=",
+    tokenize(src, _tokens, lexer) {
+      const match = /^<p data-caption="(figure|table)">(.*?)<\/p>[^\S\n]*(?:\n|$)/.exec(src);
+      if (!match) return undefined;
+      return {
+        type: "caption",
+        raw: match[0],
+        kind: match[1],
+        tokens: lexer.inlineTokens(match[2]),
+      };
+    },
+  },
+  parseMarkdown: (token: MarkdownToken, helpers) =>
+    helpers.createNode(
+      "caption",
+      { kind: token.kind === "table" ? "table" : "figure" },
+      helpers.parseInline(token.tokens ?? []),
+    ),
+});
+
+/** A cross-reference: "see section 2.1", "Figura 3.2", "nota 4". It holds
+ *  what it points at, never the words it shows — those are worked out each
+ *  time it is drawn, so they follow the target when it is renumbered. What
+ *  it does hold is `label`, the words when it was made, for every reader
+ *  that cannot ask the document: the plain-text projection, the server, a
+ *  Markdown export made without the archive. `match` is the target's own
+ *  words, which find a heading that has not been given its id yet. One-way
+ *  in Markdown, like `[[note]]`: the words leave, the pointer does not. */
+export const CrossReference = Node.create({
+  name: "crossReference",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    const data = (name: string, html = name) => ({
+      default: null,
+      parseHTML: (element: HTMLElement) => element.getAttribute(`data-${html}`) || null,
+      renderHTML: (attributes: Record<string, unknown>) =>
+        attributes[name] ? { [`data-${html}`]: String(attributes[name]) } : {},
+    });
+    return {
+      target: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-xref") || null,
+        renderHTML: (attributes) => ({ "data-xref": attributes.target ?? "" }),
+      },
+      noteId: data("noteId", "note-id"),
+      kind: data("kind"),
+      match: data("match"),
+      label: data("label"),
+    };
+  },
+  parseHTML: () => [{ tag: "span[data-xref]" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "span",
+    mergeAttributes(HTMLAttributes, { class: "cross-reference" }),
+    String(node.attrs.label ?? ""),
+  ],
+  renderText: ({ node }) => String(node.attrs.label ?? ""),
+  renderMarkdown: (node: JSONContent) => String(node.attrs?.label ?? ""),
+});
+
 export const BASE_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -881,6 +1082,10 @@ export const BASE_EXTENSIONS = [
   Subscript,
   PageBreak,
   TableOfContents,
+  ReferenceAnchor,
+  Footnote,
+  Caption,
+  CrossReference,
 ];
 
 /** The persisted document schema, whole. */
@@ -946,7 +1151,36 @@ export function legacyMarkdownToRichText(markdown: string): JSONContent {
       return index > 0 && lines[index - 1].trim().length > 0;
     })
     .join("\n");
-  return promotePrivateMedia(legacyMarkdown.parse(cleaned));
+  const { body, definitions } = takeFootnoteDefinitions(cleaned);
+  footnoteDefinitions = definitions;
+  try {
+    return promotePrivateMedia(legacyMarkdown.parse(body));
+  } finally {
+    footnoteDefinitions = new Map();
+  }
+}
+
+/** `[^label]: words` lines out of the file, with the indented lines that
+ *  continue them — pandoc's form, and what `richTextToMarkdown` writes. */
+function takeFootnoteDefinitions(markdown: string): {
+  body: string;
+  definitions: Map<string, string>;
+} {
+  const definitions = new Map<string, string>();
+  const lines = markdown.split("\n");
+  const kept: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^\[\^([^\]\s]+)\]:[ \t]?(.*)$/.exec(lines[index]);
+    if (!match) {
+      kept.push(lines[index]);
+      continue;
+    }
+    let text = match[2];
+    while (index + 1 < lines.length && /^(?: {4}|\t)/.test(lines[index + 1]))
+      text += `\n${lines[++index].replace(/^(?: {4}|\t)/, "")}`;
+    definitions.set(match[1], text.trimEnd());
+  }
+  return { body: kept.join("\n"), definitions };
 }
 
 /** The inverse of the legacy parser, over the same extensions, so what this
@@ -954,8 +1188,39 @@ export function legacyMarkdownToRichText(markdown: string): JSONContent {
  *  back to the `napp-image:` / `napp-file:` references the parser promotes —
  *  a Markdown file cannot carry a Storage object, and a reference at least
  *  survives a round trip through this app. */
-export function richTextToMarkdown(document: JSONContent): string {
-  return legacyMarkdown.serialize(demotePrivateMedia(document));
+export function richTextToMarkdown(
+  document: JSONContent,
+  options: { reference?: (attrs: Record<string, unknown>) => string | null } = {},
+): string {
+  const footnotes: string[] = [];
+  const body = legacyMarkdown.serialize(
+    numberReferences(demotePrivateMedia(document), footnotes, options.reference),
+  );
+  if (!footnotes.length) return body;
+  const definitions = footnotes.map(
+    (text, index) => `[^${index + 1}]: ${text.replace(/\n/g, "\n    ")}`,
+  );
+  return `${body.replace(/\s+$/, "")}\n\n${definitions.join("\n")}`;
+}
+
+/** A copy of the document with each footnote given the number it is written
+ *  under and each cross-reference the words the archive gives it now, when
+ *  there is an archive to ask (`reference`); otherwise it keeps its label. */
+function numberReferences(
+  node: JSONContent,
+  footnotes: string[],
+  reference?: (attrs: Record<string, unknown>) => string | null,
+): JSONContent {
+  if (node.type === "footnote") {
+    footnotes.push(typeof node.attrs?.text === "string" ? node.attrs.text : "");
+    return { ...node, attrs: { ...node.attrs, number: footnotes.length } };
+  }
+  if (node.type === "crossReference") {
+    const label = reference?.(node.attrs ?? {});
+    return label ? { ...node, attrs: { ...node.attrs, label } } : node;
+  }
+  const content = node.content?.map((child) => numberReferences(child, footnotes, reference));
+  return content ? { ...node, content } : node;
 }
 
 function demotePrivateMedia(node: JSONContent): JSONContent {
@@ -1001,6 +1266,7 @@ function readableText(node: JSONContent): string {
   if (node.type === "hardBreak") return "\n";
   if (node.type === "privateFile") return String(node.attrs?.label ?? "Attachment");
   if (node.type === "privateImage") return String(node.attrs?.alt ?? "");
+  if (node.type === "crossReference") return String(node.attrs?.label ?? "");
 
   const children = (node.content ?? []).map(readableText).join("");
   if (
@@ -1013,6 +1279,7 @@ function readableText(node: JSONContent): string {
       "tableCell",
       "tableHeader",
       "privateFile",
+      "caption",
     ].includes(node.type ?? "")
   ) {
     return `${children}\n`;

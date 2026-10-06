@@ -52,7 +52,7 @@ import {
   Target,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
-import { PageSetupFields } from "@/components/WritingMenus";
+import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
 import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
 import type { SettingsSection } from "@/components/settingsSections";
@@ -1186,6 +1186,15 @@ export function SettingsPanel({
                   <div className="appearance-controls settings-page-setup">
                     <PageSetupFields
                       page={document.page}
+                      disabled={document.disabled}
+                      onChange={document.onPage}
+                    />
+                  </div>
+                  <h3>References</h3>
+                  <div className="appearance-controls settings-page-setup">
+                    <ReferenceFields
+                      page={document.page}
+                      footnotes={document.features.footnotes}
                       disabled={document.disabled}
                       onChange={document.onPage}
                     />

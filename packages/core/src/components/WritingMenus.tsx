@@ -8,6 +8,7 @@ import { MoreHorizontal, Ruler } from "@/components/icons";
 import { MenuItems } from "@/components/MenuPrimitives";
 import { useDismiss } from "@/components/useDismiss";
 import type { MenuItem } from "@/lib/menuShape";
+import { REFERENCE_WORDS } from "@/lib/references";
 import {
   LINE_SPACINGS,
   PAGE_MARGINS,
@@ -131,6 +132,76 @@ export function PageSetupFields({
           onChange={(event) => set("firstLineIndent", event.target.checked)}
         />
       </label>
+    </>
+  );
+}
+
+/** How the document's references are printed: Word's footnote and caption
+ *  options, the four a thesis is actually set by. In Settings → Document,
+ *  beside the page, because they are the document's as the page is. */
+export function ReferenceFields({
+  page,
+  footnotes,
+  disabled,
+  onChange,
+}: {
+  page: PageSetup;
+  footnotes: boolean;
+  disabled?: boolean;
+  onChange: (page: PageSetup) => void;
+}) {
+  const set = <K extends keyof PageSetup>(key: K, value: PageSetup[K]) =>
+    onChange({ ...page, [key]: value });
+  const figure = REFERENCE_WORDS[page.labels].figure;
+  return (
+    <>
+      <Field name="Labels">
+        <select
+          disabled={disabled}
+          value={page.labels}
+          onChange={(event) => set("labels", event.target.value as PageSetup["labels"])}
+        >
+          <option value="en">English</option>
+          <option value="it">Italiano</option>
+        </select>
+      </Field>
+      {footnotes && (
+        <Field name="Footnote numbers">
+          <select
+            disabled={disabled}
+            value={page.footnoteNumbering}
+            onChange={(event) =>
+              set("footnoteNumbering", event.target.value as PageSetup["footnoteNumbering"])
+            }
+          >
+            <option value="chapter">Each chapter</option>
+            <option value="document">Continuous</option>
+          </select>
+        </Field>
+      )}
+      <Field name="After a caption's number">
+        <select
+          disabled={disabled}
+          value={page.captionSeparator}
+          onChange={(event) =>
+            set("captionSeparator", event.target.value as PageSetup["captionSeparator"])
+          }
+        >
+          <option value="period">{figure} 1.</option>
+          <option value="colon">{figure} 1:</option>
+          <option value="dash">{figure} 1 —</option>
+        </select>
+      </Field>
+      <Field name="Table captions">
+        <select
+          disabled={disabled}
+          value={page.tableCaption}
+          onChange={(event) => set("tableCaption", event.target.value as PageSetup["tableCaption"])}
+        >
+          <option value="above">Above</option>
+          <option value="below">Below</option>
+        </select>
+      </Field>
     </>
   );
 }

@@ -24,8 +24,11 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Caption,
   Chapters,
+  CrossReference,
   Eraser,
+  Footnote,
   Highlighter,
   ImagePlus,
   Indent,
@@ -47,7 +50,9 @@ import {
   Underline,
   Undo2,
 } from "@/components/icons";
-import { WRITING_FONTS } from "@/lib/spaceShape";
+import { WRITING_FONTS, type PageSetup } from "@/lib/spaceShape";
+import { insertCaption, insertCrossReference, insertFootnote } from "../lib/referenceMarks";
+import { CrossReferencePicker } from "./CrossReferencePicker";
 import { keyName } from "@/lib/shortcuts";
 
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72];
@@ -270,15 +275,34 @@ function Swatches({
 
 export function ManuscriptToolbar({
   editor,
+  noteId,
+  footnotes,
+  page,
   onLink,
   onImage,
   onFind,
 }: {
   editor: Editor | null;
+  /** The chapter, so a cross-reference says "in chapter 2" only of others. */
+  noteId: string;
+  /** The document has footnotes on. */
+  footnotes: boolean;
+  /** Which side of a table its caption goes. */
+  page: Pick<PageSetup, "tableCaption">;
   onLink: () => void;
   onImage: () => void;
   onFind: () => void;
 }) {
+  const [citing, setCiting] = useState(false);
+  const citeRoot = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!citing) return;
+    const away = (event: PointerEvent) => {
+      if (!citeRoot.current?.contains(event.target as Node)) setCiting(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [citing]);
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => {
@@ -606,71 +630,124 @@ export function ManuscriptToolbar({
       </div>
 
       <div className="ribbon-group">
-        <Drop
-          label="Insert"
-          disabled={off}
-          face={
-            <>
-              <Plus size={15} />
-              <span className="ribbon-word">Insert</span>
-            </>
-          }
-        >
-          {(close) => (
-            <>
-              <MenuRow
-                icon={<Link size={16} />}
-                label="Link"
-                hint={keyName("⌘K")}
-                onPress={() => {
-                  close();
-                  onLink();
-                }}
-              />
-              <MenuRow
-                icon={<ImagePlus size={16} />}
-                label="Picture"
-                onPress={() => {
-                  close();
-                  onImage();
-                }}
-              />
-              <MenuRow
-                icon={<Table2 size={16} />}
-                label="Table"
-                onPress={() => {
-                  close();
-                  chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-                }}
-              />
-              <MenuRow
-                icon={<Minus size={16} />}
-                label="Line"
-                onPress={() => {
-                  close();
-                  chain().setHorizontalRule().run();
-                }}
-              />
-              <MenuRow
-                icon={<Chapters size={16} />}
-                label="Contents"
-                onPress={() => {
-                  close();
-                  chain().insertContent({ type: "tableOfContents" }).run();
-                }}
-              />
-              <MenuRow
-                icon={<PageBreak size={16} />}
-                label="Page break"
-                hint={keyName("⌘↩")}
-                onPress={() => {
-                  close();
-                  chain().insertContent({ type: "pageBreak" }).run();
-                }}
-              />
-            </>
+        <span ref={citeRoot} className="relative inline-flex">
+          <Drop
+            label="Insert"
+            disabled={off}
+            face={
+              <>
+                <Plus size={15} />
+                <span className="ribbon-word">Insert</span>
+              </>
+            }
+          >
+            {(close) => (
+              <>
+                <MenuRow
+                  icon={<Link size={16} />}
+                  label="Link"
+                  hint={keyName("⌘K")}
+                  onPress={() => {
+                    close();
+                    onLink();
+                  }}
+                />
+                <MenuRow
+                  icon={<ImagePlus size={16} />}
+                  label="Picture"
+                  onPress={() => {
+                    close();
+                    onImage();
+                  }}
+                />
+                <MenuRow
+                  icon={<Table2 size={16} />}
+                  label="Table"
+                  onPress={() => {
+                    close();
+                    chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+                  }}
+                />
+                <MenuRow
+                  icon={<Minus size={16} />}
+                  label="Line"
+                  onPress={() => {
+                    close();
+                    chain().setHorizontalRule().run();
+                  }}
+                />
+                <MenuRow
+                  icon={<Chapters size={16} />}
+                  label="Contents"
+                  onPress={() => {
+                    close();
+                    chain().insertContent({ type: "tableOfContents" }).run();
+                  }}
+                />
+                <MenuRow
+                  icon={<PageBreak size={16} />}
+                  label="Page break"
+                  hint={keyName("⌘↩")}
+                  onPress={() => {
+                    close();
+                    chain().insertContent({ type: "pageBreak" }).run();
+                  }}
+                />
+                {/* Word's References tab, the part of it a long piece of
+                  writing is held together by. */}
+                <div className="menu-separator" />
+                {footnotes && (
+                  <MenuRow
+                    icon={<Footnote size={16} />}
+                    label="Footnote"
+                    hint={keyName("⌥⌘F")}
+                    onPress={() => {
+                      close();
+                      insertFootnote(editor!);
+                    }}
+                  />
+                )}
+                <MenuRow
+                  icon={<Caption size={16} />}
+                  label="Figure caption"
+                  onPress={() => {
+                    close();
+                    insertCaption(editor!, "figure", page.tableCaption);
+                  }}
+                />
+                <MenuRow
+                  icon={<Caption size={16} />}
+                  label="Table caption"
+                  onPress={() => {
+                    close();
+                    insertCaption(editor!, "table", page.tableCaption);
+                  }}
+                />
+                <MenuRow
+                  icon={<CrossReference size={16} />}
+                  label="Cross-reference…"
+                  onPress={() => {
+                    close();
+                    setCiting(true);
+                  }}
+                />
+              </>
+            )}
+          </Drop>
+          {citing && editor && (
+            <CrossReferencePicker
+              from={noteId}
+              onClose={() => {
+                setCiting(false);
+                editor.commands.focus();
+              }}
+              onPick={(target, label, pendingId) => {
+                setCiting(false);
+                insertCrossReference(editor, target, noteId, label, pendingId);
+              }}
+            />
           )}
-        </Drop>
+        </span>
       </div>
 
       <div className="ribbon-group">

@@ -44,3 +44,15 @@ test("the page is read, not trusted", () => {
   assert.equal(page.fontSize, 12);
   assert.equal(page.lineHeight, 2);
 });
+
+test("the reference options are read, not trusted", () => {
+  assert.equal(DEFAULT_PAGE.labels, "en");
+  assert.equal(DEFAULT_PAGE.footnoteNumbering, "chapter");
+  const read = pageSetup({
+    page: { labels: "it", footnoteNumbering: "document", captionSeparator: "semicolon" },
+  });
+  assert.equal(read.labels, "it");
+  assert.equal(read.footnoteNumbering, "document");
+  assert.equal(read.captionSeparator, "period");
+  assert.equal(pageSetup({ page: { tableCaption: "below" } }).tableCaption, "below");
+});

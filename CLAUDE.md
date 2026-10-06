@@ -1113,6 +1113,34 @@ size, margins and letter of the page set-up.
   before they existed and Postgres sees no edit. Word's paragraph keys
   (⇧⌘L/E/R/J, ⌘↩) are a `manuscript`-only extension; a note keeps its keys.
 
+**References: footnotes, captions, cross-references.** Three schema members in
+`BASE_EXTENSIONS` (`Footnote`, `Caption`, `CrossReference`) and one heading
+attribute (`anchor`), every attribute null by default. **No number is ever
+stored.** The sheet counts with CSS counters started from `sheetCounters()`;
+the footnote list under the chapter, a reference's words, the picker and ⌘K
+ask `countTargets()` in `lib/references.ts`. One count, two drawings — change
+one and change the other.
+
+- A footnote's words are a string attribute, written when its popover closes,
+  not per keystroke. A new one opens itself through `footnoteWanted` in
+  `referenceMarks.ts`, the `penWanted` pattern; closed empty, it goes.
+- The open chapter's targets reach the store from the live editor
+  (`setLiveTargets`), because the projection is a save behind and a caption
+  written a second ago must already be citable.
+- An id is given only when something is cited. A target in another chapter
+  cannot be written from here — its `Y.Doc` is not open — so the reference
+  carries the id it wants and the target's words (`match`), resolves by words
+  meanwhile, and the target's chapter adopts the id the next time it is open
+  in an editor that may write (`adoptionsFor` → `adoptTargets`). A paste that
+  duplicates a cited id loses the copy's (`UniqueReferenceTargets`).
+- Four options are the document's and live in `settings.page`: label language
+  (English by default, Italian on request),
+  footnotes per chapter or continuous, the caption separator, which side of a
+  table its caption goes. Settings → Document → References.
+- Markdown: pandoc's `[^n]` with definitions at the end, a caption as
+  `<p data-caption="…">` with Markdown inside, a cross-reference as its words.
+  DOCX gets Word's own footnotes.
+
 ## Two people in one note
 
 Title and content are one Yjs document. The browser holds it in memory and in

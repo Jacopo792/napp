@@ -41,6 +41,7 @@ import {
   Heading2,
   Layers,
   Pilcrow,
+  Footnote,
   UserRound,
 } from "@/components/icons";
 import type { SettingsSection } from "@/components/settingsSections";
@@ -49,9 +50,21 @@ import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
 import {
   OPEN_PLACE,
   openPlace,
+  referenceSnapshot,
   setDocumentContents,
+  setDocumentReferences,
   type PlaceRequest,
+  type PlaceTarget,
 } from "@/lib/documentContents";
+import {
+  EMPTY_TARGETS,
+  REFERENCE_WORDS,
+  referenceText,
+  resolveReference,
+  targetKind,
+  targetsOf,
+  type ChapterTargets,
+} from "@/lib/references";
 import { ContentsList } from "@/components/ContentsList";
 import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
@@ -292,6 +305,28 @@ const NoteEditor = lazy(() =>
 
 /** A Postgres row write is cheap enough to commit shortly after typing stops. */
 const AUTOSAVE_MS = 250;
+
+/* A chapter's targets, read once per projection: the content object is
+   replaced whenever the note changes, so it is its own cache key. */
+const targetCache = new WeakMap<object, ChapterTargets>();
+
+/** A Markdown export's cross-references say what the archive gives them
+ *  now, rather than the words they were made with. */
+function citing(from: string) {
+  return {
+    reference: (attrs: Record<string, unknown>) => {
+      const { counted, settings, chapters } = referenceSnapshot();
+      if (!chapters.length || typeof attrs.target !== "string") return null;
+      const target = resolveReference(counted, {
+        target: attrs.target,
+        noteId: typeof attrs.noteId === "string" ? attrs.noteId : from,
+        kind: targetKind(attrs.kind),
+        match: typeof attrs.match === "string" ? attrs.match : "",
+      });
+      return target ? referenceText(target, from, settings) : null;
+    },
+  };
+}
 /** How long a pause has to be before the other person is told you stopped. */
 const TYPING_IDLE_MS = 2500;
 
@@ -519,8 +554,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     noteId: string;
     history?: string | true;
     comments?: boolean;
-    /** Words to go to once the note is open — a heading or a line ⌘K found. */
-    reveal?: string;
+    /** Words to go to once the note is open — a heading or a line ⌘K found —
+     *  or a footnote, a caption, a cited heading. */
+    reveal?: string | PlaceTarget;
   } | null>(null);
 
   /* A hold, and the two refs it needs. The timer is one, because it has to be
@@ -1278,6 +1314,47 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [manuscript, entries, docFeatures.numbering]);
   useEffect(() => setDocumentContents(contents), [contents]);
 
+  /* Every chapter's footnotes, captions and cited headings, from the same
+     projections, in the structure's order — what a cross-reference's words,
+     a sheet's first footnote number and the picker are counted from. The
+     notebook is there too, counted on its own, so a page of it can cite
+     and be cited like a chapter. */
+  const referenceChapters = useMemo(() => {
+    if (!manuscript) return [];
+    const byId = new Map(entries.map((entry) => [entry.note.id, entry.note]));
+    const read = (id: string): ChapterTargets => {
+      const content = byId.get(id)?.content;
+      if (!content || typeof content !== "object") return EMPTY_TARGETS;
+      let found = targetCache.get(content);
+      if (!found) targetCache.set(content, (found = targetsOf(content)));
+      return found;
+    };
+    return [
+      ...manuscript.chapters.map((item, index) => ({
+        id: item.id,
+        title: item.title,
+        number: index + 1,
+        targets: read(item.id),
+      })),
+      ...manuscript.notebook.map((item) => ({
+        id: item.id,
+        title: item.title,
+        number: null,
+        targets: read(item.id),
+      })),
+    ];
+  }, [manuscript, entries]);
+  const page = currentSpace?.page ?? DEFAULT_PAGE;
+  useEffect(
+    () =>
+      setDocumentReferences(referenceChapters, {
+        numbered: docFeatures.numbering,
+        footnotes: page.footnoteNumbering,
+        language: page.labels,
+      }),
+    [referenceChapters, docFeatures.numbering, page.footnoteNumbering, page.labels],
+  );
+
   /* Words today: yours, from the versions the server writes after each
      stretch of writing, so it counts what was written on any device — and
      runs up to ten minutes behind, which is how often a stretch is closed.
@@ -1972,12 +2049,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     (entry: NoteEntry) => {
       if (entry.note.id === selectedId && collaborative.ready && collaborative.doc) {
         const live = projectDocument(collaborative.doc);
-        return noteToMarkdown(live.title, live.content);
+        return noteToMarkdown(live.title, live.content, citing(entry.note.id));
       }
       /* What is on screen, not what last reached Postgres: exporting a note you
        are still typing in should give you the words you can see. */
       const draft = readDraft(entry.note.id);
-      return noteToMarkdown(draft?.title ?? entry.note.title, draft?.content ?? entry.note.content);
+      return noteToMarkdown(
+        draft?.title ?? entry.note.title,
+        draft?.content ?? entry.note.content,
+        citing(entry.note.id),
+      );
     },
     [selectedId, collaborative.ready, collaborative.doc],
   );
@@ -2857,9 +2938,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text } = (event as CustomEvent<PlaceRequest>).detail;
+      const { noteId, text, target } = (event as CustomEvent<PlaceRequest>).detail;
       handleSelectNote(noteId);
-      if (text) setOpenThen({ noteId, reveal: text });
+      if (target ?? text) setOpenThen({ noteId, reveal: target ?? text });
     };
     window.addEventListener(OPEN_PLACE, open);
     return () => window.removeEventListener(OPEN_PLACE, open);
@@ -3473,20 +3554,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Opening what was found. In a document the structure's own path — the
      notes list's scope and filter are not on screen there — and then, if a
      place inside it was found, going to that place. */
-  const openFound = (id: string, then?: { reveal?: string; history?: string }) => () => {
-    if (docMode) {
-      handleSelectNote(id);
-      if (compact) {
-        setFoldersOpen(false);
-        setMobileScreen("note");
+  const openFound =
+    (id: string, then?: { reveal?: string | PlaceTarget; history?: string }) => () => {
+      if (docMode) {
+        handleSelectNote(id);
+        if (compact) {
+          setFoldersOpen(false);
+          setMobileScreen("note");
+        }
+      } else {
+        setQuery("");
+        setSelectedFolderId(ALL);
+        handleSelectNote(id);
       }
-    } else {
-      setQuery("");
-      setSelectedFolderId(ALL);
-      handleSelectNote(id);
-    }
-    if (then) setOpenThen({ noteId: id, ...then });
-  };
+      if (then) setOpenThen({ noteId: id, ...then });
+    };
   const middle = () => ({
     x: window.innerWidth / 2,
     y: window.innerHeight / 3,
@@ -3742,11 +3824,29 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      `includes`. */
   const paletteSearch = (q: string): Command[] => {
     const found: Command[] = [];
+    const references = referenceSnapshot();
     let lines = 0;
     for (const entry of searchable) {
       const id = entry.note.id;
       const title = entry.note.title || "Untitled";
       const at = Date.parse(entry.note.updatedAt);
+      /* A footnote's words are an attribute, outside the text the haystack
+         is made of, so they are asked before it can rule the note out. */
+      for (const target of references.counted.get(id)?.targets ?? []) {
+        if (target.kind !== "footnote" || !fold(target.text).includes(q)) continue;
+        found.push({
+          id: `footnote:${id}:${target.index}`,
+          group: "Footnotes",
+          name: target.text.length > 90 ? `${target.text.slice(0, 89)}…` : target.text,
+          hint: `${REFERENCE_WORDS[references.settings.language].footnote} ${target.number} · ${title}`,
+          rank: 4,
+          at,
+          icon: <Footnote size={16} />,
+          run: openFound(id, {
+            reveal: { kind: "footnote", id: target.id, index: target.index },
+          }),
+        });
+      }
       if (!derivedOf(entry.note).haystack.includes(q)) continue;
       headingsOf(entry.note.content).forEach((heading, index) => {
         if (!fold(heading.text).includes(q)) return;
@@ -4518,7 +4618,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const partName = chapter?.folderId ? manuscript.parts.get(chapter.folderId) : undefined;
     const notebookName =
       viewedMember && !viewedMember.isSelf ? `${nameOf(viewedMember)}'s notebook` : "Notebook";
-    const page = currentSpace?.page ?? DEFAULT_PAGE;
     const before = chapterAt > 0 ? manuscript.chapters[chapterAt - 1] : undefined;
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
@@ -4877,6 +4976,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 ? [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · ")
                 : notebookName,
             footer: turn,
+            footnotes: docFeatures.footnotes,
             numbered: docFeatures.numbering && chapterAt >= 0 ? chapterAt + 1 : null,
             writing: {
               focus: focusMode ? writingPreferences.focusScope : "off",

@@ -71,6 +71,7 @@ export const SHORTCUTS: Shortcut[] = [
     kind: DOC,
   },
   { group: "In the text", keys: "\u2318\u21b5", what: "Page break", kind: DOC },
+  { group: "In the text", keys: "\u2325\u2318F", what: "Footnote", kind: DOC },
   { group: "In the text", keys: "\u2318F", what: "Find and replace", kind: DOC },
   { group: "In the text", keys: "\u2318K", what: "Link the selected words", kind: DOC },
   { group: "In the text", keys: "/", what: "Formatting and blocks", kind: DOC },

@@ -57,9 +57,22 @@ import {
   useState,
 } from "react";
 import { ContentsView } from "./ContentsView";
+import { FootnoteView } from "./FootnoteView";
+import { CrossReferenceView } from "./CrossReferenceView";
+import {
+  UniqueReferenceTargets,
+  adoptTargets,
+  findTarget,
+  footnoteKeys,
+  openFootnoteAt,
+} from "@/features/editor/lib/referenceMarks";
+import { targetsOf, type Adoption, type ChapterTargets } from "@/lib/references";
+import type { PlaceTarget } from "@/lib/documentContents";
 import { WRITING_FOCUS, WritingFocus, type WritingFocusSettings } from "../lib/writingFocus";
 import {
   BASE_EXTENSIONS,
+  CrossReference,
+  Footnote,
   DRAWING_BOX,
   DRAWING_INKS,
   Drawing,
@@ -163,6 +176,10 @@ export interface RichTextEditorHandle {
   /** Select the first place these words occur and scroll to it, leaving no
    *  search behind. False when they are not (yet) in the document. */
   reveal: (text: string) => boolean;
+  /** Go to a footnote, a caption or a heading; a footnote opens to be read. */
+  revealTarget: (target: PlaceTarget) => boolean;
+  /** Give this chapter's targets the ids references elsewhere cite them by. */
+  adopt: (adoptions: Adoption[]) => void;
   focus: () => void;
 }
 
@@ -209,6 +226,13 @@ interface Props {
   /** A document only: what focus mode leaves lit, and whether the line being
    *  written is kept mid-window. */
   writing?: WritingFocusSettings;
+  /** The note this editor holds, for a cross-reference to say "in chapter 2"
+   *  only of what is not in this one. */
+  noteId?: string;
+  /** A document with footnotes on: ⌥⌘F puts one in. */
+  footnotes?: boolean;
+  /** A document only: what this chapter can be cited by, as it is typed. */
+  onTargets?: (targets: ChapterTargets) => void;
 }
 
 /* Word's paragraph keys, on the paragraphs and headings the selection
@@ -1813,6 +1837,23 @@ const ContentsWithView = TableOfContents.extend({
   },
 });
 
+const FootnoteWithView = Footnote.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(FootnoteView);
+  },
+});
+
+function crossReferenceExtension(noteId: () => string) {
+  return CrossReference.extend<{ noteId: () => string }>({
+    addOptions: () => ({ noteId }),
+    addNodeView() {
+      return ReactNodeViewRenderer(CrossReferenceView);
+    },
+  });
+}
+
+const VIEWED_ELSEWHERE = new Set(["tableOfContents", "footnote", "crossReference"]);
+
 function privateFileExtension(resolve: Resolver) {
   return PrivateFile.extend<PrivateFileOptions>({
     addOptions: () => ({ resolve }),
@@ -1905,6 +1946,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onEditor,
     manuscript = false,
     writing,
+    noteId = "",
+    footnotes = false,
+    onTargets,
   },
   ref,
 ) {
@@ -1963,6 +2007,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   writeLockOwnerRef.current = writeLockOwner;
   const writeLockGuard = useMemo(() => writeLockGuardExtension(writeLockOwnerRef), []);
 
+  const noteIdRef = useRef(noteId);
+  noteIdRef.current = noteId;
+  const crossReferences = useMemo(() => crossReferenceExtension(() => noteIdRef.current), []);
+  const footnotesRef = useRef(footnotes);
+  footnotesRef.current = footnotes;
+  const footnoteShortcut = useMemo(() => footnoteKeys(() => footnotesRef.current), []);
+  const onTargetsRef = useRef(onTargets);
+  onTargetsRef.current = onTargets;
+
   const sentenceCapitalize = useMemo(() => sentenceCapitalizeExtension(), []);
   const autocorrectEnabled = useRef(autocorrectOn);
   autocorrectEnabled.current = autocorrectOn;
@@ -1971,8 +2024,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const editor = useEditor(
     {
       extensions: [
-        ...BASE_EXTENSIONS.filter((extension) => extension.name !== "tableOfContents"),
+        ...BASE_EXTENSIONS.filter((extension) => !VIEWED_ELSEWHERE.has(extension.name)),
         ContentsWithView,
+        FootnoteWithView,
+        crossReferences,
+        UniqueReferenceTargets,
         ...(collaboration
           ? [
               Collaboration.configure({ document: collaboration.document, field: BODY_FRAGMENT }),
@@ -2004,7 +2060,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         sentenceCapitalize,
         autocorrect,
         ...(manuscript
-          ? [ManuscriptKeys, WritingFocus.configure({ read: () => writingRef.current })]
+          ? [
+              ManuscriptKeys,
+              footnoteShortcut,
+              WritingFocus.configure({ read: () => writingRef.current }),
+            ]
           : []),
       ],
       content: collaboration ? undefined : value,
@@ -2190,6 +2250,27 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     return () => onEditor?.(null);
   }, [editor, onEditor]);
 
+  /* What this chapter can be cited by, read out of the live document a
+     quarter of a second after it stops changing — the projection is a save
+     behind, and a caption written a moment ago is already citable. */
+  const reportsTargets = Boolean(onTargets);
+  useEffect(() => {
+    if (!editor || !reportsTargets) return;
+    let timer = 0;
+    const report = () => onTargetsRef.current?.(targetsOf(editor.getJSON()));
+    const changed = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (!transaction.docChanged) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(report, 250);
+    };
+    report();
+    editor.on("transaction", changed);
+    return () => {
+      window.clearTimeout(timer);
+      editor.off("transaction", changed);
+    };
+  }, [editor, reportsTargets]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -2348,6 +2429,27 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       },
       closeSearch() {
         editor?.commands.clearSearch();
+      },
+      revealTarget(target) {
+        if (!editor) return false;
+        const found = findTarget(editor.state.doc, target);
+        if (!found) return false;
+        /* After a footnote's number, at the start of a heading or caption. */
+        editor
+          .chain()
+          .focus(undefined, { scrollIntoView: false })
+          .setTextSelection(found.pos + 1)
+          .run();
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        (editor.view.nodeDOM(found.pos) as HTMLElement | null)?.scrollIntoView?.({
+          block: "center",
+          behavior: still ? "auto" : "smooth",
+        });
+        if (found.node.type.name === "footnote") openFootnoteAt(found.pos);
+        return true;
+      },
+      adopt(adoptions) {
+        if (editor) adoptTargets(editor, adoptions);
       },
       reveal(text) {
         if (!editor) return false;

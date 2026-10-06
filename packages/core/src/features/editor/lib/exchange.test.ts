@@ -280,3 +280,89 @@ test("a table of contents leaves as [TOC] and comes back as the block", () => {
   assert.ok(note.content.content?.some((node) => node.type === "tableOfContents"));
   assert.equal(richTextToMarkdown(note.content), markdown);
 });
+
+test("footnotes leave as pandoc's [^n] and come back with their words", () => {
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "L'Uno" },
+          { type: "footnote", attrs: { text: "Enn. VI 9, 3.\nCfr. V 1.", id: "f1" } },
+          { type: "text", text: " è oltre l'essere" },
+          { type: "footnote", attrs: { text: "Resp. 509b." } },
+          { type: "text", text: "." },
+        ],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "Un [^3] scritto a mano." }] },
+    ],
+  };
+  const markdown = richTextToMarkdown(document);
+  assert.match(markdown, /L'Uno\[\^1\] è oltre l'essere\[\^2\]\./);
+  assert.match(markdown, /^\[\^1\]: Enn\. VI 9, 3\.\n {4}Cfr\. V 1\.$/m);
+  assert.match(markdown, /^\[\^2\]: Resp\. 509b\.$/m);
+  assert.ok(!markdown.includes("f1"));
+  const note = markdownToNote("x.md", `# T\n\n${markdown}`);
+  const notes = note.content.content?.[0]?.content?.filter((node) => node.type === "footnote");
+  assert.deepEqual(
+    notes?.map((node) => node.attrs?.text),
+    ["Enn. VI 9, 3.\nCfr. V 1.", "Resp. 509b."],
+  );
+  assert.equal(richTextToMarkdown(note.content), markdown);
+});
+
+test("a caption keeps its kind and its marks through Markdown", () => {
+  const document = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "Prima." }] },
+      {
+        type: "caption",
+        attrs: { kind: "table", id: "c1" },
+        content: [
+          { type: "text", text: "Le tre " },
+          { type: "text", text: "ipostasi", marks: [{ type: "italic" }] },
+        ],
+      },
+    ],
+  };
+  const markdown = richTextToMarkdown(document);
+  assert.match(markdown, /^<p data-caption="table">Le tre \*ipostasi\*<\/p>$/m);
+  assert.ok(!markdown.includes("c1"));
+  const back = markdownToNote("x.md", `# T\n\n${markdown}`).content;
+  const caption = back.content?.find((node) => node.type === "caption");
+  assert.equal(caption?.attrs?.kind, "table");
+  assert.equal(richTextToMarkdown(back), markdown);
+});
+
+test("a cross-reference leaves as its words, never as its target", () => {
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Si veda la " },
+          {
+            type: "crossReference",
+            attrs: {
+              target: "h-bene",
+              noteId: "n1",
+              kind: "section",
+              match: "Il Bene",
+              label: "sezione 1.1",
+            },
+          },
+          { type: "text", text: "." },
+        ],
+      },
+    ],
+  };
+  assert.equal(richTextToMarkdown(document).trim(), "Si veda la sezione 1.1.");
+  assert.equal(
+    richTextToMarkdown(document, { reference: () => "sezione 2.3" }).trim(),
+    "Si veda la sezione 2.3.",
+  );
+  assert.ok(!richTextToMarkdown(document).includes("h-bene"));
+});

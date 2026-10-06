@@ -2,6 +2,13 @@
  * options are, read out of a row. A file of its own because `spaces.ts`
  * reaches the Supabase client, which the preview swaps out — and a stand-in
  * cannot borrow these from the module it stands in for. */
+import {
+  CAPTION_SEPARATORS,
+  REFERENCE_WORDS,
+  type CaptionSeparator,
+  type FootnoteNumbering,
+  type ReferenceLanguage,
+} from "./references.ts";
 
 /** What an archive is for. A document is one piece of writing in chapters;
  *  `archives.kind` holds it, so it is the same for every member. It is the
@@ -150,6 +157,14 @@ export interface PageSetup {
   lineHeight: (typeof LINE_SPACINGS)[number];
   /** The first line of each paragraph set in, as a book sets it. */
   firstLineIndent: boolean;
+  /** Word's References tab, cut to the four choices a thesis is set by:
+   *  the language the labels are printed in, whether footnotes start again
+   *  in each chapter, what stands between a caption's number and its words,
+   *  and which side of a table its caption goes. */
+  labels: ReferenceLanguage;
+  footnoteNumbering: FootnoteNumbering;
+  captionSeparator: CaptionSeparator;
+  tableCaption: "above" | "below";
 }
 
 export const DEFAULT_PAGE: PageSetup = {
@@ -160,6 +175,10 @@ export const DEFAULT_PAGE: PageSetup = {
   fontSize: 12,
   lineHeight: 1.5,
   firstLineIndent: false,
+  labels: "en",
+  footnoteNumbering: "chapter",
+  captionSeparator: "period",
+  tableCaption: "above",
 };
 
 export function pageSetup(settings: unknown): PageSetup {
@@ -176,6 +195,11 @@ export function pageSetup(settings: unknown): PageSetup {
   if (LINE_SPACINGS.includes(raw.lineHeight as PageSetup["lineHeight"]))
     page.lineHeight = raw.lineHeight as PageSetup["lineHeight"];
   if (typeof raw.firstLineIndent === "boolean") page.firstLineIndent = raw.firstLineIndent;
+  if (raw.labels === "it") page.labels = "it";
+  if (raw.footnoteNumbering === "document") page.footnoteNumbering = "document";
+  if (typeof raw.captionSeparator === "string" && raw.captionSeparator in CAPTION_SEPARATORS)
+    page.captionSeparator = raw.captionSeparator as CaptionSeparator;
+  if (raw.tableCaption === "below") page.tableCaption = "below";
   return page;
 }
 
@@ -195,5 +219,9 @@ export function pageStyle(page: PageSetup): Record<string, string> {
     "--sheet-size": `${page.fontSize}pt`,
     "--sheet-leading": String(page.lineHeight),
     "--sheet-first-line": page.firstLineIndent ? "1.25cm" : "0",
+    /* Strings for `content:`, so they carry their own quotes. */
+    "--label-figure": `"${REFERENCE_WORDS[page.labels].figure} "`,
+    "--label-table": `"${REFERENCE_WORDS[page.labels].table} "`,
+    "--caption-separator": `"${CAPTION_SEPARATORS[page.captionSeparator]}"`,
   };
 }

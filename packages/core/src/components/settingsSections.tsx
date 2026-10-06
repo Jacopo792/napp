@@ -89,7 +89,7 @@ export const SETTINGS_SECTIONS = [
         name: "Document",
         icon: <Chapters size={16} />,
         keywords:
-          "document thesis book preset options numbering footnotes citations review word goal page setup paper size orientation margins font size line spacing indent",
+          "document thesis book preset options numbering footnotes citations review word goal page setup paper size orientation margins font size line spacing indent references labels captions figure table cross-reference footnote numbers continuous",
         only: "document",
       },
       {

@@ -46,6 +46,8 @@ import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
 import type { Editor } from "@tiptap/core";
 import { pageStyle, type PageSetup } from "@/lib/spaceShape";
+import { setLiveTargets, useReferences, type PlaceTarget } from "@/lib/documentContents";
+import { adoptionsFor, sheetCounters } from "@/lib/references";
 
 /** What a chapter of a document is framed by instead of a note's header:
  *  the page it is set on, the line over its title, and what comes after it. */
@@ -64,6 +66,8 @@ export interface ManuscriptFrame {
   topLevel?: number;
   /** Focus mode and typewriter scrolling, as the reader set them. */
   writing?: WritingFocusSettings;
+  /** The document has footnotes on: Insert and ⌥⌘F offer one. */
+  footnotes?: boolean;
 }
 
 interface Props {
@@ -157,7 +161,7 @@ export interface NoteEditorHandle {
   drawOnPage: () => void;
   /** Go to the first place these words occur — once they are there, which
    *  for a note just opened is after its document has arrived. */
-  reveal: (text: string) => void;
+  reveal: (place: string | PlaceTarget) => void;
   focus: () => void;
 }
 
@@ -261,14 +265,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      opened is an empty editor until its document syncs. Tried every 150 ms
      and given up on after a few seconds, so a passage deleted in the
      meantime does not pull the caret away later. */
-  const revealing = useRef<string | null>(null);
+  const revealing = useRef<string | PlaceTarget | null>(null);
   const [revealAsked, setRevealAsked] = useState(0);
   useEffect(() => {
-    const text = revealing.current;
-    if (!text) return;
+    const place = revealing.current;
+    if (!place) return;
     let tries = 0;
     const timer = window.setInterval(() => {
-      if (editorRef.current?.reveal(text) || ++tries > 50) {
+      const found =
+        typeof place === "string"
+          ? editorRef.current?.reveal(place)
+          : editorRef.current?.revealTarget(place);
+      if (found || ++tries > 50) {
         revealing.current = null;
         window.clearInterval(timer);
       }
@@ -311,6 +319,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const linkUrlRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const findRef = useRef<HTMLInputElement>(null);
+
+  /* A document's references, counted across every chapter: where this
+     sheet's counters start, the footnotes listed at its foot, and the ids
+     references from other chapters are waiting for this one to give. */
+  const references = useReferences();
+  const noteId = entry?.note.id ?? "";
+  const starts = sheetCounters(references.counted, noteId);
+  const chapterFootnotes = isManuscript
+    ? (references.counted.get(noteId)?.targets ?? []).filter((target) => target.kind === "footnote")
+    : [];
+  const adoptions =
+    isManuscript && canEdit && synced
+      ? adoptionsFor(references.chapters, references.counted, noteId)
+      : [];
+  const adoptionKey = adoptions.map((adoption) => adoption.id).join(" ");
+  const adoptionsRef = useRef(adoptions);
+  adoptionsRef.current = adoptions;
+  useEffect(() => {
+    if (adoptionKey) editorRef.current?.adopt(adoptionsRef.current);
+  }, [adoptionKey]);
+  useEffect(() => () => setLiveTargets(noteId, null), [noteId]);
 
   const [shellWidth, setShellWidth] = useState<number | null>(null);
 
@@ -374,8 +403,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     drawOnPage() {
       editorRef.current?.format("drawing-page");
     },
-    reveal(text) {
-      revealing.current = text;
+    reveal(place) {
+      revealing.current = place;
       setRevealAsked((count) => count + 1);
     },
     focus() {
@@ -919,6 +948,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           {canEdit ? (
             <ManuscriptToolbar
               editor={instance}
+              noteId={entry.note.id}
+              footnotes={Boolean(manuscript.footnotes)}
+              page={manuscript.page}
               onLink={openLinkForm}
               onImage={() => imageRef.current?.click()}
               onFind={() => {
@@ -960,6 +992,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               data-ink={sheet.adaptInk ? "adapt" : "keep"}
               style={{
                 ...pageStyle(manuscript.page),
+                ...({
+                  "--footnote-start": starts.footnote,
+                  "--figure-start": starts.figure,
+                  "--table-start": starts.table,
+                } as CSSProperties),
                 ...(manuscript.numbered
                   ? ({ "--chapter": manuscript.numbered } as CSSProperties)
                   : {}),
@@ -990,6 +1027,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   ref={editorRef}
                   manuscript
                   writing={manuscript.writing}
+                  noteId={entry.note.id}
+                  footnotes={manuscript.footnotes}
+                  onTargets={(targets) => setLiveTargets(entry.note.id, targets)}
                   onEditor={setInstance}
                   value={readDraft(entry.note.id)?.content ?? entry.note.content}
                   revision={syncRevision}
@@ -1028,6 +1068,35 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   <div className="skeleton" style={{ width: "78%" }} />
                   <div className="skeleton" style={{ width: "45%" }} />
                 </div>
+              )}
+              {/* The chapter's footnotes, as Word's print layout puts them
+                  at the foot of the page: a short rule, then each note. The
+                  number is the one its mark in the text is drawn with. */}
+              {chapterFootnotes.length > 0 && (
+                <section className="sheet-footnotes" aria-label="Footnotes">
+                  <ol>
+                    {chapterFootnotes.map((note) => (
+                      <li key={note.index}>
+                        <button
+                          type="button"
+                          className="sheet-footnote"
+                          onClick={() =>
+                            editorRef.current?.revealTarget({
+                              kind: "footnote",
+                              id: note.id,
+                              index: note.index,
+                            })
+                          }
+                        >
+                          <span className="sheet-footnote-number">{note.number}</span>
+                          <span className={note.text ? "" : "is-empty"}>
+                            {note.text || "Empty footnote"}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
               )}
             </article>
             {manuscript.footer}

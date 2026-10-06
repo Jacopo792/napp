@@ -268,16 +268,16 @@ const CHAPTERS: { title: string; folder: string | null; position?: number; body:
     title: "L'Uno e la processione",
     folder: P_ONE,
     position: 2,
-    body: `## La sovrabbondanza\n\n${paragraph("L'Uno produce senza diminuire, come una sorgente che non si svuota nei fiumi che alimenta.", 22)}\n\n## Il limite del linguaggio\n\n${paragraph("Di ciò che è al di là dell'essere si può dire soltanto ciò che non è.", 12)}`,
+    body: `## La sovrabbondanza\n\n${paragraph("L'Uno produce senza diminuire, come una sorgente che non si svuota nei fiumi che alimenta.", 22)} Così in Enneadi V 2, 1.[^1]\n\n<p data-caption="figure">La processione come irradiazione dalla sorgente</p>\n\n## Il limite del linguaggio\n\n${paragraph("Di ciò che è al di là dell'essere si può dire soltanto ciò che non è.", 12)} È la via negativa.[^2]\n\n[^1]: Plot. Enn. V 2, 1, 7-9: «essendo perfetto, sovrabbonda».\n[^2]: Cfr. Enn. VI 9, 3 e, per la ripresa medievale, Dionigi, De divinis nominibus.`,
   },
   {
     title: "L'Intelletto e le idee",
     folder: P_ONE,
     position: 3,
-    body: paragraph(
+    body: `${paragraph(
       "Nell'Intelletto pensare ed essere coincidono, e ogni idea contiene tutte le altre.",
       30,
-    ),
+    )} È la tesi di Parmenide riletta.[^1]\n\n<p data-caption="table">Le tre ipostasi e i loro predicati</p>\n\n| Ipostasi | Atto |\n| --- | --- |\n| Uno | sovrabbondare |\n| Intelletto | pensare |\n| Anima | ordinare |\n\n[^1]: Enn. V 1, 8, 17-18.`,
   },
   {
     title: "L'anima e il corpo",

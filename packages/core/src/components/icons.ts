@@ -19,6 +19,8 @@ export {
   BookOpen,
   Books,
   Article as Chapters,
+  Subtitles as Caption,
+  ArrowBendDownRight as CrossReference,
   TextSuperscript as Footnote,
   CalendarBlank as CalendarDays,
   BookmarkSimple as Bookmark,

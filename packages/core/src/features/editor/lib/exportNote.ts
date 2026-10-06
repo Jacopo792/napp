@@ -68,14 +68,34 @@ export async function exportDocx(
     TableRow,
     TableCell,
     ExternalHyperlink,
+    FootnoteReferenceRun,
     WidthType,
   } = await import("docx");
+  /* Word's own footnotes, numbered by Word: the one place an export already
+     has somewhere real to put them. A cross-reference leaves as the words it
+     was made with; its live numbering is the document export's to do. */
+  const footnotes: Record<string, { children: InstanceType<typeof Paragraph>[] }> = {};
+  let footnoteCount = 0;
   const inline = (
     node: JSONContent,
     mono = false,
-  ): (InstanceType<typeof TextRun> | InstanceType<typeof ExternalHyperlink>)[] =>
+  ): (
+    | InstanceType<typeof TextRun>
+    | InstanceType<typeof ExternalHyperlink>
+    | InstanceType<typeof FootnoteReferenceRun>
+  )[] =>
     (node.content ?? []).flatMap((child) => {
       if (child.type === "hardBreak") return [new TextRun({ break: 1 })];
+      if (child.type === "footnote") {
+        footnoteCount += 1;
+        const text = typeof child.attrs?.text === "string" ? child.attrs.text : "";
+        footnotes[footnoteCount] = {
+          children: text.split("\n").map((line) => new Paragraph({ text: line })),
+        };
+        return [new FootnoteReferenceRun(footnoteCount)];
+      }
+      if (child.type === "crossReference")
+        return [new TextRun({ text: String(child.attrs?.label ?? "") })];
       if (child.type !== "text") return inline(child, mono);
       const marks = child.marks ?? [];
       const style = marks.find((m) => m.type === "textStyle")?.attrs;
@@ -180,6 +200,14 @@ export async function exportDocx(
         }),
       ];
     }
+    if (node.type === "caption")
+      return [
+        new Paragraph({
+          children: inline(node),
+          style: "Caption",
+          spacing: { after: 140 },
+        }),
+      ];
     if (["paragraph", "heading", "codeBlock"].includes(node.type ?? ""))
       return [
         new Paragraph({
@@ -222,15 +250,13 @@ export async function exportDocx(
       return [new Paragraph({ text: "────────────────────────", spacing: { after: 140 } })];
     return (await Promise.all((node.content ?? []).map((child) => blocks(child)))).flat();
   }
+  const children = [new Paragraph({ text: title, heading: "Title" }), ...(await blocks(content))];
   return Packer.toBlob(
     new Document({
       title,
       styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
-      sections: [
-        {
-          children: [new Paragraph({ text: title, heading: "Title" }), ...(await blocks(content))],
-        },
-      ],
+      footnotes,
+      sections: [{ children }],
     }),
   );
 }

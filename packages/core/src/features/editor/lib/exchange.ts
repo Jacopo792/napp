@@ -21,8 +21,12 @@ import { legacyMarkdownToRichText, richTextToMarkdown } from "./content.ts";
 
 /** `# Title` first, because every other Markdown tool treats the first heading
  *  as the document's name and this app keeps the title in a column. */
-export function noteToMarkdown(title: string, document: JSONContent): string {
-  const body = richTextToMarkdown(document).trim();
+export function noteToMarkdown(
+  title: string,
+  document: JSONContent,
+  options?: Parameters<typeof richTextToMarkdown>[1],
+): string {
+  const body = richTextToMarkdown(document, options).trim();
   const heading = `# ${(title || "Untitled").replace(/\s+/g, " ").trim()}`;
   return body ? `${heading}\n\n${body}\n` : `${heading}\n`;
 }

@@ -10977,7 +10977,8 @@ button.sheet-chip:hover,
    `headingNumbers()` in manuscript.ts counts the same way for the contents —
    a deeper heading before any section is 2.0.1 in both. */
 .manuscript-sheet.is-numbered {
-  counter-reset: chapter var(--chapter) s1 s2 s3;
+  counter-reset: chapter var(--chapter) s1 s2 s3 footnote var(--footnote-start, 0) figure
+    var(--figure-start, 0) table var(--table-start, 0);
 }
 
 .manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h1,
@@ -11016,6 +11017,280 @@ button.sheet-chip:hover,
 
 .manuscript-sheet.is-numbered[data-top="1"] .rich-text-content h3::before {
   content: counter(chapter) "." counter(s1) "." counter(s2) "." counter(s3);
+}
+
+/* ── References ─────────────────────────────────────────────────────────────
+   Footnotes and captions are counted where they stand, as the headings are,
+   from where the chapters before this one left off (`--footnote-start`,
+   `--figure-start`, `--table-start`, from `sheetCounters()`). The list under
+   the chapter, a cross-reference's words and ⌘K count the same way in
+   `lib/references.ts`. One `counter-reset`, because a second declaration of
+   it replaces the first — the numbered sheet's rule above carries all of it. */
+.manuscript-sheet {
+  counter-reset: footnote var(--footnote-start, 0) figure var(--figure-start, 0) table
+    var(--table-start, 0);
+}
+
+/* The number in the text. Outside a document's sheet there is nothing to
+   count from, so it is a mark rather than a wrong number. */
+.footnote-ref {
+  padding: 0 1px;
+  border-radius: var(--radius-xs);
+  color: var(--accent);
+  font-size: 0.72em;
+  font-variant-numeric: tabular-nums;
+  line-height: 0;
+  vertical-align: super;
+  cursor: pointer;
+}
+
+.footnote-ref::after {
+  content: "*";
+}
+
+.manuscript-sheet .footnote-ref {
+  counter-increment: footnote;
+}
+
+.manuscript-sheet .footnote-ref::after {
+  content: counter(footnote);
+}
+
+.footnote-ref:hover,
+.footnote-ref.is-selected {
+  background: var(--accent-wash);
+}
+
+.footnote-ref.is-empty {
+  color: var(--ink-4);
+}
+
+/* A caption: Word's Caption style, smaller and set apart, with its label
+   drawn in front of it in the document's language. */
+.caption-block {
+  margin: 0.35em 0 1.1em;
+  color: var(--ink-2);
+  font-size: 0.88em;
+  text-align: center;
+}
+
+.manuscript-sheet .caption-block[data-caption="figure"] {
+  counter-increment: figure;
+}
+
+.manuscript-sheet .caption-block[data-caption="table"] {
+  counter-increment: table;
+}
+
+.manuscript-sheet .caption-block::before {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.manuscript-sheet .caption-block[data-caption="figure"]::before {
+  content: var(--label-figure) counter(figure) var(--caption-separator);
+}
+
+.manuscript-sheet .caption-block[data-caption="table"]::before {
+  content: var(--label-table) counter(table) var(--caption-separator);
+}
+
+.manuscript-sheet.is-numbered .caption-block[data-caption="figure"]::before {
+  content: var(--label-figure) counter(chapter) "." counter(figure) var(--caption-separator);
+}
+
+.manuscript-sheet.is-numbered .caption-block[data-caption="table"]::before {
+  content: var(--label-table) counter(chapter) "." counter(table) var(--caption-separator);
+}
+
+/* A cross-reference reads as words of the sentence and goes where it says. */
+.cross-reference {
+  border-radius: var(--radius-xs);
+  color: var(--accent);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.cross-reference:hover,
+.cross-reference.is-selected {
+  background: var(--accent-wash);
+}
+
+.cross-reference.is-missing {
+  color: var(--danger);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The chapter's footnotes at the foot of its sheet, under Word's short
+   separator. A sheet that has some lays out as a column, so the list sits at
+   the bottom of a sheet the words do not fill. */
+.manuscript-sheet:has(> .sheet-footnotes) {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-footnotes {
+  position: relative;
+  margin-top: auto;
+  padding-top: 2.5em;
+  font-family: var(--sheet-font, var(--font-reading));
+  font-size: 0.82em;
+  line-height: 1.45;
+}
+
+.sheet-footnotes::before {
+  content: "";
+  position: absolute;
+  top: 1.6em;
+  left: 0;
+  width: 5cm;
+  max-width: 40%;
+  border-top: 1px solid var(--ink-4);
+}
+
+.sheet-footnotes ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sheet-footnote {
+  display: flex;
+  width: calc(100% + 0.6em);
+  margin: 0 -0.3em;
+  gap: 0.5em;
+  border-radius: var(--radius-xs);
+  padding: 0.12em 0.3em;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  white-space: pre-line;
+}
+
+.sheet-footnote:hover {
+  background: var(--accent-wash);
+}
+
+.sheet-footnote-number {
+  flex: none;
+  min-width: 1.4em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-footnote .is-empty {
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+/* The popover a footnote is written in, fixed under its number. */
+.footnote-panel {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  width: min(340px, calc(100vw - 24px));
+  gap: 6px;
+  padding: 8px;
+  transform-origin: top left;
+}
+
+.footnote-panel textarea,
+.xref-search {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.footnote-panel textarea {
+  min-height: 4.8em;
+  resize: vertical;
+}
+
+.footnote-panel textarea:focus,
+.xref-search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.footnote-panel-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  white-space: pre-line;
+}
+
+.footnote-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Word's Cross-reference dialog, as one filtered list under Insert. */
+.ribbon-panel.xref-picker {
+  right: 0;
+  left: auto;
+  display: grid;
+  width: min(23rem, calc(100vw - 24px));
+  gap: 6px;
+  padding: 6px;
+}
+
+.xref-list {
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.xref-row {
+  align-items: baseline;
+}
+
+.xref-row.is-active {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.xref-number {
+  flex: none;
+  min-width: 3.4em;
+  color: var(--ink-3);
+}
+
+.xref-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xref-where {
+  max-width: 7rem;
+  flex: none;
+  overflow: hidden;
+  font-size: var(--text-xs, 11px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xref-empty {
+  margin: 0;
+  padding: 8px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footnote-panel,
+  .xref-picker {
+    animation: none;
+  }
 }
 
 .manuscript-sheet .rich-text-content blockquote {

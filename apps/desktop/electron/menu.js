@@ -137,6 +137,8 @@ function template(isDev) {
         item("Underline", "Command+U", mod("u")),
         { type: "separator" },
         item("Add Link", "Command+K", mod("k")),
+        /* Word's key. A document with footnotes off lets it fall through. */
+        item("Footnote", "Alt+Command+F", mod("f", { code: "KeyF", altKey: true })),
         { type: "separator" },
         item("Draw on the Page", "Alt+D", press({ key: "d", code: "KeyD", altKey: true })),
       ],
