@@ -34,6 +34,7 @@ import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
+import { prefetchNote } from "@/lib/collab";
 import { formatStamp } from "@/lib/format";
 import { derivedOf, indexOf } from "@/lib/derived";
 import {
@@ -1420,6 +1421,14 @@ export function NoteList({
         key={`${folderLabel}:${query.trim()}`}
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
+        onPointerOver={(event) => {
+          // A mouse only: a finger has no resting before its tap.
+          if (event.pointerType !== "mouse") return;
+          const id = (event.target as Element)
+            .closest("[data-note-row]")
+            ?.getAttribute("data-note-row");
+          if (id) prefetchNote(id);
+        }}
         className={`list-in flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-2 ${
           query.trim() ? "is-searching" : "is-cascading"
         }`}

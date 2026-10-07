@@ -3,6 +3,19 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.11 — 2026-10-07
+
+Notes open faster in the browser.
+
+### Changed
+
+- `collab.ts` keeps the last eight notes' `Y.Doc`, IndexedDB store and
+  provider open on the shared socket instead of destroying them on every
+  switch; a parked note clears its awareness. Measured in WebKit against the
+  live server: a revisit went from 490–710 ms to 200–235 ms before words.
+- `prefetchNote` opens and parks a note on mouse hover over its row; a first
+  open with a 400 ms hover went from 450–670 ms to 180–230 ms.
+
 ## 0.9.10 — 2026-10-07
 
 The window's shape, back as it was.

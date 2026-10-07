@@ -135,78 +135,184 @@ export function wakeCollaboration(): void {
   void shared.connect();
 }
 
+/* The notes opened lately, kept open.
+ *
+ * Every note switch used to destroy the document, its local store and its
+ * provider, and build all three again on the way back: a fresh IndexedDB read,
+ * an auth message and a sync round trip to Frankfurt before a single word could
+ * go on screen — 350 to 550 ms measured in Safari for a note left a few seconds
+ * earlier, during which the page sat empty under "Connecting". Kept open on the
+ * one shared socket, a document stays synced for nothing and comes back at
+ * once.
+ *
+ * Kept is not *present*: a parked note publishes no awareness, so the other
+ * member never sees you on a page you have left. It still decides nothing about
+ * access — the editor mounts only for a note in the catalogue RLS returned, and
+ * the server authorises every write on the socket it already rechecks. Scoped
+ * to the account and the archive, and dropped wholesale on sign-out. */
+const KEPT = 8;
+
+interface Held {
+  key: string;
+  doc: Y.Doc;
+  provider: HocuspocusProvider;
+  local: IndexeddbPersistence;
+  state: Omit<CollaborativeNote, "waking">;
+  users: number;
+  listeners: Set<(state: Omit<CollaborativeNote, "waking">) => void>;
+}
+
+const held = new Map<string, Held>();
+
+function drop(entry: Held): void {
+  held.delete(entry.key);
+  entry.provider.destroy();
+  void entry.local.destroy();
+  entry.doc.destroy();
+}
+
+/* Least recently released first: `Map` keeps insertion order, and a note is
+   re-inserted each time it is opened. */
+function trim(scope: string): void {
+  for (const entry of [...held.values()]) {
+    if (entry.users === 0 && !entry.key.startsWith(scope)) drop(entry);
+  }
+  const idle = [...held.values()].filter((entry) => entry.users === 0);
+  for (const entry of idle.slice(0, Math.max(0, idle.length - KEPT))) drop(entry);
+}
+
+supabase.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_OUT") for (const entry of [...held.values()]) drop(entry);
+});
+
+function acquire(archiveId: string, userId: string, noteId: string): Held {
+  const scope = `${archiveId}:${userId}:`;
+  const key = scope + noteId;
+  const existing = held.get(key);
+  if (existing) {
+    held.delete(key);
+    held.set(key, existing);
+    existing.users += 1;
+    /* Parking cleared the awareness state, and `setLocalStateField` writes
+       nothing into a null one — so it is given an empty one to write into. */
+    if (existing.provider.awareness?.getLocalState() === null) {
+      existing.provider.awareness.setLocalState({});
+    }
+    return existing;
+  }
+
+  const doc = new Y.Doc();
+  const local = new IndexeddbPersistence(`napp:yjs:${archiveId}:${userId}:${noteId}`, doc);
+  const entry: Held = {
+    key,
+    doc,
+    local,
+    provider: null as unknown as HocuspocusProvider,
+    state: {
+      doc,
+      provider: null,
+      ready: false,
+      cached: false,
+      connection: "connecting",
+      refusal: "",
+    },
+    users: 1,
+    listeners: new Set(),
+  };
+  const update = (change: Partial<CollaborativeNote>) => {
+    entry.state = { ...entry.state, ...change };
+    for (const listener of entry.listeners) listener(entry.state);
+  };
+  entry.provider = new HocuspocusProvider({
+    websocketProvider: sharedSocket(),
+    name: noteId,
+    document: doc,
+    /* A function, not a string: the socket reconnects long after the access
+       token that opened it has expired, and this is asked again each time. */
+    token: async () => (await supabase.auth.getSession()).data.session?.access_token ?? "",
+    onSynced: () => update({ ready: true, refusal: "" }),
+    onStatus: ({ status }) =>
+      update({ connection: status === "connected" ? "connected" : "connecting" }),
+    onDisconnect: () => update({ connection: "offline" }),
+    onAuthenticationFailed: ({ reason }) =>
+      update({ ready: false, refusal: reason || "This note is not available to you" }),
+  });
+  entry.state = { ...entry.state, provider: entry.provider };
+
+  /* Supplying our own websocket means the provider does not attach itself —
+     `manageSocket` is only true when it built the socket. For the same
+     reason `provider.destroy()` in `drop` leaves the shared socket alone. */
+  entry.provider.attach();
+
+  /* The local store, which is milliseconds away rather than a continent.
+     Its job is only to put the words on screen; it decides nothing. What
+     makes that safe is the caller: `notes.tsx` opens an editor for a note in
+     the catalogue Postgres just returned under row level security, and a
+     member who has lost access is handed no such row. An empty store is not
+     a cache hit — an empty editor is worse than the bars that stand in for
+     one — and this is the same `Y.Doc` the server will update, so its
+     arrival is a merge into a live document, never the second build of a
+     second document that once made the text paint twice. */
+  void local.whenSynced.then(() => {
+    if (!held.has(key)) return;
+    const hasWords =
+      doc.getXmlFragment(BODY_FRAGMENT).length > 0 || doc.getText(TITLE_TEXT).length > 0;
+    if (hasWords) update({ cached: true });
+  });
+
+  held.set(key, entry);
+  trim(scope);
+  return entry;
+}
+
+function release(entry: Held): void {
+  entry.users -= 1;
+  if (entry.users > 0) return;
+  /* Parked: still synced, no longer here. */
+  entry.provider.awareness?.setLocalState(null);
+  trim(entry.key.slice(0, entry.key.lastIndexOf(":") + 1));
+}
+
+/* Whose notes the list is showing, for `prefetchNote` — set by the hook,
+   which is the one place that knows. */
+let current: { archiveId: string; userId: string } | null = null;
+let lastPrefetched = "";
+
+/** Start opening a note the pointer has come to rest on. The second or so
+ *  between a pointer arriving on a row and the click is about what the server
+ *  takes to sync a note, so by the click it is usually already here. Opened
+ *  and parked at once: it publishes no awareness until it is really opened. */
+export function prefetchNote(noteId: string): void {
+  if (!current || noteId === lastPrefetched) return;
+  lastPrefetched = noteId;
+  release(acquire(current.archiveId, current.userId, noteId));
+}
+
 export function useCollaborativeNote(
   noteId: string | null,
   identity: CollaborationIdentity | null,
 ): CollaborativeNote {
-  const [state, setState] = useState<CollaborativeNote>(CLOSED);
+  const [state, setState] = useState<Omit<CollaborativeNote, "waking">>(CLOSED);
   const userId = identity?.userId ?? null;
   const archiveId = identity?.archiveId ?? null;
   const name = identity?.name ?? "";
+
+  useEffect(() => {
+    // Known before any note is open, so the first one can be prefetched too.
+    current = userId && archiveId ? { archiveId, userId } : null;
+  }, [userId, archiveId]);
 
   useEffect(() => {
     if (!noteId || !userId || !archiveId) {
       setState(CLOSED);
       return;
     }
-    let closed = false;
-    const update = (change: Partial<CollaborativeNote>) => {
-      if (!closed) setState((current) => ({ ...current, ...change }));
-    };
-
-    const doc = new Y.Doc();
-    const local = new IndexeddbPersistence(`napp:yjs:${archiveId}:${userId}:${noteId}`, doc);
-    const provider = new HocuspocusProvider({
-      websocketProvider: sharedSocket(),
-      name: noteId,
-      document: doc,
-      /* A function, not a string: the socket reconnects long after the access
-         token that opened it has expired, and this is asked again each time. */
-      token: async () => (await supabase.auth.getSession()).data.session?.access_token ?? "",
-      onSynced: () => update({ ready: true, refusal: "" }),
-      onStatus: ({ status }) =>
-        update({ connection: status === "connected" ? "connected" : "connecting" }),
-      onDisconnect: () => update({ connection: "offline" }),
-      onAuthenticationFailed: ({ reason }) =>
-        update({ ready: false, refusal: reason || "This note is not available to you" }),
-    });
-
-    /* Supplying our own websocket means the provider does not attach itself —
-       `manageSocket` is only true when it built the socket. For the same
-       reason the `provider.destroy()` below leaves the shared socket alone. */
-    provider.attach();
-
-    setState({
-      doc,
-      provider,
-      ready: false,
-      cached: false,
-      connection: "connecting",
-      refusal: "",
-      waking: false,
-    });
-
-    /* The local store, which is milliseconds away rather than a continent.
-       Its job is only to put the words on screen; it decides nothing. What
-       makes that safe is the caller: `notes.tsx` opens an editor for a note in
-       the catalogue Postgres just returned under row level security, and a
-       member who has lost access is handed no such row. An empty store is not
-       a cache hit — an empty editor is worse than the bars that stand in for
-       one — and this is the same `Y.Doc` the server will update, so its
-       arrival is a merge into a live document, never the second build of a
-       second document that once made the text paint twice. */
-    void local.whenSynced.then(() => {
-      if (closed) return;
-      const hasWords =
-        doc.getXmlFragment(BODY_FRAGMENT).length > 0 || doc.getText(TITLE_TEXT).length > 0;
-      if (hasWords) update({ cached: true });
-    });
-
+    const entry = acquire(archiveId, userId, noteId);
+    entry.listeners.add(setState);
+    setState(entry.state);
     return () => {
-      closed = true;
-      provider.destroy();
-      void local.destroy();
-      doc.destroy();
+      entry.listeners.delete(setState);
+      release(entry);
     };
   }, [noteId, userId, archiveId]);
 

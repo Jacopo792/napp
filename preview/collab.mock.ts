@@ -20,6 +20,10 @@ export function wakeCollaboration(): void {
   /* Preview documents are already local and ready. */
 }
 
+export function prefetchNote(_noteId: string): void {
+  /* Nothing to fetch: every preview document is already in memory. */
+}
+
 const documents = new Map<string, Y.Doc>();
 
 export function useCollaborativeNote(

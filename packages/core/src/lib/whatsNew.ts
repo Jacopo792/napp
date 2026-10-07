@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.11",
+    date: "2026-10-07",
+    headline: "Notes open faster in the browser",
+    sections: [
+      {
+        heading: "Speed",
+        items: [
+          {
+            title: "Going back to a note is quick",
+            text: "The notes you opened last stay ready, so returning to one shows its words straight away instead of waiting for the server.",
+          },
+          {
+            title: "A note starts opening when you point at it",
+            text: "Resting the pointer on a note in the list gets it ready before you click. Safari gains the most.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.10",
     date: "2026-10-07",
     headline: "The window's shape, back as it was",

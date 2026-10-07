@@ -1216,6 +1216,17 @@ The collaboration server is part of the authorization boundary:
   `manageSocket` is false, so the provider must `attach()` itself and its
   `destroy()` leaves the socket alone. Keep `name` and `publishPresence` out of
   that effect's deps: a nickname arriving is not a reason to reconnect.
+- **The last eight notes stay open.** Every switch used to destroy the
+  document, its IndexedDB store and its provider and build all three again on
+  the way back — 500–700 ms in Safari before a word, for a note left seconds
+  earlier. `collab.ts` now parks a closed note on the shared socket, still
+  synced, and a return is the editor's mount alone (~200 ms in WebKit). A
+  parked note publishes **no awareness** (`setLocalState(null)`; reuse gives it
+  `{}` back, because `setLocalStateField` writes nothing into null), so being
+  kept is never being present. Entries are scoped by archive and account and
+  dropped on `SIGNED_OUT`. `prefetchNote` opens and parks a note the mouse
+  rests on, which covers a first open with the time between hover and click;
+  a finger has no hover and gets none.
 - Redis/Valkey carries Yjs and awareness updates between instances. It is not
   persistence, and the app must still work with one instance when REDIS_URL is
   absent.
