@@ -3,6 +3,16 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.10 — 2026-10-07
+
+The window's shape, back as it was.
+
+### Reverted
+
+- The 0.9.9 shape: floating sidebar and list panels, the band without its
+  hairline and the capsule material. `styles.css` is back to 0.9.8. The
+  writing group's centring on the scroll box and the chunk-reload fix stay.
+
 ## 0.9.9 — 2026-10-07
 
 Panels with a shape, and Settings that always opens.

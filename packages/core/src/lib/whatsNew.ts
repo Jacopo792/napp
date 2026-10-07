@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.10",
+    date: "2026-10-07",
+    headline: "The window's shape, back as it was",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "Flush columns again",
+            text: "The sidebar and the list are columns again rather than floating panels, under one band with a line beneath it.",
+          },
+          {
+            title: "Writing tools over the words",
+            text: "The writing tools stay centred over the words of the note, even when the scrollbar is showing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.9",
     date: "2026-10-07",
     headline: "Panels with a shape, and Settings that always opens",

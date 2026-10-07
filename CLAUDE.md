@@ -1783,22 +1783,10 @@ Two things that were load-bearing and are easy to undo by accident:
 The gain is not only the look. The gutter and the two ten-pixel seams were 40px
 of a narrow window spent on air.
 
-**And then macOS 26 moved, and half of this went with it.** The sidebar is no
-longer a column there but a panel floating inside the window, and the flush
-window read as _flat_ beside Notes. Now the sidebar and the list are both
-panels the full height of the window, inset 8px and rounded 14px, each with its
-own header inside it (the sidebar's panel is a `::before` layer; the list is a
-real inset box so its radius clips what its rows paint). The note keeps its
-band and the line under it, and is the darker page the panels float on, so the
-step between the list and the writing is kept. The list's header is 44px and
-the note's band 60, so every capsule's centre is at 30px. Capsules are pills
-with no frame: a light edge along the top and a contact shadow (`--capsule-*`).
-
-Three things were tried and were wrong. A rounded sidebar beside a square list
-read as two languages in one window. Capsules as framed 12px boxes read as
-buttons in boxes. And the list's header out on the window's ground, with the
-note's line taken away, merged the two into one strip — against which the
-note's group, centred on the note to the pixel, read as off-centre.
+**Floating panels were tried in 0.9.9 and taken back in 0.9.10.** A sidebar
+and a list as rounded panels inset on the page's ground, framed capsules,
+capsules centred on one line across the window: Jacopo did not like the
+result and asked for this shape back. Do not re-propose it.
 
 ## Interface notes worth knowing
 
