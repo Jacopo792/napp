@@ -37,7 +37,7 @@ import { editBody, readDraft } from "@/features/editor/lib/draft";
 import { extractPdfText } from "@/features/editor/lib/pdf";
 import { assertAttachable, attachmentLabel } from "@/features/editor/lib/attachments";
 import { loadPastedImage } from "@/features/editor/lib/pastedImage";
-import { imageAltFromFilename } from "@/lib/image";
+import { imageAltFromFilename, type AvatarCrop } from "@/lib/image";
 import { proofreadText } from "@/features/editor/lib/proofread";
 import type { AppSession } from "@/lib/session";
 import { NoteComments, type CommentAuthor } from "./NoteComments";
@@ -129,6 +129,8 @@ interface Props {
   /** Right-click on the page, but never on the words themselves. */
   onContextMenu?: (event: MouseEvent) => void;
   onUpdatePageProperties?: (values: PagePropertyValues) => Promise<void>;
+  /** The note's photo, set, re-cut or (null) taken off — as the row menu does. */
+  onSetPhoto?: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
   collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
   /** Every note `[[` can reach from this one, and the notes that reach this
    *  one. Both absent where there is no archive behind the page. */
@@ -244,6 +246,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     headerLead,
     onContextMenu,
     onUpdatePageProperties,
+    onSetPhoto,
     collaboration = null,
     linkable,
     backlinks,
@@ -1393,9 +1396,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <PageIdentity
                   photo={entry.note.photo}
                   cover={entry.note.cover}
-                  canEdit={canEdit}
                   resolveImage={resolveImage}
-                  onChange={updatePageProperties}
+                  onSetPhoto={
+                    canEdit && onSetPhoto
+                      ? (file, crop) => onSetPhoto(entry.note.id, file, crop)
+                      : undefined
+                  }
                 />
                 {viewingAsPartner && (
                   <p className="label mb-3 text-ink-3">

@@ -812,7 +812,9 @@ function PrivateImageView({
     <NodeViewWrapper className={`rich-media-image ${error ? "is-error" : ""}`}>
       {/* The frame is what the ink lies over, and it holds the picture alone:
           an overlay on the wrapper would reach down over the caption, and the
-          caption is not part of the picture. */}
+          caption is not part of the picture. There is no caption under it
+          any more: the alt was a file name or an object id, and a pasted
+          picture arrived with a uuid printed beneath it. */}
       <span className="rich-media-image-frame" contentEditable={false}>
         {src && video ? (
           <video
@@ -893,7 +895,6 @@ function PrivateImageView({
         </span>
       )}
       {ink.menu}
-      {alt && alt !== "Image" && <span className="rich-media-caption">{alt}</span>}
     </NodeViewWrapper>
   );
 }
@@ -1952,9 +1953,6 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
     >
       <figure className="lightbox-figure" onClick={(event) => event.stopPropagation()}>
         <img src={preview.src} alt={preview.alt} />
-        {preview.alt && preview.alt !== "Image" && (
-          <figcaption className="readout">{preview.alt}</figcaption>
-        )}
       </figure>
       <button type="button" onClick={onClose} className="lightbox-close" aria-label="Close image">
         ×

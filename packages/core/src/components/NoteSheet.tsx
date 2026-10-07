@@ -71,7 +71,7 @@ interface Props {
   /** The face that was pressed, for the person sheet to fly out of. */
   onOpenPerson: (userId: string, from: Element) => void;
   /** Absent where this reader cannot change the note. */
-  onSetPhoto?: (file: File, crop: AvatarCrop) => void;
+  onSetPhoto?: (file: File | null, crop?: AvatarCrop) => void;
 }
 
 const RECENT = 8;
@@ -126,8 +126,9 @@ export function NoteSheet({
           <SheetPortrait
             className="sheet-portrait sheet-note-glyph"
             image={photoUrl}
-            label={onSetPhoto ? "Change photo" : "Show photo"}
+            label={onSetPhoto ? "Note photo" : "Show photo"}
             onPick={onSetPhoto}
+            onRemove={onSetPhoto && (() => onSetPhoto(null))}
           >
             {photoUrl ? <img src={photoUrl} alt="" draggable={false} /> : glyph}
           </SheetPortrait>

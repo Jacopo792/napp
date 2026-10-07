@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { FOLDER_DRAG, folderDropSide } from "@/lib/folderOrder";
 import {
   Archive,
   ChevronRight,
@@ -323,6 +324,8 @@ function Row({
   onSelect,
   onContextMenu,
   onHold,
+  movable = false,
+  dropSide,
 }: {
   scope: Scope;
   glyph: React.ReactNode;
@@ -338,8 +341,23 @@ function Row({
   onContextMenu?: (event: React.MouseEvent) => void;
   /** A mouse pressed and kept still; the click that ends it is not a select. */
   onHold?: (row: Element) => void;
+  /** A folder that can be dragged to another place among the folders. */
+  movable?: boolean;
+  /** Where a folder being dragged over this one would land beside it. */
+  dropSide?: (draggedId: string) => "before" | "after" | null;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: scope.id, disabled: !droppable });
+  const {
+    setNodeRef,
+    isOver,
+    active: carried,
+  } = useDroppable({
+    id: scope.id,
+    disabled: !droppable,
+  });
+  const drag = useDraggable({ id: `${FOLDER_DRAG}${scope.id}`, disabled: !movable });
+  const activeId = carried ? String(carried.id) : "";
+  const folderOver = isOver && activeId.startsWith(FOLDER_DRAG);
+  const side = folderOver ? (dropSide?.(activeId.slice(FOLDER_DRAG.length)) ?? null) : null;
   const hold = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
   function holdEnd() {
     const press = hold.current;
@@ -352,12 +370,17 @@ function Row({
   return (
     <div
       ref={setNodeRef}
-      className={`sidebar-row ${active ? "is-active" : ""} ${isOver ? "is-over" : ""}`}
+      className={`sidebar-row ${active ? "is-active" : ""} ${isOver && !folderOver ? "is-over" : ""} ${
+        side ? `is-over-${side}` : ""
+      } ${drag.isDragging ? "is-lifted" : ""}`}
       data-folder-row={onHold ? scope.id : undefined}
       style={{ paddingLeft: `${depth * INDENT}px` }}
       onContextMenu={onContextMenu}
     >
       <button
+        ref={drag.setNodeRef}
+        {...drag.attributes}
+        {...drag.listeners}
         type="button"
         className="sidebar-target press"
         onClick={() => {
@@ -365,6 +388,7 @@ function Row({
           onSelect();
         }}
         onPointerDown={(event) => {
+          drag.listeners?.onPointerDown?.(event);
           if (!onHold || event.pointerType !== "mouse" || event.button !== 0) return;
           window.clearTimeout(hold.current?.timer);
           const row = event.currentTarget;
@@ -533,6 +557,10 @@ export function Sidebar({
                 onDelete={() => onDeleteFolder(node.folder.id)}
               />
             ) : undefined
+          }
+          movable={canWrite}
+          dropSide={(draggedId) =>
+            draggedId === node.folder.id ? null : folderDropSide(folders, draggedId, node.folder.id)
           }
           onSelect={() => onSelect(node.folder.id)}
           onHold={(row) => onFolderInfo(node.folder.id, glyphOrigin(row))}

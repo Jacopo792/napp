@@ -3,6 +3,31 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.8 — 2026-10-07
+
+Pictures you can edit, and folders in your order.
+
+### Added
+
+- `SheetPortrait` press opens View / Edit / Change / Remove (page-only menu,
+  never `popUpMenu`: Change opens a file dialog); Edit re-crops the stored
+  picture. Used by the page's note photo and the note sheet; "Edit photo" in
+  the row menu.
+- Cover: explicit Edit mode (drag, Done/Cancel) instead of dragging on any
+  press; holding a picture cover opens it full screen (`ImageZoom`).
+- Folders are draggable (`folder:<id>` drag ids, `lib/folderOrder.ts`); the
+  array order is the persisted `position`.
+
+### Changed
+
+- ⌘\ and the sidebar toggle hide only the folders: `pane-slide.is-sidebar`
+  and `pane-slide.is-list` are separate slides, the list hides only in focus
+  mode.
+
+### Removed
+
+- The alt caption under pasted images and videos, and in the lightbox.
+
 ## 0.9.7 — 2026-10-06
 
 Delete what you made, and clear Notes in one go.

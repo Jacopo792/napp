@@ -23,6 +23,7 @@ import {
   Pin,
   RotateCcw,
   Camera,
+  Crop,
   Search,
   SquarePen,
   Table2,
@@ -1091,6 +1092,22 @@ export function NoteList({
       },
       ...(entry.note.photo
         ? [
+            {
+              kind: "item" as const,
+              id: "photo:edit",
+              label: "Edit photo",
+              icon: <Crop size={16} />,
+              run: () => {
+                const objectId = entry.note.photo?.objectId;
+                if (!objectId) return;
+                void resolveImage(objectId).then((blob) =>
+                  setCropping({
+                    noteId: entry.note.id,
+                    file: new File([blob], "photo", { type: blob.type || "image/png" }),
+                  }),
+                );
+              },
+            },
             {
               kind: "item" as const,
               id: "photo:remove",

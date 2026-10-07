@@ -42,6 +42,47 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.8",
+    date: "2026-10-07",
+    headline: "Pictures you can edit, and folders in your order",
+    sections: [
+      {
+        heading: "Pictures",
+        items: [
+          {
+            title: "Edit a note's photo",
+            text: "Click the photo on the page or in Note info to view it, crop it again, change it or remove it. Edit photo is in the note's right-click menu too.",
+          },
+          {
+            title: "Edit the cover",
+            text: "A picture cover has Edit: drag it into place, then Done. Remove takes it off.",
+          },
+          {
+            title: "Hold to see it whole",
+            text: "Hold a photo, a cover or a picture in a note and it opens full screen.",
+          },
+          {
+            title: "No more file names under pictures",
+            text: "A pasted picture or video no longer shows a string of letters and numbers beneath it.",
+          },
+        ],
+      },
+      {
+        heading: "Sidebar",
+        items: [
+          {
+            title: "Hide only the folders",
+            text: "The sidebar button and ⌘\\ hide the folders and leave your notes where they are. Focus mode still hides both.",
+          },
+          {
+            title: "Drag folders into order",
+            text: "Drag a folder above or below another to put it where you want it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.7",
     date: "2026-10-06",
     headline: "Delete what you made, and clear Notes in one go",

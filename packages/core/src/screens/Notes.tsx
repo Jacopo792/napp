@@ -49,6 +49,7 @@ import {
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
+import { FOLDER_DRAG, moveFolder } from "@/lib/folderOrder";
 import {
   OPEN_PLACE,
   openPlace,
@@ -2626,7 +2627,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     setDragId(null);
     const over = e.over?.id as string | undefined;
     if (!over) return;
-    const noteId = e.active.id as string;
+    const activeId = e.active.id as string;
+    if (activeId.startsWith(FOLDER_DRAG)) {
+      const dragged = activeId.slice(FOLDER_DRAG.length);
+      handleMetaChange((prev) => {
+        const folders = moveFolder(prev.folders, dragged, over);
+        return folders ? { ...prev, folders } : prev;
+      });
+      return;
+    }
+    const noteId = activeId;
     const folderId = over === UNFILED ? null : over;
     handleMetaChange((prev) => {
       const existing = prev.notes.find((n) => n.id === noteId);
@@ -3394,6 +3404,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   if (!session) return null;
 
   const dragEntry = dragId ? entries.find((e) => e.note.id === dragId) : null;
+  const dragFolder = dragId?.startsWith(FOLDER_DRAG)
+    ? activeMeta.folders.find((folder) => folder.id === dragId.slice(FOLDER_DRAG.length))
+    : null;
 
   /* The states have very different lengths, so the readout is given one slot of
      a fixed width below and every state is measured against the widest of them.
@@ -3562,15 +3575,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Hiding the columns opens the list's strip, at its leading edge, the way
      Notes and Mail put it: the control that moves the columns stands where
      they are. Compose goes to the trailing edge. */
+  /* The list stays when the folders go, so the one control for them stays
+     where it was too, at the list's leading edge, and says which way it goes. */
+  const listOpen = navigationOpen || !focusMode;
   const sidebarToggle = !compact && (
     <button
       type="button"
-      onClick={() => changeNavigation(false)}
-      aria-label="Hide the sidebar"
-      title={"Hide the sidebar · ⌘\\"}
+      onClick={() => changeNavigation((open) => !open)}
+      aria-label={navigationOpen ? "Hide the sidebar" : "Show the sidebar"}
+      title={navigationOpen ? "Hide the sidebar · ⌘\\" : "Show the sidebar · ⌘\\"}
+      aria-pressed={navigationOpen}
       className="toolbar-button press shrink-0"
     >
-      <PanelLeftClose size={18} />
+      {navigationOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
     </button>
   );
 
@@ -5032,6 +5049,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           resolveImage={resolveImage}
           resolveFile={resolveFile}
           onUpdatePageProperties={handleUpdatePageProperties}
+          onSetPhoto={handleNotePhoto}
           collaboration={
             (collaborative.ready || collaborative.cached) && collaborative.doc
               ? {
@@ -5294,6 +5312,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     resolveImage={resolveImage}
                     resolveFile={resolveFile}
                     onUpdatePageProperties={handleUpdatePageProperties}
+                    onSetPhoto={handleNotePhoto}
                     collaboration={
                       (collaborative.ready || collaborative.cached) && collaborative.doc
                         ? {
@@ -5377,15 +5396,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               somebody narrowed the pane. Closing, there is nothing left to
               cut; opening, the track is off to the left of the window and the
               window clips it for us. */}
+          {/* Two slides, not one. `⌘\` and the toggle take the folders away
+              and leave the list where it is — hiding the sidebar used to take
+              the notes with it, which is not what "sidebar" says. Focus mode
+              is what takes both. */}
           <div
-            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
-            style={{ width: navigationOpen ? sidebarShown + listShown + 2 : 0 }}
+            className={`pane-slide is-sidebar ${navigationOpen ? "" : "is-collapsed"}`}
+            style={{ width: navigationOpen ? sidebarShown + 1 : 0 }}
             aria-hidden={!navigationOpen}
             inert={!navigationOpen}
           >
             <div
               className="pane-slide-track flex h-full min-h-0"
-              style={{ width: sidebarShown + listShown + 2 }}
+              style={{ width: sidebarShown + 1 }}
             >
               <div className="pane-frame" style={{ width: sidebarShown }}>
                 {sidebar}
@@ -5398,6 +5421,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 defaultValue={SIDEBAR_DEFAULT}
                 onChange={setSidebarWidth}
               />
+            </div>
+          </div>
+          <div
+            className={`pane-slide is-list ${listOpen ? "" : "is-collapsed"}`}
+            style={{ width: listOpen ? listShown + 1 : 0 }}
+            aria-hidden={!listOpen}
+            inert={!listOpen}
+          >
+            <div className="pane-slide-track flex h-full min-h-0" style={{ width: listShown + 1 }}>
               <div
                 className="pane-frame"
                 data-scope-direction={scopeDirection ?? undefined}
@@ -5488,6 +5520,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               resolveImage={resolveImage}
               resolveFile={resolveFile}
               onUpdatePageProperties={handleUpdatePageProperties}
+              onSetPhoto={handleNotePhoto}
               collaboration={
                 (collaborative.ready || collaborative.cached) && collaborative.doc
                   ? {
@@ -5502,7 +5535,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   : undefined
               }
               navigationAction={
-                !navigationOpen ? (
+                !listOpen ? (
                   <>
                     {/* With the columns away this strip is the only chrome in
                         the window, so it carries what the columns did: getting
@@ -5588,6 +5621,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   resolveImage={resolveImage}
                   resolveFile={resolveFile}
                   onUpdatePageProperties={handleUpdatePageProperties}
+                  onSetPhoto={handleNotePhoto}
                   collaboration={
                     (splitCollaborative.ready || splitCollaborative.cached) &&
                     splitCollaborative.doc
@@ -5617,9 +5651,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         </div>
 
         <DragOverlay dropAnimation={null}>
-          {dragEntry ? (
+          {dragEntry || dragFolder ? (
             <div className="drag-chip w-56 px-3 py-2">
-              <p className="readout truncate text-ink">{dragEntry.note.title || "Untitled"}</p>
+              <p className="readout truncate text-ink">
+                {dragFolder ? dragFolder.name : dragEntry?.note.title || "Untitled"}
+              </p>
             </div>
           ) : null}
         </DragOverlay>

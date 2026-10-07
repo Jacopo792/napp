@@ -28,6 +28,7 @@ export {
   ClockCounterClockwise as History,
   Info,
   Camera,
+  Crop,
   Check,
   CaretDown as ChevronDown,
   CaretLeft as ChevronLeft,

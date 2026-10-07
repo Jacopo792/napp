@@ -678,8 +678,9 @@ inset by 10px, so the window's corner is inside the first one. `main.js` moves
 them to the middle of the 52px header strip with `trafficLightPosition`, and the
 stylesheet holds a gutter open for them. Change one number and the buttons are
 either over the avatar or floating in a gap. The gutter follows the leftmost
-strip, not the sidebar: ⌘\ collapses the whole navigation pane and the buttons
-are then over the note's own toolbar.
+strip, not the sidebar: ⌘\ takes the folders away and the buttons are then over
+the note list's strip; focus mode takes the list too and they are over the
+note's own toolbar.
 
 **Full screen is a fact the window states, not one the page can ask for.**
 macOS hides the traffic lights in full screen, so the 88px held for them has to

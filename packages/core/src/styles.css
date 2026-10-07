@@ -1963,6 +1963,13 @@
   view-transition-name: navigation;
 }
 
+/* The list is a slide of its own now, and a name is one element's: two
+   slides both called `navigation` abort the transition. When only the folders
+   go, the list's picture is unchanged and simply travels left. */
+.is-sliding-navigation .pane-slide.is-list {
+  view-transition-name: navigation-list;
+}
+
 .is-sliding-navigation .pane-slide + .pane-page .editor-body {
   view-transition-name: note-body;
 }
@@ -1994,6 +2001,7 @@
 }
 
 .is-sliding-navigation::view-transition-group(navigation),
+.is-sliding-navigation::view-transition-group(navigation-list),
 .is-sliding-navigation::view-transition-group(note-body),
 .is-sliding-navigation::view-transition-group(note-split) {
   overflow: clip;
@@ -2009,6 +2017,8 @@
 
 .is-sliding-navigation::view-transition-old(navigation),
 .is-sliding-navigation::view-transition-new(navigation),
+.is-sliding-navigation::view-transition-old(navigation-list),
+.is-sliding-navigation::view-transition-new(navigation-list),
 .is-sliding-navigation::view-transition-old(note-toolbar-end),
 .is-sliding-navigation::view-transition-new(note-toolbar-end) {
   right: 0;
@@ -2017,6 +2027,8 @@
 
 .is-sliding-navigation::view-transition-old(navigation),
 .is-sliding-navigation::view-transition-new(navigation),
+.is-sliding-navigation::view-transition-old(navigation-list),
+.is-sliding-navigation::view-transition-new(navigation-list),
 .is-sliding-navigation::view-transition-new(note-body),
 .is-sliding-navigation::view-transition-new(note-split) {
   animation: none;
@@ -5307,11 +5319,6 @@
   box-shadow: var(--shadow-popover);
 }
 
-.lightbox-figure figcaption {
-  color: #ffffff;
-  text-align: center;
-}
-
 .lightbox-close {
   position: absolute;
   top: clamp(0.75rem, 3vw, 1.5rem);
@@ -6166,6 +6173,32 @@
 .sidebar-row.is-over {
   background: var(--accent-wash);
   box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* A folder carried over another one says where it would land, as a line on
+   the edge it would land on — the book's structure draws the same one. */
+.sidebar-row.is-over-before::before,
+.sidebar-row.is-over-after::after {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+}
+
+.sidebar-row.is-over-before::before {
+  top: -1px;
+}
+
+.sidebar-row.is-over-after::after {
+  bottom: -1px;
+}
+
+.sidebar-row.is-lifted {
+  opacity: 0.4;
 }
 
 .sidebar-row.is-editing {
@@ -7458,13 +7491,6 @@
   color: var(--ink);
   opacity: 1;
 }
-.rich-media-caption {
-  display: block;
-  margin-top: 0.45rem;
-  color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-}
 .rich-media-loading {
   display: flex;
   align-items: center;
@@ -7660,7 +7686,7 @@
 }
 
 .note-page-cover.is-placing {
-  cursor: ns-resize;
+  cursor: grabbing;
 }
 
 /* `cover-in` animates a transform and therefore makes the cover a stacking
@@ -7700,6 +7726,7 @@
   .note-page-cover:hover .note-cover-actions,
   .note-page-cover:focus-within .note-cover-actions,
   .note-page-cover.is-placing .note-cover-actions,
+  .note-page-cover.is-editing .note-cover-actions,
   .note-page-cover.is-picker-open .note-cover-actions {
     opacity: 1;
     transform: none;
@@ -7728,6 +7755,18 @@
 
 .note-property-action:hover {
   background: rgb(20 20 22 / 0.9);
+}
+
+.note-property-action.is-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.note-page-cover.is-editing:not(.is-placing) {
+  cursor: grab;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .note-cover-picker {
@@ -8730,8 +8769,8 @@
       draggable strip does not receive its own click.
 
    The gutter follows the leftmost strip rather than the sidebar: closing the
-   folders (⌘\, and focus mode does it too) collapses the whole navigation pane,
-   and the buttons are then over the note's own toolbar. ───────────────────── */
+   folders (⌘\) puts the buttons over the list's strip, and focus mode, which
+   takes the list too, puts them over the note's own toolbar. ───────────────────── */
 :root {
   --titlebar-inset: 0px;
 }
@@ -8803,7 +8842,12 @@
 }
 
 [data-shell="mac"] .sidebar-topbar,
-[data-shell="mac"] .pane-slide.is-collapsed ~ .editor-shell .editor-toolbar {
+[data-shell="mac"] .pane-slide.is-sidebar.is-collapsed + .pane-slide.is-list .collection-toolbar,
+[data-shell="mac"] .pane-slide.is-list.is-collapsed ~ .editor-shell .editor-toolbar,
+[data-shell="mac"]
+  .pane-slide:not(.is-sidebar, .is-list).is-collapsed
+  ~ .editor-shell
+  .editor-toolbar {
   padding-left: var(--titlebar-inset);
   transition: padding-left var(--dur-base) var(--ease);
 }
@@ -12316,4 +12360,14 @@ button.sheet-chip:hover,
   .rich-text-content .is-flashing {
     animation-duration: 1.2s;
   }
+}
+
+/* A cover held comes up as what it is, a landscape, not cut to a square. */
+.portrait-zoom.is-wide img {
+  width: auto;
+  max-width: min(92vw, 1400px);
+  max-height: 86vh;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 14px;
 }
