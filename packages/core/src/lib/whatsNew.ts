@@ -42,6 +42,35 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.9",
+    date: "2026-10-07",
+    headline: "Panels with a shape, and Settings that always opens",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "The sidebar and the list float",
+            text: "Both are rounded panels standing off the window, and the note is the darker page beside them.",
+          },
+          {
+            title: "Toolbar buttons on one line",
+            text: "Every group of buttons sits on the same line, and the writing tools are centred over the words of the note.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Settings after an update",
+            text: "A tab left open across an update could fail to open Settings. It now reloads itself and opens.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.8",
     date: "2026-10-07",
     headline: "Pictures you can edit, and folders in your order",

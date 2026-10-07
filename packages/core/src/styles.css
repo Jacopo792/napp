@@ -12371,3 +12371,160 @@ button.sheet-chip:hover,
   object-fit: contain;
   border-radius: 14px;
 }
+
+/* ══ Shape: floating panels under one band of capsules ══════════════════════
+   _Flush columns, one band of chrome_ was right about the macOS it was written
+   against and wrong about the one after it. Since macOS 26 the sidebar is a
+   panel floating inside the window, and the toolbar is capsules standing on
+   the window's ground. Taking both away — the cards in the flush-columns pass,
+   the capsules' material in the "a fill and nothing else" pass — is what made
+   the window read as flat: every surface was a value step and nothing had an
+   edge that caught light.
+
+   So: one band across the top, on the page's ground, holding every capsule on
+   one line; under it, the list as a rounded panel; beside both, the sidebar as
+   a panel the full height of the window. The note is the darker page the
+   panels float on, so the step between the list and the writing is kept.
+   Built from tokens, so it holds in every palette and both themes. */
+:root {
+  --float-inset: 8px;
+  --float-radius: 14px;
+  --float-rim: rgb(255 255 255 / 0.06);
+  --capsule-fill: color-mix(in srgb, var(--page) 88%, var(--ink));
+  --capsule-edge: rgb(255 255 255 / 0.07);
+  --capsule-light: rgb(255 255 255 / 0.07);
+  --capsule-shadow: 0 1px 2px rgb(0 0 0 / 0.22), 0 4px 12px -6px rgb(0 0 0 / 0.35);
+}
+
+:root[data-theme="light"] {
+  --float-rim: rgb(0 0 0 / 0.06);
+  --capsule-fill: color-mix(in srgb, var(--page) 96%, var(--ink));
+  --capsule-edge: rgb(0 0 0 / 0.07);
+  --capsule-light: rgb(255 255 255 / 0.8);
+  --capsule-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 12px -6px rgb(0 0 0 / 0.14);
+}
+
+.workspace-grid {
+  background: var(--page);
+}
+
+/* The sidebar's panel is a layer behind the column rather than the column
+   itself: the column keeps its width and nothing inside reflows. `z-index: 0`
+   makes the column the stacking context the layer sits at the bottom of —
+   without it the layer would fall behind the grid's own ground. */
+.workspace-grid .sidebar-column {
+  position: relative;
+  z-index: 0;
+  padding-inline: 6px;
+  background: transparent;
+}
+
+.workspace-grid .sidebar-column::before {
+  position: absolute;
+  inset: var(--float-inset);
+  z-index: -1;
+  border-radius: var(--float-radius);
+  background: var(--paper);
+  box-shadow:
+    inset 0 0 0 1px var(--float-rim),
+    var(--shadow-soft);
+  content: "";
+  pointer-events: none;
+}
+
+.workspace-grid :is(.sidebar-footer, .sidebar-topbar) {
+  background: transparent;
+}
+
+/* Its rule ran past the panel's edge into the ground. */
+.workspace-grid .sidebar-footer {
+  border-top-color: transparent;
+}
+
+.has-wallpaper .workspace-grid .sidebar-column::before {
+  border-radius: var(--float-radius);
+  box-shadow:
+    inset 0 0 0 1px var(--float-rim),
+    var(--shadow-soft);
+}
+
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper) .workspace-grid .sidebar-column {
+  background: transparent;
+}
+
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper)
+  .workspace-grid
+  .sidebar-column::before {
+  background: color-mix(in srgb, var(--paper) var(--glass-tint-native, 55%), transparent);
+}
+
+/* The list is a panel the full height of the window, like the sidebar, with
+   its own header inside it: the header is part of the list, and a list whose
+   header sat on the window's ground merged with the note's band into one strip
+   — against which the note's centred group read as off-centre. The panel is a
+   real inset box, so its own radius clips what its rows and sticky headings
+   paint; the rim is an outline, which paints above them. */
+.workspace-grid .collection-column {
+  width: calc(100% - var(--float-inset));
+  height: calc(100% - 2 * var(--float-inset));
+  margin-block: var(--float-inset);
+  border-radius: var(--float-radius);
+  outline: 1px solid var(--float-rim);
+  outline-offset: -1px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* The header takes the 44px left above the panel's own 8px, so its capsule's
+   centre is at 30 — and the note's band is 60 for the same centre. Every
+   capsule in the window stands on one line. */
+.workspace-grid .collection-column > .collection-toolbar {
+  height: 44px;
+  min-height: 44px;
+}
+
+.workspace-grid .editor-toolbar {
+  height: auto;
+  min-height: 60px;
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.workspace-grid .collection-column > .glass-search {
+  margin-top: 4px;
+}
+
+/* A floating panel needs no seam beside it; the handle is still there to grab,
+   and still shows itself under the pointer. */
+.pane-slide-track > .pane-resizer:not(:hover, :focus-visible) {
+  background: transparent;
+}
+
+.is-pane-resizing .pane-slide-track > .pane-resizer {
+  background: var(--ink-4);
+}
+
+/* The list's and the sidebar's headers are inside their panels, which are
+   their edge; the note's band keeps its line (above). */
+.collection-toolbar,
+.sidebar-topbar {
+  box-shadow: none;
+}
+
+/* The capsules. A pill a step off the ground, no frame — a light hairline round
+   each one read as a box — but an edge drawn by the light along the top and a
+   contact shadow under it. */
+:is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
+  border-color: transparent;
+  background: var(--capsule-fill);
+  box-shadow:
+    inset 0 1px 0 var(--capsule-light),
+    0 0 0 0.5px var(--capsule-edge),
+    var(--capsule-shadow);
+}
+
+.has-translucent-sidebar :is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
+  background: color-mix(in srgb, var(--capsule-fill) var(--glass-tint, 76%), transparent);
+}
+
+.workspace-shell.is-focus :is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
+  box-shadow: inset 0 1px 0 var(--capsule-light);
+}

@@ -1,8 +1,22 @@
 /* eslint-disable react-refresh/only-export-components -- TanStack's root-route factory must
    reference the three local screen components; splitting this file only hides that dependency. */
-import { createRootRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
+import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { initAxes } from "@/lib/axes";
+
+/* A tab left open across a release still names the old build's chunks, and
+   Pages has already replaced them: opening Settings asked for a
+   `SettingsPanel-<hash>.js` that no longer exists. Vite announces that failure
+   here, and the cure is the new `index.html` — so reload, once. The stamp stops
+   a loop when the cause is a network that is really down; then the error
+   screen shows, and its button reloads too. */
+window.addEventListener("vite:preloadError", (event) => {
+  const last = Number(sessionStorage.getItem("napp:chunk-reload") ?? 0);
+  if (Date.now() - last < 10_000) return;
+  sessionStorage.setItem("napp:chunk-reload", String(Date.now()));
+  event.preventDefault();
+  window.location.reload();
+});
 
 export const rootRoute = createRootRoute({
   component: Root,
@@ -67,8 +81,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  const router = useRouter();
+function ErrorComponent({ error }: { error: Error }) {
   return (
     <Notice
       figure="Err"
@@ -76,10 +89,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       detail={error.message}
       action={
         <button
-          onClick={() => {
-            router.invalidate();
-            reset();
-          }}
+          // A reload, not a re-render: re-rendering asks again for the same
+          // missing chunk, and this screen is where that failure ends up.
+          onClick={() => window.location.reload()}
           className="label rounded-lg bg-accent px-3 py-2 text-on-accent transition-opacity hover:opacity-90"
         >
           Try again →

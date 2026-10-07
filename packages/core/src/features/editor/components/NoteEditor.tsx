@@ -666,6 +666,49 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           ? "row"
           : "stacked";
 
+  /* The writing group is centred on the words, not on the strip. The strip
+     spans the whole column; the words are centred in what the scroll box
+     leaves once its scrollbar has taken its width — on a Mac set to always
+     show scrollbars, half of that is how far the group stood right of the
+     text. It moves onto that centre and stops 16px short of either
+     neighbour. A scrollbar arriving shrinks the scroll box's content box,
+     which is what the observer sees. */
+  const centreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const centre = centreRef.current;
+    const strip = centre?.parentElement;
+    if (!centre || !strip || !scroller || toolbarLayout !== "centred") return;
+    const place = () => {
+      const shift = Number(centre.dataset.shift ?? 0);
+      const box = centre.getBoundingClientRect();
+      const left = box.left - shift;
+      const right = box.right - shift;
+      // The left cell stretches to its column, so its own box says nothing:
+      // what may not be covered is what is drawn in it.
+      const lead = centre.previousElementSibling;
+      const before = Math.max(
+        strip.getBoundingClientRect().left,
+        ...[...(lead?.children ?? [])].map((child) => child.getBoundingClientRect().right),
+      );
+      const after = centre.nextElementSibling?.getBoundingClientRect().left ?? right;
+      const words =
+        scroller.getBoundingClientRect().left + scroller.clientLeft + scroller.clientWidth / 2;
+      const wanted = words - (left + right) / 2;
+      const next = Math.round(Math.min(Math.max(wanted, before + 16 - left), after - 16 - right));
+      centre.dataset.shift = String(next);
+      centre.style.translate = `${next}px 0`;
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(strip);
+    observer.observe(scroller);
+    return () => {
+      observer.disconnect();
+      centre.style.translate = "";
+      delete centre.dataset.shift;
+    };
+  }, [toolbarLayout, scroller]);
+
   const fileInputs = (
     <>
       <input
@@ -1290,7 +1333,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             over a 632px editor the cluster ran fifteen pixels underneath the
             save readout, and no width of readout could have avoided it. */}
         {toolbarLayout !== "stacked" &&
-          (toolbar ? <div className="justify-self-center">{toolbar}</div> : <span />)}
+          (toolbar ? (
+            <div ref={centreRef} className="justify-self-center">
+              {toolbar}
+            </div>
+          ) : (
+            <span />
+          ))}
 
         {/* In a narrow pane the writing controls have a centred row of their
             own, leaving the status and page actions unobstructed. */}

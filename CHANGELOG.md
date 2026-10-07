@@ -3,6 +3,30 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.9 — 2026-10-07
+
+Panels with a shape, and Settings that always opens.
+
+### Changed
+
+- Sidebar and note list are floating panels (8px inset, 14px radius) on the
+  page's ground: the sidebar as a `::before` layer, the list as an inset box.
+  The note keeps its band and hairline; list header 44px and note band 60px so
+  every capsule's centre is at 30px.
+- Toolbar capsules have a top light edge and a contact shadow
+  (`--capsule-*`).
+- The note's writing group is centred on the scroll box's content area
+  (where the words are centred), not on the strip, so a classic scrollbar no
+  longer leaves it to the right of the text; clamped 16px clear of its
+  neighbours (`NoteEditor.tsx`).
+
+### Fixed
+
+- A tab left open across a deploy requested a chunk Pages no longer serves
+  ("Failed to fetch dynamically imported module"). `vite:preloadError` now
+  reloads once (guarded by a 10 s stamp), and the error screen's Try again
+  reloads instead of re-rendering.
+
 ## 0.9.8 — 2026-10-07
 
 Pictures you can edit, and folders in your order.
