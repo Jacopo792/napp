@@ -9,6 +9,8 @@ import {
   FolderPlus,
   Info,
   Lock,
+  Plus,
+  Users,
   MessageSquare,
   MoreHorizontal,
   NotebookText,
@@ -21,8 +23,9 @@ import {
 } from "@/components/icons";
 import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
-import { ContextMenu } from "./ContextMenu";
-import { useContextMenu } from "@/lib/contextMenu";
+import { ContextMenu, PointMenu } from "./ContextMenu";
+import { useContextMenu, type MenuPoint } from "@/lib/contextMenu";
+import type { MenuItem } from "@/lib/menuShape";
 import { WhatsNewButton } from "./WhatsNewButton";
 import { UpdateNotice } from "./UpdateNotice";
 import { MenuButton } from "./MenuPrimitives";
@@ -77,6 +80,10 @@ interface Props {
   closeInStrip?: boolean;
   onSettings: () => void;
   onLock: () => void;
+  accountEmail: string;
+  accounts: () => { userId: string; email: string }[];
+  onSwitchAccount: (userId: string) => void;
+  onAddAccount: () => void;
   /** What changed in Napp, and whether there is a release not read yet. */
   onWhatsNew: () => void;
   whatsNewUnseen: boolean;
@@ -450,6 +457,10 @@ export function Sidebar({
   closeInStrip = false,
   onSettings,
   onLock,
+  accountEmail,
+  accounts,
+  onSwitchAccount,
+  onAddAccount,
   onWhatsNew,
   whatsNewUnseen,
   spaceSwitch,
@@ -462,6 +473,7 @@ export function Sidebar({
   const [renaming, setRenaming] = useState<string | null>(null);
   /* The same three actions the folder's own ⋯ carries, on the right button. */
   const folderMenu = useContextMenu<FolderType>();
+  const [accountMenu, setAccountMenu] = useState<(MenuPoint & { items: MenuItem[] }) | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const closeFolderMenu = useCallback(() => {
     folderMenu.close();
@@ -790,14 +802,55 @@ export function Sidebar({
           type="button"
           className="sidebar-footer-button press"
           data-motion="lock"
-          onClick={onLock}
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            setAccountMenu({
+              x: box.left,
+              /* Opens upward: the button is the last thing in the column. */
+              y: box.top - 4 - 36 * (accounts().length + 3),
+              items: [
+                { kind: "label", label: accountEmail },
+                ...accounts().map(
+                  (a): MenuItem => ({
+                    kind: "item",
+                    id: `account:${a.userId}`,
+                    label: a.email,
+                    run: () => onSwitchAccount(a.userId),
+                  }),
+                ),
+                { kind: "separator" },
+                {
+                  kind: "item",
+                  id: "account-add",
+                  label: "Add account",
+                  icon: <Plus size={16} />,
+                  run: onAddAccount,
+                },
+                {
+                  kind: "item",
+                  id: "account-lock",
+                  label: "Lock & sign out",
+                  icon: <Lock size={16} />,
+                  run: onLock,
+                },
+              ],
+            });
+          }}
         >
           <span className="sidebar-glyph" data-tone="lock">
-            <Lock size={16} />
+            <Users size={16} />
           </span>
-          <span>Lock &amp; sign out</span>
+          <span>Switch account</span>
         </button>
       </div>
+
+      {accountMenu && (
+        <PointMenu
+          point={accountMenu}
+          items={accountMenu.items}
+          close={() => setAccountMenu(null)}
+        />
+      )}
 
       {folderMenu.target && (
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>

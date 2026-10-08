@@ -180,7 +180,98 @@ export async function restoreSession(): Promise<AppSession | null> {
   return restoreArchiveSession(localStorage, supabase.auth);
 }
 
+/* Other accounts on this device, kept so switching is a click instead of a
+   password. Their refresh tokens sit in the same localStorage the signed-in
+   account's already does, so this widens nothing. Signing out forgets the
+   account that signed out; the rest stay. */
+const ACCOUNTS_KEY = "napp:accounts";
+
+interface SavedAccount {
+  userId: string;
+  email: string;
+  archiveId: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+function savedAccounts(): SavedAccount[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) ?? "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAccounts(list: SavedAccount[]): void {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+}
+
+function currentAppSession(): AppSession | null {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
+  } catch {
+    return null;
+  }
+}
+
+/** The signed-in account's tokens, taken now because they rotate. */
+async function stashCurrent(): Promise<void> {
+  const app = currentAppSession();
+  const { data } = await supabase.auth.getSession();
+  if (!app || !data.session) return;
+  saveAccounts([
+    ...savedAccounts().filter((a) => a.userId !== app.userId),
+    {
+      userId: app.userId,
+      email: app.email,
+      archiveId: app.archiveId,
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+    },
+  ]);
+}
+
+export function otherAccounts(userId: string): { userId: string; email: string }[] {
+  return savedAccounts()
+    .filter((a) => a.userId !== userId)
+    .map(({ userId, email }) => ({ userId, email }));
+}
+
+/** Leaves this account signed in for later and opens the sign-in page. */
+export async function addAccount(): Promise<void> {
+  await stashCurrent();
+  localStorage.removeItem(SESSION_KEY);
+  resetArchiveCache();
+  await supabase.auth.signOut({ scope: "local" });
+}
+
+/** Swaps to a saved account and reloads, so every channel, provider and cache
+ *  of the old one is rebuilt rather than reset. A token the server no longer
+ *  honours drops the account and throws. */
+export async function switchAccount(userId: string): Promise<void> {
+  await stashCurrent();
+  const target = savedAccounts().find((a) => a.userId === userId);
+  if (!target) throw new Error("That account is no longer saved");
+  const { error } = await supabase.auth.setSession({
+    access_token: target.accessToken,
+    refresh_token: target.refreshToken,
+  });
+  if (error) {
+    saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
+    throw new Error(`Sign in to ${target.email} again`);
+  }
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({ userId, email: target.email, archiveId: target.archiveId }),
+  );
+  resetArchiveCache();
+  window.location.reload();
+}
+
 export async function clearSession(): Promise<void> {
+  const leaving = currentAppSession();
+  if (leaving) saveAccounts(savedAccounts().filter((a) => a.userId !== leaving.userId));
   localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();
   /* The in-memory cache goes with the tab; the one on disk has to be asked.

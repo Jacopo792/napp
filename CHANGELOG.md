@@ -3,6 +3,18 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.12 — 2026-10-08
+
+Switch between accounts without signing in again.
+
+### Added
+
+- `session.ts` keeps each account's tokens under `napp:accounts` when it is
+  left (`switchAccount`, `addAccount`, `otherAccounts`); `clearSession` forgets
+  only the account signing out. The sidebar's footer button is Switch account,
+  a menu with the saved accounts, Add account and Lock & sign out. A rejected
+  token drops the account from the list.
+
 ## 0.9.11 — 2026-10-07
 
 Notes open faster in the browser.

@@ -78,3 +78,16 @@ export async function restoreSession(): Promise<AppSession | null> {
 export async function clearSession(): Promise<void> {
   signedOut = true;
 }
+
+/* One other account, so the switch menu has something to show. */
+export function otherAccounts(): { userId: string; email: string }[] {
+  return [{ userId: "preview-other", email: "second@example.invalid" }];
+}
+
+export async function addAccount(): Promise<void> {
+  signedOut = true;
+}
+
+export async function switchAccount(): Promise<void> {
+  window.location.reload();
+}

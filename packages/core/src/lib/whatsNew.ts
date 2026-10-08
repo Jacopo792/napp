@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.12",
+    date: "2026-10-08",
+    headline: "Switch between your accounts",
+    sections: [
+      {
+        heading: "Accounts",
+        items: [
+          {
+            title: "Switch account",
+            text: "The button at the foot of the sidebar now lists the other accounts you have signed in on this device. Pick one and you are in, with no password.",
+          },
+          {
+            title: "Add an account",
+            text: "Add account keeps you signed in for later and opens the sign-in page. Lock & sign out is in the same menu.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.11",
     date: "2026-10-07",
     headline: "Notes open faster in the browser",

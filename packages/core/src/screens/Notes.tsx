@@ -79,7 +79,15 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { chooseArchive, restoreSession, clearSession, type AppSession } from "@/lib/session";
+import {
+  addAccount,
+  chooseArchive,
+  clearSession,
+  otherAccounts,
+  restoreSession,
+  switchAccount,
+  type AppSession,
+} from "@/lib/session";
 import {
   createSpace,
   setDocumentFeatures,
@@ -3202,6 +3210,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     navigate({ to: "/" });
   }
 
+  function handleSwitchAccount(userId: string) {
+    saveNow();
+    clearDrafts();
+    void switchAccount(userId).catch(() => navigate({ to: "/" }));
+  }
+
+  function handleAddAccount() {
+    saveNow();
+    clearDrafts();
+    void addAccount().then(() => navigate({ to: "/" }));
+  }
+
   /* Leaving an archive and deleting one end the same way: whatever is still
      waiting lands first, the act runs, and the window goes to another
      archive — or, with none left, to the door. */
@@ -4534,6 +4554,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         setSettingsOpen(true);
       }}
       onLock={handleLock}
+      accountEmail={session?.email ?? ""}
+      accounts={() => (session ? otherAccounts(session.userId) : [])}
+      onSwitchAccount={handleSwitchAccount}
+      onAddAccount={handleAddAccount}
       spaceSwitch={spaceSwitch}
       peopleShelf={peopleShelf}
       scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
