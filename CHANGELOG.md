@@ -3,6 +3,18 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.13 — 2026-10-09
+
+Text pasted from a PDF keeps its paragraphs.
+
+### Fixed
+
+- `reflow.ts` (`transformPasted`) rejoins a paste that arrives one paragraph
+  per printed line: lines of a uniform measure are merged unless short and
+  sentence-ending (paragraph end) or short without a sentence (heading); a
+  style change with no space at the seam (a page turn) splits the paragraph.
+  In a manuscript, pasted font family, size and line height are dropped.
+
 ## 0.9.12 — 2026-10-08
 
 Switch between accounts without signing in again.

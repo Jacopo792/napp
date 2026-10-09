@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.13",
+    date: "2026-10-09",
+    headline: "Text pasted from a PDF keeps its paragraphs",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Paste from a PDF",
+            text: "Text copied out of a PDF used to land one line per paragraph. Lines are now joined back into their paragraphs, headings stay on their own, and a page turn no longer glues two lines together.",
+          },
+          {
+            title: "One letter in a book",
+            text: "Pasting into a book keeps bold, italics and colour but takes the book's own typeface and size.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.12",
     date: "2026-10-08",
     headline: "Switch between your accounts",
