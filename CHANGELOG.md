@@ -3,6 +3,27 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.14 — 2026-10-09
+
+Pasting from Pages, Word and TextEdit keeps its look.
+
+### Fixed
+
+- `inlinePastedStyles` (`transformPastedHTML`): RTF on the macOS clipboard
+  reaches Chromium as Cocoa HTML with every style in a `<style>` block keyed by
+  class, which ProseMirror never reads. Class rules are written onto the
+  elements they match, and a `font` shorthand's italic or bold becomes
+  `<em>`/`<strong>`, so centring and emphasis survive.
+- `reflowPasted` collapses runs of empty spacer paragraphs, drops trailing
+  ones, closes the slice start when the first paragraph is aligned (so it is
+  not poured into the caret's paragraph), and no longer leaves an empty
+  `textStyle` mark behind in a manuscript.
+
+### Known
+
+- Preview copies a PDF's text through PDFKit, which reports every font as
+  Helvetica: no italics, alignment or indent reach the clipboard at all.
+
 ## 0.9.13 — 2026-10-09
 
 Text pasted from a PDF keeps its paragraphs.

@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.14",
+    date: "2026-10-09",
+    headline: "Pasting from Pages, Word and TextEdit keeps its look",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Centred lines and italics survive a paste",
+            text: "Text copied from Pages, Word or TextEdit now arrives with its centring, italics and bold, and the empty lines used for spacing are tidied away.",
+          },
+          {
+            title: "Copying from a PDF",
+            text: "A PDF opened in Preview hands over plain words only, with no italics or centring. For a document that keeps its look, copy from the original file instead.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.13",
     date: "2026-10-09",
     headline: "Text pasted from a PDF keeps its paragraphs",

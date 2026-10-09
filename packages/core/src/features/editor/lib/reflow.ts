@@ -65,7 +65,9 @@ function withoutFonts(fragment: Fragment): Fragment {
     const marks = node.marks.flatMap((mark) => {
       if (mark.type.name !== "textStyle") return [mark];
       const attrs = { ...mark.attrs, fontFamily: null, fontSize: null, lineHeight: null };
-      return Object.values(attrs).some((value) => value != null) ? [mark.type.create(attrs)] : [];
+      return Object.values(attrs).some((value) => value != null && value !== "")
+        ? [mark.type.create(attrs)]
+        : [];
     });
     nodes.push(node.mark(marks));
   });
@@ -74,8 +76,21 @@ function withoutFonts(fragment: Fragment): Fragment {
 
 export function reflowPasted(slice: Slice, options: { dropFonts: boolean }): Slice {
   let content = options.dropFonts ? withoutFonts(slice.content) : slice.content;
+  /* A document spaced with empty paragraphs — eleven of them above an
+     epigraph, four for a page turn — is spaced by the sheet here. */
+  const blank = (node: Node) => {
+    let only = node.type.name === "paragraph" && !node.textContent.trim();
+    node.forEach((child) => (only &&= child.isText || child.type.name === "hardBreak"));
+    return only;
+  };
   const blocks: Node[] = [];
-  content.forEach((node) => blocks.push(node));
+  content.forEach((node) => {
+    const spacer = content.childCount >= 3 && blank(node);
+    if (!spacer || (blocks.length && !blank(blocks[blocks.length - 1]))) blocks.push(node);
+  });
+  if (!blocks.length) return slice;
+  while (blocks.length > 1 && blank(blocks[blocks.length - 1])) blocks.pop();
+  if (blocks.length !== content.childCount) content = Fragment.fromArray(blocks);
   if (blocks.length >= 3 && blocks.every((node) => node.type.name === "paragraph")) {
     const lines = blocks.flatMap(splitAtStyleSeams);
     const joins = hardWraps(lines.map((node) => node.textContent));
@@ -95,5 +110,50 @@ export function reflowPasted(slice: Slice, options: { dropFonts: boolean }): Sli
     });
     content = Fragment.fromArray(merged);
   }
-  return content === slice.content ? slice : new Slice(content, slice.openStart, slice.openEnd);
+  /* An open start pours the first paragraph into the one under the caret,
+     which keeps its own setting: a centred epigraph lands flush left. A
+     first paragraph that says where it sits arrives whole. */
+  const openStart = content.firstChild?.attrs.textAlign ? 0 : slice.openStart;
+  if (content === slice.content && openStart === slice.openStart) return slice;
+  return new Slice(content, openStart, slice.openEnd);
+}
+
+/* Pages, TextEdit and Word put their formatting on the clipboard as RTF, and
+   Chromium hands it over as HTML whose every style lives in a `<style>`
+   block, keyed by class — `p.p3 {text-align: center}`, `span.s1 {font:
+   italic 12px Times}`. The editor reads inline styles and tags, never a
+   stylesheet, so the centring and the italics were on the clipboard and
+   were dropped. Each rule is written onto the elements it matches, and the
+   `font` shorthand, which no mark reads, is said again as tags. */
+export function inlinePastedStyles(html: string): string {
+  if (!/<style/i.test(html)) return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const css = Array.from(doc.querySelectorAll("style"), (style) => style.textContent ?? "").join(
+    "\n",
+  );
+  for (const [, selector, declarations] of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    let targets: Element[];
+    try {
+      targets = Array.from(doc.body.querySelectorAll(selector.trim()));
+    } catch {
+      continue;
+    }
+    for (const element of targets) {
+      if (!(element instanceof HTMLElement)) continue;
+      const inline = element.style.cssText;
+      element.style.cssText = `${declarations};${inline}`;
+    }
+  }
+  for (const element of Array.from(doc.body.querySelectorAll<HTMLElement>("[style]"))) {
+    const italic = element.style.fontStyle === "italic";
+    const weight = element.style.fontWeight;
+    const bold = weight === "bold" || Number(weight) >= 600;
+    for (const tag of [italic && "em", bold && "strong"]) {
+      if (!tag || !element.firstChild) continue;
+      const wrapper = doc.createElement(tag);
+      wrapper.append(...Array.from(element.childNodes));
+      element.append(wrapper);
+    }
+  }
+  return doc.body.innerHTML;
 }

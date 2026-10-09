@@ -99,7 +99,7 @@ import {
 } from "@/features/editor/lib/content";
 import { attachmentType, attachmentExtension } from "@/features/editor/lib/attachments";
 import { mediaPaste } from "@/features/editor/lib/paste";
-import { reflowPasted } from "@/features/editor/lib/reflow";
+import { inlinePastedStyles, reflowPasted } from "@/features/editor/lib/reflow";
 import { splitMediaStroke } from "@/features/editor/lib/mediaInk";
 import { rememberSpelling, takeAutocorrection } from "@/features/editor/lib/autocorrect";
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
@@ -2148,6 +2148,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         },
         transformPastedText(text) {
           return capitalizeSentences(text);
+        },
+        transformPastedHTML(html) {
+          return inlinePastedStyles(html);
         },
         transformPasted(slice) {
           return reflowPasted(slice, { dropFonts: manuscript });
