@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.16 — 2026-10-10
+
+Frosted glass is yours to turn on.
+
+### Changed
+
+- `Appearance.frosted`, default `false`, switched in Settings → Style →
+  Material. It sets `has-frosted-glass` on the root, which now scopes 0.9.15's
+  wallpaper glass (`--glass-tint`, `blur(48px) saturate(1.5)`, transparent
+  `.sidebar-footer`); without it the columns are 0.9.14's again (88%,
+  `blur(18px) saturate(1.06)`). The picture palettes bring their picture only
+  while it is on, and otherwise apply their three colours alone. Travels in
+  `profile_preferences` with the rest of the appearance.
+
 ## 0.9.15 — 2026-10-10
 
 Eight palettes made of glass and light.

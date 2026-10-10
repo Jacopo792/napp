@@ -874,7 +874,9 @@ export function SettingsPanel({
                           aria-pressed={active}
                           className={active ? "is-active" : ""}
                           onClick={async () => {
-                            const picture = PALETTE_PICTURES[palette.id];
+                            const picture = appearance.frosted
+                              ? PALETTE_PICTURES[palette.id]
+                              : undefined;
                             if (picture)
                               await setWallpaper(await (await fetch(picture)).blob()).catch(
                                 () => undefined,
@@ -1138,6 +1140,22 @@ export function SettingsPanel({
                         checked={appearance.translucentSidebar}
                         onChange={(event) =>
                           setAppearance({ ...appearance, translucentSidebar: event.target.checked })
+                        }
+                      />
+                    </label>
+
+                    <label className="appearance-row">
+                      <RowLead
+                        icon={<Image size={16} />}
+                        label="Frosted glass"
+                        hint="A wallpaper blurred into light, and palettes with a picture of their own"
+                      />
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={appearance.frosted}
+                        onChange={(event) =>
+                          setAppearance({ ...appearance, frosted: event.target.checked })
                         }
                       />
                     </label>

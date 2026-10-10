@@ -50,6 +50,10 @@ export interface Appearance {
   iconTint: string;
   /** `"auto"` or a hex colour. */
   folderColour: string;
+  /** Glass over a wallpaper that blurs the picture into light, and palettes
+   *  that bring a picture of their own. Off — the default — is the plainer
+   *  glass of 0.9.14, which some readers prefer. */
+  frosted: boolean;
 }
 
 /* A new account opens on Graphite: the grey a Mac window is, and the system's
@@ -73,6 +77,8 @@ export const DEFAULT_APPEARANCE: Appearance = {
   iconStyle: "clear",
   iconTint: "auto",
   folderColour: "auto",
+  /* Off until asked for: opening Napp after the update looks as it did. */
+  frosted: false,
 };
 
 /* Seventeen starting points, each a ground, an ink and one colour to act with.
@@ -286,6 +292,7 @@ function read(): Appearance {
         : DEFAULT_APPEARANCE.iconStyle,
       iconTint: autoOrHex(parsed.iconTint),
       folderColour: autoOrHex(parsed.folderColour),
+      frosted: parsed.frosted === true,
     };
   } catch {
     return DEFAULT_APPEARANCE;
@@ -485,6 +492,7 @@ export function applyAppearance(config = current): void {
   );
   root.style.setProperty("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
   root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
+  root.classList.toggle("has-frosted-glass", config.frosted);
   /* Liquid Glass: the share of the palette laid over a translucent surface.
      Two ranges, because the Mac's own material is already a tint and a CSS
      backdrop blur is not — the same "clear" is a lighter coat over vibrancy. */

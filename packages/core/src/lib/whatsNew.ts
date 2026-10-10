@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.16",
+    date: "2026-10-10",
+    headline: "Frosted glass is yours to turn on",
+    sections: [
+      {
+        heading: "Appearance",
+        items: [
+          {
+            title: "Napp looks as it did",
+            text: "The frosted glass from the last update is now a switch, and it starts off. Turn on Frosted glass in Settings → Style for the softer glass over a wallpaper and for the eight palettes that bring a photograph of their own.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.15",
     date: "2026-10-10",
     headline: "Eight palettes made of glass and light",
