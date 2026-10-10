@@ -75,7 +75,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   folderColour: "auto",
 };
 
-/* Nine starting points, each a ground, an ink and one colour to act with.
+/* Seventeen starting points, each a ground, an ink and one colour to act with.
    Every ground carries a little of its accent's hue — a palette whose ground
    is neutral grey reads as one colour dropped onto a grey app — and every
    accent is a colour somebody would choose on purpose, not a tint of the
@@ -101,9 +101,9 @@ export const APPEARANCE_PRESETS = [
     background: "#121214",
     foreground: "#ececea",
   },
-  /* The one light ground: warm paper and an ink-blue. `setTheme()` replaces
-     the three colours whenever the THEME segment is touched, so a second
-     light preset would be wiped by the click that selects its own theme. */
+  /* Warm paper and an ink-blue. A light preset sets its own theme when it is
+     pressed; touching the THEME segment afterwards still resets the three
+     colours, for this one and for Vanilla and Lavender alike. */
   {
     id: "paper",
     name: "Paper",
@@ -159,6 +159,75 @@ export const APPEARANCE_PRESETS = [
     accent: "#e59aa4",
     background: "#221c1e",
     foreground: "#f3e9ea",
+  },
+  /* Four from one series (dyslove.design): Cosmic #23212C, Violet #36255C,
+     Lavender #D2C3F6 and Vanilla #F1FEC8, each the ground of its own preset
+     and lending the others an ink or an accent. */
+  {
+    id: "cosmic",
+    name: "Cosmic",
+    theme: "dark" as const,
+    accent: "#d2c3f6",
+    background: "#23212c",
+    foreground: "#f1fec8",
+  },
+  {
+    id: "violet",
+    name: "Violet",
+    theme: "dark" as const,
+    accent: "#f1fec8",
+    background: "#36255c",
+    foreground: "#efe9fc",
+  },
+  {
+    id: "lavender",
+    name: "Lavender",
+    theme: "light" as const,
+    accent: "#36255c",
+    background: "#d2c3f6",
+    foreground: "#1b1530",
+  },
+  {
+    id: "vanilla",
+    name: "Vanilla",
+    theme: "light" as const,
+    accent: "#36255c",
+    background: "#f1fec8",
+    foreground: "#1d1f12",
+  },
+  /* Four darker ones in the same manner, each a photograph whose light sits
+     on the left, behind the glass, and fades to the ground under the page. */
+  {
+    id: "abyss",
+    name: "Abyss",
+    theme: "dark" as const,
+    accent: "#5fd4c4",
+    background: "#0e2226",
+    foreground: "#e3f2f1",
+  },
+  {
+    id: "ember",
+    name: "Ember",
+    theme: "dark" as const,
+    accent: "#ff8a4c",
+    background: "#1e1210",
+    foreground: "#f6e7dc",
+  },
+  {
+    id: "pine",
+    name: "Pine",
+    theme: "dark" as const,
+    accent: "#a9c8a0",
+    background: "#121c17",
+    foreground: "#e4ece5",
+  },
+  {
+    id: "aurora",
+    name: "Aurora",
+    theme: "dark" as const,
+    accent: "#7fe3d6",
+    background: "#10142a",
+    foreground: "#e8ecfb",
   },
 ] as const;
 

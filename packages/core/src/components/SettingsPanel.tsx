@@ -78,6 +78,7 @@ import type { AvatarCrop } from "@/lib/image";
 import {
   APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE,
+  currentAppearance,
   ICON_STYLES,
   SYSTEM_COLOURS,
   type IconStyle,
@@ -88,6 +89,18 @@ import {
   type ThemeMode,
 } from "@/lib/appearance";
 import type { Folder, NoteLock } from "@/lib/types";
+
+/* The palettes that are glass over a photograph, not three colours: frosted
+   glass over a flat ground is a flat ground. Choosing one puts its picture
+   (named after the preset's id) behind the window, with the glass cleared
+   enough to show it.
+   ponytail: 200×112 pictures, which is all a 48px backdrop blur can show; a
+   larger copy is needed only if a picture is ever seen unblurred. */
+const PALETTE_PICTURES: Partial<Record<string, string>> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>("../assets/palettes/*.jpg", { eager: true, import: "default" }),
+  ).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -4), url]),
+);
 import type { ListPreferences } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
@@ -860,15 +873,21 @@ export function SettingsPanel({
                           type="button"
                           aria-pressed={active}
                           className={active ? "is-active" : ""}
-                          onClick={() =>
+                          onClick={async () => {
+                            const picture = PALETTE_PICTURES[palette.id];
+                            if (picture)
+                              await setWallpaper(await (await fetch(picture)).blob()).catch(
+                                () => undefined,
+                              );
                             setAppearance({
-                              ...appearance,
+                              ...currentAppearance(),
                               theme: palette.theme,
                               accent: palette.accent,
                               background: palette.background,
                               foreground: palette.foreground,
-                            })
-                          }
+                              ...(picture ? { glass: 30, wallpaperDim: 12, wallpaperBlur: 0 } : {}),
+                            });
+                          }}
                         >
                           <span
                             className="palette-chip"

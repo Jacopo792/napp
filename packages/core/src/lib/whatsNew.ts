@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.15",
+    date: "2026-10-10",
+    headline: "Eight palettes made of glass and light",
+    sections: [
+      {
+        heading: "Appearance",
+        items: [
+          {
+            title: "Palettes with a photograph behind them",
+            text: "Cosmic, Violet, Lavender and Vanilla, and four darker ones — Abyss, Ember, Pine and Aurora — each come with their own picture. Choose one in Settings → Appearance and the sidebar and the note list turn to frosted glass with its light coming through.",
+          },
+          {
+            title: "Clearer glass over a wallpaper",
+            text: "With any wallpaper, the sidebar and the list now let the picture through as soft colour, and the Liquid Glass slider decides how much. The strip at the foot of the sidebar is glass too.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.14",
     date: "2026-10-09",
     headline: "Pasting from Pages, Word and TextEdit keeps its look",

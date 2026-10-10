@@ -492,9 +492,14 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.06);
-  backdrop-filter: blur(18px) saturate(1.06);
+  /* Frosted, not tinted: at a fixed 88% the picture was a shade nobody could
+     see, and the columns read as flat colour. A wide blur turns the picture
+     into soft light inside the pane, the saturation keeps its colour from
+     going grey, and how much of the palette sits over it is the Liquid Glass
+     slider's to say. */
+  background: color-mix(in srgb, var(--paper) var(--glass-tint, 76%), transparent);
+  -webkit-backdrop-filter: blur(48px) saturate(1.5);
+  backdrop-filter: blur(48px) saturate(1.5);
   content: "";
   pointer-events: none;
 }
@@ -505,7 +510,8 @@
    filter is a full extra compositing pass per frame for output the eye cannot
    tell from one pass. The painted hairline underneath still separates it. */
 .has-wallpaper .collection-toolbar,
-.has-wallpaper .editor-toolbar {
+.has-wallpaper .editor-toolbar,
+.has-wallpaper .sidebar-footer {
   background: transparent;
 }
 

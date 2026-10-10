@@ -3,6 +3,27 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.15 — 2026-10-10
+
+Eight palettes made of glass and light.
+
+### Added
+
+- Presets Cosmic, Violet, Lavender, Vanilla, Abyss, Ember, Pine and Aurora
+  (`APPEARANCE_PRESETS`). Each has a picture in
+  `packages/core/src/assets/palettes/<id>.jpg`, picked up by
+  `import.meta.glob` in `SettingsPanel`; choosing the preset sets it as the
+  wallpaper with `glass: 30`, `wallpaperDim: 12`, `wallpaperBlur: 0`. The
+  pictures are original, generated for this, 200×112 — only ever seen through
+  a 48px backdrop blur.
+
+### Changed
+
+- Sidebar and list glass over a wallpaper: `--glass-tint` (the Liquid Glass
+  slider) instead of a fixed 88%, `blur(48px) saturate(1.5)` instead of
+  `blur(18px) saturate(1.06)`. `.sidebar-footer` is transparent over a
+  wallpaper, like the toolbars. The note page stays opaque.
+
 ## 0.9.14 — 2026-10-09
 
 Pasting from Pages, Word and TextEdit keeps its look.
