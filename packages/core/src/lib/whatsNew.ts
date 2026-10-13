@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.35",
+    date: "2026-10-13",
+    headline: "Housekeeping",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes stay as you left them",
+            text: "Behind the scenes, the guard that stops a note from showing as edited when you only opened it is now written down, so it holds for whatever Napp learns next.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.34",
     date: "2026-10-13",
     headline: "Opening a note no longer edits it",

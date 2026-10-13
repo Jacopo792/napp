@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.35 — 2026-10-13
+
+### Changed
+
+- Repository guide records that a new `null`-default attribute restamps old notes as edited, and where `storeDocument` guards against it. No behaviour change.
+
 ## 0.9.34 — 2026-10-13
 
 ### Fixed

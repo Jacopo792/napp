@@ -1295,6 +1295,15 @@ The collaboration server is part of the authorization boundary:
   trimmed, and the trim reaches the last real text node only once the empty
   paragraphs after it are gone. Deleting words that were already there is still
   an edit, and `integration.test.ts` pins both halves.
+- **A new attribute with a `null` default is an edit on every old note.** A
+  projection out of Yjs spells a default as `null` (`noteLink.blockId` came out
+  as `"blockId": null`) where a row written before the attribute existed says
+  nothing: the same words, a different jsonb, so the first store of any such
+  note restamped it "Edited" — opened from Linked from, with nothing typed.
+  `storeDocument` therefore compares the projection with the row minus `null`
+  attributes (`withoutNullAttributes`) and, when that is the only difference,
+  hands the row's own content back. Pinned by `storeNoEdit.test.ts`; expect to
+  meet it again with the next attribute added to a mark or node.
 
 The old draft/three-way merge path is compatibility code for a pre-Yjs client,
 not the live writer. Do not call saveNote() from the collaborative editor.
