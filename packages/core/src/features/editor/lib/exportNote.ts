@@ -98,6 +98,9 @@ export async function exportDocx(
         return [new TextRun({ text: String(child.attrs?.label ?? "") })];
       if (child.type !== "text") return inline(child, mono);
       const marks = child.marks ?? [];
+      /* A pending insertion is not in the document until it is accepted —
+         the Markdown export says the same. A pending deletion still is. */
+      if (marks.some((m) => m.type === "suggestedInsert")) return [];
       const style = marks.find((m) => m.type === "textStyle")?.attrs;
       const color = String(style?.color ?? "").replace("#", "");
       const run = new TextRun({
@@ -317,7 +320,7 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
     copy.style.borderColor = "#ccc";
     if (
       original.matches(
-        ".rich-media-remove,.rich-media-drawing-tools,.drawing-overlay-tools,.ink-delete-menu,.ProseMirror-gapcursor",
+        ".rich-media-remove,.rich-media-drawing-tools,.drawing-overlay-tools,.ink-delete-menu,.ProseMirror-gapcursor,ins.suggested-insert",
       )
     )
       copy.remove();

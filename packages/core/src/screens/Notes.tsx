@@ -5209,6 +5209,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   eyebrow: [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · "),
                   footer: turn,
                   footnotes: docFeatures.footnotes,
+                  review: docFeatures.review,
                   numbered: docFeatures.numbering ? chapterAt + 1 : null,
                   writing: {
                     focus: focusMode ? writingPreferences.focusScope : "off",

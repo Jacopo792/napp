@@ -25,6 +25,7 @@ import {
   AlignRight,
   Bold,
   Caption,
+  Check,
   Chapters,
   CrossReference,
   Eraser,
@@ -42,16 +43,19 @@ import {
   PageBreak,
   Plus,
   Redo2,
+  Review,
   Strikethrough,
   Subscript,
   Superscript,
   Table2,
   Underline,
   Undo2,
+  X,
 } from "@/components/icons";
 import { WRITING_FONTS, type PageSetup } from "@/lib/spaceShape";
 import { insertCaption, insertCrossReference, insertFootnote } from "../lib/referenceMarks";
 import { CrossReferencePicker } from "./CrossReferencePicker";
+import { settle, suggestionAt, suggestionsIn } from "../lib/suggestions";
 import { keyName } from "@/lib/shortcuts";
 
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72];
@@ -279,6 +283,7 @@ export function ManuscriptToolbar({
   page,
   onLink,
   onImage,
+  review,
 }: {
   editor: Editor | null;
   /** The chapter, so a cross-reference says "in chapter 2" only of others. */
@@ -289,6 +294,9 @@ export function ManuscriptToolbar({
   page: Pick<PageSetup, "tableCaption">;
   onLink: () => void;
   onImage: () => void;
+  /** Present when the document has Suggested changes on: whether this writer
+   *  is suggesting, and the switch. */
+  review?: { on: boolean; toggle: () => void };
 }) {
   const [citing, setCiting] = useState(false);
   const citeRoot = useRef<HTMLSpanElement>(null);
@@ -326,6 +334,10 @@ export function ManuscriptToolbar({
         align: ((blockAttribute(current, "textAlign") as Align | null) ?? "left") as Align,
         spacing: (blockAttribute(current, "lineHeight") as number | null) ?? null,
         indent: (blockAttribute(current, "indent") as number | undefined) ?? 0,
+        /* ponytail: a walk of the chapter per transaction. A chapter is a few
+           thousand nodes; cache by doc if a long one ever makes typing lag. */
+        pending: review ? suggestionsIn(current.state.doc).length : 0,
+        here: review ? suggestionAt(current.state.doc, current.state.selection.from) : null,
       };
     },
   });
@@ -752,6 +764,77 @@ export function ManuscriptToolbar({
           )}
         </span>
       </div>
+
+      {/* Word's Review tab, cut to its three acts: propose instead of
+          writing, and accept or reject what was proposed — the change the
+          caret is in, or every one in the chapter from the menu. */}
+      {review && (
+        <div className="ribbon-group">
+          <Tool
+            label={review.on ? "Suggesting — your edits are proposals" : "Suggest changes"}
+            active={review.on}
+            disabled={off}
+            onPress={review.toggle}
+          >
+            <Review size={15} />
+            <span className="ribbon-word">{review.on ? "Suggesting" : "Editing"}</span>
+          </Tool>
+          {state?.here && (
+            <>
+              <Tool
+                label="Accept this change"
+                disabled={off}
+                onPress={() => editor!.view.dispatch(settle(editor!.state, [state.here!], true))}
+              >
+                <Check size={15} />
+              </Tool>
+              <Tool
+                label="Reject this change"
+                disabled={off}
+                onPress={() => editor!.view.dispatch(settle(editor!.state, [state.here!], false))}
+              >
+                <X size={15} />
+              </Tool>
+            </>
+          )}
+          {(state?.pending ?? 0) > 0 && (
+            <Drop
+              label="All changes"
+              disabled={off}
+              face={
+                <span className="ribbon-word">
+                  {state!.pending} {state!.pending === 1 ? "change" : "changes"}
+                </span>
+              }
+            >
+              {(close) => (
+                <>
+                  <MenuRow
+                    icon={<Check size={16} />}
+                    label="Accept all"
+                    onPress={() => {
+                      close();
+                      editor!.view.dispatch(
+                        settle(editor!.state, suggestionsIn(editor!.state.doc), true),
+                      );
+                    }}
+                  />
+                  <MenuRow
+                    icon={<X size={16} />}
+                    label="Reject all"
+                    onPress={() => {
+                      close();
+                      editor!.view.dispatch(
+                        settle(editor!.state, suggestionsIn(editor!.state.doc), false),
+                      );
+                    }}
+                  />
+                </>
+              )}
+            </Drop>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -301,6 +301,18 @@ update and delete on `note_comments` separately, so resolving a thread of six
 remarks is six announcements — each one re-reading every comment in the
 archive. They arrive together and are answered together.
 
+A remark may name members with @ (`mentions`, frozen with the body) and a
+thread may be handed to one (`assignee_id`); `private.check_comment_people()`
+refuses anybody who is not in the archive. Reactions are rows of their own in
+`note_comment_reactions`, because a reaction is not the author's to own.
+`note_comments` was missing from the Realtime publication until 0.9.18, which
+is why the badge only moved on a reload; check `pg_publication_tables` when a
+channel hears nothing.
+
+**Updates** is the Remarks shape again: a scope listing the notes another
+member wrote in since this account last opened them, read from
+`note_versions` against the same per-note line (`remarksSeen`).
+
 `subscribeToComments` is a channel of its own and deliberately not another
 table in `subscribeToArchive`'s list: that subscription's caller reloads the
 whole archive snapshot and already fires on every save either member makes.
@@ -1145,6 +1157,18 @@ size, margins and letter of the page set-up.
   Yjs stores no null, so an untouched paragraph projects exactly as it did
   before they existed and Postgres sees no edit. Word's paragraph keys
   (⇧⌘L/E/R/J, ⌘↩) are a `manuscript`-only extension; a note keeps its keys.
+
+**Suggested changes** are the `review` switch, and `suggestions.ts` is the
+whole of them. Two marks in `BASE_EXTENSIONS` (`suggestedInsert`,
+`suggestedDelete`), because a schema without a deletion mark would accept every
+pending deletion silently. While a writer has Suggesting on, an
+`appendTransaction` turns the edit that just happened into a proposal — the
+deleted words put back struck, the typed ones marked — so every way of editing
+is one path. Only one replace step inside one text block is tracked; joining
+and splitting blocks are applied as they are. Deleting your own proposal takes
+it back for real. An export is the text as it stands until somebody decides:
+no pending insertion, every pending deletion. Status, synopsis and a word goal
+per chapter are `notes.chapter`, metadata like `position`.
 
 **References: footnotes, captions, cross-references.** Three schema members in
 `BASE_EXTENSIONS` (`Footnote`, `Caption`, `CrossReference`) and one heading

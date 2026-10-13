@@ -3,6 +3,21 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.21 — 2026-10-13
+
+Suggest changes instead of making them.
+
+### Added
+
+- `suggestedInsert` and `suggestedDelete` marks in `BASE_EXTENSIONS`, and
+  `features/editor/lib/suggestions.ts`: an `appendTransaction` that, while
+  Suggesting is on, puts deleted words back marked and marks typed ones
+  (one replace step inside one text block), `suggestionsIn`, `suggestionAt`
+  and `settle` for accepting and rejecting. The manuscript bar offers it when
+  the document's `review` feature is on. Markdown and DOCX leave pending
+  insertions out and keep pending deletions; print and the rasterised PDF do
+  the same.
+
 ## 0.9.20 — 2026-10-13
 
 See what changed while you were away.

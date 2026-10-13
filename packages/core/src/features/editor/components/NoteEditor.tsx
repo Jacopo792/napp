@@ -76,7 +76,13 @@ export interface ManuscriptFrame {
   writing?: WritingFocusSettings;
   /** The document has footnotes on: Insert and ⌥⌘F offer one. */
   footnotes?: boolean;
+  /** The document has Suggested changes on: the bar offers Suggesting. */
+  review?: boolean;
 }
+
+/* Whether this hand is suggesting, kept across chapters the way the pen is:
+   it is a fact about the writer, not about the chapter or the document. */
+let suggestingWanted = false;
 
 interface Props {
   mobile?: boolean;
@@ -335,6 +341,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      which is a thread that has been anchored and not yet said anything in. */
   const [focusThread, setFocusThread] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Map<string, string>>(() => new Map());
+  const [suggesting, setSuggesting] = useState(suggestingWanted);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
   const [findStatus, setFindStatus] = useState({ current: 0, total: 0 });
@@ -1085,6 +1092,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               page={manuscript.page}
               onLink={openLinkForm}
               onImage={() => imageRef.current?.click()}
+              review={
+                manuscript.review && canEdit
+                  ? {
+                      on: suggesting,
+                      toggle: () => {
+                        suggestingWanted = !suggesting;
+                        setSuggesting(!suggesting);
+                      },
+                    }
+                  : undefined
+              }
             />
           ) : (
             <span className="manuscript-bar-quiet">{headerStatus}</span>
@@ -1193,6 +1211,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   writing={manuscript.writing}
                   noteId={entry.note.id}
                   footnotes={manuscript.footnotes}
+                  suggesting={{
+                    on: Boolean(manuscript.review) && suggesting,
+                    author: session?.userId ?? "",
+                  }}
                   onTargets={(targets) => setLiveTargets(entry.note.id, targets)}
                   onEditor={setInstance}
                   value={readDraft(entry.note.id)?.content ?? entry.note.content}

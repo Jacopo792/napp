@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.21",
+    date: "2026-10-13",
+    headline: "Suggest changes instead of making them",
+    sections: [
+      {
+        heading: "Book",
+        items: [
+          {
+            title: "Suggesting",
+            text: "In a book with Suggested changes on, press Editing in the writing bar to switch to Suggesting. What you type is proposed in green; what you delete stays, struck through in red, until somebody decides.",
+          },
+          {
+            title: "Accept or reject",
+            text: "Put the caret in a change to accept or reject it, or use the changes menu to settle every one in the chapter at once. Exports and prints show the chapter as it stands until a change is accepted.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.20",
     date: "2026-10-13",
     headline: "See what changed while you were away",

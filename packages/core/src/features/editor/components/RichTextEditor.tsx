@@ -107,6 +107,7 @@ import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import { platform } from "@/platform";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
+import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
 import type * as Y from "yjs";
 
 export type FormatAction =
@@ -236,6 +237,9 @@ interface Props {
   /** A chapter of a document: the paragraph keys Word has, which a note
    *  never needed and does not get. */
   manuscript?: boolean;
+  /** Whether this writer's edits are proposals, and in whose name. Read on
+   *  every transaction, so switching needs no new editor. */
+  suggesting?: SuggestionMode;
   /** A document only: what focus mode leaves lit, and whether the line being
    *  written is kept mid-window. */
   writing?: WritingFocusSettings;
@@ -2024,9 +2028,13 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     noteId = "",
     footnotes = false,
     onTargets,
+    suggesting,
   },
   ref,
 ) {
+  const suggestingRef = useRef<SuggestionMode>({ on: false, author: "" });
+  suggestingRef.current = suggesting ?? { on: false, author: "" };
+  const suggestions = useMemo(() => suggestionsExtension(() => suggestingRef.current), []);
   /* Read by the plugin on every transaction, so a change of setting needs no
      new editor — only the empty transaction below, to draw it again. */
   const writingRef = useRef<WritingFocusSettings>(writing ?? { focus: "off", typewriter: false });
@@ -2140,6 +2148,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           ? [
               ManuscriptKeys,
               footnoteShortcut,
+              suggestions,
               WritingFocus.configure({ read: () => writingRef.current }),
             ]
           : []),

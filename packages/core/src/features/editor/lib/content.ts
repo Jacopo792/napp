@@ -655,6 +655,64 @@ export const WriteLock = Mark.create({
   renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
 });
 
+/** Words proposed rather than written — Word's track changes, Google Docs'
+ * suggesting. An insertion is text somebody offered to add; a deletion is
+ * text somebody offered to take away, left standing struck through until the
+ * offer is accepted. `suggestions.ts` is what turns ordinary typing into
+ * these while Suggesting is on, and what accepts and rejects them.
+ *
+ * Both are in the schema and not only in the editor, for the reason every
+ * mark here is: the collaboration server, the Yjs conversion and the
+ * exporters read documents that hold them, and a schema without a mark
+ * drops it — which for a pending deletion would be accepting it silently.
+ *
+ * Each excludes itself (the default) and the other, so a run of text is one
+ * proposal by one person, and y-prosemirror stores both under a stable key.
+ *
+ * An export is the document as it stands until somebody decides: a pending
+ * insertion is not in it yet, a pending deletion still is. */
+export const SuggestedInsert = Mark.create({
+  name: "suggestedInsert",
+  inclusive: true,
+  excludes: "suggestedInsert suggestedDelete",
+  addAttributes() {
+    return {
+      author: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-suggested-by") ?? "",
+        renderHTML: (attributes) =>
+          attributes.author ? { "data-suggested-by": attributes.author } : {},
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "ins[data-suggested-by]" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["ins", mergeAttributes(HTMLAttributes, { class: "suggested-insert" }), 0];
+  },
+  renderMarkdown: () => "",
+});
+
+export const SuggestedDelete = Mark.create({
+  name: "suggestedDelete",
+  inclusive: false,
+  excludes: "suggestedInsert suggestedDelete",
+  addAttributes() {
+    return {
+      author: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-suggested-by") ?? "",
+        renderHTML: (attributes) =>
+          attributes.author ? { "data-suggested-by": attributes.author } : {},
+      },
+    };
+  },
+  parseHTML: () => [{ tag: "del[data-suggested-by]" }],
+  renderHTML({ HTMLAttributes }) {
+    return ["del", mergeAttributes(HTMLAttributes, { class: "suggested-delete" }), 0];
+  },
+  renderMarkdown: (mark, helpers) => helpers.renderChildren(mark),
+});
+
 /** A link from one note in this archive to another.
  *
  * A mark and not a node, so the words stay words: the title reads in the
@@ -1086,6 +1144,8 @@ export const BASE_EXTENSIONS = [
   Footnote,
   Caption,
   CrossReference,
+  SuggestedInsert,
+  SuggestedDelete,
 ];
 
 /** The persisted document schema, whole. */
