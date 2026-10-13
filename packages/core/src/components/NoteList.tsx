@@ -1,3 +1,4 @@
+import { usePresence } from "@/components/usePresence";
 import {
   memo,
   useCallback,
@@ -136,6 +137,7 @@ interface Props {
   unreadIds?: Set<string>;
   /** Notes the other member has open right now, and the colour she wears. */
   peerNoteIds?: Set<string>;
+  peerTypingNoteIds?: Set<string>;
   peerColor?: string;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
@@ -188,6 +190,20 @@ const GLYPHS = {
    pezzi giusti)", and a list that cuts that at 30 characters throws away the
    naming scheme its owner built. Three lines, then it stops. */
 
+function PeerDot({ here, typing, color }: { here: boolean; typing: boolean; color?: string }) {
+  const present = usePresence(here, 120);
+  if (!present) return null;
+  return (
+    <span
+      className={`note-row-peer ${here ? "" : "is-away"} ${here && typing ? "is-typing" : ""}`}
+      role="img"
+      aria-hidden={!here}
+      aria-label={typing ? "The other member is writing" : "Open by the other member now"}
+      style={{ "--face": color } as React.CSSProperties}
+    />
+  );
+}
+
 const Row = memo(function Row({
   mobile,
   gallery,
@@ -196,6 +212,7 @@ const Row = memo(function Row({
   selected,
   unread,
   peerHere,
+  peerTyping,
   peerColor,
   showFolder,
   onSelect,
@@ -218,6 +235,7 @@ const Row = memo(function Row({
   selected: boolean;
   unread: boolean;
   peerHere: boolean;
+  peerTyping: boolean;
   peerColor?: string;
   showFolder: boolean;
   trashMode: boolean;
@@ -664,16 +682,7 @@ const Row = memo(function Row({
             overflow: "hidden",
           }}
         >
-          {/* Somebody else is in this note right now: a dot in her colour,
-              and a wave leaving it, before the title it belongs to. */}
-          {peerHere && (
-            <span
-              className="note-row-peer"
-              role="img"
-              aria-label="Open by the other member now"
-              style={{ "--face": peerColor } as React.CSSProperties}
-            />
-          )}
+          <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
           {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
           {entry.note.title || "Untitled"}
         </p>
@@ -906,6 +915,7 @@ export function NoteList({
   archiveMode,
   unreadIds,
   peerNoteIds,
+  peerTypingNoteIds,
   peerColor,
   searchRef,
   onQueryChange,
@@ -1213,6 +1223,7 @@ export function NoteList({
                 selected={selectedId === entry.note.id}
                 unread={unreadIds?.has(entry.note.id) ?? false}
                 peerHere={peerNoteIds?.has(entry.note.id) ?? false}
+                peerTyping={peerTypingNoteIds?.has(entry.note.id) ?? false}
                 peerColor={peerColor}
                 showFolder={showFolder}
                 trashMode={trashMode}

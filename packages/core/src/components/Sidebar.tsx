@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { FOLDER_DRAG, folderDropSide } from "@/lib/folderOrder";
@@ -221,51 +222,49 @@ function FolderMenu({
       >
         <MoreHorizontal size={16} />
       </button>
-      {open && (
-        <div role="menu" className="popover menu-popover sidebar-menu">
-          <button
-            type="button"
-            role="menuitem"
-            className="menu-row text-ink-2"
-            onClick={() => {
-              setOpen(false);
-              onRename();
-            }}
-          >
-            <Pencil size={16} className="text-ink-3" />
-            Rename folder
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="menu-row text-ink-2"
-            onClick={() => {
-              setOpen(false);
-              onNewSubfolder();
-            }}
-          >
-            <FolderPlus size={16} className="text-ink-3" />
-            New folder inside
-          </button>
-          <div className="menu-separator" />
-          <button
-            type="button"
-            role="menuitem"
-            className="menu-row text-danger"
-            onClick={() => {
-              if (!confirm) {
-                setConfirm(true);
-                return;
-              }
-              setOpen(false);
-              onDelete();
-            }}
-          >
-            <Trash2 size={16} />
-            {confirm ? "Delete — click to confirm" : "Delete folder"}
-          </button>
-        </div>
-      )}
+      <MenuSurface open={open} role="menu" className="popover menu-popover sidebar-menu">
+        <button
+          type="button"
+          role="menuitem"
+          className="menu-row text-ink-2"
+          onClick={() => {
+            setOpen(false);
+            onRename();
+          }}
+        >
+          <Pencil size={16} className="text-ink-3" />
+          Rename folder
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className="menu-row text-ink-2"
+          onClick={() => {
+            setOpen(false);
+            onNewSubfolder();
+          }}
+        >
+          <FolderPlus size={16} className="text-ink-3" />
+          New folder inside
+        </button>
+        <div className="menu-separator" />
+        <button
+          type="button"
+          role="menuitem"
+          className="menu-row text-danger"
+          onClick={() => {
+            if (!confirm) {
+              setConfirm(true);
+              return;
+            }
+            setOpen(false);
+            onDelete();
+          }}
+        >
+          <Trash2 size={16} />
+          {confirm ? "Delete — click to confirm" : "Delete folder"}
+        </button>
+      </MenuSurface>
     </div>
   );
 }

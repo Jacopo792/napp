@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 /* The few controls a document carries beside its writing bar: how the page is
  * set up, what can be done with the chapter, and the document's own Trash.
  *
@@ -305,11 +306,9 @@ export function MenuButton({
         {icon}
         {children}
       </button>
-      {open && (
-        <div role="menu" className="popover menu-popover writing-menu">
-          <MenuItems items={items} close={close} />
-        </div>
-      )}
+      <MenuSurface open={open} role="menu" className="popover menu-popover writing-menu">
+        <MenuItems items={items} close={close} />
+      </MenuSurface>
     </div>
   );
 }

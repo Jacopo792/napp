@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.33",
+    date: "2026-10-13",
+    headline: "Quieter, quicker movement",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Less waiting when you navigate",
+            text: "Lists, menus and people cards arrive sooner, with smaller movements. Menus fade away when dismissed, and searching keeps the results still while you type.",
+          },
+          {
+            title: "Presence that means something",
+            text: "A member's dot stays still while they read and moves only when they are writing in that note. Sidebar icons respond with a smaller movement, and reduced motion is respected.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.32",
     date: "2026-10-13",
     headline: "Link straight to a paragraph",

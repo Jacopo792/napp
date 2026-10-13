@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 import {
   Archive,
   ArchiveRestore,
@@ -142,115 +143,114 @@ export function CollectionMenu({
       >
         <MoreHorizontal size={20} />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
+      <MenuSurface
+        open={open}
+        role="menu"
+        className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
+      >
+        <MenuButton
+          onClick={() => {
+            onOpenPalette();
+            close();
+          }}
         >
+          <Search size={16} />
+          Find anything
+          <kbd className="menu-key">{keyName("⌘K")}</kbd>
+        </MenuButton>
+        <MenuButton
+          onClick={() => {
+            onOpenShortcuts();
+            close();
+          }}
+        >
+          <Keyboard size={16} />
+          Keyboard shortcuts
+          <kbd className="menu-key">?</kbd>
+        </MenuButton>
+        <div className="menu-separator" />
+        <p className="menu-label">Sort by</p>
+        {(["updated", "created", "title"] as const).map((criterion) => (
+          <MenuButton
+            key={criterion}
+            active={preferences.sortBy === criterion}
+            onClick={() => onChange({ ...preferences, sortBy: criterion })}
+          >
+            {criterion === "title" ? <ArrowDownAZ size={16} /> : <Clock3 size={16} />}
+            {criterion === "updated"
+              ? "Date edited"
+              : criterion === "created"
+                ? "Date created"
+                : "Title"}
+          </MenuButton>
+        ))}
+        <div className="menu-separator" />
+        <MenuButton
+          active={preferences.direction === "desc"}
+          onClick={() => onChange({ ...preferences, direction: "desc" })}
+        >
+          <ArrowDownUp size={16} />
+          Newest first
+        </MenuButton>
+        <MenuButton
+          active={preferences.direction === "asc"}
+          onClick={() => onChange({ ...preferences, direction: "asc" })}
+        >
+          <ArrowDownUp size={16} className="rotate-180" />
+          Oldest first
+        </MenuButton>
+        <div className="menu-separator" />
+        <MenuButton
+          active={preferences.groupByDate}
+          onClick={() => onChange({ ...preferences, groupByDate: !preferences.groupByDate })}
+        >
+          <CalendarDays size={16} />
+          Group by date
+        </MenuButton>
+        <div className="menu-separator" />
+        <MenuButton
+          onClick={() => {
+            onExportAll();
+            close();
+          }}
+        >
+          <FolderDown size={16} />
+          Export all as Markdown
+        </MenuButton>
+        {onIndexMedia && (
           <MenuButton
             onClick={() => {
-              onOpenPalette();
+              onIndexMedia();
               close();
             }}
           >
             <Search size={16} />
-            Find anything
-            <kbd className="menu-key">{keyName("⌘K")}</kbd>
+            {indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable"}
           </MenuButton>
-          <MenuButton
-            onClick={() => {
-              onOpenShortcuts();
-              close();
-            }}
-          >
-            <Keyboard size={16} />
-            Keyboard shortcuts
-            <kbd className="menu-key">?</kbd>
-          </MenuButton>
-          <div className="menu-separator" />
-          <p className="menu-label">Sort by</p>
-          {(["updated", "created", "title"] as const).map((criterion) => (
+        )}
+        {bulk && bulk.count > 0 && (
+          <>
+            <div className="menu-separator" />
+            {/* Two clicks, the same two the trash asks for on a single row.
+                  A confirmation that replaces the label in place says what is
+                  about to happen without moving the pointer to a new box. */}
             <MenuButton
-              key={criterion}
-              active={preferences.sortBy === criterion}
-              onClick={() => onChange({ ...preferences, sortBy: criterion })}
-            >
-              {criterion === "title" ? <ArrowDownAZ size={16} /> : <Clock3 size={16} />}
-              {criterion === "updated"
-                ? "Date edited"
-                : criterion === "created"
-                  ? "Date created"
-                  : "Title"}
-            </MenuButton>
-          ))}
-          <div className="menu-separator" />
-          <MenuButton
-            active={preferences.direction === "desc"}
-            onClick={() => onChange({ ...preferences, direction: "desc" })}
-          >
-            <ArrowDownUp size={16} />
-            Newest first
-          </MenuButton>
-          <MenuButton
-            active={preferences.direction === "asc"}
-            onClick={() => onChange({ ...preferences, direction: "asc" })}
-          >
-            <ArrowDownUp size={16} className="rotate-180" />
-            Oldest first
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton
-            active={preferences.groupByDate}
-            onClick={() => onChange({ ...preferences, groupByDate: !preferences.groupByDate })}
-          >
-            <CalendarDays size={16} />
-            Group by date
-          </MenuButton>
-          <div className="menu-separator" />
-          <MenuButton
-            onClick={() => {
-              onExportAll();
-              close();
-            }}
-          >
-            <FolderDown size={16} />
-            Export all as Markdown
-          </MenuButton>
-          {onIndexMedia && (
-            <MenuButton
+              danger={bulk.danger}
               onClick={() => {
-                onIndexMedia();
+                if (!confirming) {
+                  setConfirming(true);
+                  return;
+                }
+                bulk.run();
                 close();
               }}
             >
-              <Search size={16} />
-              {indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable"}
+              {bulk.danger ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}
+              {confirming ? bulk.confirm : `${bulk.label} (${bulk.count})`}
             </MenuButton>
-          )}
-          {bulk && bulk.count > 0 && (
-            <>
-              <div className="menu-separator" />
-              {/* Two clicks, the same two the trash asks for on a single row.
-                  A confirmation that replaces the label in place says what is
-                  about to happen without moving the pointer to a new box. */}
-              <MenuButton
-                danger={bulk.danger}
-                onClick={() => {
-                  if (!confirming) {
-                    setConfirming(true);
-                    return;
-                  }
-                  bulk.run();
-                  close();
-                }}
-              >
-                {bulk.danger ? <Trash2 size={16} /> : <ArchiveRestore size={16} />}
-                {confirming ? bulk.confirm : `${bulk.label} (${bulk.count})`}
-              </MenuButton>
-            </>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </MenuSurface>
     </div>
   );
 }
@@ -422,14 +422,13 @@ export function NoteMenu(props: NoteMenuActions) {
       >
         <MoreHorizontal size={16} />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
-        >
-          <MenuItems items={noteMenuItems(props)} close={close} />
-        </div>
-      )}
+      <MenuSurface
+        open={open}
+        role="menu"
+        className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
+      >
+        <MenuItems items={noteMenuItems(props)} close={close} />
+      </MenuSurface>
     </div>
   );
 }

@@ -639,7 +639,7 @@
      is short enough that it is never a wait — the list is legible before the
      eye has finished travelling to it — and it comes from the corner the menu
      hangs off, so the panel looks attached to the control that opened it. */
-  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
+  animation: menu-in 140ms var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -654,12 +654,12 @@
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.985);
+    transform: translateY(-2px);
   }
 }
 
 .context-menu {
-  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
+  animation: menu-in 140ms var(--ease-out) backwards;
 }
 
 /* A card that answers a hold should look like it came out of the finger that
@@ -1437,7 +1437,7 @@
   border-radius: var(--radius-md);
   background: var(--page);
   box-shadow: var(--shadow-popover);
-  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
+  animation: menu-in 140ms var(--ease-out) backwards;
 }
 
 .note-comment-palette {
@@ -5717,7 +5717,7 @@
    you were reading it. Shorter, smaller, and no overshoot. */
 .menu-popover {
   transform-origin: top right;
-  animation: menu-reveal var(--dur-fast) var(--ease-out) backwards;
+  animation: menu-reveal 140ms var(--ease-out) backwards;
 }
 
 .menu-popover.left-0 {
@@ -5727,7 +5727,7 @@
 @keyframes menu-reveal {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.975);
+    transform: translateY(-2px);
   }
 }
 
@@ -6065,8 +6065,8 @@
 }
 
 /* Opening a folder deals its notes in rather than swapping them under you:
-   each row 22ms behind the one above, the first eight only, so a long list
-   is not a long wait. Not while searching — the list is rebuilt on every
+   capped group and row delays keep the entire cascade within 404ms, so a long
+   list is not a long wait. Not while searching — the list is rebuilt on every
    keystroke there, and a cascade per letter is a list that never holds
    still. */
 @property --group-delay {
@@ -6080,12 +6080,12 @@
    rather than restarting under every heading. Registered as a <time> so it
    is worked out on the section, not re-read on each row. */
 .list-in.is-cascading > .note-group {
-  --group-delay: calc(min(sibling-index() - 1, 4) * 70ms);
+  --group-delay: calc(min(sibling-index() - 1, 4) * 30ms);
 }
 
 .list-in.is-cascading .note-group-heading,
 .list-in.is-cascading .note-row-list {
-  animation: row-in 280ms var(--ease-out) backwards;
+  animation: row-in 200ms var(--ease-out) backwards;
 }
 
 .list-in.is-cascading .note-group-heading {
@@ -6093,7 +6093,7 @@
 }
 
 .list-in.is-cascading .note-row-list {
-  animation-delay: calc(var(--group-delay) + min(sibling-index(), 6) * 22ms);
+  animation-delay: calc(var(--group-delay) + min(sibling-index(), 6) * 14ms);
 }
 
 @keyframes row-in {
@@ -6716,7 +6716,7 @@
   }
 
   .sidebar-footer-button[data-motion="settings"]:hover svg {
-    animation: glyph-turn var(--dur-slow) var(--ease-in-out);
+    animation: glyph-turn var(--dur-base) var(--ease-in-out);
   }
 
   .sidebar-footer-button[data-motion="lock"]:hover svg {
@@ -6758,14 +6758,14 @@
 /* A page lifting off the ones under it, which is what "all notes" is. */
 @keyframes glyph-leaf {
   50% {
-    transform: perspective(60px) rotateY(-26deg) translateX(1px);
+    transform: perspective(60px) rotateY(-12deg) translateX(0.5px);
   }
 }
 
 /* The lid, hinged at the fold rather than at the middle of the box. */
 @keyframes glyph-lift {
   50% {
-    transform: rotate(-9deg);
+    transform: rotate(-5deg);
   }
 }
 
@@ -6773,36 +6773,35 @@
    what a pin pushed home does. */
 @keyframes glyph-jab {
   45% {
-    transform: translateY(1.5px) rotate(-8deg);
+    transform: translateY(1px) rotate(-4deg);
   }
 }
 
 /* Somebody said something. */
 @keyframes glyph-pop {
   45% {
-    transform: scale(1.18);
+    transform: scale(1.08);
   }
 }
 
 /* Down into the box, and back up empty-handed. */
 @keyframes glyph-file {
   45% {
-    transform: translateY(2px);
+    transform: translateY(1px);
   }
 }
 
 /* Knocked, not emptied: the bin tips off its base and rocks back. */
 @keyframes glyph-tip {
   45% {
-    transform: rotate(-14deg);
+    transform: rotate(-7deg);
   }
 }
 
-/* All the way round rather than partway and back, because a gear that returns
-   the way it came is a gear being wound, and no gear is wound. */
+/* A small acknowledgement of the hover, returning to the resting glyph. */
 @keyframes glyph-turn {
-  to {
-    transform: rotate(360deg);
+  50% {
+    transform: rotate(30deg);
   }
 }
 
@@ -9347,10 +9346,7 @@ text.ink-stroke {
   transition-duration: var(--dur-press);
 }
 
-/* The other member is in this note. A dot in her colour, the size of the
-   pin beside it, with a wave leaving it every two seconds — the one moving
-   thing in a list that otherwise holds still, which is what makes it findable
-   at a glance. */
+/* Reading stays still. Awareness from this note alone can say writing. */
 .note-row-peer {
   position: relative;
   display: inline-block;
@@ -9360,9 +9356,35 @@ text.ink-stroke {
   border-radius: 50%;
   background: var(--face, var(--ok));
   vertical-align: 0.08em;
+  opacity: 1;
+  animation: peer-in 120ms var(--ease-out) backwards;
+  transition: opacity 120ms var(--ease-out);
 }
 
-.note-row-peer::after {
+.note-row-peer.is-away {
+  opacity: 0;
+}
+
+.menu-section {
+  animation: menu-section-in 100ms var(--ease-out) backwards;
+}
+
+@keyframes menu-section-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-section {
+    animation: none;
+  }
+  .note-row-peer {
+    transition: none;
+  }
+}
+
+.note-row-peer.is-typing::after {
   position: absolute;
   inset: 0;
   border-radius: 50%;
@@ -9385,7 +9407,7 @@ text.ink-stroke {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .note-row-peer::after {
+  .note-row-peer.is-typing::after {
     animation: none;
     opacity: 0;
   }
@@ -9475,27 +9497,27 @@ text.ink-stroke {
    pages. Replaces the list's upward entrance only when the scope changed. */
 .pane-frame[data-scope-direction="next"] .list-in {
   animation-name: list-in-next;
-  animation-duration: var(--dur-slow);
-  animation-timing-function: var(--ease);
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
 }
 
 .pane-frame[data-scope-direction="previous"] .list-in {
   animation-name: list-in-previous;
-  animation-duration: var(--dur-slow);
-  animation-timing-function: var(--ease);
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
 }
 
 @keyframes list-in-next {
   from {
     opacity: 0;
-    transform: translateX(28px);
+    transform: translateX(8px);
   }
 }
 
 @keyframes list-in-previous {
   from {
     opacity: 0;
-    transform: translateX(-28px);
+    transform: translateX(-8px);
   }
 }
 
@@ -13026,4 +13048,43 @@ button.sheet-chip:hover,
   .ribbon-group.is-review {
     display: none;
   }
+}
+
+/* An exiting menu cannot intercept the click that dismissed it. */
+[data-menu-exiting] {
+  pointer-events: none;
+  animation: menu-out 80ms var(--ease-out) forwards;
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-menu-exiting] {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@keyframes peer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-popover,
+  .ribbon-panel,
+  .context-menu,
+  .menu-section,
+  .note-row-peer {
+    animation: none;
+  }
+}
+
+/* Filtering responds to every keystroke without replaying navigation. */
+.list-in.is-searching,
+.pane-frame[data-scope-direction] .list-in.is-searching {
+  animation: none;
 }

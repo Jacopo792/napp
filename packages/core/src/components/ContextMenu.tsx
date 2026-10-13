@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { MenuSurface } from "@/components/MenuSurface";
+import { MenuCloseContext } from "@/components/usePresence";
 import { createPortal } from "react-dom";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
@@ -33,6 +35,8 @@ export function ContextMenu({
   className?: string;
   children: ReactNode;
 }) {
+  const [closing, setClosing] = useState<MenuPoint | null>(null);
+  const requestClose = useCallback(() => setClosing(point), [point]);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
   /* Measured rather than guessed, because a submenu changes the height while
@@ -54,28 +58,29 @@ export function ContextMenu({
     /* Attached after the click that opened the menu has finished dispatching,
        so none of these can see that click and close it again immediately. */
     const away = (event: Event) => {
-      if (!(event.target instanceof Node) || !document.contains(event.target)) return onClose();
+      if (!(event.target instanceof Node) || !document.contains(event.target))
+        return requestClose();
       const panel = document.querySelector(".context-menu");
-      if (!panel?.contains(event.target)) onClose();
+      if (!panel?.contains(event.target)) requestClose();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     document.addEventListener("mousedown", away);
     document.addEventListener("contextmenu", away);
     document.addEventListener("keydown", escape);
-    window.addEventListener("resize", onClose);
-    window.addEventListener("blur", onClose);
-    document.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", requestClose);
+    window.addEventListener("blur", requestClose);
+    document.addEventListener("scroll", requestClose, true);
     return () => {
       document.removeEventListener("mousedown", away);
       document.removeEventListener("contextmenu", away);
       document.removeEventListener("keydown", escape);
-      window.removeEventListener("resize", onClose);
-      window.removeEventListener("blur", onClose);
-      document.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", requestClose);
+      window.removeEventListener("blur", requestClose);
+      document.removeEventListener("scroll", requestClose, true);
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   const left = size.w
     ? Math.max(EDGE, Math.min(point.x, window.innerWidth - size.w - EDGE))
@@ -85,14 +90,18 @@ export function ContextMenu({
     : point.y;
 
   return createPortal(
-    <div
-      ref={measure}
-      role="menu"
-      className={`context-menu popover menu-popover p-1.5 ${className}`}
-      style={{ left, top, width, visibility: size.h ? "visible" : "hidden" }}
-    >
-      {children}
-    </div>,
+    <MenuCloseContext.Provider value={requestClose}>
+      <MenuSurface
+        open={closing !== point}
+        onExit={onClose}
+        ref={measure}
+        role="menu"
+        className={`context-menu popover menu-popover p-1.5 ${className}`}
+        style={{ left, top, width, visibility: size.h ? "visible" : "hidden" }}
+      >
+        {children}
+      </MenuSurface>
+    </MenuCloseContext.Provider>,
     document.body,
   );
 }

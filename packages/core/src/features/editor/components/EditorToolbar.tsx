@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   Bold,
@@ -171,9 +172,9 @@ export function EditorToolbar({
   }
 
   function menu(tool: Tool, label: string, align: "left" | "right", children: ReactNode) {
-    if (open !== tool) return null;
     return (
-      <div
+      <MenuSurface
+        open={open === tool}
         id={`${id}-${tool}`}
         role="menu"
         aria-label={label}
@@ -182,7 +183,7 @@ export function EditorToolbar({
         }`}
       >
         {children}
-      </div>
+      </MenuSurface>
     );
   }
 

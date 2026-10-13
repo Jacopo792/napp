@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 /* Which archive the window is open on, and the way to another — the accounts
  * row at the top of Mail's sidebar, for the same reason: everything under it
  * belongs to the one it names.
@@ -198,51 +199,49 @@ export function SpaceSwitch({
         <span className="space-switch-name">{current.name}</span>
         <ChevronDown size={14} className="space-switch-chevron" />
       </button>
-      {open && (
-        <div role="menu" className="popover menu-popover space-menu">
-          {spaces.map((space) => (
-            <div
-              key={space.archiveId}
-              className="space-menu-row"
-              onContextMenu={(event) => {
-                event.preventDefault();
+      <MenuSurface open={open} role="menu" className="popover menu-popover space-menu">
+        {spaces.map((space) => (
+          <div
+            key={space.archiveId}
+            className="space-menu-row"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              close();
+              setMenu({
+                point: { x: event.clientX, y: event.clientY },
+                items: spaceItems(space),
+              });
+            }}
+          >
+            <MenuButton
+              active={space.archiveId === currentId}
+              onClick={() => {
                 close();
-                setMenu({
-                  point: { x: event.clientX, y: event.clientY },
-                  items: spaceItems(space),
-                });
+                if (space.archiveId !== currentId) onSwitch(space.archiveId);
               }}
             >
-              <MenuButton
-                active={space.archiveId === currentId}
-                onClick={() => {
-                  close();
-                  if (space.archiveId !== currentId) onSwitch(space.archiveId);
-                }}
-              >
-                <FaceStack members={space.members} />
-                <span className="truncate">{space.name}</span>
-              </MenuButton>
-            </div>
-          ))}
-          <div className="menu-separator" />
-          <MenuItems
-            close={close}
-            items={[
-              ...spaceItems(current).filter(
-                (item) => item.kind === "item" && item.id !== "space-delete",
-              ),
-              {
-                kind: "item",
-                id: "space-new",
-                label: "New archive…",
-                icon: <Plus size={16} />,
-                run: () => onCreate(origin()),
-              },
-            ]}
-          />
-        </div>
-      )}
+              <FaceStack members={space.members} />
+              <span className="truncate">{space.name}</span>
+            </MenuButton>
+          </div>
+        ))}
+        <div className="menu-separator" />
+        <MenuItems
+          close={close}
+          items={[
+            ...spaceItems(current).filter(
+              (item) => item.kind === "item" && item.id !== "space-delete",
+            ),
+            {
+              kind: "item",
+              id: "space-new",
+              label: "New archive…",
+              icon: <Plus size={16} />,
+              run: () => onCreate(origin()),
+            },
+          ]}
+        />
+      </MenuSurface>
       {menu && (
         <ContextMenu point={menu.point} onClose={() => setMenu(null)}>
           <MenuItems items={menu.items} close={() => setMenu(null)} />

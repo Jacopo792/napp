@@ -1,3 +1,4 @@
+import { MenuSurface } from "@/components/MenuSurface";
 /* The writing bar of a document: Word's Home tab, cut to what a long piece of
  * writing is actually set with.
  *
@@ -222,11 +223,9 @@ function Drop({
       >
         {face}
       </button>
-      {open && (
-        <div role="menu" aria-label={label} className="popover ribbon-panel">
-          {children(() => setOpen(false))}
-        </div>
-      )}
+      <MenuSurface open={open} role="menu" aria-label={label} className="popover ribbon-panel">
+        {children(() => setOpen(false))}
+      </MenuSurface>
     </span>
   );
 }

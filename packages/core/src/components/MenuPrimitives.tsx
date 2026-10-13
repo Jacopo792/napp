@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
+import { MenuCloseContext } from "@/components/usePresence";
 import { Check, ChevronRight } from "@/components/icons";
 import { findItem, type MenuItem } from "@/lib/menuShape";
 
@@ -29,12 +30,13 @@ export function MenuButton({
 /** A described menu (`@/lib/menu`) drawn in the page: one level in, and a way
  *  back out of it. */
 export function MenuItems({ items, close }: { items: MenuItem[]; close: () => void }) {
+  const contextClose = useContext(MenuCloseContext);
   const [inside, setInside] = useState<string | null>(null);
   const open = inside ? findItem(items, inside) : undefined;
   const section = open?.kind === "item" && open.submenu ? open.submenu : items;
 
   return (
-    <>
+    <div className="menu-section" key={inside ?? "root"}>
       {open && (
         <MenuButton onClick={() => setInside(null)}>
           <ChevronRight size={16} className="rotate-180" />
@@ -58,7 +60,7 @@ export function MenuItems({ items, close }: { items: MenuItem[]; close: () => vo
             danger={item.danger}
             onClick={() => {
               if (item.submenu) return setInside(item.id);
-              close();
+              (contextClose ?? close)();
               item.run?.();
             }}
           >
@@ -69,6 +71,6 @@ export function MenuItems({ items, close }: { items: MenuItem[]; close: () => vo
           </MenuButton>
         ),
       )}
-    </>
+    </div>
   );
 }

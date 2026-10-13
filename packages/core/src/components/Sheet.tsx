@@ -56,8 +56,8 @@ export interface SheetOrigin {
   height: number;
 }
 
-const OPEN = { duration: 260, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
-const FLY = { duration: 440, easing: "cubic-bezier(0.32, 1.25, 0.6, 1)" };
+const OPEN = { duration: 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
+const FLY = { duration: 320, easing: "cubic-bezier(0.32, 1.25, 0.6, 1)" };
 const SHEET_FROM = 0.94;
 const CLOSE = { duration: 200, easing: "cubic-bezier(0.4, 0, 0.6, 1)" };
 

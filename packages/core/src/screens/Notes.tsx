@@ -4456,10 +4456,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      open here is answered by awareness, which is certain; every other note by
      the presence channel, which is the only thing that can see it. */
   const peerNoteIds = new Set<string>();
+  const peerTypingNoteIds = new Set<string>();
   if (flags.collaborators) {
     for (const [userId, noteId] of present)
       if (noteId && userId !== session?.userId) peerNoteIds.add(noteId);
     if (selectedId && hereIds.size > 0) peerNoteIds.add(selectedId);
+    if (selectedId && typingIds.size > 0) peerTypingNoteIds.add(selectedId);
   }
   const peopleShelf = (
     <div
@@ -5692,6 +5694,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
                   peerNoteIds={peerNoteIds}
+                  peerTypingNoteIds={peerTypingNoteIds}
                   peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
@@ -5889,6 +5892,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
                   peerNoteIds={peerNoteIds}
+                  peerTypingNoteIds={peerTypingNoteIds}
                   peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}

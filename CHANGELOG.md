@@ -3,6 +3,15 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.33 — 2026-10-13
+
+### Changed
+
+- Cap list cascades at 404ms and shorten person-scope transitions to 8px/200ms. Disable the list entrance while filtering.
+- Drive row typing rings from the selected note's awareness; fade presence in/out over 120ms and keep idle presence static.
+- Shared menu surfaces retain inert, accessibility-hidden content for an 80ms exit, cancel exits on reopening, enter over 140ms/2px, and fade submenu changes without animating dimensions. Preserve native system menus and run chosen actions immediately.
+- Shorten sheet frame/avatar entrances to 220/320ms and reduce sidebar hover excursions. Preserve direct swipe tracking and explicit action buttons. Respect reduced motion throughout.
+
 ## 0.9.32 — 2026-10-13
 
 ### Added
