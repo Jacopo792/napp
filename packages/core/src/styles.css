@@ -10888,6 +10888,59 @@ button.sheet-chip:hover,
   white-space: nowrap;
 }
 
+/* Where a chapter stands, as a dot before its name — the colour of a label in
+   Scrivener's binder, and nothing at all for a chapter never given one. */
+.structure-status {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+.structure-status.is-draft {
+  background: var(--ink-4);
+}
+
+.structure-status.is-revised {
+  background: #e0a43a;
+}
+
+.structure-status.is-final {
+  background: #4caf7a;
+}
+
+/* Two lines of what happens, under the name and in its column. */
+.structure-synopsis {
+  display: -webkit-box;
+  grid-column: 2 / -1;
+  overflow: hidden;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.structure-words.is-met {
+  color: #4caf7a;
+}
+
+.structure-field {
+  width: calc(100% - 16px);
+  margin: 2px 8px 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  resize: vertical;
+}
+
 .structure-words {
   color: var(--ink-4);
   font-size: var(--text-2xs);

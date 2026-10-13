@@ -40,7 +40,13 @@ import {
 import { PointMenu } from "@/components/ContextMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
-import type { ContentsHeading, StructureRow } from "@/lib/manuscript";
+import {
+  CHAPTER_STATUSES,
+  SYNOPSIS_LIMIT,
+  type ContentsHeading,
+  type StructureRow,
+} from "@/lib/manuscript";
+import type { ChapterInfo } from "@/lib/types";
 import { keyName } from "@/lib/shortcuts";
 
 export interface ChapterItem {
@@ -52,6 +58,7 @@ export interface ChapterItem {
   /** May this one be placed in the manuscript? A partner's notebook note in
    *  a shared manuscript is theirs — see `Notes.tsx`. */
   movable: boolean;
+  chapter?: ChapterInfo;
 }
 
 export type StructureTarget =
@@ -102,9 +109,92 @@ function Row({
       ) : (
         <FileText size={14} className="structure-number" />
       )}
-      <span className="structure-title">{item.title || "Untitled"}</span>
-      <span className="structure-words">{item.words.toLocaleString()}</span>
+      <span className="structure-title">
+        {item.chapter?.status && (
+          <i
+            className={`structure-status is-${item.chapter.status}`}
+            title={CHAPTER_STATUSES.find((one) => one.id === item.chapter?.status)?.label}
+          />
+        )}
+        {item.title || "Untitled"}
+      </span>
+      <span
+        className={`structure-words ${
+          item.chapter?.goal && item.words >= item.chapter.goal ? "is-met" : ""
+        }`}
+      >
+        {item.words.toLocaleString()}
+        {item.chapter?.goal ? ` / ${item.chapter.goal.toLocaleString()}` : ""}
+      </span>
+      {item.chapter?.synopsis && (
+        <span className="structure-synopsis">{item.chapter.synopsis}</span>
+      )}
     </button>
+  );
+}
+
+/** The synopsis or the goal of one chapter, written in place under its row —
+ *  the way a part is renamed in place. Enter keeps a goal; a synopsis takes
+ *  ⌘↩, because it is two lines and Enter is how the second one starts. */
+function ChapterField({
+  field,
+  info,
+  onSave,
+  onDone,
+}: {
+  field: "synopsis" | "goal";
+  info: ChapterInfo | undefined;
+  onSave: (info: ChapterInfo | undefined) => void;
+  onDone: () => void;
+}) {
+  const [draft, setDraft] = useState(
+    field === "synopsis" ? (info?.synopsis ?? "") : info?.goal ? String(info.goal) : "",
+  );
+  const save = () => {
+    const next: ChapterInfo = { ...info };
+    if (field === "synopsis") {
+      if (draft.trim()) next.synopsis = draft.trim();
+      else delete next.synopsis;
+    } else {
+      const goal = Number.parseInt(draft.replace(/\D/g, ""), 10);
+      if (goal > 0) next.goal = goal;
+      else delete next.goal;
+    }
+    onSave(Object.keys(next).length > 0 ? next : undefined);
+    onDone();
+  };
+  const keys = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") onDone();
+    if (event.key === "Enter" && (field === "goal" || event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      save();
+    }
+  };
+  return field === "synopsis" ? (
+    <textarea
+      autoFocus
+      className="structure-field"
+      aria-label="Synopsis"
+      placeholder="What happens in this chapter"
+      maxLength={SYNOPSIS_LIMIT}
+      rows={3}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={save}
+      onKeyDown={keys}
+    />
+  ) : (
+    <input
+      autoFocus
+      className="structure-field"
+      aria-label="Words this chapter is meant to have"
+      placeholder="Words"
+      inputMode="numeric"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={save}
+      onKeyDown={keys}
+    />
   );
 }
 
@@ -212,6 +302,7 @@ export function StructurePane({
   onTrash,
   onTrashAll,
   onInfo,
+  onChapter,
   headings = [],
   onHeading,
   stats,
@@ -239,6 +330,8 @@ export function StructurePane({
   /** Every page under Notes, in one go. */
   onTrashAll: (ids: string[]) => void;
   onInfo: (id: string, point: MenuPoint) => void;
+  /** A chapter's status, synopsis or goal changed. */
+  onChapter?: (id: string, info: ChapterInfo | undefined) => void;
   /** The open chapter's headings, under its row — the navigation pane of a
    *  long document, numbered as the page numbers them. */
   headings?: ContentsHeading[];
@@ -253,6 +346,7 @@ export function StructurePane({
   const [menu, setMenu] = useState<{ point: MenuPoint; items: MenuItem[] } | null>(null);
   const [notebookOpen, setNotebookOpen] = useState(true);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [writing, setWriting] = useState<{ id: string; field: "synopsis" | "goal" } | null>(null);
 
   const chapters = useMemo(
     () => rows.flatMap((row) => (row.kind === "chapter" ? [row.item] : [])),
@@ -352,6 +446,52 @@ export function StructurePane({
             },
           ],
         });
+        if (onChapter) {
+          const info = item.chapter;
+          items.push(
+            {
+              kind: "item",
+              id: "status",
+              label: "Status",
+              submenu: [
+                ...CHAPTER_STATUSES.map((status) => ({
+                  kind: "item" as const,
+                  id: `status-${status.id}`,
+                  label: status.label,
+                  checked: info?.status === status.id,
+                  run: () => onChapter(item.id, { ...info, status: status.id }),
+                })),
+                ...(info?.status
+                  ? [
+                      { kind: "separator" as const },
+                      {
+                        kind: "item" as const,
+                        id: "status-none",
+                        label: "No status",
+                        run: () => {
+                          const { status: _gone, ...rest } = info;
+                          onChapter(item.id, Object.keys(rest).length > 0 ? rest : undefined);
+                        },
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              kind: "item",
+              id: "synopsis",
+              label: info?.synopsis ? "Edit synopsis" : "Write a synopsis",
+              run: () => setWriting({ id: item.id, field: "synopsis" }),
+            },
+            {
+              kind: "item",
+              id: "goal",
+              label: info?.goal ? "Change word goal" : "Set a word goal",
+              run: () => setWriting({ id: item.id, field: "goal" }),
+            },
+            { kind: "separator" },
+          );
+        }
         items.push({
           kind: "item",
           id: "unplace",
@@ -492,6 +632,17 @@ export function StructurePane({
             )
             .flatMap((element, index) => {
               const row = rows[index];
+              if (row.kind === "chapter" && writing?.id === row.item.id && onChapter)
+                return [
+                  element,
+                  <ChapterField
+                    key={`field:${row.item.id}`}
+                    field={writing.field}
+                    info={row.item.chapter}
+                    onSave={(info) => onChapter(row.item.id, info)}
+                    onDone={() => setWriting(null)}
+                  />,
+                ];
               if (row.kind !== "chapter" || row.item.id !== selectedId || headings.length === 0)
                 return [element];
               return [

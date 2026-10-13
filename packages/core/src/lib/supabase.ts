@@ -3,6 +3,7 @@ import type { AppSession } from "./session";
 import type { Folder, Meta, Note, NoteMeta } from "./types";
 import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
+import { chapterFromStorage } from "./manuscript";
 import {
   adoptArchiveCache,
   noteCache,
@@ -54,6 +55,7 @@ interface NoteRow {
      version — see `pageProperties` below. */
   page_icon: unknown;
   cover: unknown;
+  chapter: unknown;
 }
 
 interface FolderRow {
@@ -103,7 +105,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     supabase
       .from("notes")
       .select(
-        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, position, folder_id, version, content_version, page_icon, cover",
+        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, position, folder_id, version, content_version, page_icon, cover, chapter",
       )
       .eq("archive_id", archiveId),
     supabase
@@ -287,6 +289,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       trashedAt: row.trashed_at ?? undefined,
       archivedAt: row.archived_at ?? undefined,
       lockedBy: row.locked_by ?? undefined,
+      chapter: chapterFromStorage(row.chapter),
     });
   }
 
@@ -344,6 +347,7 @@ export async function createNote(
       pinned: metadata.pinned ?? false,
       folder_id: metadata.folderId,
       position: metadata.position ?? null,
+      chapter: metadata.chapter ?? null,
     })
     .select("version")
     .single();
@@ -550,7 +554,8 @@ export async function persistMetaDiff(
       previous.position !== metadata.position ||
       previous.trashedAt !== metadata.trashedAt ||
       previous.archivedAt !== metadata.archivedAt ||
-      previous.lockedBy !== metadata.lockedBy
+      previous.lockedBy !== metadata.lockedBy ||
+      !sameJson(previous.chapter ?? null, metadata.chapter ?? null)
     );
   });
   await all([
@@ -566,6 +571,7 @@ export async function persistMetaDiff(
           trashed_at: metadata.trashedAt ?? null,
           archived_at: metadata.archivedAt ?? null,
           locked_by: metadata.lockedBy ?? null,
+          chapter: metadata.chapter ?? null,
         })
         .eq("archive_id", archiveId)
         .eq("id", metadata.id),

@@ -7,6 +7,7 @@
  * introduction) or after the last (a conclusion) without belonging to one.
  *
  * Pure, so `node --experimental-strip-types` can test it. */
+import type { ChapterInfo } from "./types.ts";
 
 export interface Placed {
   id: string;
@@ -183,4 +184,29 @@ export function contentsOf<T extends Placed & { title: string }>(
       },
     ];
   });
+}
+
+export const CHAPTER_STATUSES = [
+  { id: "draft", label: "Draft" },
+  { id: "revised", label: "Revised" },
+  { id: "final", label: "Final" },
+] as const;
+
+/** A synopsis is two lines on a card, not a second chapter. */
+export const SYNOPSIS_LIMIT = 600;
+
+/** What the `chapter` column holds, read rather than trusted: it is written
+ *  by the other member's browser too. Undefined when nothing in it is
+ *  usable, so a chapter with none compares equal to one never given any. */
+export function chapterFromStorage(value: unknown): ChapterInfo | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as { status?: unknown; synopsis?: unknown; goal?: unknown };
+  const info: ChapterInfo = {};
+  if (raw.status === "draft" || raw.status === "revised" || raw.status === "final")
+    info.status = raw.status;
+  if (typeof raw.synopsis === "string" && raw.synopsis.trim())
+    info.synopsis = raw.synopsis.trim().slice(0, SYNOPSIS_LIMIT);
+  if (typeof raw.goal === "number" && Number.isFinite(raw.goal) && raw.goal > 0)
+    info.goal = Math.min(1_000_000, Math.round(raw.goal));
+  return Object.keys(info).length > 0 ? info : undefined;
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  chapterFromStorage,
   contentsOf,
   headingNumbers,
   intoPart,
@@ -92,4 +93,21 @@ test("the contents follow the structure, skipping empty and continued parts", ()
     contentsOf(rows, new Map(), () => [{ text: "x", level: 1 }], false)[0].headings[0].number,
     null,
   );
+});
+
+test("a chapter's status, synopsis and goal are read, never trusted", () => {
+  assert.deepEqual(
+    chapterFromStorage({ status: "revised", synopsis: "  Lui parte. ", goal: 2999.6 }),
+    {
+      status: "revised",
+      synopsis: "Lui parte.",
+      goal: 3000,
+    },
+  );
+  // What is not one of the three, or not usable, is dropped; nothing left is nothing.
+  assert.deepEqual(chapterFromStorage({ status: "done", goal: -4, synopsis: 7 }), undefined);
+  assert.equal(chapterFromStorage({ synopsis: "   " }), undefined);
+  assert.equal(chapterFromStorage(null), undefined);
+  assert.equal(chapterFromStorage(["final"]), undefined);
+  assert.equal(chapterFromStorage({ synopsis: "x".repeat(900) })?.synopsis?.length, 600);
 });

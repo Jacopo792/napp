@@ -1275,6 +1275,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             folderId: row?.folderId && parts.has(row.folderId) ? row.folderId : null,
             position: row?.position ?? null,
             movable: owner === manuscriptOwner,
+            chapter: row?.chapter,
           },
         ];
       });
@@ -5017,6 +5018,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onRenamePart={handleRenamePart}
         onDeletePart={handleDeletePart}
         onMove={handleMoveChapter}
+        onChapter={(id, chapter) => setNoteRow(manuscriptOwner, id, { chapter })}
         onTrash={handleTrashDocNote}
         onTrashAll={handleTrashDocNotes}
         onInfo={(id, point) =>

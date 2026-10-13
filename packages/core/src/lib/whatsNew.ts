@@ -42,6 +42,30 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.19",
+    date: "2026-10-13",
+    headline: "Chapters that say how far along they are",
+    sections: [
+      {
+        heading: "Book",
+        items: [
+          {
+            title: "Status",
+            text: "Right-click a chapter and mark it Draft, Revised or Final. A coloured dot before its name says which, for everyone writing the book.",
+          },
+          {
+            title: "Synopsis",
+            text: "Write a synopsis gives a chapter two lines of what happens in it, shown under its name in the structure.",
+          },
+          {
+            title: "A goal for each chapter",
+            text: "Set a word goal on a chapter and its count reads 1,200 / 3,000, turning green once it is met.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.18",
     date: "2026-10-13",
     headline: "Comments that know who they are for",

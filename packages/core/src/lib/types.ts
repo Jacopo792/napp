@@ -50,6 +50,14 @@ export interface Folder {
    stopped selecting `tags` and `note_tags`, so a note's metadata is a folder,
    a pin and two timestamps. Re-adding the feature means re-adding the reads —
    the rows never went anywhere. */
+/** How far along a chapter is, what it is about, and how long it is meant to
+ *  be. Only a document archive reads it. */
+export interface ChapterInfo {
+  status?: "draft" | "revised" | "final";
+  synopsis?: string;
+  goal?: number;
+}
+
 export interface NoteMeta {
   id: string;
   folderId: string | null;
@@ -77,6 +85,8 @@ export interface NoteMeta {
    * shared, and every member writes every note.
    */
   lockedBy?: string;
+  /** Status, synopsis and goal, when the note is a chapter that has any. */
+  chapter?: ChapterInfo;
 }
 
 /** What the interface needs to say about a note's lock: who holds it, whether

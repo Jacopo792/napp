@@ -3,6 +3,19 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.19 — 2026-10-13
+
+Chapters that say how far along they are.
+
+### Added
+
+- `notes.chapter jsonb` — `{ status: draft|revised|final, synopsis, goal }`,
+  checked in Postgres and read by `chapterFromStorage()` in `manuscript.ts`.
+  It is `NoteMeta.chapter`, written by `persistMetaDiff` like `position`, so
+  it moves no version and is not an edit. The structure pane draws the status
+  as a dot, the synopsis as two lines under the name and the goal beside the
+  count; the chapter's right-click sets all three, the last two in place.
+
 ## 0.9.18 — 2026-10-13
 
 Comments that know who they are for.
