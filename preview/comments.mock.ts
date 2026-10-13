@@ -3,14 +3,14 @@
    as the tab, like everything else in the preview. */
 import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
-import type { ArchiveComment, NoteComment } from "@/lib/commentThreads";
+import type { ArchiveComment, NoteComment, Reaction } from "@/lib/commentThreads";
 
 export {
   notesWithOpenRemarks,
   threadsOf,
   unreadRemarks,
 } from "@/lib/commentThreads";
-export type { ArchiveComment, NoteComment, CommentThread } from "@/lib/commentThreads";
+export type { ArchiveComment, NoteComment, CommentThread, Reaction } from "@/lib/commentThreads";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const store = new Map<string, NoteComment[]>();
@@ -29,9 +29,11 @@ function seed(noteId: string): void {
       id: "seed-1",
       threadId,
       authorId: PREVIEW_U2,
-      body: "Questo passaggio mi convince poco — lo rivediamo?",
+      body: "@Preview questo passaggio mi convince poco — lo rivediamo?",
       createdAt: new Date(Date.now() - 3_600_000).toISOString(),
       resolvedAt: null,
+      mentions: [PREVIEW_U1],
+      assigneeId: PREVIEW_U1,
     },
     {
       id: "seed-2",
@@ -40,6 +42,8 @@ function seed(noteId: string): void {
       body: "D'accordo. Provo a riscriverlo più corto.",
       createdAt: new Date(Date.now() - 1_800_000).toISOString(),
       resolvedAt: null,
+      mentions: [],
+      assigneeId: PREVIEW_U1,
     },
   ]);
 }
@@ -59,6 +63,8 @@ export async function addComment(
   noteId: string,
   threadId: string,
   body: string,
+  mentions: string[] = [],
+  assigneeId: string | null = null,
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
@@ -68,6 +74,8 @@ export async function addComment(
     body: body.trim(),
     createdAt: new Date().toISOString(),
     resolvedAt: null,
+    mentions,
+    assigneeId,
   };
   store.set(noteId, [...(store.get(noteId) ?? []), saved]);
   archiveOf.set(noteId, session.archiveId);
@@ -101,6 +109,7 @@ export async function updateComment(
   session: AppSession,
   commentId: string,
   body: string,
+  mentions: string[],
 ): Promise<NoteComment> {
   await sleep(100);
   for (const [noteId, rows] of store) {
@@ -108,7 +117,7 @@ export async function updateComment(
       (comment) => comment.id === commentId && comment.authorId === session.userId,
     );
     if (!found) continue;
-    const saved = { ...found, body: body.trim() };
+    const saved = { ...found, body: body.trim(), mentions };
     store.set(
       noteId,
       rows.map((comment) => (comment.id === commentId ? saved : comment)),
@@ -125,4 +134,40 @@ export async function loadArchiveComments(session: AppSession): Promise<ArchiveC
   return [...store]
     .filter(([noteId]) => archiveOf.get(noteId) === session.archiveId)
     .flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId })));
+}
+
+export async function assignThread(
+  _session: AppSession,
+  noteId: string,
+  threadId: string,
+  assigneeId: string | null,
+): Promise<void> {
+  await sleep(100);
+  store.set(
+    noteId,
+    (store.get(noteId) ?? []).map((c) => (c.threadId === threadId ? { ...c, assigneeId } : c)),
+  );
+}
+
+let reactions: (Reaction & { noteId: string })[] = [
+  { noteId: FIXTURE_NOTES[0].id, commentId: "seed-2", userId: PREVIEW_U2, emoji: "👍" },
+];
+
+export async function loadReactions(_session: AppSession, noteId: string): Promise<Reaction[]> {
+  await sleep(80);
+  return reactions.filter((reaction) => reaction.noteId === noteId);
+}
+
+export async function setReaction(
+  session: AppSession,
+  noteId: string,
+  commentId: string,
+  emoji: string,
+  on: boolean,
+): Promise<void> {
+  await sleep(80);
+  reactions = reactions.filter(
+    (r) => !(r.commentId === commentId && r.userId === session.userId && r.emoji === emoji),
+  );
+  if (on) reactions.push({ noteId, commentId, userId: session.userId, emoji });
 }

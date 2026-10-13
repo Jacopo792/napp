@@ -3,6 +3,31 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.18 — 2026-10-13
+
+Comments that know who they are for.
+
+### Added
+
+- `note_comments.mentions uuid[]` (frozen with the body: only the author may
+  change it) and `note_comments.assignee_id` (any editor, every row of the
+  thread). `private.check_comment_people()` refuses a mention or an assignee
+  who is not a member of the archive.
+- `note_comment_reactions (comment_id, user_id, emoji)`: members read, a
+  member inserts and deletes only their own, and only on a remark in the same
+  archive and note.
+- `mentionedIn()` (longest name first, whole names), `mentionQuery()`,
+  `isForYou()` and `tally()` in `commentThreads.ts`. The panel suggests
+  members after @, draws the names, filters For you, assigns, and reacts with
+  six fixed emoji, optimistically.
+
+### Fixed
+
+- `note_comments` was never in the `supabase_realtime` publication, so
+  `subscribeToComments` heard nothing and a remark reached the other member
+  only when the archive was read again for another reason. It and the
+  reactions table are published now.
+
 ## 0.9.17 — 2026-10-13
 
 Notes that name each other, and a search that forgives.

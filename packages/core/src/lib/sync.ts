@@ -44,6 +44,16 @@ export function subscribeToComments(archiveId: string, onChange: () => void): Re
       },
       onChange,
     )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "note_comment_reactions",
+        filter: `archive_id=eq.${archiveId}`,
+      },
+      onChange,
+    )
     .subscribe();
 }
 

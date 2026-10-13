@@ -14,17 +14,26 @@ import { fail, supabase } from "./supabaseClient";
 import {
   toComment,
   type ArchiveComment,
+  type Reaction,
   type CommentRow,
   type NoteComment,
 } from "./commentThreads";
 
 export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
-export type { ArchiveComment, NoteComment, CommentThread, RemarksSeen } from "./commentThreads";
+export type {
+  ArchiveComment,
+  NoteComment,
+  CommentThread,
+  Reaction,
+  RemarksSeen,
+} from "./commentThreads";
+
+const COLUMNS = "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id";
 
 export async function loadComments(session: AppSession, noteId: string): Promise<NoteComment[]> {
   const result = await supabase
     .from("note_comments")
-    .select("id, thread_id, author_id, body, created_at, resolved_at")
+    .select(COLUMNS)
     .eq("archive_id", session.archiveId)
     .eq("note_id", noteId)
     .order("created_at");
@@ -40,6 +49,8 @@ export async function addComment(
   noteId: string,
   threadId: string,
   body: string,
+  mentions: string[] = [],
+  assigneeId: string | null = null,
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
@@ -51,8 +62,11 @@ export async function addComment(
       thread_id: threadId,
       author_id: session.userId,
       body: trimmed,
+      mentions,
+      // A reply carries the thread's assignee, so every row agrees on it.
+      assignee_id: assigneeId,
     })
-    .select("id, thread_id, author_id, body, created_at, resolved_at")
+    .select(COLUMNS)
     .single();
   fail(result.error);
   return toComment(result.data as CommentRow);
@@ -75,6 +89,62 @@ export async function resolveThread(
   fail(result.error);
 }
 
+/** Hand a thread to a member, or (null) to nobody. Like resolving, anyone
+ *  who may edit the note may do it, and every row of the thread is written. */
+export async function assignThread(
+  session: AppSession,
+  noteId: string,
+  threadId: string,
+  assigneeId: string | null,
+): Promise<void> {
+  const result = await supabase
+    .from("note_comments")
+    .update({ assignee_id: assigneeId })
+    .eq("archive_id", session.archiveId)
+    .eq("note_id", noteId)
+    .eq("thread_id", threadId);
+  fail(result.error);
+}
+
+export async function loadReactions(session: AppSession, noteId: string): Promise<Reaction[]> {
+  const result = await supabase
+    .from("note_comment_reactions")
+    .select("comment_id, user_id, emoji")
+    .eq("archive_id", session.archiveId)
+    .eq("note_id", noteId)
+    .order("created_at");
+  fail(result.error);
+  return ((result.data ?? []) as { comment_id: string; user_id: string; emoji: string }[]).map(
+    (row) => ({ commentId: row.comment_id, userId: row.user_id, emoji: row.emoji }),
+  );
+}
+
+/** Your own reaction, given or taken back. Nobody else's can be: the policy
+ *  holds both directions to the caller's own name. */
+export async function setReaction(
+  session: AppSession,
+  noteId: string,
+  commentId: string,
+  emoji: string,
+  on: boolean,
+): Promise<void> {
+  const result = on
+    ? await supabase.from("note_comment_reactions").insert({
+        comment_id: commentId,
+        archive_id: session.archiveId,
+        note_id: noteId,
+        user_id: session.userId,
+        emoji,
+      })
+    : await supabase
+        .from("note_comment_reactions")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", session.userId)
+        .eq("emoji", emoji);
+  fail(result.error);
+}
+
 /** Only your own, and the database is what enforces that. */
 export async function deleteComment(session: AppSession, commentId: string): Promise<void> {
   const result = await supabase
@@ -92,16 +162,17 @@ export async function updateComment(
   session: AppSession,
   commentId: string,
   body: string,
+  mentions: string[],
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
   const result = await supabase
     .from("note_comments")
-    .update({ body: trimmed })
+    .update({ body: trimmed, mentions })
     .eq("archive_id", session.archiveId)
     .eq("id", commentId)
     .eq("author_id", session.userId)
-    .select("id, thread_id, author_id, body, created_at, resolved_at")
+    .select(COLUMNS)
     .single();
   fail(result.error);
   return toComment(result.data as CommentRow);
@@ -114,7 +185,7 @@ export async function updateComment(
 export async function loadArchiveComments(session: AppSession): Promise<ArchiveComment[]> {
   const result = await supabase
     .from("note_comments")
-    .select("id, note_id, thread_id, author_id, body, created_at, resolved_at")
+    .select(`note_id, ${COLUMNS}`)
     .eq("archive_id", session.archiveId)
     .order("created_at", { ascending: false })
     .limit(300);

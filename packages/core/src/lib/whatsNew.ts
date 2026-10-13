@@ -42,6 +42,34 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.18",
+    date: "2026-10-13",
+    headline: "Comments that know who they are for",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "@ someone",
+            text: "Type @ in a comment and pick a member. Their name is drawn as a name, and the thread shows up under For you in their comments.",
+          },
+          {
+            title: "Hand a thread over",
+            text: "Assign under a thread gives it to a member, and its passage says whose it is. Resolving it is still how it gets done.",
+          },
+          {
+            title: "Reactions",
+            text: "Answer a comment with 👍, ❤️, 😄, 🎉, 👀 or ✅. Hold the pointer over one to see who gave it.",
+          },
+          {
+            title: "Comments arrive as they are written",
+            text: "A comment from another member now reaches you at once, rather than the next time Napp happened to look.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.17",
     date: "2026-10-13",
     headline: "Notes that name each other, and a search that forgives",

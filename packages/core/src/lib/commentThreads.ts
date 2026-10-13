@@ -12,7 +12,23 @@ export interface NoteComment {
   createdAt: string;
   /** Set once somebody has dealt with the remark. The thread stays readable. */
   resolvedAt: string | null;
+  /** The members this remark names with @ — who it is said to. */
+  mentions: string[];
+  /** Whose job the thread is. Carried on every row, read off the first. */
+  assigneeId: string | null;
 }
+
+/** Somebody answering a remark without words. */
+export interface Reaction {
+  commentId: string;
+  userId: string;
+  emoji: string;
+}
+
+/** The six a reaction can be. A fixed handful, the way Slack and Notion open
+ *  with one: a remark is answered at a glance, and a picker of every emoji is
+ *  a search nobody wanted to run to say "yes". */
+export const REACTIONS = ["👍", "❤️", "😄", "🎉", "👀", "✅"] as const;
 
 /** One passage's conversation, oldest first. */
 export interface CommentThread {
@@ -21,6 +37,7 @@ export interface CommentThread {
   resolved: boolean;
   /** The first remark decides where the thread sits in the list. */
   createdAt: string;
+  assigneeId: string | null;
 }
 
 export interface CommentRow {
@@ -30,6 +47,8 @@ export interface CommentRow {
   body: string;
   created_at: string;
   resolved_at: string | null;
+  mentions?: string[] | null;
+  assignee_id?: string | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -39,6 +58,8 @@ export const toComment = (row: CommentRow): NoteComment => ({
   body: row.body,
   createdAt: row.created_at,
   resolvedAt: row.resolved_at,
+  mentions: row.mentions ?? [],
+  assigneeId: row.assignee_id ?? null,
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening
@@ -57,6 +78,7 @@ export function threadsOf(comments: NoteComment[]): CommentThread[] {
       comments: group,
       resolved: group[0].resolvedAt !== null,
       createdAt: group[0].createdAt,
+      assigneeId: group[0].assigneeId,
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
@@ -117,4 +139,68 @@ export function unreadRemarks(
       !resolvedThreads.has(comment.threadId) &&
       comment.createdAt > (seen[comment.noteId] ?? ""),
   );
+}
+
+/* ── Addressing a remark ───────────────────────────────────────────────────── */
+
+/** Who a remark names: every member whose name follows an @ in it, as a
+ *  whole word. Read off the words when the remark is sent rather than kept
+ *  beside them while typing, so a name deleted from the draft is not named. */
+export function mentionedIn(body: string, members: { userId: string; name: string }[]): string[] {
+  const folded = body.toLocaleLowerCase();
+  /* Longest names first, and an @ taken by one is not read again: "@Anna
+     Maria" names Anna Maria, not Anna as well. */
+  const taken = new Set<number>();
+  const named = new Set<string>();
+  const longestFirst = [...members].sort((a, b) => b.name.length - a.name.length);
+  for (const { userId, name } of longestFirst) {
+    const wanted = `@${name.trim().toLocaleLowerCase()}`;
+    if (wanted.length < 2) continue;
+    for (let at = folded.indexOf(wanted); at >= 0; at = folded.indexOf(wanted, at + 1)) {
+      const next = folded[at + wanted.length];
+      if (taken.has(at) || (next !== undefined && /[\p{L}\p{N}]/u.test(next))) continue;
+      taken.add(at);
+      named.add(userId);
+    }
+  }
+  return members.filter(({ userId }) => named.has(userId)).map(({ userId }) => userId);
+}
+
+/** The name being typed after an @ at the caret, or null — what the
+ *  composer's suggestions are filtered by. */
+export function mentionQuery(text: string, caret: number): string | null {
+  const match = /(?:^|\s)@([\p{L}\p{N}._-]*)$/u.exec(text.slice(0, caret));
+  return match ? match[1] : null;
+}
+
+/** A thread that wants this reader: handed to them, or naming them. */
+export function isForYou(thread: CommentThread, selfId: string): boolean {
+  return (
+    thread.assigneeId === selfId ||
+    thread.comments.some((comment) => comment.mentions.includes(selfId))
+  );
+}
+
+/** A remark's reactions, one entry per emoji in `REACTIONS` order, then any
+ *  other in the order first given. */
+export function tally(
+  reactions: Reaction[],
+  commentId: string,
+  selfId: string,
+): { emoji: string; count: number; mine: boolean }[] {
+  const byEmoji = new Map<string, { count: number; mine: boolean }>();
+  for (const reaction of reactions) {
+    if (reaction.commentId !== commentId) continue;
+    const found = byEmoji.get(reaction.emoji) ?? { count: 0, mine: false };
+    found.count += 1;
+    found.mine ||= reaction.userId === selfId;
+    byEmoji.set(reaction.emoji, found);
+  }
+  const rank = (emoji: string) => {
+    const at = (REACTIONS as readonly string[]).indexOf(emoji);
+    return at < 0 ? REACTIONS.length : at;
+  };
+  return [...byEmoji.entries()]
+    .map(([emoji, found]) => ({ emoji, ...found }))
+    .sort((a, b) => rank(a.emoji) - rank(b.emoji));
 }

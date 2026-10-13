@@ -133,6 +133,7 @@ export {
   FileDashed as PageBreak,
   ArrowsVertical as LineSpacing,
   Ruler,
+  Smiley as Smile,
   Export,
   SidebarSimple as PanelRight,
   TreeView as Structure,

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isForYou,
+  mentionQuery,
+  mentionedIn,
   notesWithOpenRemarks,
+  tally,
   threadsOf,
   unreadRemarks,
   type ArchiveComment,
@@ -15,6 +19,8 @@ const comment = (over: Partial<NoteComment>): NoteComment => ({
   body: "b",
   createdAt: "2026-09-01T10:00:00Z",
   resolvedAt: null,
+  mentions: [],
+  assigneeId: null,
   ...over,
 });
 
@@ -59,6 +65,8 @@ const remark = (over: Partial<ArchiveComment>): ArchiveComment => ({
   body: "b",
   createdAt: "2026-09-01T10:00:00Z",
   resolvedAt: null,
+  mentions: [],
+  assigneeId: null,
   ...over,
 });
 
@@ -116,4 +124,46 @@ test("having read one note's remarks leaves the others unread", () => {
     unreadRemarks(rows, ME, { n1: "2026-09-02T00:00:00Z" }).map((r) => r.id),
     ["unread"],
   );
+});
+
+const PEOPLE = [
+  { userId: "a", name: "Anna" },
+  { userId: "b", name: "Anna Maria" },
+  { userId: "c", name: "Bo" },
+];
+
+test("a remark names the members written after an @, as whole names", () => {
+  assert.deepEqual(mentionedIn("@anna, guarda qui", PEOPLE), ["a"]);
+  assert.deepEqual(mentionedIn("@Anna Maria e @Bo", PEOPLE), ["b", "c"]);
+  assert.deepEqual(mentionedIn("@Anna e @Anna Maria", PEOPLE), ["a", "b"]);
+  // A longer word is not the name, and an address is not a mention.
+  assert.deepEqual(mentionedIn("@Annabella", PEOPLE), []);
+  assert.deepEqual(mentionedIn("bo@example.com", PEOPLE), []);
+});
+
+test("the name being typed after an @ is what suggestions are filtered by", () => {
+  assert.equal(mentionQuery("ciao @An", 8), "An");
+  assert.equal(mentionQuery("@", 1), "");
+  assert.equal(mentionQuery("mail@x", 6), null);
+  assert.equal(mentionQuery("@Anna fatto", 11), null);
+});
+
+test("a thread is for you when it is handed to you or names you", () => {
+  const thread = threadsOf([comment({ mentions: ["c"] })])[0];
+  assert.equal(isForYou(thread, "c"), true);
+  assert.equal(isForYou(thread, "a"), false);
+  assert.equal(isForYou(threadsOf([comment({ assigneeId: "a" })])[0], "a"), true);
+});
+
+test("reactions are counted per emoji, in the offered order, with your own marked", () => {
+  const reactions = [
+    { commentId: "c", userId: "a", emoji: "✅" },
+    { commentId: "c", userId: "b", emoji: "👍" },
+    { commentId: "c", userId: "a", emoji: "👍" },
+    { commentId: "other", userId: "a", emoji: "🎉" },
+  ];
+  assert.deepEqual(tally(reactions, "c", "a"), [
+    { emoji: "👍", count: 2, mine: true },
+    { emoji: "✅", count: 1, mine: true },
+  ]);
 });

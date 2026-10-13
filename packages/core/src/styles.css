@@ -1372,6 +1372,131 @@
   gap: 4px;
 }
 
+/* ── Addressed, handed over, answered without words ─────────────────────────
+   The names a remark is said to read as names; the person a thread is handed
+   to sits under its passage, where the reader looks first; and a reaction is
+   a chip under the words it answers, counted, with your own lit. */
+.note-comment-mention {
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+.note-comment-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.note-comment-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.note-comment-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+}
+
+.note-comment-reaction.is-mine {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
+}
+
+.note-comment-react,
+.note-comment-assign,
+.note-comment-composer {
+  position: relative;
+}
+
+/* Opacity, not display, so the row does not jump when the pointer arrives. */
+.note-comment:not(:hover) .note-comment-react > .note-comment-action[aria-expanded="false"] {
+  opacity: 0;
+}
+
+.note-comment-palette,
+.note-comment-assign-menu,
+.note-comment-suggestions {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--page);
+  box-shadow: var(--shadow-popover);
+  animation: menu-in var(--dur-fast) var(--ease-out) backwards;
+}
+
+.note-comment-palette {
+  bottom: calc(100% + 4px);
+  left: 0;
+  gap: 2px;
+  padding: 4px;
+}
+
+.note-comment-palette-emoji {
+  border-radius: var(--radius-sm);
+  padding: 2px 5px;
+  font-size: var(--text-sm);
+}
+
+.note-comment-palette-emoji:hover,
+.note-comment-palette-emoji.is-mine {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.note-comment-assign-menu,
+.note-comment-suggestions {
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+}
+
+.note-comment-assign-menu {
+  top: calc(100% + 4px);
+  left: 0;
+}
+
+.note-comment-suggestions {
+  bottom: calc(100% + 4px);
+  left: 0;
+}
+
+.note-comment-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  text-align: left;
+}
+
+.note-comment-suggestion:hover,
+.note-comment-suggestion[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
+}
+
+.note-comments-toggle.is-on {
+  color: var(--accent);
+}
+
 /* A reply box per thread, all of them open at once, was most of the panel's
    weight — five threads meant five empty textareas asking to be filled. It is
    one line until the thread is the one being answered. */

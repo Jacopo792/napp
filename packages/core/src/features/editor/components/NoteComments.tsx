@@ -34,21 +34,35 @@ import {
   MessageSquare,
   Pencil,
   RotateCcw,
+  Smile,
   Trash2,
+  UserPlus,
   X,
 } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/WorkspaceMenus";
+import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
+  assignThread,
   deleteComment,
   loadComments,
+  loadReactions,
   resolveThread,
+  setReaction,
   threadsOf,
   type NoteComment,
+  type Reaction,
   updateComment,
 } from "@/lib/comments";
-import type { CommentThread } from "@/lib/commentThreads";
+import {
+  REACTIONS,
+  isForYou,
+  mentionQuery,
+  mentionedIn,
+  tally,
+  type CommentThread,
+} from "@/lib/commentThreads";
 import { collaborationColor } from "@/features/editor/lib/ydoc";
 import { formatStamp } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
@@ -113,12 +127,31 @@ export function NoteComments({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  /** Only the threads handed to this reader or naming them. */
+  const [forYou, setForYou] = useState(false);
+  /** The composer an @ is being typed in, and the name so far. */
+  const [suggesting, setSuggesting] = useState<{ threadId: string; query: string } | null>(null);
+  /** Which thread's Assign menu, or which remark's reactions, is open. */
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [reacting, setReacting] = useState<string | null>(null);
+  const members = useMemo(() => [...authors.values()], [authors]);
+  /* One of each is open at a time, so one ref each, on the one that is. */
+  const closeAssign = useCallback(() => setAssigning(null), []);
+  const closeReact = useCallback(() => setReacting(null), []);
+  const assignRef = useDismiss<HTMLSpanElement>(assigning !== null, closeAssign);
+  const reactRef = useDismiss<HTMLSpanElement>(reacting !== null, closeReact);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const threadRefs = useRef(new Map<string, HTMLElement>());
 
   useEffect(() => {
     let live = true;
     setLoading(true);
+    /* Reactions are a convenience over the conversation: failing to read them
+       must not keep the remarks from showing. */
+    loadReactions(session, noteId)
+      .then((rows) => live && setReactions(rows))
+      .catch(() => live && setReactions([]));
     loadComments(session, noteId)
       .then((rows) => {
         if (!live) return;
@@ -155,7 +188,16 @@ export function NoteComments({
       const body = (draft[threadId] ?? "").trim();
       if (!body) return;
       try {
-        const saved = await addComment(session, noteId, threadId, body);
+        const assignee =
+          comments.find((comment) => comment.threadId === threadId)?.assigneeId ?? null;
+        const saved = await addComment(
+          session,
+          noteId,
+          threadId,
+          body,
+          mentionedIn(body, members),
+          assignee,
+        );
         setComments((current) => [...current, saved]);
         setDraft((current) => ({ ...current, [threadId]: "" }));
         setFailure("");
@@ -165,7 +207,7 @@ export function NoteComments({
         setFailure(reason instanceof Error ? reason.message : "Could not save that comment");
       }
     },
-    [draft, session, noteId, pendingThread, onPendingHandled, onChanged],
+    [draft, session, noteId, pendingThread, onPendingHandled, onChanged, comments, members],
   );
 
   /* Oldest first, so the column is a log: the thread you opened first stays at
@@ -179,7 +221,12 @@ export function NoteComments({
      things said, and the panel is read as one. */
   const threads = useMemo(() => threadsOf(comments), [comments]);
   const pendingIsNew = pendingThread && !threads.some((t) => t.threadId === pendingThread);
-  const shown = threads.filter((thread) => showResolved || !thread.resolved);
+  const forYouCount = threads.filter(
+    (thread) => !thread.resolved && isForYou(thread, session.userId),
+  ).length;
+  const shown = threads.filter(
+    (thread) => (showResolved || !thread.resolved) && (!forYou || isForYou(thread, session.userId)),
+  );
   const resolvedCount = threads.filter((thread) => thread.resolved).length;
 
   /* Arriving from the passage. The thread may be hidden — a resolved one is
@@ -223,7 +270,7 @@ export function NoteComments({
     const body = editDraft.trim();
     if (!body) return;
     try {
-      const saved = await updateComment(session, comment.id, body);
+      const saved = await updateComment(session, comment.id, body, mentionedIn(body, members));
       setComments((current) =>
         current.map((candidate) => (candidate.id === comment.id ? saved : candidate)),
       );
@@ -233,6 +280,73 @@ export function NoteComments({
     } catch (reason) {
       setFailure(reason instanceof Error ? reason.message : "Could not edit that comment");
     }
+  }
+
+  async function assign(threadId: string, assigneeId: string | null) {
+    setAssigning(null);
+    try {
+      await assignThread(session, noteId, threadId, assigneeId);
+      setComments((current) =>
+        current.map((c) => (c.threadId === threadId ? { ...c, assigneeId } : c)),
+      );
+      onChanged?.();
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : "Could not hand that thread over");
+    }
+  }
+
+  async function react(commentId: string, emoji: string, on: boolean) {
+    setReacting(null);
+    const mine = (r: Reaction) =>
+      r.commentId === commentId && r.userId === session.userId && r.emoji === emoji;
+    const before = reactions;
+    /* Shown at once and put back on refusal: a reaction is the one act here
+       that should feel like nothing happened between pressing and seeing. */
+    setReactions((current) =>
+      on
+        ? [...current.filter((r) => !mine(r)), { commentId, userId: session.userId, emoji }]
+        : current.filter((r) => !mine(r)),
+    );
+    try {
+      await setReaction(session, noteId, commentId, emoji, on);
+    } catch (reason) {
+      setReactions(before);
+      setFailure(reason instanceof Error ? reason.message : "Could not save that reaction");
+    }
+  }
+
+  /** The draft with the @name being typed replaced by the chosen member. */
+  function pickMention(threadId: string, name: string) {
+    const field = document.activeElement;
+    const text = draft[threadId] ?? "";
+    const caret = field instanceof HTMLTextAreaElement ? field.selectionStart : text.length;
+    const start = text.slice(0, caret).lastIndexOf("@");
+    if (start < 0) return;
+    const next = `${text.slice(0, start)}@${name} ${text.slice(caret)}`;
+    setDraft((current) => ({ ...current, [threadId]: next }));
+    setSuggesting(null);
+  }
+
+  /** A remark's words, with the members it names drawn as names. */
+  function words(comment: NoteComment) {
+    const named = members.filter((member) => comment.mentions.includes(member.userId));
+    if (named.length === 0) return comment.body;
+    const pattern = new RegExp(
+      `(@(?:${named
+        .map((member) => member.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .sort((a, b) => b.length - a.length)
+        .join("|")}))`,
+      "giu",
+    );
+    return comment.body.split(pattern).map((part, index) =>
+      index % 2 === 1 ? (
+        <span key={index} className="note-comment-mention">
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    );
   }
 
   async function remove(comment: NoteComment, lastInThread: boolean) {
@@ -249,6 +363,14 @@ export function NoteComments({
     }
   }
 
+  function suggestions(threadId: string) {
+    if (!suggesting || suggesting.threadId !== threadId) return [];
+    const wanted = suggesting.query.toLocaleLowerCase();
+    return members
+      .filter((member) => member.name && member.name.toLocaleLowerCase().startsWith(wanted))
+      .slice(0, 5);
+  }
+
   function composer(threadId: string, placeholder: string, open: boolean) {
     return (
       <div
@@ -258,9 +380,25 @@ export function NoteComments({
         <textarea
           ref={threadId === pendingThread ? composerRef : undefined}
           value={draft[threadId] ?? ""}
-          onChange={(event) => setDraft((c) => ({ ...c, [threadId]: event.target.value }))}
+          onChange={(event) => {
+            const text = event.target.value;
+            setDraft((c) => ({ ...c, [threadId]: text }));
+            const query = mentionQuery(text, event.target.selectionStart ?? text.length);
+            setSuggesting(query === null ? null : { threadId, query });
+          }}
           onFocus={() => setActive(threadId)}
           onKeyDown={(event) => {
+            const offered = suggestions(threadId);
+            if (offered.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
+              event.preventDefault();
+              pickMention(threadId, offered[0].name);
+              return;
+            }
+            if (event.key === "Escape" && suggesting) {
+              event.stopPropagation();
+              setSuggesting(null);
+              return;
+            }
             /* Enter sends. A remark is a line or two said to one other person,
                so the common case is the one that should cost one key — ⌘↵ made
                the short reply the awkward one. Shift+Enter is the way to a new
@@ -278,6 +416,27 @@ export function NoteComments({
           rows={open ? 2 : 1}
           aria-label={placeholder}
         />
+        {suggestions(threadId).length > 0 && (
+          <div className="note-comment-suggestions" role="listbox">
+            {suggestions(threadId).map((member, index) => (
+              <button
+                key={member.userId}
+                type="button"
+                role="option"
+                aria-selected={index === 0}
+                className="note-comment-suggestion press"
+                onMouseDown={(event) => {
+                  // Before the textarea loses focus, or the caret is gone.
+                  event.preventDefault();
+                  pickMention(threadId, member.name);
+                }}
+              >
+                <Avatar url={member.avatarUrl} name={member.name} email="" compact />
+                {member.name}
+              </button>
+            ))}
+          </div>
+        )}
         {open && (
           <div className="note-comment-composer-actions">
             <kbd className="readout" title="Shift + Enter for a new line">
@@ -394,11 +553,73 @@ export function NoteComments({
               </div>
             </div>
           ) : (
-            <p className="note-comment-body">{comment.body}</p>
+            <p className="note-comment-body">{words(comment)}</p>
           )}
+          {reactionRow(comment)}
         </div>
       </div>
     );
+  }
+
+  function reactionRow(comment: NoteComment) {
+    const counted = tally(reactions, comment.id, session.userId);
+    if (counted.length === 0 && !canEdit) return null;
+    return (
+      <div className="note-comment-reactions" onClick={(event) => event.stopPropagation()}>
+        {counted.map(({ emoji, count, mine }) => (
+          <button
+            key={emoji}
+            type="button"
+            className={`note-comment-reaction press ${mine ? "is-mine" : ""}`}
+            disabled={!canEdit}
+            aria-pressed={mine}
+            title={reactors(comment.id, emoji)}
+            onClick={() => void react(comment.id, emoji, !mine)}
+          >
+            <span>{emoji}</span>
+            <span className="readout">{count}</span>
+          </button>
+        ))}
+        {canEdit && (
+          <span className="note-comment-react" ref={reacting === comment.id ? reactRef : undefined}>
+            <button
+              type="button"
+              className="note-comment-action is-quiet press"
+              aria-label="React"
+              aria-expanded={reacting === comment.id}
+              onClick={() => setReacting((open) => (open === comment.id ? null : comment.id))}
+            >
+              <Smile size={13} />
+            </button>
+            {reacting === comment.id && (
+              <span className="note-comment-palette">
+                {REACTIONS.map((emoji) => {
+                  const mine = counted.some((one) => one.emoji === emoji && one.mine);
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={`note-comment-palette-emoji press ${mine ? "is-mine" : ""}`}
+                      onClick={() => void react(comment.id, emoji, !mine)}
+                    >
+                      {emoji}
+                    </button>
+                  );
+                })}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  /** Who gave this reaction, by name — the reaction's own tooltip. */
+  function reactors(commentId: string, emoji: string) {
+    return reactions
+      .filter((r) => r.commentId === commentId && r.emoji === emoji)
+      .map((r) => (r.userId === session.userId ? "You" : authors.get(r.userId)?.name || "Someone"))
+      .join(", ");
   }
 
   function card(thread: CommentThread) {
@@ -434,6 +655,14 @@ export function NoteComments({
         <p className={`note-comment-quote ${quotes.has(thread.threadId) ? "" : "is-orphan"}`}>
           {quotes.get(thread.threadId) || "The passage this was about is gone"}
         </p>
+        {thread.assigneeId && (
+          <p className="note-comment-assignee">
+            <UserPlus size={12} />
+            {thread.assigneeId === session.userId
+              ? "Yours"
+              : authors.get(thread.assigneeId)?.name || "Someone"}
+          </p>
+        )}
 
         {remark(head, true, thread.comments.length === 1)}
 
@@ -471,6 +700,59 @@ export function NoteComments({
               {thread.resolved ? <RotateCcw size={12} /> : <Check size={12} />}
               {thread.resolved ? "Reopen" : "Resolve"}
             </button>
+            {!thread.resolved && (
+              <span
+                className="note-comment-assign"
+                ref={assigning === thread.threadId ? assignRef : undefined}
+              >
+                <button
+                  type="button"
+                  className="note-comment-action press"
+                  aria-expanded={assigning === thread.threadId}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setAssigning((open) => (open === thread.threadId ? null : thread.threadId));
+                  }}
+                >
+                  <UserPlus size={12} />
+                  Assign
+                </button>
+                {assigning === thread.threadId && (
+                  <span className="note-comment-assign-menu" role="menu">
+                    {members.map((member) => (
+                      <button
+                        key={member.userId}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={thread.assigneeId === member.userId}
+                        className="note-comment-suggestion press"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void assign(thread.threadId, member.userId);
+                        }}
+                      >
+                        <Avatar url={member.avatarUrl} name={member.name} email="" compact />
+                        {member.userId === session.userId ? "Me" : member.name || "Someone"}
+                        {thread.assigneeId === member.userId && <Check size={12} />}
+                      </button>
+                    ))}
+                    {thread.assigneeId && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="note-comment-suggestion press"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void assign(thread.threadId, null);
+                        }}
+                      >
+                        Nobody
+                      </button>
+                    )}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
 
@@ -532,6 +814,17 @@ export function NoteComments({
           Comments
           {threads.length > 0 && <b className="note-comments-count">{threads.length}</b>}
         </span>
+        {forYouCount > 0 && (
+          <button
+            type="button"
+            className={`note-comment-action press note-comments-toggle ${forYou ? "is-on" : ""}`}
+            aria-pressed={forYou}
+            onClick={() => setForYou((on) => !on)}
+          >
+            For you
+            <b className="note-comments-count">{forYouCount}</b>
+          </button>
+        )}
         {resolvedCount > 0 && (
           <button
             type="button"
