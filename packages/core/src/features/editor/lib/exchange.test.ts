@@ -366,3 +366,37 @@ test("a cross-reference leaves as its words, never as its target", () => {
   );
   assert.ok(!richTextToMarkdown(document).includes("h-bene"));
 });
+
+test("a citation leaves as pandoc's [@key] and the bibliography as its #refs div", () => {
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Come si legge " },
+          { type: "citation", attrs: { key: "eco1975", locator: "12-15", label: "(Eco 1975)" } },
+          { type: "text", text: " e " },
+          { type: "citation", attrs: { key: "rossi:2020", label: "(Rossi 2020)" } },
+          { type: "text", text: ". Scrivere a [@mano] resta [testo]." },
+        ],
+      },
+      { type: "bibliography" },
+    ],
+  };
+  const markdown = richTextToMarkdown(document);
+  assert.match(markdown, /Come si legge \[@eco1975, 12-15\] e \[@rossi:2020\]\./);
+  assert.match(markdown, /^::: \{#refs\}\n:::$/m);
+  const back = markdownToNote("x.md", `# T\n\n${markdown}`).content;
+  const cited = back.content?.[0]?.content?.filter((node) => node.type === "citation");
+  assert.deepEqual(
+    cited?.map((node) => [node.attrs?.key, node.attrs?.locator]),
+    [
+      ["eco1975", "12-15"],
+      ["rossi:2020", null],
+    ],
+  );
+  /* Typed, not cited: the export escapes it, so it comes back as words. */
+  assert.match(JSON.stringify(back), /Scrivere a \[@mano\] resta/);
+  assert.ok(back.content?.some((node) => node.type === "bibliography"));
+});

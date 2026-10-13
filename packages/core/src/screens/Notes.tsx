@@ -57,6 +57,8 @@ import {
   referenceSnapshot,
   setDocumentContents,
   setDocumentReferences,
+  setDocumentSources,
+  setSourceImporter,
   type PlaceRequest,
   type Place,
 } from "@/lib/documentContents";
@@ -99,8 +101,11 @@ import {
   renameSpace,
   setSpaceSeats,
   findInOtherArchives,
+  loadSources,
+  saveSources,
   type Space,
 } from "@/lib/spaces";
+import { parseSources } from "@/lib/citations";
 import {
   createNote,
   createArchiveInvite,
@@ -1395,9 +1400,43 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         numbered: docFeatures.numbering,
         footnotes: page.footnoteNumbering,
         language: page.labels,
+        citations: page.citationStyle,
       }),
-    [referenceChapters, docFeatures.numbering, page.footnoteNumbering, page.labels],
+    [
+      referenceChapters,
+      docFeatures.numbering,
+      page.footnoteNumbering,
+      page.labels,
+      page.citationStyle,
+    ],
   );
+
+  /* The library, read when a document that cites opens, and taken in from a
+     file through the picker. Read again after an import rather than merged
+     here, so what is shown is what the table holds. */
+  const citingArchive = docMode && docFeatures.citations ? session?.archiveId : undefined;
+  useEffect(() => {
+    if (!citingArchive || !session) return;
+    let current = true;
+    const read = () =>
+      loadSources(session).then((sources) => {
+        if (current) setDocumentSources(sources);
+      });
+    read().catch((error) => console.warn("Could not read the sources", error));
+    setSourceImporter(async (text) => {
+      const sources = parseSources(text);
+      if (!sources.length) throw new Error("No BibTeX or CSL-JSON entries in that file");
+      await saveSources(session, sources);
+      await read();
+      return sources.length;
+    });
+    return () => {
+      current = false;
+      setSourceImporter(null);
+      setDocumentSources([]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the archive, not the session object, decides
+  }, [citingArchive]);
 
   /* Words today: yours, from the versions the server writes after each
      stretch of writing, so it counts what was written on any device — and
@@ -5260,6 +5299,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   eyebrow: [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · "),
                   footer: turn,
                   footnotes: docFeatures.footnotes,
+                  citations: docFeatures.citations,
                   review: docFeatures.review,
                   numbered: docFeatures.numbering ? chapterAt + 1 : null,
                   writing: {

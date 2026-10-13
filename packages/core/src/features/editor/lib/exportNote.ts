@@ -8,6 +8,8 @@ import {
 } from "./content";
 import { exportFileName } from "./exchange";
 import { platform } from "@/platform";
+import { referenceSnapshot } from "@/lib/documentContents";
+import { bibliography, citationText } from "@/lib/citations";
 
 type Resolve = (id: string) => Promise<Blob>;
 function png(canvas: HTMLCanvasElement): Uint8Array {
@@ -76,6 +78,7 @@ export async function exportDocx(
      was made with; its live numbering is the document export's to do. */
   const footnotes: Record<string, { children: InstanceType<typeof Paragraph>[] }> = {};
   let footnoteCount = 0;
+  const { citing } = referenceSnapshot();
   const inline = (
     node: JSONContent,
     mono = false,
@@ -96,6 +99,17 @@ export async function exportDocx(
       }
       if (child.type === "crossReference")
         return [new TextRun({ text: String(child.attrs?.label ?? "") })];
+      /* A citation and the bibliography are printed from the library as it
+         stands, as the sheet prints them; with no library open, the words
+         the citation was made with. */
+      if (child.type === "citation")
+        return [
+          new TextRun({
+            text: citing.sources.size
+              ? citationText(String(child.attrs?.key ?? ""), child.attrs?.locator, citing)
+              : String(child.attrs?.label ?? ""),
+          }),
+        ];
       if (child.type !== "text") return inline(child, mono);
       const marks = child.marks ?? [];
       /* A pending insertion is not in the document until it is accepted —
@@ -203,6 +217,20 @@ export async function exportDocx(
         }),
       ];
     }
+    if (node.type === "bibliography")
+      return bibliography(citing).map(
+        (entry) =>
+          new Paragraph({
+            children: [
+              ...(entry.number !== undefined ? [new TextRun(`[${entry.number}] `)] : []),
+              ...entry.runs.map((run) => new TextRun({ text: run.text, italics: run.italic })),
+            ],
+            /* Hanging, as a bibliography is set: the second line under the
+               first one's words, not under its author. */
+            indent: { left: 720, hanging: 720 },
+            spacing: { after: 120 },
+          }),
+      );
     if (node.type === "caption")
       return [
         new Paragraph({

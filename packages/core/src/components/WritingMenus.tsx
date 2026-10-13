@@ -142,11 +142,13 @@ export function PageSetupFields({
 export function ReferenceFields({
   page,
   footnotes,
+  citations,
   disabled,
   onChange,
 }: {
   page: PageSetup;
   footnotes: boolean;
+  citations: boolean;
   disabled?: boolean;
   onChange: (page: PageSetup) => void;
 }) {
@@ -192,6 +194,20 @@ export function ReferenceFields({
           <option value="dash">{figure} 1 —</option>
         </select>
       </Field>
+      {citations && (
+        <Field name="Citations">
+          <select
+            disabled={disabled}
+            value={page.citationStyle}
+            onChange={(event) =>
+              set("citationStyle", event.target.value as PageSetup["citationStyle"])
+            }
+          >
+            <option value="author-date">(Rossi 2020)</option>
+            <option value="numeric">[1]</option>
+          </select>
+        </Field>
+      )}
       <Field name="Table captions">
         <select
           disabled={disabled}

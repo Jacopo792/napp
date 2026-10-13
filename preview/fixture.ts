@@ -269,7 +269,7 @@ const CHAPTERS: { title: string; folder: string | null; position?: number; body:
     title: "L'Uno e la processione",
     folder: P_ONE,
     position: 2,
-    body: `## La sovrabbondanza\n\n${paragraph("L'Uno produce senza diminuire, come una sorgente che non si svuota nei fiumi che alimenta.", 22)} Così in Enneadi V 2, 1.[^1]\n\n<p data-caption="figure">La processione come irradiazione dalla sorgente</p>\n\n## Il limite del linguaggio\n\n${paragraph("Di ciò che è al di là dell'essere si può dire soltanto ciò che non è.", 12)} È la via negativa.[^2]\n\n[^1]: Plot. Enn. V 2, 1, 7-9: «essendo perfetto, sovrabbonda».\n[^2]: Cfr. Enn. VI 9, 3 e, per la ripresa medievale, Dionigi, De divinis nominibus.`,
+    body: `## La sovrabbondanza\n\n${paragraph("L'Uno produce senza diminuire, come una sorgente che non si svuota nei fiumi che alimenta.", 22)} Così in Enneadi V 2, 1 [@hadot1963, 45-47].[^1]\n\n<p data-caption="figure">La processione come irradiazione dalla sorgente</p>\n\n## Il limite del linguaggio\n\n${paragraph("Di ciò che è al di là dell'essere si può dire soltanto ciò che non è.", 12)} È la via negativa.[^2]\n\n[^1]: Plot. Enn. V 2, 1, 7-9: «essendo perfetto, sovrabbonda».\n[^2]: Cfr. Enn. VI 9, 3 e, per la ripresa medievale, Dionigi, De divinis nominibus.`,
   },
   {
     title: "L'Intelletto e le idee",
@@ -278,7 +278,7 @@ const CHAPTERS: { title: string; folder: string | null; position?: number; body:
     body: `${paragraph(
       "Nell'Intelletto pensare ed essere coincidono, e ogni idea contiene tutte le altre.",
       30,
-    )} È la tesi di Parmenide riletta.[^1]\n\n<p data-caption="table">Le tre ipostasi e i loro predicati</p>\n\n| Ipostasi | Atto |\n| --- | --- |\n| Uno | sovrabbondare |\n| Intelletto | pensare |\n| Anima | ordinare |\n\n[^1]: Enn. V 1, 8, 17-18.`,
+    )} È la tesi di Parmenide riletta [@reale2002] [@hadot1963, 12].[^1]\n\n<p data-caption="table">Le tre ipostasi e i loro predicati</p>\n\n| Ipostasi | Atto |\n| --- | --- |\n| Uno | sovrabbondare |\n| Intelletto | pensare |\n| Anima | ordinare |\n\n[^1]: Enn. V 1, 8, 17-18.`,
   },
   {
     title: "L'anima e il corpo",
@@ -312,6 +312,11 @@ export const THESIS_META: Meta = {
     ...(chapter.position === undefined ? {} : { position: chapter.position }),
   })),
 };
+
+/** The thesis's library, as a `.bib` file somebody imported. */
+export const THESIS_SOURCES_BIB = String.raw`@book{hadot1963, author = {Hadot, Pierre}, title = {Plotin ou la simplicit\'e du regard}, publisher = {Plon}, address = {Paris}, year = {1963}}
+@book{reale2002, author = {Giovanni Reale}, title = {Plotino e il neoplatonismo pagano}, publisher = {Bompiani}, address = {Milano}, year = {2002}}
+@article{beierwaltes, author = {Beierwaltes, Werner and Bussanich, John}, title = {L'Uno e la luce}, journal = {Rivista di Filosofia Neo-Scolastica}, volume = {77}, number = {2}, pages = {181--204}, year = {1985}}`;
 
 export const THESIS_NOTES: Note[] = CHAPTERS.map((chapter, index) => {
   const content = legacyMarkdownToRichText(chapter.body);

@@ -76,6 +76,8 @@ export interface ManuscriptFrame {
   writing?: WritingFocusSettings;
   /** The document has footnotes on: Insert and ⌥⌘F offer one. */
   footnotes?: boolean;
+  /** The document cites sources. */
+  citations?: boolean;
   /** The document has Suggested changes on: the bar offers Suggesting. */
   review?: boolean;
 }
@@ -1089,6 +1091,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               editor={instance}
               noteId={entry.note.id}
               footnotes={Boolean(manuscript.footnotes)}
+              citations={Boolean(manuscript.citations)}
               page={manuscript.page}
               onLink={openLinkForm}
               onImage={() => imageRef.current?.click()}

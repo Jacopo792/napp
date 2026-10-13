@@ -1237,6 +1237,7 @@ export function SettingsPanel({
                     <ReferenceFields
                       page={document.page}
                       footnotes={document.features.footnotes}
+                      citations={document.features.citations}
                       disabled={document.disabled}
                       onChange={document.onPage}
                     />

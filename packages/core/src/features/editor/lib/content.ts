@@ -1111,6 +1111,94 @@ export const CrossReference = Node.create({
   renderMarkdown: (node: JSONContent) => String(node.attrs?.label ?? ""),
 });
 
+/** A citation of a source in the archive's library: its key, and where in
+ *  it — "12", "45-67", "chap. 3". Like a cross-reference it holds what it
+ *  cites, never what it prints: "(Rossi 2020, p. 12)" or "[3, p. 12]" is
+ *  worked out each time it is drawn, so changing the style or citing
+ *  something earlier renumbers it without a write. `label` is the words when
+ *  it was made, for the readers that cannot ask the library. Markdown is
+ *  pandoc's, which reads it back: `[@rossi2020, 12]`. */
+export const Citation = Node.create({
+  name: "citation",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    const data = (name: string) => ({
+      default: null,
+      parseHTML: (element: HTMLElement) => element.getAttribute(`data-${name}`) || null,
+      renderHTML: (attributes: Record<string, unknown>) =>
+        attributes[name] ? { [`data-${name}`]: String(attributes[name]) } : {},
+    });
+    return {
+      key: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-cite") || null,
+        renderHTML: (attributes) => ({ "data-cite": attributes.key ?? "" }),
+      },
+      locator: data("locator"),
+      label: data("label"),
+    };
+  },
+  parseHTML: () => [{ tag: "span[data-cite]" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "span",
+    mergeAttributes(HTMLAttributes, { class: "citation" }),
+    String(node.attrs.label ?? ""),
+  ],
+  renderText: ({ node }) => String(node.attrs.label ?? ""),
+  renderMarkdown: (node: JSONContent) => {
+    const key = String(node.attrs?.key ?? "");
+    const locator = String(node.attrs?.locator ?? "").replace(/[[\]]/g, "");
+    return key ? `[@${key}${locator ? `, ${locator}` : ""}]` : "";
+  },
+  markdownTokenName: "citation",
+  markdownTokenizer: {
+    name: "citation",
+    level: "inline",
+    start: "[@",
+    tokenize(src) {
+      const match = /^\[@([\p{L}\p{N}_][\p{L}\p{N}_:.#$%&+?<>~/-]*)(?:,\s*([^\]]*))?\]/u.exec(src);
+      return match
+        ? { type: "citation", raw: match[0], key: match[1], locator: match[2]?.trim() || null }
+        : undefined;
+    },
+  },
+  parseMarkdown: (token: MarkdownToken) => ({
+    type: "citation",
+    attrs: { key: String(token.key), locator: token.locator ?? null },
+  }),
+});
+
+/** The works the document cites, where somebody chose to put them — the
+ *  `[TOC]` block's sibling: it carries nothing, and is drawn from the library
+ *  and the citations as they stand. Markdown is pandoc's `#refs` div, which
+ *  is where pandoc itself puts the bibliography it generates. */
+export const Bibliography = Node.create({
+  name: "bibliography",
+  group: "block",
+  atom: true,
+  selectable: true,
+  parseHTML: () => [{ tag: "div[data-bibliography]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    mergeAttributes(HTMLAttributes, { "data-bibliography": "", class: "bibliography-block" }),
+  ],
+  renderMarkdown: () => "::: {#refs}\n:::",
+  markdownTokenName: "bibliography",
+  markdownTokenizer: {
+    name: "bibliography",
+    level: "block",
+    start: ":::",
+    tokenize(src) {
+      const match = /^::: *\{#refs\} *\n:::[^\S\n]*(?:\n|$)/.exec(src);
+      return match ? { type: "bibliography", raw: match[0] } : undefined;
+    },
+  },
+  parseMarkdown: () => ({ type: "bibliography" }),
+});
+
 export const BASE_EXTENSIONS = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
@@ -1144,6 +1232,8 @@ export const BASE_EXTENSIONS = [
   Footnote,
   Caption,
   CrossReference,
+  Citation,
+  Bibliography,
   SuggestedInsert,
   SuggestedDelete,
 ];
@@ -1326,7 +1416,8 @@ function readableText(node: JSONContent): string {
   if (node.type === "hardBreak") return "\n";
   if (node.type === "privateFile") return String(node.attrs?.label ?? "Attachment");
   if (node.type === "privateImage") return String(node.attrs?.alt ?? "");
-  if (node.type === "crossReference") return String(node.attrs?.label ?? "");
+  if (node.type === "crossReference" || node.type === "citation")
+    return String(node.attrs?.label ?? "");
 
   const children = (node.content ?? []).map(readableText).join("");
   if (

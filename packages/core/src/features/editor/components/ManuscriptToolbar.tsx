@@ -24,6 +24,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Books,
   Caption,
   Check,
   Chapters,
@@ -38,6 +39,7 @@ import {
   Link,
   List,
   ListOrdered,
+  Quote,
   Minus,
   Outdent,
   PageBreak,
@@ -55,6 +57,7 @@ import {
 import { WRITING_FONTS, type PageSetup } from "@/lib/spaceShape";
 import { insertCaption, insertCrossReference, insertFootnote } from "../lib/referenceMarks";
 import { CrossReferencePicker } from "./CrossReferencePicker";
+import { CitationPicker } from "./CitationPicker";
 import { settle, suggestionAt, suggestionsIn } from "../lib/suggestions";
 import { keyName } from "@/lib/shortcuts";
 
@@ -280,6 +283,7 @@ export function ManuscriptToolbar({
   editor,
   noteId,
   footnotes,
+  citations,
   page,
   onLink,
   onImage,
@@ -290,6 +294,8 @@ export function ManuscriptToolbar({
   noteId: string;
   /** The document has footnotes on. */
   footnotes: boolean;
+  /** The document has citations on. */
+  citations: boolean;
   /** Which side of a table its caption goes. */
   page: Pick<PageSetup, "tableCaption">;
   onLink: () => void;
@@ -298,7 +304,9 @@ export function ManuscriptToolbar({
    *  is suggesting, and the switch. */
   review?: { on: boolean; toggle: () => void };
 }) {
-  const [citing, setCiting] = useState(false);
+  /* Which picker is open off the Insert menu: a cross-reference or a
+     citation. One slot, because the two stand in the same place. */
+  const [citing, setCiting] = useState<"reference" | "source" | false>(false);
   const citeRoot = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!citing) return;
@@ -743,13 +751,49 @@ export function ManuscriptToolbar({
                   label="Cross-reference…"
                   onPress={() => {
                     close();
-                    setCiting(true);
+                    setCiting("reference");
                   }}
                 />
+                {citations && (
+                  <>
+                    <MenuRow
+                      icon={<Quote size={16} />}
+                      label="Citation…"
+                      onPress={() => {
+                        close();
+                        setCiting("source");
+                      }}
+                    />
+                    <MenuRow
+                      icon={<Books size={16} />}
+                      label="Bibliography"
+                      onPress={() => {
+                        close();
+                        chain().insertContent({ type: "bibliography" }).run();
+                      }}
+                    />
+                  </>
+                )}
               </>
             )}
           </Drop>
-          {citing && editor && (
+          {citing === "source" && editor && (
+            <CitationPicker
+              onClose={() => {
+                setCiting(false);
+                editor.commands.focus();
+              }}
+              onPick={(key, locator, label) => {
+                setCiting(false);
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({ type: "citation", attrs: { key, locator, label } })
+                  .run();
+              }}
+            />
+          )}
+          {citing === "reference" && editor && (
             <CrossReferencePicker
               from={noteId}
               onClose={() => {

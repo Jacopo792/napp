@@ -10,7 +10,10 @@ import {
   PREVIEW_U1,
   PREVIEW_U2,
   THESIS_NOTES,
+  THESIS_SOURCES_BIB,
 } from "./fixture";
+import { parseSources } from "@/lib/citations";
+import type { Source } from "@/lib/citations";
 import type { FarNote, Space } from "@/lib/spaces";
 import {
   DEFAULT_FEATURES,
@@ -154,6 +157,24 @@ export async function setDocumentFeatures(
   features: DocumentFeatures,
 ): Promise<void> {
   await mergeSpaceSettings(session, { features });
+}
+
+const libraries = new Map<string, Map<string, Source>>([
+  [
+    PREVIEW_THESIS,
+    new Map(parseSources(THESIS_SOURCES_BIB).map((source) => [source.id, source])),
+  ],
+]);
+
+export async function loadSources(session: AppSession): Promise<Source[]> {
+  return [...(libraries.get(session.archiveId)?.values() ?? [])];
+}
+
+export async function saveSources(session: AppSession, sources: Source[]): Promise<void> {
+  await sleep(120);
+  const library = libraries.get(session.archiveId) ?? new Map<string, Source>();
+  for (const source of sources) library.set(source.id, source);
+  libraries.set(session.archiveId, library);
 }
 
 export async function setPageSetup(session: AppSession, page: PageSetup): Promise<void> {

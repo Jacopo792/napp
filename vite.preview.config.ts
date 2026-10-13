@@ -27,7 +27,7 @@ export default defineConfig({
   envDir: here("."),
   /* The desktop port is not a preference: it is the one the Electron window
      loads in development, so it has to be that port or nothing. */
-  server: desktop ? { port: 5174, strictPort: true } : { port: 5199 },
+  server: desktop ? { port: 5174, strictPort: true } : { port: Number(process.env.PORT) || 5199 },
   resolve: {
     alias: [
       { find: /^@\/lib\/supabase$/, replacement: here("./preview/supabase.mock.ts") },

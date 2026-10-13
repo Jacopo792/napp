@@ -60,6 +60,8 @@ import {
 import { ContentsView } from "./ContentsView";
 import { FootnoteView } from "./FootnoteView";
 import { CrossReferenceView } from "./CrossReferenceView";
+import { CitationView } from "./CitationView";
+import { BibliographyView } from "./BibliographyView";
 import {
   UniqueReferenceTargets,
   adoptTargets,
@@ -72,6 +74,8 @@ import type { PlaceTarget } from "@/lib/documentContents";
 import { WRITING_FOCUS, WritingFocus, type WritingFocusSettings } from "../lib/writingFocus";
 import {
   BASE_EXTENSIONS,
+  Bibliography,
+  Citation,
   CrossReference,
   Footnote,
   DRAWING_BOX,
@@ -1933,7 +1937,25 @@ function crossReferenceExtension(noteId: () => string) {
   });
 }
 
-const VIEWED_ELSEWHERE = new Set(["tableOfContents", "footnote", "crossReference"]);
+const CitationWithView = Citation.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CitationView);
+  },
+});
+
+const BibliographyWithView = Bibliography.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(BibliographyView);
+  },
+});
+
+const VIEWED_ELSEWHERE = new Set([
+  "tableOfContents",
+  "footnote",
+  "crossReference",
+  "citation",
+  "bibliography",
+]);
 
 function privateFileExtension(resolve: Resolver) {
   return PrivateFile.extend<PrivateFileOptions>({
@@ -2111,6 +2133,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         ...BASE_EXTENSIONS.filter((extension) => !VIEWED_ELSEWHERE.has(extension.name)),
         ContentsWithView,
         FootnoteWithView,
+        CitationWithView,
+        BibliographyWithView,
         crossReferences,
         UniqueReferenceTargets,
         ...(collaboration

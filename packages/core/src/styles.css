@@ -11610,6 +11610,50 @@ button.sheet-chip:hover,
   text-decoration: none;
 }
 
+/* A citation is words of the sentence too, and says so only on hover: in
+   print it is just "(Rossi 2020)". */
+.citation {
+  border-radius: var(--radius-xs);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.citation:hover,
+.citation.is-selected {
+  background: var(--accent-wash);
+}
+
+.citation.is-missing {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* The works cited, set with a hanging indent as a bibliography is. */
+.bibliography-block {
+  margin: 1em 0;
+  border-radius: var(--radius-sm);
+  user-select: none;
+}
+
+.bibliography-block.is-selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.bibliography-entry {
+  margin: 0 0 0.6em;
+  padding-left: 2em;
+  text-indent: -2em;
+}
+
+.bibliography-number {
+  display: inline-block;
+  min-width: 2em;
+  text-indent: 0;
+}
+
+.bibliography-empty {
+  color: var(--ink-3);
+}
+
 /* The chapter's footnotes at the foot of its sheet, under Word's short
    separator. A sheet that has some lays out as a column, so the list sits at
    the bottom of a sheet the words do not fill. */
@@ -11762,6 +11806,24 @@ button.sheet-chip:hover,
   font-size: var(--text-xs, 11px);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cite-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem;
+  gap: 6px;
+}
+
+.cite-foot {
+  display: grid;
+  gap: 2px;
+  border-top: 1px solid var(--rule);
+  padding-top: 4px;
+}
+
+.cite-status {
+  padding: 0 8px 4px;
+  font-size: var(--text-xs, 11px);
 }
 
 .xref-empty {

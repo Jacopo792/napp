@@ -1194,6 +1194,18 @@ one and change the other.
   `<p data-caption="…">` with Markdown inside, a cross-reference as its words.
   DOCX gets Word's own footnotes.
 
+**Citations** are the same shape. The library is `archive_sources`, one
+CSL-JSON row per key — a table rather than a key in `archives.settings`,
+because an import is an upsert and two members importing at once must not
+overwrite one blob. A `citation` node holds `key`, `locator` and the `label`
+it was made with; `targetsOf()` collects the keys beside the cross-references,
+and `lib/citations.ts` prints them in one of two styles written by hand
+(author-date, numeric — `settings.page.citationStyle`). A numeric style
+numbers by first citation through the chapters as they stand, so nothing is
+stored. The `bibliography` block is the `[TOC]` block's sibling: it lists only
+what is cited. Markdown is pandoc's `[@key, p]` and `::: {#refs}`, which pandoc
+itself resolves; reach for citeproc only when a document needs a real CSL style.
+
 ## Two people in one note
 
 Title and content are one Yjs document. The browser holds it in memory and in

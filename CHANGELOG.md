@@ -3,6 +3,24 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.27 — 2026-10-13
+
+A book that cites its sources.
+
+### Added
+
+- `archive_sources` (migration `20261013030000`): one CSL-JSON row per
+  citation key, member-read, writer-written. An import is an upsert.
+- `lib/citations.ts`: BibTeX and CSL-JSON readers, and two hand-written
+  styles — author-date and numeric — chosen by `settings.page.citationStyle`.
+  No citeproc.
+- `citation` (inline: `key`, `locator`, `label`) and `bibliography` (block)
+  in `BASE_EXTENSIONS`, every attribute null by default. Nothing numbered is
+  stored: citation keys ride in `targetsOf()` beside the cross-references and
+  are counted at read time.
+- Markdown: pandoc's `[@key, locator]` and the `::: {#refs}` div, both read
+  back. DOCX prints citations and the bibliography from the live library.
+
 ## 0.9.26 — 2026-10-13
 
 Updates taken out.

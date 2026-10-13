@@ -42,6 +42,30 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.27",
+    date: "2026-10-13",
+    headline: "A book that cites its sources",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Citations",
+            text: "Insert → Citation… finds a source by author, title or year and puts it in the sentence, with the page if you give one. Bring your library in from Zotero, as BibTeX or CSL JSON, from the foot of the same list.",
+          },
+          {
+            title: "A bibliography that writes itself",
+            text: "Insert → Bibliography lists every work the book cites, and only those. Choose (Rossi 2020) or [1] in Settings → Document; every citation changes with it.",
+          },
+          {
+            title: "Out to Word and Markdown",
+            text: "A Word export prints the citations and the bibliography as the page shows them. Markdown keeps pandoc's [@key], so pandoc can set the book from it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.26",
     date: "2026-10-13",
     headline: "Updates taken out",

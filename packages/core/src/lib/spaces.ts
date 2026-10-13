@@ -7,6 +7,7 @@
  * `create_archive`, because a new archive has no member yet for a policy to
  * recognise. Switching is `chooseArchive` in `session.ts`, which checks the
  * membership again before it stores anything. */
+import { readSource, type Source } from "./citations";
 import type { AppSession } from "./sessionRestore";
 import { fail, supabase } from "./supabaseClient";
 import {
@@ -184,6 +185,35 @@ export async function setDocumentFeatures(
   features: DocumentFeatures,
 ): Promise<void> {
   await mergeSpaceSettings(session, { features });
+}
+
+/** The archive's library: every source its citations can cite, read rather
+ *  than trusted because the other member wrote it. */
+export async function loadSources(session: AppSession): Promise<Source[]> {
+  const result = await supabase
+    .from("archive_sources")
+    .select("csl")
+    .eq("archive_id", session.archiveId)
+    .order("key");
+  fail(result.error);
+  return ((result.data ?? []) as { csl: unknown }[])
+    .map((row) => readSource(row.csl))
+    .filter((source): source is Source => source !== null);
+}
+
+/** An import: a source already there under the same key is replaced, which
+ *  is how a corrected `.bib` is taken in again. */
+export async function saveSources(session: AppSession, sources: Source[]): Promise<void> {
+  for (let at = 0; at < sources.length; at += 500) {
+    const result = await supabase.from("archive_sources").upsert(
+      sources.slice(at, at + 500).map((source) => ({
+        archive_id: session.archiveId,
+        key: source.id,
+        csl: source,
+      })),
+    );
+    fail(result.error);
+  }
 }
 
 export async function setPageSetup(session: AppSession, page: PageSetup): Promise<void> {

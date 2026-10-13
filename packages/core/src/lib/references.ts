@@ -10,6 +10,7 @@
  *
  * Pure, so `node --experimental-strip-types` can test it. */
 import type { JSONContent } from "@tiptap/core";
+import type { CitationStyle } from "./citations.ts";
 import { headingNumbers } from "./manuscript.ts";
 
 export type CaptionKind = "figure" | "table";
@@ -39,9 +40,12 @@ export interface ReferenceUse {
 export interface ChapterTargets {
   targets: Target[];
   references: ReferenceUse[];
+  /** The source keys it cites, in order, repeats kept — what a numeric
+   *  style numbers by first appearance. */
+  citations: string[];
 }
 
-export const EMPTY_TARGETS: ChapterTargets = { targets: [], references: [] };
+export const EMPTY_TARGETS: ChapterTargets = { targets: [], references: [], citations: [] };
 
 const TARGET_KINDS: readonly TargetKind[] = ["section", "figure", "table", "footnote"];
 
@@ -66,6 +70,7 @@ export function targetsOf(document: JSONContent | null | undefined): ChapterTarg
   if (!document) return EMPTY_TARGETS;
   const targets: Target[] = [];
   const references: ReferenceUse[] = [];
+  const citations: string[] = [];
   const walk = (node: JSONContent) => {
     const attrs = node.attrs ?? {};
     if (node.type === "heading") {
@@ -99,10 +104,15 @@ export function targetsOf(document: JSONContent | null | undefined): ChapterTarg
         });
       return;
     }
+    if (node.type === "citation") {
+      const key = stringOr(attrs.key);
+      if (key) citations.push(key);
+      return;
+    }
     node.content?.forEach(walk);
   };
   walk(document);
-  return { targets, references };
+  return { targets, references, citations };
 }
 
 /* ── Counting ───────────────────────────────────────────────────────────── */
@@ -116,6 +126,7 @@ export interface ReferenceSettings {
   numbered: boolean;
   footnotes: FootnoteNumbering;
   language: ReferenceLanguage;
+  citations: CitationStyle;
 }
 
 export interface ReferenceChapter {

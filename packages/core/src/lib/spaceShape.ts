@@ -2,6 +2,7 @@
  * options are, read out of a row. A file of its own because `spaces.ts`
  * reaches the Supabase client, which the preview swaps out — and a stand-in
  * cannot borrow these from the module it stands in for. */
+import type { CitationStyle } from "./citations.ts";
 import {
   CAPTION_SEPARATORS,
   REFERENCE_WORDS,
@@ -156,6 +157,8 @@ export interface PageSetup {
   footnoteNumbering: FootnoteNumbering;
   captionSeparator: CaptionSeparator;
   tableCaption: "above" | "below";
+  /** "(Rossi 2020, p. 12)" or "[3, p. 12]". */
+  citationStyle: CitationStyle;
 }
 
 export const DEFAULT_PAGE: PageSetup = {
@@ -170,6 +173,7 @@ export const DEFAULT_PAGE: PageSetup = {
   footnoteNumbering: "chapter",
   captionSeparator: "period",
   tableCaption: "above",
+  citationStyle: "author-date",
 };
 
 export function pageSetup(settings: unknown): PageSetup {
@@ -191,6 +195,7 @@ export function pageSetup(settings: unknown): PageSetup {
   if (typeof raw.captionSeparator === "string" && raw.captionSeparator in CAPTION_SEPARATORS)
     page.captionSeparator = raw.captionSeparator as CaptionSeparator;
   if (raw.tableCaption === "below") page.tableCaption = "below";
+  if (raw.citationStyle === "numeric") page.citationStyle = "numeric";
   return page;
 }
 
