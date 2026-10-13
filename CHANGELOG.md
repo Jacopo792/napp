@@ -3,6 +3,16 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.30 — 2026-10-13
+
+### Added
+
+- Whole-manuscript EPUB 3 export from Chapter actions, using live editor JSON for the open chapter, XHTML chapter files, navigation, citations, footnotes, embedded pictures and drawings. Stored ZIP writer preserves the first uncompressed mimetype entry.
+
+### Fixed
+
+- Prevent writing-bar groups from overlapping the right-hand controls. Add a persistent page navigator with page selection and render only the active page or spread. Keep preview snapshots scoped to their chapter; show a reading bar while Pages is open.
+
 ## 0.9.29 — 2026-10-13
 
 Pages, heads and spreads.

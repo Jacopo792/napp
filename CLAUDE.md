@@ -1152,8 +1152,9 @@ size, margins and letter of the page set-up.
   a printed chapter is cut by Chromium from `printPageCss()`'s `@page` rules
   (paper, margins, running heads in margin boxes, spreads with `:left` and
   `:right`), injected only while a chapter is on the desk. The Pages view
-  copies the sheet into CSS columns one page high and shows each column as a
-  page — a picture, so pagination never goes through the Yjs binding.
+  copies the sheet into CSS columns one page high and shows the active page
+  or facing spread, with a persistent navigator at the bottom right — a
+  picture, so pagination never goes through the Yjs binding.
 - `ParagraphFormat`, `Superscript`, `Subscript` and `PageBreak` are in
   `BASE_EXTENSIONS`. The paragraph attributes default to **null**, never 0:
   Yjs stores no null, so an untouched paragraph projects exactly as it did

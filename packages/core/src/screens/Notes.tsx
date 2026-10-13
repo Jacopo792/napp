@@ -5018,6 +5018,29 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         </nav>
       ) : null;
 
+    const saveBook = async () => {
+      setError("");
+      try {
+        const chapters = manuscript.chapters.map((item) => {
+          const entry = entries.find((one) => one.note.id === item.id);
+          if (!entry) throw new Error("A chapter could not be loaded");
+          const content =
+            selected?.note.id === item.id
+              ? noteEditorRef.current?.getContent()
+              : entry.note.content;
+          if (!content) throw new Error("Wait for the open chapter to load before exporting");
+          return { title: item.title, content };
+        });
+        const { exportEpub } = await import("@/features/editor/lib/exportNote");
+        const title = currentSpace?.name || "Untitled";
+        const blob = await exportEpub(title, chapters, page.labels, resolveImage);
+        await platform().saveFile(exportFileName(title).replace(/\.md$/, "") + ".epub", blob);
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        setError(reason instanceof Error ? reason.message : "Could not export book");
+      }
+    };
+
     const chapterItems: MenuItem[] = selected
       ? [
           {
@@ -5034,6 +5057,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             hint: keyName("⌘."),
             icon: <Maximize2 size={16} />,
             run: toggleFocus,
+          },
+          { kind: "separator" },
+          {
+            kind: "item",
+            id: "epub",
+            label: "Save book as EPUB",
+            icon: <FileDown size={16} />,
+            run: () => void saveBook(),
           },
           { kind: "separator" },
           { kind: "label", label: chapterAt >= 0 ? "This chapter" : "This page" },

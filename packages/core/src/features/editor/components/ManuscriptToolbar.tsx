@@ -443,7 +443,7 @@ export function ManuscriptToolbar({
         </select>
       </div>
 
-      <div className="ribbon-group">
+      <div className="ribbon-group is-character">
         <Tool
           label="Bold"
           shortcut="⌘B"
@@ -813,7 +813,7 @@ export function ManuscriptToolbar({
           writing, and accept or reject what was proposed — the change the
           caret is in, or every one in the chapter from the menu. */}
       {review && (
-        <div className="ribbon-group">
+        <div className="ribbon-group is-review">
           <Tool
             label={review.on ? "Suggesting — your edits are proposals" : "Suggest changes"}
             active={review.on}

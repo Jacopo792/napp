@@ -11258,6 +11258,8 @@ button.sheet-chip:hover,
 }
 
 .ribbon-tool {
+  flex-shrink: 0;
+  white-space: nowrap;
   display: inline-flex;
   min-width: 30px;
   height: 30px;
@@ -11346,34 +11348,34 @@ button.sheet-chip:hover,
 /* Put away in this order: the text's own face (the page's is in Page set-up),
    indents, undo and redo (⌘Z), line spacing and size, then alignment and
    clearing — so Insert, at the end, is never the one cut off. */
-@container manuscript-bar (max-width: 1000px) {
+@container manuscript-bar (max-width: 1200px) {
   .ribbon-select.is-font,
   .ribbon-cluster.is-indent {
     display: none;
   }
 }
 
-@container manuscript-bar (max-width: 880px) {
+@container manuscript-bar (max-width: 1100px) {
   .ribbon-group.is-history {
     display: none;
   }
 }
 
-@container manuscript-bar (max-width: 760px) {
+@container manuscript-bar (max-width: 1000px) {
   .ribbon-select-wrap,
   .ribbon-select.is-size {
     display: none;
   }
 }
 
-@container manuscript-bar (max-width: 700px) {
+@container manuscript-bar (max-width: 900px) {
   .ribbon-cluster.is-align,
   .ribbon-cluster.is-clear {
     display: none;
   }
 }
 
-@container manuscript-bar (max-width: 1080px) {
+@container manuscript-bar (max-width: 1400px) {
   .ribbon-select.is-style {
     width: 92px;
   }
@@ -12533,13 +12535,49 @@ button.sheet-chip:hover,
    other or two by two, the first page alone on the right as a book opens.
    The sheet stays mounted underneath — the editor is never rebuilt — and is
    only taken out of the layout while the pages are up. */
-.manuscript-desk.is-paged > :not(.page-spread-desk) {
+.manuscript-desk.is-paged {
   display: none;
 }
 
+.page-spread-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .page-spread-desk {
   position: relative;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+}
+.page-spread-navigation {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-2);
+}
+.page-spread-navigation label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.page-spread-navigation input {
+  width: 4.5em;
+  padding: 3px 5px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
 }
 
 .page-spread-measure {
@@ -12554,7 +12592,7 @@ button.sheet-chip:hover,
   gap: 24px 2px;
 }
 
-.page-spread-pages.is-facing > :first-child {
+.page-spread-pages.is-facing.is-first > :first-child {
   grid-column: 2;
 }
 
@@ -12637,11 +12675,11 @@ button.sheet-chip:hover,
 }
 
 @media print {
-  .page-spread-desk {
+  .page-spread-view {
     display: none;
   }
 
-  .manuscript-desk.is-paged > :not(.page-spread-desk) {
+  .manuscript-desk.is-paged {
     display: block;
   }
 }
@@ -12971,5 +13009,21 @@ button.sheet-chip:hover,
   .suggested-delete {
     color: inherit;
     text-decoration: none;
+  }
+}
+
+/* Keep the essentials within the writing bar, including the controls at its end. */
+@container manuscript-bar (max-width: 760px) {
+  .ribbon-group.is-character > span {
+    display: none;
+  }
+  .manuscript-bar-end > button > span {
+    display: none;
+  }
+}
+@container manuscript-bar (max-width: 500px) {
+  .ribbon-select.is-style,
+  .ribbon-group.is-review {
+    display: none;
   }
 }

@@ -1,3 +1,4 @@
+import type { JSONContent } from "@tiptap/core";
 import {
   ChevronDown,
   ChevronUp,
@@ -180,6 +181,7 @@ const TOOLBAR_ROOM = 700;
 const TOOLBAR_ROW_ROOM = 460;
 
 export interface NoteEditorHandle {
+  getContent: () => JSONContent | null;
   openFind: (query?: string) => void;
   savePdf: () => void;
   saveDocx: () => void;
@@ -351,7 +353,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [suggesting, setSuggesting] = useState(suggestingWanted);
   const [findOpen, setFindOpen] = useState(false);
   /* The chapter as pages, copied out of the sheet when asked for. */
-  const [pages, setPages] = useState<SheetSnapshot | null>(null);
+  const [pageView, setPageView] = useState<{ noteId: string; snapshot: SheetSnapshot } | null>(
+    null,
+  );
+  const pages = pageView && pageView.noteId === entry?.note.id ? pageView.snapshot : null;
+  const setPages = (snapshot: SheetSnapshot | null) =>
+    setPageView(snapshot && entry ? { noteId: entry.note.id, snapshot } : null);
   const sheetRef = useRef<HTMLElement>(null);
   const chapterTitle = entry?.note.title ?? "";
   const printCss = manuscript
@@ -425,6 +432,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   };
 
   useImperativeHandle(ref, () => ({
+    getContent() {
+      return editorRef.current?.getContent() ?? null;
+    },
     savePdf() {
       void exportAs("pdf");
     },
@@ -1109,7 +1119,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       >
         <div className="manuscript-bar relative shrink-0">
           {headerLead}
-          {canEdit ? (
+          {canEdit && !pages ? (
             <ManuscriptToolbar
               editor={instance}
               noteId={entry.note.id}
@@ -1131,7 +1141,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               }
             />
           ) : (
-            <span className="manuscript-bar-quiet">{headerStatus}</span>
+            <span className="manuscript-bar-quiet">{pages ? "Pages" : headerStatus}</span>
           )}
           {/* Finding, remarks and versions at the right: the formatting row
               is for the words. Nothing that reads as a status stands here —
@@ -1144,7 +1154,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               className={`ribbon-tool press ${pages ? "is-active" : ""}`}
               aria-label="Pages"
               aria-pressed={Boolean(pages)}
-              title="Pages"
+              title={pages ? "Return to editing" : "Read as pages"}
               onClick={() =>
                 setPages(
                   pages || !sheetRef.current ? null : snapshotSheet(sheetRef.current, chapterTitle),
@@ -1152,6 +1162,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               }
             >
               <BookOpen size={16} />
+              <span>{pages ? "Edit" : "Pages"}</span>
             </button>
             <button
               type="button"
@@ -1199,6 +1210,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         {passageMenuLayer}
 
         <div className="editor-body flex min-h-0 flex-1">
+          {pages && (
+            <PageSpread
+              key={entry.note.id}
+              snapshot={pages}
+              page={manuscript.page}
+              book={manuscript.book ?? ""}
+              chapter={chapterTitle}
+            />
+          )}
+
           {/* The desk, and the sheet on it. The sheet is the page the
               document is set on — its width, its margins, its letter — so
               what is written here is what prints. */}
@@ -1207,14 +1228,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""}`}
             onContextMenu={onPassageMenu}
           >
-            {pages && (
-              <PageSpread
-                snapshot={pages}
-                page={manuscript.page}
-                book={manuscript.book ?? ""}
-                chapter={chapterTitle}
-              />
-            )}
             <article
               ref={sheetRef}
               className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}

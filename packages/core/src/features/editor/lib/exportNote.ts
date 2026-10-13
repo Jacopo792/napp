@@ -1,4 +1,6 @@
-import type { JSONContent } from "@tiptap/core";
+import { generateHTML, type JSONContent } from "@tiptap/core";
+import { DOCUMENT_EXTENSIONS } from "./content";
+import { storedZip, type ZipEntry } from "@/lib/zip";
 import {
   DRAWING_TEXT_FONT,
   drawingMarks,
@@ -471,4 +473,167 @@ export async function saveNoteExport(
   const blob =
     format === "docx" ? await exportDocx(title, content, resolve) : await exportPdf(title, element);
   await platform().saveFile(name, blob);
+}
+
+/** A book in chapter order. The caller supplies the open editor's live JSON. */
+export async function exportEpub(
+  title: string,
+  chapters: { title: string; content: JSONContent }[],
+  language: string,
+  resolve: Resolve,
+): Promise<Blob> {
+  if (!chapters.length) throw new Error("The book has no chapters");
+  const escape = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>';
+  const epubNS = "http://www.idpf.org/2007/ops";
+  const entries: ZipEntry[] = [
+    { name: "mimetype", data: "application/epub+zip" },
+    {
+      name: "META-INF/container.xml",
+      data: `${xml}<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`,
+    },
+    {
+      name: "OEBPS/style.css",
+      data: "body{font-family:serif;line-height:1.5}img{max-width:100%;height:auto}table{border-collapse:collapse}td,th{border:1px solid;padding:.3em}aside{font-size:.9em}pre{white-space:pre-wrap}h1,h2,h3{break-after:avoid}",
+    },
+  ];
+  const assets: { name: string; type: string }[] = [];
+  const { citing, settings } = referenceSnapshot();
+  let footnote = 0;
+  const xhtml = (name: string, body: string) =>
+    `${xml}<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="${epubNS}" lang="${escape(language)}" xml:lang="${escape(language)}"><head><title>${escape(name)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${body}</body></html>`;
+  for (const [index, chapter] of chapters.entries()) {
+    const doc = new DOMParser().parseFromString(
+      generateHTML(chapter.content, DOCUMENT_EXTENSIONS),
+      "text/html",
+    );
+    const body = doc.body;
+    body
+      .querySelectorAll("ins.suggested-insert, div[data-contents], .page-break")
+      .forEach((node) => node.remove());
+    body
+      .querySelectorAll("del.suggested-delete")
+      .forEach((node) => node.replaceWith(...node.childNodes));
+    body
+      .querySelectorAll("span[data-cite]")
+      .forEach((node) =>
+        node.replaceWith(
+          doc.createTextNode(
+            citing.sources.size
+              ? citationText(
+                  node.getAttribute("data-cite") || "",
+                  node.getAttribute("data-locator"),
+                  citing,
+                )
+              : node.textContent || "",
+          ),
+        ),
+      );
+    body.querySelectorAll("div[data-bibliography]").forEach((node) => {
+      const section = doc.createElement("section");
+      for (const entry of bibliography(citing)) {
+        const p = doc.createElement("p");
+        p.textContent = `${entry.number ? `${entry.number}. ` : ""}${entry.runs.map((run) => run.text).join("")}`;
+        section.append(p);
+      }
+      node.replaceWith(section);
+    });
+    if (settings.footnotes === "chapter") footnote = 0;
+    body.querySelectorAll("sup[data-footnote]").forEach((node) => {
+      footnote += 1;
+      const link = doc.createElement("a");
+      link.setAttributeNS(epubNS, "epub:type", "noteref");
+      link.href = `#fn-${footnote}`;
+      link.textContent = String(footnote);
+      const aside = doc.createElement("aside");
+      aside.id = `fn-${footnote}`;
+      aside.setAttributeNS(epubNS, "epub:type", "footnote");
+      aside.textContent = `${footnote}. ${node.getAttribute("data-footnote") || ""}`;
+      node.replaceWith(link);
+      body.append(aside);
+    });
+    body.querySelectorAll("napp-private-file").forEach((node) => {
+      const p = doc.createElement("p");
+      p.textContent = node.getAttribute("label") || "Attachment";
+      node.replaceWith(p);
+    });
+    for (const node of body.querySelectorAll("napp-private-image, napp-drawing, img")) {
+      let blob: Blob;
+      let ext: string;
+      if (node.localName === "napp-drawing") {
+        blob = new Blob(
+          [
+            drawingSvg(
+              drawingMarks(node.getAttribute("strokes")),
+              node.getAttribute("surface") === "page" ? "page" : "board",
+            ),
+          ],
+          { type: "image/svg+xml" },
+        );
+        ext = "svg";
+      } else {
+        const original =
+          node.localName === "napp-private-image"
+            ? await resolve(node.getAttribute("objectid") || "")
+            : await (await fetch(node.getAttribute("src") || "")).blob();
+        blob = new Blob(
+          [png(await picture(original, drawingMarks(node.getAttribute("strokes")))) as BlobPart],
+          { type: "image/png" },
+        );
+        ext = "png";
+      }
+      const name = `images/image-${assets.length + 1}.${ext}`;
+      entries.push({ name: `OEBPS/${name}`, data: new Uint8Array(await blob.arrayBuffer()) });
+      assets.push({ name, type: blob.type });
+      const image = doc.createElement("img");
+      image.setAttribute("src", name);
+      image.setAttribute("alt", node.getAttribute("alt") || "Drawing");
+      node.replaceWith(image);
+    }
+    /* Links to other notes have no destination outside this archive. */
+    body.querySelectorAll("a").forEach((node) => {
+      const href = node.getAttribute("href") || "";
+      if (href && !/^(https?:|mailto:|#)/i.test(href)) node.removeAttribute("href");
+    });
+    const heading = doc.createElement("h1");
+    heading.textContent = chapter.title || "Untitled";
+    body.prepend(heading);
+    const serial = new XMLSerializer();
+    entries.push({
+      name: `OEBPS/chapter-${index + 1}.xhtml`,
+      data: xhtml(
+        chapter.title,
+        [...body.childNodes].map((node) => serial.serializeToString(node)).join(""),
+      ),
+    });
+  }
+  entries.push({
+    name: "OEBPS/nav.xhtml",
+    data: xhtml(
+      title,
+      `<nav epub:type="toc" id="toc"><h1>${escape(title)}</h1><ol>${chapters.map((chapter, i) => `<li><a href="chapter-${i + 1}.xhtml">${escape(chapter.title || "Untitled")}</a></li>`).join("")}</ol></nav>`,
+    ),
+  });
+  const manifest =
+    chapters
+      .map(
+        (_, i) =>
+          `<item id="chapter-${i + 1}" href="chapter-${i + 1}.xhtml" media-type="application/xhtml+xml"/>`,
+      )
+      .join("") +
+    assets
+      .map(
+        (asset, i) => `<item id="image-${i + 1}" href="${asset.name}" media-type="${asset.type}"/>`,
+      )
+      .join("");
+  entries.push({
+    name: "OEBPS/content.opf",
+    data: `${xml}<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:uuid:${crypto.randomUUID()}</dc:identifier><dc:title>${escape(title)}</dc:title><dc:language>${escape(language)}</dc:language><meta property="dcterms:modified">${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="style" href="style.css" media-type="text/css"/>${manifest}</manifest><spine>${chapters.map((_, i) => `<itemref idref="chapter-${i + 1}"/>`).join("")}</spine></package>`,
+  });
+  return new Blob([storedZip(entries) as BlobPart], { type: "application/epub+zip" });
 }

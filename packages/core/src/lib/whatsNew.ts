@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.30",
+    date: "2026-10-13",
+    headline: "Read and take your book with you",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Save your book as EPUB",
+            text: "Chapter actions can save the whole book for your ebook reader, with chapters in order, pictures, citations and footnotes.",
+          },
+          {
+            title: "Turn the pages",
+            text: "Pages has previous and next arrows and a page number at the bottom right. The writing bar keeps its tools apart even in Safari and narrow windows.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.29",
     date: "2026-10-13",
     headline: "Pages, heads and spreads",

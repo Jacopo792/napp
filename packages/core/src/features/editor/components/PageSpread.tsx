@@ -13,6 +13,7 @@
  * column — simple and exact, and heavy only for a chapter of hundreds of
  * pages. Page numbers start at 1 in each chapter, as printing one does. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { ChevronLeft, ChevronRight } from "@/components/icons";
 import { fontStack, pageBox, type PageSetup } from "@/lib/spaceShape";
 import type { SheetSnapshot } from "../lib/pageSnapshot";
 
@@ -43,6 +44,14 @@ export function PageSpread({
   const desk = useRef<HTMLDivElement>(null);
   const [count, setCount] = useState(1);
   const [scale, setScale] = useState(1);
+  const [wanted, setWanted] = useState(1);
+  const active = Math.min(wanted, count);
+  const first = page.facing && active > 1 ? active - (active % 2) : active;
+  const visible = page.facing && first > 1 ? [first, first + 1].filter((n) => n <= count) : [first];
+  const go = (number: number) => {
+    setWanted(Math.max(1, Math.min(count, number)));
+    desk.current?.scrollTo({ top: 0 });
+  };
 
   /* How many columns the flow fills, once its letters have loaded — a page
      counted in a fallback face is a page count that changes under you. */
@@ -56,9 +65,15 @@ export function PageSpread({
       );
     };
     count();
+    const flow = measure.current;
+    flow?.addEventListener("load", count, true);
+    const observer = new ResizeObserver(count);
+    if (flow) observer.observe(flow);
     void document.fonts.ready.then(count);
     return () => {
       live = false;
+      observer.disconnect();
+      flow?.removeEventListener("load", count, true);
     };
   }, [snapshot, inner.width, inner.height]);
 
@@ -119,47 +134,84 @@ export function PageSpread({
   );
 
   return (
-    <div ref={desk} className="page-spread-desk">
-      <div className="page-spread-measure" aria-hidden="true">
-        {flow(0, measure)}
-      </div>
-      <div
-        className={`page-spread-pages ${page.facing ? "is-facing" : ""}`}
-        style={{ zoom: scale, gridTemplateColumns: `repeat(${across}, ${width}px)` }}
-      >
-        {Array.from({ length: count }, (_, index) => {
-          const number = index + 1;
-          /* A book's first page is a right-hand one, so left pages are the
+    <div className="page-spread-view">
+      <div ref={desk} className="page-spread-desk">
+        <div className="page-spread-measure" aria-hidden="true">
+          {flow(0, measure)}
+        </div>
+        <div
+          className={`page-spread-pages ${page.facing ? "is-facing" : ""} ${first === 1 ? "is-first" : ""}`}
+          style={{ zoom: scale, gridTemplateColumns: `repeat(${across}, ${width}px)` }}
+        >
+          {visible.map((number) => {
+            const index = number - 1;
+            /* A book's first page is a right-hand one, so left pages are the
              even ones. */
-          const left = page.facing && number % 2 === 0;
-          const head = page.headers && number > 1;
-          return (
-            <section
-              key={index}
-              className={`page-spread-page ${left ? "is-left" : "is-right"}`}
-              style={{ width, height, fontFamily: fontStack(page.font) ?? undefined }}
-              aria-label={`Page ${number}`}
-            >
-              {head && (
-                <header className="page-spread-head" style={{ ...edges, top: half }}>
-                  {page.facing && left ? book : chapter}
-                </header>
-              )}
-              <div
-                className="page-spread-window"
-                style={{ top: margin, left: margin, width: inner.width, height: inner.height }}
+            const left = page.facing && number % 2 === 0;
+            const head = page.headers && number > 1;
+            return (
+              <section
+                key={index}
+                className={`page-spread-page ${left ? "is-left" : "is-right"}`}
+                style={{ width, height, fontFamily: fontStack(page.font) ?? undefined }}
+                aria-label={`Page ${number}`}
               >
-                {flow(index)}
-              </div>
-              {head && (
-                <footer className="page-spread-foot" style={{ ...edges, bottom: half }}>
-                  {number}
-                </footer>
-              )}
-            </section>
-          );
-        })}
+                {head && (
+                  <header className="page-spread-head" style={{ ...edges, top: half }}>
+                    {page.facing && left ? book : chapter}
+                  </header>
+                )}
+                <div
+                  className="page-spread-window"
+                  style={{ top: margin, left: margin, width: inner.width, height: inner.height }}
+                >
+                  {flow(index)}
+                </div>
+                {head && (
+                  <footer className="page-spread-foot" style={{ ...edges, bottom: half }}>
+                    {number}
+                  </footer>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
+      <nav className="page-spread-navigation" aria-label="Page navigation">
+        <button
+          type="button"
+          className="ribbon-tool"
+          aria-label="Previous page"
+          disabled={first === 1}
+          onClick={() => go(page.facing ? first - 2 : first - 1)}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <label>
+          Page{" "}
+          <input
+            aria-label="Page number"
+            type="number"
+            min={1}
+            max={count}
+            value={active}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isFinite(value) && value >= 1) go(value);
+            }}
+          />
+          <span> of {count}</span>
+        </label>
+        <button
+          type="button"
+          className="ribbon-tool"
+          aria-label="Next page"
+          disabled={visible[visible.length - 1] >= count}
+          onClick={() => go(page.facing ? (first === 1 ? 2 : first + 2) : first + 1)}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </nav>
     </div>
   );
 }
