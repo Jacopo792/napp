@@ -42,6 +42,34 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.29",
+    date: "2026-10-13",
+    headline: "Pages, heads and spreads",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "See the chapter as pages",
+            text: "The book button at the right of the writing bar cuts the chapter into pages the size of your page setup, and shows them as they will print.",
+          },
+          {
+            title: "Page numbers and running heads",
+            text: "Turn them on in Settings → Document. Every page but a chapter's first carries the chapter's name above and its number below, in print and in a saved PDF.",
+          },
+          {
+            title: "Facing pages",
+            text: "Set the book in spreads: the number on the outer corner, the book's name over a left page and the chapter's over a right one. The first page stands alone on the right, as a book opens.",
+          },
+          {
+            title: "Printing follows the page setup",
+            text: "A printed chapter now takes the paper size, orientation and margins you chose, instead of the printer's.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.28",
     date: "2026-10-13",
     headline: "The book as cards",

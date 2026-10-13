@@ -3,6 +3,26 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.29 — 2026-10-13
+
+Pages, heads and spreads.
+
+### Added
+
+- `settings.page.headers` and `settings.page.facing`. `printPageCss()` in
+  `spaceShape.ts` writes `@page` rules — paper, margins, and the running heads
+  and numbers in CSS margin boxes, `:left`/`:right` for spreads, nothing on
+  `:first` — into a stylesheet that exists only while a chapter is on the
+  desk. Chromium (and Electron's `printToPDF`) paginates and numbers it.
+- The Pages view (`PageSpread`): the chapter copied out of the sheet into CSS
+  columns one page high, each page a window onto its column. Read-only; the
+  editor underneath is never paginated or rebuilt.
+
+### Changed
+
+- A printed chapter follows the page setup's paper and margins instead of the
+  fixed 16 mm every print had.
+
 ## 0.9.28 — 2026-10-13
 
 The book as cards.

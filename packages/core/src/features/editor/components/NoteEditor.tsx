@@ -11,6 +11,7 @@ import {
   NotebookPen,
   Search,
   X,
+  BookOpen,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
 import { PointMenu } from "@/components/ContextMenu";
@@ -53,7 +54,9 @@ import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
 import type { Editor } from "@tiptap/core";
-import { pageStyle, type PageSetup } from "@/lib/spaceShape";
+import { pageStyle, printPageCss, type PageSetup } from "@/lib/spaceShape";
+import { PageSpread } from "./PageSpread";
+import { snapshotSheet, type SheetSnapshot } from "../lib/pageSnapshot";
 import { openPlace, setLiveTargets, useReferences, type Place } from "@/lib/documentContents";
 import { adoptionsFor, sheetCounters } from "@/lib/references";
 
@@ -63,6 +66,8 @@ type InspectorTab = "headings" | "comments" | "versions";
 
 export interface ManuscriptFrame {
   page: PageSetup;
+  /** The document's name, for the running head over a left page. */
+  book?: string;
   /** "Chapter 3", "Part II · Chapter 3". */
   eyebrow?: string;
   /** Previous and next chapter, under the last line. */
@@ -345,6 +350,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [quotes, setQuotes] = useState<Map<string, string>>(() => new Map());
   const [suggesting, setSuggesting] = useState(suggestingWanted);
   const [findOpen, setFindOpen] = useState(false);
+  /* The chapter as pages, copied out of the sheet when asked for. */
+  const [pages, setPages] = useState<SheetSnapshot | null>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+  const chapterTitle = entry?.note.title ?? "";
+  const printCss = manuscript
+    ? printPageCss(manuscript.page, { book: manuscript.book ?? "", chapter: chapterTitle })
+    : null;
+  /* The page a printed chapter is set on, written where `@page` can read it:
+     a stylesheet of its own, there only while a chapter is on the desk, so a
+     note printed from a notes archive keeps the margins it always had. */
+  useEffect(() => {
+    if (!printCss) return;
+    const style = document.createElement("style");
+    style.dataset.print = "chapter";
+    style.textContent = `@media print { ${printCss} }`;
+    document.head.append(style);
+    return () => style.remove();
+  }, [printCss]);
   const [findQuery, setFindQuery] = useState("");
   const [findStatus, setFindStatus] = useState({ current: 0, total: 0 });
   const attachPdfRef = useRef<HTMLInputElement>(null);
@@ -1118,6 +1141,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           <span className="manuscript-bar-end">
             <button
               type="button"
+              className={`ribbon-tool press ${pages ? "is-active" : ""}`}
+              aria-label="Pages"
+              aria-pressed={Boolean(pages)}
+              title="Pages"
+              onClick={() =>
+                setPages(
+                  pages || !sheetRef.current ? null : snapshotSheet(sheetRef.current, chapterTitle),
+                )
+              }
+            >
+              <BookOpen size={16} />
+            </button>
+            <button
+              type="button"
               className={`ribbon-tool press ${findOpen ? "is-active" : ""}`}
               aria-label="Find and replace"
               title={`Find and replace · ${keyName("⌘F")}`}
@@ -1167,10 +1204,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               what is written here is what prints. */}
           <div
             ref={setScroller}
-            className="manuscript-desk min-h-0 flex-1"
+            className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""}`}
             onContextMenu={onPassageMenu}
           >
+            {pages && (
+              <PageSpread
+                snapshot={pages}
+                page={manuscript.page}
+                book={manuscript.book ?? ""}
+                chapter={chapterTitle}
+              />
+            )}
             <article
+              ref={sheetRef}
               className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}
               data-top={manuscript.topLevel ?? 1}
               data-tone={sheet.sheetTone}

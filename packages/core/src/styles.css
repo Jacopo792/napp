@@ -12529,6 +12529,123 @@ button.sheet-chip:hover,
   }
 }
 
+/* The chapter as pages (`PageSpread`): paper laid on the desk, one under the
+   other or two by two, the first page alone on the right as a book opens.
+   The sheet stays mounted underneath — the editor is never rebuilt — and is
+   only taken out of the layout while the pages are up. */
+.manuscript-desk.is-paged > :not(.page-spread-desk) {
+  display: none;
+}
+
+.page-spread-desk {
+  position: relative;
+  min-height: 100%;
+}
+
+.page-spread-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.page-spread-pages {
+  display: grid;
+  justify-content: center;
+  gap: 24px 2px;
+}
+
+.page-spread-pages.is-facing > :first-child {
+  grid-column: 2;
+}
+
+.page-spread-page {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1d1d1f;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 1px 3px rgb(0 0 0 / 0.18);
+  animation: sheet-in var(--dur-base) var(--ease) backwards;
+}
+
+/* The fold: a left page darkens toward the spine and a right one away from
+   it, so two pages read as an open book rather than two sheets touching. */
+.page-spread-pages.is-facing .page-spread-page.is-left {
+  box-shadow:
+    inset -18px 0 24px -24px rgb(0 0 0 / 0.35),
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+.page-spread-pages.is-facing .page-spread-page.is-right {
+  box-shadow:
+    inset 18px 0 24px -24px rgb(0 0 0 / 0.35),
+    0 0 0 1px rgb(0 0 0 / 0.06),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+.page-spread-window {
+  position: absolute;
+  overflow: hidden;
+}
+
+.manuscript-sheet.page-spread-flow {
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  box-shadow: none;
+  animation: none;
+}
+
+.page-spread-flow .page-break {
+  break-after: column;
+}
+
+.page-spread-flow .page-break::after,
+.page-spread-flow .drawing-overlay-tools,
+.page-spread-flow .rich-media-remove {
+  display: none;
+}
+
+.page-spread-title {
+  margin: 0 0 0.8em;
+  font-family: var(--sheet-font, var(--font-display));
+  font-size: 2em;
+  line-height: 1.15;
+}
+
+.page-spread-head,
+.page-spread-foot {
+  position: absolute;
+  color: #555;
+  font-size: 9pt;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.page-spread-foot {
+  transform: translateY(50%);
+}
+
+.page-spread-pages.is-facing .is-left :is(.page-spread-head, .page-spread-foot) {
+  text-align: left;
+}
+
+.page-spread-pages.is-facing .is-right :is(.page-spread-head, .page-spread-foot) {
+  text-align: right;
+}
+
+@media print {
+  .page-spread-desk {
+    display: none;
+  }
+
+  .manuscript-desk.is-paged > :not(.page-spread-desk) {
+    display: block;
+  }
+}
+
 /* ══ What's New ══════════════════════════════════════════════════════════════
    Every release, newest first: the versions down the side, the release on
    the right in plain words. It opens by itself once after an update, on the

@@ -1148,6 +1148,12 @@ size, margins and letter of the page set-up.
   thing the metadata path does.
 - The sheet is paper in every theme: the tokens are re-pointed inside
   `.manuscript-sheet`, so ink chosen there prints the colour it was chosen.
+- **Pages are the printer's, never the editor's.** The sheet is one column;
+  a printed chapter is cut by Chromium from `printPageCss()`'s `@page` rules
+  (paper, margins, running heads in margin boxes, spreads with `:left` and
+  `:right`), injected only while a chapter is on the desk. The Pages view
+  copies the sheet into CSS columns one page high and shows each column as a
+  page — a picture, so pagination never goes through the Yjs binding.
 - `ParagraphFormat`, `Superscript`, `Subscript` and `PageBreak` are in
   `BASE_EXTENSIONS`. The paragraph attributes default to **null**, never 0:
   Yjs stores no null, so an untouched paragraph projects exactly as it did

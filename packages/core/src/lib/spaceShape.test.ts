@@ -7,6 +7,7 @@ import {
   DEFAULT_PAGE,
   documentFeatures,
   pageSetup,
+  printPageCss,
 } from "./spaceShape.ts";
 
 test("an unknown kind is notes, including the retired 'thesis'", () => {
@@ -55,4 +56,19 @@ test("the reference options are read, not trusted", () => {
   assert.equal(read.footnoteNumbering, "document");
   assert.equal(read.captionSeparator, "period");
   assert.equal(pageSetup({ page: { tableCaption: "below" } }).tableCaption, "below");
+});
+
+test("a printed chapter is set on the page setup, with heads only when asked", () => {
+  const heads = { book: 'Il "libro"', chapter: "Capitolo\nprimo" };
+  const plain = printPageCss({ ...DEFAULT_PAGE, orientation: "landscape", margins: "wide" }, heads);
+  assert.equal(plain, "@page { size: 297mm 210mm; margin: 38.1mm; }");
+  const single = printPageCss({ ...DEFAULT_PAGE, headers: true }, heads);
+  assert.match(single, /@top-center \{ content: "Capitolo primo";/);
+  assert.match(single, /@bottom-center \{ content: counter\(page\);/);
+  assert.match(single, /@page :first \{ @top-left \{ content: none; \}/);
+  const facing = printPageCss({ ...DEFAULT_PAGE, headers: true, facing: true }, heads);
+  assert.match(facing, /@page :left \{ @top-left \{ content: "Il \\"libro\\"";/);
+  assert.match(facing, /@page :right \{ @top-right \{ content: "Capitolo primo";.*@bottom-right/);
+  assert.equal(pageSetup({ page: { headers: true, facing: "yes" } }).facing, false);
+  assert.equal(pageSetup({ page: { headers: true } }).headers, true);
 });

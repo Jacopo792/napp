@@ -132,6 +132,26 @@ export function PageSetupFields({
           onChange={(event) => set("firstLineIndent", event.target.checked)}
         />
       </label>
+      <label className="page-setup-row">
+        <span>Page numbers and running heads</span>
+        <input
+          type="checkbox"
+          role="switch"
+          disabled={disabled}
+          checked={page.headers}
+          onChange={(event) => set("headers", event.target.checked)}
+        />
+      </label>
+      <label className="page-setup-row">
+        <span>Facing pages</span>
+        <input
+          type="checkbox"
+          role="switch"
+          disabled={disabled}
+          checked={page.facing}
+          onChange={(event) => set("facing", event.target.checked)}
+        />
+      </label>
     </>
   );
 }

@@ -159,6 +159,11 @@ export interface PageSetup {
   tableCaption: "above" | "below";
   /** "(Rossi 2020, p. 12)" or "[3, p. 12]". */
   citationStyle: CitationStyle;
+  /** A running head and a page number on every page but a chapter's first. */
+  headers: boolean;
+  /** Set as a book is, in spreads: the number on the outer corner, the
+   *  book's name over a left page and the chapter's over a right one. */
+  facing: boolean;
 }
 
 export const DEFAULT_PAGE: PageSetup = {
@@ -174,6 +179,8 @@ export const DEFAULT_PAGE: PageSetup = {
   captionSeparator: "period",
   tableCaption: "above",
   citationStyle: "author-date",
+  headers: false,
+  facing: false,
 };
 
 export function pageSetup(settings: unknown): PageSetup {
@@ -196,6 +203,8 @@ export function pageSetup(settings: unknown): PageSetup {
     page.captionSeparator = raw.captionSeparator as CaptionSeparator;
   if (raw.tableCaption === "below") page.tableCaption = "below";
   if (raw.citationStyle === "numeric") page.citationStyle = "numeric";
+  if (typeof raw.headers === "boolean") page.headers = raw.headers;
+  if (typeof raw.facing === "boolean") page.facing = raw.facing;
   return page;
 }
 
@@ -220,4 +229,54 @@ export function pageStyle(page: PageSetup): Record<string, string> {
     "--label-table": `"${REFERENCE_WORDS[page.labels].table} "`,
     "--caption-separator": `"${CAPTION_SEPARATORS[page.captionSeparator]}"`,
   };
+}
+
+/** The page in millimetres, as it lies: width and height after orientation. */
+export function pageBox(page: PageSetup): { width: number; height: number; margin: number } {
+  const size = PAGE_SIZES[page.size];
+  const landscape = page.orientation === "landscape";
+  return {
+    width: landscape ? size.height : size.width,
+    height: landscape ? size.width : size.height,
+    margin: PAGE_MARGINS[page.margins].mm,
+  };
+}
+
+/** A string for `content:`, which a title somebody typed could otherwise
+ *  end early. */
+const cssString = (value: string) =>
+  `"${value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/[\n\r]+/g, " ")}"`;
+
+/** What a printed chapter is set on: the paper and margins of the page
+ *  setup, and — when the document asks — its running heads and numbers in
+ *  the page's own margin boxes, which is CSS paged media rather than a
+ *  layout of ours, so Chromium paginates and numbers it. A chapter's first
+ *  page carries neither head nor number, as a book's does. */
+export function printPageCss(page: PageSetup, heads: { book: string; chapter: string }): string {
+  const box = pageBox(page);
+  const rules = [`@page { size: ${box.width}mm ${box.height}mm; margin: ${box.margin}mm; }`];
+  if (!page.headers) return rules.join("\n");
+  const face = `font-family: ${fontStack(page.font) ?? "serif"}; font-size: 9pt; color: #555;`;
+  const margin = (where: string, content: string) => `@${where} { content: ${content}; ${face} }`;
+  const number = "counter(page)";
+  if (page.facing)
+    rules.push(
+      `@page :left { ${margin("top-left", cssString(heads.book))} ${margin("bottom-left", number)} }`,
+      `@page :right { ${margin("top-right", cssString(heads.chapter))} ${margin("bottom-right", number)} }`,
+    );
+  else
+    rules.push(
+      `@page { ${margin("top-center", cssString(heads.chapter))} ${margin("bottom-center", number)} }`,
+    );
+  rules.push(
+    "@page :first { " +
+      ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"]
+        .map((where) => `@${where} { content: none; }`)
+        .join(" ") +
+      " }",
+  );
+  return rules.join("\n");
 }

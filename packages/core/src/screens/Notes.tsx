@@ -5341,6 +5341,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             chapterAt >= 0
               ? {
                   page,
+                  book: currentSpace?.name ?? "",
                   eyebrow: [partName, `Chapter ${chapterAt + 1}`].filter(Boolean).join(" · "),
                   footer: turn,
                   footnotes: docFeatures.footnotes,
