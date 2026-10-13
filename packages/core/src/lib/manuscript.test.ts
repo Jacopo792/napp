@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   chapterFromStorage,
   contentsOf,
+  dropTarget,
   headingNumbers,
   intoPart,
   moveTo,
@@ -110,4 +111,15 @@ test("a chapter's status, synopsis and goal are read, never trusted", () => {
   assert.equal(chapterFromStorage(null), undefined);
   assert.equal(chapterFromStorage(["final"]), undefined);
   assert.equal(chapterFromStorage({ synopsis: "x".repeat(900) })?.synopsis?.length, 600);
+});
+
+test("a drop lands after the card under the hand going down, before it going up", () => {
+  const order = ["a", "b", "c"];
+  assert.deepEqual(dropTarget("row:c", "a", order), { kind: "after", id: "c" });
+  assert.deepEqual(dropTarget("row:a", "c", order), { kind: "before", id: "a" });
+  assert.deepEqual(dropTarget("row:b", "n", order), { kind: "before", id: "b" });
+  assert.equal(dropTarget("row:b", "b", order), null);
+  assert.deepEqual(dropTarget("part:p1", "a", order), { kind: "part", folderId: "p1" });
+  assert.deepEqual(dropTarget("notebook", "a", order), { kind: "notebook" });
+  assert.equal(dropTarget(null, "a", order), null);
 });

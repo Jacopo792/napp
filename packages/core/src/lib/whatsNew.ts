@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.28",
+    date: "2026-10-13",
+    headline: "The book as cards",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "A board of chapters",
+            text: "The new button beside Chapters lays the book out as index cards: number, title, status and words on each, and what happens written on the card itself. Drag a card to move the chapter; press its name to open it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.27",
     date: "2026-10-13",
     headline: "A book that cites its sources",

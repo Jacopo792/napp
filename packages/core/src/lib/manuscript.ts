@@ -210,3 +210,34 @@ export function chapterFromStorage(value: unknown): ChapterInfo | undefined {
     info.goal = Math.min(1_000_000, Math.round(raw.goal));
   return Object.keys(info).length > 0 ? info : undefined;
 }
+
+/* ── Moving ─────────────────────────────────────────────────────────────── */
+
+export type StructureTarget =
+  | { kind: "before"; id: string }
+  | { kind: "after"; id: string }
+  | { kind: "part"; folderId: string }
+  | { kind: "end" }
+  | { kind: "notebook" };
+
+/** Where a drop over `over` lands while `dragging` is held: moving down lands
+ *  after the row under the hand, moving up lands before it — the reading
+ *  every sortable list has taught. From the notebook, which has no place in
+ *  the order yet, it is always before. The board reads drops the same way. */
+export function dropTarget(
+  over: string | null,
+  dragging: string | null,
+  order: string[],
+): StructureTarget | null {
+  if (!over) return null;
+  if (over === "notebook") return { kind: "notebook" };
+  if (over === "end") return { kind: "end" };
+  if (over.startsWith("part:")) return { kind: "part", folderId: over.slice(5) };
+  if (over.startsWith("row:")) {
+    const id = over.slice(4);
+    if (!dragging || id === dragging) return null;
+    const from = order.indexOf(dragging);
+    return { kind: from >= 0 && from < order.indexOf(id) ? "after" : "before", id };
+  }
+  return null;
+}

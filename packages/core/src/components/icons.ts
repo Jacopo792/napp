@@ -18,6 +18,7 @@ export {
   TextB as Bold,
   BookOpen,
   Books,
+  SquaresFour as Board,
   Article as Chapters,
   Subtitles as Caption,
   Sparkle,

@@ -224,6 +224,7 @@ import { FolderSheet } from "@/components/FolderSheet";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
 import { TrashSheet } from "@/components/TrashSheet";
 import { UpdateNotice } from "@/components/UpdateNotice";
+import { ChapterBoard } from "@/components/ChapterBoard";
 import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
 import { MenuButton as WritingMenuButton, PageSetupButton } from "@/components/WritingMenus";
 import type { MenuItem } from "@/lib/menuShape";
@@ -586,6 +587,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /** The phone has no room for a permanent sidebar, so it gets the same one
    *  as a drawer — the destinations are identical, only the staging differs. */
   const [foldersOpen, setFoldersOpen] = useState(false);
+  /* The chapters as cards in place of the page — a document's corkboard. */
+  const [boardOpen, setBoardOpen] = useState(false);
   const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
   const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
@@ -4977,6 +4980,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
     const openFromStructure = (id: string) => {
+      setBoardOpen(false);
       handleSelectNote(id);
       if (compact) {
         setFoldersOpen(false);
@@ -5173,6 +5177,47 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         headings={contents.find((entry) => entry.id === selectedId)?.headings}
         stats={statsShown ? { today: wordsToday } : undefined}
         onHeading={(text) => selectedId && openPlace({ noteId: selectedId, text })}
+        board={{
+          open: boardOpen,
+          toggle: () => {
+            setBoardOpen((open) => !open);
+            if (compact) setFoldersOpen(false);
+          },
+        }}
+      />
+    );
+
+    const chapterBoard = (
+      <ChapterBoard
+        lead={
+          compact ? (
+            <button
+              type="button"
+              onClick={() => setFoldersOpen(true)}
+              aria-label="Structure"
+              className="ribbon-tool press"
+            >
+              <Structure size={18} />
+            </button>
+          ) : (
+            !navigationOpen && (
+              <button
+                type="button"
+                onClick={() => changeNavigation(true)}
+                aria-label="Show the structure"
+                className="ribbon-tool press"
+              >
+                <PanelLeftOpen size={16} />
+              </button>
+            )
+          )
+        }
+        rows={manuscript.rows}
+        parts={manuscript.parts}
+        canWrite={canWriteArchive}
+        onOpen={openFromStructure}
+        onMove={handleMoveChapter}
+        onChapter={(id, chapter) => setNoteRow(manuscriptOwner, id, { chapter })}
       />
     );
 
@@ -5328,7 +5373,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             className="h-full overflow-hidden"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
-            {chapterEditor}
+            {boardOpen ? chapterBoard : chapterEditor}
           </main>
           {foldersOpen && (
             <div className="mobile-nav-layer" role="presentation">
@@ -5378,7 +5423,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               />
             </div>
           </div>
-          {chapterEditor}
+          {boardOpen ? chapterBoard : chapterEditor}
         </div>
         {settingsPanel}
         {keyboardSheets}

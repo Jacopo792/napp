@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.28 — 2026-10-13
+
+The book as cards.
+
+### Added
+
+- `ChapterBoard`: the structure's rows laid out as cards in place of the
+  sheet, toggled from the Chapters heading. Same `onMove`, same `chapter`
+  info, so nothing new is stored. `dropTarget()` moved into `manuscript.ts`,
+  shared by the structure and the board, with a test.
+
 ## 0.9.27 — 2026-10-13
 
 A book that cites its sources.

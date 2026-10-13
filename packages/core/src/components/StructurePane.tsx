@@ -28,6 +28,7 @@ import {
 } from "@dnd-kit/core";
 import {
   ArrowDownUp,
+  Board,
   ChevronDown,
   FileText,
   FolderPlus,
@@ -43,11 +44,15 @@ import type { MenuPoint } from "@/lib/contextMenu";
 import {
   CHAPTER_STATUSES,
   SYNOPSIS_LIMIT,
+  dropTarget,
+  type StructureTarget,
   type ContentsHeading,
   type StructureRow,
 } from "@/lib/manuscript";
 import type { ChapterInfo } from "@/lib/types";
 import { keyName } from "@/lib/shortcuts";
+
+export type { StructureTarget };
 
 export interface ChapterItem {
   id: string;
@@ -60,13 +65,6 @@ export interface ChapterItem {
   movable: boolean;
   chapter?: ChapterInfo;
 }
-
-export type StructureTarget =
-  | { kind: "before"; id: string }
-  | { kind: "after"; id: string }
-  | { kind: "part"; folderId: string }
-  | { kind: "end" }
-  | { kind: "notebook" };
 
 function Row({
   item,
@@ -136,7 +134,7 @@ function Row({
 /** The synopsis or the goal of one chapter, written in place under its row —
  *  the way a part is renamed in place. Enter keeps a goal; a synopsis takes
  *  ⌘↩, because it is two lines and Enter is how the second one starts. */
-function ChapterField({
+export function ChapterField({
   field,
   info,
   onSave,
@@ -306,6 +304,7 @@ export function StructurePane({
   headings = [],
   onHeading,
   stats,
+  board,
 }: {
   header?: ReactNode;
   footer?: ReactNode;
@@ -339,6 +338,8 @@ export function StructurePane({
   /** Words written today (yours, from the versions). Absent when the reader
    *  switched it off. */
   stats?: { today: number | null };
+  /** The chapters laid out as cards in place of the page, and the switch. */
+  board?: { open: boolean; toggle: () => void };
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [dragging, setDragging] = useState<string | null>(null);
@@ -358,27 +359,12 @@ export function StructurePane({
       notebook.find((item) => item.id === dragging))
     : undefined;
 
-  /* Moving down lands after the row under the hand, moving up lands before
-     it — the reading every sortable list has taught. From the notebook,
-     which has no place in the order yet, it is always before. */
-  function rowSide(targetId: string): "before" | "after" {
-    if (!dragging) return "before";
-    const from = indexOf(dragging);
-    return from >= 0 && from < indexOf(targetId) ? "after" : "before";
-  }
-
-  function targetOf(over: string | null): StructureTarget | null {
-    if (!over) return null;
-    if (over === "notebook") return { kind: "notebook" };
-    if (over === "end") return { kind: "end" };
-    if (over.startsWith("part:")) return { kind: "part", folderId: over.slice(5) };
-    if (over.startsWith("row:")) {
-      const id = over.slice(4);
-      if (id === dragging) return null;
-      return { kind: rowSide(id), id };
-    }
-    return null;
-  }
+  const targetOf = (over: string | null) =>
+    dropTarget(
+      over,
+      dragging,
+      chapters.map((item) => item.id),
+    );
 
   function end(event: DragEndEvent) {
     const target = targetOf((event.over?.id as string | undefined) ?? null);
@@ -584,6 +570,18 @@ export function StructurePane({
         <div className="structure-scroll">
           <div className="structure-heading">
             <span>Chapters</span>
+            {board && chapters.length > 0 && (
+              <button
+                type="button"
+                className={`structure-new press ${board.open ? "is-on" : ""}`}
+                aria-label="Board"
+                aria-pressed={board.open}
+                title="Board"
+                onClick={board.toggle}
+              >
+                <Board size={13} weight={board.open ? "fill" : "bold"} />
+              </button>
+            )}
             {canWrite && (
               <button
                 type="button"
