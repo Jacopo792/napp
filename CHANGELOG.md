@@ -3,6 +3,15 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.25 — 2026-10-13
+
+Tasks taken out again.
+
+### Removed
+
+- 0.9.24's tasks: `lib/tasks.ts`, the sidebar's Tasks row and the tasks in
+  ⌘K, reverted whole. Jacopo did not want the feature; do not re-propose it.
+
 ## 0.9.24 — 2026-10-13
 
 Tasks with a name and a date.

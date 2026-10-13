@@ -166,11 +166,7 @@ energy is required to separate the molecules. That is all.`,
 Current is not "used up" as it passes through a load: the same amount enters and
 leaves. Energy is what is consumed, and the voltage drop reveals it.
 
-To clarify: why neutral is at ground potential but is not ground.
-
-- [ ] @Preview ask why neutral is not ground 2026-10-11
-- [ ] Draw the circuit for the load 20/12
-- [x] Read the chapter on charge`,
+To clarify: why neutral is at ground potential but is not ground.`,
   },
   {
     title: "Drafts",

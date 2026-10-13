@@ -28,7 +28,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   CalendarDays,
-  ListChecks,
   Search,
   Settings,
   SquarePen,
@@ -199,7 +198,6 @@ import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED, UPDATES } from "@/lib/scopes";
 import { changedSince, UPDATES_WINDOW_DAYS, type RecentVersion } from "@/lib/updates";
 import { dailyTitle, isDailyTemplate, isTemplateFolder } from "@/lib/templates";
-import { isoDay, yourTasks } from "@/lib/tasks";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -1226,27 +1224,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const updatedNotes = useMemo(
     () => (selfId ? changedSince(recentVersions, selfId, remarksSeen, updatesFloor) : new Map()),
     [recentVersions, selfId, remarksSeen, updatesFloor],
-  );
-
-  /* The open tasks that want this reader, across every note they can read —
-     a task handed to them by name may be in somebody else's. */
-  const taskList = useMemo(
-    () =>
-      selfId
-        ? yourTasks(
-            entries
-              .filter((entry) => !trashedIds.has(entry.note.id))
-              .map((entry) => ({
-                id: entry.note.id,
-                ownerId: entry.note.ownerId ?? null,
-                content: entry.note.content,
-              })),
-            members.map((member) => ({ userId: member.userId, name: member.nickname })),
-            selfId,
-            new Date(),
-          )
-        : [],
-    [entries, trashedIds, members, selfId],
   );
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
@@ -4067,29 +4044,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 void handleNewFrom({ title: template.note.title, content: template.note.content }),
             })),
           ]),
-      /* Each open task as a line to go to, soonest first: `at` keeps the
-         order the list was sorted in when they all answer "tasks" equally. */
-      ...taskList.map((task, index) => {
-        const title = entries.find((entry) => entry.note.id === task.noteId)?.note.title;
-        const today = isoDay(new Date());
-        const when = !task.due
-          ? null
-          : task.due < today
-            ? `Overdue · ${task.due.slice(8)}/${task.due.slice(5, 7)}`
-            : task.due === today
-              ? "Today"
-              : `${task.due.slice(8)}/${task.due.slice(5, 7)}`;
-        return {
-          id: `task:${task.noteId}:${index}`,
-          group: "Your tasks",
-          name: task.text,
-          hint: [when, title || "Untitled"].filter(Boolean).join(" · "),
-          keywords: "tasks task compiti todo da fare",
-          icon: <ListChecks size={16} />,
-          at: taskList.length - index,
-          run: () => openPlace({ noteId: task.noteId, passage: task.text }),
-        };
-      }),
       ...(selectedId && !docMode
         ? ownedEntries
             .filter(
@@ -4755,17 +4709,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
     <Sidebar
-      tasks={
-        taskList.length > 0
-          ? {
-              count: taskList.length,
-              onOpen: () => {
-                setPaletteQuery("tasks");
-                setPaletteOpen(true);
-              },
-            }
-          : undefined
-      }
       onWhatsNew={() => {
         setFoldersOpen(false);
         openWhatsNew();
