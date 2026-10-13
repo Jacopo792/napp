@@ -27,6 +27,7 @@ import {
   NotebookText,
   PanelLeftClose,
   PanelLeftOpen,
+  CalendarDays,
   Search,
   Settings,
   SquarePen,
@@ -196,6 +197,7 @@ import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED, UPDATES } from "@/lib/scopes";
 import { changedSince, UPDATES_WINDOW_DAYS, type RecentVersion } from "@/lib/updates";
+import { dailyTitle, isDailyTemplate, isTemplateFolder } from "@/lib/templates";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -2209,101 +2211,104 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [canWriteArchive, viewAs, selectedFolderId],
   );
 
-  const handleNew = useCallback(async () => {
-    if (!canWriteArchive) return;
-    const s = sessionRef.current;
-    if (!s) return;
-    const folderId =
-      selectedFolderId === ALL ||
-      selectedFolderId === UNFILED ||
-      selectedFolderId === TRASH ||
-      selectedFolderId === ARCHIVE
-        ? null
-        : selectedFolderId;
+  /** A new note, empty or started from a template or the day. */
+  const handleNewFrom = useCallback(
+    async (seed?: { title: string; content: JSONContent }) => {
+      if (!canWriteArchive) return;
+      const s = sessionRef.current;
+      if (!s) return;
+      /* Every scope that is not a folder starts with two underscores — Remarks
+       and Updates were once filed under as if they were folders, and the
+       insert was refused by the folder's foreign key. */
+      const folderId = selectedFolderId.startsWith("__") ? null : selectedFolderId;
+      const content = structuredClone(seed?.content ?? EMPTY_RICH_TEXT);
 
-    const note: Note = {
-      id: crypto.randomUUID(),
-      title: "",
-      body: "",
-      content: structuredClone(EMPTY_RICH_TEXT),
-      contentVersion: RICH_TEXT_VERSION,
-      legacyBody: null,
-      photo: null,
-      cover: null,
-      ownerId: viewAs,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+      const note: Note = {
+        id: crypto.randomUUID(),
+        title: seed?.title ?? "",
+        body: seed ? richTextToPlainText(content) : "",
+        content,
+        contentVersion: RICH_TEXT_VERSION,
+        legacyBody: null,
+        photo: null,
+        cover: null,
+        ownerId: viewAs,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    setSaving(true);
-    setError("");
-    try {
-      // A note filed in a folder that has just been created still lives only
-      // in the pending Meta: Postgres has not seen the folder row yet, so
-      // inserting the note with that folder_id would violate the
-      // notes_folder_owner_id_fkey. Flush the pending folder first.
-      if (folderId !== null) {
-        const pending = pendingMetaRef.current.get(viewAs);
-        const needsFlush = pending?.after.folders.some((folder) => folder.id === folderId) ?? false;
-        if (needsFlush) {
-          window.clearTimeout(timerRef.current);
-          window.clearTimeout(retryRef.current);
-          while (inFlightRef.current) {
-            await new Promise((resolve) => setTimeout(resolve, 30));
-          }
-          const currentPending = pendingMetaRef.current.get(viewAs);
-          if (currentPending) {
-            pendingMetaRef.current.delete(viewAs);
-            try {
-              await persistMetaDiff(s, viewAs, currentPending.before, currentPending.after);
-              setDirty(pendingMetaRef.current.size > 0 || hasPending());
-            } catch (err) {
-              const newer = pendingMetaRef.current.get(viewAs);
-              pendingMetaRef.current.set(viewAs, {
-                before: currentPending.before,
-                after: newer?.after ?? currentPending.after,
-              });
-              throw err;
+      setSaving(true);
+      setError("");
+      try {
+        // A note filed in a folder that has just been created still lives only
+        // in the pending Meta: Postgres has not seen the folder row yet, so
+        // inserting the note with that folder_id would violate the
+        // notes_folder_owner_id_fkey. Flush the pending folder first.
+        if (folderId !== null) {
+          const pending = pendingMetaRef.current.get(viewAs);
+          const needsFlush =
+            pending?.after.folders.some((folder) => folder.id === folderId) ?? false;
+          if (needsFlush) {
+            window.clearTimeout(timerRef.current);
+            window.clearTimeout(retryRef.current);
+            while (inFlightRef.current) {
+              await new Promise((resolve) => setTimeout(resolve, 30));
+            }
+            const currentPending = pendingMetaRef.current.get(viewAs);
+            if (currentPending) {
+              pendingMetaRef.current.delete(viewAs);
+              try {
+                await persistMetaDiff(s, viewAs, currentPending.before, currentPending.after);
+                setDirty(pendingMetaRef.current.size > 0 || hasPending());
+              } catch (err) {
+                const newer = pendingMetaRef.current.get(viewAs);
+                pendingMetaRef.current.set(viewAs, {
+                  before: currentPending.before,
+                  after: newer?.after ?? currentPending.after,
+                });
+                throw err;
+              }
             }
           }
         }
+
+        const metadata: NoteMeta = { id: note.id, folderId };
+        const entry = await createNote(s, note, metadata);
+        entriesRef.current = [entry, ...entriesRef.current];
+        setEntries(entriesRef.current);
+
+        setMetas((current) => {
+          const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
+          return { ...current, [viewAs]: { ...base, notes: [...base.notes, metadata] } };
+        });
+
+        setQuery("");
+        if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
+        setSelectedId(note.id);
+        setListPreferences((current) => ({
+          ...current,
+          [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), note.id),
+        }));
+        if (compact) setMobileScreen("note");
+        ensureDraft(
+          note.id,
+          { title: note.title, body: note.body, content: structuredClone(content) },
+          note.updatedAt,
+        );
+        if (!seed) window.setTimeout(() => titleRef.current?.focus(), 0);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create note");
+      } finally {
+        setSaving(false);
       }
-
-      const metadata: NoteMeta = { id: note.id, folderId };
-      const entry = await createNote(s, note, metadata);
-      entriesRef.current = [entry, ...entriesRef.current];
-      setEntries(entriesRef.current);
-
-      setMetas((current) => {
-        const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
-        return { ...current, [viewAs]: { ...base, notes: [...base.notes, metadata] } };
-      });
-
-      setQuery("");
-      if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
-      setSelectedId(note.id);
-      setListPreferences((current) => ({
-        ...current,
-        [viewAs]: rememberRecent(current[viewAs] ?? createListPreferences(viewAs), note.id),
-      }));
-      if (compact) setMobileScreen("note");
-      ensureDraft(
-        note.id,
-        {
-          title: "",
-          body: "",
-          content: structuredClone(EMPTY_RICH_TEXT),
-        },
-        note.updatedAt,
-      );
-      window.setTimeout(() => titleRef.current?.focus(), 0);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create note");
-    } finally {
-      setSaving(false);
-    }
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewAs, selectedFolderId, canWriteArchive]);
+    [viewAs, selectedFolderId, canWriteArchive],
+  );
+
+  /* Never handed an argument: it is bound straight to buttons, and a click
+     event arriving as the seed would become the note. */
+  const handleNew = useCallback(() => handleNewFrom(), [handleNewFrom]);
 
   const handleMoveToTrash = useCallback(
     (entry: NoteEntry) => {
@@ -3653,6 +3658,33 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       { id: TRASH, label: "Trash", count: trash },
     ];
   })();
+  /* The notes in a folder named Templates or Modelli, in this scope. */
+  const templateFolders = new Set(
+    activeMeta.folders.filter((folder) => isTemplateFolder(folder.name)).map((f) => f.id),
+  );
+  const templates = ownedEntries.filter((entry) => {
+    const meta = indexOf(activeMeta).byNote.get(entry.note.id);
+    return meta?.folderId && templateFolders.has(meta.folderId) && !trashedIds.has(entry.note.id);
+  });
+
+  /** Open today's note, making it first — from the Daily template if there
+   *  is one — when there is none yet. */
+  function openToday() {
+    const title = dailyTitle(new Date());
+    const found = ownedEntries.find(
+      (entry) => entry.note.title === title && !trashedIds.has(entry.note.id),
+    );
+    if (found) {
+      handleOpenRecent(found.note.id);
+      return;
+    }
+    const daily = templates.find((entry) => isDailyTemplate(entry.note.title));
+    void handleNewFrom({
+      title,
+      content: daily?.note.content ?? EMPTY_RICH_TEXT,
+    });
+  }
+
   /* On the phone there is no sidebar, so the scope in force is still worth a
      dismissible chip above the list. On the desktop the sidebar says it. */
   const activeFilters: ActiveFilter[] =
@@ -3937,6 +3969,27 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         icon: <SquarePen size={16} />,
         run: () => (docMode ? handleNewChapter(null) : void handleNew()),
       },
+      ...(docMode || !canWriteArchive
+        ? []
+        : [
+            {
+              id: "today",
+              group: "Do",
+              name: "Today's note",
+              keywords: "daily journal diary oggi giornaliera diario",
+              icon: <CalendarDays size={16} />,
+              run: openToday,
+            },
+            ...templates.map((template) => ({
+              id: `template:${template.note.id}`,
+              group: "New from template",
+              name: template.note.title || "Untitled",
+              keywords: "template modello new",
+              icon: <SquarePen size={16} />,
+              run: () =>
+                void handleNewFrom({ title: template.note.title, content: template.note.content }),
+            })),
+          ]),
       ...(selectedId && !docMode
         ? ownedEntries
             .filter(

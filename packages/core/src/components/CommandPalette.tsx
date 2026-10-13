@@ -48,13 +48,16 @@ function score(command: Command, query: string): number {
   if (word) return 1;
   if (name.includes(query)) return 2;
   /* Held in order rather than whole: "riu cli" for "Riunione cliente". In
-     two or three runs it ranks under every whole match and over a heading;
-     cut into more it is barely the name any more, and goes under its own
-     second line. */
+     two runs that each start a word it ranks under every whole match and
+     over a heading. Anything looser is barely the name any more — "oggi" is
+     in "questo passaggio" — and goes under the words a command was given to
+     be found by, and under its own second line. `fuzzyMatch` counts a run
+     starting inside a word as a tenth, so under 1.1 is exactly that. */
   const loose = fuzzyMatch(name, query);
-  if (loose !== null) return loose < 3 ? 2 + (loose + 1) / 4 : 5.5;
+  if (loose !== null && loose < 1.1) return 2 + (loose + 1) / 4;
   if (command.keywords && fold(command.keywords).includes(query)) return 4;
   if (command.hint && fold(command.hint).includes(query)) return 5;
+  if (loose !== null) return 5.5;
   return -1;
 }
 

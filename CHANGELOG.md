@@ -3,6 +3,26 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.22 — 2026-10-13
+
+A note for today, and notes to start from.
+
+### Added
+
+- `lib/templates.ts`: a template is any note in a folder named Templates or
+  Modelli; `dailyTitle()` writes the date the reader's language writes it.
+  ⌘K offers Today's note (opened if it exists, else made, from a Daily /
+  Giornaliera template if there is one) and New from template.
+  `handleNewFrom(seed)` makes a note with a title and content;
+  `handleNew` stays argument-free, because it is bound straight to buttons.
+
+### Fixed
+
+- A note made while Remarks (or Updates) was open was filed under the scope's
+  id as if it were a folder, and the insert failed on the folder foreign key.
+- A fuzzy ⌘K match ranks above keywords only in two runs that each start a
+  word; anything looser goes under the command's keywords and second line.
+
 ## 0.9.21 — 2026-10-13
 
 Suggest changes instead of making them.

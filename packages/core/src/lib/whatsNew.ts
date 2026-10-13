@@ -42,6 +42,30 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.22",
+    date: "2026-10-13",
+    headline: "A note for today, and notes to start from",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Today's note",
+            text: "Ask ⌘K for Today's note (or type oggi). It opens the note titled with today's date, and makes it if there is none yet.",
+          },
+          {
+            title: "Templates",
+            text: "Put notes in a folder called Templates or Modelli and they appear in ⌘K under New from template. A template called Daily or Giornaliera is what each day's note starts from.",
+          },
+          {
+            title: "A search that guesses less",
+            text: "⌘K now ranks a loose match below the words a command is known by, so a few scattered letters no longer jump ahead of what you meant.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.21",
     date: "2026-10-13",
     headline: "Suggest changes instead of making them",
