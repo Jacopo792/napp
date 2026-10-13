@@ -14,6 +14,9 @@ interface Props {
   role?: "editor" | "viewer";
   color: string;
   wash: string;
+  /** Keeping this person's caret in view, and the switch. */
+  following?: boolean;
+  onFollow?: (on: boolean) => void;
 }
 
 function timeLabel(value: string): string {
@@ -42,6 +45,8 @@ export function MemberPresenceCard({
   role,
   color,
   wash,
+  following = false,
+  onFollow,
 }: Props) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -55,7 +60,9 @@ export function MemberPresenceCard({
     >
       <button
         type="button"
-        className={`note-reader has-custom-presence press ${typing ? "is-typing" : ""}`}
+        className={`note-reader has-custom-presence press ${typing ? "is-typing" : ""} ${
+          following ? "is-followed" : ""
+        }`}
         aria-label={`Open ${name}'s profile`}
         aria-expanded={open}
         title={typing ? `${name} is writing` : `${name} has this note open`}
@@ -101,6 +108,18 @@ export function MemberPresenceCard({
                 : []),
             ]}
           />
+          {onFollow && (
+            <button
+              type="button"
+              className="member-presence-follow press"
+              onClick={() => {
+                onFollow(!following);
+                close();
+              }}
+            >
+              {following ? "Stop following" : `Follow ${name}`}
+            </button>
+          )}
         </span>
       )}
     </span>

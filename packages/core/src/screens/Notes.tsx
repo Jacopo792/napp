@@ -647,6 +647,50 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      list is connected to this note by construction. */
   const notePeers = useCollaborationPeers(collaborative.provider, session?.userId ?? null);
 
+  /* Follow: keep one collaborator's caret in view while they write — Figma's
+     and Google Docs' follow. It ends the moment the reader takes the page
+     back (a wheel, a touch, a key), when the person leaves the note, or when
+     the note changes: following is something you are doing now, not a
+     setting. */
+  const [following, setFollowing] = useState<string | null>(null);
+  useEffect(() => setFollowing(null), [selectedId]);
+  useEffect(() => {
+    if (following && !notePeers.some((peer) => peer.userId === following)) setFollowing(null);
+  }, [following, notePeers]);
+  useEffect(() => {
+    const awareness = collaborative.provider?.awareness;
+    if (!following || !awareness) return;
+    let frame = 0;
+    const chase = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const caret = document.querySelector<HTMLElement>(
+          `.rich-text-content [data-caret-user="${CSS.escape(following)}"]`,
+        );
+        if (!caret) return;
+        const box = caret.getBoundingClientRect();
+        if (box.top < 80 || box.bottom > window.innerHeight - 80)
+          caret.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    };
+    const stop = () => setFollowing(null);
+    const keys = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.ctrlKey) stop();
+    };
+    chase();
+    awareness.on("change", chase);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchmove", stop, { passive: true });
+    window.addEventListener("keydown", keys);
+    return () => {
+      cancelAnimationFrame(frame);
+      awareness.off("change", chase);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchmove", stop);
+      window.removeEventListener("keydown", keys);
+    };
+  }, [following, collaborative.provider]);
+
   // ── Refs mirroring state, so the save pipeline can read the truth
   //    synchronously without waiting for a React commit. ───────────────────
   const entriesRef = useRef<NoteEntry[]>([]);
@@ -3399,12 +3443,22 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               role={member?.role}
               color={palette.color}
               wash={palette.wash}
+              following={following === peer.userId}
+              onFollow={(on) => setFollowing(on ? peer.userId : null)}
             />
           );
         })}
       </span>
     );
-  }, [flags.collaborators, selectedId, notePeers, members, avatarUrls, writingPreferences]);
+  }, [
+    flags.collaborators,
+    selectedId,
+    notePeers,
+    members,
+    avatarUrls,
+    writingPreferences,
+    following,
+  ]);
 
   /* Who may sign a remark: the archive's own roster, with the avatars already
      resolved for the sidebar. Comments name people, and a comment from "an id"

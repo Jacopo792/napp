@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.23",
+    date: "2026-10-13",
+    headline: "Follow somebody through a note",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Follow",
+            text: "Press the face of somebody in the note you have open and choose Follow. The page keeps their caret in view as they write, until you scroll or type yourself.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.22",
     date: "2026-10-13",
     headline: "A note for today, and notes to start from",

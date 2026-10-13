@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.23 — 2026-10-13
+
+Follow somebody through a note.
+
+### Added
+
+- Follow, from a collaborator's presence card. The caret renderer carries
+  `data-caret-user`; while following, every awareness change scrolls that
+  caret into view if it has left it. Ends on wheel, touch or an unmodified
+  key, when the person leaves, or when the note changes.
+
 ## 0.9.22 — 2026-10-13
 
 A note for today, and notes to start from.

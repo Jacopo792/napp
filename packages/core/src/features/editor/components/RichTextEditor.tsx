@@ -2121,6 +2121,20 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
                     CollaborationCaret.configure({
                       provider: collaboration.provider,
                       user: { name: "You", color: "var(--accent)" },
+                      /* The extension's own caret, plus whose it is — what
+                         Follow looks for to keep somebody's caret in view. */
+                      render: (user: { name?: string; color?: string; userId?: string }) => {
+                        const caret = document.createElement("span");
+                        caret.classList.add("collaboration-carets__caret");
+                        caret.style.borderColor = user.color ?? "";
+                        caret.dataset.caretUser = user.userId ?? "";
+                        const label = document.createElement("div");
+                        label.classList.add("collaboration-carets__label");
+                        label.style.backgroundColor = user.color ?? "";
+                        label.textContent = user.name ?? "";
+                        caret.append(label);
+                        return caret;
+                      },
                     }),
                   ]
                 : []),
