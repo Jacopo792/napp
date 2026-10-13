@@ -33,6 +33,8 @@ COPY packages/collab-server/src ./packages/collab-server/src
 # cost of the files the server never reaches is the bytes.
 COPY packages/core/package.json ./packages/core/package.json
 COPY packages/core/src/features/editor/lib/ ./packages/core/src/features/editor/lib/
+# Shared schema validation now also reads the pure paragraph-link helpers.
+COPY packages/core/src/lib/ ./packages/core/src/lib/
 
 # `--config.node-linker=hoisted` builds a flat node_modules and does not link
 # workspace packages into it, so `@notes-app/core` resolves in development and

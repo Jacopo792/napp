@@ -3,6 +3,14 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.32 — 2026-10-13
+
+### Added
+
+- Explicit paragraph/heading `blockId` attributes, null by default and assigned only by Copy link to paragraph. `noteLink.blockId` routes through `openPlace` and the existing passage decoration. Typed and pasted `[[Title#^id]]` links resolve against the open archive.
+- Structural-edit anchor deduplication retains the original when a linked paragraph is pasted before it. Markdown exports/imports keep the paragraph marker; EPUB keeps links between exported chapters.
+- The collaboration image includes shared pure helpers under core/src/lib. Preview Yjs projections and server schema verification cover the new attributes.
+
 ## 0.9.31 — 2026-10-13
 
 ### Added

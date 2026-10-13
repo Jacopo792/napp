@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.32",
+    date: "2026-10-13",
+    headline: "Link straight to a paragraph",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Copy a paragraph link",
+            text: "Right-click a paragraph and choose Copy link to paragraph. Paste the link in another note to return directly to those words, even after text is added above them.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.31",
     date: "2026-10-13",
     headline: "Find words in pictures",

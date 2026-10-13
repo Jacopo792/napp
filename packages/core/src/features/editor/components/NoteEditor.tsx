@@ -1,3 +1,4 @@
+import { paragraphLink } from "@/lib/blockLinks";
 import type { JSONContent } from "@tiptap/core";
 import {
   ChevronDown,
@@ -310,11 +311,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const found =
         typeof place === "string"
           ? editorRef.current?.reveal(place)
-          : "passage" in place
-            ? place.link
-              ? editorRef.current?.linkPassage(place.passage, place.link)
-              : editorRef.current?.flashPassage(place.passage)
-            : editorRef.current?.revealTarget(place);
+          : "blockId" in place
+            ? editorRef.current?.flashBlock(place.blockId)
+            : "passage" in place
+              ? place.link
+                ? editorRef.current?.linkPassage(place.passage, place.link)
+                : editorRef.current?.flashPassage(place.passage)
+              : editorRef.current?.revealTarget(place);
       if (found || ++tries > 50) {
         revealing.current = null;
         window.clearInterval(timer);
@@ -345,6 +348,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      held here rather than being read back with the rest. */
   const [pendingThread, setPendingThread] = useState<string | null>(null);
   const [passageMenu, setPassageMenu] = useState<MenuPoint | null>(null);
+  const [passageHasSelection, setPassageHasSelection] = useState(false);
   /* The thread the panel should scroll to and outline, set by clicking the
      underlined passage it belongs to. Not the same thing as `pendingThread`,
      which is a thread that has been anchored and not yet said anything in. */
@@ -471,6 +475,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       editorRef.current?.format("drawing-page");
     },
     reveal(place) {
+      setPages(null);
       revealing.current = place;
       setRevealAsked((count) => count + 1);
     },
@@ -864,15 +869,43 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      Without a selection the system's own menu stays — spelling, paste —
      because there is nothing for a comment to be about. */
   const onPassageMenu = (event: ReactMouseEvent) => {
-    if (!canComment && !onContinueAsNote) return;
+    if (!canComment && !onContinueAsNote && !canEdit) return;
     const chosen = window.getSelection();
-    if (!chosen || chosen.isCollapsed || !chosen.toString().trim()) return;
+    if ((!chosen || chosen.isCollapsed || !chosen.toString().trim()) && !canEdit) return;
     if (!(event.target as HTMLElement).closest(".rich-text-content")) return;
     event.preventDefault();
+    event.stopPropagation();
+    setPassageHasSelection(Boolean(chosen && !chosen.isCollapsed && chosen.toString().trim()));
     setPassageMenu({ x: event.clientX, y: event.clientY });
   };
   const passageMenuItems: MenuItem[] = [
-    ...(canComment
+    ...(canEdit
+      ? [
+          {
+            kind: "item" as const,
+            id: "paragraph-link",
+            label: "Copy link to paragraph",
+            icon: <Link2 size={16} />,
+            run: () => {
+              if (!entry || !passageMenu) return;
+              const id = editorRef.current?.paragraphIdAt({
+                left: passageMenu.x,
+                top: passageMenu.y,
+              });
+              if (!id) {
+                setFailure("This paragraph cannot be linked");
+                return;
+              }
+              void navigator.clipboard.writeText(paragraphLink(chapterTitle, id)).then(
+                () => report("Paragraph link copied"),
+                () => setFailure("Could not copy paragraph link"),
+              );
+            },
+          },
+        ]
+      : []),
+
+    ...(canComment && passageHasSelection
       ? [
           {
             kind: "item" as const,
@@ -883,7 +916,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           },
         ]
       : []),
-    ...(onContinueAsNote
+    ...(onContinueAsNote && passageHasSelection
       ? [
           {
             kind: "item" as const,
@@ -897,14 +930,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           },
         ]
       : []),
-    { kind: "separator" },
-    {
-      kind: "item",
-      id: "copy",
-      label: "Copy",
-      icon: <Copy size={16} />,
-      run: () => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? ""),
-    },
+    ...(passageHasSelection
+      ? [
+          { kind: "separator" as const },
+          {
+            kind: "item" as const,
+            id: "copy",
+            label: "Copy",
+            icon: <Copy size={16} />,
+            run: () => void navigator.clipboard.writeText(window.getSelection()?.toString() ?? ""),
+          },
+        ]
+      : []),
   ];
   const passageMenuLayer = passageMenu && (
     <PointMenu point={passageMenu} items={passageMenuItems} close={() => setPassageMenu(null)} />

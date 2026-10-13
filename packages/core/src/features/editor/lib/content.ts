@@ -1,3 +1,4 @@
+import { blockId } from "../../../lib/blockLinks.ts";
 import {
   Extension,
   Mark,
@@ -727,12 +728,38 @@ export const SuggestedDelete = Mark.create({
  * serializer, the legacy parser, the Yjs conversion and the collaboration
  * server all read documents that may contain it, and a schema that does not
  * know a mark drops it. */
+export const BlockAnchors = Extension.create({
+  name: "blockAnchors",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph", "heading"],
+        attributes: {
+          blockId: {
+            default: null,
+            parseHTML: (element) => blockId(element.getAttribute("data-block-id")),
+            renderHTML: (attrs) =>
+              blockId(attrs.blockId)
+                ? { id: `block-${attrs.blockId}`, "data-block-id": attrs.blockId }
+                : {},
+          },
+        },
+      },
+    ];
+  },
+});
+
 export const NoteLink = Mark.create({
   name: "noteLink",
   inclusive: false,
   excludes: "",
   addAttributes() {
     return {
+      blockId: {
+        default: null,
+        parseHTML: (element) => blockId(element.getAttribute("data-block-ref")),
+        renderHTML: (attrs) => (blockId(attrs.blockId) ? { "data-block-ref": attrs.blockId } : {}),
+      },
       noteId: {
         default: "",
         parseHTML: (element) => element.getAttribute("data-note") ?? "",
@@ -754,7 +781,8 @@ export const NoteLink = Mark.create({
      title to a note id, which needs the archive; this file has no archive and
      is not going to grow one. An imported file keeps the words and loses the
      link, which is the honest half to lose. */
-  renderMarkdown: (mark, helpers) => `[[${helpers.renderChildren(mark)}]]`,
+  renderMarkdown: (mark, helpers) =>
+    `[[${helpers.renderChildren(mark)}${blockId(mark.attrs?.blockId) ? `#^${mark.attrs!.blockId}` : ""}]]`,
 });
 
 /** Everything the schema holds except the two private-media nodes, which the
@@ -1223,6 +1251,7 @@ export const BASE_EXTENSIONS = [
   CommentAnchor,
   WriteLock,
   NoteLink,
+  BlockAnchors,
   ParagraphFormat,
   Superscript,
   Subscript,
@@ -1255,6 +1284,16 @@ function privateReference(value: unknown, scheme: "napp-image:" | "napp-file:"):
 /** Convert the old Markdown media syntax into first-class document nodes. */
 function promotePrivateMedia(node: JSONContent): JSONContent {
   const content = node.content?.map(promotePrivateMedia);
+  if (content?.length && ["paragraph", "heading"].includes(node.type || "")) {
+    const last = content[content.length - 1];
+    const match =
+      last.type === "text" ? /(?:^|\s)\^([A-Za-z0-9_-]{1,128})$/.exec(last.text || "") : null;
+    if (match) {
+      last.text = (last.text || "").slice(0, match.index).trimEnd();
+      if (!last.text) content.pop();
+      return { ...node, attrs: { ...node.attrs, blockId: match[1] }, content };
+    }
+  }
 
   if (node.type === "image") {
     const objectId = privateReference(node.attrs?.src, "napp-image:");
@@ -1399,6 +1438,8 @@ function demotePrivateMedia(node: JSONContent): JSONContent {
     };
   }
   const content = node.content?.map(demotePrivateMedia);
+  if (content && ["paragraph", "heading"].includes(node.type || "") && blockId(node.attrs?.blockId))
+    content.push({ type: "text", text: ` ^${node.attrs!.blockId}` });
   return content ? { ...node, content } : node;
 }
 

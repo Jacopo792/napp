@@ -156,10 +156,14 @@ export interface PassagePlace {
   link?: string;
 }
 
-export type Place = string | PlaceTarget | PassagePlace;
+export interface BlockPlace {
+  blockId: string;
+}
+export type Place = string | PlaceTarget | PassagePlace | BlockPlace;
 
 export interface PlaceRequest {
   noteId: string;
+  blockId?: string;
   /** A heading to go to inside it. */
   text?: string;
   target?: PlaceTarget;

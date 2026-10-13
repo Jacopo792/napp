@@ -3213,9 +3213,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text, target, passage, link } = (event as CustomEvent<PlaceRequest>).detail;
+      const { noteId, text, target, passage, link, blockId } = (event as CustomEvent<PlaceRequest>)
+        .detail;
       handleSelectNote(noteId);
-      const reveal: Place | undefined = passage ? { passage, link } : (target ?? text);
+      const reveal: Place | undefined = blockId
+        ? { blockId }
+        : passage
+          ? { passage, link }
+          : (target ?? text);
       if (reveal) setOpenThen({ noteId, reveal });
     };
     window.addEventListener(OPEN_PLACE, open);
@@ -5170,7 +5175,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               ? noteEditorRef.current?.getContent()
               : entry.note.content;
           if (!content) throw new Error("Wait for the open chapter to load before exporting");
-          return { title: item.title, content };
+          return { id: item.id, title: item.title, content };
         });
         const { exportEpub } = await import("@/features/editor/lib/exportNote");
         const title = currentSpace?.name || "Untitled";

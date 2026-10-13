@@ -1213,6 +1213,18 @@ stored. The `bibliography` block is the `[TOC]` block's sibling: it lists only
 what is cited. Markdown is pandoc's `[@key, p]` and `::: {#refs}`, which pandoc
 itself resolves; reach for citeproc only when a document needs a real CSL style.
 
+## Links to a paragraph
+
+`blockId` is a null-default global attribute on paragraphs and headings, assigned
+only by Copy link to paragraph. `noteLink.blockId` carries the destination;
+`openPlace` opens the note and the existing passage decoration finds it by id.
+Copying produces `[[Title#^id]]`, supported by typing, the note picker and paste.
+`UniqueBlockAnchors` visits only structural local edits and removes the copied
+id after a paste or split, preserving the original even when the paste came
+before it. It leaves incoming Yjs transactions alone. The schema's validator
+is in `lib/blockLinks.ts`; the server image copies that shared directory too.
+Markdown keeps the `^id` marker; EPUB keeps links within the exported book.
+
 ## Two people in one note
 
 Title and content are one Yjs document. The browser holds it in memory and in

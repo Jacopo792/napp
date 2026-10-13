@@ -478,7 +478,7 @@ export async function saveNoteExport(
 /** A book in chapter order. The caller supplies the open editor's live JSON. */
 export async function exportEpub(
   title: string,
-  chapters: { title: string; content: JSONContent }[],
+  chapters: { id?: string; title: string; content: JSONContent }[],
   language: string,
   resolve: Resolve,
 ): Promise<Blob> {
@@ -595,10 +595,20 @@ export async function exportEpub(
       image.setAttribute("alt", node.getAttribute("alt") || "Drawing");
       node.replaceWith(image);
     }
+    body.querySelectorAll("a[data-note]").forEach((node) => {
+      const destination = chapters.findIndex((one) => one.id === node.getAttribute("data-note"));
+      if (destination < 0) return;
+      const target = node.getAttribute("data-block-ref");
+      node.setAttribute(
+        "href",
+        `chapter-${destination + 1}.xhtml${target ? `#block-${target}` : ""}`,
+      );
+    });
     /* Links to other notes have no destination outside this archive. */
     body.querySelectorAll("a").forEach((node) => {
       const href = node.getAttribute("href") || "";
-      if (href && !/^(https?:|mailto:|#)/i.test(href)) node.removeAttribute("href");
+      if (href && !/^(https?:|mailto:|#|chapter-\d+\.xhtml(?:#|$))/i.test(href))
+        node.removeAttribute("href");
     });
     const heading = doc.createElement("h1");
     heading.textContent = chapter.title || "Untitled";

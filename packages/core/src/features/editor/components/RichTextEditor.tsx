@@ -1,5 +1,8 @@
+import { UniqueBlockAnchors } from "../lib/blockAnchors";
+import { anchoredBlock, blockId, readBlockLink } from "@/lib/blockLinks";
 import {
   Extension,
+  InputRule,
   mergeAttributes,
   Node,
   type Editor,
@@ -70,7 +73,7 @@ import {
   openFootnoteAt,
 } from "@/features/editor/lib/referenceMarks";
 import { targetsOf, type Adoption, type ChapterTargets } from "@/lib/references";
-import type { PlaceTarget } from "@/lib/documentContents";
+import { openPlace, type PlaceTarget } from "@/lib/documentContents";
 import { WRITING_FOCUS, WritingFocus, type WritingFocusSettings } from "../lib/writingFocus";
 import {
   BASE_EXTENSIONS,
@@ -188,6 +191,8 @@ export interface RichTextEditorHandle {
   /** Go to these words and light them for a moment — the caret is left at
    *  their end, not on them, so nothing stays selected. */
   flashPassage: (text: string) => boolean;
+  flashBlock: (id: string) => boolean;
+  paragraphIdAt: (coords: { left: number; top: number }) => string | null;
   /** The same, after making the first of these words not already a note link
    *  into a link to `noteId` — an unlinked mention, linked. Only lit where
    *  the note cannot be written. */
@@ -572,9 +577,53 @@ function autocorrectExtension(enabled: React.RefObject<boolean>) {
 function noteLinkExtension(notes: React.RefObject<{ id: string; title: string }[]>, limit = 8) {
   return Extension.create({
     name: "noteLink",
+
+    addInputRules() {
+      return [
+        new InputRule({
+          find: /\[\[([^\]\n]+)#\^([A-Za-z0-9_-]{1,128})\]\]$/,
+          handler: ({ range, match, chain }) => {
+            const link = readBlockLink(match[0]);
+            const found =
+              link && notes.current.filter((note) => (note.title || "Untitled") === link.title);
+            if (!link || !found || found.length !== 1) return null;
+            chain()
+              .deleteRange(range)
+              .insertContent({
+                type: "text",
+                text: link.title,
+                marks: [{ type: "noteLink", attrs: { noteId: found[0].id, blockId: link.id } }],
+              })
+              .run();
+          },
+        }),
+      ];
+    },
     addProseMirrorPlugins() {
       return [
-        Suggestion<{ id: string; title: string }>({
+        new Plugin({
+          key: new PluginKey("blockLinkPaste"),
+          props: {
+            handlePaste(view, event) {
+              const link = readBlockLink(event.clipboardData?.getData("text/plain") || "");
+              const found =
+                link && notes.current.filter((note) => (note.title || "Untitled") === link.title);
+              if (!link || !found || found.length !== 1) return false;
+              const mark = view.state.schema.marks.noteLink.create({
+                noteId: found[0].id,
+                blockId: link.id,
+              });
+              view.dispatch(
+                view.state.tr.replaceSelectionWith(
+                  view.state.schema.text(link.title, [mark]),
+                  false,
+                ),
+              );
+              return true;
+            },
+          },
+        }),
+        Suggestion<{ id: string; title: string; blockId?: string | null }>({
           editor: this.editor,
           /* Its own key. ProseMirror refuses two plugins that share one, and
              `Suggestion` defaults every instance to `suggestion$` — so the
@@ -583,10 +632,12 @@ function noteLinkExtension(notes: React.RefObject<{ id: string; title: string }[
           char: "[[",
           allowedPrefixes: null,
           items: ({ query }) => {
-            const q = query.toLowerCase();
+            const [title, target] = query.split("#^");
+            const q = title.toLowerCase();
             return notes.current
               .filter((note) => (note.title || "Untitled").toLowerCase().includes(q))
-              .slice(0, limit);
+              .slice(0, limit)
+              .map((note) => ({ ...note, blockId: blockId(target) }));
           },
           command: ({ editor, range, props }) => {
             const title = props.title || "Untitled";
@@ -597,7 +648,12 @@ function noteLinkExtension(notes: React.RefObject<{ id: string; title: string }[
               .insertContent([
                 {
                   type: "text",
-                  marks: [{ type: "noteLink", attrs: { noteId: props.id } }],
+                  marks: [
+                    {
+                      type: "noteLink",
+                      attrs: { noteId: props.id, blockId: props.blockId ?? null },
+                    },
+                  ],
                   text: title,
                 },
                 /* A space outside the mark, so the sentence carries on next to
@@ -2178,6 +2234,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         }),
         slashMenu,
         noteLinks,
+        UniqueBlockAnchors,
         writeLockGuard,
         PassageFlash,
         sentenceCapitalize,
@@ -2226,6 +2283,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
             event.preventDefault();
             /* A link inside a quotation is Continue as note's way back: it
                goes to the words, not only to the chapter. */
+            const targetBlock = blockId(anchor?.getAttribute("data-block-ref"));
+            if (targetBlock) {
+              openPlace({ noteId, blockId: targetBlock });
+              return true;
+            }
             onOpenNoteRef.current(
               noteId,
               anchor?.closest("blockquote") ? (anchor.textContent ?? undefined) : undefined,
@@ -2517,6 +2579,30 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         const { from, to } = found as { from: number; to: number };
         editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
         return true;
+      },
+      flashBlock(id) {
+        if (!editor) return false;
+        const range = anchoredBlock(editor.state.doc, id);
+        return range ? lightPassage(range) : false;
+      },
+      paragraphIdAt(coords) {
+        if (!editor) return null;
+        const hit = editor.view.posAtCoords(coords);
+        if (!hit) return null;
+        const position = editor.state.doc.resolve(hit.pos);
+        if (
+          !position.parent.isTextblock ||
+          !Object.hasOwn(position.parent.attrs, "blockId") ||
+          !position.parent.textContent.trim()
+        )
+          return null;
+        const existing = blockId(position.parent.attrs.blockId);
+        if (existing) return existing;
+        if (readOnly) return null;
+        const id = crypto.randomUUID();
+        const pos = position.before();
+        editor.view.dispatch(editor.state.tr.setNodeAttribute(pos, "blockId", id));
+        return editor.state.doc.nodeAt(pos)?.attrs.blockId === id ? id : null;
       },
       flashPassage(text) {
         if (!editor) return false;
