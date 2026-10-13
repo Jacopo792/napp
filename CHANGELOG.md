@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.34 — 2026-10-13
+
+### Fixed
+
+- Opening a note that holds links to other notes no longer restamps it as edited. A Yjs projection spells `noteLink.blockId` as `null` where rows written earlier say nothing; `storeDocument` now hands the row back unchanged when the only difference is `null` attributes.
+
 ## 0.9.33 — 2026-10-13
 
 ### Changed

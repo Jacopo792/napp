@@ -5,11 +5,13 @@
  * already decided, from the caller's own row level security, that this note is
  * theirs to open. The service role persists; it never authorises. */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isDeepStrictEqual } from "node:util";
 import * as Y from "yjs";
 import {
   noteDocument,
   richTextToPlainText,
   withoutInvisibleDocumentEnding,
+  withoutNullAttributes,
 } from "@notes-app/core/editor/content.ts";
 import {
   DOCUMENT_FORMAT_VERSION,
@@ -107,7 +109,15 @@ export async function storeDocument(
   document: Y.Doc,
 ): Promise<void> {
   const projected = projectDocument(document);
-  const content = withoutInvisibleDocumentEnding(projected.content);
+  let content = withoutInvisibleDocumentEnding(projected.content);
+  /* A difference that is only `null` attributes is not an edit: hand the row
+     back what it already holds so `save_note_document` sees no change. */
+  const row = await service.from("notes").select("content").eq("id", noteId).maybeSingle();
+  if (
+    row.data?.content &&
+    isDeepStrictEqual(withoutNullAttributes(row.data.content), withoutNullAttributes(content))
+  )
+    content = row.data.content;
   const saved = await service.rpc("save_note_document", {
     target_note_id: noteId,
     document_state_base64: Buffer.from(Y.encodeStateAsUpdate(document)).toString("base64"),

@@ -1582,6 +1582,21 @@ export function withoutInvisibleDocumentEnding(content: JSONContent): JSONConten
   }
 }
 
+/** The same document, minus attributes that are `null`. A projection out of
+ *  Yjs spells a default as `null` (`noteLink.blockId`) where the row written
+ *  before that attribute existed says nothing — the same words, a different
+ *  jsonb, and so an "edit" the first time any such note is stored. */
+export function withoutNullAttributes(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutNullAttributes);
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== null)
+        .map(([k, v]) => [k, withoutNullAttributes(v)]),
+    );
+  return value;
+}
+
 function trimFinalTextWhitespace(node: JSONContent): void {
   const last = node.content?.at(-1);
   if (last) return trimFinalTextWhitespace(last);

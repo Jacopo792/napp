@@ -20,6 +20,7 @@ import {
   strokePoints,
   translateStroke,
   withoutInvisibleDocumentEnding,
+  withoutNullAttributes,
 } from "./content.ts";
 
 test("legacy colours become structured marks without delimiter text", () => {
@@ -319,4 +320,11 @@ test("a caption counts toward the boxes a drawing is measured by", () => {
   assert.deepEqual(drawingBox(caption, "page"), { width: 1000, height: 410 });
   const box = drawingInkBox(caption);
   assert.ok(box.y < 400 && box.height > 40, "the box reaches above the baseline and below it");
+});
+
+test("a null attribute is not a difference", () => {
+  assert.deepEqual(
+    withoutNullAttributes({ marks: [{ type: "noteLink", attrs: { blockId: null, noteId: "a" } }] }),
+    { marks: [{ type: "noteLink", attrs: { noteId: "a" } }] },
+  );
 });

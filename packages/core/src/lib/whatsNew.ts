@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.34",
+    date: "2026-10-13",
+    headline: "Opening a note no longer edits it",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          {
+            title: "No false “Edited”",
+            text: "Opening a note that links to other notes, for instance from Linked from, no longer shows it as edited when you have changed nothing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.33",
     date: "2026-10-13",
     headline: "Quieter, quicker movement",
