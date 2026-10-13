@@ -8,6 +8,7 @@ import {
   FolderOpen,
   FolderPlus,
   History,
+  ListChecks,
   Info,
   Lock,
   Plus,
@@ -85,6 +86,8 @@ interface Props {
   accounts: () => { userId: string; email: string }[];
   onSwitchAccount: (userId: string) => void;
   onAddAccount: () => void;
+  /** Open tasks that want this reader, and the way to them. */
+  tasks?: { count: number; onOpen: () => void };
   /** What changed in Napp, and whether there is a release not read yet. */
   onWhatsNew: () => void;
   whatsNewUnseen: boolean;
@@ -464,6 +467,7 @@ export function Sidebar({
   onAddAccount,
   onWhatsNew,
   whatsNewUnseen,
+  tasks,
   spaceSwitch,
   peopleShelf,
   scopeLabel,
@@ -738,8 +742,21 @@ export function Sidebar({
 
           Archive shares that block, above Trash: both are places a note leaves
           the folders for, and the one you can come back from belongs first. */}
-      {(remarks || archive || trash || updates) && (
+      {(remarks || archive || trash || updates || tasks) && (
         <div className="sidebar-tail">
+          {/* Tasks open the palette standing in them rather than being a list
+              of their own: a task is a line inside a note, and the palette is
+              already where a line is found and gone to. */}
+          {tasks && tasks.count > 0 && (
+            <Row
+              scope={{ id: "__tasks", label: "Tasks", count: 0, unread: tasks.count }}
+              glyph={<ListChecks size={16} />}
+              motion="remarks"
+              active={false}
+              droppable={false}
+              onSelect={tasks.onOpen}
+            />
+          )}
           {/* What the others wrote since you last looked. Only while there is
               some, and its number is the notes waiting — it goes down as each
               is opened, so it is a count that can reach nothing. */}

@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.24 — 2026-10-13
+
+Tasks with a name and a date.
+
+### Added
+
+- `lib/tasks.ts`: a task's person and date are read from its own words — an
+  @member (`mentionedIn`, as comments read them) and the first date written
+  2026-10-20, 20/10 or 20/10/2026. No schema; the words export as they are
+  and the ISO form is what Obsidian's Tasks plugin reads. `yourTasks()` is
+  the open tasks handed to you anywhere, or dated and unnamed in your own
+  notes, soonest first. The sidebar's Tasks opens ⌘K standing in them; a task
+  goes to its line through `openPlace({ passage })`.
+
 ## 0.9.23 — 2026-10-13
 
 Follow somebody through a note.

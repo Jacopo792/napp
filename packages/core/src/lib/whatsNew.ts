@@ -42,6 +42,26 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.24",
+    date: "2026-10-13",
+    headline: "Tasks with a name and a date",
+    sections: [
+      {
+        heading: "Tasks",
+        items: [
+          {
+            title: "Give a task to someone",
+            text: "Write @ and a member's name in a checklist item, and a date like 20/10 or 2026-10-20. The task is theirs, due that day.",
+          },
+          {
+            title: "Your tasks",
+            text: "Tasks in the sidebar counts the open tasks handed to you, and the dated ones in your own notes. Press it for the list, soonest first and overdue marked; choose one to go to its line.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.23",
     date: "2026-10-13",
     headline: "Follow somebody through a note",
