@@ -130,3 +130,20 @@ export async function loadNamedVersions(session: AppSession) {
       .map((version) => ({ ...version, noteId: note.id, title: note.title })),
   );
 }
+
+/** The fixture's seeded stretches, across every note that has them. */
+export async function loadRecentVersions(session: AppSession, since: string) {
+  await sleep(120);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return [];
+  return FIXTURE_NOTES.slice(0, 3).flatMap((note) =>
+    seed(note.id)
+      .filter((version) => version.createdAt > since)
+      .map((version) => ({
+        noteId: note.id,
+        createdAt: version.createdAt,
+        authorIds: version.authorIds,
+        wordsAdded: version.wordsAdded,
+        wordsRemoved: version.wordsRemoved,
+      })),
+  );
+}

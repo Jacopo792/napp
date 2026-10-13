@@ -12,6 +12,7 @@
 import type { JSONContent } from "@tiptap/core";
 import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
+import type { RecentVersion } from "./updates";
 
 export type VersionBody = { title: string; content: JSONContent };
 
@@ -181,5 +182,37 @@ export async function loadNamedVersions(session: AppSession): Promise<NamedVersi
   return ((result.data ?? []) as (VersionRow & { note_id: string })[]).map((row) => ({
     ...toVersion(row),
     noteId: row.note_id,
+  }));
+}
+
+/** Every version written in the archive since `since`, light — what the
+ *  Updates list is made of (see `updates.ts`).
+ *  ponytail: the newest 500; a week of two people writing stays well under. */
+export async function loadRecentVersions(
+  session: AppSession,
+  since: string,
+): Promise<RecentVersion[]> {
+  const result = await supabase
+    .from("note_versions")
+    .select("note_id, created_at, author_ids, words_added, words_removed")
+    .eq("archive_id", session.archiveId)
+    .gt("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  fail(result.error);
+  return (
+    (result.data ?? []) as {
+      note_id: string;
+      created_at: string;
+      author_ids: string[];
+      words_added: number | null;
+      words_removed: number | null;
+    }[]
+  ).map((row) => ({
+    noteId: row.note_id,
+    createdAt: row.created_at,
+    authorIds: row.author_ids,
+    wordsAdded: row.words_added,
+    wordsRemoved: row.words_removed,
   }));
 }

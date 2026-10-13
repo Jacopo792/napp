@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.20 — 2026-10-13
+
+See what changed while you were away.
+
+### Added
+
+- The `UPDATES` scope: notes another member wrote in after this account last
+  opened them. `changedSince()` in `lib/updates.ts` reads
+  `loadRecentVersions()` (the last seven days of `note_versions`, light)
+  against `remarksSeen`, which already holds when each note was last opened
+  and travels with the account; a note never opened is measured from the
+  seven-day floor. Read on arrival and on every wake. The sidebar row shows
+  only while something is waiting.
+
 ## 0.9.19 — 2026-10-13
 
 Chapters that say how far along they are.

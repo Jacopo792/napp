@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.20",
+    date: "2026-10-13",
+    headline: "See what changed while you were away",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Updates",
+            text: "A new place in the sidebar lists the notes somebody else has written in since you last opened them, with a count. Open a note and it leaves the list. Switch to a member's notes to see what they changed in their own.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.19",
     date: "2026-10-13",
     headline: "Chapters that say how far along they are",
