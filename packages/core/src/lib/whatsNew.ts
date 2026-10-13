@@ -42,6 +42,31 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.17",
+    date: "2026-10-13",
+    headline: "Notes that name each other, and a search that forgives",
+    sections: [
+      {
+        heading: "Links",
+        items: [
+          {
+            title: "Mentioned in",
+            text: "At the foot of a note, under Linked from, Napp now lists the notes that name it in plain words without linking to it. Press the name to open that note at the words, or Link to turn them into a link.",
+          },
+        ],
+      },
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "⌘K finds what you half remember",
+            text: "Words or letters in the right order are enough: “wds rem” finds Words to Remember. Whole matches still come first.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.16",
     date: "2026-10-10",
     headline: "Frosted glass is yours to turn on",

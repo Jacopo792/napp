@@ -183,6 +183,10 @@ export interface RichTextEditorHandle {
   /** Go to these words and light them for a moment — the caret is left at
    *  their end, not on them, so nothing stays selected. */
   flashPassage: (text: string) => boolean;
+  /** The same, after making the first of these words not already a note link
+   *  into a link to `noteId` — an unlinked mention, linked. Only lit where
+   *  the note cannot be written. */
+  linkPassage: (text: string, noteId: string) => boolean;
   /** Give this chapter's targets the ids references elsewhere cite them by. */
   adopt: (adoptions: Adoption[]) => void;
   focus: () => void;
@@ -422,24 +426,30 @@ const PassageFlash = Extension.create({
 });
 
 /** Where these words stand inside one block of text, or null. */
-function findPassage(doc: ProseMirrorNode, text: string): { from: number; to: number } | null {
+function findPassage(
+  doc: ProseMirrorNode,
+  text: string,
+  skip?: (range: { from: number; to: number }) => boolean,
+): { from: number; to: number } | null {
   let found: { from: number; to: number } | null = null;
   doc.descendants((node, pos) => {
     if (found) return false;
     if (!node.isTextblock) return true;
-    const at = node.textContent.indexOf(text);
-    if (at < 0) return false;
-    /* Text offset to document position: walk the inline children, since a
-       footnote or a picture inside the block takes one position and no text. */
-    let offset = 0;
-    let from = -1;
-    node.forEach((child, childOffset) => {
-      const length = child.isText ? child.text!.length : 0;
-      if (from < 0 && child.isText && at < offset + length)
-        from = pos + 1 + childOffset + (at - offset);
-      offset += length;
-    });
-    if (from >= 0) found = { from, to: from + text.length };
+    const content = node.textContent;
+    for (let at = content.indexOf(text); at >= 0 && !found; at = content.indexOf(text, at + 1)) {
+      /* Text offset to document position: walk the inline children, since a
+         footnote or a picture inside the block takes one position and no text. */
+      let offset = 0;
+      let from = -1;
+      node.forEach((child, childOffset) => {
+        const length = child.isText ? child.text!.length : 0;
+        if (from < 0 && child.isText && at < offset + length)
+          from = pos + 1 + childOffset + (at - offset);
+        offset += length;
+      });
+      const range = { from, to: from + text.length };
+      if (from >= 0 && !skip?.(range)) found = range;
+    }
     return false;
   });
   return found;
@@ -2349,6 +2359,27 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     };
   }, [editor, reportsTargets]);
 
+  /* Light a range for a moment, the caret left at its end. */
+  const lightPassage = useCallback(
+    (range: { from: number; to: number }) => {
+      if (!editor) return false;
+      editor.chain().focus().setTextSelection(range.to).run();
+      editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, range));
+      const { node } = editor.view.domAtPos(range.from);
+      (node instanceof Element ? node : node.parentElement)?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+      window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => {
+        if (!editor.isDestroyed)
+          editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, null));
+      }, 2600);
+      return true;
+    },
+    [editor],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -2449,19 +2480,20 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           findPassage(editor.state.doc, words) ??
           (words.length > 60 ? findPassage(editor.state.doc, words.slice(0, 60)) : null);
         if (!range) return false;
-        editor.chain().focus().setTextSelection(range.to).run();
-        editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, range));
-        const { node } = editor.view.domAtPos(range.from);
-        (node instanceof Element ? node : node.parentElement)?.scrollIntoView({
-          block: "center",
-          behavior: "smooth",
-        });
-        window.clearTimeout(flashTimer.current);
-        flashTimer.current = window.setTimeout(() => {
-          if (!editor.isDestroyed)
-            editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, null));
-        }, 2600);
-        return true;
+        return lightPassage(range);
+      },
+      linkPassage(text, noteId) {
+        if (!editor) return false;
+        const linkType = editor.schema.marks.noteLink;
+        const range = findPassage(editor.state.doc, text, ({ from, to }) =>
+          editor.state.doc.rangeHasMark(from, to, linkType),
+        );
+        if (!range) return false;
+        if (!readOnly)
+          editor.view.dispatch(
+            editor.state.tr.addMark(range.from, range.to, linkType.create({ noteId })),
+          );
+        return lightPassage(range);
       },
       commentQuotes() {
         if (!editor) return new Map();
@@ -2576,7 +2608,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor?.commands.focus();
       },
     }),
-    [editor, format, insertionPoint, readOnly, resolveImage],
+    [editor, format, insertionPoint, lightPassage, readOnly, resolveImage],
   );
 
   useEffect(() => {

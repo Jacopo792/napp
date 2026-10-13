@@ -186,7 +186,8 @@ To clarify: why neutral is at ground potential but is not ground.`,
     body: `Things started and never finished. Do not delete.
 
 - A piece on why concept maps work only when you draw them yourself
-- The difference between understanding and remembering that you understood`,
+- The difference between understanding and remembering that you understood
+- A last one for the aphorisms, if it ever comes`,
   },
   {
     title: "BHAGAVAD GĪTĀ — the Problem of the Second Chapter",

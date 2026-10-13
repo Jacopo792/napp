@@ -1,6 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { headingsOf, nameMatch, snippetOf } from "./spotlight.ts";
+import { fuzzyMatch, headingsOf, nameMatch, snippetOf } from "./spotlight.ts";
+
+test("a name holding the query in order is found, and the tighter hold ranks first", () => {
+  const name = "riunione cliente";
+  // Words in order, letters in order, and neither.
+  assert.notEqual(fuzzyMatch(name, "riu cli"), null);
+  assert.notEqual(fuzzyMatch(name, "rncl"), null);
+  assert.equal(fuzzyMatch(name, "clr"), null);
+  assert.equal(fuzzyMatch(name, "riu xyz"), null);
+  // Two runs that start words beat two runs that start inside them.
+  assert.ok(fuzzyMatch(name, "riu cli")! < fuzzyMatch(name, "iun ien")!);
+  // Fewer runs beat more, whatever else.
+  assert.ok(fuzzyMatch(name, "riu cli")! < fuzzyMatch(name, "rncl")!);
+  // The same hold in a shorter name ranks first.
+  assert.ok(fuzzyMatch("riu cli", "rc")! < fuzzyMatch("riunione cliente", "rc")!);
+});
 
 test("a name is matched at its start, then a word's start, then anywhere", () => {
   assert.equal(nameMatch("L'Uno e la processione", "l'uno"), 0);

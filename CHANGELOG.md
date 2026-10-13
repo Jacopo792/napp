@@ -3,6 +3,26 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.17 — 2026-10-13
+
+Notes that name each other, and a search that forgives.
+
+### Added
+
+- Unlinked mentions. `mentionOf()` in `lib/derived.ts` finds a note's title as
+  plain words in another document, a text block at a time and folded both
+  sides; a whole word only at an end that is a letter or digit, never inside a
+  `noteLink`, and not for titles under three characters. `Notes.tsx` memoises
+  the list beside the backlinks; a note that already links is a backlink, not
+  a mention. NoteEditor shows "Mentioned in" with Link, which sends
+  `openPlace({ passage, link })`; the editor's `linkPassage()` adds the
+  `noteLink` mark to the first unlinked occurrence through its own binding.
+  `findPassage()` takes a `skip` predicate. Rules read out of Obsidian 1.14.4.
+- Fuzzy ⌘K. `fuzzyMatch()` in `lib/spotlight.ts`: the query's words in order,
+  else its letters; scored by runs, runs starting mid-word, spread, start and
+  name length. Two or three runs rank between a whole match and a heading,
+  more go under a command's second line.
+
 ## 0.9.16 — 2026-10-10
 
 Frosted glass is yours to turn on.

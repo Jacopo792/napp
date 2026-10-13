@@ -15,6 +15,38 @@ export function nameMatch(name: string, query: string): number {
   return -1;
 }
 
+/** A name that does not contain the query whole may still hold it in order:
+ *  "riu cli" or "rncl" in "Riunione cliente". The query's words are looked
+ *  for one after another, and failing that its letters are. Both already
+ *  folded. Lower is better, null is no: the number of separate runs the
+ *  match is cut into counts most, then runs that start inside a word, then
+ *  how far the match is spread, how late it starts, and how long the name
+ *  is — the order Obsidian's quick switcher ranks by, written again here. */
+export function fuzzyMatch(name: string, query: string): number | null {
+  const words = query.split(/\s+/).filter(Boolean);
+  return inOrder(name, words) ?? inOrder(name, [...words.join("")]);
+}
+
+function inOrder(name: string, pieces: string[]): number | null {
+  if (pieces.length === 0) return null;
+  let from = 0;
+  let runs = 0;
+  let inside = 0;
+  let first = -1;
+  for (const piece of pieces) {
+    const at = name.indexOf(piece, from);
+    if (at < 0) return null;
+    if (first < 0 || at !== from) {
+      runs += 1;
+      if (at > 0 && /[\p{L}\p{N}]/u.test(name[at - 1])) inside += 1;
+    }
+    if (first < 0) first = at;
+    from = at + piece.length;
+  }
+  const spread = from - first - pieces.join("").length;
+  return runs - 1 + inside / 10 + spread / 100 + first / 1000 + name.length / 10000;
+}
+
 export interface Heading {
   text: string;
   level: number;

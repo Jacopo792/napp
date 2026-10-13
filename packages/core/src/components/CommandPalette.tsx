@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "@/components/icons";
 import { fold } from "@/lib/format";
-import type { Snippet } from "@/lib/spotlight";
+import { fuzzyMatch, type Snippet } from "@/lib/spotlight";
 import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 
 export interface Command {
@@ -47,6 +47,12 @@ function score(command: Command, query: string): number {
   const word = name.split(/\s+/).some((part) => part.startsWith(query));
   if (word) return 1;
   if (name.includes(query)) return 2;
+  /* Held in order rather than whole: "riu cli" for "Riunione cliente". In
+     two or three runs it ranks under every whole match and over a heading;
+     cut into more it is barely the name any more, and goes under its own
+     second line. */
+  const loose = fuzzyMatch(name, query);
+  if (loose !== null) return loose < 3 ? 2 + (loose + 1) / 4 : 5.5;
   if (command.keywords && fold(command.keywords).includes(query)) return 4;
   if (command.hint && fold(command.hint).includes(query)) return 5;
   return -1;

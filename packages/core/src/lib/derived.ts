@@ -84,6 +84,66 @@ export function linksTo(document: unknown, noteId: string): boolean {
   return Array.isArray(node.content) && node.content.some((child) => linksTo(child, noteId));
 }
 
+/** The first place this document names a note without linking to it — its
+ *  title as plain words — returned exactly as it is written there, because
+ *  those are the words the editor is then asked to find and link. Null when
+ *  it never does.
+ *
+ * Read a text block at a time, not a text node, so a title with one word in
+ * bold is still found, and folded both sides as the search is. A title is a
+ * whole word only at an end that is a letter or a digit: "Dante" is not
+ * inside "Danteschi", but "C++" ends in punctuation and needs no boundary
+ * after it. Words already inside any note link are not a mention. This is
+ * Obsidian's "unlinked mentions", with the rules read out of its app.js. */
+export function mentionOf(document: unknown, title: string): string | null {
+  const wanted = fold(title.trim());
+  // ponytail: too short to mean the note rather than the language.
+  if (wanted.length < 3) return null;
+  const letter = /[\p{L}\p{N}]/u;
+  const open = letter.test(wanted[0]);
+  const close = letter.test(wanted[wanted.length - 1]);
+
+  let found: string | null = null;
+  const block = (node: { content?: unknown[] }) => {
+    let text = "";
+    const linked: boolean[] = [];
+    for (const child of node.content ?? []) {
+      const leaf = child as { text?: string; marks?: { type?: string }[] };
+      if (typeof leaf.text !== "string") continue;
+      const inLink = leaf.marks?.some((mark) => mark.type === "noteLink") ?? false;
+      text += leaf.text;
+      for (let n = 0; n < leaf.text.length; n += 1) linked.push(inLink);
+    }
+    let folded = "";
+    const at: number[] = [];
+    for (let index = 0; index < text.length; index += 1) {
+      const one = fold(text[index]);
+      for (let n = 0; n < one.length; n += 1) at.push(index);
+      folded += one;
+    }
+    for (let hit = folded.indexOf(wanted); hit >= 0; hit = folded.indexOf(wanted, hit + 1)) {
+      const end = hit + wanted.length;
+      if (open && hit > 0 && letter.test(folded[hit - 1])) continue;
+      if (close && end < folded.length && letter.test(folded[end])) continue;
+      const start = at[hit];
+      const stop = at[end - 1] + 1;
+      if (linked.slice(start, stop).some(Boolean)) continue;
+      return text.slice(start, stop);
+    }
+    return null;
+  };
+  const walk = (node: unknown) => {
+    if (found || !node || typeof node !== "object") return;
+    const shaped = node as { content?: unknown[] };
+    if (!Array.isArray(shaped.content)) return;
+    if (shaped.content.some((child) => typeof (child as { text?: unknown }).text === "string"))
+      found = block(shaped);
+    else shaped.content.forEach(walk);
+  };
+  walk(document);
+  return found;
+}
+
 /** Every note this document links to, in the order the links first appear —
  *  the other direction of `linksTo`, for the note sheet's "Links to". */
 export function linkedNoteIds(document: unknown, found = new Set<string>()): Set<string> {

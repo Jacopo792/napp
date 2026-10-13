@@ -159,7 +159,7 @@ import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "
 import type { NoteEntry } from "@/lib/entries";
 import { fold, formatDateTime, formatStamp } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
-import { derivedOf, indexOf, linkedNoteIds, linksTo } from "@/lib/derived";
+import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
 import {
   clearDrafts,
   dropDraft,
@@ -3007,9 +3007,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text, target, passage } = (event as CustomEvent<PlaceRequest>).detail;
+      const { noteId, text, target, passage, link } = (event as CustomEvent<PlaceRequest>).detail;
       handleSelectNote(noteId);
-      const reveal: Place | undefined = passage ? { passage } : (target ?? text);
+      const reveal: Place | undefined = passage ? { passage, link } : (target ?? text);
       if (reveal) setOpenThen({ noteId, reveal });
     };
     window.addEventListener(OPEN_PLACE, open);
@@ -3397,6 +3397,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         : [],
     [ownedEntries, trashedIds, selectedId],
   );
+
+  /* Which notes name this one in plain words and do not link to it —
+     Obsidian's unlinked mentions. The same walk over the same documents as
+     the backlinks above, memoised for the same reason, and a note that
+     already links here is a backlink rather than a mention. */
+  const selectedTitle =
+    ownedEntries.find((entry) => entry.note.id === selectedId)?.note.title ?? "";
+  const mentions = useMemo(() => {
+    if (!selectedId || !selectedTitle) return [];
+    const found: { id: string; title: string; words: string }[] = [];
+    for (const entry of ownedEntries) {
+      if (entry.note.id === selectedId || trashedIds.has(entry.note.id)) continue;
+      if (linksTo(entry.note.content, selectedId)) continue;
+      const words = mentionOf(entry.note.content, selectedTitle);
+      if (words) found.push({ id: entry.note.id, title: entry.note.title, words });
+    }
+    return found;
+  }, [ownedEntries, trashedIds, selectedId, selectedTitle]);
 
   /* ── Always leave a useful writing surface ──────────────────────────────
      The handles already stopped before either navigation pane could eat the
@@ -5364,6 +5382,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     commentAuthors={commentAuthors}
                     linkable={linkableNotes}
                     backlinks={backlinks}
+                    mentions={mentions}
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
                   />
@@ -5613,6 +5632,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               commentAuthors={commentAuthors}
               linkable={linkableNotes}
               backlinks={backlinks}
+              mentions={mentions}
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
             />
