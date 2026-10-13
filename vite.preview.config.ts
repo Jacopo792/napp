@@ -1,3 +1,4 @@
+import { ocrAssets } from "./scripts/ocrAssets";
 import { defineConfig } from "vite";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -41,8 +42,9 @@ export default defineConfig({
       { find: /^@\/lib\/collab$/, replacement: here("./preview/collab.mock.ts") },
       { find: /^@\/lib\/comments$/, replacement: here("./preview/comments.mock.ts") },
       { find: /^@\/lib\/history$/, replacement: here("./preview/history.mock.ts") },
+      { find: /^@\/lib\/mediaText$/, replacement: here("./preview/mediaText.mock.ts") },
       { find: /^@\/lib\/spaces$/, replacement: here("./preview/spaces.mock.ts") },
     ],
   },
-  plugins: [react(), tailwindcss(), tsConfigPaths({ root: here(".") })],
+  plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root: here(".") })],
 });

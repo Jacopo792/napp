@@ -1,3 +1,5 @@
+import { readableMedia } from "@/lib/mediaTextShape";
+import { loadMediaText, saveMediaText, subscribeMediaText } from "@/lib/mediaText";
 import type { JSONContent } from "@tiptap/core";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -466,6 +468,31 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [syncRevision, setSyncRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mediaTexts, setMediaTexts] = useState<Map<string, string>>(new Map());
+  const [indexingMedia, setIndexingMedia] = useState(false);
+  const indexingAbort = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!session) return;
+    let live = true;
+    const read = () => {
+      void loadMediaText(session)
+        .then((rows) => {
+          if (live) setMediaTexts(rows);
+        })
+        .catch((reason) => {
+          if (live)
+            setError(reason instanceof Error ? reason.message : "Could not read attachment text");
+        });
+    };
+    read();
+    const stop = subscribeMediaText(session, read);
+    return () => {
+      live = false;
+      indexingAbort.current?.abort();
+      stop();
+    };
+  }, [session]);
+
   const [dragId, setDragId] = useState<string | null>(null);
   const [navigationOpen, setNavigationOpen] = useState(() => {
     try {
@@ -1250,6 +1277,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   );
 
   // ── The visible slice: folder → search, newest first ────────────────────
+  const mediaHaystacks = useMemo(
+    () =>
+      new Map(
+        entries.map((entry) => [
+          entry.note.id,
+          fold(
+            readableMedia(entry.note.content)
+              .map((media) => mediaTexts.get(media.id) || "")
+              .join("\n"),
+          ),
+        ]),
+      ),
+    [entries, mediaTexts],
+  );
+
   const visible = useMemo(() => {
     const meta = activeMeta;
     const index = indexOf(meta);
@@ -1283,11 +1325,22 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     /* Folded, like the haystack it is looked for in. */
     const q = fold(query.trim());
     if (q) {
-      list = list.filter((e) => derivedOf(e.note).haystack.includes(q));
+      list = list.filter(
+        (e) => derivedOf(e.note).haystack.includes(q) || mediaHaystacks.get(e.note.id)?.includes(q),
+      );
     }
 
     return list;
-  }, [ownedEntries, activeMeta, trashedIds, archivedIds, remarkedIds, selectedFolderId, query]);
+  }, [
+    ownedEntries,
+    activeMeta,
+    trashedIds,
+    archivedIds,
+    remarkedIds,
+    selectedFolderId,
+    query,
+    mediaHaystacks,
+  ]);
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -2155,6 +2208,67 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     },
     [selectedId, collaborative.ready, collaborative.doc],
   );
+
+  const indexMedia = async () => {
+    if (!session || !canWriteArchive || indexingMedia) return;
+    const controller = new AbortController();
+    indexingAbort.current = controller;
+    const media = new Map(
+      entries
+        .flatMap((entry) =>
+          readableMedia(
+            selected?.note.id === entry.note.id
+              ? (noteEditorRef.current?.getContent() ?? entry.note.content)
+              : entry.note.content,
+          ),
+        )
+        .filter((one) => !mediaTexts.has(one.id))
+        .map((one) => [one.id, one]),
+    );
+    if (!media.size) {
+      setStatusFlash("Images and PDFs are searchable");
+      return;
+    }
+    setIndexingMedia(true);
+    setError("");
+    let recognizer:
+      | Awaited<ReturnType<typeof import("@/features/editor/lib/ocr").textRecognizer>>
+      | undefined;
+    try {
+      let done = 0;
+      for (const one of media.values()) {
+        if (controller.signal.aborted) break;
+        setStatusFlash(`Reading images and PDFs… ${done + 1}/${media.size}`);
+        const blob = one.type === "pdf" ? await resolveFile(one.id) : await resolveImage(one.id);
+        if (controller.signal.aborted) break;
+        const read = async (input: Blob | HTMLCanvasElement) => {
+          recognizer ??= await (await import("@/features/editor/lib/ocr")).textRecognizer();
+          return recognizer.read(input);
+        };
+        const text =
+          one.type === "pdf"
+            ? await (
+                await import("@/features/editor/lib/pdf")
+              ).extractPdfText(
+                new File([blob], one.label, { type: "application/pdf" }),
+                undefined,
+                read,
+              )
+            : await read(blob);
+        if (controller.signal.aborted) break;
+        await saveMediaText(session, one.id, text);
+        if (!controller.signal.aborted) setMediaTexts((rows) => new Map(rows).set(one.id, text));
+        done += 1;
+      }
+      if (!controller.signal.aborted) setStatusFlash("Images and PDFs are searchable");
+    } catch (reason) {
+      if (!controller.signal.aborted)
+        setError(reason instanceof Error ? reason.message : "Could not read attachment text");
+    } finally {
+      await recognizer?.close();
+      if (!controller.signal.aborted) setIndexingMedia(false);
+    }
+  };
 
   const handleCopyMarkdown = useCallback(
     async (entry: NoteEntry) => {
@@ -3763,6 +3877,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       <CollectionMenu
         preferences={activeListPreferences}
         onChange={handleListPreferencesChange}
+        onIndexMedia={canWriteArchive ? () => void indexMedia() : undefined}
+        indexingMedia={indexingMedia}
         onExportAll={() => void handleExportAll()}
         onOpenPalette={() => {
           setPaletteQuery("");
@@ -4074,6 +4190,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         icon: <Settings size={16} />,
         run: () => setSettingsOpen(true),
       },
+      ...(canWriteArchive
+        ? [
+            {
+              id: "ocr",
+              group: "Do",
+              name: indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable",
+              icon: <Search size={16} />,
+              run: () => void indexMedia(),
+            },
+          ]
+        : []),
       {
         id: "export",
         group: "Do",
@@ -4150,6 +4277,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }),
         });
       }
+      const mediaText = readableMedia(entry.note.content)
+        .map((one) => mediaTexts.get(one.id) || "")
+        .join("\n");
+      if (fold(mediaText).includes(q) && mediaText)
+        found.push({
+          id: `media:${id}`,
+          group: "Images and PDFs",
+          name: title,
+          snippet: snippetOf(mediaText, q) ?? undefined,
+          rank: 6,
+          at,
+          icon: <Search size={16} />,
+          run: openFound(id),
+        });
       if (!derivedOf(entry.note).haystack.includes(q)) continue;
       headingsOf(entry.note.content).forEach((heading, index) => {
         if (!fold(heading.text).includes(q)) return;
@@ -5058,6 +5199,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             icon: <Maximize2 size={16} />,
             run: toggleFocus,
           },
+          ...(canWriteArchive
+            ? [
+                {
+                  kind: "item" as const,
+                  id: "ocr",
+                  label: indexingMedia
+                    ? "Reading images and PDFs…"
+                    : "Make images and PDFs searchable",
+                  icon: <Search size={16} />,
+                  run: () => void indexMedia(),
+                },
+              ]
+            : []),
           { kind: "separator" },
           {
             kind: "item",

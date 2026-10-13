@@ -3,6 +3,13 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.31 — 2026-10-13
+
+### Added
+
+- Lazy local Italian/English OCR using Tesseract.js, with worker, CPU-specific WebAssembly and language data bundled in both shells. PDF extraction falls back to rasterization and OCR for pages without selectable text.
+- `media_text` with archive RLS and Realtime; explicit indexing from the collection menu, Chapter actions and command palette. List search and palette search join the stored recognized text to media references in each note.
+
 ## 0.9.30 — 2026-10-13
 
 ### Added

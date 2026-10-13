@@ -46,6 +46,7 @@ function allowStreamIteration(): void {
 export async function extractPdfText(
   file: File,
   onProgress?: (page: number, total: number) => void,
+  recognize?: (canvas: HTMLCanvasElement) => Promise<string>,
 ): Promise<string> {
   if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
     throw new Error("Choose a PDF file");
@@ -60,6 +61,7 @@ export async function extractPdfText(
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
   const pdf = await loadingTask.promise;
 
+  let recognizer: Awaited<ReturnType<typeof import("./ocr").textRecognizer>> | undefined;
   try {
     if (pdf.numPages > MAX_PAGES) throw new Error(`PDF has more than ${MAX_PAGES} pages`);
 
@@ -68,7 +70,7 @@ export async function extractPdfText(
       onProgress?.(pageNumber, pdf.numPages);
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
-      const text = content.items
+      let text = content.items
         .map((item) => {
           if (!("str" in item)) return "";
           return `${item.str}${item.hasEOL ? "\n" : " "}`;
@@ -78,16 +80,31 @@ export async function extractPdfText(
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 
+      if (!text) {
+        if (!recognize && !recognizer) recognizer = await (await import("./ocr")).textRecognizer();
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({
+          scale: Math.min(2, 2400 / Math.max(base.width, base.height)),
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        await page.render({ canvas, viewport }).promise;
+        text = await (recognize ?? recognizer!.read)(canvas);
+        canvas.width = canvas.height = 0;
+      }
+      page.cleanup();
       if (text) pages.push(pdf.numPages > 1 ? `## Page ${pageNumber}\n\n${text}` : text);
     }
 
     if (pages.length === 0) {
-      throw new Error("No selectable text found. Scanned PDFs need OCR, which is not included");
+      throw new Error("No text could be read from this PDF");
     }
 
     const title = file.name.replace(/\.pdf$/i, "");
     return `# ${title}\n\n${pages.join("\n\n")}`;
   } finally {
+    await recognizer?.close();
     await loadingTask.destroy();
   }
 }

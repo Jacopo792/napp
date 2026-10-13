@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.31",
+    date: "2026-10-13",
+    headline: "Find words in pictures",
+    sections: [
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "Make images and PDFs searchable",
+            text: "Choose Make images and PDFs searchable from the list menu, Chapter actions or the command palette. Napp reads the words on your device and keeps them in the archive for search. Scanned PDFs can also be imported as text.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.30",
     date: "2026-10-13",
     headline: "Read and take your book with you",

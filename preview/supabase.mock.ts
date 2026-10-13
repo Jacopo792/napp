@@ -1,3 +1,6 @@
+import { projectDocument } from "@/features/editor/lib/ydoc";
+import { richTextToPlainText } from "@/features/editor/lib/content";
+import type { Doc } from "yjs";
 /* Preview-only stand-in for src/lib/supabase.ts. An in-memory archive built from
    the fixture, with enough latency that "Saving" and "Saved" are actually
    observable. Never bundled by vite.config.ts — only vite.preview.config.ts
@@ -316,4 +319,18 @@ export async function revokeArchiveInvite(inviteId: string): Promise<void> {
  *  still takes a moment — enough for the caller's confirmation to settle. */
 export async function leaveArchive(_session: AppSession): Promise<void> {
   await sleep(160);
+}
+
+/** The local equivalent of the collaboration server projecting a changed document. */
+export function projectPreviewNote(noteId: string, document: Doc): void {
+ for (const [archiveId, store] of stores) {
+  const previous = store.notes.get(noteId);
+  if (!previous) continue;
+  const projection = projectDocument(document);
+  const body = richTextToPlainText(projection.content);
+  if (previous.note.title === projection.title && JSON.stringify(previous.note.content) === JSON.stringify(projection.content)) return;
+  store.notes.set(noteId, {note: {...previous.note, ...projection, body, updatedAt: new Date().toISOString()}, version: previous.version + 1});
+  window.dispatchEvent(new CustomEvent("napp:preview-archive-changed", {detail: archiveId}));
+  return;
+ }
 }

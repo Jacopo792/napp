@@ -11,7 +11,7 @@ import type {
   Peer,
 } from "@/lib/collab";
 import { FIXTURE_NOTES, PREVIEW_U2, THESIS_NOTES } from "./fixture";
-import { createdNotes } from "./supabase.mock";
+import { createdNotes, projectPreviewNote } from "./supabase.mock";
 
 export { collaborationColor };
 export type { CollaborationIdentity, CollaborativeNote, ConnectionState, Peer } from "@/lib/collab";
@@ -37,7 +37,9 @@ export function useCollaborativeNote(
       const note =
         [...FIXTURE_NOTES, ...THESIS_NOTES].find((candidate) => candidate.id === noteId) ??
         createdNotes.get(noteId);
-      documents.set(noteId, seedDocument(note?.title ?? "", note?.content));
+      const document = seedDocument(note?.title ?? "", note?.content);
+      documents.set(noteId, document);
+      document.on("update", () => projectPreviewNote(noteId, document));
       redraw((n) => n + 1);
     }
   }, [noteId]);

@@ -103,6 +103,8 @@ export function CollectionMenu({
   preferences,
   onChange,
   onExportAll,
+  onIndexMedia,
+  indexingMedia,
   onOpenPalette,
   onOpenShortcuts,
   bulk,
@@ -110,6 +112,8 @@ export function CollectionMenu({
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
   onExportAll: () => void;
+  onIndexMedia?: () => void;
+  indexingMedia?: boolean;
   /** The two keyboard surfaces, offered by name. A shortcut nobody is told
    *  about is a shortcut nobody has. */
   onOpenPalette: () => void;
@@ -212,6 +216,17 @@ export function CollectionMenu({
             <FolderDown size={16} />
             Export all as Markdown
           </MenuButton>
+          {onIndexMedia && (
+            <MenuButton
+              onClick={() => {
+                onIndexMedia();
+                close();
+              }}
+            >
+              <Search size={16} />
+              {indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable"}
+            </MenuButton>
+          )}
           {bulk && bulk.count > 0 && (
             <>
               <div className="menu-separator" />

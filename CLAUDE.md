@@ -1689,6 +1689,16 @@ test` runs under `node --experimental-strip-types`, which does not resolve an
 extensionless relative import; `allowImportingTsExtensions` is already on, so
 the extension costs nothing and is what makes a source file testable.
 
+## Searching pictures
+
+`media_text(archive_id, object_id, text)` keeps recognized words separately from
+notes. Membership permits reading; `can_write_archive` permits writing. Search
+joins only media references in notes the catalogue has actually returned. The
+explicit Make images and PDFs searchable command loads one Italian/English
+Tesseract worker for the run, then terminates it; PDF pages with no selectable
+text are rasterized and read. `scripts/ocrAssets.ts` ships the worker, CPU-specific
+LSTM cores and language data with both shells, so the desktop CSP needs no CDN.
+
 ## Attachments and exports
 
 The Attachments menu (the paperclip) is where a note gains a PDF or a video, and

@@ -1,3 +1,4 @@
+import { ocrAssets } from "../../scripts/ocrAssets";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
@@ -24,6 +25,6 @@ export default defineConfig(({ mode }) => {
     base: env.VITE_BASE_PATH ?? "/",
     envDir: root,
     build: { chunkSizeWarningLimit: 1400 },
-    plugins: [react(), tailwindcss(), tsConfigPaths({ root })],
+    plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root })],
   };
 });

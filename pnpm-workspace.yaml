@@ -10,3 +10,4 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   core-js: false
+  tesseract.js: false
