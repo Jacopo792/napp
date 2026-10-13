@@ -7,7 +7,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  History,
   Info,
   Lock,
   Plus,
@@ -22,7 +21,7 @@ import {
   Trash2,
   X,
 } from "@/components/icons";
-import { ALL, ARCHIVE, REMARKS, TRASH, UPDATES } from "@/lib/scopes";
+import { ALL, ARCHIVE, REMARKS, TRASH } from "@/lib/scopes";
 import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu, PointMenu } from "./ContextMenu";
 import { useContextMenu, type MenuPoint } from "@/lib/contextMenu";
@@ -495,7 +494,6 @@ export function Sidebar({
   const trash = scopes.find((scope) => scope.id === TRASH);
   const archive = scopes.find((scope) => scope.id === ARCHIVE);
   const remarks = scopes.find((scope) => scope.id === REMARKS);
-  const updates = scopes.find((scope) => scope.id === UPDATES);
 
   function toggle(id: string) {
     setExpanded((current) => {
@@ -738,21 +736,8 @@ export function Sidebar({
 
           Archive shares that block, above Trash: both are places a note leaves
           the folders for, and the one you can come back from belongs first. */}
-      {(remarks || archive || trash || updates) && (
+      {(remarks || archive || trash) && (
         <div className="sidebar-tail">
-          {/* What the others wrote since you last looked. Only while there is
-              some, and its number is the notes waiting — it goes down as each
-              is opened, so it is a count that can reach nothing. */}
-          {updates && ((updates.unread ?? 0) > 0 || selectedId === UPDATES) && (
-            <Row
-              scope={updates}
-              glyph={<History size={16} />}
-              motion="remarks"
-              active={selectedId === UPDATES}
-              droppable={false}
-              onSelect={() => onSelect(UPDATES)}
-            />
-          )}
           {/* What has been said, above what has been filed and what has been
               thrown away. It is the one row here you can arrive at with
               something waiting in it, so it is the one row that can carry a

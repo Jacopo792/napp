@@ -15,6 +15,3 @@ export const ARCHIVE = "__archive";
    panel of its own for the same reason Trash is one: the list already knows how
    to draw notes, and a second list would be a second thing to keep in step. */
 export const REMARKS = "__remarks";
-/* The same kind of place as Remarks: the notes somebody else has written in
-   since you last opened them. A note leaves it when you open it. */
-export const UPDATES = "__updates";

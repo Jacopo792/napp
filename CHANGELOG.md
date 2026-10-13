@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.26 — 2026-10-13
+
+Updates taken out.
+
+### Removed
+
+- 0.9.20's Updates scope, `lib/updates.ts` and `loadRecentVersions()`,
+  reverted whole: the note sheet's versions and the person sheet already say
+  who changed what, so it was a second answer to the same question. Do not
+  re-propose it.
+
 ## 0.9.25 — 2026-10-13
 
 Tasks taken out again.

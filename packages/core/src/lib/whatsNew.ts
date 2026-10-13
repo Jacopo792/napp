@@ -42,6 +42,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.26",
+    date: "2026-10-13",
+    headline: "Updates taken out",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "One place to see what changed",
+            text: "The Updates list is gone. A note's history and a person's sheet already say who changed what, and they still do.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.25",
     date: "2026-10-13",
     headline: "Tasks taken out again",

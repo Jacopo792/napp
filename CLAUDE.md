@@ -309,10 +309,6 @@ refuses anybody who is not in the archive. Reactions are rows of their own in
 is why the badge only moved on a reload; check `pg_publication_tables` when a
 channel hears nothing.
 
-**Updates** is the Remarks shape again: a scope listing the notes another
-member wrote in since this account last opened them, read from
-`note_versions` against the same per-note line (`remarksSeen`).
-
 `subscribeToComments` is a channel of its own and deliberately not another
 table in `subscribeToArchive`'s list: that subscription's caller reloads the
 whole archive snapshot and already fires on every save either member makes.

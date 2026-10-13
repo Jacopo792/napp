@@ -69,12 +69,7 @@ import {
   targetsOf,
   type ChapterTargets,
 } from "@/lib/references";
-import {
-  loadContributions,
-  loadNamedVersions,
-  loadRecentVersions,
-  type NamedVersion,
-} from "@/lib/history";
+import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
   DndContext,
   DragEndEvent,
@@ -195,8 +190,7 @@ import {
 } from "@/features/editor/lib/exchange";
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
-import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED, UPDATES } from "@/lib/scopes";
-import { changedSince, UPDATES_WINDOW_DAYS, type RecentVersion } from "@/lib/updates";
+import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { dailyTitle, isDailyTemplate, isTemplateFolder } from "@/lib/templates";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
@@ -1201,31 +1195,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
        badge. */
   }, [session, refreshRemarks, awake]);
 
-  /* What the others wrote lately, for Updates. Read on arrival and on every
-     wake, like the remarks; `note_versions` is not on Realtime, and a version
-     is only written after a stretch of writing ends anyway. */
-  const [recentVersions, setRecentVersions] = useState<RecentVersion[]>([]);
-  const updatesFloor = useMemo(
-    () => new Date(Date.now() - UPDATES_WINDOW_DAYS * 86_400_000).toISOString(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- moves with a wake
-    [awake],
-  );
-  useEffect(() => {
-    if (!session) return;
-    let live = true;
-    loadRecentVersions(session, updatesFloor)
-      .then((rows) => live && setRecentVersions(rows))
-      /* A convenience over notes already saved: failing is an empty list. */
-      .catch(() => live && setRecentVersions([]));
-    return () => {
-      live = false;
-    };
-  }, [session, updatesFloor]);
-  const updatedNotes = useMemo(
-    () => (selfId ? changedSince(recentVersions, selfId, remarksSeen, updatesFloor) : new Map()),
-    [recentVersions, selfId, remarksSeen, updatesFloor],
-  );
-
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
   const unreadRemarkNotes = useMemo(
     () =>
@@ -1285,10 +1254,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
     if (selectedFolderId === TRASH) {
       list = list.filter((entry) => trashedIds.has(entry.note.id));
-    } else if (selectedFolderId === UPDATES) {
-      list = list.filter(
-        (entry) => updatedNotes.has(entry.note.id) && !trashedIds.has(entry.note.id),
-      );
     } else if (selectedFolderId === REMARKS) {
       /* Not the trash: a note on its way out is nobody's to discuss. */
       list = list.filter(
@@ -1314,16 +1279,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
 
     return list;
-  }, [
-    ownedEntries,
-    activeMeta,
-    trashedIds,
-    archivedIds,
-    remarkedIds,
-    updatedNotes,
-    selectedFolderId,
-    query,
-  ]);
+  }, [ownedEntries, activeMeta, trashedIds, archivedIds, remarkedIds, selectedFolderId, query]);
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -1548,13 +1504,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         ? "Unfiled"
         : selectedFolderId === REMARKS
           ? "Remarks"
-          : selectedFolderId === UPDATES
-            ? "Updates"
-            : selectedFolderId === TRASH
-              ? "Trash"
-              : selectedFolderId === ARCHIVE
-                ? "Archive"
-                : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
+          : selectedFolderId === TRASH
+            ? "Trash"
+            : selectedFolderId === ARCHIVE
+              ? "Archive"
+              : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
 
   // Seed the store from the stored note. `ensureDraft` leaves unsaved work
   // alone, so this is safe to run whenever the selection or the entry changes.
@@ -3695,14 +3649,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         count: byFolder.get(folder.id) ?? 0,
       })),
       {
-        id: UPDATES,
-        label: "Updates",
-        count: 0,
-        unread: ownedEntries.filter(
-          (entry) => updatedNotes.has(entry.note.id) && !trashedIds.has(entry.note.id),
-        ).length,
-      },
-      {
         id: REMARKS,
         label: "Remarks",
         count: [...remarkedIds].filter((id) => !trashedIds.has(id)).length,
@@ -3889,8 +3835,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 <Trash2 size={16} />
               ) : scope.id === REMARKS ? (
                 <MessageSquare size={16} />
-              ) : scope.id === UPDATES ? (
-                <History size={16} />
               ) : scope.id === ARCHIVE ? (
                 <Archive size={16} />
               ) : scope.id === ALL ? (
