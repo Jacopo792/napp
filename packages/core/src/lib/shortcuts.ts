@@ -21,6 +21,13 @@ const DOC = "document" as const;
 export const SHORTCUTS: Shortcut[] = [
   { group: "Anywhere", keys: "\u2318K", what: "Search everything" },
   { group: "Anywhere", keys: "\u2318N", what: "New note", kind: NOTES },
+  /* Only the desktop app can be reached from outside its window. */
+  {
+    group: "Anywhere",
+    keys: "\u2325\u2318N",
+    what: "New note from any app (desktop)",
+    kind: NOTES,
+  },
   { group: "Anywhere", keys: "\u2318N", what: "New chapter", kind: DOC },
   { group: "Anywhere", keys: "\u2318S", what: "Save now" },
   { group: "Anywhere", keys: "\u2318,", what: "Settings" },

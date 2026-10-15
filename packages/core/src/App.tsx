@@ -23,6 +23,7 @@ import { rootRoute } from "./screens/Root";
 import { initAxes } from "./lib/axes";
 import { initAppearance } from "./lib/appearance";
 import { initWritingPreferences } from "./lib/writingPreferences";
+import { keepCapture } from "./lib/capture";
 
 /* Before React, as they always have been: these write CSS custom properties on
    the document element, and a first paint that happens first is a flash of the
@@ -30,6 +31,9 @@ import { initWritingPreferences } from "./lib/writingPreferences";
 initAppearance();
 initAxes();
 initWritingPreferences();
+/* Something shared into the app rides in the address; it is taken out of it
+   before the router reads the address, and before a sign-in can lose it. */
+keepCapture();
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,

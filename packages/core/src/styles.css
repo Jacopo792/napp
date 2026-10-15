@@ -7160,11 +7160,29 @@
   border-color: var(--accent);
 }
 
+/* A note picked up: it leaves the page a little, tilted in the hand and
+   casting a deeper shadow, and stays that way while it is carried. */
 .drag-chip {
   border: 1px solid var(--accent);
   border-radius: var(--radius-md);
   background: var(--page);
   box-shadow: var(--shadow-popover);
+  transform: rotate(-1.5deg) scale(1.02);
+  animation: drag-lift 220ms var(--ease-out) backwards;
+}
+
+@keyframes drag-lift {
+  from {
+    transform: none;
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drag-chip {
+    transform: none;
+    animation: none;
+  }
 }
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */

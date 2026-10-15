@@ -29,7 +29,6 @@ import {
   NotebookText,
   PanelLeftClose,
   PanelLeftOpen,
-  CalendarDays,
   Search,
   Settings,
   SquarePen,
@@ -78,6 +77,7 @@ import {
   DndContext,
   DragEndEvent,
   DragOverlay,
+  type DropAnimationFunction,
   DragStartEvent,
   PointerSensor,
   useSensor,
@@ -198,8 +198,9 @@ import {
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
-import { aimNote, captureRows, sendNotes } from "@/lib/motion";
-import { dailyTitle, isDailyTemplate, isTemplateFolder } from "@/lib/templates";
+import { aimNote, captureRows, sendNotes, settleBack } from "@/lib/motion";
+import { isTemplateFolder } from "@/lib/templates";
+import { captureNote, takeCapture } from "@/lib/capture";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { NoteList, type ActiveFilter } from "@/components/NoteList";
@@ -2861,8 +2862,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   // ── Drag a note onto a folder ───────────────────────────────────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  /* Whether the drag that just ended landed somewhere. Read by the drop
+     animation, which dnd-kit runs after this handler: a note let go over a
+     place has been thrown into it already (`sendNotes`), and one let go over
+     nothing goes back to the row it came from. */
+  const landedRef = useRef(false);
+  const dropBack = useCallback<DropAnimationFunction>(
+    ({ active, dragOverlay }) =>
+      landedRef.current ? undefined : settleBack(dragOverlay.node, active.rect),
+    [],
+  );
+
   function handleDragEnd(e: DragEndEvent) {
     setDragId(null);
+    landedRef.current = Boolean(e.over);
     const over = e.over?.id as string | undefined;
     if (!over) return;
     const activeId = e.active.id as string;
@@ -3260,6 +3273,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => window.removeEventListener(OPEN_PLACE, open);
   }, [handleSelectNote]);
 
+  /* Shared in from another app (see `lib/capture.ts`): a new note, once the
+     archive it lands in is open and may be written. */
+  useEffect(() => {
+    if (loading || !canWriteArchive) return;
+    const capture = takeCapture();
+    if (capture) void handleNewFrom(captureNote(capture));
+  }, [loading, canWriteArchive, handleNewFrom]);
+
   /* Arrived from ⌘K in another archive: open what was chosen there, in the
      scope it sits in, once this archive's notes are here. */
   useEffect(() => {
@@ -3626,36 +3647,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [members, avatarUrls],
   );
 
-  /* Which notes reached this one. Found by walking the Tiptap JSON of the
-     notes already in memory rather than by asking Postgres: a link is a mark
-     inside the document, so there is no column to index and no query to write,
-     and the documents are here anyway because the list is drawn from them.
-
-     Memoised, and that is not an optimisation to take back later. It is the
-     only full-depth walk over every document in the archive, and it sat
-     unmemoised in the render body of a component that re-renders on every
-     keystroke — the typing flag, the save readout and the presence roster all
-     land here. The projection only changes when a save lands, so the deps say
-     so and the scan runs then. */
-  const backlinks = useMemo(
-    () =>
-      selectedId
-        ? ownedEntries
-            .filter(
-              (entry) =>
-                entry.note.id !== selectedId &&
-                !trashedIds.has(entry.note.id) &&
-                linksTo(entry.note.content, selectedId),
-            )
-            .map((entry) => ({ id: entry.note.id, title: entry.note.title }))
-        : [],
-    [ownedEntries, trashedIds, selectedId],
-  );
-
   /* Which notes name this one in plain words and do not link to it —
-     Obsidian's unlinked mentions. The same walk over the same documents as
-     the backlinks above, memoised for the same reason, and a note that
-     already links here is a backlink rather than a mention. */
+     Obsidian's unlinked mentions. Found by walking the Tiptap JSON of the notes
+     already in memory: a link and a name are both inside the document, so
+     there is no column to index. Memoised, and that is not an optimisation to
+     take back: it is a full-depth walk over every document in the archive, in
+     a component that re-renders on every keystroke, and the projection only
+     changes when a save lands. A note that already links here is not a
+     mention. (The foot's "Linked from" list was taken out in 0.9.37; the note
+     sheet still says what links here.) */
   const selectedTitle =
     ownedEntries.find((entry) => entry.note.id === selectedId)?.note.title ?? "";
   const mentions = useMemo(() => {
@@ -3787,8 +3787,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     .filter((note): note is Note => Boolean(note))
     .map((note) => ({ id: note.id, title: note.title }));
 
-  /* Which notes `[[` can reach. The backlinks that answer the other half of
-     the question are computed above, in a memo. */
+  /* Which notes `[[` can reach. */
   const linkableNotes = ownedEntries
     .filter((entry) => !trashedIds.has(entry.note.id))
     .map((entry) => ({ id: entry.note.id, title: entry.note.title }));
@@ -3860,24 +3859,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const meta = indexOf(activeMeta).byNote.get(entry.note.id);
     return meta?.folderId && templateFolders.has(meta.folderId) && !trashedIds.has(entry.note.id);
   });
-
-  /** Open today's note, making it first — from the Daily template if there
-   *  is one — when there is none yet. */
-  function openToday() {
-    const title = dailyTitle(new Date());
-    const found = ownedEntries.find(
-      (entry) => entry.note.title === title && !trashedIds.has(entry.note.id),
-    );
-    if (found) {
-      handleOpenRecent(found.note.id);
-      return;
-    }
-    const daily = templates.find((entry) => isDailyTemplate(entry.note.title));
-    void handleNewFrom({
-      title,
-      content: daily?.note.content ?? EMPTY_RICH_TEXT,
-    });
-  }
 
   /* On the phone there is no sidebar, so the scope in force is still worth a
      dismissible chip above the list. On the desktop the sidebar says it. */
@@ -4166,14 +4147,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       ...(docMode || !canWriteArchive
         ? []
         : [
-            {
-              id: "today",
-              group: "Do",
-              name: "Today's note",
-              keywords: "daily journal diary oggi giornaliera diario",
-              icon: <CalendarDays size={16} />,
-              run: openToday,
-            },
             ...templates.map((template) => ({
               id: `template:${template.note.id}`,
               group: "New from template",
@@ -5803,7 +5776,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     session={session}
                     commentAuthors={commentAuthors}
                     linkable={linkableNotes}
-                    backlinks={backlinks}
                     mentions={mentions}
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
@@ -6054,7 +6026,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               session={session}
               commentAuthors={commentAuthors}
               linkable={linkableNotes}
-              backlinks={backlinks}
               mentions={mentions}
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
@@ -6117,7 +6088,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           )}
         </div>
 
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={dropBack}>
           {dragEntry || dragFolder ? (
             <div className="drag-chip w-56 px-3 py-2">
               <p className="readout truncate text-ink">

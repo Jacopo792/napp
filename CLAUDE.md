@@ -1698,7 +1698,10 @@ What points at a note is found by walking the Tiptap JSON of the notes already
 in memory (`linksTo()` in `packages/core/src/lib/derived.ts`), never by querying a column: a
 link is a mark inside the document, so there is nothing to index. It therefore
 follows the Postgres projection, which means a link written now appears in the
-other note's foot when the save lands rather than as it is typed.
+other note's sheet when the save lands rather than as it is typed. The foot of
+the page no longer lists what links here — "Linked from" was taken out in
+0.9.37 at Jacopo's request; the note sheet still says it, and "Mentioned in"
+stays at the foot. Do not put the list back.
 
 Three things the tests pin: the round trip is stable, the title heading is not
 left duplicated in the body, and a note link leaves as `[[Title]]` and never as
@@ -1831,6 +1834,50 @@ needs anyway.
 The in-memory note cache (`noteCache`, `resetArchiveCache`, `adoptArchiveCache`)
 lives in `noteStore.ts` for that reason and no other — `session.ts` has to clear
 it on sign-out, and that one import was the whole rope. Keep it there.
+
+## Movement with a cause
+
+`lib/motion.ts` holds the rule every animation here follows: **a movement
+starts where something was touched and ends where the thing went.** Before
+0.9.36 most entrances drifted a few pixels upward whatever caused them, and
+the report was that the motion was random and had no concreteness — it was
+not a request for less motion. So:
+
+- A note trashed, archived, restored or filed is **thrown** at its place in
+  the sidebar (`sendNotes`, called from `handleMetaChangeFor`), and the glyph
+  lands it (`glyph-take`). The rows left behind close the gap by FLIP
+  (`captureRows` before the change, `playRows` in `NoteList`'s layout effect).
+- Menus scale out of the last pointer-down (`MenuSurface`), a right-click menu
+  out of its point; overlays `emerge` from the pressed point; a picture zooms
+  from its thumbnail. Opened from the keyboard, they only fade.
+- **Sidebar glyphs never move on hover.** They move when something happens to
+  their place: held over, given to, pressed. Do not put the hover wiggles back.
+- A note opened from the list arrives from the side of the list it was on
+  (`aimNote`); from anywhere else it fades.
+- A notched mouse wheel glides (trackpads untouched), columns fade under the
+  chrome (not on Windows: a mask costs ClearType), and the title rises into the
+  strip once it has scrolled away.
+
+A new animation needs an answer to "from where, to where". An entrance with no
+direction of its own is a fade.
+
+## Sharing into a note, and catching one from anywhere
+
+`lib/capture.ts`: something shared in arrives as `#capture?title&text&url` —
+**a fragment, never a query**, because the web server is GitHub Pages and what
+somebody shares into their notes is not GitHub's to log. Android reaches it
+through the manifest's `share_target` (`apps/web/public/`), whose GET request
+the one-purpose `sw.js` answers on the phone with a redirect to the fragment.
+iOS has no web share target; a Shortcut in the share sheet opens the fragment
+directly. The capture is lifted out of the address in `App.tsx` before
+routing, so a sign-in on the way does not lose it.
+
+The desktop app registers ⌥⌘N / Ctrl+Alt+N with `globalShortcut`: the window
+comes forward and the New Note chord is pressed, exactly as the Dock menu does.
+
+A note reopens at the block that was at the top of the page
+(`lib/readingPlace.ts`) — a block and a fraction of it, never pixels, and kept
+per device like a pane's width.
 
 ## Flush columns, one band of chrome
 

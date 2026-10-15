@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.37 — 2026-10-15
+
+### Added
+
+- Desktop global shortcut `CommandOrControl+Alt+N` (and the Dock's New Note) brings the window forward and presses the New Note chord.
+- Share capture via `#capture?title&text&url` (`lib/capture.ts`), lifted out of the address before routing and turned into a note once the archive is writable. Web manifest with a GET `share_target`; a one-purpose service worker redirects `share?…` to the fragment on-device so shared text is never sent to GitHub Pages. 192/512 icons for Android installability.
+- Reading place per note (`lib/readingPlace.ts`): top block index and fraction, kept per device in localStorage (200 notes), restored once the document arrives unless something else scrolled first.
+- Drag chip lifts on pick-up; a drop over nothing settles the chip back to its row (`settleBack`), a drop on a place keeps the thrown flight.
+
+### Removed
+
+- "Linked from" at the foot of a note (the note sheet keeps it) and its per-render backlink walk.
+- Today's note and the daily-template helpers; templates stay.
+
 ## 0.9.36 — 2026-10-15
 
 ### Changed

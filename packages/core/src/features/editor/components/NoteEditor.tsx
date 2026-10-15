@@ -50,6 +50,7 @@ import { NoteOutline } from "./NoteOutline";
 import { EditorToolbar } from "./EditorToolbar";
 import { ManuscriptToolbar } from "./ManuscriptToolbar";
 import { TitleField } from "./TitleField";
+import { rememberPlace, restorePlace } from "@/lib/readingPlace";
 import { RichTextEditor, type RichTextEditorHandle } from "./RichTextEditor";
 import { PageCover, PageIdentity, type PagePropertyValues } from "./PageProperties";
 import { TITLE_TEXT } from "@/features/editor/lib/ydoc";
@@ -148,10 +149,9 @@ interface Props {
   /** The note's photo, set, re-cut or (null) taken off — as the row menu does. */
   onSetPhoto?: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
   collaboration?: { document: Y.Doc; provider: HocuspocusProvider | null } | null;
-  /** Every note `[[` can reach from this one, and the notes that reach this
-   *  one. Both absent where there is no archive behind the page. */
+  /** Every note `[[` can reach from this one. Absent where there is no
+   *  archive behind the page. */
   linkable?: { id: string; title: string }[];
-  backlinks?: { id: string; title: string }[];
   /** Notes that name this one in plain words, and the words they use. */
   mentions?: { id: string; title: string; words: string }[];
   onOpenNote?: (noteId: string, passage?: string) => void;
@@ -268,7 +268,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onSetPhoto,
     collaboration = null,
     linkable,
-    backlinks,
     mentions,
     onOpenNote,
     onRemarksChanged,
@@ -363,6 +362,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       setTitleAway(false);
     };
   }, [scroller, titleRef, entry?.note.id]);
+  /* A note opens where it was left, and remembers where that is as it is
+     read. Written while scrolling rather than on the way out: by the time a
+     cleanup runs the page is either gone or already showing the next note,
+     and either would be remembered as this one's place. */
+  const readingId = entry?.note.id;
+  useEffect(() => {
+    if (!scroller || !readingId) return;
+    const cancel = restorePlace(readingId, scroller);
+    let timer = 0;
+    const onScroll = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => rememberPlace(readingId, scroller), 250);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancel();
+      window.clearTimeout(timer);
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [scroller, readingId]);
   /* A passage the bubble menu has just anchored, waiting for its first remark.
      It exists in the document and not yet in the archive, which is why it is
      held here rather than being read back with the rest. */
@@ -1702,30 +1721,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <div className="skeleton" style={{ width: "45%" }} />
               </div>
             )}
-            {/* What points here. A note is not only what it says; the notes
-                that reached for it are part of what it is, and they are the
-                one thing about a note it cannot state itself. Only when there
-                are some — an empty "Linked from" under every note teaches the
-                reader to stop looking at the foot of the page. */}
-            {backlinks && backlinks.length > 0 && (
-              <div className={`note-backlinks ${mobile ? "px-0" : ""}`}>
-                <p className="note-backlinks-label">Linked from</p>
-                <div className="note-backlinks-list">
-                  {backlinks.map((note) => (
-                    <button
-                      key={note.id}
-                      type="button"
-                      className="note-backlink press"
-                      onClick={() => onOpenNote?.(note.id)}
-                    >
-                      <Link2 size={12} />
-                      {note.title || "Untitled"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* What names this note without reaching for it — Obsidian's
                 unlinked mentions. The name opens the note at the words; Link
                 opens it and makes them a link, as typing `[[` there would. */}

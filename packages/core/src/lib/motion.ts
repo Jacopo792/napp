@@ -449,3 +449,25 @@ if (typeof document !== "undefined" && !/Windows/.test(navigator.userAgent)) {
     { capture: true, passive: true },
   );
 }
+
+/* ── Let go over nothing ────────────────────────────────────────────────────
+   A note dragged and dropped where nothing takes it goes back where it came
+   from, smaller and fading into its own row — the drag is undone, visibly,
+   rather than the chip vanishing where the pointer happened to be. */
+export function settleBack(node: HTMLElement, home: { left: number; top: number }) {
+  if (reduced()) return;
+  const box = node.getBoundingClientRect();
+  const base = node.style.transform || "";
+  return node
+    .animate(
+      [
+        { transform: base, opacity: 1 },
+        {
+          transform: `${base} translate(${home.left - box.left}px, ${home.top - box.top}px) scale(0.96)`,
+          opacity: 0,
+        },
+      ],
+      { duration: 300, easing: EASE, fill: "forwards" },
+    )
+    .finished.then(() => {});
+}

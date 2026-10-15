@@ -42,6 +42,43 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.37",
+    date: "2026-10-15",
+    headline: "Catch a thought from anywhere",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "A new note from any app",
+            text: "In the desktop app, press ⌥⌘N (Ctrl+Alt+N on Windows) wherever you are: Napp comes forward with a new note ready. New Note in the Dock does the same.",
+          },
+          {
+            title: "Share into Napp",
+            text: "On Android, add Napp to your home screen and it appears in the share sheet: what you share becomes a new note. On iPhone, a Shortcut in the share sheet can do the same. What you share never passes through the web server.",
+          },
+          {
+            title: "Back where you were",
+            text: "A long note opens again at the paragraph you were reading, on each device.",
+          },
+          {
+            title: "Picked up and put back",
+            text: "A note you drag lifts off the list. Let go over a folder, the Archive or the Trash and it goes in; let go over nothing and it returns to its place.",
+          },
+        ],
+      },
+      {
+        heading: "Taken out",
+        items: [
+          {
+            title: "Linked from and Today's note",
+            text: "The list of notes linking here is gone from the foot of the page; the note's info sheet still shows it. Today's note is gone from ⌘K. Templates stay.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.36",
     date: "2026-10-15",
     headline: "Movement that goes somewhere",

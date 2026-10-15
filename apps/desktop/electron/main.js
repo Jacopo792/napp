@@ -18,6 +18,7 @@ const {
   BrowserWindow,
   clipboard,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   net,
@@ -447,28 +448,33 @@ app.whenReady().then(() => {
   });
   installMenu(isDev);
   createWindow();
-  /* The Dock's own menu, which every Mac notes app has: a new note without
-     bringing the window forward first and finding the button. It presses the
-     same chord the menu bar's New Note does, so it has no logic of its own. */
+  /* A new note from anywhere: the window comes forward and the same chord the
+     menu bar's New Note presses is pressed, so there is no logic of its own.
+     A thought is caught in the two seconds it lasts, wherever the hand was —
+     which is the whole of why notes end up in the app that is already open. */
+  const newNote = () => {
+    const existing = BrowserWindow.getAllWindows()[0];
+    const window = existing ?? createWindow();
+    const press = () =>
+      window.webContents.send("napp:command", {
+        key: "n",
+        ...(process.platform === "darwin" ? { metaKey: true } : { ctrlKey: true }),
+      });
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+    /* A window made just now has no page to hear the key yet. */
+    if (existing) press();
+    else window.webContents.once("did-finish-load", press);
+  };
+  /* ⌥⌘N on a Mac, Ctrl+Alt+N on Windows. Taken from the whole system, so it
+     is a chord nobody types; if another application already holds it, the
+     registration simply fails and the menu and the Dock still work. */
+  globalShortcut.register("CommandOrControl+Alt+N", newNote);
+  app.on("will-quit", () => globalShortcut.unregisterAll());
+  /* The Dock's own menu, which every Mac notes app has: the same act. */
   if (process.platform === "darwin") {
-    app.dock.setMenu(
-      Menu.buildFromTemplate([
-        {
-          label: "New Note",
-          click: () => {
-            const existing = BrowserWindow.getAllWindows()[0];
-            const window = existing ?? createWindow();
-            const press = () =>
-              window.webContents.send("napp:command", { key: "n", metaKey: true });
-            window.show();
-            window.focus();
-            /* A window made just now has no page to hear the key yet. */
-            if (existing) press();
-            else window.webContents.once("did-finish-load", press);
-          },
-        },
-      ]),
-    );
+    app.dock.setMenu(Menu.buildFromTemplate([{ label: "New Note", click: newNote }]));
   }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
