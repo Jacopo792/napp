@@ -343,6 +343,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  /* Scrolled past, the title does not leave: it rises into the strip above
+     the page, the way a large title becomes the bar's. Asked of the title
+     itself, so a cover of any height above it changes nothing. */
+  const [titleAway, setTitleAway] = useState(false);
+  useEffect(() => {
+    const title = titleRef.current;
+    if (!scroller || !title) return;
+    const watch = new IntersectionObserver(
+      ([seen]) =>
+        setTitleAway(
+          !seen.isIntersecting && seen.boundingClientRect.top < (seen.rootBounds?.top ?? 0),
+        ),
+      { root: scroller },
+    );
+    watch.observe(title);
+    return () => {
+      watch.disconnect();
+      setTitleAway(false);
+    };
+  }, [scroller, titleRef, entry?.note.id]);
   /* A passage the bubble menu has just anchored, waiting for its first remark.
      It exists in the document and not yet in the archive, which is why it is
      held here rather than being read back with the rest. */
@@ -1452,6 +1472,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         <span className="flex min-w-0 items-center gap-2">
           {navigationAction && <span className="flex items-center gap-1">{navigationAction}</span>}
           {headerPresence}
+          {/* Only where the strip keeps a column of its own on this side; in a
+              narrow pane it would run under the buttons opposite. */}
+          {!mobile && toolbarLayout === "centred" && (
+            <span className="editor-strip-title" data-shown={titleAway || undefined} aria-hidden>
+              {entry.note.title || "Untitled"}
+            </span>
+          )}
         </span>
 
         {/* A wide enough editor keeps the cluster optically centred over the

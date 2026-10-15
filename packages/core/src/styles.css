@@ -635,11 +635,12 @@
   background: var(--page);
   box-shadow: var(--shadow-popover);
   overflow: hidden;
-  /* A menu that is simply present on the next frame reads as a jump cut. This
-     is short enough that it is never a wait — the list is legible before the
-     eye has finished travelling to it — and it comes from the corner the menu
-     hangs off, so the panel looks attached to the control that opened it. */
-  animation: menu-in 140ms var(--ease-out) backwards;
+  /* A menu that is simply present on the next frame reads as a jump cut. It
+     grows instead, out of the control that opened it: `MenuSurface` points
+     `transform-origin` at wherever the pointer went down, a right-click menu
+     at the point itself, and this is only the fallback for a menu opened from
+     the keyboard. Short enough never to be a wait. */
+  animation: menu-in 180ms var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -654,7 +655,7 @@
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: scale(0.9);
   }
 }
 
@@ -5467,7 +5468,6 @@
   gap: 0.75rem;
   max-width: 100%;
   max-height: 100%;
-  animation: lightbox-lift var(--dur-slow) var(--ease) backwards;
 }
 
 .lightbox-figure img {
@@ -5507,13 +5507,6 @@
 @keyframes lightbox-in {
   from {
     opacity: 0;
-  }
-}
-
-@keyframes lightbox-lift {
-  from {
-    opacity: 0;
-    transform: scale(0.965) translateY(10px);
   }
 }
 
@@ -5717,7 +5710,7 @@
    you were reading it. Shorter, smaller, and no overshoot. */
 .menu-popover {
   transform-origin: top right;
-  animation: menu-reveal 140ms var(--ease-out) backwards;
+  animation: menu-reveal 180ms var(--ease-out) backwards;
 }
 
 .menu-popover.left-0 {
@@ -5727,7 +5720,7 @@
 @keyframes menu-reveal {
   from {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: scale(0.9);
   }
 }
 
@@ -5751,9 +5744,8 @@
   animation: fade-in var(--dur-base) var(--ease-out) backwards;
 }
 
-.settings-panel {
-  animation: settings-reveal var(--dur-base) var(--ease-out) backwards;
-}
+/* The panel itself comes out of whatever opened it — the gear, a menu row —
+   in `lib/motion.ts`, where the press is known. */
 
 @keyframes fade-in {
   from {
@@ -5775,7 +5767,7 @@
 }
 
 .settings-layer.is-closing .settings-panel {
-  animation: settings-leave 160ms var(--ease-press) forwards;
+  animation: settings-leave 200ms var(--ease-in-out) forwards;
 }
 
 @keyframes fade-out {
@@ -5784,10 +5776,12 @@
   }
 }
 
+/* And goes back towards it: the origin the entrance set is still on the
+   element. */
 @keyframes settings-leave {
   to {
     opacity: 0;
-    transform: scale(0.98);
+    transform: scale(0.82);
   }
 }
 
@@ -5802,7 +5796,6 @@
 @keyframes settings-section-in {
   from {
     opacity: 0;
-    transform: translateY(3px);
   }
 }
 
@@ -5815,12 +5808,36 @@
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
+}
+
+/* A note opened from the list beside it comes from the side of the list it
+   was on: the next note down rises into place, the one above comes down, the
+   way the page would move if the notes were one long scroll. Opened from
+   anywhere else — a link, ⌘K, a reload — it has no direction and only fades. */
+@keyframes page-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes page-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+:root[data-note-direction="down"] .page-in > * {
+  animation-name: page-in-below;
+}
+
+:root[data-note-direction="up"] .page-in > * {
+  animation-name: page-in-above;
 }
 
 /* Opening another note, raised by `handleSelectNote`. The page being left is
@@ -5846,6 +5863,29 @@
 .is-opening-note::view-transition-old(note-body) {
   animation: fade-out 160ms var(--ease-out) both;
   mix-blend-mode: normal;
+}
+
+/* The page being left goes the other way from the one arriving. */
+.is-opening-note[data-note-direction="down"]::view-transition-old(note-body) {
+  animation-name: page-out-above;
+}
+
+.is-opening-note[data-note-direction="up"]::view-transition-old(note-body) {
+  animation-name: page-out-below;
+}
+
+@keyframes page-out-above {
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes page-out-below {
+  to {
+    opacity: 0;
+    transform: translateY(14px);
+  }
 }
 
 /* The body that waited behind the skeleton arrives the way the rest of the
@@ -6663,65 +6703,74 @@
    16px icon on a 16.96px box — permanently blurred, on the one row you look at
    most. State never justifies a fractional icon. */
 
-/* ── One move each ───────────────────────────────────────────────────────────
-   Every destination in this column does something of its own when the pointer
-   arrives on it: the bin tips, the shelf takes something in, the remark pops,
-   the gear turns. It is the difference between a list of pictures and a list
-   of places.
+/* ── A place takes what is given to it ───────────────────────────────────────
+   The glyphs in this column used to move whenever a pointer crossed them — the
+   bin tipped, the folder lifted, the gear turned — and a movement nobody caused
+   reads as the list fidgeting. They move now when something happens to the
+   place they stand for, and only then.
 
-   Three rules hold it together.
+   **Held over it, the place opens.** A note dragged over the Trash, the
+   Archive or a folder is a question — "here?" — and the glyph answers by
+   opening towards it, for as long as the note is held there.
 
-   **On hover, and only where there is one.** `@media (hover: hover)` is not
-   politeness here, it is the whole of what keeps this from being noise: a tap
-   has no hover, so on a phone a destination opens rather than performs, and
-   nothing plays on mount either — which is what a move tied to the *selected*
-   row would do on every reload, and on the phone every time the drawer opens.
+   **Given to it, the place takes it.** A note thrown here from the list (see
+   `lib/motion.ts`) lands on the glyph, and the glyph gives under its weight
+   and comes back: squashed at the base, a little taller on the rebound, still.
+   One landing for every destination, because it is the same act each time.
 
-   **The whole glyph moves, never a stroke inside it.** Reaching in for a
-   glyph's path by position would put the bin's lid animation on whatever stroke
-   that library happens to draw first next version, and nothing would fail —
-   the wrong line would simply start moving.
+   **Pressed, the control does what it is about to do.** The gear turns as
+   Settings comes out of it; the padlock closes as the archive locks.
 
-   **Every move ends where it started.** They are transient, so the note above
-   about fractional icons is not contradicted: the resting glyph is still on
-   the pixel grid, and what is off it for 240ms is a thing in motion, which is
-   the one time the eye does not read an edge. Held states stay square.
+   The whole glyph moves, never a stroke inside it: reaching for a path by
+   position would animate whatever stroke the icon library draws first next
+   version. Every move ends where it started, so the resting glyph stays on
+   the pixel grid. */
+.sidebar-glyph[data-motion="trash"] svg {
+  transform-origin: 30% 100%;
+}
 
-   Durations and curves are the four this file allows and no fifth. */
-@media (hover: hover) and (pointer: fine) {
-  .sidebar-row:hover .sidebar-glyph[data-motion="notes"] svg {
-    animation: glyph-leaf var(--dur-base) var(--ease-out);
+.sidebar-glyph[data-motion="folder"] svg {
+  transform-origin: 20% 100%;
+}
+
+.sidebar-row.is-over .sidebar-glyph[data-motion="trash"] svg {
+  transform: rotate(-12deg);
+}
+
+.sidebar-row.is-over .sidebar-glyph[data-motion="folder"] svg {
+  transform: rotate(-6deg) scale(1.08);
+}
+
+.sidebar-row.is-over .sidebar-glyph[data-motion="archive"] svg {
+  transform: translateY(-1.5px) scale(1.06);
+}
+
+.sidebar-glyph.is-receiving svg {
+  transform-origin: 50% 100%;
+  animation: glyph-take 420ms var(--ease-out);
+}
+
+@keyframes glyph-take {
+  0% {
+    transform: none;
   }
-
-  .sidebar-row:hover .sidebar-glyph[data-motion="folder"] svg {
-    transform-origin: 20% 100%;
-    animation: glyph-lift var(--dur-base) var(--ease-spring);
+  28% {
+    transform: translateY(1px) scale(1.16, 0.82);
   }
-
-  .sidebar-row:hover .sidebar-glyph[data-motion="pin"] svg {
-    animation: glyph-jab var(--dur-base) var(--ease-spring);
+  58% {
+    transform: translateY(-1.5px) scale(0.94, 1.08);
   }
-
-  .sidebar-row:hover .sidebar-glyph[data-motion="remarks"] svg {
-    animation: glyph-pop var(--dur-base) var(--ease-spring);
+  80% {
+    transform: scale(1.02, 0.98);
   }
+}
 
-  .sidebar-row:hover .sidebar-glyph[data-motion="archive"] svg {
-    animation: glyph-file var(--dur-base) var(--ease);
-  }
+.sidebar-footer-button[data-motion="settings"]:active svg {
+  transform: rotate(60deg);
+}
 
-  .sidebar-row:hover .sidebar-glyph[data-motion="trash"] svg {
-    transform-origin: 50% 100%;
-    animation: glyph-tip var(--dur-base) var(--ease-spring);
-  }
-
-  .sidebar-footer-button[data-motion="settings"]:hover svg {
-    animation: glyph-turn var(--dur-base) var(--ease-in-out);
-  }
-
-  .sidebar-footer-button[data-motion="lock"]:hover svg {
-    animation: glyph-refuse var(--dur-base) var(--ease-press);
-  }
+.sidebar-footer-button[data-motion="lock"]:active svg {
+  transform: translateY(1px) scale(0.9, 0.84);
 }
 
 /* ── Leaning toward where it goes ────────────────────────────────────────────
@@ -6755,76 +6804,21 @@
   }
 }
 
-/* A page lifting off the ones under it, which is what "all notes" is. */
-@keyframes glyph-leaf {
-  50% {
-    transform: perspective(60px) rotateY(-12deg) translateX(0.5px);
-  }
-}
-
-/* The lid, hinged at the fold rather than at the middle of the box. */
-@keyframes glyph-lift {
-  50% {
-    transform: rotate(-5deg);
-  }
-}
-
-/* In, and it stays in — the overshoot on the way back is the spring, and it is
-   what a pin pushed home does. */
-@keyframes glyph-jab {
-  45% {
-    transform: translateY(1px) rotate(-4deg);
-  }
-}
-
-/* Somebody said something. */
-@keyframes glyph-pop {
-  45% {
-    transform: scale(1.08);
-  }
-}
-
-/* Down into the box, and back up empty-handed. */
-@keyframes glyph-file {
-  45% {
-    transform: translateY(1px);
-  }
-}
-
-/* Knocked, not emptied: the bin tips off its base and rocks back. */
-@keyframes glyph-tip {
-  45% {
-    transform: rotate(-7deg);
-  }
-}
-
-/* A small acknowledgement of the hover, returning to the resting glyph. */
-@keyframes glyph-turn {
-  50% {
-    transform: rotate(30deg);
-  }
-}
-
-/* The shake of something that will not open. */
-@keyframes glyph-refuse {
-  20%,
-  60% {
-    transform: translateX(-1.5px);
-  }
-
-  40%,
-  80% {
-    transform: translateX(1.5px);
-  }
-}
-
 /* And the press, which the hover cannot stand in for: a click is the one
    moment the hand wants an answer, and on a phone it is the only one there is.
-   `scale`, the standalone property, so it composes with whichever hover move
-   is mid-flight rather than replacing its `transform`. */
+   `scale`, the standalone property, so it composes with whichever move is
+   mid-flight rather than replacing its `transform`. */
 .sidebar-glyph svg,
 .sidebar-footer-button svg {
-  transition: scale var(--dur-press) var(--ease-press);
+  transition:
+    scale var(--dur-press) var(--ease-press),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.sidebar-footer-button[data-motion="settings"] svg {
+  transition:
+    scale var(--dur-press) var(--ease-press),
+    transform var(--dur-slow) var(--ease);
 }
 
 .sidebar-row:active .sidebar-glyph svg,
@@ -6833,8 +6827,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-row:hover .sidebar-glyph svg,
-  .sidebar-footer-button:hover svg {
+  .sidebar-glyph.is-receiving svg {
     animation: none;
   }
 
@@ -7838,10 +7831,13 @@
   touch-action: none;
 }
 
+/* A band unrolled from the top edge it hangs from, not a picture sliding in. */
 @keyframes cover-in {
   from {
-    opacity: 0;
-    transform: translateY(-8px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
   }
 }
 
@@ -12828,7 +12824,6 @@ button.sheet-chip:hover,
 @keyframes whats-new-release-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
   }
 }
 
@@ -13055,9 +13050,11 @@ button.sheet-chip:hover,
   pointer-events: none;
   animation: menu-out 80ms var(--ease-out) forwards;
 }
+/* Back into where it came from, faster than it left. */
 @keyframes menu-out {
   to {
     opacity: 0;
+    transform: scale(0.96);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -13087,4 +13084,76 @@ button.sheet-chip:hover,
 .list-in.is-searching,
 .pane-frame[data-scope-direction] .list-in.is-searching {
   animation: none;
+}
+
+/* ── A note in flight ────────────────────────────────────────────────────────
+   The copy of a row thrown at a place in the sidebar (`lib/motion.ts`). Three
+   layers because a throw is three motions: across, down, and smaller. */
+.note-flight {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+}
+
+.note-flight-axis {
+  width: 100%;
+  height: 100%;
+}
+
+.note-flight-card {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-popover);
+}
+
+/* What's New comes out of the row at the foot of the sidebar that opened it
+   (`emerge` in `lib/motion.ts`), so the palette's own drop is not wanted. */
+.palette.whats-new {
+  animation: none;
+}
+
+/* Content going under the chrome rather than being cut by it — the column
+   fades at an edge that has more behind it (`lib/motion.ts` writes how much).
+   Only while there is an edge to fade, so a column at rest is not a layer. */
+[data-edged] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--edge-top, 0px),
+    #000 calc(100% - var(--edge-bottom, 0px)),
+    transparent 100%
+  );
+}
+
+/* The title, once it has scrolled up out of the page, arrives in the strip
+   from below — from the direction it left in — and goes back down into the
+   page when the page comes back to it. */
+.editor-strip-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-base) var(--ease);
+  pointer-events: none;
+}
+
+.editor-strip-title[data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-strip-title {
+    transform: none;
+  }
 }

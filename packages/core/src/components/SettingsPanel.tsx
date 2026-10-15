@@ -113,6 +113,7 @@ import {
   type WritingPreferences,
 } from "@/lib/writingPreferences";
 import { Avatar } from "./WorkspaceMenus";
+import { emerge } from "@/lib/motion";
 /* Settings, in a chunk of its own.
  *
  * It is one panel behind one button, opened rarely and never on the way to a
@@ -630,6 +631,7 @@ export function SettingsPanel({
         aria-modal="true"
         aria-labelledby="settings-title"
         className="settings-panel glass-sheet"
+        ref={arrive}
       >
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
@@ -1677,3 +1679,7 @@ export function SettingsPanel({
     </div>
   );
 }
+
+/* Settings comes out of what opened it: the gear turning at the foot of the
+   sidebar, or the menu row that was pressed. Stable, so it runs once. */
+const arrive = (el: HTMLElement | null) => emerge(el);

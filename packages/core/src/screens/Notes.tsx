@@ -198,6 +198,7 @@ import {
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
+import { aimNote, captureRows, sendNotes } from "@/lib/motion";
 import { dailyTitle, isDailyTemplate, isTemplateFolder } from "@/lib/templates";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
@@ -2106,10 +2107,31 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         before: pending?.before ?? base,
         after: m,
       });
+      /* Where each note went, read while its row is still where it was: the
+         row is thrown at that place in the sidebar, and the rows left behind
+         are measured so they can close over the gap. */
+      const was = new Map(base.notes.map((note) => [note.id, note]));
+      const moves: { id: string; to: string | null; leaves: boolean }[] = [];
+      for (const note of m.notes) {
+        const prev = was.get(note.id);
+        const home = note.folderId ?? ALL;
+        if (!prev?.trashedAt && note.trashedAt)
+          moves.push({ id: note.id, to: TRASH, leaves: true });
+        else if (prev?.trashedAt && !note.trashedAt)
+          moves.push({ id: note.id, to: note.archivedAt ? ARCHIVE : home, leaves: true });
+        else if (!prev?.archivedAt && note.archivedAt)
+          moves.push({ id: note.id, to: ARCHIVE, leaves: true });
+        else if (prev?.archivedAt && !note.archivedAt)
+          moves.push({ id: note.id, to: home, leaves: true });
+        else if (prev && prev.folderId !== note.folderId)
+          moves.push({ id: note.id, to: home, leaves: selectedFolderId !== ALL });
+      }
+      captureRows();
+      sendNotes(moves);
       setMetas((current) => ({ ...current, [owner]: m }));
       schedule();
     },
-    [schedule, canWriteArchive, selfId],
+    [schedule, canWriteArchive, selfId, selectedFolderId],
   );
 
   const handleMetaChange = useCallback(
@@ -2569,6 +2591,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         for (const id of doomed) dropDraft(id);
         await deleteNotes(s, [...doomed]);
 
+        captureRows();
+        sendNotes([...doomed].map((id) => ({ id, to: null, leaves: true })));
         entriesRef.current = entriesRef.current.filter((e) => !doomed.has(e.note.id));
         setEntries(entriesRef.current);
 
@@ -3191,10 +3215,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         !root.classList.contains("is-sliding-navigation")
       ) {
         root.classList.add("is-opening-note");
+        const from = selectedIdRef.current;
+        /* Aimed inside the callback: by then the old page is already a
+           picture, so the direction never restarts its entrance. */
         document
-          .startViewTransition(() => flushSync(() => setSelectedId(id)))
+          .startViewTransition(() =>
+            flushSync(() => {
+              aimNote(from, id);
+              setSelectedId(id);
+            }),
+          )
           .finished.finally(() => root.classList.remove("is-opening-note"));
       } else {
+        aimNote(selectedIdRef.current, id);
         setSelectedId(id);
       }
       /* Opening the note *is* having read what was said on it — a remark

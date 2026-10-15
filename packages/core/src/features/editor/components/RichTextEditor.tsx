@@ -112,6 +112,7 @@ import { rememberSpelling, takeAutocorrection } from "@/features/editor/lib/auto
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import { platform } from "@/platform";
+import { emerge } from "@/lib/motion";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
 import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
@@ -2022,6 +2023,15 @@ function privateFileExtension(resolve: Resolver) {
   });
 }
 
+/* The picture grows out of itself in the note rather than appearing over it.
+   Already decoded when it was shown in the note, so it is usually complete at
+   mount and can be measured at once; otherwise it waits for the bytes. */
+const openOut = (img: HTMLImageElement | null) => {
+  if (!img) return;
+  if (img.complete) emerge(img, "zoom");
+  else img.addEventListener("load", () => emerge(img, "zoom"), { once: true });
+};
+
 function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: () => void }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -2045,7 +2055,7 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
       onClick={onClose}
     >
       <figure className="lightbox-figure" onClick={(event) => event.stopPropagation()}>
-        <img src={preview.src} alt={preview.alt} />
+        <img src={preview.src} alt={preview.alt} ref={openOut} />
       </figure>
       <button type="button" onClick={onClose} className="lightbox-close" aria-label="Close image">
         ×

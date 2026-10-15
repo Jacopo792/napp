@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -49,6 +50,7 @@ import {
 import type { NoteEntry } from "@/lib/entries";
 import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
+import { playRows } from "@/lib/motion";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuItems } from "./MenuPrimitives";
 import { pinItem, lockItems, moveItem } from "./menuNoteItems";
@@ -947,6 +949,10 @@ export function NoteList({
   /* Which note the picture being cut is for: the menu is gone by the time the
      cropper is on screen. */
   const [cropping, setCropping] = useState<{ noteId: string; file: File } | null>(null);
+  /* Every render after a note was moved: the rows measured just before the
+     move are put back where they were and let go. Cheap when nothing moved —
+     there is no snapshot to read. */
+  useLayoutEffect(playRows);
   /* Which date groups are folded shut. The *closed* ones are what is stored, so
      a bucket that appears for the first time — a new month, a new year — opens
      rather than arriving already hidden. Same shape as the folder tree's
@@ -1198,6 +1204,7 @@ export function NoteList({
           aria-expanded={open}
           aria-controls={`note-group-body-${group.id}`}
           onClick={() => toggleGroup(group.id)}
+          data-flip={`group:${group.id}`}
           className={`note-group-heading ${groupIndex === 0 ? "is-first" : ""}`}
         >
           <ChevronRight

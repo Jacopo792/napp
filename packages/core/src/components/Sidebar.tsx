@@ -380,6 +380,7 @@ function Row({
         side ? `is-over-${side}` : ""
       } ${drag.isDragging ? "is-lifted" : ""}`}
       data-folder-row={onHold ? scope.id : undefined}
+      data-scope-row={scope.id}
       style={{ paddingLeft: `${depth * INDENT}px` }}
       onContextMenu={onContextMenu}
     >

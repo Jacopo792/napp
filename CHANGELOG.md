@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.36 — 2026-10-15
+
+### Changed
+
+- New `lib/motion.ts`: every movement has a source and a destination. Metadata changes that trash, archive, restore or refile a note throw a copy of its row (or of the drag chip) at the destination's sidebar glyph on an arc (separate X, Y and scale layers), and the glyph plays a landing (`glyph-take`). Deleting forever dissolves the copy in place. Sidebar rows carry `data-scope-row`.
+- List FLIP: rows and day headings (`data-flip`) are measured before a metadata change and played back in `NoteList`'s layout effect, so neighbours close gaps and pinned notes rise into Pinned.
+- Menus scale from their origin: `MenuSurface` points `transform-origin` at the last pointer-down, context menus at the clicked point; exits shrink back. Settings and What's New grow out of the pressed point (`emerge`), and the lightbox image zooms from its thumbnail.
+- Sidebar hover wiggles removed. Drag-over opens the Trash, Archive and folder glyphs; the gear turns and the padlock shuts on press.
+- Note switches carry direction (`data-note-direction`): the next note down rises, the previous falls, and the outgoing view-transition snapshot leaves the other way. Without a list origin the page only fades. The cover unrolls with a clip-path; Settings sections and What's New releases cross-fade without travel.
+- Smooth mouse-wheel scrolling for notched wheels (trackpads and uncertain input stay native), eased toward an accumulating target per scroll box; snap containers and modified wheels are left alone.
+- Scroll-edge masks on the sidebar, list, editor and Settings, present only while there is an edge to fade; off on Windows to keep ClearType.
+- The note title appears in the editor strip once scrolled out of view (centred toolbar layout only).
+- All movement is disabled under `prefers-reduced-motion`.
+
 ## 0.9.35 — 2026-10-13
 
 ### Changed

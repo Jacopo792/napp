@@ -42,6 +42,51 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.36",
+    date: "2026-10-15",
+    headline: "Movement that goes somewhere",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes go where you send them",
+            text: "Move a note to the Trash, the Archive or a folder and it travels there in the sidebar, which takes it in. The notes left behind close the gap, and a pinned note rises into Pinned.",
+          },
+          {
+            title: "Menus and windows come from what you pressed",
+            text: "Menus grow out of their button, or out of the point you right-clicked. Settings and What's New open out of the row that opened them and return to it, and a picture opens out of itself in the note.",
+          },
+          {
+            title: "Places answer when something happens to them",
+            text: "Sidebar icons no longer move when the pointer passes. Hold a note over the Trash, the Archive or a folder and it opens towards it; the gear turns as Settings opens.",
+          },
+          {
+            title: "Moving through notes",
+            text: "The next note down the list rises into place and the one above comes down, as if the notes were one long page. A cover unrolls from the top of the page.",
+          },
+        ],
+      },
+      {
+        heading: "Scrolling",
+        items: [
+          {
+            title: "A mouse wheel that glides",
+            text: "Each notch of a mouse wheel now carries the page smoothly instead of jumping. A trackpad scrolls as it always did.",
+          },
+          {
+            title: "Words pass under the toolbars",
+            text: "Lists, notes and Settings fade at the edge where there is more to read, instead of being cut by the bar above them. Not on Windows, where it would blur the text.",
+          },
+          {
+            title: "The title stays with you",
+            text: "Scroll past a note's title and it rises into the bar above the page, and goes back down when you return to the top.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.35",
     date: "2026-10-13",
     headline: "Housekeeping",

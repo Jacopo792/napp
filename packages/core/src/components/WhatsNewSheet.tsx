@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Download, Sparkle, X } from "@/components/icons";
 import { DOWNLOADS, RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
+import { emerge } from "@/lib/motion";
 
 export function WhatsNewSheet({
   open,
@@ -55,6 +56,7 @@ export function WhatsNewSheet({
         aria-modal="true"
         aria-labelledby="whats-new-title"
         className="palette whats-new glass-sheet"
+        ref={arrive}
       >
         <header className="whats-new-head">
           <span className="whats-new-mark" aria-hidden="true">
@@ -151,3 +153,8 @@ export function WhatsNewSheet({
     </div>
   );
 }
+
+/* Out of the row that opened it — or, opened by itself after an update, from
+   its own middle. Module-level so the ref is the same function every render
+   and runs once, on the way in. */
+const arrive = (el: HTMLElement | null) => emerge(el);

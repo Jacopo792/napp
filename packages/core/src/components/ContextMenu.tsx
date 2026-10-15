@@ -97,7 +97,15 @@ export function ContextMenu({
         ref={measure}
         role="menu"
         className={`context-menu popover menu-popover p-1.5 ${className}`}
-        style={{ left, top, width, visibility: size.h ? "visible" : "hidden" }}
+        /* It grows out of the point that was pressed, wherever the edge of
+           the window has pushed the panel to. */
+        style={{
+          left,
+          top,
+          width,
+          visibility: size.h ? "visible" : "hidden",
+          transformOrigin: `${point.x - left}px ${point.y - top}px`,
+        }}
       >
         {children}
       </MenuSurface>
