@@ -1380,6 +1380,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           {
             id: entry.note.id,
             title: entry.note.title,
+            preview: derivedOf(entry.note).preview,
             words: derivedOf(entry.note).words,
             folderId: row?.folderId && parts.has(row.folderId) ? row.folderId : null,
             position: row?.position ?? null,
@@ -5536,6 +5537,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     focus: focusMode ? writingPreferences.focusScope : "off",
                     typewriter: writingPreferences.typewriter,
                   },
+                  onToggleFocus: toggleFocus,
+                  onToggleTypewriter: () =>
+                    setWritingPreferences({
+                      ...writingPreferences,
+                      typewriter: !writingPreferences.typewriter,
+                    }),
                   topLevel: topLevel(
                     headingsOf(selected.note.content).map((heading) => heading.level),
                   ),

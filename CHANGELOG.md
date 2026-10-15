@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.39 — 2026-10-15
+
+### Changed
+
+- Manuscript bar: the ribbon is cut to style, bold, italic, Aa and Insert (plus Review). Font, size, the other text effects, colour, highlight, alignment, spacing, indent and lists move into one Aa panel (`.format-panel`). Undo and redo leave the bar; ⌘Z and ⇧⌘Z remain. The container queries that hid controls one by one are gone.
+- The bar's tools fade (`.is-quiet`) on a typed key in the desk and return after 8px of pointer travel, on focus inside the bar, or while one of its menus is open.
+- Focus mode and typewriter scrolling get buttons in the bar end (`ManuscriptFrame.onToggleFocus` / `onToggleTypewriter`).
+- Dark sheet: it takes the theme's page, ink, rule and accent through `--desk-*` tokens captured on `.manuscript-desk`, in place of fixed neutral greys.
+- Structure rows with no title show the chapter's preview in italics.
+- Botanical plates: the empty editor shows the whole plant centred above its line, instead of cropped off the corner. The tailpiece is 128px and centred, 2.75rem under the last line (it moved inside the text column, before "Mentioned in"). The draw order is the stem alone, then the sprigs from 560ms in 70ms steps.
+
 ## 0.9.38 — 2026-10-15
 
 ### Changed

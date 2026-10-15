@@ -1,11 +1,8 @@
 import { MenuSurface } from "@/components/MenuSurface";
-/* The writing bar of a document: Word's Home tab, cut to what a long piece of
- * writing is actually set with.
- *
- * Groups in Word's order, because that order is in the hand of everybody who
- * has written a thesis: history, style, character, paragraph, insert, find.
- * Every group is one press away and none hides behind a tab — a ribbon's
- * tabs exist because Word has two thousand commands, and this has forty.
+/* The writing bar of a document: what prose is written with in sight —
+ * style, bold, italic, Insert — and every other way of setting a character or
+ * a paragraph one press away under Aa. It was Word's Home tab in full, twenty
+ * controls standing over every page, and a book is not a form.
  *
  * It reads the selection (`useEditorState`), so the font menu says which font
  * the words are in, the size says their size and the alignment shows which
@@ -32,7 +29,6 @@ import {
   CrossReference,
   Eraser,
   Footnote,
-  Highlighter,
   ImagePlus,
   Indent,
   Italic,
@@ -45,14 +41,12 @@ import {
   Outdent,
   PageBreak,
   Plus,
-  Redo2,
   Review,
   Strikethrough,
   Subscript,
   Superscript,
   Table2,
   Underline,
-  Undo2,
   X,
 } from "@/components/icons";
 import { WRITING_FONTS, type PageSetup } from "@/lib/spaceShape";
@@ -323,13 +317,9 @@ export function ManuscriptToolbar({
       const level = [1, 2, 3].find((n) => current.isActive("heading", { level: n }));
       return {
         editable: current.isEditable,
-        canUndo: current.can().undo(),
-        canRedo: current.can().redo(),
         block: current.isActive("blockquote") ? "quote" : level ? `h${level}` : "body",
         font: (style.fontFamily as string | undefined) ?? "",
         size: (style.fontSize as string | undefined) ?? "",
-        color: (style.color as string | undefined) ?? "",
-        marker: (style.backgroundColor as string | undefined) ?? "",
         bold: current.isActive("bold"),
         italic: current.isActive("italic"),
         underline: current.isActive("underline"),
@@ -355,25 +345,6 @@ export function ManuscriptToolbar({
 
   return (
     <div className="ribbon" role="toolbar" aria-label="Formatting">
-      <div className="ribbon-group is-history">
-        <Tool
-          label="Undo"
-          shortcut="⌘Z"
-          disabled={off || !state?.canUndo}
-          onPress={() => chain().undo().run()}
-        >
-          <Undo2 size={16} />
-        </Tool>
-        <Tool
-          label="Redo"
-          shortcut="⇧⌘Z"
-          disabled={off || !state?.canRedo}
-          onPress={() => chain().redo().run()}
-        >
-          <Redo2 size={16} />
-        </Tool>
-      </div>
-
       <div className="ribbon-group">
         <select
           className="ribbon-select is-style"
@@ -396,52 +367,6 @@ export function ManuscriptToolbar({
         </select>
       </div>
 
-      <div className="ribbon-group">
-        <select
-          className="ribbon-select is-font"
-          aria-label="Font"
-          disabled={off}
-          value={state?.font ?? ""}
-          style={{ fontFamily: state?.font || undefined }}
-          onChange={(event) => {
-            const value = event.target.value;
-            if (value) chain().setFontFamily(value).run();
-            else chain().unsetFontFamily().run();
-          }}
-        >
-          <option value="">Page font</option>
-          {WRITING_FONTS.map((font) => (
-            <option key={font.id} value={font.stack} style={{ fontFamily: font.stack }}>
-              {font.name}
-            </option>
-          ))}
-          {/* A face that arrived with pasted text and is not on the list
-              still has to be nameable, or the menu shows a lie. */}
-          {state?.font && !WRITING_FONTS.some((font) => font.stack === state.font) && (
-            <option value={state.font}>{state.font.split(",")[0].replaceAll('"', "")}</option>
-          )}
-        </select>
-        <select
-          className="ribbon-select is-size"
-          aria-label="Font size"
-          disabled={off}
-          value={points ?? ""}
-          onChange={(event) => {
-            const value = event.target.value;
-            if (value) chain().setFontSize(`${value}pt`).run();
-            else chain().unsetFontSize().run();
-          }}
-        >
-          <option value="">Auto</option>
-          {SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-          {points && !SIZES.includes(points) && <option value={points}>{points}</option>}
-        </select>
-      </div>
-
       <div className="ribbon-group is-character">
         <Tool
           label="Bold"
@@ -461,194 +386,188 @@ export function ManuscriptToolbar({
         >
           <Italic size={16} />
         </Tool>
-        <Tool
-          label="Underline"
-          shortcut="⌘U"
-          active={state?.underline}
-          disabled={off}
-          onPress={() => chain().toggleUnderline().run()}
-        >
-          <Underline size={16} />
-        </Tool>
-        <Drop
-          label="More text effects"
-          disabled={off}
-          face={
-            state?.sup ? (
-              <Superscript size={16} />
-            ) : state?.sub ? (
-              <Subscript size={16} />
-            ) : (
-              <Strikethrough size={16} />
-            )
-          }
-        >
-          {(close) => (
-            <>
-              <MenuRow
-                icon={<Strikethrough size={16} />}
-                label="Strikethrough"
-                checked={Boolean(state?.strike)}
-                onPress={() => {
-                  chain().toggleStrike().run();
-                  close();
-                }}
-              />
-              <MenuRow
-                icon={<Superscript size={16} />}
-                label="Superscript"
-                checked={Boolean(state?.sup)}
-                onPress={() => {
-                  chain().toggleMark("superscript").run();
-                  close();
-                }}
-              />
-              <MenuRow
-                icon={<Subscript size={16} />}
-                label="Subscript"
-                checked={Boolean(state?.sub)}
-                onPress={() => {
-                  chain().toggleMark("subscript").run();
-                  close();
-                }}
-              />
-            </>
-          )}
-        </Drop>
-        <Drop
-          label="Text colour"
-          disabled={off}
-          face={
-            <span className="ribbon-ink">
-              A<i style={{ background: state?.color || "currentColor" }} />
-            </span>
-          }
-        >
-          {(close) => (
-            <Swatches
-              colors={INKS}
-              none="Automatic"
-              onPick={(value) => {
-                if (value) chain().setColor(value).run();
-                else chain().unsetColor().run();
-                close();
-              }}
-            />
-          )}
-        </Drop>
-        <Drop
-          label="Highlight"
-          disabled={off}
-          face={
-            <span className="ribbon-ink">
-              <Highlighter size={15} />
-              <i style={{ background: state?.marker || "#fff27a" }} />
-            </span>
-          }
-        >
-          {(close) => (
-            <Swatches
-              colors={MARKERS}
-              none="No highlight"
-              onPick={(value) => {
-                if (value) chain().setBackgroundColor(value).run();
-                else chain().unsetBackgroundColor().run();
-                close();
-              }}
-            />
-          )}
-        </Drop>
-        <span className="ribbon-cluster is-clear">
-          <Tool
-            label="Clear formatting"
-            disabled={off}
-            onPress={() => {
-              chain().unsetAllMarks().clearNodes().run();
-              setBlock(editor!, { textAlign: null, indent: null, lineHeight: null });
-            }}
-          >
-            <Eraser size={16} />
-          </Tool>
-        </span>
-      </div>
-
-      <div className="ribbon-group">
-        <span className="ribbon-cluster is-align">
-          <Drop
-            label="Alignment"
-            disabled={off}
-            face={ALIGNS.find(([align]) => align === (state?.align ?? "left"))![2]}
-          >
-            {(close) =>
-              ALIGNS.map(([align, label, icon, shortcut]) => (
-                <MenuRow
-                  key={align}
-                  icon={icon}
-                  label={label}
-                  hint={keyName(shortcut)}
-                  checked={state?.align === align}
-                  onPress={() => {
-                    setBlock(editor!, { textAlign: align === "left" ? null : align });
-                    close();
+        {/* Everything else a character or a paragraph can be set with, in
+            one panel: prose is written in a style, bold and italic, and a bar
+            that showed twenty more controls all the time was a form to fill
+            in above every page. */}
+        <Drop label="Format" disabled={off} face={<span className="ribbon-letters">Aa</span>}>
+          {() => (
+            <div className="format-panel">
+              <div className="format-row">
+                <select
+                  className="ribbon-select is-font"
+                  aria-label="Font"
+                  disabled={off}
+                  value={state?.font ?? ""}
+                  style={{ fontFamily: state?.font || undefined }}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value) chain().setFontFamily(value).run();
+                    else chain().unsetFontFamily().run();
                   }}
-                />
-              ))
-            }
-          </Drop>
-        </span>
-        <label className="ribbon-select-wrap" title="Line spacing">
-          <LineSpacing size={15} />
-          <select
-            className="ribbon-select is-spacing"
-            aria-label="Line spacing"
-            disabled={off}
-            value={state?.spacing ?? ""}
-            onChange={(event) =>
-              setBlock(editor!, {
-                lineHeight: event.target.value ? Number(event.target.value) : null,
-              })
-            }
-          >
-            <option value="">Page</option>
-            {SPACINGS.map((spacing) => (
-              <option key={spacing} value={spacing}>
-                {spacing.toFixed(spacing % 1 ? 2 : 1).replace(/0$/, "")}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="ribbon-cluster is-indent">
-          <Tool
-            label="Decrease indent"
-            disabled={off || !state?.indent}
-            onPress={() => setBlock(editor!, { indent: (state?.indent ?? 0) - 1 || null })}
-          >
-            <Outdent size={16} />
-          </Tool>
-          <Tool
-            label="Increase indent"
-            disabled={off || (state?.indent ?? 0) >= 8}
-            onPress={() => setBlock(editor!, { indent: Math.min(8, (state?.indent ?? 0) + 1) })}
-          >
-            <Indent size={16} />
-          </Tool>
-        </span>
-        <Tool
-          label="Bulleted list"
-          active={state?.bullets}
-          disabled={off}
-          onPress={() => chain().toggleBulletList().run()}
-        >
-          <List size={16} />
-        </Tool>
-        <Tool
-          label="Numbered list"
-          active={state?.numbers}
-          disabled={off}
-          onPress={() => chain().toggleOrderedList().run()}
-        >
-          <ListOrdered size={16} />
-        </Tool>
+                >
+                  <option value="">Page font</option>
+                  {WRITING_FONTS.map((font) => (
+                    <option key={font.id} value={font.stack} style={{ fontFamily: font.stack }}>
+                      {font.name}
+                    </option>
+                  ))}
+                  {/* A face that arrived with pasted text and is not on the
+                      list still has to be nameable, or the menu shows a lie. */}
+                  {state?.font && !WRITING_FONTS.some((font) => font.stack === state.font) && (
+                    <option value={state.font}>
+                      {state.font.split(",")[0].replaceAll('"', "")}
+                    </option>
+                  )}
+                </select>
+                <select
+                  className="ribbon-select is-size"
+                  aria-label="Font size"
+                  disabled={off}
+                  value={points ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value) chain().setFontSize(`${value}pt`).run();
+                    else chain().unsetFontSize().run();
+                  }}
+                >
+                  <option value="">Auto</option>
+                  {SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                  {points && !SIZES.includes(points) && <option value={points}>{points}</option>}
+                </select>
+              </div>
+              <div className="format-row">
+                <Tool
+                  label="Underline"
+                  shortcut="⌘U"
+                  active={state?.underline}
+                  onPress={() => chain().toggleUnderline().run()}
+                >
+                  <Underline size={16} />
+                </Tool>
+                <Tool
+                  label="Strikethrough"
+                  active={state?.strike}
+                  onPress={() => chain().toggleStrike().run()}
+                >
+                  <Strikethrough size={16} />
+                </Tool>
+                <Tool
+                  label="Superscript"
+                  active={state?.sup}
+                  onPress={() => chain().toggleMark("superscript").run()}
+                >
+                  <Superscript size={16} />
+                </Tool>
+                <Tool
+                  label="Subscript"
+                  active={state?.sub}
+                  onPress={() => chain().toggleMark("subscript").run()}
+                >
+                  <Subscript size={16} />
+                </Tool>
+                <Tool
+                  label="Clear formatting"
+                  onPress={() => {
+                    chain().unsetAllMarks().clearNodes().run();
+                    setBlock(editor!, { textAlign: null, indent: null, lineHeight: null });
+                  }}
+                >
+                  <Eraser size={16} />
+                </Tool>
+              </div>
+              <div className="format-row">
+                {ALIGNS.map(([align, label, icon, shortcut]) => (
+                  <Tool
+                    key={align}
+                    label={label}
+                    shortcut={shortcut}
+                    active={(state?.align ?? "left") === align}
+                    onPress={() =>
+                      setBlock(editor!, { textAlign: align === "left" ? null : align })
+                    }
+                  >
+                    {icon}
+                  </Tool>
+                ))}
+                <label className="ribbon-select-wrap" title="Line spacing">
+                  <LineSpacing size={15} />
+                  <select
+                    className="ribbon-select is-spacing"
+                    aria-label="Line spacing"
+                    value={state?.spacing ?? ""}
+                    onChange={(event) =>
+                      setBlock(editor!, {
+                        lineHeight: event.target.value ? Number(event.target.value) : null,
+                      })
+                    }
+                  >
+                    <option value="">Page</option>
+                    {SPACINGS.map((spacing) => (
+                      <option key={spacing} value={spacing}>
+                        {spacing.toFixed(spacing % 1 ? 2 : 1).replace(/0$/, "")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="format-row">
+                <Tool
+                  label="Bulleted list"
+                  active={state?.bullets}
+                  onPress={() => chain().toggleBulletList().run()}
+                >
+                  <List size={16} />
+                </Tool>
+                <Tool
+                  label="Numbered list"
+                  active={state?.numbers}
+                  onPress={() => chain().toggleOrderedList().run()}
+                >
+                  <ListOrdered size={16} />
+                </Tool>
+                <Tool
+                  label="Decrease indent"
+                  disabled={!state?.indent}
+                  onPress={() => setBlock(editor!, { indent: (state?.indent ?? 0) - 1 || null })}
+                >
+                  <Outdent size={16} />
+                </Tool>
+                <Tool
+                  label="Increase indent"
+                  disabled={(state?.indent ?? 0) >= 8}
+                  onPress={() =>
+                    setBlock(editor!, { indent: Math.min(8, (state?.indent ?? 0) + 1) })
+                  }
+                >
+                  <Indent size={16} />
+                </Tool>
+              </div>
+              <p className="format-heading">Colour</p>
+              <Swatches
+                colors={INKS}
+                none="Automatic"
+                onPick={(value) => {
+                  if (value) chain().setColor(value).run();
+                  else chain().unsetColor().run();
+                }}
+              />
+              <p className="format-heading">Highlight</p>
+              <Swatches
+                colors={MARKERS}
+                none="No highlight"
+                onPick={(value) => {
+                  if (value) chain().setBackgroundColor(value).run();
+                  else chain().unsetBackgroundColor().run();
+                }}
+              />
+            </div>
+          )}
+        </Drop>
       </div>
 
       <div className="ribbon-group">

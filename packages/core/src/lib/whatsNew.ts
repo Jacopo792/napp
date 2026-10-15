@@ -42,6 +42,43 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.39",
+    date: "2026-10-15",
+    headline: "A quieter book, tidier flowers",
+    sections: [
+      {
+        heading: "In a book",
+        items: [
+          {
+            title: "A writing bar that steps back",
+            text: "The bar over the page now holds the style, bold, italic and Insert. Fonts, sizes, colours, alignment, spacing and lists are all under Aa. While you type, the bar fades out, and it comes back as soon as you move the pointer.",
+          },
+          {
+            title: "Focus and typewriter, one press away",
+            text: "Focus mode and typewriter scrolling have their own buttons in the bar, instead of being tucked away in Settings.",
+          },
+          {
+            title: "A dark page in your colours",
+            text: "In a dark theme the page now takes the colours you chose, instead of a grey of its own.",
+          },
+          {
+            title: "Chapters named by how they begin",
+            text: "A chapter with no title yet shows its first words in the structure, instead of another Untitled.",
+          },
+        ],
+      },
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Flowers in their place",
+            text: "With no note open, the flower now stands whole in the middle of the page with its line beneath it. At the end of a note it sits small and centred under the last line. Both now grow in order: the stem first, then each leaf and petal.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.38",
     date: "2026-10-15",
     headline: "Movement, looked at closely",

@@ -14,6 +14,8 @@ import {
   Search,
   X,
   BookOpen,
+  Keyboard,
+  Target,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
 import { PointMenu } from "@/components/ContextMenu";
@@ -82,6 +84,9 @@ export interface ManuscriptFrame {
   topLevel?: number;
   /** Focus mode and typewriter scrolling, as the reader set them. */
   writing?: WritingFocusSettings;
+  /** Both are one press in the bar: tucked in Settings, nobody found them. */
+  onToggleFocus?: () => void;
+  onToggleTypewriter?: () => void;
   /** The document has footnotes on: Insert and ⌥⌘F offer one. */
   footnotes?: boolean;
   /** The document cites sources. */
@@ -210,8 +215,8 @@ export interface NoteEditorHandle {
 let tailpieceDrawn = false;
 
 /** The mark at the end of a note, in the run-out the text already leaves below
- *  itself: a plate in the bottom margin, on the outer edge, the way a botanical
- *  book puts one there.
+ *  itself: a small plate centred a fixed step under the last line, the way a
+ *  printed book closes a chapter with a tailpiece.
  *
  *  A sibling of the editor and never a node inside it — anything in the
  *  document would be editable, would serialise into Markdown, and would reach
@@ -387,6 +392,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      held here rather than being read back with the rest. */
   const [pendingThread, setPendingThread] = useState<string | null>(null);
   const [passageMenu, setPassageMenu] = useState<MenuPoint | null>(null);
+
+  /* The writing bar steps back while somebody is writing on the sheet and
+     comes back the moment the pointer moves: tools are for between
+     sentences, not over them. Only typed characters count — a shortcut is
+     a reach for the tools, not a sentence. */
+  const [quiet, setQuiet] = useState(false);
+  useEffect(() => {
+    if (!quiet) return;
+    let travelled = 0;
+    const wake = (event: PointerEvent) => {
+      travelled += Math.abs(event.movementX) + Math.abs(event.movementY);
+      if (travelled > 8) setQuiet(false);
+    };
+    window.addEventListener("pointermove", wake);
+    return () => window.removeEventListener("pointermove", wake);
+  }, [quiet]);
   const [passageHasSelection, setPassageHasSelection] = useState(false);
   /* The thread the panel should scroll to and outline, set by clicking the
      underlined passage it belongs to. Not the same thing as `pendingThread`,
@@ -1193,7 +1214,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         ref={shellRef}
         className={`editor-shell manuscript-shell flex min-w-0 flex-1 flex-col ${mobile ? "is-mobile" : ""}`}
       >
-        <div className="manuscript-bar relative shrink-0">
+        <div className={`manuscript-bar relative shrink-0 ${quiet ? "is-quiet" : ""}`}>
           {headerLead}
           {canEdit && !pages ? (
             <ManuscriptToolbar
@@ -1240,6 +1261,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               <BookOpen size={16} />
               <span>{pages ? "Edit" : "Pages"}</span>
             </button>
+            {manuscript.onToggleFocus && (
+              <button
+                type="button"
+                className={`ribbon-tool press ${manuscript.writing?.focus !== "off" ? "is-active" : ""}`}
+                aria-label="Focus mode"
+                aria-pressed={manuscript.writing?.focus !== "off"}
+                title="Focus mode · Esc to leave"
+                onClick={manuscript.onToggleFocus}
+              >
+                <Target size={16} />
+              </button>
+            )}
+            {manuscript.onToggleTypewriter && (
+              <button
+                type="button"
+                className={`ribbon-tool press ${manuscript.writing?.typewriter ? "is-active" : ""}`}
+                aria-label="Typewriter scrolling"
+                aria-pressed={Boolean(manuscript.writing?.typewriter)}
+                title="Typewriter scrolling"
+                onClick={manuscript.onToggleTypewriter}
+              >
+                <Keyboard size={16} />
+              </button>
+            )}
             <button
               type="button"
               className={`ribbon-tool press ${findOpen ? "is-active" : ""}`}
@@ -1303,6 +1348,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             ref={setScroller}
             className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""}`}
             onContextMenu={onPassageMenu}
+            onKeyDown={(event) => {
+              if (event.metaKey || event.ctrlKey || event.altKey) return;
+              if (event.key.length === 1 || event.key === "Enter" || event.key === "Backspace")
+                setQuiet(true);
+            }}
           >
             <article
               ref={sheetRef}
@@ -1708,6 +1758,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 }}
               />
             )}
+            {collaboration && <NoteTailpiece noteId={entry.note.id} />}
 
             {/* The title paints from the draft store the moment you click, and
               the body cannot: it waits for the server to authorise and sync.
@@ -1753,8 +1804,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 </div>
               </div>
             )}
-
-            {collaboration && <NoteTailpiece noteId={entry.note.id} />}
           </div>
         </div>
 

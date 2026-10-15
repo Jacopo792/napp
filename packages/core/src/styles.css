@@ -933,20 +933,22 @@
   }
 }
 
-/* The editor with no note in it. The same plate as the door, at the height of
-   the pane, running off the bottom right corner — clipped there for the reason
-   `.login-garden` is clipped: a stem hanging below the fold is a scrollbar on a
-   page that has nothing to scroll. */
+/* The editor with no note in it: a plate and its caption, the way a
+   herbarium sheet is laid out — the plant whole and upright in the middle of
+   the page, the line set under it as its label. It ran off the bottom right
+   corner once, as large as the pane, and a plant cropped by whatever width the
+   window happened to be never landed in the same place twice. */
 .editor-empty {
   position: relative;
+  flex-direction: column;
+  gap: 18px;
   overflow: clip;
 }
 
 .botanical-plate.is-empty-page {
-  right: -11vh;
-  bottom: -16vh;
-  height: 114vh;
-  opacity: 0.09;
+  position: static;
+  height: min(46vh, 380px);
+  opacity: 0.16;
   pointer-events: none;
 }
 
@@ -1567,8 +1569,8 @@
   }
 }
 
-/* The tailpiece under a note: a botanical plate in the bottom margin, on the
-   outer edge, the way a printed book puts one there. The printer's mark for
+/* The tailpiece under a note: a small botanical plate centred under the last
+   line, the way a printed book closes a chapter. The printer's mark for
    "this is the end of the text", and the only picture the reading surface has.
 
    It lives in the 40vh of run-out `.rich-text-content` leaves below the last
@@ -1583,22 +1585,22 @@
    note onward gets — so the one authored moment stays a moment. */
 .note-tailpiece {
   display: flex;
-  justify-content: flex-end;
-  margin-top: -34vh;
-  padding-right: clamp(0px, 4vw, 40px);
+  justify-content: center;
+  /* Pulled up into the run-out to a fixed distance under the last line, and
+     the rest of the run-out kept below it — so the mark always sits the same
+     step after the text, in the middle of the measure, as a printer's
+     tailpiece does. On the outer edge it floated at whatever height the
+     window's vh put it, beside nothing. */
+  margin: calc(-40vh + 2.75rem) auto 24vh;
   pointer-events: none;
 }
 
-/* The whole plant and not a crop of its head. A box that stops just under the
-   flower cuts the stem mid-line and leaves a leaf hanging in the air, which
-   reads as a drawing that failed to finish rather than as a plate — and the
-   heads sit at four different heights, so one crop could never hold all four
-   anyway. At this height the full plate is a plant, not the stick it was at
-   150. */
+/* The whole plant and not a crop of its head: a box that stops under the
+   flower cuts the stem mid-line, and the heads sit at four different heights. */
 .botanical-plate.note-tailpiece-plate {
   position: static;
-  height: 190px;
-  opacity: 0.14;
+  height: 128px;
+  opacity: 0.16;
 }
 
 /* Already drawn this visit: the plate is simply there, at full length and with
@@ -1610,25 +1612,30 @@
 }
 
 @media (max-width: 700px) {
-  .note-tailpiece {
-    margin-top: -30vh;
-    padding-right: 6px;
-  }
-
   .botanical-plate.note-tailpiece-plate {
-    height: 138px;
+    height: 104px;
   }
 }
 
 /* The one authored moment on this surface: the plant draws itself, base to
    tip, while the card settles. `pathLength` normalises every path to 1, so a
    vein and a stem take the same dash and differ only in when they start. */
+/* In the order a plant grows: the stem first and alone, then each leaf and
+   petal in its turn once the stem has reached them. Every path starting
+   within a few frames of every other, as it did, read as scribbling rather
+   than drawing. */
 .botanical-plate .stem,
 .botanical-plate .sprig {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: plate-draw 900ms var(--ease-out) forwards;
-  animation-delay: calc(120ms + var(--i) * 78ms);
+  animation: plate-draw 640ms var(--ease-out) forwards;
+  animation-delay: calc(560ms + var(--i) * 70ms);
+}
+
+.botanical-plate .stem {
+  animation-duration: 900ms;
+  animation-timing-function: var(--ease);
+  animation-delay: 80ms;
 }
 
 @keyframes plate-draw {
@@ -10967,6 +10974,14 @@ button.sheet-chip:hover,
   white-space: nowrap;
 }
 
+/* A chapter with no title yet is named by how it begins, set apart so it is
+   not mistaken for a title: seven "Untitled" rows said nothing about which
+   was which. */
+.structure-untitled {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
 /* Where a chapter stands, as a dot before its name — the colour of a label in
    Scrivener's binder, and nothing at all for a chapter never given one. */
 .structure-status {
@@ -11246,6 +11261,16 @@ button.sheet-chip:hover,
   box-shadow: inset 0 -1px 0 var(--rule);
 }
 
+/* Writing: the tools fade where they stand, the strip itself stays — a bar
+   that collapsed would move the sheet under the words being typed. */
+.manuscript-bar > * {
+  transition: opacity 600ms var(--ease);
+}
+
+.manuscript-bar.is-quiet:not(:focus-within, :has([aria-expanded="true"])) > * {
+  opacity: 0;
+}
+
 .manuscript-bar-end {
   display: flex;
   flex-shrink: 0;
@@ -11287,10 +11312,6 @@ button.sheet-chip:hover,
   flex-wrap: nowrap;
   align-items: center;
   gap: 4px;
-}
-
-.ribbon-cluster {
-  display: contents;
 }
 
 .ribbon-group {
@@ -11402,45 +11423,7 @@ button.sheet-chip:hover,
   border-radius: var(--radius-pill);
 }
 
-/* Put away in this order: the text's own face (the page's is in Page set-up),
-   indents, undo and redo (⌘Z), line spacing and size, then alignment and
-   clearing — so Insert, at the end, is never the one cut off. */
-@container manuscript-bar (max-width: 1200px) {
-  .ribbon-select.is-font,
-  .ribbon-cluster.is-indent {
-    display: none;
-  }
-}
-
-@container manuscript-bar (max-width: 1100px) {
-  .ribbon-group.is-history {
-    display: none;
-  }
-}
-
-@container manuscript-bar (max-width: 1000px) {
-  .ribbon-select-wrap,
-  .ribbon-select.is-size {
-    display: none;
-  }
-}
-
 @container manuscript-bar (max-width: 900px) {
-  .ribbon-cluster.is-align,
-  .ribbon-cluster.is-clear {
-    display: none;
-  }
-}
-
-@container manuscript-bar (max-width: 1400px) {
-  .ribbon-select.is-style {
-    width: 92px;
-  }
-
-  .ribbon-select.is-font {
-    width: 100px;
-  }
-
   .ribbon-word {
     display: none;
   }
@@ -11448,10 +11431,48 @@ button.sheet-chip:hover,
   .ribbon-tool:has(.ribbon-word) {
     padding: 0;
   }
+}
 
-  .ribbon-group {
-    padding: 0 2px;
-  }
+.ribbon-letters {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+/* Aa: the rest of the ribbon, folded into one panel in rows by kind. */
+.ribbon-panel:has(.format-panel) {
+  width: 15.5rem;
+}
+
+.format-panel .ribbon-select.is-font {
+  flex: 1;
+  width: auto;
+}
+
+.format-row {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-bottom: 6px;
+}
+
+.format-row + .format-row {
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 6px;
+}
+
+.format-row .ribbon-select-wrap {
+  margin-left: auto;
+}
+
+.format-heading {
+  margin: 0;
+  padding: 8px 2px 6px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
 }
 
 .ribbon-panel {
@@ -11506,6 +11527,20 @@ button.sheet-chip:hover,
 
 /* ── The desk and the sheet ── */
 .manuscript-desk {
+  /* The window's own tokens, kept under other names before the sheet
+     re-points them, so a dark sheet can be set in the palette the reader
+     chose rather than in a grey of its own. */
+  --desk-page: var(--page);
+  --desk-ink: var(--ink);
+  --desk-ink-2: var(--ink-2);
+  --desk-ink-3: var(--ink-3);
+  --desk-ink-4: var(--ink-4);
+  --desk-rule: var(--rule);
+  --desk-rule-soft: var(--rule-soft);
+  --desk-accent: var(--accent);
+  --desk-accent-strong: var(--accent-strong);
+  --desk-accent-wash: var(--accent-wash);
+
   overflow: auto;
   padding: 32px 24px 96px;
   background: var(--surface);
@@ -11562,17 +11597,19 @@ button.sheet-chip:hover,
 @media screen {
   [data-theme="dark"] .manuscript-sheet[data-tone="theme"],
   .manuscript-sheet[data-tone="dark"] {
-    --ink: #ececee;
-    --ink-2: #cfcfd3;
-    --ink-3: #9d9da3;
-    --ink-4: #707076;
-    --rule: #3b3b40;
-    --rule-soft: #2f2f33;
-    --accent: #5aa0ff;
-    --accent-strong: #8dbdff;
-    --accent-wash: rgb(90 160 255 / 0.16);
-    --page: #1f1f22;
-    --paper: #1f1f22;
+    /* The theme's own page, not a neutral grey: a #1f1f22 slab on Fjord's
+       blue desk read as a hole cut in the window. */
+    --ink: var(--desk-ink);
+    --ink-2: var(--desk-ink-2);
+    --ink-3: var(--desk-ink-3);
+    --ink-4: var(--desk-ink-4);
+    --rule: var(--desk-rule);
+    --rule-soft: var(--desk-rule-soft);
+    --accent: var(--desk-accent);
+    --accent-strong: var(--desk-accent-strong);
+    --accent-wash: var(--desk-accent-wash);
+    --page: var(--desk-page);
+    --paper: var(--desk-page);
     --tint-yellow: #e8c547;
     --tint-purple: #b49cf7;
     --tint-pink: #f283ad;
@@ -11586,7 +11623,7 @@ button.sheet-chip:hover,
 
   :is([data-theme="dark"] .manuscript-sheet[data-tone="theme"], .manuscript-sheet[data-tone="dark"])
     ::selection {
-    background: rgb(90 160 255 / 0.3);
+    background: var(--accent-wash);
   }
 
   :is(
@@ -13070,9 +13107,6 @@ button.sheet-chip:hover,
 
 /* Keep the essentials within the writing bar, including the controls at its end. */
 @container manuscript-bar (max-width: 760px) {
-  .ribbon-group.is-character > span {
-    display: none;
-  }
   .manuscript-bar-end > button > span {
     display: none;
   }

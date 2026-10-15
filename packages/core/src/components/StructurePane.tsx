@@ -57,6 +57,8 @@ export type { StructureTarget };
 export interface ChapterItem {
   id: string;
   title: string;
+  /** The first words, standing in for a title nobody has written yet. */
+  preview?: string;
   words: number;
   folderId: string | null;
   position?: number | null;
@@ -114,7 +116,7 @@ function Row({
             title={CHAPTER_STATUSES.find((one) => one.id === item.chapter?.status)?.label}
           />
         )}
-        {item.title || "Untitled"}
+        {item.title || <span className="structure-untitled">{item.preview || "Untitled"}</span>}
       </span>
       <span
         className={`structure-words ${
