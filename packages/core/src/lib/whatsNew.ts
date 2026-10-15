@@ -42,6 +42,42 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.38",
+    date: "2026-10-15",
+    headline: "Movement, looked at closely",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes land where they go",
+            text: "A note sent to the Trash, the Archive or a folder now folds into a small page and drops all the way into its place, instead of fading out before it arrives.",
+          },
+          {
+            title: "One page at a time",
+            text: "Moving to the next note, the old page leaves before the new one arrives, so the two never show through each other.",
+          },
+          {
+            title: "Settings opens out of the gear",
+            text: "Settings grows visibly out of the button that opened it, instead of appearing almost at once.",
+          },
+          {
+            title: "A dragged note finds its way back",
+            text: "Let go over nothing, a dragged note travels back to its row before it settles in. Held over a folder, it draws in so you can see the folder it is going into.",
+          },
+          {
+            title: "A smoother mouse wheel",
+            text: "Scrolling with a mouse wheel no longer jerks back at the first moment, and jumping to a heading while the page is still gliding goes where you asked.",
+          },
+          {
+            title: "A quieter toolbar",
+            text: "The toolbar no longer says when the note was edited: its row in the list already does. It speaks only while something is happening, such as saving.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.37",
     date: "2026-10-15",
     headline: "Catch a thought from anywhere",

@@ -1612,9 +1612,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 {/* The note's time used to stand here, centred over the title.
                     It was meant as the caption of the page and read as a line
                     with nothing under it — a date floating in the gap between
-                    the toolbar and the words. It is in the editor header now,
-                    in the slot that already reports on this note; see
-                    `saveReadout` in `Notes.tsx`. */}
+                    the toolbar and the words. The note's row in the list says
+                    it, and the note sheet gives the full date; the header
+                    slot no longer repeats it (see `saveReadout` in
+                    `Notes.tsx`). */}
                 <PageIdentity
                   photo={entry.note.photo}
                   cover={entry.note.cover}

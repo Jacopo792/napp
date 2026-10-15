@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.38 — 2026-10-15
+
+### Changed
+
+- Flight to a sidebar place: the row's copy folds into a page-shaped sheet (`.note-flight-sheet`, non-uniform scale) and the vertical axis eases in and out, so it reaches the glyph before fading (it previously faded ~190px short).
+- Directional note switches: the outgoing view-transition snapshot leaves in 110ms and the incoming page waits 90ms, so the two never overlap; travel 20px.
+- `emerge` uses a cubic ease over 440ms from 0.5 scale so an overlay is seen travelling from its origin.
+- `settleBack` keeps the chip opaque for 75% of a distance-scaled return; the drag chip shrinks toward the pointer while over a sidebar place.
+- The editor header's resting "Edited …" readout is removed; the list row already carries the time. Transient states (saving, failure, waking, offline) remain.
+
+### Fixed
+
+- Smooth wheel scrolling: a frame timestamp earlier than the event made the first step negative; a scroll by anything else mid-glide now ends the glide instead of being overridden.
+
 ## 0.9.37 — 2026-10-15
 
 ### Added

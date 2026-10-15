@@ -165,7 +165,7 @@ import {
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
 import type { NoteEntry } from "@/lib/entries";
-import { fold, formatDateTime, formatStamp } from "@/lib/format";
+import { fold, formatDateTime } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
 import {
@@ -3705,7 +3705,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      Left to size itself it slid back and forth by 55px on each debounce, which
      is the one thing in the toolbar that moves while you are looking at it. The
      write error is carried in the tooltip for the same reason. */
-  const edited = selected?.note.updatedAt ?? "";
   const saveReadout = collaborative.refusal ? (
     <span className="label text-danger" title={collaborative.refusal}>
       Unavailable
@@ -3758,25 +3757,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     <span className="label text-accent" title={merge.detail}>
       {merge.label}
     </span>
-  ) : selected ? (
-    /* The resting state of this slot, and the only place in the window the
-       note's own time is said.
-    
-       It used to be a line centred over the title, which is a caption with no
-       picture under it — and this slot, which is *about* the state of the
-       note, said nothing at all until something happened to it. So the two
-       swapped: the slot says when the note was last edited, and it says it in
-       the list's own shorthand, because everything else that appears here is
-       measured against a 7.5rem box that clips.
-
-       It also replaces "Updated elsewhere", which was two accented seconds of
-       blue and then nothing. A change made in the other window *is* a new
-       time, so the time arriving is the whole announcement — and unlike the
-       flash it is still there a minute later, when somebody looks up. */
-    <span className="label text-ink-4" title={`Last edited ${formatDateTime(edited)}`}>
-      Edited {formatStamp(edited)}
-    </span>
   ) : null;
+  /* At rest the slot says nothing. It used to say "Edited 15:19", which the
+     note's own row in the list already says in the same words a hand's width
+     away — two places saying one thing is one too many, and Jacopo asked for
+     the toolbar's copy to go. The slot speaks only when something is
+     happening to the note: saving, a failure, the server waking. */
 
   const pinned = selected
     ? indexOf(activeMeta).byNote.get(selected.note.id)?.pinned === true

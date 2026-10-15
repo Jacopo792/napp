@@ -102,11 +102,13 @@ export function emerge(el: HTMLElement | null, mode: "grow" | "zoom" = "grow") {
   if (p) originAtPress(el);
   el.animate(
     [
-      { opacity: 0, transform: `scale(${p ? 0.55 : 0.96})` },
-      { opacity: 1, offset: 0.45 },
+      { opacity: 0, transform: `scale(${p ? 0.5 : 0.96})` },
+      { opacity: 1, offset: 0.3 },
       { opacity: 1, transform: "none" },
     ],
-    { duration: p ? 380 : 240, easing: EASE_OUT, fill: "backwards" },
+    /* A cubic rather than the expo of a menu: the panel travels far enough
+       that the eye has to be given the journey, not only the arrival. */
+    { duration: p ? 440 : 240, easing: "cubic-bezier(0.33, 1, 0.68, 1)", fill: "backwards" },
   );
 }
 
@@ -186,10 +188,15 @@ function ghost(source: Element, from: DOMRect) {
   card.removeAttribute("id");
   card.classList.add("note-flight-card");
   card.style.transform = "";
+  /* What the row becomes on the way: a blank sheet. Text shrunk to a few
+     pixels is a grey smear; a page is a thing you can watch drop into a bin. */
+  const sheet = document.createElement("div");
+  sheet.className = "note-flight-sheet";
+  card.append(sheet);
   middle.append(card);
   outer.append(middle);
   document.body.append(outer);
-  return { outer, middle, card };
+  return { outer, middle, card, sheet };
 }
 
 export function receive(glyph: Element) {
@@ -220,10 +227,13 @@ function fly(noteId: string, scopeId: string, delay: number): boolean {
   const to = glyph.getBoundingClientRect();
   if (!from.width) return false;
 
-  const { outer, middle, card } = ghost(source, from);
+  const { outer, middle, card, sheet } = ghost(source, from);
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-  const end = Math.max(0.04, (to.width * 1.4) / from.width);
+  /* The row folds into a page the size of a glyph — portrait, the shape of
+     a note — rather than shrinking into a sliver of itself. */
+  const size = (w: number, h: number) =>
+    `scale(${Math.min(1, w / from.width)}, ${Math.min(1, h / from.height)})`;
   const duration = Math.min(680, 460 + Math.hypot(dx, dy) * 0.18);
   const timing = { duration, delay, fill: "both" as const };
 
@@ -237,15 +247,19 @@ function fly(noteId: string, scopeId: string, delay: number): boolean {
       { transform: `translateY(${Math.min(0, dy) - 18}px)`, offset: 0.3 },
       { transform: `translateY(${dy}px)` },
     ],
-    { ...timing, easing: "cubic-bezier(0.11, 0, 0.5, 0)" },
+    { ...timing, easing: "cubic-bezier(0.45, 0, 0.55, 1)" },
   );
+  sheet.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1 }], {
+    ...timing,
+    easing: "linear",
+  });
   card
     .animate(
       [
-        { transform: "scale(1)", opacity: 1, boxShadow: "var(--shadow-soft)" },
-        { transform: "scale(0.62) rotate(-2deg)", opacity: 1, offset: 0.3 },
-        { transform: `scale(${end * 1.6}) rotate(-4deg)`, opacity: 1, offset: 0.82 },
-        { transform: `scale(${end})`, opacity: 0 },
+        { transform: "none", opacity: 1 },
+        { transform: `${size(120, 64)} rotate(-3deg)`, opacity: 1, offset: 0.3 },
+        { transform: `${size(18, 23)} rotate(-8deg)`, opacity: 1, offset: 0.84 },
+        { transform: `${size(10, 13)} rotate(-8deg)`, opacity: 0 },
       ],
       { ...timing, easing: "linear" },
     )
@@ -383,7 +397,17 @@ function roll(el: HTMLElement, dy: number) {
   const g = glide;
   g.last = performance.now();
   const step = (now: number) => {
-    const dt = Math.min(48, now - g.last);
+    /* Moved by something else mid-glide — a jump to a heading, a find, the
+       scrollbar: that move wins, and this one stops rather than dragging the
+       page back to where it was going. */
+    if (Math.abs(el.scrollTop - g.at) > 2) {
+      g.frame = 0;
+      g.target = g.at = el.scrollTop;
+      return;
+    }
+    /* A frame's timestamp is when the frame began, which can be before the
+       moment the glide was started from inside an event: never step back. */
+    const dt = Math.max(0, Math.min(48, now - g.last));
     g.last = now;
     /* A constant fraction of what is left, per unit of time: fast off the
        notch, a long settle, and no end that has to be scheduled. */
@@ -458,16 +482,22 @@ export function settleBack(node: HTMLElement, home: { left: number; top: number 
   if (reduced()) return;
   const box = node.getBoundingClientRect();
   const base = node.style.transform || "";
+  const dx = home.left - box.left;
+  const dy = home.top - box.top;
+  /* Seen travelling the whole way and only then let into the row: a chip
+     that faded as it left read as one that vanished. Longer for longer. */
   return node
     .animate(
       [
         { transform: base, opacity: 1 },
-        {
-          transform: `${base} translate(${home.left - box.left}px, ${home.top - box.top}px) scale(0.96)`,
-          opacity: 0,
-        },
+        { opacity: 1, offset: 0.75 },
+        { transform: `${base} translate(${dx}px, ${dy}px) scale(0.96)`, opacity: 0 },
       ],
-      { duration: 300, easing: EASE, fill: "forwards" },
+      {
+        duration: Math.min(520, 300 + Math.hypot(dx, dy) * 0.25),
+        easing: "cubic-bezier(0.3, 0, 0.2, 1)",
+        fill: "forwards",
+      },
     )
     .finished.then(() => {});
 }

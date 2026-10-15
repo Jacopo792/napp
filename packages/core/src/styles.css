@@ -5821,23 +5821,28 @@
 @keyframes page-in-below {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(20px);
   }
 }
 
 @keyframes page-in-above {
   from {
     opacity: 0;
-    transform: translateY(-14px);
+    transform: translateY(-20px);
   }
 }
 
+/* The old page is out of the way before the new one moves in: two texts
+   crossing each other in the same place read as a double exposure, not as a
+   page turning. */
 :root[data-note-direction="down"] .page-in > * {
   animation-name: page-in-below;
+  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
 }
 
 :root[data-note-direction="up"] .page-in > * {
   animation-name: page-in-above;
+  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
 }
 
 /* Opening another note, raised by `handleSelectNote`. The page being left is
@@ -5868,10 +5873,14 @@
 /* The page being left goes the other way from the one arriving. */
 .is-opening-note[data-note-direction="down"]::view-transition-old(note-body) {
   animation-name: page-out-above;
+  animation-duration: 110ms;
+  animation-timing-function: var(--ease-press);
 }
 
 .is-opening-note[data-note-direction="up"]::view-transition-old(note-body) {
   animation-name: page-out-below;
+  animation-duration: 110ms;
+  animation-timing-function: var(--ease-press);
 }
 
 @keyframes page-out-above {
@@ -7169,6 +7178,18 @@
   box-shadow: var(--shadow-popover);
   transform: rotate(-1.5deg) scale(1.02);
   animation: drag-lift 220ms var(--ease-out) backwards;
+}
+
+/* Held over a place in the sidebar, the note gathers itself towards the
+   pointer — small enough that the folder, the Archive or the Trash it is
+   being offered to can be seen opening for it underneath. */
+.drag-chip {
+  transform-origin: 18% 50%;
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+body:has(.sidebar-row.is-over) .drag-chip {
+  transform: rotate(-6deg) scale(0.42);
 }
 
 @keyframes drag-lift {
@@ -13119,6 +13140,7 @@ button.sheet-chip:hover,
 }
 
 .note-flight-card {
+  position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -13174,4 +13196,14 @@ button.sheet-chip:hover,
   .editor-strip-title {
     transform: none;
   }
+}
+
+/* The blank page the row folds into while it flies; see `ghost`. */
+.note-flight-sheet {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ink) 14%, var(--paper));
 }
