@@ -155,7 +155,7 @@ function Part({
   return (
     <h3
       ref={drop.setNodeRef}
-      className={`board-part ${drop.isOver ? "is-over" : ""}`}
+      className={`board-part is-divider ${drop.isOver ? "is-over" : ""}`}
       onContextMenu={(event) => {
         if (!onMenu) return;
         event.preventDefault();

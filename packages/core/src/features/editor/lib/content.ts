@@ -795,6 +795,55 @@ export const NoteLink = Mark.create({
  * export keeps the words and loses the setting — the honest half to lose. */
 const ALIGNMENTS = ["left", "center", "right", "justify"] as const;
 
+function spacingAttribute(data: string, property: string) {
+  const key = data === "data-space-before" ? "spaceBefore" : "spaceAfter";
+  return {
+    default: null,
+    parseHTML: (element: HTMLElement) => {
+      const value = Number(element.getAttribute(data));
+      return value > 0 && value <= 96 ? value : null;
+    },
+    renderHTML: (attributes: Record<string, unknown>) =>
+      attributes[key]
+        ? { [data]: attributes[key], style: `${property}: ${attributes[key]}pt` }
+        : {},
+  };
+}
+
+/* Capitals, as Pages offers them under Capitalisation: a property of the
+ * letters, so it rides on the text style beside colour and size. */
+const TEXT_CASES = {
+  upper: "text-transform: uppercase",
+  small: "font-variant-caps: all-small-caps",
+};
+
+export const TextCase = Extension.create({
+  name: "textCase",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          textCase: {
+            default: null,
+            parseHTML: (element) => {
+              const value = element.getAttribute("data-case");
+              return value && value in TEXT_CASES ? value : null;
+            },
+            renderHTML: (attributes) =>
+              attributes.textCase && attributes.textCase in TEXT_CASES
+                ? {
+                    "data-case": attributes.textCase,
+                    style: TEXT_CASES[attributes.textCase as keyof typeof TEXT_CASES],
+                  }
+                : {},
+          },
+        },
+      },
+    ];
+  },
+});
+
 export const ParagraphFormat = Extension.create({
   name: "paragraphFormat",
   addGlobalAttributes() {
@@ -843,6 +892,9 @@ export const ParagraphFormat = Extension.create({
                   }
                 : {},
           },
+          /* Pages' "before paragraph" and "after paragraph", in points. */
+          spaceBefore: spacingAttribute("data-space-before", "margin-top"),
+          spaceAfter: spacingAttribute("data-space-after", "margin-bottom"),
         },
       },
     ];
@@ -1253,6 +1305,7 @@ export const BASE_EXTENSIONS = [
   NoteLink,
   BlockAnchors,
   ParagraphFormat,
+  TextCase,
   Superscript,
   Subscript,
   PageBreak,

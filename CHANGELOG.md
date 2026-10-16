@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.42 — 2026-10-16
+
+### Changed
+
+- Fonts: `lib/localFonts.ts` lists installed families through `queryLocalFonts()` (asked on the opening click; Electron grants `local-fonts`), with a canvas-measured fallback list where the API is absent. `FontPicker` draws each family in itself with a search field; a chosen face is stored as one quoted family.
+- Manuscript bar: the paragraph style `<select>` is a menu of styles drawn in their own look (headings, body, quote, bulleted and numbered lists) with Tiptap's shortcuts. Font and size stand in the bar from 980px of bar width (`.ribbon-group.is-type`), in Aa below it. Size is a free field with a list (1–400pt, half points).
+- New attributes, null by default: `spaceBefore` / `spaceAfter` on paragraphs and headings (points), `textCase` (`upper` | `small`) on `textStyle`.
+- Corkboard: parts are divider cards in the grid flow (`.board-part.is-divider`) instead of full-width headings; cards are 132px tall.
+- Comment cards: one head row (avatar, name, time, tools), Resolve always visible, other tools on hover, reaction chips only when there are reactions, composer only on the active thread or with a draft, no reply rail, no "you" pill.
+- Comment margin: placed at the column's edge (`MARGIN_ASIDE`); on the desk the sheet and margin are centred together. Cards are no longer positioned at their anchors: they stack under the header in passage order (CSS `order`), the panel is sticky inside the scroller, and the quote is shown again.
+
 ## 0.9.41 — 2026-10-16
 
 ### Fixed

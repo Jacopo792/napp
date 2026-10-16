@@ -39,7 +39,15 @@ import {
   UserPlus,
   X,
 } from "@/components/icons";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
@@ -100,8 +108,8 @@ interface Props {
   margin?: HTMLElement | null;
 }
 
-/** Space between two cards in the margin. */
-const MARGIN_GAP = 10;
+/** Air between the page's edge and the cards beside it. */
+const MARGIN_ASIDE = 28;
 
 /** A thread longer than this is folded in the middle. Somebody arriving at a
  *  conversation wants how it opened and how it stands, not the middle of it. */
@@ -447,9 +455,6 @@ export function NoteComments({
         )}
         {open && (
           <div className="note-comment-composer-actions">
-            <kbd className="readout" title="Shift + Enter for a new line">
-              ⇧↵
-            </kbd>
             <button
               type="button"
               className="note-comment-send press"
@@ -467,7 +472,7 @@ export function NoteComments({
   /** One remark. `head` is the one that opened the thread — full weight, its
    *  own line for the name. A reply is quieter and sits under the rail, so the
    *  shape of the card says which is which before a word is read. */
-  function remark(comment: NoteComment, head: boolean, onlyOne: boolean) {
+  function remark(comment: NoteComment, head: boolean, onlyOne: boolean, extra?: ReactNode) {
     const author = authors.get(comment.authorId);
     const name = author?.name || "Someone";
     const mine = comment.authorId === session.userId;
@@ -482,96 +487,100 @@ export function NoteComments({
         className={`note-comment ${head ? "is-head" : "is-reply"} ${mine ? "is-mine" : ""}`}
         style={{ "--author": colour } as React.CSSProperties}
       >
-        <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
-        <div className="note-comment-said">
-          <p className="note-comment-signature">
+        {/* Who and when on the left, what can be done on the right — Docs'
+            card. The tools were a row of words under the remark, which put
+            the most-used one (Resolve) the furthest from the eye. */}
+        <div className="note-comment-head">
+          <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
+          <span className="note-comment-who">
             <span className="note-comment-name truncate">{name}</span>
-            {mine && <span className="note-comment-you">you</span>}
             <span className="readout note-comment-stamp">{formatStamp(comment.createdAt)}</span>
+          </span>
+          <span className="note-comment-tools" onClick={(event) => event.stopPropagation()}>
+            {canEdit && reactTool(comment)}
             {mine && (
-              <span className="note-comment-own-actions">
-                <button
-                  type="button"
-                  className="note-comment-action is-quiet press"
-                  aria-label={head ? "Edit this comment" : "Edit this reply"}
-                  title={head ? "Edit this comment" : "Edit this reply"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setEditing(comment.id);
-                    setEditDraft(comment.body);
-                  }}
-                >
-                  <Pencil size={12.5} />
-                </button>
-                <button
-                  type="button"
-                  className="note-comment-action is-quiet is-delete press"
-                  aria-label={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                  title={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void remove(comment, onlyOne);
-                  }}
-                >
-                  <Trash2 size={12.5} />
-                </button>
-              </span>
-            )}
-          </p>
-          {editing === comment.id ? (
-            <div className="note-comment-editor" onClick={(event) => event.stopPropagation()}>
-              <textarea
-                value={editDraft}
-                onChange={(event) => setEditDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setEditing(null);
-                    setEditDraft("");
-                  } else if (
-                    event.key === "Enter" &&
-                    (event.metaKey || event.ctrlKey) &&
-                    !event.nativeEvent.isComposing
-                  ) {
-                    event.preventDefault();
-                    void saveEdit(comment);
-                  }
+              <button
+                type="button"
+                className="note-comment-tool is-quiet press"
+                aria-label={head ? "Edit this comment" : "Edit this reply"}
+                title={head ? "Edit this comment" : "Edit this reply"}
+                onClick={() => {
+                  setEditing(comment.id);
+                  setEditDraft(comment.body);
                 }}
-                aria-label={head ? "Edit comment" : "Edit reply"}
-                autoFocus
-              />
-              <div className="note-comment-editor-actions">
-                <button
-                  type="button"
-                  className="note-comment-action press"
-                  onClick={() => {
-                    setEditing(null);
-                    setEditDraft("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="note-comment-send press"
-                  disabled={!editDraft.trim() || editDraft.trim() === comment.body}
-                  onClick={() => void saveEdit(comment)}
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="note-comment-body">{words(comment)}</p>
-          )}
-          {reactionRow(comment)}
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {mine && (
+              <button
+                type="button"
+                className="note-comment-tool is-quiet is-delete press"
+                aria-label={head && onlyOne ? "Delete this comment" : "Delete this reply"}
+                title={head && onlyOne ? "Delete this comment" : "Delete this reply"}
+                onClick={() => void remove(comment, onlyOne)}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+            {extra}
+          </span>
         </div>
+        {editing === comment.id ? (
+          <div className="note-comment-editor" onClick={(event) => event.stopPropagation()}>
+            <textarea
+              value={editDraft}
+              onChange={(event) => setEditDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setEditing(null);
+                  setEditDraft("");
+                } else if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void saveEdit(comment);
+                }
+              }}
+              aria-label={head ? "Edit comment" : "Edit reply"}
+              autoFocus
+            />
+            <div className="note-comment-editor-actions">
+              <button
+                type="button"
+                className="note-comment-action press"
+                onClick={() => {
+                  setEditing(null);
+                  setEditDraft("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="note-comment-send press"
+                disabled={!editDraft.trim() || editDraft.trim() === comment.body}
+                onClick={() => void saveEdit(comment)}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="note-comment-body">{words(comment)}</p>
+        )}
+        {reactionRow(comment)}
       </div>
     );
   }
 
+  /** The chips under a remark. Only there when somebody has reacted: an
+   *  empty row held a gap under every remark for a button nobody saw. */
   function reactionRow(comment: NoteComment) {
     const counted = tally(reactions, comment.id, session.userId);
-    if (counted.length === 0 && !canEdit) return null;
+    if (counted.length === 0) return null;
     return (
       <div className="note-comment-reactions" onClick={(event) => event.stopPropagation()}>
         {counted.map(({ emoji, count, mine }) => (
@@ -588,37 +597,42 @@ export function NoteComments({
             <span className="readout">{count}</span>
           </button>
         ))}
-        {canEdit && (
-          <span className="note-comment-react" ref={reacting === comment.id ? reactRef : undefined}>
-            <button
-              type="button"
-              className="note-comment-action is-quiet press"
-              aria-label="React"
-              aria-expanded={reacting === comment.id}
-              onClick={() => setReacting((open) => (open === comment.id ? null : comment.id))}
-            >
-              <Smile size={13} />
-            </button>
-            {reacting === comment.id && (
-              <span className="note-comment-palette">
-                {REACTIONS.map((emoji) => {
-                  const mine = counted.some((one) => one.emoji === emoji && one.mine);
-                  return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className={`note-comment-palette-emoji press ${mine ? "is-mine" : ""}`}
-                      onClick={() => void react(comment.id, emoji, !mine)}
-                    >
-                      {emoji}
-                    </button>
-                  );
-                })}
-              </span>
-            )}
+      </div>
+    );
+  }
+
+  function reactTool(comment: NoteComment) {
+    const counted = tally(reactions, comment.id, session.userId);
+    return (
+      <span className="note-comment-react" ref={reacting === comment.id ? reactRef : undefined}>
+        <button
+          type="button"
+          className="note-comment-tool is-quiet press"
+          aria-label="React"
+          title="React"
+          aria-expanded={reacting === comment.id}
+          onClick={() => setReacting((open) => (open === comment.id ? null : comment.id))}
+        >
+          <Smile size={14} />
+        </button>
+        {reacting === comment.id && (
+          <span className="note-comment-palette">
+            {REACTIONS.map((emoji) => {
+              const mine = counted.some((one) => one.emoji === emoji && one.mine);
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  className={`note-comment-palette-emoji press ${mine ? "is-mine" : ""}`}
+                  onClick={() => void react(comment.id, emoji, !mine)}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
           </span>
         )}
-      </div>
+      </span>
     );
   }
 
@@ -628,6 +642,70 @@ export function NoteComments({
       .filter((r) => r.commentId === commentId && r.emoji === emoji)
       .map((r) => (r.userId === session.userId ? "You" : authors.get(r.userId)?.name || "Someone"))
       .join(", ");
+  }
+
+  /** Resolve, always in reach, and Assign beside it on hover. */
+  function threadTools(thread: CommentThread) {
+    return (
+      <>
+        {!thread.resolved && (
+          <span
+            className="note-comment-assign"
+            ref={assigning === thread.threadId ? assignRef : undefined}
+          >
+            <button
+              type="button"
+              className="note-comment-tool is-quiet press"
+              aria-label="Assign"
+              title="Assign"
+              aria-expanded={assigning === thread.threadId}
+              onClick={() =>
+                setAssigning((open) => (open === thread.threadId ? null : thread.threadId))
+              }
+            >
+              <UserPlus size={14} />
+            </button>
+            {assigning === thread.threadId && (
+              <span className="note-comment-assign-menu" role="menu">
+                {members.map((member) => (
+                  <button
+                    key={member.userId}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={thread.assigneeId === member.userId}
+                    className="note-comment-suggestion press"
+                    onClick={() => void assign(thread.threadId, member.userId)}
+                  >
+                    <Avatar url={member.avatarUrl} name={member.name} email="" compact />
+                    {member.userId === session.userId ? "Me" : member.name || "Someone"}
+                    {thread.assigneeId === member.userId && <Check size={12} />}
+                  </button>
+                ))}
+                {thread.assigneeId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="note-comment-suggestion press"
+                    onClick={() => void assign(thread.threadId, null)}
+                  >
+                    Nobody
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
+        )}
+        <button
+          type="button"
+          className="note-comment-tool is-resolve press"
+          aria-label={thread.resolved ? "Reopen" : "Resolve"}
+          title={thread.resolved ? "Reopen" : "Resolve"}
+          onClick={() => void toggleResolved(thread.threadId, !thread.resolved)}
+        >
+          {thread.resolved ? <RotateCcw size={14} /> : <Check size={15} weight="bold" />}
+        </button>
+      </>
+    );
   }
 
   function card(thread: CommentThread) {
@@ -672,7 +750,7 @@ export function NoteComments({
           </p>
         )}
 
-        {remark(head, true, thread.comments.length === 1)}
+        {remark(head, true, thread.comments.length === 1, canEdit && threadTools(thread))}
 
         {hiddenCount > 0 && (
           <button
@@ -690,81 +768,13 @@ export function NoteComments({
 
         {visibleReplies.map((reply) => remark(reply, false, false))}
 
-        {canEdit && (
-          <div className="note-comment-thread-actions">
-            <button
-              type="button"
-              className="note-comment-action press"
-              onClick={(event) => {
-                event.stopPropagation();
-                void toggleResolved(thread.threadId, !thread.resolved);
-              }}
-              title={
-                thread.resolved
-                  ? "Put this back among the open threads"
-                  : "Mark this dealt with — it stays readable under “resolved”"
-              }
-            >
-              {thread.resolved ? <RotateCcw size={12} /> : <Check size={12} />}
-              {thread.resolved ? "Reopen" : "Resolve"}
-            </button>
-            {!thread.resolved && (
-              <span
-                className="note-comment-assign"
-                ref={assigning === thread.threadId ? assignRef : undefined}
-              >
-                <button
-                  type="button"
-                  className="note-comment-action press"
-                  aria-expanded={assigning === thread.threadId}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setAssigning((open) => (open === thread.threadId ? null : thread.threadId));
-                  }}
-                >
-                  <UserPlus size={12} />
-                  Assign
-                </button>
-                {assigning === thread.threadId && (
-                  <span className="note-comment-assign-menu" role="menu">
-                    {members.map((member) => (
-                      <button
-                        key={member.userId}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={thread.assigneeId === member.userId}
-                        className="note-comment-suggestion press"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void assign(thread.threadId, member.userId);
-                        }}
-                      >
-                        <Avatar url={member.avatarUrl} name={member.name} email="" compact />
-                        {member.userId === session.userId ? "Me" : member.name || "Someone"}
-                        {thread.assigneeId === member.userId && <Check size={12} />}
-                      </button>
-                    ))}
-                    {thread.assigneeId && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="note-comment-suggestion press"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void assign(thread.threadId, null);
-                        }}
-                      >
-                        Nobody
-                      </button>
-                    )}
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-        )}
-
-        {canEdit && !thread.resolved && composer(thread.threadId, "Reply", isActive)}
+        {/* The reply box belongs to the thread being read. One under every
+            card was most of the column's weight — five threads, five empty
+            fields asking to be filled. */}
+        {canEdit &&
+          !thread.resolved &&
+          (isActive || (draft[thread.threadId] ?? "") !== "") &&
+          composer(thread.threadId, "Reply…", true)}
       </article>
     );
   }
@@ -795,7 +805,7 @@ export function NoteComments({
           className="note-comment-thread is-pending is-active"
         >
           <p className="note-comment-quote">{quotes.get(pendingThread) || "This passage"}</p>
-          {composer(pendingThread, "What about this passage?", true)}
+          {composer(pendingThread, "Add a comment…", true)}
         </article>
       )}
     </>
@@ -812,67 +822,47 @@ export function NoteComments({
   const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
 
   /* ── The margin ──────────────────────────────────────────────────────────
-     The column that was pinned to the passages and taken back (see the top of
-     this file) stood beside the page in a panel of its own, which did not
-     scroll with it. Here the cards are inside the page's own scroller, so a
-     card is on screen exactly when its passage is, and the column scrolls
-     because the page does. Each card wants the height of its passage; where
-     two want the same place the later one is pushed down, and the card being
-     read is the one that gets its place exactly — the others make way above
-     and below it, the way Word and Docs keep the open one level with its
-     words. Written onto the cards directly: it follows every reflow of the
+     Beside the page, inside its scroller, and held at the top of it while the
+     page moves. The cards were level with their passages, which left the
+     header alone at the top of the margin and the first remark half a page
+     below it; they now stand under the header in the order their passages
+     come in the text — the open one lights its words, and a click on the
+     words opens its card, so the eye-line is stated rather than implied.
+     Written onto the elements directly: it follows every reflow of the
      note, which is not a reason to render the conversation again. */
   const placeRef = useRef<() => void>(() => {});
   placeRef.current = () => {
     if (!margin) return;
     const scope = margin.parentElement;
     if (!scope) return;
-    const origin = margin.getBoundingClientRect().top;
-    const head = margin.querySelector<HTMLElement>(".note-comments-header");
-    const floor = head ? head.offsetHeight + MARGIN_GAP : 0;
-    const anchorOf = (id: string) =>
-      /^[a-zA-Z0-9-]+$/.test(id)
+    /* Beside the words, not against the far wall: the page is centred in
+       what the window leaves it, so a margin pinned to the right edge stood
+       further from the sheet the wider the window was. */
+    const column =
+      scope.querySelector(".manuscript-sheet") ?? scope.querySelector(".rich-text-content");
+    if (column) {
+      const box = column.getBoundingClientRect();
+      const origin = scope.getBoundingClientRect();
+      margin.style.left = `${Math.round(box.right - origin.left + scope.scrollLeft + MARGIN_ASIDE)}px`;
+      /* As tall as the page, so the column has the length of the page to
+         stay pinned along. */
+      const bottom = box.bottom - origin.top + scope.scrollTop;
+      margin.style.height = `${Math.max(0, Math.round(bottom - margin.offsetTop))}px`;
+    }
+    margin.style.setProperty("--margin-room", `${scope.clientHeight - 48}px`);
+    const anchorTop = (id: string) => {
+      const anchor = /^[a-zA-Z0-9-]+$/.test(id)
         ? scope.querySelector(`.rich-text-content span[data-comment-thread="${id}"]`)
         : null;
-    const cards = [...threadRefs.current.entries()]
-      .filter(([, node]) => node.isConnected)
-      .map(([id, node]) => {
-        const anchor = anchorOf(id);
-        return {
-          id,
-          node,
-          want: anchor ? anchor.getBoundingClientRect().top - origin : Number.POSITIVE_INFINITY,
-          height: node.offsetHeight,
-        };
-      })
-      .sort((a, b) => a.want - b.want);
-    const tops = cards.map(() => 0);
-    const settle = (from: number) => {
-      for (let i = from; i < cards.length; i++) {
-        const below = i > 0 ? tops[i - 1] + cards[i - 1].height + MARGIN_GAP : floor;
-        tops[i] = Math.max(Number.isFinite(cards[i].want) ? cards[i].want : below, below);
-      }
+      return anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY;
     };
-    const at = cards.findIndex((card) => card.id === active && Number.isFinite(card.want));
-    if (at < 0) settle(0);
-    else {
-      tops[at] = Math.max(cards[at].want, floor);
-      settle(at + 1);
-      for (let i = at - 1; i >= 0; i--)
-        tops[i] = Math.min(cards[i].want, tops[i + 1] - cards[i].height - MARGIN_GAP);
-      if (tops[0] < floor) settle(0);
-    }
-    cards.forEach((card, i) => {
-      card.node.style.transform = `translateY(${Math.round(tops[i])}px)`;
-      /* Placed where it belongs first, and only then allowed to glide: a
-         card that arrives must not fly down from the top of the margin. */
-      if (!("placed" in card.node.dataset)) {
-        void card.node.offsetHeight; // the first place lands before gliding is on
-        card.node.dataset.placed = "";
-      }
-    });
-    const last = cards.length - 1;
-    margin.style.minHeight = last >= 0 ? `${tops[last] + cards[last].height}px` : "";
+    [...threadRefs.current.entries()]
+      .filter(([, node]) => node.isConnected)
+      .map(([id, node]) => ({ node, at: anchorTop(id) }))
+      .sort((a, b) => a.at - b.at)
+      .forEach(({ node }, index) => {
+        node.style.order = String(index);
+      });
   };
 
   useLayoutEffect(() => placeRef.current());
@@ -887,8 +877,7 @@ export function NoteComments({
     const sizes = new ResizeObserver(later);
     const content = margin.parentElement.querySelector(".rich-text-content");
     if (content) sizes.observe(content);
-    sizes.observe(margin);
-    for (const node of threadRefs.current.values()) sizes.observe(node);
+    sizes.observe(margin.parentElement);
     return () => {
       cancelAnimationFrame(frame);
       sizes.disconnect();

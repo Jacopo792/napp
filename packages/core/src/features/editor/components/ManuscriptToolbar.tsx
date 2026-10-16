@@ -13,7 +13,8 @@ import { MenuSurface } from "@/components/MenuSurface";
  * editor keeps its selection while one is open — `chain().focus()` puts the
  * caret back where it was before the command runs. Every button cancels its
  * own `mousedown` for the same reason. */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useDismiss } from "@/components/useDismiss";
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import {
@@ -25,6 +26,7 @@ import {
   Books,
   Caption,
   Check,
+  ChevronDown,
   Chapters,
   CrossReference,
   Eraser,
@@ -42,6 +44,7 @@ import {
   PageBreak,
   Plus,
   Review,
+  Search,
   Strikethrough,
   Subscript,
   Superscript,
@@ -55,9 +58,12 @@ import { CrossReferencePicker } from "./CrossReferencePicker";
 import { CitationPicker } from "./CitationPicker";
 import { settle, suggestionAt, suggestionsIn } from "../lib/suggestions";
 import { keyName } from "@/lib/shortcuts";
+import { familyName, familyStack, localFontFamilies } from "@/lib/localFonts";
+import { fold } from "@/lib/format";
 
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72];
 const SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
+const PARAGRAPH_SPACES = [3, 6, 8, 10, 12, 18, 24, 36];
 
 /* Ink for a white page. "Automatic" is no colour at all, which is the page's
    own ink — the only choice that still reads if the page is ever darkened. */
@@ -86,6 +92,33 @@ const MARKERS = [
 ];
 
 type Align = "left" | "center" | "right" | "justify";
+
+/* The paragraph styles, each drawn in its own look the way Pages lists them:
+   the menu is a preview of the page, not a list of names to learn. A list is
+   a style here too — it is what a paragraph *is*, which is the question the
+   menu answers. The keys are Tiptap's own, said where they can be learnt. */
+const STYLES = [
+  { id: "h1", name: "Heading 1", key: "⌥⌘1" },
+  { id: "h2", name: "Heading 2", key: "⌥⌘2" },
+  { id: "h3", name: "Heading 3", key: "⌥⌘3" },
+  { id: "body", name: "Body text", key: "⌥⌘0" },
+  { id: "quote", name: "Block quote", key: "⇧⌘B" },
+  { id: "bullets", name: "• Bulleted list", key: "⇧⌘8" },
+  { id: "numbers", name: "1. Numbered list", key: "⇧⌘7" },
+] as const;
+
+type StyleId = (typeof STYLES)[number]["id"];
+
+function setStyle(editor: Editor, id: StyleId) {
+  /* From whatever the paragraph was: a heading inside a quote inside a list
+     is not something anybody asked for by choosing "Heading". */
+  const run = editor.chain().focus().clearNodes();
+  if (id === "body") run.setParagraph().run();
+  else if (id === "quote") run.setBlockquote().run();
+  else if (id === "bullets") run.toggleBulletList().run();
+  else if (id === "numbers") run.toggleOrderedList().run();
+  else run.setHeading({ level: Number(id.slice(1)) as 1 | 2 | 3 }).run();
+}
 
 const ALIGNS = [
   ["left", "Align left", <AlignLeft key="l" size={16} />, "⇧⌘L"],
@@ -180,11 +213,13 @@ function Drop({
   label,
   face,
   disabled,
+  className = "",
   children,
 }: {
   label: string;
   face: ReactNode;
   disabled?: boolean;
+  className?: string;
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -211,13 +246,18 @@ function Drop({
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={disabled}
-        className={`ribbon-tool press ${open ? "is-active" : ""}`}
+        className={`ribbon-tool press ${className} ${open ? "is-active" : ""}`}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => setOpen((now) => !now)}
       >
         {face}
       </button>
-      <MenuSurface open={open} role="menu" aria-label={label} className="popover ribbon-panel">
+      <MenuSurface
+        open={open}
+        role="menu"
+        aria-label={label}
+        className={`popover ribbon-panel ${className}`}
+      >
         {children(() => setOpen(false))}
       </MenuSurface>
     </span>
@@ -272,6 +312,198 @@ function Swatches({
   );
 }
 
+/** Every family on this machine, each set in itself — Pages' font menu. The
+ *  list is asked for on the click that opens it, which is the only moment
+ *  Chromium will answer (see `localFonts.ts`). It opens in place inside the
+ *  Aa panel rather than as a menu off a menu. */
+function FontPicker({
+  font,
+  disabled,
+  onPick,
+}: {
+  font: string;
+  disabled?: boolean;
+  onPick: (stack: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const shut = useCallback(() => setOpen(false), []);
+  const root = useDismiss(open, shut);
+  const [families, setFamilies] = useState<string[] | null>(null);
+  const [query, setQuery] = useState("");
+  const name = font
+    ? (WRITING_FONTS.find((one) => one.stack === font)?.name ?? familyName(font))
+    : "Page font";
+  const wanted = fold(query.trim());
+  const shown = (families ?? []).filter((family) => fold(family).includes(wanted));
+  const pick = (stack: string | null) => {
+    setOpen(false);
+    setQuery("");
+    onPick(stack);
+  };
+  return (
+    <div ref={root} className="font-picker">
+      <button
+        type="button"
+        className="ribbon-select font-picker-face press"
+        aria-expanded={open}
+        aria-label="Font"
+        disabled={disabled}
+        style={{ fontFamily: font || undefined }}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => {
+          setOpen((now) => !now);
+          if (!families) void localFontFamilies().then(setFamilies);
+        }}
+      >
+        <span className="truncate">{name}</span>
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="font-picker-list">
+          <label className="font-picker-search">
+            <Search size={13} />
+            <input
+              autoFocus
+              value={query}
+              placeholder="Search fonts"
+              aria-label="Search fonts"
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && shown[0]) pick(familyStack(shown[0]));
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setOpen(false);
+                }
+              }}
+            />
+          </label>
+          <div className="font-picker-scroll" role="listbox" aria-label="Fonts">
+            {!wanted && <FontRow name="Page font" checked={!font} onPress={() => pick(null)} />}
+            {families === null && <p className="font-picker-note">Reading fonts…</p>}
+            {shown.map((family) => {
+              const stack = familyStack(family);
+              return (
+                <FontRow
+                  key={family}
+                  name={family}
+                  face={stack}
+                  checked={familyName(font) === family}
+                  onPress={() => pick(stack)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FontRow({
+  name,
+  face,
+  checked,
+  onPress,
+}: {
+  name: string;
+  face?: string;
+  checked: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={checked}
+      className={`font-picker-row ${checked ? "is-checked" : ""}`}
+      style={{ fontFamily: face }}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onPress}
+    >
+      <span className="font-picker-check">{checked && <Check size={13} />}</span>
+      <span className="truncate">{name}</span>
+    </button>
+  );
+}
+
+/** A size in points, typed or chosen — Pages' field with its list beside it. */
+function SizeField({
+  points,
+  disabled,
+  onSize,
+}: {
+  points: number | null;
+  disabled?: boolean;
+  onSize: (pt: number | null) => void;
+}) {
+  const sizes = useId();
+  const [text, setText] = useState(points ? String(points) : "");
+  useEffect(() => setText(points ? String(points) : ""), [points]);
+  const commit = (value: string) => {
+    const pt = Number(value.replace(",", "."));
+    if (!value.trim()) onSize(null);
+    else if (pt >= 1 && pt <= 400) onSize(Math.round(pt * 2) / 2);
+    else setText(points ? String(points) : "");
+  };
+  return (
+    <>
+      <input
+        className="ribbon-select is-size"
+        aria-label="Font size"
+        list={sizes}
+        disabled={disabled}
+        inputMode="decimal"
+        placeholder="Auto"
+        value={text}
+        onChange={(event) => {
+          setText(event.target.value);
+          /* Chosen from the list rather than typed: no Enter is coming. */
+          const how = (event.nativeEvent as InputEvent).inputType;
+          if (!how || how === "insertReplacementText") commit(event.target.value);
+        }}
+        onKeyDown={(event) => event.key === "Enter" && commit(text)}
+        onBlur={() => text !== (points ? String(points) : "") && commit(text)}
+      />
+      <datalist id={sizes}>
+        {SIZES.map((size) => (
+          <option key={size} value={size} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+/** Points before or after a paragraph. */
+function SpaceField({
+  label,
+  value,
+  onSpace,
+}: {
+  label: string;
+  value: number | null;
+  onSpace: (pt: number | null) => void;
+}) {
+  return (
+    <label className="format-space">
+      <span>{label}</span>
+      <select
+        className="ribbon-select"
+        aria-label={`Space ${label.toLowerCase()} paragraph`}
+        value={value ?? ""}
+        onChange={(event) => onSpace(event.target.value ? Number(event.target.value) : null)}
+      >
+        <option value="">0 pt</option>
+        {PARAGRAPH_SPACES.map((pt) => (
+          <option key={pt} value={pt}>
+            {pt} pt
+          </option>
+        ))}
+        {value && !PARAGRAPH_SPACES.includes(value) && <option value={value}>{value} pt</option>}
+      </select>
+    </label>
+  );
+}
+
 export function ManuscriptToolbar({
   editor,
   noteId,
@@ -317,7 +549,15 @@ export function ManuscriptToolbar({
       const level = [1, 2, 3].find((n) => current.isActive("heading", { level: n }));
       return {
         editable: current.isEditable,
-        block: current.isActive("blockquote") ? "quote" : level ? `h${level}` : "body",
+        block: (current.isActive("bulletList")
+          ? "bullets"
+          : current.isActive("orderedList")
+            ? "numbers"
+            : current.isActive("blockquote")
+              ? "quote"
+              : level
+                ? `h${level}`
+                : "body") as StyleId,
         font: (style.fontFamily as string | undefined) ?? "",
         size: (style.fontSize as string | undefined) ?? "",
         bold: current.isActive("bold"),
@@ -330,6 +570,9 @@ export function ManuscriptToolbar({
         numbers: current.isActive("orderedList"),
         align: ((blockAttribute(current, "textAlign") as Align | null) ?? "left") as Align,
         spacing: (blockAttribute(current, "lineHeight") as number | null) ?? null,
+        before: (blockAttribute(current, "spaceBefore") as number | null) ?? null,
+        after: (blockAttribute(current, "spaceAfter") as number | null) ?? null,
+        textCase: (style.textCase as string | undefined) ?? "",
         indent: (blockAttribute(current, "indent") as number | undefined) ?? 0,
         /* ponytail: a walk of the chapter per transaction. A chapter is a few
            thousand nodes; cache by doc if a long one ever makes typing lag. */
@@ -346,25 +589,65 @@ export function ManuscriptToolbar({
   return (
     <div className="ribbon" role="toolbar" aria-label="Formatting">
       <div className="ribbon-group">
-        <select
-          className="ribbon-select is-style"
-          aria-label="Paragraph style"
+        <Drop
+          label="Paragraph style"
           disabled={off}
-          value={state?.block ?? "body"}
-          onChange={(event) => {
-            const value = event.target.value;
-            const run = chain();
-            if (value === "body") run.setParagraph().run();
-            else if (value === "quote") run.setParagraph().toggleBlockquote().run();
-            else run.setHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
-          }}
+          className="is-style"
+          face={
+            <>
+              <span className="truncate">
+                {STYLES.find((one) => one.id === (state?.block ?? "body"))?.name}
+              </span>
+              <ChevronDown size={12} />
+            </>
+          }
         >
-          <option value="body">Body text</option>
-          <option value="h1">Title 1</option>
-          <option value="h2">Title 2</option>
-          <option value="h3">Title 3</option>
-          <option value="quote">Block quote</option>
-        </select>
+          {(close) =>
+            STYLES.map((style) => (
+              <button
+                key={style.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={state?.block === style.id}
+                className={`style-row is-${style.id} ${state?.block === style.id ? "is-checked" : ""}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setStyle(editor!, style.id);
+                  close();
+                }}
+              >
+                <span className="style-row-check">
+                  {state?.block === style.id && <Check size={13} />}
+                </span>
+                <span className="style-row-name">{style.name}</span>
+                <span className="readout style-row-key">{style.key}</span>
+              </button>
+            ))
+          }
+        </Drop>
+      </div>
+
+      {/* The face and its size stand in the bar when it has the room —
+          they are what a writer reaches for most after the style, and a wide
+          bar with them folded away under Aa was a strip of nothing. Narrow,
+          they go back into Aa. */}
+      <div className="ribbon-group is-type">
+        <FontPicker
+          font={state?.font ?? ""}
+          disabled={off}
+          onPick={(stack) => {
+            if (stack) chain().setFontFamily(stack).run();
+            else chain().unsetFontFamily().run();
+          }}
+        />
+        <SizeField
+          points={points}
+          disabled={off}
+          onSize={(pt) => {
+            if (pt) chain().setFontSize(`${pt}pt`).run();
+            else chain().unsetFontSize().run();
+          }}
+        />
       </div>
 
       <div className="ribbon-group is-character">
@@ -393,52 +676,21 @@ export function ManuscriptToolbar({
         <Drop label="Format" disabled={off} face={<span className="ribbon-letters">Aa</span>}>
           {() => (
             <div className="format-panel">
-              <div className="format-row">
-                <select
-                  className="ribbon-select is-font"
-                  aria-label="Font"
-                  disabled={off}
-                  value={state?.font ?? ""}
-                  style={{ fontFamily: state?.font || undefined }}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value) chain().setFontFamily(value).run();
+              <div className="format-row is-type">
+                <FontPicker
+                  font={state?.font ?? ""}
+                  onPick={(stack) => {
+                    if (stack) chain().setFontFamily(stack).run();
                     else chain().unsetFontFamily().run();
                   }}
-                >
-                  <option value="">Page font</option>
-                  {WRITING_FONTS.map((font) => (
-                    <option key={font.id} value={font.stack} style={{ fontFamily: font.stack }}>
-                      {font.name}
-                    </option>
-                  ))}
-                  {/* A face that arrived with pasted text and is not on the
-                      list still has to be nameable, or the menu shows a lie. */}
-                  {state?.font && !WRITING_FONTS.some((font) => font.stack === state.font) && (
-                    <option value={state.font}>
-                      {state.font.split(",")[0].replaceAll('"', "")}
-                    </option>
-                  )}
-                </select>
-                <select
-                  className="ribbon-select is-size"
-                  aria-label="Font size"
-                  disabled={off}
-                  value={points ?? ""}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value) chain().setFontSize(`${value}pt`).run();
+                />
+                <SizeField
+                  points={points}
+                  onSize={(pt) => {
+                    if (pt) chain().setFontSize(`${pt}pt`).run();
                     else chain().unsetFontSize().run();
                   }}
-                >
-                  <option value="">Auto</option>
-                  {SIZES.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                  {points && !SIZES.includes(points) && <option value={points}>{points}</option>}
-                </select>
+                />
               </div>
               <div className="format-row">
                 <Tool
@@ -474,11 +726,37 @@ export function ManuscriptToolbar({
                   label="Clear formatting"
                   onPress={() => {
                     chain().unsetAllMarks().clearNodes().run();
-                    setBlock(editor!, { textAlign: null, indent: null, lineHeight: null });
+                    setBlock(editor!, {
+                      textAlign: null,
+                      indent: null,
+                      lineHeight: null,
+                      spaceBefore: null,
+                      spaceAfter: null,
+                    });
                   }}
                 >
                   <Eraser size={16} />
                 </Tool>
+              </div>
+              <div className="format-row">
+                <label className="format-space is-wide">
+                  <span>Capitals</span>
+                  <select
+                    className="ribbon-select"
+                    aria-label="Capitals"
+                    value={state?.textCase ?? ""}
+                    onChange={(event) =>
+                      chain()
+                        .setMark("textStyle", { textCase: event.target.value || null })
+                        .removeEmptyTextStyle()
+                        .run()
+                    }
+                  >
+                    <option value="">None</option>
+                    <option value="upper">All caps</option>
+                    <option value="small">Small caps</option>
+                  </select>
+                </label>
               </div>
               <div className="format-row">
                 {ALIGNS.map(([align, label, icon, shortcut]) => (
@@ -514,6 +792,18 @@ export function ManuscriptToolbar({
                     ))}
                   </select>
                 </label>
+              </div>
+              <div className="format-row is-spaces">
+                <SpaceField
+                  label="Before"
+                  value={state?.before ?? null}
+                  onSpace={(pt) => setBlock(editor!, { spaceBefore: pt })}
+                />
+                <SpaceField
+                  label="After"
+                  value={state?.after ?? null}
+                  onSpace={(pt) => setBlock(editor!, { spaceAfter: pt })}
+                />
               </div>
               <div className="format-row">
                 <Tool

@@ -1484,6 +1484,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""} ${
               inMargin ? "has-margin" : ""
             }`}
+            /* The sheet's width on the desk too, so the sheet and the
+               comments beside it can be centred as one. */
+            style={
+              { "--sheet-width": pageStyle(manuscript.page)["--sheet-width"] } as CSSProperties
+            }
             onContextMenu={onPassageMenu}
             onKeyDown={(event) => {
               if (event.metaKey || event.ctrlKey || event.altKey) return;

@@ -45,6 +45,47 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.42",
+    date: "2026-10-16",
+    headline: "Every font you have",
+    sections: [
+      {
+        heading: "Writing a book",
+        items: [
+          {
+            title: "All your fonts",
+            text: "The font menu lists every typeface installed on your computer, each written in its own letters, with a search field. Font and size now sit in the bar when there is room.",
+          },
+          {
+            title: "Styles you can see",
+            text: "The style menu shows each style as it looks on the page — headings, body text, quote and lists — with its keyboard shortcut.",
+          },
+          {
+            title: "More in Aa",
+            text: "Type any size you like, add space before or after a paragraph, and set words in all caps or small caps.",
+          },
+          {
+            title: "A fuller board",
+            text: "On the board a part is a card of its own in the run of the book, so the chapters fill the width instead of one short row per part.",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Cleaner cards",
+            text: "Who wrote it and when sit on one line with Resolve beside them; edit, react, assign and delete appear under the pointer. The reply box only opens on the conversation you are in.",
+          },
+          {
+            title: "Right beside the page",
+            text: "In a book the comments stand next to the sheet and stay in view as you scroll, starting just under their heading, each with the words it is about.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.41",
     date: "2026-10-16",
     headline: "Remarks that glide",
