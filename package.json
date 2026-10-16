@@ -15,6 +15,7 @@
     "dev:mobile": "pnpm --filter @notes-app/mobile dev",
     "android": "pnpm --filter @notes-app/mobile android",
     "build:android": "pnpm --filter @notes-app/mobile build:apk",
+    "ios": "pnpm --filter @notes-app/mobile ios",
     "preview:dist": "pnpm --filter @notes-app/web preview:dist",
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "preview:desktop-ui": "NAPP_SHELL=desktop vite dev --config vite.preview.config.ts",
