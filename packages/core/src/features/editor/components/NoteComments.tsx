@@ -866,8 +866,10 @@ export function NoteComments({
       card.node.style.transform = `translateY(${Math.round(tops[i])}px)`;
       /* Placed where it belongs first, and only then allowed to glide: a
          card that arrives must not fly down from the top of the margin. */
-      if (!("placed" in card.node.dataset))
-        requestAnimationFrame(() => (card.node.dataset.placed = ""));
+      if (!("placed" in card.node.dataset)) {
+        void card.node.offsetHeight; // the first place lands before gliding is on
+        card.node.dataset.placed = "";
+      }
     });
     const last = cards.length - 1;
     margin.style.minHeight = last >= 0 ? `${tops[last] + cards[last].height}px` : "";

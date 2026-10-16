@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.41",
+    date: "2026-10-16",
+    headline: "Remarks that glide",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Smoother margin",
+            text: "When you pick another remark in the margin, the cards now slide to their new places instead of jumping, from the very first one.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.40",
     date: "2026-10-16",
     headline: "A book that looks like a book",

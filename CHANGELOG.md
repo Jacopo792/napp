@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.41 — 2026-10-16
+
+### Fixed
+
+- Margin comments: a card's `data-placed` (which turns its transform transition on) was set in a `requestAnimationFrame` that could be skipped, so cards jumped instead of gliding until a second placement. It is set synchronously after a forced style flush.
+
 ## 0.9.40 — 2026-10-16
 
 ### Changed
