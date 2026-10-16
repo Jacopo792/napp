@@ -39,7 +39,8 @@ import {
   UserPlus,
   X,
 } from "@/components/icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
@@ -94,7 +95,13 @@ interface Props {
   /** Something was said, resolved or taken back — so lists outside this
    *  panel can read again now rather than when Realtime gets round to it. */
   onChanged?: () => void;
+  /** Where the page has room beside its words: the cards are drawn in this
+   *  element, inside the scrolling page, each beside its own passage. */
+  margin?: HTMLElement | null;
 }
+
+/** Space between two cards in the margin. */
+const MARGIN_GAP = 10;
 
 /** A thread longer than this is folded in the middle. Somebody arriving at a
  *  conversation wants how it opened and how it stands, not the middle of it. */
@@ -115,6 +122,7 @@ export function NoteComments({
   onRemoveAnchor,
   onResolveAnchor,
   onChanged,
+  margin,
 }: Props) {
   const [comments, setComments] = useState<NoteComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -803,8 +811,93 @@ export function NoteComments({
      put in a stylesheet. */
   const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
 
-  return (
-    <aside className="note-comments" aria-label="Comments on this note">
+  /* ── The margin ──────────────────────────────────────────────────────────
+     The column that was pinned to the passages and taken back (see the top of
+     this file) stood beside the page in a panel of its own, which did not
+     scroll with it. Here the cards are inside the page's own scroller, so a
+     card is on screen exactly when its passage is, and the column scrolls
+     because the page does. Each card wants the height of its passage; where
+     two want the same place the later one is pushed down, and the card being
+     read is the one that gets its place exactly — the others make way above
+     and below it, the way Word and Docs keep the open one level with its
+     words. Written onto the cards directly: it follows every reflow of the
+     note, which is not a reason to render the conversation again. */
+  const placeRef = useRef<() => void>(() => {});
+  placeRef.current = () => {
+    if (!margin) return;
+    const scope = margin.parentElement;
+    if (!scope) return;
+    const origin = margin.getBoundingClientRect().top;
+    const head = margin.querySelector<HTMLElement>(".note-comments-header");
+    const floor = head ? head.offsetHeight + MARGIN_GAP : 0;
+    const anchorOf = (id: string) =>
+      /^[a-zA-Z0-9-]+$/.test(id)
+        ? scope.querySelector(`.rich-text-content span[data-comment-thread="${id}"]`)
+        : null;
+    const cards = [...threadRefs.current.entries()]
+      .filter(([, node]) => node.isConnected)
+      .map(([id, node]) => {
+        const anchor = anchorOf(id);
+        return {
+          id,
+          node,
+          want: anchor ? anchor.getBoundingClientRect().top - origin : Number.POSITIVE_INFINITY,
+          height: node.offsetHeight,
+        };
+      })
+      .sort((a, b) => a.want - b.want);
+    const tops = cards.map(() => 0);
+    const settle = (from: number) => {
+      for (let i = from; i < cards.length; i++) {
+        const below = i > 0 ? tops[i - 1] + cards[i - 1].height + MARGIN_GAP : floor;
+        tops[i] = Math.max(Number.isFinite(cards[i].want) ? cards[i].want : below, below);
+      }
+    };
+    const at = cards.findIndex((card) => card.id === active && Number.isFinite(card.want));
+    if (at < 0) settle(0);
+    else {
+      tops[at] = Math.max(cards[at].want, floor);
+      settle(at + 1);
+      for (let i = at - 1; i >= 0; i--)
+        tops[i] = Math.min(cards[i].want, tops[i + 1] - cards[i].height - MARGIN_GAP);
+      if (tops[0] < floor) settle(0);
+    }
+    cards.forEach((card, i) => {
+      card.node.style.transform = `translateY(${Math.round(tops[i])}px)`;
+      /* Placed where it belongs first, and only then allowed to glide: a
+         card that arrives must not fly down from the top of the margin. */
+      if (!("placed" in card.node.dataset))
+        requestAnimationFrame(() => (card.node.dataset.placed = ""));
+    });
+    const last = cards.length - 1;
+    margin.style.minHeight = last >= 0 ? `${tops[last] + cards[last].height}px` : "";
+  };
+
+  useLayoutEffect(() => placeRef.current());
+
+  useEffect(() => {
+    if (!margin?.parentElement) return;
+    let frame = 0;
+    const later = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => placeRef.current());
+    };
+    const sizes = new ResizeObserver(later);
+    const content = margin.parentElement.querySelector(".rich-text-content");
+    if (content) sizes.observe(content);
+    sizes.observe(margin);
+    for (const node of threadRefs.current.values()) sizes.observe(node);
+    return () => {
+      cancelAnimationFrame(frame);
+      sizes.disconnect();
+    };
+  }, [margin, comments, pendingThread, showResolved, forYou, expanded]);
+
+  const panel = (
+    <aside
+      className={`note-comments ${margin ? "is-margin" : ""}`}
+      aria-label="Comments on this note"
+    >
       {lit && (
         <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
       )}
@@ -853,4 +946,5 @@ export function NoteComments({
       <div className="note-comments-scroll">{body}</div>
     </aside>
   );
+  return margin ? createPortal(panel, margin) : panel;
 }

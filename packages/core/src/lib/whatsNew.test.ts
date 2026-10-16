@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   CURRENT_RELEASE,
   RELEASES,
@@ -46,4 +46,15 @@ test("every entry says something", () => {
     for (const section of release.sections)
       for (const item of section.items) assert.ok(item.title && item.text, item.title);
   }
+});
+
+test("every picture a release names is in the bundle", () => {
+  for (const release of RELEASES)
+    for (const section of release.sections)
+      for (const item of section.items)
+        if (item.image)
+          assert.ok(
+            existsSync(new URL(`../assets/whats-new/${item.image}`, import.meta.url)),
+            `${release.version}: ${item.image} is missing`,
+          );
 });

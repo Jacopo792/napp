@@ -26,18 +26,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import {
-  ArrowDownUp,
-  Board,
-  ChevronDown,
-  FileText,
-  FolderPlus,
-  Info,
-  NotebookText,
-  Pencil,
-  Plus,
-  Trash2,
-} from "@/components/icons";
+import { Board, ChevronDown, FileText, Plus, Trash2 } from "@/components/icons";
 import { PointMenu } from "@/components/ContextMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
@@ -51,6 +40,7 @@ import {
 } from "@/lib/manuscript";
 import type { ChapterInfo } from "@/lib/types";
 import { keyName } from "@/lib/shortcuts";
+import { chapterMenuItems, partMenuItems, type StructureActions } from "./structureMenus";
 
 export type { StructureTarget };
 
@@ -311,7 +301,9 @@ export function StructurePane({
   header?: ReactNode;
   footer?: ReactNode;
   documentName: string;
-  total: number;
+  /** The book's count under the structure — where it is a drawer, on a
+   *  phone. A window says it in the status bar instead. */
+  total?: number;
   goal?: number;
   rows: StructureRow<ChapterItem>[];
   parts: Map<string, string>;
@@ -355,7 +347,6 @@ export function StructurePane({
     () => rows.flatMap((row) => (row.kind === "chapter" ? [row.item] : [])),
     [rows],
   );
-  const indexOf = (id: string) => chapters.findIndex((item) => item.id === id);
   const dragged = dragging
     ? (chapters.find((item) => item.id === dragging) ??
       notebook.find((item) => item.id === dragging))
@@ -376,184 +367,29 @@ export function StructurePane({
     if (target) onMove(id, target);
   }
 
-  function chapterMenu(item: ChapterItem, point: MenuPoint, placed: boolean) {
-    const at = indexOf(item.id);
-    const items: MenuItem[] = [
-      {
-        kind: "item",
-        id: "open",
-        label: placed ? "Open chapter" : "Open",
-        run: () => onOpen(item.id),
-      },
-      {
-        kind: "item",
-        id: "info",
-        label: "Info",
-        icon: <Info size={16} />,
-        run: () => onInfo(item.id, point),
-      },
-    ];
-    if (canWrite && item.movable) {
-      items.push({ kind: "separator" });
-      if (placed) {
-        if (at > 0)
-          items.push({
-            kind: "item",
-            id: "up",
-            label: "Move up",
-            icon: <ArrowDownUp size={16} />,
-            run: () => onMove(item.id, { kind: "before", id: chapters[at - 1].id }),
-          });
-        if (at < chapters.length - 1)
-          items.push({
-            kind: "item",
-            id: "down",
-            label: "Move down",
-            run: () => onMove(item.id, { kind: "after", id: chapters[at + 1].id }),
-          });
-        items.push({
-          kind: "item",
-          id: "part",
-          label: "Group in a part",
-          icon: <FolderPlus size={16} />,
-          submenu: [
-            ...[...parts].map(([folderId, name]) => ({
-              kind: "item" as const,
-              id: `part-${folderId}`,
-              label: name || "Untitled part",
-              checked: item.folderId === folderId,
-              run: () => onMove(item.id, { kind: "part", folderId }),
-            })),
-            ...(parts.size > 0 ? [{ kind: "separator" as const }] : []),
-            {
-              kind: "item" as const,
-              id: "part-new",
-              label: "New part",
-              icon: <Plus size={16} />,
-              run: () => onNewPart(item.id),
-            },
-          ],
-        });
-        if (onChapter) {
-          const info = item.chapter;
-          items.push(
-            {
-              kind: "item",
-              id: "status",
-              label: "Status",
-              submenu: [
-                ...CHAPTER_STATUSES.map((status) => ({
-                  kind: "item" as const,
-                  id: `status-${status.id}`,
-                  label: status.label,
-                  checked: info?.status === status.id,
-                  run: () => onChapter(item.id, { ...info, status: status.id }),
-                })),
-                ...(info?.status
-                  ? [
-                      { kind: "separator" as const },
-                      {
-                        kind: "item" as const,
-                        id: "status-none",
-                        label: "No status",
-                        run: () => {
-                          const { status: _gone, ...rest } = info;
-                          onChapter(item.id, Object.keys(rest).length > 0 ? rest : undefined);
-                        },
-                      },
-                    ]
-                  : []),
-              ],
-            },
-            {
-              kind: "item",
-              id: "synopsis",
-              label: info?.synopsis ? "Edit synopsis" : "Write a synopsis",
-              run: () => setWriting({ id: item.id, field: "synopsis" }),
-            },
-            {
-              kind: "item",
-              id: "goal",
-              label: info?.goal ? "Change word goal" : "Set a word goal",
-              run: () => setWriting({ id: item.id, field: "goal" }),
-            },
-            { kind: "separator" },
-          );
-        }
-        items.push({
-          kind: "item",
-          id: "unplace",
-          label: "Take out of the book",
-          icon: <NotebookText size={16} />,
-          run: () => onMove(item.id, { kind: "notebook" }),
-        });
-      } else {
-        items.push({
-          kind: "item",
-          id: "place",
-          label: "Make it a chapter",
-          icon: <Plus size={16} />,
-          run: () => onMove(item.id, { kind: "end" }),
-        });
-      }
-      items.push(
-        { kind: "separator" },
-        {
-          kind: "item",
-          id: "trash",
-          label: "Move to Trash",
-          danger: true,
-          icon: <Trash2 size={16} />,
-          run: () => onTrash(item.id),
-        },
-      );
-    }
-    setMenu({ point, items });
-  }
-
-  function partMenu(folderId: string, point: MenuPoint) {
-    if (!canWrite) return;
-    setMenu({
-      point,
-      items: [
-        {
-          kind: "item",
-          id: "chapter",
-          label: "New chapter in this part",
-          icon: <Plus size={16} />,
-          run: () => onNewChapter(folderId),
-        },
-        {
-          kind: "item",
-          id: "rename",
-          label: "Rename…",
-          icon: <Pencil size={16} />,
-          hint: "double-click",
-          run: () => setRenaming(folderId),
-        },
-        { kind: "separator" },
-        {
-          kind: "item",
-          id: "delete",
-          label: "Delete part",
-          danger: true,
-          icon: <Trash2 size={16} />,
-          submenu: [
-            {
-              kind: "item",
-              id: "delete-yes",
-              label: "Delete — its chapters stay",
-              danger: true,
-              run: () => onDeletePart(folderId),
-            },
-          ],
-        },
-      ],
-    });
-  }
+  const actions: StructureActions = {
+    chapters,
+    parts,
+    canWrite,
+    onOpen,
+    onInfo,
+    onMove,
+    onNewPart,
+    onNewChapter,
+    onDeletePart,
+    onTrash,
+    onChapter,
+    write: (id, field) => setWriting({ id, field }),
+    rename: setRenaming,
+  };
+  const chapterMenu = (item: ChapterItem, point: MenuPoint, placed: boolean) =>
+    setMenu({ point, items: chapterMenuItems(actions, item, point, placed) });
+  const partMenu = (folderId: string, point: MenuPoint) => {
+    if (canWrite) setMenu({ point, items: partMenuItems(actions, folderId) });
+  };
 
   const over = targetOf(overId);
-  const progress = goal ? Math.min(1, total / goal) : 0;
+  const progress = goal && total ? Math.min(1, total / goal) : 0;
 
   return (
     <aside className="structure-pane" aria-label="Structure">
@@ -734,18 +570,20 @@ export function StructurePane({
 
       {/* The count is a glance, not a heading: it sits under the work, where
           the eye arrives having finished with the structure. */}
-      <div className="structure-total" aria-label={documentName}>
-        <span>
-          {total.toLocaleString()}
-          {goal ? ` / ${goal.toLocaleString()} words` : " words"}
-          {stats?.today ? ` · today ${signed(stats.today)}` : ""}
-        </span>
-        {goal ? (
-          <span className="structure-goal" aria-hidden="true">
-            <i style={{ transform: `scaleX(${progress})` }} />
+      {total !== undefined && (
+        <div className="structure-total" aria-label={documentName}>
+          <span>
+            {total.toLocaleString()}
+            {goal ? ` / ${goal.toLocaleString()} words` : " words"}
+            {stats?.today ? ` · today ${signed(stats.today)}` : ""}
           </span>
-        ) : null}
-      </div>
+          {goal ? (
+            <span className="structure-goal" aria-hidden="true">
+              <i style={{ transform: `scaleX(${progress})` }} />
+            </span>
+          ) : null}
+        </div>
+      )}
       {footer}
       {menu && <PointMenu point={menu.point} items={menu.items} close={() => setMenu(null)} />}
     </aside>

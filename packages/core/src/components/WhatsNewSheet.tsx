@@ -11,6 +11,18 @@ import { Download, Sparkle, X } from "@/components/icons";
 import { DOWNLOADS, RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
 import { emerge } from "@/lib/motion";
 
+/* The pictures go into the bundle by name, so a release's entry needs no
+   import of its own and a missing file is an empty slot, not a failed build. */
+const PICTURES = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>("../assets/whats-new/*", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  ).map(([path, url]) => [path.split("/").pop() ?? path, url]),
+);
+
 export function WhatsNewSheet({
   open,
   seen,
@@ -106,6 +118,9 @@ export function WhatsNewSheet({
                     <li key={item.title}>
                       <strong>{item.title}</strong>
                       <span>{item.text}</span>
+                      {item.image && PICTURES[item.image] && (
+                        <img src={PICTURES[item.image]} alt="" loading="lazy" decoding="async" />
+                      )}
                     </li>
                   ))}
                 </ul>

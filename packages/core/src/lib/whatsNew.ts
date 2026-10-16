@@ -13,6 +13,9 @@
 export interface ReleaseItem {
   title: string;
   text: string;
+  /** A picture of it, by file name in `assets/whats-new/` — bundled with
+   *  both shells, so it shows with no network. */
+  image?: string;
 }
 
 export interface ReleaseSection {
@@ -41,6 +44,46 @@ export const DOWNLOADS = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    version: "0.9.40",
+    date: "2026-10-16",
+    headline: "A book that looks like a book",
+    sections: [
+      {
+        heading: "In a book",
+        items: [
+          {
+            title: "Paper on a desk",
+            text: "The chapter is now a white page on a darker desk, the way Pages and Word show it, whatever theme you use. A bar at the bottom says which page you are on, how many words the chapter has — or how many you have selected — and how far the whole book is from its goal.",
+          },
+          {
+            title: "Everything at the top",
+            text: "The column on the left is gone. The strip across the top says which book and which chapter you are in: press the chapter's name to jump to any other chapter or note. Who else is in the book is beside it, and Settings, Trash and the exports are under ⋯.",
+            image: "0.9.40-book-chapters.jpg",
+          },
+          {
+            title: "Organize on the board",
+            text: "The button at the top left (or ⌘\\) turns the page over to the board: every chapter as a card, in order, grouped by part. Drag a card to move it, write what happens on it, and right-click it for its status, its word goal, its part or the Trash. Your notes are at the end.",
+            image: "0.9.40-book-board.jpg",
+          },
+          {
+            title: "Chapters arrive from where they are",
+            text: "Going to the next chapter brings the page up from below, going back brings it down from above.",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Comments in the margin",
+            text: "When there is room, comments stand in the margin beside the words they are about, in books and in notes, and scroll with the page. The one you are reading moves next to its passage and the others make way. In a narrow window they are the panel they were.",
+            image: "0.9.40-book-margin.jpg",
+          },
+        ],
+      },
+    ],
+  },
   {
     version: "0.9.39",
     date: "2026-10-15",

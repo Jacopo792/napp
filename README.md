@@ -6,9 +6,15 @@ A private place for your notes and your writing, shared with the people you choo
 
 ## Why I built it
 
-I wanted an ordinary notes app that did not slowly turn into a project-management
-tool. Somewhere calm for quick lists and long writing alike, with just enough sharing
-for the few people who keep things together: partners, friends, a study group.
+Writing is lonely work. For years I wrote on my own, in a diary nobody else would
+ever open, and I kept wondering how good it would be if someone could look over my
+shoulder — read what I had just written, stop on a sentence, tell me what they
+thought of it.
+
+Napp is that, in a way: an answer to the writer's solitude. A calm place to write,
+from a quick list to a whole book, where the people you choose can be in the same
+page with you, see the words arrive and leave a remark beside the line they are
+about. Everyone else stays out.
 
 ## What is in it
 
@@ -56,6 +62,30 @@ Control-click the app in Applications and choose **Open**. Once only.
 
 Intel Macs and Windows have their own file on the same release page.
 [`DESKTOP.md`](DESKTOP.md) has installation help and the practical details.
+
+## Writing a book
+
+![A chapter on the page, with a comment in the margin](docs/book-preview.png)
+
+A **Book** archive is set like the page it will be printed on: white paper on a
+desk, the book and the chapter named across the top, and a bar underneath with the
+page you are on, the words in the chapter and how far the book is from its goal.
+Press the chapter's name to go to any other.
+
+![The board](docs/book-board-preview.png)
+
+Organizing is the board: every chapter as a card, in order and grouped by part.
+Drag a card to move it, write on it what happens there, right-click it for its
+status, its word goal or its part.
+
+## Remarks in the margin
+
+![Comments in the margin](docs/comments-preview.png)
+
+Select a passage and leave a remark on it. When the window has room, the
+conversation stands in the margin beside the words it is about and scrolls with
+them, in a book and in a note alike; the one you are reading moves next to its
+passage. Reply, react, hand a thread to someone, resolve it when it is done.
 
 ## Make it yours
 

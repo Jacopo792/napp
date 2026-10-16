@@ -18,6 +18,7 @@ import {
   Target,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
+import { countWords } from "@/lib/format";
 import { PointMenu } from "@/components/ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
@@ -93,11 +94,113 @@ export interface ManuscriptFrame {
   citations?: boolean;
   /** The document has Suggested changes on: the bar offers Suggesting. */
   review?: boolean;
+  /** The chapter's word goal, for the status bar. */
+  goal?: number;
+  /** Turned to from the chapter before it or after it. */
+  arrive?: "next" | "previous";
+  /** The window's strip over the writing bar: book, chapter, people, ⋯. */
+  titlebar?: ReactNode;
+  /** The whole book's count, at the right of the status bar. */
+  bookWords?: { total: number; goal?: number; today: number | null };
 }
 
 /* Whether this hand is suggesting, kept across chapters the way the pen is:
    it is a fact about the writer, not about the chapter or the document. */
 let suggestingWanted = false;
+
+/** What the comments' margin takes beside the page: its cards and air. */
+const MARGIN_ROOM = 384;
+/** The narrowest a note's column may become to make room for the margin. */
+const NOTE_MEASURE_MIN = 520;
+
+/** Word's status bar: where you are in the chapter and how much of it there
+ *  is, under the desk rather than in the structure, where the eye is not.
+ *  The page is the desk's own measure — the sheet's height in page heights.
+ *  ponytail: an estimate; Chromium's print breaks (footnotes, widows) can
+ *  land a page apart on a long chapter. Pages is the exact count. */
+function SheetStatus({
+  editor,
+  desk,
+  sheet,
+  goal,
+  book,
+}: {
+  editor: Editor | null;
+  desk: HTMLElement | null;
+  sheet: HTMLElement | null;
+  goal?: number;
+  book?: ManuscriptFrame["bookWords"];
+}) {
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const tick = () => redraw((n) => n + 1);
+    editor?.on("update", tick);
+    editor?.on("selectionUpdate", tick);
+    desk?.addEventListener("scroll", tick, { passive: true });
+    const sizes = sheet ? new ResizeObserver(tick) : null;
+    if (sheet) sizes?.observe(sheet);
+    return () => {
+      editor?.off("update", tick);
+      editor?.off("selectionUpdate", tick);
+      desk?.removeEventListener("scroll", tick);
+      sizes?.disconnect();
+    };
+  }, [editor, desk, sheet]);
+
+  if (!editor) return null;
+  const { doc, selection } = editor.state;
+  const words = countWords(doc.textBetween(0, doc.content.size, " ", " "));
+  const chosen = selection.empty
+    ? 0
+    : countWords(doc.textBetween(selection.from, selection.to, " ", " "));
+
+  let page = 1;
+  let pages = 1;
+  if (desk && sheet) {
+    const style = getComputedStyle(sheet);
+    const margins = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const perPage = parseFloat(style.minHeight) - margins;
+    if (perPage > 0) {
+      pages = Math.max(1, Math.ceil((sheet.offsetHeight - margins) / perPage));
+      const seen = desk.scrollTop + desk.clientHeight / 2 - sheet.offsetTop;
+      page = Math.min(pages, Math.max(1, Math.ceil(seen / perPage)));
+    }
+  }
+
+  return (
+    <footer className="manuscript-statusbar" aria-label="Chapter">
+      <span>
+        Page {page} of {pages}
+      </span>
+      <span>
+        {chosen ? `${chosen.toLocaleString()} of ` : ""}
+        {words.toLocaleString()}
+        {goal ? ` / ${goal.toLocaleString()}` : ""} words
+      </span>
+      {goal ? (
+        <span className="structure-goal" aria-hidden="true">
+          <i style={{ transform: `scaleX(${Math.min(1, words / goal)})` }} />
+        </span>
+      ) : null}
+      {book && (
+        <span className="manuscript-statusbar-book">
+          <span>
+            Book {book.total.toLocaleString()}
+            {book.goal ? ` / ${book.goal.toLocaleString()}` : ""} words
+            {book.today
+              ? ` · today ${book.today > 0 ? "+" : "−"}${Math.abs(book.today).toLocaleString()}`
+              : ""}
+          </span>
+          {book.goal ? (
+            <span className="structure-goal" aria-hidden="true">
+              <i style={{ transform: `scaleX(${Math.min(1, book.total / book.goal)})` }} />
+            </span>
+          ) : null}
+        </span>
+      )}
+    </footer>
+  );
+}
 
 interface Props {
   mobile?: boolean;
@@ -282,6 +385,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   ref,
 ) {
   const [instance, setInstance] = useState<Editor | null>(null);
+  /* Read once: the sheet's entrance is decided by how it was reached, and a
+     later render saying otherwise would restart it. */
+  const [arrive] = useState(() => manuscript?.arrive);
   /** The colour of a document's sheet is the reader's, like the theme. */
   const sheet = useWritingPreferences();
   /** The inspector reopens on the tab it was closed on. */
@@ -347,6 +453,29 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  /* Comments stand in the page's margin when the page has one wide enough;
+     otherwise they are the panel they always were. Measured on the whole
+     body of the editor — the panel, while open, is part of what the margin
+     would have — and against the sheet's own width, read while it has no
+     margin, because a margin is what narrows it. A note's column may give
+     up a little of its measure for the margin; a printed page may not. */
+  const [marginHost, setMarginHost] = useState<HTMLDivElement | null>(null);
+  const [roomy, setRoomy] = useState(false);
+  useEffect(() => {
+    const body = scroller?.parentElement;
+    if (!scroller || !body || mobile) return;
+    let sheetWidth = 0;
+    const measure = () => {
+      const sheet = scroller.querySelector<HTMLElement>(".manuscript-sheet");
+      if (sheet && !scroller.classList.contains("has-margin")) sheetWidth = sheet.offsetWidth;
+      const need = sheet ? sheetWidth + MARGIN_ROOM + 48 : NOTE_MEASURE_MIN + MARGIN_ROOM + 80;
+      setRoomy(body.clientWidth >= need);
+    };
+    measure();
+    const sizes = new ResizeObserver(measure);
+    sizes.observe(body);
+    return () => sizes.disconnect();
+  }, [scroller, mobile]);
   /* Scrolled past, the title does not leave: it rises into the strip above
      the page, the way a large title becomes the bar's. Asked of the title
      itself, so a cover of any height above it changes nothing. */
@@ -1138,28 +1267,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onClose={() => setHistoryOpen(false)}
     />
   );
-  const commentsPanel = (commentsOpen || keepPanels) && session && commentAuthors && (
-    <NoteComments
-      key={entry.note.id}
-      session={session}
-      noteId={entry.note.id}
-      canEdit={canEdit}
-      authors={commentAuthors}
-      quotes={quotes}
-      pendingThread={pendingThread}
-      onPendingHandled={() => setPendingThread(null)}
-      focusThread={focusThread}
-      onFocusHandled={() => setFocusThread(null)}
-      onClose={closeComments}
-      onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
-      onRemoveAnchor={(threadId) => {
-        editorRef.current?.removeComment(threadId);
-        setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-      }}
-      onResolveAnchor={syncCommentResolution}
-      onChanged={onRemarksChanged}
-    />
-  );
+  const inMargin = commentsOpen && roomy && !mobile && !pages;
+  const commentsPanel = (commentsOpen || keepPanels) &&
+    session &&
+    commentAuthors &&
+    !(inMargin && !marginHost) && (
+      <NoteComments
+        key={entry.note.id}
+        session={session}
+        noteId={entry.note.id}
+        canEdit={canEdit}
+        authors={commentAuthors}
+        quotes={quotes}
+        pendingThread={pendingThread}
+        onPendingHandled={() => setPendingThread(null)}
+        focusThread={focusThread}
+        onFocusHandled={() => setFocusThread(null)}
+        onClose={closeComments}
+        onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
+        onRemoveAnchor={(threadId) => {
+          editorRef.current?.removeComment(threadId);
+          setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+        }}
+        onResolveAnchor={syncCommentResolution}
+        onChanged={onRemarksChanged}
+        margin={inMargin ? marginHost : null}
+      />
+    );
   const sidePanels = (
     <>
       {outlinePanel}
@@ -1214,6 +1348,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         ref={shellRef}
         className={`editor-shell manuscript-shell flex min-w-0 flex-1 flex-col ${mobile ? "is-mobile" : ""}`}
       >
+        {manuscript.titlebar}
         <div className={`manuscript-bar relative shrink-0 ${quiet ? "is-quiet" : ""}`}>
           {headerLead}
           {canEdit && !pages ? (
@@ -1346,7 +1481,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               what is written here is what prints. */}
           <div
             ref={setScroller}
-            className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""}`}
+            className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""} ${
+              inMargin ? "has-margin" : ""
+            }`}
             onContextMenu={onPassageMenu}
             onKeyDown={(event) => {
               if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1354,11 +1491,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 setQuiet(true);
             }}
           >
+            {inMargin && <div ref={setMarginHost} className="comment-margin" />}
+            {inMargin && commentsPanel}
             <article
               ref={sheetRef}
               className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}
               data-top={manuscript.topLevel ?? 1}
               data-tone={sheet.sheetTone}
+              data-arrive={arrive}
               data-ink={sheet.adaptInk ? "adapt" : "keep"}
               style={{
                 ...pageStyle(manuscript.page),
@@ -1476,7 +1616,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </article>
             {manuscript.footer}
           </div>
-          {inspectorTab && (
+          {inspectorTab && !(inMargin && inspectorTab === "comments") && (
             <aside className="manuscript-inspector" aria-label="Inspector">
               <div className="inspector-tabs" role="tablist">
                 {inspectorTabs
@@ -1506,7 +1646,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 {outlinePanel}
               </div>
               <div className="inspector-pane" hidden={inspectorTab !== "comments"}>
-                {commentsPanel}
+                {!inMargin && commentsPanel}
               </div>
               <div className="inspector-pane" hidden={inspectorTab !== "versions"}>
                 {historyPanel}
@@ -1514,6 +1654,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </aside>
           )}
         </div>
+        {!pages && !mobile && (
+          <SheetStatus
+            editor={instance}
+            desk={scroller}
+            sheet={sheetRef.current}
+            goal={manuscript.goal}
+            book={manuscript.bookWords}
+          />
+        )}
       </section>
     );
 
@@ -1643,9 +1792,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div className="editor-body flex min-h-0 flex-1">
         <div
           ref={setScroller}
-          className="editor-scroll page-in min-h-0 flex-1"
+          className={`editor-scroll page-in min-h-0 flex-1 ${inMargin ? "has-margin" : ""}`}
           onContextMenu={onPassageMenu}
         >
+          {inMargin && <div ref={setMarginHost} className="comment-margin" />}
           <PageCover
             cover={entry.note.cover}
             photo={entry.note.photo}

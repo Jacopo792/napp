@@ -1116,10 +1116,20 @@ else may only leave. The Notes heading in a book's structure has its own
 right-click, which moves every page under it to the Trash.
 
 A notes archive renders exactly what it always did. A document renders the
-branch at the end of `ArchiveScreen`: `StructurePane` where the sidebar and the
-list were, and `NoteEditor` with `manuscript` — the same binding, comments,
-history and find, under a writing bar (`ManuscriptToolbar`) and on a sheet the
-size, margins and letter of the page set-up.
+branch at the end of `ArchiveScreen`: `NoteEditor` with `manuscript` — the same
+binding, comments, history and find, under a writing bar (`ManuscriptToolbar`)
+and on a sheet the size, margins and letter of the page set-up.
+
+**A window has no structure column (0.9.40).** Pages' arrangement: one title
+strip (`.manuscript-titlebar`) says which book and which chapter — the
+chapter's name is a menu of every chapter and notebook page — who else is in
+it, and puts the rest of the app under ⋯. Organizing is the **corkboard**,
+turned to in place of the sheet by the strip's first button or ⌘\: the cards
+carry the same right-click menu the structure's rows do (`structureMenus.tsx`
+is the one list). `StructurePane` survives as the phone's drawer. Do not put
+the column back beside the sheet — it was taken away at Jacopo's request.
+The sheet is paper by default, on a desk darker than every pane, with Word's
+status bar under it.
 
 - A chapter is a note with `notes.position`; the notebook ("Notes" in the
   structure) is every note without one. A comment is a comment, as in a notes
@@ -1328,6 +1338,15 @@ inventing. `exchange.test.ts` pins that.
 `private.freeze_comment_record()` makes `author_id` and `body` immutable: a
 policy can say who may update a row, not which columns. Resolving is any
 editor's to do, deleting is the author's alone.
+
+## Comments in the margin
+
+When the editor body has room, `NoteComments` portals its cards into
+`.comment-margin` **inside the page's own scroller**, each at its passage's
+height, later ones pushed down, the active one exact. That is what makes it
+differ from the pinned column the file's header says was taken back: that
+column was a panel that did not scroll with the page. A narrow pane still gets
+the panel. Positions are written onto the cards directly, never as state.
 
 ## Members and profiles
 

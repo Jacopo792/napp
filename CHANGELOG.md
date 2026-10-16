@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.40 — 2026-10-16
+
+### Changed
+
+- Document archive (window): the structure column is removed. A title strip (`.manuscript-titlebar`) carries the archive, a chapter menu built from the structure rows and the notebook, the people shelf, `UpdateNotice` and one ⋯ menu (chapter actions, What's New, Settings, Trash). The phone keeps the structure drawer.
+- The title strip's first button (and ⌘\\ in a document) toggles the corkboard in place of the sheet, with a view-transition crossfade (`toggleBoard`). Cards carry the structure's right-click menu (`structureMenus.tsx`, shared with `StructurePane`), the goal field and part renaming; notebook pages follow the chapters.
+- The sheet is paper by default (`sheetTone: "paper"`); the desk is 14% darker than `--surface`. A status bar under the desk shows the estimated page, chapter words (selection words when there is a selection), chapter goal and book total/goal/today.
+- A chapter opened from the one before or after it enters from below or above (`data-arrive`); otherwise it fades.
+- Comments: when the editor body has room (`MARGIN_ROOM`, sheet width or a 520px note measure), `NoteComments` renders through a portal into a margin inside the page's scroller. Cards are positioned at their anchors with collision stacking, the active card keeps its exact place, and they glide on reflow. Otherwise the panel is unchanged.
+- What's New items take an optional `image`, bundled from `assets/whats-new/` by `import.meta.glob`; a test checks every named file exists.
+
 ## 0.9.39 — 2026-10-15
 
 ### Changed

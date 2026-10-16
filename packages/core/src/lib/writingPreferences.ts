@@ -38,7 +38,7 @@ export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   focusScope: "paragraph",
   typewriter: false,
   writingStats: true,
-  sheetTone: "theme",
+  sheetTone: "paper",
   adaptInk: true,
 };
 

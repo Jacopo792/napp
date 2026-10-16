@@ -1101,6 +1101,84 @@
   color: var(--ink-2);
 }
 
+/* ── Comments in the margin ──
+   Inside the page's own scroller (see `NoteComments`): the page moves over to
+   make room, and each card stands level with its passage. */
+.has-margin {
+  position: relative;
+  padding-right: 360px;
+}
+
+.manuscript-desk.has-margin {
+  padding-right: 384px;
+}
+
+.comment-margin {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 316px;
+}
+
+.manuscript-desk > .comment-margin {
+  top: 40px;
+}
+
+.note-comments.is-margin {
+  position: relative;
+  display: block;
+  width: auto;
+  border: 0;
+  background: transparent;
+}
+
+.note-comments.is-margin .note-comments-header {
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 6px 8px 6px 12px;
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
+}
+
+.note-comments.is-margin .note-comments-scroll {
+  display: block;
+  overflow: visible;
+  padding: 0;
+}
+
+.note-comments.is-margin .note-comment-thread {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  will-change: transform;
+}
+
+/* The card being read steps toward its words, the way Docs moves it. */
+.note-comments.is-margin .note-comment-thread.is-active {
+  z-index: 1;
+  translate: -14px 0;
+}
+
+.note-comments.is-margin .note-comment-thread[data-placed] {
+  transition:
+    transform var(--dur-base) var(--ease),
+    translate var(--dur-base) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+/* Standing beside its passage, a card does not need to quote it back. */
+.note-comments.is-margin .note-comment-quote:not(.is-orphan) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-comments.is-margin .note-comment-thread[data-placed] {
+    transition: none;
+  }
+}
+
 .note-comments-scroll {
   display: flex;
   flex-direction: column;
@@ -2135,6 +2213,15 @@
 
 .is-sliding-navigation .split-seam + .pane-page {
   view-transition-name: note-split;
+}
+
+/* A book turns between its sheet and its corkboard (`toggleBoard`): one
+   crossfade of the window, short, while the cards fade in after it in
+   reading order. */
+.is-turning-board::view-transition-old(root),
+.is-turning-board::view-transition-new(root) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease);
 }
 
 .is-sliding-navigation::view-transition-old(root),
@@ -10979,7 +11066,6 @@ button.sheet-chip:hover,
    was which. */
 .structure-untitled {
   color: var(--ink-3);
-  font-style: italic;
 }
 
 /* Where a chapter stands, as a dot before its name — the colour of a label in
@@ -11089,8 +11175,8 @@ button.sheet-chip:hover,
    how far along — and it lands with the same line a row does. */
 .board-desk {
   overflow: auto;
-  padding: 24px 24px 96px;
-  background: var(--surface);
+  padding: 32px 32px 96px;
+  background: color-mix(in srgb, var(--surface) 86%, #000);
 }
 
 .board-grid {
@@ -11128,6 +11214,26 @@ button.sheet-chip:hover,
   transition:
     opacity var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
+}
+
+/* The board arrives card by card, in the order the book is read — a fade,
+   because a card has nowhere it came from. Capped, so a long book is not a
+   long wait. */
+.board-card {
+  animation: board-card-in var(--dur-base) var(--ease) backwards;
+  animation-delay: calc(min(var(--index, 0), 14) * 22ms);
+}
+
+@keyframes board-card-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card {
+    animation: none;
+  }
 }
 
 .board-card:hover {
@@ -11242,17 +11348,97 @@ button.sheet-chip:hover,
   white-space: nowrap;
 }
 
+/* ── The window's strip over a book ──
+   Pages' arrangement: which book, which chapter, who else is in it, and ⋯.
+   52px, the height of the structure's own top strip beside it, so the
+   hairline under both is one line across the window. */
+.manuscript-titlebar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  height: 52px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  background: var(--paper);
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+.manuscript-titlebar-book {
+  padding: 0 6px;
+  color: var(--ink-3);
+  font-size: var(--text-md);
+  white-space: nowrap;
+}
+
+.manuscript-titlebar-book::after,
+.manuscript-titlebar > .space-switch-wrap::after {
+  margin-left: 10px;
+  color: var(--ink-4);
+  content: "/";
+}
+
+.manuscript-titlebar > .space-switch-wrap {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+
+.manuscript-titlebar-chapter {
+  display: flex;
+  max-width: 42ch;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.manuscript-titlebar-chapter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manuscript-titlebar-chapter + .writing-menu {
+  right: auto;
+  left: 0;
+  max-height: min(70vh, 32rem);
+  overflow-y: auto;
+}
+
+.manuscript-titlebar-chapter:hover,
+.manuscript-titlebar-chapter.is-active {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.manuscript-titlebar-end {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.manuscript-titlebar-end .people-shelf {
+  width: 250px;
+  margin: 0;
+}
+
 /* ── The writing bar ── */
 .manuscript-shell {
   min-width: 0;
-  background: var(--surface);
+  background: var(--paper);
 }
 
 .manuscript-bar {
   position: relative;
   z-index: 20;
   display: flex;
-  min-height: 52px;
+  min-height: 44px;
   align-items: center;
   gap: 4px;
   padding: 5px 8px;
@@ -11542,8 +11728,37 @@ button.sheet-chip:hover,
   --desk-accent-wash: var(--accent-wash);
 
   overflow: auto;
-  padding: 32px 24px 96px;
-  background: var(--surface);
+  padding: 40px 24px 96px;
+  /* The desk recedes: a step darker than every pane round it, so the sheet
+     is the brightest thing in the window, the way Pages and Word set it. */
+  background: color-mix(in srgb, var(--surface) 86%, #000);
+}
+
+/* Word's status bar: the page, the words, the goal — under the desk. */
+.manuscript-statusbar {
+  display: flex;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px;
+  background: var(--paper);
+  box-shadow: inset 0 1px 0 var(--rule);
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.manuscript-statusbar .structure-goal {
+  width: 120px;
+  margin: 0;
+}
+
+.manuscript-statusbar-book {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
 /* The page is paper whatever the window is wearing: a document is written on
@@ -11651,7 +11866,24 @@ button.sheet-chip:hover,
 @keyframes sheet-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+  }
+}
+
+/* A chapter turned to arrives from where it stands in the book: the next one
+   comes up from below, the one before comes down from above — the way the
+   page would scroll to it. Opened from nowhere in particular, it only fades. */
+.manuscript-sheet[data-arrive] {
+  animation: sheet-arrive var(--dur-slow) var(--ease) backwards;
+}
+
+.manuscript-sheet[data-arrive="previous"] {
+  --arrive-from: -32px;
+}
+
+@keyframes sheet-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--arrive-from, 32px));
   }
 }
 
@@ -12548,17 +12780,17 @@ button.sheet-chip:hover,
 
 /* The window is dragged by its band of chrome, and only by the parts of it
    that are not something to press. */
-[data-shell] .manuscript-bar {
+[data-shell] :is(.manuscript-bar, .manuscript-titlebar) {
   -webkit-app-region: drag;
 }
 
 [data-shell]
-  .manuscript-bar
+  :is(.manuscript-bar, .manuscript-titlebar)
   :is(button, a, input, select, textarea, label, [role], [tabindex], [contenteditable]) {
   -webkit-app-region: no-drag;
 }
 
-[data-shell="mac"] .pane-slide.is-collapsed ~ .manuscript-shell .manuscript-bar {
+[data-shell="mac"] .manuscript-titlebar {
   padding-left: var(--titlebar-inset);
 }
 
@@ -12582,7 +12814,8 @@ button.sheet-chip:hover,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .manuscript-sheet {
+  .manuscript-sheet,
+  .manuscript-sheet[data-arrive] {
     animation-name: sheet-fade;
   }
 
@@ -12595,7 +12828,9 @@ button.sheet-chip:hover,
 
 @media print {
   .structure-pane,
+  .manuscript-titlebar,
   .manuscript-bar,
+  .manuscript-statusbar,
   .manuscript-turn {
     display: none !important;
   }
@@ -12948,6 +13183,15 @@ button.sheet-chip:hover,
 
 .whats-new-release li span {
   color: var(--ink-2);
+}
+
+.whats-new-release li img {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .whats-new-foot {

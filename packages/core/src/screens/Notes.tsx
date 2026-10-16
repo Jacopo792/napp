@@ -47,6 +47,9 @@ import {
   Footnote,
   Sparkle,
   UserRound,
+  Board,
+  ChevronDown,
+  Plus,
 } from "@/components/icons";
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
@@ -618,6 +621,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [foldersOpen, setFoldersOpen] = useState(false);
   /* The chapters as cards in place of the page — a document's corkboard. */
   const [boardOpen, setBoardOpen] = useState(false);
+  /* The page left, read while the next one renders — so a chapter knows
+     whether it was turned to forwards or back. */
+  const lastOpened = useRef<string | null>(null);
   const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
   const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
@@ -1543,6 +1549,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : null;
 
   const selected = docMode ? docSelected : (visible.find((e) => e.note.id === selectedId) ?? null);
+  const selectedNoteId = selected?.note.id ?? null;
+  useEffect(() => {
+    lastOpened.current = selectedNoteId;
+  }, [selectedNoteId]);
 
   /* A book opens on the chapter last written in. It had a title page with a
      Continue button, which was one more press between the window and the
@@ -1935,6 +1945,26 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     },
     [],
   );
+
+  /* A book's structure is its corkboard, laid in place of the sheet. The
+     sheet and the board are the same window turned over, so the change is
+     one crossfade of the whole picture while the cards settle in — see
+     `.is-turning-board` in the stylesheet. */
+  const toggleBoard = useCallback(() => {
+    const apply = () => flushSync(() => setBoardOpen((open) => !open));
+    if (
+      !document.startViewTransition ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      apply();
+      return;
+    }
+    const root = document.documentElement;
+    root.classList.add("is-turning-board");
+    document
+      .startViewTransition(apply)
+      .finished.finally(() => root.classList.remove("is-turning-board"));
+  }, []);
 
   const toggleFocus = useCallback(() => {
     if (focusMode) {
@@ -2791,7 +2821,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       }
       if (mod && e.key === "\\") {
         e.preventDefault();
-        changeNavigation((current) => !current);
+        if (docMode && !compact) toggleBoard();
+        else changeNavigation((current) => !current);
         return;
       }
       /* The shortcuts sheet, and it is a chord rather than the bare `?` it was
@@ -2858,6 +2889,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     focusMode,
     toggleFocus,
     changeNavigation,
+    toggleBoard,
+    docMode,
+    compact,
   ]);
 
   // ── Drag a note onto a folder ───────────────────────────────────────────
@@ -5121,7 +5155,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const after = chapterAt >= 0 ? manuscript.chapters[chapterAt + 1] : undefined;
 
     const openFromStructure = (id: string) => {
-      setBoardOpen(false);
+      if (boardOpen && !compact) toggleBoard();
       handleSelectNote(id);
       if (compact) {
         setFoldersOpen(false);
@@ -5267,11 +5301,116 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : [];
 
     const docActions = selected ? (
-      <>
-        <PageSetupButton page={page} disabled={!canWriteArchive} onChange={savePageSetup} />
-        <WritingMenuButton label="Chapter actions" items={chapterItems} />
-      </>
+      <PageSetupButton page={page} disabled={!canWriteArchive} onChange={savePageSetup} />
     ) : null;
+
+    /* Pages' arrangement: the window's chrome is one strip across the top —
+       which book, which chapter, who else is in it, and the rest of the app
+       behind ⋯ — and the structure is a navigator opened when it is wanted,
+       not a column the sheet always shares the window with. */
+    const appItems: MenuItem[] = [
+      {
+        kind: "item",
+        id: "whats-new",
+        label: whatsNewUnseen ? "What's New •" : "What's New",
+        icon: <Sparkle size={16} />,
+        run: openWhatsNew,
+      },
+      {
+        kind: "item",
+        id: "settings",
+        label: "Settings",
+        icon: <Settings size={16} />,
+        run: () => setSettingsOpen(true),
+      },
+      {
+        kind: "item",
+        id: "trash",
+        label: docTrash.length ? `Show Trash (${docTrash.length})` : "Show Trash",
+        icon: <Trash2 size={16} />,
+        run: () =>
+          openSheet({ x: window.innerWidth - 40, y: 26, width: 1, height: 1, kind: "trash" }),
+      },
+    ];
+    const pageLabel = (item: ChapterItem) => item.title || item.preview || "Untitled";
+    const chapterMenu: MenuItem[] = [
+      ...manuscript.rows.map(
+        (row): MenuItem =>
+          row.kind === "part"
+            ? { kind: "label", label: manuscript.parts.get(row.folderId) ?? "" }
+            : {
+                kind: "item",
+                id: `chapter:${row.item.id}`,
+                label: `${row.number}   ${pageLabel(row.item)}`,
+                checked: row.item.id === selected?.note.id,
+                run: () => openFromStructure(row.item.id),
+              },
+      ),
+      ...(manuscript.notebook.length
+        ? [
+            { kind: "separator" as const },
+            { kind: "label" as const, label: notebookName },
+            ...manuscript.notebook.map(
+              (item): MenuItem => ({
+                kind: "item",
+                id: `note:${item.id}`,
+                label: pageLabel(item),
+                checked: item.id === selected?.note.id,
+                run: () => openFromStructure(item.id),
+              }),
+            ),
+          ]
+        : []),
+      ...(canWriteArchive
+        ? [
+            { kind: "separator" as const },
+            {
+              kind: "item" as const,
+              id: "new-chapter",
+              label: "New chapter",
+              icon: <Plus size={16} />,
+              run: () => handleNewChapter(null),
+            },
+          ]
+        : []),
+    ];
+    const titlebar = compact ? null : (
+      <div className="manuscript-titlebar">
+        <button
+          type="button"
+          onClick={toggleBoard}
+          aria-label="Organize the book"
+          aria-pressed={boardOpen}
+          title={"Organize the book · ⌘\\"}
+          className={`ribbon-tool press ${boardOpen ? "is-active" : ""}`}
+        >
+          <Board size={16} />
+        </button>
+        {spaceSwitch || <span className="manuscript-titlebar-book">{currentSpace?.name}</span>}
+        <WritingMenuButton
+          label="Chapters"
+          icon={null}
+          className="manuscript-titlebar-chapter press"
+          items={chapterMenu}
+        >
+          <span>
+            {chapterAt >= 0 ? `${chapterAt + 1} · ` : ""}
+            {chapter ? pageLabel(chapter) : selected?.note.title || "Contents"}
+          </span>
+          <ChevronDown size={12} />
+        </WritingMenuButton>
+        <span className="manuscript-titlebar-end">
+          <UpdateNotice />
+          {roster.length > 1 && peopleShelf}
+          <WritingMenuButton
+            label="More"
+            items={
+              chapterItems.length ? [...chapterItems, { kind: "separator" }, ...appItems] : appItems
+            }
+          />
+        </span>
+      </div>
+    );
 
     const structure = (
       <StructurePane
@@ -5293,53 +5432,57 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 </button>
               )}
             </div>
-            <div className="structure-people">
-              {spaceSwitch}
-              {roster.length > 1 && peopleShelf}
-            </div>
+            {compact && (
+              <div className="structure-people">
+                {spaceSwitch}
+                {roster.length > 1 && peopleShelf}
+              </div>
+            )}
           </>
         }
         footer={
-          <div className="sidebar-footer">
-            <UpdateNotice />
-            <WhatsNewButton
-              unseen={whatsNewUnseen}
-              onOpen={() => {
-                setFoldersOpen(false);
-                openWhatsNew();
-              }}
-            />
-            <button
-              type="button"
-              className="sidebar-footer-button press"
-              onClick={() => {
-                setFoldersOpen(false);
-                setSettingsOpen(true);
-              }}
-            >
-              <span className="sidebar-glyph" data-tone="settings">
-                <Settings size={16} />
-              </span>
-              <span>Settings</span>
-            </button>
-            <button
-              type="button"
-              className="sidebar-footer-button press"
-              onClick={(event) => {
-                setFoldersOpen(false);
-                openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
-              }}
-            >
-              <span className="sidebar-glyph" data-tone="trash">
-                <Trash2 size={16} />
-              </span>
-              <span>Trash</span>
-              {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
-            </button>
-          </div>
+          compact && (
+            <div className="sidebar-footer">
+              <UpdateNotice />
+              <WhatsNewButton
+                unseen={whatsNewUnseen}
+                onOpen={() => {
+                  setFoldersOpen(false);
+                  openWhatsNew();
+                }}
+              />
+              <button
+                type="button"
+                className="sidebar-footer-button press"
+                onClick={() => {
+                  setFoldersOpen(false);
+                  setSettingsOpen(true);
+                }}
+              >
+                <span className="sidebar-glyph" data-tone="settings">
+                  <Settings size={16} />
+                </span>
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                className="sidebar-footer-button press"
+                onClick={(event) => {
+                  setFoldersOpen(false);
+                  openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
+                }}
+              >
+                <span className="sidebar-glyph" data-tone="trash">
+                  <Trash2 size={16} />
+                </span>
+                <span>Trash</span>
+                {docTrash.length > 0 && <small className="ml-auto">{docTrash.length}</small>}
+              </button>
+            </div>
+          )
         }
         documentName={currentSpace?.name ?? ""}
-        total={manuscript.total}
+        total={compact ? manuscript.total : undefined}
         goal={docFeatures.wordGoal}
         rows={manuscript.rows}
         parts={manuscript.parts}
@@ -5374,6 +5517,31 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
     const chapterBoard = (
       <ChapterBoard
+        titlebar={titlebar}
+        notebook={compact ? undefined : manuscript.notebook}
+        notebookName={notebookName}
+        actions={
+          compact
+            ? undefined
+            : {
+                onOpen: openFromStructure,
+                onInfo: (id, point) =>
+                  openSheet({
+                    x: point.x,
+                    y: point.y,
+                    width: 1,
+                    height: 1,
+                    kind: "note",
+                    noteId: id,
+                  }),
+                onMove: handleMoveChapter,
+                onNewPart: handleNewPart,
+                onNewChapter: handleNewChapter,
+                onDeletePart: handleDeletePart,
+                onTrash: handleTrashDocNote,
+              }
+        }
+        onRenamePart={handleRenamePart}
         lead={
           compact ? (
             <button
@@ -5410,17 +5578,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
        that opens the last one written in. The desk then offers the first. */
     const titlePage = (
       <section className="editor-shell manuscript-shell flex min-w-0 flex-1 flex-col">
+        {titlebar}
         <div className="manuscript-bar shrink-0">
-          {!navigationOpen && !compact && (
-            <button
-              type="button"
-              onClick={() => changeNavigation(true)}
-              aria-label="Show the structure"
-              className="ribbon-tool press"
-            >
-              <PanelLeftOpen size={16} />
-            </button>
-          )}
           {compact && (
             <button
               type="button"
@@ -5493,19 +5652,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 >
                   <Structure size={18} />
                 </button>
-              ) : (
-                !navigationOpen && (
-                  <button
-                    type="button"
-                    onClick={() => changeNavigation(true)}
-                    aria-label="Show the structure"
-                    title={"Show the structure · ⌘\\"}
-                    className="ribbon-tool press"
-                  >
-                    <PanelLeftOpen size={16} />
-                  </button>
-                )
-              )}
+              ) : null}
             </>
           }
           headerActions={<>{docActions}</>}
@@ -5532,6 +5679,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   footnotes: docFeatures.footnotes,
                   citations: docFeatures.citations,
                   review: docFeatures.review,
+                  goal: chapter?.chapter?.goal,
+                  arrive: (() => {
+                    const from = manuscript.chapters.findIndex(
+                      (item) => item.id === lastOpened.current,
+                    );
+                    if (from < 0 || from === chapterAt) return undefined;
+                    return from < chapterAt ? "next" : "previous";
+                  })(),
+                  titlebar,
+                  bookWords: {
+                    total: manuscript.total,
+                    goal: docFeatures.wordGoal,
+                    today: statsShown ? wordsToday : null,
+                  },
                   numbered: docFeatures.numbering ? chapterAt + 1 : null,
                   writing: {
                     focus: focusMode ? writingPreferences.focusScope : "off",
@@ -5584,7 +5745,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         </div>
       );
 
-    const structureWidth = Math.max(sidebarShown, 272);
     return (
       <div
         className={`workspace-shell writing-shell h-screen overflow-hidden ${
@@ -5592,29 +5752,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         } ${focusMode && quiet ? "is-quiet" : ""}`}
       >
         <div className="workspace-grid flex h-full min-h-0">
-          <div
-            className={`pane-slide ${navigationOpen ? "" : "is-collapsed"}`}
-            style={{ width: navigationOpen ? structureWidth + 1 : 0 }}
-            aria-hidden={!navigationOpen}
-            inert={!navigationOpen}
-          >
-            <div
-              className="pane-slide-track flex h-full min-h-0"
-              style={{ width: structureWidth + 1 }}
-            >
-              <div className="pane-frame" style={{ width: structureWidth }}>
-                {structure}
-              </div>
-              <PaneResizer
-                label="Resize the structure"
-                value={structureWidth}
-                min={272}
-                max={sidebarMax}
-                defaultValue={SIDEBAR_DEFAULT}
-                onChange={setSidebarWidth}
-              />
-            </div>
-          </div>
           {boardOpen ? chapterBoard : chapterEditor}
         </div>
         {settingsPanel}
