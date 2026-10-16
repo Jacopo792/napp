@@ -7,7 +7,17 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // .claude/.github hold installed agent tooling, not app source.
-  { ignores: ["**/dist", ".output", ".vinxi", ".claude/**", ".github/**"] },
+  {
+    ignores: [
+      "**/dist",
+      ".output",
+      ".vinxi",
+      ".claude/**",
+      ".github/**",
+      "apps/mobile/android/**",
+      "apps/mobile/ios/**",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -58,9 +68,11 @@ export default tseslint.config(
                 "**/apps/*",
                 "@notes-app/web",
                 "@notes-app/desktop",
+                "@notes-app/mobile",
+                "@capacitor/*",
               ],
               message:
-                "The core may not import a shell. Add a member to Platform in @/platform and let apps/web and apps/desktop each answer it.",
+                "The core may not import a shell. Add a member to Platform in @/platform and let every shell under apps/ answer it.",
             },
           ],
         },

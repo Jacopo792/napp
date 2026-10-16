@@ -78,6 +78,14 @@ jobs:
           VITE_WEB_ORIGIN: https://checks.example.invalid/
         run: pnpm --filter @notes-app/desktop build:renderer
 
+      - name: Build the mobile renderer
+        env:
+          VITE_SUPABASE_URL: https://checks.example.invalid
+          VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
+          VITE_COLLAB_URL: wss://checks.example.invalid
+          VITE_WEB_ORIGIN: https://checks.example.invalid/
+        run: pnpm --filter @notes-app/mobile build:web
+
   # The desktop renderer, on Windows, and nothing else.
   #
   # `checks` above builds it on Ubuntu, which cannot see a whole class of fault:

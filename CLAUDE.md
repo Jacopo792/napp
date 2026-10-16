@@ -17,6 +17,10 @@ already there.
 - Keep `PP` level with `main` after a release: `git push origin main:PP`.
 - `pnpm healthcheck` is the gate before any push.
 
+Jacopo asked by name, on 16 October 2026, for two more: **`android`** and
+**`ios`**, where the phone app is built until it is merged. They are not
+precedent for any other branch.
+
 A stray branch found on the remote that is fully merged into `main` is deleted;
 one that is not is reported, never deleted unasked.
 
@@ -30,6 +34,7 @@ and may never fork it:
 | `packages/core`          | the app: `lib/`, `components/`, `features/editor/`, `screens/`, `styles.css`, `App.tsx`, `platform.ts` |
 | `apps/web`               | the browser. Vite → GitHub Pages, exactly as before                                                    |
 | `apps/desktop`           | the Electron window. macOS `.dmg`, Windows `.exe`                                                      |
+| `apps/mobile`            | the phone. Capacitor: an Android `.apk` and an iOS app, one shell around two native projects           |
 | `packages/collab-server` | the Hocuspocus service (was `server/`)                                                                 |
 
 A shell contains an `index.html`, a `main.tsx` of about nine lines, one
@@ -849,6 +854,31 @@ correctly and then dies on `makensis: spawn Unknown system error -86` —
 EBADARCH, because the NSIS binary electron-builder fetches is x86_64. There is
 no arrangement of flags that fixes it; the Windows installer is made on a
 Windows runner, which is what the matrix is for.
+
+## The phone app
+
+`apps/mobile` is one shell for both phones. Capacitor puts the same Vite build
+in the system WebView, and the two native projects (`android/`, `ios/`) are
+generated around it — the shell's rule from _One app, two shells_ holds.
+`platform.mobile.ts` hands every file to the **share sheet**, written to the
+app's cache first, because a phone's Files, Drive and PDF viewer all live
+there. `print` does nothing: a WebView has no print dialog.
+
+**Its origins are `https://notes` (Android) and `capacitor://notes` (iOS)**, and
+both have to be in `ALLOWED_ORIGINS` on Render — set by hand in the dashboard,
+like `app://notes`, or the app signs in and opens no note.
+
+Build with the deployed server, for the reason the desktop build refuses a
+local one:
+
+```bash
+VITE_COLLAB_URL=wss://notes-collab.onrender.com pnpm build:android
+```
+
+The `.apk` is a debug build installed by hand. iOS without a paid developer
+account is the free Apple ID provisioning: Xcode installs it on one phone and
+the signature lasts seven days. Both are how the app is tested before any
+store.
 
 ## Deployment
 

@@ -27,7 +27,7 @@ export type SavedAs = "file" | "folder";
 export interface Platform {
   /** For the rare case where the difference has to be said out loud, rather
    *  than done differently. Prefer a member over a branch on this. */
-  readonly kind: "web" | "desktop";
+  readonly kind: "web" | "desktop" | "mobile";
 
   /** Where an invitation or a confirmation email has to land. Always the
    *  published web origin, on both shells: a link opened on somebody else's
