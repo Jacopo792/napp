@@ -330,7 +330,7 @@ export function projectPreviewNote(noteId: string, document: Doc): void {
   const body = richTextToPlainText(projection.content);
   if (previous.note.title === projection.title && JSON.stringify(previous.note.content) === JSON.stringify(projection.content)) return;
   store.notes.set(noteId, {note: {...previous.note, ...projection, body, updatedAt: new Date().toISOString()}, version: previous.version + 1});
-  window.dispatchEvent(new CustomEvent("napp:preview-archive-changed", {detail: archiveId}));
+  window.dispatchEvent?.(new CustomEvent("napp:preview-archive-changed", {detail: archiveId}));
   return;
  }
 }

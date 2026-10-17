@@ -16,6 +16,7 @@ export default tseslint.config(
       ".github/**",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
+      "apps/mobile/.expo/**",
     ],
   },
   {
@@ -69,7 +70,13 @@ export default tseslint.config(
                 "@notes-app/web",
                 "@notes-app/desktop",
                 "@notes-app/mobile",
-                "@capacitor/*",
+                "react-native",
+                "react-native-*",
+                "react-native/*",
+                "expo",
+                "expo-*",
+                "expo/*",
+                "@expo/*",
               ],
               message:
                 "The core may not import a shell. Add a member to Platform in @/platform and let every shell under apps/ answer it.",
@@ -78,6 +85,32 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  /* The phone draws with React Native and knows the archive only through the
+     core. A Tiptap or DOM import here is the editor being written a second
+     time: the editor is the core's, hosted in a WebView. */
+  {
+    files: ["apps/mobile/src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tiptap/*", "prosemirror-*", "react-dom", "react-dom/*"],
+              message:
+                "The phone draws with React Native. The editor is the core's, hosted in a WebView; the logic is imported from @/.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  /* Node-run configuration in the phone app: Babel and Metro read these. */
+  {
+    files: ["apps/mobile/*.js"],
+    languageOptions: { sourceType: "commonjs", globals: globals.node },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   /* The main process and the preload. Node, not a browser, and CommonJS
      because Electron's main process has no type stripping and no ESM loader

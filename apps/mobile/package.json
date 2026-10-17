@@ -1,34 +1,31 @@
 {
   "name": "@notes-app/mobile",
-  "version": "0.9.42",
+  "version": "0.9.43",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "description": "Notes — a shared archive for two",
-  "author": "Jacopo792",
+  "main": "index.ts",
   "scripts": {
-    "dev": "vite dev",
-    "build:web": "vite build",
-    "sync": "pnpm build:web && cap sync",
-    "android": "pnpm sync && cap run android",
-    "build:apk": "pnpm sync && cd android && ./gradlew assembleDebug",
-    "ios": "pnpm sync && cap open ios"
+    "start": "expo start --dev-client",
+    "preview": "NAPP_PREVIEW=1 expo start --dev-client --clear",
+    "ios": "expo run:ios",
+    "android": "expo run:android"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
-    "@capacitor/core": "^8.5.3",
-    "@capacitor/filesystem": "^8.1.5",
-    "@capacitor/ios": "^8.5.3",
-    "@capacitor/share": "^8.0.3"
+    "@notes-app/core": "workspace:*",
+    "expo": "~58.0.0",
+    "expo-crypto": "~58.0.0",
+    "expo-dev-client": "~58.0.0",
+    "expo-file-system": "~58.0.0",
+    "expo-sharing": "~58.0.0",
+    "expo-sqlite": "~58.0.0",
+    "expo-status-bar": "~58.0.0",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "~5.10.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.3",
-    "@notes-app/core": "workspace:*",
-    "@tailwindcss/vite": "^4.2.1",
-    "@vitejs/plugin-react": "^5.0.4",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwindcss": "^4.2.1",
-    "vite": "^7.3.1",
-    "vite-tsconfig-paths": "^6.0.2"
-  }
+    "babel-preset-expo": "~58.0.16"
+  },
+  "description": "Notes — a shared archive for two",
+  "author": "Jacopo792"
 }

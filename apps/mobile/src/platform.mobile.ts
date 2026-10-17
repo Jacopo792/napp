@@ -1,50 +1,18 @@
-/* The phone's answers. A phone has no Downloads folder the reader looks in and
-   no "open with" the page can reach, but it has the share sheet, and the share
-   sheet is where both of those live on a phone: Save to Files, Drive, Mail, a
-   PDF viewer. So every file this shell hands over is written to the app's
-   cache and given to the sheet. */
-import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
+/* The phone's answers. What a browser does with a download and a new tab
+   a phone does with the share sheet and Quick Look, so a file is written to the
+   app's cache first and handed to whichever of the two fits. A folder is the
+   one thing a phone can be asked for directly: the system picker grants this
+   session a directory to write into. */
+import { Directory, File, Paths } from "expo-file-system";
+import { shareAsync } from "expo-sharing";
 import type { Platform } from "@notes-app/core/platform";
 
-function base64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function cache(name: string, data: Blob | string): Promise<string> {
-  const path = `share/${name.replace(/[/\\]/g, "-")}`;
-  const { uri } =
-    typeof data === "string"
-      ? await Filesystem.writeFile({
-          path,
-          data,
-          directory: Directory.Cache,
-          encoding: Encoding.UTF8,
-          recursive: true,
-        })
-      : await Filesystem.writeFile({
-          path,
-          data: await base64(data),
-          directory: Directory.Cache,
-          recursive: true,
-        });
-  return uri;
-}
-
-/* Dismissing the sheet rejects, which is the reader changing their mind and
-   not an error to tell them about — the core already ignores an AbortError. */
-async function share(files: string[]): Promise<void> {
-  try {
-    await Share.share({ files });
-  } catch (reason) {
-    if (/cancel/i.test(String(reason))) throw new DOMException("Dismissed", "AbortError");
-    throw reason;
-  }
+async function cache(name: string, data: Blob | string): Promise<File> {
+  const file = new File(Paths.cache, name.replace(/[/\\]/g, "-"));
+  if (file.exists) file.delete();
+  file.create();
+  await file.write(typeof data === "string" ? data : await data.arrayBuffer());
+  return file;
 }
 
 export const mobilePlatform: Platform = {
@@ -57,22 +25,22 @@ export const mobilePlatform: Platform = {
   inviteToken: () => undefined,
 
   async saveFile(name, data) {
-    await share([await cache(name, data)]);
+    await shareAsync((await cache(name, data)).uri);
   },
 
   async saveFolder(files) {
-    await share(await Promise.all(files.map((file) => cache(file.name, file.text))));
+    const directory = await Directory.pickDirectoryAsync();
+    for (const { name, text } of files)
+      await directory.createFile(name, "text/markdown").write(text);
     return "folder";
   },
 
-  /* The sheet previews a PDF or a video and offers every app that opens one. */
   async openFile(name, load) {
-    await share([await cache(name, await load())]);
+    await (await cache(name, await load())).preview();
     return null;
   },
 
-  /* ponytail: a WebView has no print dialog, so this does nothing; Save as PDF
-     goes through the share sheet and covers printing from there. A native
-     print plugin is the upgrade if the menu item is missed. */
+  /* ponytail: nothing to print until the note itself is on screen, in the
+     editor's WebView; Print arrives with it. */
   async print() {},
 };

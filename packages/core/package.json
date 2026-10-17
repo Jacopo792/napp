@@ -41,8 +41,8 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "pdfjs-dist": "^6.2.108",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "tesseract.js": "^7.0.0",
     "tesseract.js-core": "^7.0.0",
     "y-indexeddb": "9.0.12",
@@ -51,8 +51,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.16.5",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.2.1",
     "vite": "^7.3.1"
   }

@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@notes-app/core": "workspace:*",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

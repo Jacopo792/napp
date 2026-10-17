@@ -78,13 +78,17 @@ jobs:
           VITE_WEB_ORIGIN: https://checks.example.invalid/
         run: pnpm --filter @notes-app/desktop build:renderer
 
-      - name: Build the mobile renderer
+      # The phone's JavaScript, bundled by Metro the way a build on a Mac
+      # would. Typechecking cannot see a module Metro fails to resolve — a
+      # package's react-native export condition, an import the core gained
+      # that only Vite knew how to find.
+      - name: Bundle the phone app
         env:
           VITE_SUPABASE_URL: https://checks.example.invalid
           VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
           VITE_COLLAB_URL: wss://checks.example.invalid
           VITE_WEB_ORIGIN: https://checks.example.invalid/
-        run: pnpm --filter @notes-app/mobile build:web
+        run: pnpm --filter @notes-app/mobile exec expo export --platform ios --output-dir "$RUNNER_TEMP/phone"
 
   # The desktop renderer, on Windows, and nothing else.
   #
