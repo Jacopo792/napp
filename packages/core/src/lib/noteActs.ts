@@ -32,6 +32,22 @@ export const shelveNote = (
   at = new Date().toISOString(),
 ): Meta => withNote(prev, noteId, { archivedAt: archived ? at : undefined });
 
+export const pinNote = (prev: Meta, noteId: string): Meta =>
+  withNote(prev, noteId, {
+    pinned: !prev.notes.find((note) => note.id === noteId)?.pinned,
+  });
+
+/** Locking names one account on the row; unlocking clears it. Nobody can do
+ *  either on somebody else's lock — `honourLocks` puts that row back. */
+export const lockNote = (prev: Meta, noteId: string, selfId: string): Meta =>
+  withNote(prev, noteId, {
+    lockedBy:
+      prev.notes.find((note) => note.id === noteId)?.lockedBy === selfId ? undefined : selfId,
+  });
+
+export const fileNote = (prev: Meta, noteId: string, folderId: string | null): Meta =>
+  withNote(prev, noteId, { folderId });
+
 /** A note somebody else has locked keeps the metadata it had. Postgres refuses
  *  the write either way; what this saves is a list that shows a move the
  *  archive rejected. */

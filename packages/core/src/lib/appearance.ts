@@ -397,36 +397,27 @@ const SEMANTIC = {
   },
 } as const;
 
-export function applyAppearance(config = current): void {
-  const root = document.documentElement;
-  const dark = darkMode(config);
+/** Every colour the interface is drawn in, worked out from the reader's
+ *  appearance — as a map, so the web can write it onto the document and the
+ *  phone can read it into its own styles. One derivation, two surfaces. */
+export function appearanceTokens(config: Appearance, dark: boolean): Record<string, string> {
+  const tokens: Record<string, string> = {};
+  const set = (name: string, value: string) => void (tokens[name] = value);
   const background = config.background;
   const foreground = config.foreground;
   const contrastShift = (config.contrast - 50) / 100;
 
-  root.dataset.theme = dark ? "dark" : "light";
-  root.style.colorScheme = dark ? "dark" : "light";
-  root.style.setProperty("--page", background);
-  root.style.setProperty(
+  set("--page", background);
+  set(
     "--paper",
     mix(background, dark ? 0.11 + contrastShift * 0.08 : 0.035, dark ? "white" : "black"),
   );
-  root.style.setProperty(
+  set(
     "--surface",
     mix(background, dark ? 0.17 + contrastShift * 0.12 : 0.045, dark ? "black" : "white"),
   );
-  root.style.setProperty("--ink", foreground);
-  /* Windows owns the caption buttons, so the native strip follows the page
-     ground and ink whenever a reader changes palette. A wallpaper is content,
-     not something Windows can safely crop into window controls; its own base
-     palette remains the visual bridge between the two. */
-  const nativeFrame = (
-    window as unknown as {
-      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
-    }
-  ).napp;
-  nativeFrame?.setFrameTheme?.(background, foreground);
-  root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
+  set("--ink", foreground);
+  set("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
   /* The two muted inks are the whole legibility budget of the interface: every
      metadata line, every list marker and every idle glyph is one of them, and
      they were mixed far enough toward the ground to read as "disabled" on
@@ -442,9 +433,9 @@ export function applyAppearance(config = current): void {
      above 4.5:1 on that ground. It is held at 3.4:1 — over the 3:1 floor for
      an icon or a large label, which is all it is for. It is not a tier to set
      a sentence in. */
-  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.24 : 0.26, dark ? "black" : "white"));
-  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.34 : 0.36, dark ? "black" : "white"));
-  root.style.setProperty(
+  set("--ink-3", mix(foreground, dark ? 0.24 : 0.26, dark ? "black" : "white"));
+  set("--ink-4", mix(foreground, dark ? 0.34 : 0.36, dark ? "black" : "white"));
+  set(
     "--rule",
     mix(
       background,
@@ -452,7 +443,7 @@ export function applyAppearance(config = current): void {
       dark ? "white" : "black",
     ),
   );
-  root.style.setProperty(
+  set(
     "--rule-soft",
     mix(
       background,
@@ -473,39 +464,35 @@ export function applyAppearance(config = current): void {
   const accent = legibleOn(config.accent, paper, 3);
   const onAccent =
     contrastRatio(accent, "#f7f7f7") >= contrastRatio(accent, "#161616") ? "#f7f7f7" : "#161616";
-  root.style.setProperty("--accent", accent);
-  root.style.setProperty("--accent-strong", legibleOn(config.accent, paper, 4.5));
-  root.style.setProperty("--accent-wash", `${accent}24`);
+  set("--accent", accent);
+  set("--accent-strong", legibleOn(config.accent, paper, 4.5));
+  set("--accent-wash", `${accent}24`);
   /* Tinted icons take the accent unless the reader gave them a hue of their
      own, lifted to the same floors the accent is so a dark tint stays a
      visible glyph. */
   const tint = autoOrHex(config.iconTint);
-  root.style.setProperty("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
-  root.style.setProperty(
+  set("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
+  set(
     "--icon-tint-strong",
     tint === "auto" ? legibleOn(config.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
   );
-  root.style.setProperty("--on-accent", onAccent);
-  root.style.setProperty(
+  set("--on-accent", onAccent);
+  set(
     "--glass",
     config.translucentSidebar ? `${background}cc` : mix(background, 0.09, dark ? "white" : "black"),
   );
-  root.style.setProperty("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
-  root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
-  root.classList.toggle("has-frosted-glass", config.frosted);
+  set("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
   /* Liquid Glass: the share of the palette laid over a translucent surface.
      Two ranges, because the Mac's own material is already a tint and a CSS
      backdrop blur is not — the same "clear" is a lighter coat over vibrancy. */
   const glass = clamp(config.glass, 0, 100, DEFAULT_APPEARANCE.glass);
-  root.style.setProperty("--glass-tint", `${40 + glass / 2}%`);
-  root.style.setProperty("--glass-tint-native", `${20 + glass / 2}%`);
-  root.style.setProperty("--glass-tint-menu", `${70 + glass / 4}%`);
-  root.dataset.iconStyle = config.iconStyle;
+  set("--glass-tint", `${40 + glass / 2}%`);
+  set("--glass-tint-native", `${20 + glass / 2}%`);
+  set("--glass-tint-menu", `${70 + glass / 4}%`);
   const folder = autoOrHex(config.folderColour);
-  if (folder === "auto") root.style.removeProperty("--folder-tint");
-  else root.style.setProperty("--folder-tint", folder);
+  if (folder !== "auto") set("--folder-tint", folder);
   const highlight = autoOrHex(config.highlight);
-  root.style.setProperty(
+  set(
     "--selection",
     highlight !== "auto"
       ? `${highlight}59`
@@ -513,20 +500,44 @@ export function applyAppearance(config = current): void {
         ? "rgb(255 255 255 / 0.22)"
         : "rgb(0 0 0 / 0.14)",
   );
-  root.classList.toggle("has-wallpaper", config.wallpaper && Boolean(wallpaperUrl));
-  root.style.setProperty(
-    "--wallpaper",
-    wallpaperUrl ? `url(${JSON.stringify(wallpaperUrl)})` : "none",
-  );
-  root.style.setProperty("--wallpaper-dim", String(config.wallpaperDim / 100));
-  root.style.setProperty(
-    "--wallpaper-filter",
-    config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : "none",
-  );
-  root.style.setProperty("--wallpaper-fit", config.wallpaperFit);
   for (const [token, value] of Object.entries(SEMANTIC[dark ? "dark" : "light"])) {
-    root.style.setProperty(token, value);
+    set(token, value);
   }
+  return tokens;
+}
+
+export function applyAppearance(config = current): void {
+  /* A phone draws with its own views and reads `appearanceTokens` instead;
+     there is no document to write to. */
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const dark = darkMode(config);
+  const background = config.background;
+  const foreground = config.foreground;
+
+  root.dataset.theme = dark ? "dark" : "light";
+  root.style.colorScheme = dark ? "dark" : "light";
+  const set = (name: string, value: string) => root.style.setProperty(name, value);
+  root.style.removeProperty("--folder-tint");
+  for (const [token, value] of Object.entries(appearanceTokens(config, dark))) set(token, value);
+  /* Windows owns the caption buttons, so the native strip follows the page
+     ground and ink whenever a reader changes palette. A wallpaper is content,
+     not something Windows can safely crop into window controls; its own base
+     palette remains the visual bridge between the two. */
+  const nativeFrame = (
+    window as unknown as {
+      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
+    }
+  ).napp;
+  nativeFrame?.setFrameTheme?.(background, foreground);
+  root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
+  root.classList.toggle("has-frosted-glass", config.frosted);
+  root.dataset.iconStyle = config.iconStyle;
+  root.classList.toggle("has-wallpaper", config.wallpaper && Boolean(wallpaperUrl));
+  set("--wallpaper", wallpaperUrl ? `url(${JSON.stringify(wallpaperUrl)})` : "none");
+  set("--wallpaper-dim", String(config.wallpaperDim / 100));
+  set("--wallpaper-filter", config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : "none");
+  set("--wallpaper-fit", config.wallpaperFit);
   /* The browser paints its own chrome — address bar on the phone, the band
      behind a scrolled page — from this tag, and it was nailed to the graphite
      default in the markup. A reader on the Paper theme got a black strip above
@@ -591,8 +602,12 @@ function scheduleAppearanceCommit(): void {
 }
 
 export function initAppearance(): void {
-  media = window.matchMedia("(prefers-color-scheme: dark)");
-  media.addEventListener("change", () => current.theme === "system" && applyAppearance());
+  /* The phone has a window and no media queries; it asks its own platform
+     whether the system is dark and passes the answer to `appearanceTokens`. */
+  if (typeof window.matchMedia === "function") {
+    media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", () => current.theme === "system" && applyAppearance());
+  }
   current = read();
   applyAppearance();
   if (current.wallpaper)

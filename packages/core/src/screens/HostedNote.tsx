@@ -42,11 +42,21 @@ interface Props {
   /** Where the note stands, for the host to say: a wait that is not named
    *  reads as a fault. */
   onState?: (state: HostedNoteState) => void;
+  autocorrectOn?: boolean;
+  collaboratorsVisible?: boolean;
 }
 
 const EMPTY = { type: "doc", content: [] };
 
-export function HostedNote({ session, noteId, name, canEdit, onState }: Props) {
+export function HostedNote({
+  session,
+  noteId,
+  name,
+  canEdit,
+  onState,
+  autocorrectOn = true,
+  collaboratorsVisible = true,
+}: Props) {
   const note = useCollaborativeNote(noteId, {
     userId: session.userId,
     archiveId: session.archiveId,
@@ -68,7 +78,7 @@ export function HostedNote({ session, noteId, name, canEdit, onState }: Props) {
 
   const collaboration =
     (note.ready || note.cached) && note.doc
-      ? { document: note.doc, provider: note.provider }
+      ? { document: note.doc, provider: collaboratorsVisible ? note.provider : null }
       : null;
 
   return (
@@ -97,6 +107,7 @@ export function HostedNote({ session, noteId, name, canEdit, onState }: Props) {
             noteId={noteId}
             value={EMPTY}
             readOnly={!canEdit}
+            autocorrectOn={autocorrectOn}
             placeholder="Start writing…"
             /* Yjs is the writer and the server persists it; the page has
                nothing of its own to keep. */

@@ -171,7 +171,7 @@ import type { NoteEntry } from "@/lib/entries";
 import { fold, formatDateTime } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
-import { honourLocks, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
+import { honourLocks, lockNote, pinNote, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
 import {
   clearDrafts,
   dropDraft,
@@ -201,7 +201,7 @@ import {
 } from "@/features/editor/lib/exchange";
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
-import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
+import { ALL, ARCHIVE, entriesInScope, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { aimNote, captureRows, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
@@ -1302,34 +1302,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   );
 
   const visible = useMemo(() => {
-    const meta = activeMeta;
-    const index = indexOf(meta);
-    const folderOf = (id: string) => {
-      const fid = index.byNote.get(id)?.folderId ?? null;
-      return fid && index.byFolder.has(fid) ? fid : null;
-    };
-
-    let list = ownedEntries;
-
-    if (selectedFolderId === TRASH) {
-      list = list.filter((entry) => trashedIds.has(entry.note.id));
-    } else if (selectedFolderId === REMARKS) {
-      /* Not the trash: a note on its way out is nobody's to discuss. */
-      list = list.filter(
-        (entry) => remarkedIds.has(entry.note.id) && !trashedIds.has(entry.note.id),
-      );
-    } else if (selectedFolderId === ARCHIVE) {
-      list = list.filter((entry) => archivedIds.has(entry.note.id));
-    } else {
-      list = list.filter(
-        (entry) => !trashedIds.has(entry.note.id) && !archivedIds.has(entry.note.id),
-      );
-      if (selectedFolderId === UNFILED) {
-        list = list.filter((e) => folderOf(e.note.id) === null);
-      } else if (selectedFolderId !== ALL) {
-        list = list.filter((e) => folderOf(e.note.id) === selectedFolderId);
-      }
-    }
+    let list = entriesInScope(ownedEntries, activeMeta, selectedFolderId, remarkedIds);
 
     /* Folded, like the haystack it is looked for in. */
     const q = fold(query.trim());
@@ -1340,16 +1313,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
 
     return list;
-  }, [
-    ownedEntries,
-    activeMeta,
-    trashedIds,
-    archivedIds,
-    remarkedIds,
-    selectedFolderId,
-    query,
-    mediaHaystacks,
-  ]);
+  }, [ownedEntries, activeMeta, remarkedIds, selectedFolderId, query, mediaHaystacks]);
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -2156,15 +2120,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleTogglePin = useCallback(
     (noteId: string) => {
-      handleMetaChange((prev) => {
-        const existing = indexOf(prev).byNote.get(noteId);
-        const notes: NoteMeta[] = existing
-          ? prev.notes.map((note) =>
-              note.id === noteId ? { ...note, pinned: !note.pinned } : note,
-            )
-          : [...prev.notes, { id: noteId, folderId: null, pinned: true }];
-        return { ...prev, notes };
-      });
+      handleMetaChange((prev) => pinNote(prev, noteId));
     },
     [handleMetaChange],
   );
@@ -2174,14 +2130,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      back, and `notes_editor_update` refuses it regardless. */
   const handleToggleLock = useCallback(
     (noteId: string) => {
-      handleMetaChange((prev) => {
-        const existing = indexOf(prev).byNote.get(noteId);
-        const lockedBy = existing?.lockedBy === selfId ? undefined : (selfId ?? undefined);
-        const notes: NoteMeta[] = existing
-          ? prev.notes.map((note) => (note.id === noteId ? { ...note, lockedBy } : note))
-          : [...prev.notes, { id: noteId, folderId: null, lockedBy }];
-        return { ...prev, notes };
-      });
+      handleMetaChange((prev) => (selfId ? lockNote(prev, noteId, selfId) : prev));
     },
     [handleMetaChange, selfId],
   );

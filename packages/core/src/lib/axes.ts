@@ -111,6 +111,7 @@ let current: Axes = DEFAULT_AXES;
 const listeners = new Set<() => void>();
 
 export function applyAxes(a: Axes): void {
+  if (typeof document === "undefined") return;
   const s = document.documentElement.style;
   s.setProperty("--read-size", `${a.size}px`);
   s.setProperty("--read-measure", `${a.measure}ch`);

@@ -915,16 +915,46 @@ Handler, with the curves and durations of `styles.css` read as numbers from
 `lib/motionTokens.ts`, whose test fails if the two disagree. A row is pushed
 open exactly as on the web and settles with `--ease-bounce`; the act runs on
 the press, the row leaves the way it was pushed and the list closes the gap.
-A note opens out of the row that was touched and closes back into it: what
-grows is a window over a page already full size, so the WebView is laid out
-once rather than per frame. The left edge takes the page back under the
-finger. Haptics mark what the hand did — a tick as a row comes open, a knock
-on the act, a light tap as a note opens — and nothing else. The metadata half
-of every act is `lib/noteActs.ts`, which the web's `Notes.tsx` now calls too.
+The phone's navigation is now `expo-router` over the system's native stack,
+with large collapsing titles, the back gesture, native context menus and Liquid
+Glass bars. `Link.Trigger withAppleZoom` opens a note out of its row; UIKit owns
+that transition rather than a second Reanimated page mask. Reanimated still
+owns the row under the finger. The metadata half of every act is
+`lib/noteActs.ts`, shared with the web's `Notes.tsx`.
 
-The strip on the page's left edge carries `collapsable={false}`. A view with
-no background is flattened away on Fabric, and the touch it was there to take
-goes through to the editor and raises the keyboard.
+`src/archive.tsx` holds the open archive once for every route: the snapshot,
+roster, Realtime channels, account preferences and the one way metadata changes.
+Folders groups every member's notes under their own name, including the
+partner's. The archive row and Settings → Archives reach every archive the
+account belongs to, using the core's `loadSpaces` and `chooseArchive`. Changing
+archive remounts the provider by account and archive id, so no old subscription
+or snapshot follows into the new one. Pending metadata writes are ordered; a
+read begun before an edit cannot replace it afterwards.
+
+Settings has Profile, Archives, Members, Appearance, Reading, Writing and
+Privacy. It reads and writes through the core's existing modules, including
+account-wide preferences and their own Realtime channel. Reading and writing
+stores keep their values and notify subscribers even without a document; only
+their CSS application needs a browser. Appearance, reading axes, autocorrection
+and collaborator visibility cross into the hosted editor both when it opens
+and when they change. A lock arriving while a note is open changes its editing
+permission too, without rebuilding its Y.Doc.
+
+The note page receives the native header's measured height, not a guessed
+status-bar inset. The hosted page uses it as the padding of its own scroll box:
+the title starts below the bar and the words scroll under the real material.
+WKWebView's automatic content inset is off, or that same space is counted twice.
+
+A link's Slot merges object styles and cannot keep a Pressable's style callback.
+`Grouped.Row` and `SwipeRow` keep that callback inside the component the link
+receives; handing a styled Pressable straight to the Slot loses its padding and
+press highlight.
+
+The glyphs are SF Symbols on iOS and their Material counterparts on Android,
+mapped in `src/icons.tsx`. Android's native toolbar takes image sources, not SF
+names; `useToolbarIcon` supplies them from `expo-symbols`. Text prompts use the
+iOS system dialog and an Android modal, because `Alert.prompt` exists only on
+iOS. Neither platform gets empty toolbar buttons or inert naming controls.
 
 **Its origin is `https://notes`**, and it has to be in `ALLOWED_ORIGINS` on
 Render — set by hand in the dashboard, like `app://notes`. The editor's
@@ -939,7 +969,8 @@ seven days, and asks once for the Mac's login keychain password; answer
 Always Allow. A Release build carries its bundle and needs no Metro:
 
 ```bash
-cd apps/mobile/ios && xcodebuild -workspace Napp.xcworkspace -scheme Napp -configuration Release -destination id=<udid> -derivedDataPath build -allowProvisioningUpdates build
+NAPP_PREVIEW=0 pnpm --filter @notes-app/mobile editor
+cd apps/mobile/ios && NAPP_PREVIEW=0 xcodebuild -workspace Napp.xcworkspace -scheme Napp -configuration Release -destination id=<udid> -derivedDataPath build -allowProvisioningUpdates build
 ```
 
 After one, `npx expo prebuild --clean` before the next simulator build: the

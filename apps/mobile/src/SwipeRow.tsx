@@ -1,60 +1,63 @@
-/* A note's row, which a finger pushes sideways.
+/* A note's row: pressed, it opens the note with the system's zoom out of the
+ * row; held, it offers the system's menu; pushed sideways, it uncovers its two
+ * acts.
  *
- * The rules are the web's — "Taking a note back" in CLAUDE.md — and so are the
- * numbers, from @/lib/swipe. The push opens; the press acts; there is no
- * distance that does anything. Pushing left uncovers the destructive act on
- * the right, pushing right the one that files the note away, as in Mail. The
- * row follows the finger on the UI thread, settles with `--ease-bounce` once
- * it is let go, and ticks under the finger the moment it is open.
- *
- * The act is a panel the row uncovers, inset by three from the row's edges and
- * rounded only on its outer side; what is inside it grows with the travel. */
-import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+ * The push follows the web's rules — "Taking a note back" in CLAUDE.md — and
+ * its numbers, from @/lib/swipe: the push opens, the press acts, there is no
+ * distance that does anything. Left uncovers the destructive act on the right,
+ * right the one that files the note away. The row follows the finger on the UI
+ * thread, settles with `--ease-bounce` once it is let go, and ticks the moment
+ * it is open. */
+import { useEffect, type ReactNode } from "react";
 import {
-  GestureDetector,
-  useExclusiveGestures,
-  usePanGesture,
-  useTapGesture,
-} from "react-native-gesture-handler";
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type PressableProps,
+} from "react-native";
+import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   interpolate,
-  interpolateColor,
-  measure,
-  useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { Link, type Href } from "expo-router";
+import type { SFSymbol } from "expo-symbols";
+import { SymbolView } from "./icons";
 import * as Haptics from "expo-haptics";
-import type { Icon } from "phosphor-react-native";
 import { clampTravel, OPEN, settleTravel } from "@/lib/swipe";
-import { ground, ink, muted, press, settle, travel } from "./theme";
+import { usePalette } from "./archive";
+import { settle, travel } from "./theme";
 
 export interface Act {
   label: string;
-  Icon: Icon;
+  icon: SFSymbol;
   colour: string;
   run: () => void;
-}
-
-export interface Origin {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  disabled?: boolean;
+  stationary?: boolean;
 }
 
 interface Props {
+  href: Href;
   title: string;
   stamp: string;
   preview: string;
+  pinned?: boolean;
+  locked?: boolean;
   /** Uncovered on the right by a push to the left. */
   left: Act;
   /** Uncovered on the left by a push to the right. */
   right: Act;
-  onOpen: (origin: Origin) => void;
+  /** The system menu a held row offers: `Link.Menu` and its actions. */
+  menu: ReactNode;
+  first: boolean;
+  last: boolean;
   /** Close every other row; one row open at a time, as on the web. */
   onClaim: () => void;
   /** Hand the list a way to close this row when another one opens. */
@@ -63,16 +66,30 @@ interface Props {
 
 const INSET = 3;
 const GIVE = 0.5;
+const RADIUS = 26;
 
 const tick = () => void Haptics.selectionAsync();
 
-export function SwipeRow({ title, stamp, preview, left, right, onOpen, onClaim, register }: Props) {
+/* Link's Slot merges object styles and cannot preserve a Pressable style
+   callback. Keep that callback inside the component the Slot receives. */
+function NoteFace(props: PressableProps) {
+  const palette = usePalette();
+  return (
+    <Pressable
+      {...props}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.surface }]}
+    />
+  );
+}
+
+export function SwipeRow(props: Props) {
+  const { href, title, stamp, preview, pinned, locked, left, right, menu, first, last } = props;
+  const { onClaim, register } = props;
+  const palette = usePalette();
   const { width } = useWindowDimensions();
-  const row = useAnimatedRef<Animated.View>();
   const x = useSharedValue(0);
   const start = useSharedValue(0);
   const opened = useSharedValue(false);
-  const pressed = useSharedValue(0);
 
   useEffect(() => register(() => (x.value = withTiming(0, settle))), [register, x]);
 
@@ -81,8 +98,6 @@ export function SwipeRow({ title, stamp, preview, left, right, onOpen, onClaim, 
     failOffsetY: [-10, 10],
     onActivate: () => {
       start.value = x.value;
-      /* The tap that lost to the push does not always say so. */
-      pressed.value = withTiming(0, press);
       scheduleOnRN(onClaim);
     },
     onUpdate: (event) => {
@@ -103,38 +118,21 @@ export function SwipeRow({ title, stamp, preview, left, right, onOpen, onClaim, 
     },
   });
 
-  const tap = useTapGesture({
-    maxDeltaX: 10,
-    maxDeltaY: 10,
-    onBegin: () => {
-      pressed.value = withTiming(1, press);
-    },
-    onFinalize: () => {
-      pressed.value = withTiming(0, press);
-    },
-    onActivate: () => {
-      /* A tap on an open row closes it rather than opening the note under it. */
-      if (x.value !== 0) {
-        x.value = withTiming(0, settle);
-        return;
-      }
-      const box = measure(row);
-      if (box)
-        scheduleOnRN(onOpen, { x: box.pageX, y: box.pageY, width: box.width, height: box.height });
-    },
-  });
+  const face = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
 
-  const gesture = useExclusiveGestures(pan, tap);
-
-  const face = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }],
-    backgroundColor: interpolateColor(pressed.value, [0, 1], [ground, `${ink}14`]),
-  }));
-
-  /* The row leaves the way it was pushed, the panel filling the row behind
-     it, and only then does the act run and the list close over the gap. */
+  /* The row leaves the way it was pushed, the panel filling the row behind it,
+     and only then does the act run and the list close over the gap. */
   const act = (side: "left" | "right") => {
     const chosen = side === "left" ? left : right;
+    if (chosen.disabled) {
+      x.value = withTiming(0, settle);
+      return;
+    }
+    if (chosen.stationary) {
+      x.value = withTiming(0, settle);
+      chosen.run();
+      return;
+    }
     void Haptics.impactAsync(
       side === "left" ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium,
     );
@@ -143,19 +141,61 @@ export function SwipeRow({ title, stamp, preview, left, right, onOpen, onClaim, 
     });
   };
 
+  const corners = {
+    borderTopLeftRadius: first ? RADIUS : 0,
+    borderTopRightRadius: first ? RADIUS : 0,
+    borderBottomLeftRadius: last ? RADIUS : 0,
+    borderBottomRightRadius: last ? RADIUS : 0,
+  };
+
   return (
-    <View>
+    <View style={[styles.frame, corners]}>
       <Panel edge="left" act={right} x={x} onPress={() => act("right")} />
       <Panel edge="right" act={left} x={x} onPress={() => act("left")} />
-      <GestureDetector gesture={gesture}>
-        <Animated.View ref={row} style={[styles.row, face]}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.preview} numberOfLines={1}>
-            <Text style={styles.stamp}>{stamp} </Text>
-            {preview}
-          </Text>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[{ backgroundColor: palette.paper }, corners, face]}>
+          <Link
+            href={href}
+            asChild
+            onPress={(event) => {
+              /* A press on an open row closes it rather than opening the note. */
+              if (x.value !== 0) {
+                event.preventDefault();
+                x.value = withTiming(0, settle);
+              }
+            }}
+          >
+            <Link.Trigger withAppleZoom>
+              <NoteFace>
+                <View
+                  style={[
+                    styles.text,
+                    !last && {
+                      borderBottomColor: palette.rule,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                    },
+                  ]}
+                >
+                  <View style={styles.titleLine}>
+                    <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
+                      {title}
+                    </Text>
+                    {locked ? (
+                      <SymbolView name="lock.fill" size={13} tintColor={palette.ink3} />
+                    ) : null}
+                    {pinned ? (
+                      <SymbolView name="pin.fill" size={13} tintColor={palette.accent} />
+                    ) : null}
+                  </View>
+                  <Text style={[styles.preview, { color: palette.ink3 }]} numberOfLines={1}>
+                    <Text style={{ color: palette.ink2 }}>{stamp} </Text>
+                    {preview || "No additional text"}
+                  </Text>
+                </View>
+              </NoteFace>
+            </Link.Trigger>
+            {menu}
+          </Link>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -172,7 +212,7 @@ function Panel({
    *  push to the right. */
   edge: "left" | "right";
   act: Act;
-  x: { value: number };
+  x: SharedValue<number>;
   onPress: () => void;
 }) {
   const sign = edge === "left" ? 1 : -1;
@@ -195,9 +235,14 @@ function Panel({
         panel,
       ]}
     >
-      <Pressable style={styles.panelPress} onPress={onPress} accessibilityLabel={act.label}>
+      <Pressable
+        style={styles.panelPress}
+        onPress={onPress}
+        disabled={act.disabled}
+        accessibilityLabel={act.label}
+      >
         <Animated.View style={[styles.mark, mark]}>
-          <act.Icon size={22} color="#ffffff" weight="bold" />
+          <SymbolView name={act.icon} size={22} tintColor="#ffffff" weight="semibold" />
           <Text style={styles.markLabel}>{act.label}</Text>
         </Animated.View>
       </Pressable>
@@ -206,14 +251,16 @@ function Panel({
 }
 
 const styles = StyleSheet.create({
-  row: { paddingHorizontal: 20, paddingVertical: 12, gap: 3 },
-  title: { color: ink, fontSize: 17, fontWeight: "600" },
-  preview: { color: muted, fontSize: 15 },
-  stamp: { color: ink },
+  frame: { marginHorizontal: 16, overflow: "hidden" },
+  row: { paddingLeft: 20 },
+  text: { paddingVertical: 11, paddingRight: 20, gap: 3 },
+  titleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  title: { flexShrink: 1, fontSize: 17, fontWeight: "600" },
+  preview: { fontSize: 15 },
   panel: { position: "absolute", top: INSET, bottom: INSET, overflow: "hidden" },
-  panelLeftEdge: { left: INSET, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 },
-  panelRightEdge: { right: INSET, borderTopRightRadius: 12, borderBottomRightRadius: 12 },
+  panelLeftEdge: { left: INSET, borderTopLeftRadius: 22, borderBottomLeftRadius: 22 },
+  panelRightEdge: { right: INSET, borderTopRightRadius: 22, borderBottomRightRadius: 22 },
   panelPress: { flex: 1, alignItems: "center", justifyContent: "center" },
-  mark: { alignItems: "center", gap: 2, minWidth: OPEN - INSET * 2 },
+  mark: { alignItems: "center", gap: 3, minWidth: OPEN - INSET * 2 },
   markLabel: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
 });

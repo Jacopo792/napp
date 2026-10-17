@@ -88,6 +88,7 @@ function read(): WritingPreferences {
    the pill on the note, the mark on a face in the roster — reads it from one
    place instead of each being handed it. */
 function applyWritingPreferences(next: WritingPreferences): void {
+  if (typeof document === "undefined") return;
   const palette = presencePaletteFor(next.presencePalette);
   const root = document.documentElement.style;
   root.setProperty("--presence", palette.color);

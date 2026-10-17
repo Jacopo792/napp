@@ -9,6 +9,17 @@
     />
     <meta name="color-scheme" content="light dark" />
     <title>Note</title>
+    <style>
+      #root {
+        display: flex;
+        flex-direction: column;
+        background: var(--page);
+      }
+      .editor-scroll {
+        padding-top: var(--host-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -7,6 +7,11 @@
  * refresh token: rotating the session is the app's alone, because two
  * clients rotating one refresh token is a reuse Supabase answers by revoking
  * every session in the family — the phone signed out. */
+import { useState } from "react";
+import { setAppearance } from "@/lib/appearance";
+import { setAxes } from "@/lib/axes";
+import { setWritingPreferences } from "@/lib/writingPreferences";
+import type { AccountPreferences } from "@/lib/preferenceShape";
 import { createRoot } from "react-dom/client";
 import { HostedNote } from "@notes-app/core/hosted";
 import { setPlatform } from "@notes-app/core/platform";
@@ -20,11 +25,14 @@ interface Opening {
   name: string;
   canEdit: boolean;
   accessToken: string | null;
+  preferences: AccountPreferences;
+  headerHeight: number;
 }
 
 declare global {
   interface Window {
     napp: Opening;
+    nappUpdate: (next: Pick<Opening, "canEdit" | "name" | "preferences" | "headerHeight">) => void;
     nappToken: (accessToken: string) => void;
     ReactNativeWebView?: { postMessage(message: string): void };
   }
@@ -50,13 +58,30 @@ setPlatform({
   print: async () => {},
 });
 
-const { session, noteId, name, canEdit } = window.napp;
-createRoot(document.getElementById("root")!).render(
-  <HostedNote
-    session={session}
-    noteId={noteId}
-    name={name}
-    canEdit={canEdit}
-    onState={(state) => window.ReactNativeWebView?.postMessage(JSON.stringify(state))}
-  />,
-);
+function Page() {
+  const [opening, setOpening] = useState(window.napp);
+  window.nappUpdate = (next) => {
+    document.documentElement.style.setProperty("--host-top", `${next.headerHeight}px`);
+    setAppearance(next.preferences.appearance);
+    setAxes(next.preferences.axes);
+    setWritingPreferences(next.preferences.writing);
+    setOpening((prev) => ({ ...prev, ...next }));
+  };
+  const { session, noteId, name, canEdit, preferences } = opening;
+  return (
+    <HostedNote
+      session={session}
+      noteId={noteId}
+      name={name}
+      canEdit={canEdit}
+      autocorrectOn={preferences.autocorrect}
+      collaboratorsVisible={preferences.collaborators}
+      onState={(state) => window.ReactNativeWebView?.postMessage(JSON.stringify(state))}
+    />
+  );
+}
+document.documentElement.style.setProperty("--host-top", `${window.napp.headerHeight}px`);
+setAppearance(window.napp.preferences.appearance);
+setAxes(window.napp.preferences.axes);
+setWritingPreferences(window.napp.preferences.writing);
+createRoot(document.getElementById("root")!).render(<Page />);
