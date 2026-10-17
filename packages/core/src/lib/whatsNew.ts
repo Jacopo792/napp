@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.43",
+    date: "2026-10-17",
+    headline: "Opening is only opening",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Mentioned in, without surprises",
+            text: "At the foot of a note, the name of a note that mentions it simply opens it at those words. The Link button beside it is gone: it quietly wrote a link into the other note, so opening it marked it as edited.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.42",
     date: "2026-10-16",
     headline: "Every font you have",
