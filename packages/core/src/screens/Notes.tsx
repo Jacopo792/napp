@@ -171,6 +171,7 @@ import type { NoteEntry } from "@/lib/entries";
 import { fold, formatDateTime } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
+import { honourLocks, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
 import {
   clearDrafts,
   dropDraft,
@@ -2113,28 +2114,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       const pending = pendingMetaRef.current.get(owner);
       const base = pending?.after ?? metasRef.current[owner] ?? EMPTY_META;
       const proposed = typeof next === "function" ? (next as (prev: Meta) => Meta)(base) : next;
-      /* A note somebody else has locked keeps the metadata it had. Every
-         per-note change in this page — pinning, filing, trashing, shelving —
-         is one call to this function, so the lock is honoured once here
-         rather than in each of them. Postgres refuses the write either way;
-         what this saves is a list that shows a move the archive rejected. */
-      const held = new Map(
-        base.notes
-          .filter((note) => note.lockedBy && note.lockedBy !== selfId)
-          .map((note) => [note.id, note]),
-      );
-      const m: Meta =
-        held.size === 0
-          ? proposed
-          : {
-              ...proposed,
-              notes: [
-                ...proposed.notes.map((note) => held.get(note.id) ?? note),
-                ...[...held.values()].filter(
-                  (note) => !proposed.notes.some((kept) => kept.id === note.id),
-                ),
-              ],
-            };
+      /* Every per-note change in this page — pinning, filing, trashing,
+         shelving — is one call to this function, so the lock is honoured once
+         here rather than in each of them. */
+      const m = honourLocks(base, proposed, selfId);
       pendingMetaRef.current.set(owner, {
         before: pending?.before ?? base,
         after: m,
@@ -2520,22 +2503,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleMoveToTrash = useCallback(
     (entry: NoteEntry) => {
-      handleMetaChange((prev) => {
-        const existing = prev.notes.find((note) => note.id === entry.note.id);
-        const notes: NoteMeta[] = existing
-          ? prev.notes.map((note) =>
-              note.id === entry.note.id ? { ...note, trashedAt: new Date().toISOString() } : note,
-            )
-          : [
-              ...prev.notes,
-              {
-                id: entry.note.id,
-                folderId: null,
-                trashedAt: new Date().toISOString(),
-              },
-            ];
-        return { ...prev, notes };
-      });
+      handleMetaChange((prev) => trashNote(prev, entry.note.id));
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
@@ -2550,14 +2518,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      differ by a timestamp, and both leave the list the note was in. */
   const handleArchiveChange = useCallback(
     (entry: NoteEntry, archived: boolean) => {
-      const archivedAt = archived ? new Date().toISOString() : undefined;
-      handleMetaChange((prev) => {
-        const existing = prev.notes.find((note) => note.id === entry.note.id);
-        const notes: NoteMeta[] = existing
-          ? prev.notes.map((note) => (note.id === entry.note.id ? { ...note, archivedAt } : note))
-          : [...prev.notes, { id: entry.note.id, folderId: null, archivedAt }];
-        return { ...prev, notes };
-      });
+      handleMetaChange((prev) => shelveNote(prev, entry.note.id, archived));
 
       if (selectedId === entry.note.id) {
         setSelectedId(null);
@@ -2570,12 +2531,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleRestore = useCallback(
     (entry: NoteEntry) => {
-      handleMetaChange((prev) => ({
-        ...prev,
-        notes: prev.notes.map((note) =>
-          note.id === entry.note.id ? { ...note, trashedAt: undefined } : note,
-        ),
-      }));
+      handleMetaChange((prev) => restoreNote(prev, entry.note.id));
       if (selectedId === entry.note.id) {
         setSelectedId(null);
       }

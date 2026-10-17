@@ -1,13 +1,15 @@
 /* The phone's interface, drawn with React Native. It draws; everything it
  * knows comes from the core, imported by the same `@/` names the web interface
  * uses, so the preview's stand-ins replace them here exactly as they do there. */
-import { useEffect, useMemo, useState } from "react";
-import { AppState, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, { LinearTransition } from "react-native-reanimated";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { DEFAULT_APPEARANCE } from "@/lib/appearance";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { formatStamp } from "@/lib/format";
+import { honourLocks, shelveNote, trashNote } from "@/lib/noteActs";
 import {
   authenticate,
   chooseArchive,
@@ -15,14 +17,13 @@ import {
   type AppSession,
   type AuthenticationResult,
 } from "@/lib/session";
-import { loadArchive, type ArchiveSnapshot } from "@/lib/supabase";
-import { EMPTY_META } from "@/lib/types";
+import { loadArchive, persistMetaDiff, type ArchiveSnapshot } from "@/lib/supabase";
+import { EMPTY_META, type Meta } from "@/lib/types";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import { Archive, Trash2 } from "./icons";
 import { NoteScreen } from "./NoteScreen";
-
-/* ponytail: the three appearance colours as they are, until the derivation in
-   applyAppearance is a pure function both interfaces read. */
-const { background: ground, foreground: ink, accent } = DEFAULT_APPEARANCE;
+import { SwipeRow, type Origin } from "./SwipeRow";
+import { accent, danger, ground, ink, muted, rule, shelf } from "./theme";
 
 export function App() {
   const [session, setSession] = useState<AppSession | null | undefined>(undefined);
@@ -31,16 +32,18 @@ export function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      <SafeAreaView style={styles.screen}>
+    <GestureHandlerRootView style={styles.screen}>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
         {session === undefined ? null : session ? (
           <Notes session={session} />
         ) : (
-          <SignIn onSession={setSession} />
+          <SafeAreaView style={styles.screen}>
+            <SignIn onSession={setSession} />
+          </SafeAreaView>
         )}
-      </SafeAreaView>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -120,7 +123,8 @@ function SignIn({ onSession }: { onSession: (session: AppSession) => void }) {
 function Notes({ session }: { session: AppSession }) {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ id: string; origin: Origin } | null>(null);
+  const insets = useSafeAreaInsets();
   /* Coming back to the foreground is the phone's version of the three signals
      in Notes.tsx: whatever happened while away was never announced, and the
      channel held across a sleep may be listening to nothing. So both are
@@ -166,49 +170,88 @@ function Notes({ session }: { session: AppSession }) {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [snapshot, session.userId]);
 
+  /* One row open at a time: opening one closes the rest. */
+  const closers = useRef(new Map<string, () => void>());
+  const register = useCallback((id: string, close: () => void) => {
+    closers.current.set(id, close);
+    return () => void closers.current.delete(id);
+  }, []);
+  const claim = useCallback((id: string) => {
+    for (const [other, close] of closers.current) if (other !== id) close();
+  }, []);
+
+  /* The act on the list, then on the archive. The row has already gone; the
+     metadata follows it at once, and the write after it — a refusal reads the
+     archive again rather than leaving a list the archive disagrees with. */
+  const act = useCallback(
+    (change: (prev: Meta) => Meta) => {
+      if (!snapshot) return;
+      const before = snapshot.metas[session.userId] ?? EMPTY_META;
+      const after = honourLocks(before, change(before), session.userId);
+      setSnapshot({ ...snapshot, metas: { ...snapshot.metas, [session.userId]: after } });
+      persistMetaDiff(session, session.userId, before, after).catch(() =>
+        setWake((count) => count + 1),
+      );
+    },
+    [snapshot, session],
+  );
+
   if (error && !snapshot) return <Text style={styles.error}>{error}</Text>;
 
   const self = snapshot?.members.find((member) => member.isSelf);
   const lockedBy = open
-    ? snapshot && indexOf(snapshot.metas[session.userId] ?? EMPTY_META).byNote.get(open)?.lockedBy
+    ? snapshot &&
+      indexOf(snapshot.metas[session.userId] ?? EMPTY_META).byNote.get(open.id)?.lockedBy
     : undefined;
 
   /* The list stays mounted under an open note, so coming back finds it where
-     it was left. */
+     it was left — and the note closes back into the row it came out of. */
   return (
     <View style={styles.screen}>
-      <FlatList
+      <Animated.FlatList
         data={notes}
         keyExtractor={(note) => note.id}
-        contentInsetAdjustmentBehavior="automatic"
+        itemLayoutAnimation={LinearTransition}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        ListHeaderComponent={<Text style={styles.heading}>Notes</Text>}
         ItemSeparatorComponent={() => <View style={styles.rule} />}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => setOpen(item.id)}>
-            <Text style={styles.title} numberOfLines={1}>
-              {item.title || "Untitled"}
-            </Text>
-            <Text style={styles.preview} numberOfLines={1}>
-              <Text style={styles.stamp}>{formatStamp(item.updatedAt)} </Text>
-              {derivedOf(item).preview}
-            </Text>
-          </Pressable>
+          <SwipeRow
+            title={item.title || "Untitled"}
+            stamp={formatStamp(item.updatedAt)}
+            preview={derivedOf(item).preview}
+            left={{
+              label: "Delete",
+              Icon: Trash2,
+              colour: danger,
+              run: () => act((prev) => trashNote(prev, item.id)),
+            }}
+            right={{
+              label: "Archive",
+              Icon: Archive,
+              colour: shelf,
+              run: () => act((prev) => shelveNote(prev, item.id, true)),
+            }}
+            onOpen={(origin) => setOpen({ id: item.id, origin })}
+            onClaim={() => claim(item.id)}
+            register={(close) => register(item.id, close)}
+          />
         )}
       />
       {open ? (
         <NoteScreen
-          key={open}
+          key={open.id}
           session={session}
-          noteId={open}
+          noteId={open.id}
+          origin={open.origin}
           name={self?.nickname || session.email.split("@")[0] || "Someone"}
           canEdit={!lockedBy || lockedBy === session.userId}
-          onBack={() => setOpen(null)}
+          onClosed={() => setOpen(null)}
         />
       ) : null}
     </View>
   );
 }
-
-const muted = `${ink}88`;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: ground },
@@ -223,10 +266,15 @@ const styles = StyleSheet.create({
   },
   button: { backgroundColor: accent, borderRadius: 10, paddingVertical: 13, alignItems: "center" },
   buttonLabel: { color: "#ffffff", fontSize: 17, fontWeight: "600" },
-  error: { color: "#ff453a", textAlign: "center" },
-  row: { paddingHorizontal: 20, paddingVertical: 12, gap: 3 },
+  error: { color: danger, textAlign: "center" },
   title: { color: ink, fontSize: 17, fontWeight: "600" },
-  preview: { color: muted, fontSize: 15 },
-  stamp: { color: ink },
-  rule: { height: StyleSheet.hairlineWidth, backgroundColor: `${ink}22`, marginLeft: 20 },
+  heading: {
+    color: ink,
+    fontSize: 34,
+    fontWeight: "700",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: rule, marginLeft: 20 },
 });

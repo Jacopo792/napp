@@ -220,7 +220,8 @@ puts back, the Trash deletes for good and restores. Deleting for good was once
 the one act a full swipe was not allowed to perform on its own; every act is
 that act now, so there is no flag on the pair and no exception to remember.
 
-`OPEN` and `MAX` in `NoteList.tsx` are the whole of the tuning, and **the clamp
+`OPEN` and `MAX` in `lib/swipe.ts` are the whole of the tuning — the web's
+list and the phone's read the same two numbers — and **the clamp
 is load-bearing**: a trackpad keeps sending decaying momentum after the fingers
 lift, so unclamped travel takes the row half the column. Clamped, a flick
 arrives at the give and springs back to open.
@@ -897,6 +898,33 @@ Three things the core expects of a browser are answered without touching it:
 
 `platform.mobile.ts` gives a file to the share sheet, shows one with Quick
 Look and writes a folder through the system picker. `print` does nothing yet.
+
+**A note is the core's editor, hosted.** `HostedNote` is what `NoteEditor`
+binds to a note and nothing around it; `apps/mobile/editor/` builds it into
+one HTML file, script, stylesheet and fonts inside, because the page is handed
+to the WebView as a string and nothing answers at its address. What crosses
+in is which note, as whom, and the access token, set before the page's script
+runs; what comes out is where the note stands. **The refresh token never
+crosses**: two clients rotating one refresh token is a reuse, and Supabase
+answers a reuse by revoking every session in the family — the phone signed
+out. The page is given a fresh access token whenever the app's client
+refreshes its own.
+
+**The motion is the web's rules on the UI thread.** Reanimated and Gesture
+Handler, with the curves and durations of `styles.css` read as numbers from
+`lib/motionTokens.ts`, whose test fails if the two disagree. A row is pushed
+open exactly as on the web and settles with `--ease-bounce`; the act runs on
+the press, the row leaves the way it was pushed and the list closes the gap.
+A note opens out of the row that was touched and closes back into it: what
+grows is a window over a page already full size, so the WebView is laid out
+once rather than per frame. The left edge takes the page back under the
+finger. Haptics mark what the hand did — a tick as a row comes open, a knock
+on the act, a light tap as a note opens — and nothing else. The metadata half
+of every act is `lib/noteActs.ts`, which the web's `Notes.tsx` now calls too.
+
+The strip on the page's left edge carries `collapsable={false}`. A view with
+no background is flattened away on Fabric, and the touch it was there to take
+goes through to the editor and raises the keyboard.
 
 **Its origin is `https://notes`**, and it has to be in `ALLOWED_ORIGINS` on
 Render — set by hand in the dashboard, like `app://notes`. The editor's

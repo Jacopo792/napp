@@ -38,6 +38,7 @@ import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
 import { prefetchNote } from "@/lib/collab";
 import { formatStamp } from "@/lib/format";
+import { clampTravel, OPEN, settleTravel } from "@/lib/swipe";
 import { derivedOf, indexOf } from "@/lib/derived";
 import {
   DRAWING_TEXT_FONT,
@@ -79,17 +80,7 @@ function rowOrigin(row: HTMLElement): SheetOrigin {
  *  whole list to move one row. */
 const CLOSE_OTHER_SWIPES = "napp:close-other-swipes";
 
-const OPEN = 92;
-/* Nothing happens at the end of a push, however long it is. A row uncovers
-   its buttons and waits to be pressed — so travel past the open position is
-   give and nothing else, and there is no distance at which the hand has
-   committed to anything. 56 of give is enough to feel the row resist and
-   not enough to look like a threshold that was missed. */
-const MAX = OPEN + 56;
-/* The clamp is not tidiness. A trackpad keeps sending decaying momentum
-   after the fingers have lifted, so an unclamped flick travels half the
-   column; clamped it arrives at the give and springs back to open. */
-const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
+const clamp = clampTravel;
 
 export interface ActiveFilter {
   id: string;
@@ -367,9 +358,7 @@ const Row = memo(function Row({
      which is the same two-step every irreversible act here already asked for,
      now asked for by all of them. */
   const settle = useCallback((travelled: number) => {
-    if (travelled <= -OPEN / 2) setSlid(-OPEN);
-    else if (travelled >= OPEN / 2) setSlid(OPEN);
-    else setSlid(0);
+    setSlid(settleTravel(travelled));
     setDragging(false);
   }, []);
 
