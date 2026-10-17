@@ -22,7 +22,7 @@ import {
   subscribeToAccountPreferences,
   type AccountPreferences,
 } from "@/lib/accountPreferences";
-import { setAppearance } from "@/lib/appearance";
+import { APPEARANCE_PRESETS, setAppearance } from "@/lib/appearance";
 import { setAxes } from "@/lib/axes";
 import { setWritingPreferences } from "@/lib/writingPreferences";
 import { chooseArchive } from "@/lib/session";
@@ -358,8 +358,8 @@ export function ArchiveProvider({
 function phoneView(row: AccountPreferences): AccountPreferences {
   return {
     ...row,
-    appearance: row.phone?.appearance ?? row.appearance,
-    axes: row.phone?.axes ?? row.axes,
+    appearance: { ...(row.phone?.appearance ?? row.appearance), folderColour: "auto" },
+    axes: { size: 17, measure: 68, weight: 400, leading: 1.55, face: "system" },
   };
 }
 
@@ -391,7 +391,16 @@ export function usePalette(): Palette {
   return useMemo(() => {
     const dark =
       appearance.theme === "dark" || (appearance.theme === "system" && system !== "light");
-    const t = appearanceTokens(appearance, dark);
+    /* Automatic follows the phone's display, including the ink and ground;
+       a dark palette cannot supply white text to a light system surface. */
+    const automatic = APPEARANCE_PRESETS.find(
+      (preset) => preset.id === (dark ? "graphite" : "paper"),
+    )!;
+    const resolved =
+      appearance.theme === "system"
+        ? { ...appearance, background: automatic.background, foreground: automatic.foreground }
+        : appearance;
+    const t = appearanceTokens(resolved, dark);
     return {
       dark,
       page: dark ? deepen(t["--page"], 0.55) : t["--page"],

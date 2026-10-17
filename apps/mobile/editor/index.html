@@ -15,6 +15,20 @@
         flex-direction: column;
         background: var(--page);
       }
+      /* System type, generous glyph clearance and natural word wrapping.
+         The desktop's tighter display-title rules do not fit an iPhone textarea. */
+      .note-title.note-title-mobile {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+        padding: 4px 2px 8px;
+        box-sizing: border-box;
+        hyphens: none;
+        overflow-wrap: anywhere;
+        -webkit-text-size-adjust: 100%;
+      }
       .editor-scroll {
         padding-top: var(--host-top, 0px);
         padding-bottom: calc(env(safe-area-inset-bottom) + 96px);

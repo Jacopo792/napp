@@ -10,9 +10,9 @@ import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
 import { usePalette, type Palette } from "./archive";
 import { useCard } from "./Backdrop";
-import { trashGround, useIconStyle, type IconStyle } from "./theme";
+import { trashGround } from "./theme";
 
-export const CARD_RADIUS = 28;
+export const CARD_RADIUS = 18;
 
 export function Group({
   title,
@@ -48,46 +48,31 @@ export function Chip({
   icon,
   tint,
   fill,
-  size = 34,
-  look,
+  size = 40,
 }: {
   icon?: SFSymbol;
   tint?: string;
   fill?: string;
   size?: number;
-  /** Drawn in this style rather than the reader's: the choice in Settings. */
-  look?: IconStyle;
 }) {
   const palette = usePalette();
-  const chosen = useIconStyle();
-  const style = look ?? chosen;
-  const hex = !!fill && /^#[\da-f]{6}$/i.test(fill);
-  /* Mono takes the colour off every glyph but the bin's. A swatch — a chip
-     with no glyph or only the tick of the chosen one — is the colour itself
-     and keeps it. */
-  if (style === "mono" && icon && icon !== "checkmark") {
-    tint = fill === trashGround || tint === palette.danger ? palette.danger : palette.ink;
-    fill = undefined;
-  }
-  const tinted = style === "tinted" && hex;
+  /* One system-symbol style throughout the app. Only destructive actions
+     use red; folders keep the default ink on a quiet disc. */
+  const colour =
+    fill === trashGround || tint === palette.danger ? palette.danger : (tint ?? palette.ink);
   return (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: tinted ? `${fill}33` : (fill ?? quiet(palette)),
+        backgroundColor: quiet(palette),
         alignItems: "center",
         justifyContent: "center",
       }}
     >
       {icon ? (
-        <SymbolView
-          name={icon}
-          size={size * 0.5}
-          weight="semibold"
-          tintColor={tinted ? fill : fill ? "#ffffff" : (tint ?? palette.ink)}
-        />
+        <SymbolView name={icon} size={size * 0.6} weight="semibold" tintColor={colour} />
       ) : null}
     </View>
   );
@@ -165,9 +150,14 @@ export function RowFace({
       <View style={[styles.lead, { paddingLeft: 14 + depth * 20 }]}>
         {leading ??
           (plain ? (
-            <View style={{ width: 34, alignItems: "center" }}>
+            <View style={{ width: 40, alignItems: "center" }}>
               {icon ? (
-                <SymbolView name={icon} tintColor={tint ?? palette.accent} size={22} />
+                <SymbolView
+                  name={icon}
+                  tintColor={tint ?? palette.accent}
+                  size={25}
+                  weight="semibold"
+                />
               ) : null}
             </View>
           ) : (

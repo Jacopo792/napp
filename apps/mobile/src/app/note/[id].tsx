@@ -26,6 +26,7 @@ import {
 } from "@/features/editor/lib/attachments";
 import type { HostedCommand } from "@/lib/hostedCommands";
 import type { SearchStatus } from "@/features/editor/components/RichTextEditor";
+import { IconButton } from "../../IconButton";
 import { NoteHistory } from "../../NoteHistory";
 import { NoteComments } from "../../NoteComments";
 import { useHostedNote } from "../../HostedPage";
@@ -355,36 +356,42 @@ export default function Note() {
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
       <Stack.Toolbar>
-        <Stack.Toolbar.Button
-          icon={icon("bold")}
-          disabled={!canEdit || busy}
-          onPress={() => run({ type: "format", action: "bold" })}
-          accessibilityLabel="Bold"
-        />
-        <Stack.Toolbar.Button
-          icon={icon("checklist")}
-          disabled={!canEdit || busy}
-          onPress={() => run({ type: "format", action: "checklist" })}
-          accessibilityLabel="Checklist"
-        />
-        <Stack.Toolbar.Button
-          icon={icon("tablecells")}
-          disabled={!canEdit || busy}
-          onPress={() => run({ type: "format", action: "table-3" })}
-          accessibilityLabel="Table"
-        />
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="bold"
+            label="Bold"
+            disabled={!canEdit || busy}
+            onPress={() => run({ type: "format", action: "bold" })}
+          />
+        </Stack.Toolbar.View>
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="checklist"
+            label="Checklist"
+            disabled={!canEdit || busy}
+            onPress={() => run({ type: "format", action: "checklist" })}
+          />
+        </Stack.Toolbar.View>
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="tablecells"
+            label="Table"
+            disabled={!canEdit || busy}
+            onPress={() => run({ type: "format", action: "table-3" })}
+          />
+        </Stack.Toolbar.View>
         <Stack.Toolbar.Spacer />
-        <Stack.Toolbar.Button
-          icon={icon("photo")}
-          disabled={!canEdit || busy}
-          onPress={() => attach(true)}
-          accessibilityLabel="Insert Image"
-        />
-        <Stack.Toolbar.Button
-          icon={icon("bubble.left.and.bubble.right")}
-          onPress={comments}
-          accessibilityLabel="Comments"
-        />
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="photo"
+            label="Insert image"
+            disabled={!canEdit || busy}
+            onPress={() => attach(true)}
+          />
+        </Stack.Toolbar.View>
+        <Stack.Toolbar.View>
+          <IconButton icon="bubble.left.and.bubble.right" label="Comments" onPress={comments} />
+        </Stack.Toolbar.View>
       </Stack.Toolbar>
       {panel === "history" ? (
         <NoteHistory

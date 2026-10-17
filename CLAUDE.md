@@ -979,29 +979,26 @@ archive remounts the provider by account and archive id, so no old subscription
 or snapshot follows into the new one. Pending metadata writes are ordered; a
 read begun before an edit cannot replace it afterwards.
 
-**The phone looks the way the phone was set, not the way the computer was.**
-Appearance and the reading axes chosen on the phone go into
-`profile_preferences.phone` — still the account's, so a second phone finds
-them — and never into the top-level `appearance` and `axes` the web and the
-desktop wear (Jacopo, 17 October 2026: a wallpaper changed on the phone had
-changed the computer's). Until the phone chooses, it wears the computer's.
-The web and the desktop never read `phone`, but they write the whole blob, so
-`preferencesWith` hands back the branch the row last carried. Writing colour,
-autocorrection and the privacy switches stay account-wide: they are about how
-the others see you, not how this screen looks.
+**Phone appearance stays independent from the computer.** Appearance chosen
+on the phone goes into `profile_preferences.phone`; web and desktop preserve
+that branch without applying it. Writing colour, autocorrection and privacy
+remain account-wide. Phone text uses the Apple system font and fixed reading
+defaults (17 pt, weight 400, leading 1.55). Reading, Icon Style and Folder Colour
+controls were removed at Jacopo's request on 17 October 2026; phone folders
+use the default colour and icons use one system-symbol style.
 
-Settings is a page, not a stack of cards (direction "C · Pagina", chosen
-over a single column of cards and a grid of tiles): hairline rows on the
-ground under small italic serif headings, each row's value set right in the
-quieter ink, colours chosen as swatches and short choices as segments.
-It has Profile, Archives, Members, Appearance, Reading, Writing and
-Privacy. It reads and writes through the core's existing modules, including
-account-wide preferences and their own Realtime channel. Reading and writing
-stores keep their values and notify subscribers even without a document; only
-their CSS application needs a browser. Appearance, reading axes, autocorrection
-and collaborator visibility cross into the hosted editor both when it opens
-and when they change. A lock arriving while a note is open changes its editing
-permission too, without rebuilding its Y.Doc.
+Settings uses system typography, an aligned profile card and native-style
+inset groups. Its pages are Profile, Archives, Members, Appearance, Writing
+and Privacy. Appearance has an actual preview, Automatic/Light/Dark theme,
+named palette previews and a separate wallpaper page. Account preferences
+and live editor updates still use the existing core modules. A lock arriving
+while a note is open changes editing permission without rebuilding its Y.Doc.
+
+Navigation uses a short native `simple_push` transition; note links retain
+context menus and previews without Apple zoom transitions. Toolbar icons have
+44 pt touch targets. Notes search sits above the list, avoiding the overlapping
+bottom search field. Mobile note titles use system typography, natural wrapping
+and padding that prevents glyph clipping.
 
 Native note controls now call the editor through `lib/hostedCommands.ts`:
 formatting, links, find, private images and file attachments, Markdown/Word/PDF

@@ -1,5 +1,4 @@
 import { useTextPrompt } from "../TextPrompt";
-import { useToolbarIcon } from "../icons";
 /* Folders, as Notes on the iPhone opens: whose notes, inside this archive, is
  * the You / Partner shelf of the web, and here it is the face at the top left:
  * pressing it switches to another member's notes. The group
@@ -23,6 +22,7 @@ import { Group, Row, RowFace } from "../Grouped";
 import { SwipeRow } from "../SwipeRow";
 import { shelfGround, trashGround, travel } from "../theme";
 import { useCreateNote } from "../useCreateNote";
+import { IconButton } from "../IconButton";
 import { WhoseSwitch } from "../WhoseSwitch";
 
 /** Folders in the order the web draws them: each followed by its children. */
@@ -43,7 +43,6 @@ function nested(folders: Folder[]): { folder: Folder; depth: number }[] {
 
 export default function Folders() {
   const prompt = useTextPrompt();
-  const icon = useToolbarIcon();
   const { session, snapshot, error, metaOf, act, spaces, refresh, present, profile } = useArchive();
   const current = spaces.find((space) => space.archiveId === session.archiveId);
   const palette = usePalette();
@@ -136,21 +135,27 @@ export default function Folders() {
         </Stack.Toolbar>
       ) : null}
       <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          icon={icon("gearshape")}
-          onPress={() => router.push("/settings")}
-          accessibilityLabel="Settings"
-        />
+        <Stack.Toolbar.View>
+          <IconButton icon="gearshape" label="Settings" onPress={() => router.push("/settings")} />
+        </Stack.Toolbar.View>
       </Stack.Toolbar>
       <Stack.Toolbar>
-        <Stack.Toolbar.Button icon={icon("folder.badge.plus")} onPress={() => newFolder(owner)} />
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="folder.badge.plus"
+            label="New folder"
+            onPress={() => newFolder(owner)}
+          />
+        </Stack.Toolbar.View>
         <Stack.Toolbar.Spacer />
-        <Stack.Toolbar.Button
-          icon={icon("square.and.pencil")}
-          onPress={create}
-          disabled={creating}
-          accessibilityLabel="New Note"
-        />
+        <Stack.Toolbar.View>
+          <IconButton
+            icon="square.and.pencil"
+            label="New note"
+            onPress={create}
+            disabled={creating}
+          />
+        </Stack.Toolbar.View>
       </Stack.Toolbar>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"

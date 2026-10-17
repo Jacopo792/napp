@@ -52,6 +52,8 @@ export default function Root() {
               <HostedPageProvider>
                 <Stack
                   screenOptions={{
+                    animation: "simple_push",
+                    animationDuration: 200,
                     headerLargeTitle: true,
                     headerTransparent: true,
                     headerLargeTitleShadowVisible: false,
@@ -60,7 +62,6 @@ export default function Root() {
                     headerTitleStyle: { color: palette.ink },
                     headerLargeTitleStyle: {
                       color: palette.ink,
-                      fontFamily: "Iowan Old Style",
                       fontWeight: "700",
                     },
                     contentStyle: { backgroundColor: palette.page },

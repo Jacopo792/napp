@@ -98,7 +98,10 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
   const waiting = useRef(new HostedRequests());
   /* The first preferences, for the page's first paint; later ones travel with
      each opening. */
-  const [firstPreferences] = useState(preferences);
+  const [firstPreferences] = useState(() => ({
+    ...preferences,
+    appearance: { ...preferences.appearance, background: palette.canvas, foreground: palette.ink },
+  }));
 
   useEffect(() => {
     void pageHtml().then(setHtml, (reason) => console.error("The note page did not load", reason));
@@ -280,11 +283,24 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
 /** Borrows the page for one note while its screen is in front. `Host` is
  *  where the page is drawn; `execute` asks the editor something. */
 export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
+  const palette = usePalette();
+  const resolvedPreferences = useMemo(
+    () => ({
+      ...opening.preferences,
+      appearance: {
+        ...opening.preferences.appearance,
+        background: palette.canvas,
+        foreground: palette.ink,
+      },
+    }),
+    [opening.preferences, palette.canvas, palette.ink],
+  );
+  const resolvedOpening = { ...opening, preferences: resolvedPreferences };
   const shared = useContext(Context);
   if (!shared) throw new Error("useHostedNote() outside a HostedPageProvider");
   const [key] = useState(() => `note-${randomUUID()}`);
-  const latest = useRef({ opening, handlers });
-  latest.current = { opening, handlers };
+  const latest = useRef({ opening: resolvedOpening, handlers });
+  latest.current = { opening: resolvedOpening, handlers };
   const { borrow, giveBack, update } = shared;
 
   /* Taken on focus, so a note returned to from a note it linked to takes the
@@ -305,7 +321,7 @@ export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
       });
     }, [borrow, key]),
   );
-  const { noteId, name, canEdit, preferences, headerHeight } = opening;
+  const { noteId, name, canEdit, preferences, headerHeight } = resolvedOpening;
   useEffect(() => {
     update(key, { noteId, name, canEdit, preferences, headerHeight });
   }, [update, key, noteId, name, canEdit, preferences, headerHeight]);

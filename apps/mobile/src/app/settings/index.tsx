@@ -1,13 +1,12 @@
 import { Link, useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { APPEARANCE_PRESETS } from "@/lib/appearance";
-import { PRESENCE_PALETTES } from "@/lib/writingPreferences";
 import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
-import { attempt, Line, SERIF, Section, SettingsPage } from "../../SettingsControls";
+import { SymbolView } from "../../icons";
+import { attempt, Line, Section, SettingsPage } from "../../SettingsControls";
 
-/* The contents page: who you are at the top, then what each section holds,
-   named by its value rather than by a coloured tile. */
+/* Account first, then grouped settings for this phone and this archive. */
 export default function Settings() {
   const router = useRouter();
   const { session, snapshot, spaces, profile, preferences: p, signOut } = useArchive();
@@ -31,8 +30,11 @@ export default function Settings() {
           flexDirection: "row",
           alignItems: "center",
           gap: 14,
+          padding: 16,
+          borderRadius: 12,
+          backgroundColor: palette.dark ? "#1c1c1e" : "#ffffff",
           marginHorizontal: 20,
-          marginBottom: 30,
+          marginBottom: 24,
           opacity: pressed ? 0.6 : 1,
         })}
       >
@@ -46,17 +48,20 @@ export default function Settings() {
           size={58}
         />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text
-            style={{ color: palette.ink, fontFamily: SERIF, fontSize: 24, fontWeight: "600" }}
-            numberOfLines={1}
-          >
+          <Text style={{ color: palette.ink, fontSize: 20, fontWeight: "600" }} numberOfLines={1}>
             {name}
           </Text>
           <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
             {session.email}
           </Text>
         </View>
+        <SymbolView name="chevron.right" tintColor={palette.ink4} size={14} />
       </Pressable>
+      <Section title="This phone">
+        <Link href={go("appearance")} asChild>
+          <Line label="Appearance" value={look} opens />
+        </Link>
+      </Section>
       <Section title="Archive">
         <Link href={go("archives")} asChild>
           <Line label="Archives" value={current?.name} opens />
@@ -65,34 +70,25 @@ export default function Settings() {
           <Line label="Members" value={snapshot?.members.length} opens />
         </Link>
       </Section>
-      <Section title="This phone">
-        <Link href={go("appearance")} asChild>
-          <Line label="Appearance" value={look} opens />
-        </Link>
-        <Link href={go("reading")} asChild>
-          <Line
-            label="Reading"
-            value={`${p.axes.face === "serif" ? "Serif" : "System"} · ${p.axes.size}`}
-            opens
-          />
-        </Link>
-      </Section>
-      <Section title="Account">
+      <Section title="Writing & privacy">
         <Link href={go("writing")} asChild>
-          <Line
-            label="Writing"
-            value={
-              PRESENCE_PALETTES.find((colour) => colour.id === p.writing.presencePalette)?.name
-            }
-            opens
-          />
+          <Line label="Writing" opens />
         </Link>
         <Link href={go("security")} asChild>
           <Line label="Privacy" opens />
         </Link>
       </Section>
       <Section>
-        <Line label="Sign Out" tone="danger" onPress={() => void attempt(signOut)} />
+        <Line
+          label="Sign out"
+          tone="danger"
+          onPress={() =>
+            Alert.alert("Sign out of Napp?", undefined, [
+              { text: "Cancel", style: "cancel" },
+              { text: "Sign out", style: "destructive", onPress: () => void attempt(signOut) },
+            ])
+          }
+        />
       </Section>
     </SettingsPage>
   );

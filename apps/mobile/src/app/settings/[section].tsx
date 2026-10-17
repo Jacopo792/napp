@@ -1,9 +1,8 @@
 import { useTextPrompt } from "../../TextPrompt";
 import { useEffect, useState } from "react";
 import { Pressable, Share, Text, View } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { APPEARANCE_PRESETS, SYSTEM_COLOURS } from "@/lib/appearance";
-import { PRESETS } from "@/lib/axes";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { APPEARANCE_PRESETS } from "@/lib/appearance";
 import { createSpace, renameSpace } from "@/lib/spaces";
 import {
   createArchiveInvite,
@@ -16,7 +15,6 @@ import { PRESENCE_PALETTES } from "@/lib/writingPreferences";
 import { useArchive, usePalette } from "../../archive";
 import { Chip } from "../../Grouped";
 import { Avatar } from "../../Avatar";
-import { setIconStyle, useIconStyle } from "../../theme";
 import { chooseWallpaper, ProfileHero } from "../../ProfilePhoto";
 import {
   attempt,
@@ -47,7 +45,6 @@ export default function Section() {
     error,
   } = useArchive();
   const palette = usePalette();
-  const iconStyle = useIconStyle();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
@@ -81,15 +78,16 @@ export default function Section() {
         archives: "Archives",
         members: "Members",
         appearance: "Appearance",
-        reading: "Reading",
         writing: "Writing",
         security: "Privacy",
+        palette: "Colour Palette",
+        wallpaper: "Wallpaper",
       } as Record<string, string>
     )[section] ?? "Settings";
 
   const nickname = () =>
     prompt(
-      "Nickname",
+      "Display name",
       undefined,
       (name) => {
         if (profile && name?.trim())
@@ -123,7 +121,7 @@ export default function Section() {
     update({
       appearance: {
         ...p.appearance,
-        accent: base.accent,
+        accent: p.appearance.accent,
         background: base.background,
         foreground: base.foreground,
         theme,
@@ -135,6 +133,8 @@ export default function Section() {
       preset.background === p.appearance.background && preset.accent === p.appearance.accent,
   );
 
+  if (["reading", "icons", "folders"].includes(section)) return <Redirect href="/settings" />;
+
   return (
     <SettingsPage title={title}>
       {error ? <Status>{error}</Status> : null}
@@ -143,7 +143,7 @@ export default function Section() {
           <ProfileHero />
           <Part>
             <Line
-              label="Nickname"
+              label="Display name"
               value={profile?.nickname || ""}
               disabled={!profile || busy}
               onPress={nickname}
@@ -153,7 +153,7 @@ export default function Section() {
       ) : null}
       {section === "archives" ? (
         <>
-          <Part title="Your archives">
+          <Part title="Switch archive">
             {spaces.map((space) => (
               <Choice
                 key={space.archiveId}
@@ -170,7 +170,7 @@ export default function Section() {
           </Part>
           <Part>
             <Line
-              label="New Archive"
+              label="Create archive"
               tone="action"
               disabled={busy}
               onPress={() =>
@@ -185,7 +185,7 @@ export default function Section() {
               }
             />
             <Line
-              label="Rename Current Archive"
+              label="Rename current archive"
               tone="action"
               disabled={busy || !current}
               onPress={() =>
@@ -229,7 +229,7 @@ export default function Section() {
               />
             ))}
             <Line
-              label="Invite Member"
+              label="Invite member"
               tone="action"
               value={`${snapshot?.members.length ?? 0} of ${snapshot?.seatLimit ?? 2}`}
               disabled={busy || (snapshot?.members.length ?? 0) >= (snapshot?.seatLimit ?? 2)}
@@ -256,181 +256,134 @@ export default function Section() {
           ) : null}
         </>
       ) : null}
-      {!preferencesReady && ["appearance", "reading", "writing", "security"].includes(section) ? (
+      {!preferencesReady &&
+      ["appearance", "palette", "wallpaper", "writing", "security"].includes(section) ? (
         <Text style={{ color: palette.ink3, margin: 20 }}>Loading preferences…</Text>
       ) : (
         <>
           {section === "appearance" ? (
             <>
-              <Part title={`Palette · ${palettePreset?.name ?? "Custom"}`}>
-                <Swatches
-                  items={APPEARANCE_PRESETS.map((preset) => ({
-                    id: preset.id,
-                    label: preset.name,
-                    ground: preset.background,
-                    dot: preset.accent,
-                  }))}
-                  value={palettePreset?.id}
-                  onChange={(id) => {
-                    const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === id)!;
-                    update({
-                      appearance: {
-                        ...p.appearance,
-                        theme: preset.theme,
-                        accent: preset.accent,
-                        background: preset.background,
-                        foreground: preset.foreground,
-                      },
-                    });
-                  }}
-                />
-              </Part>
+              <AppearancePreview />
               <Part title="Theme">
                 <Segments
                   options={[
-                    { id: "system", label: "System" },
-                    { id: "dark", label: "Dark" },
+                    { id: "system", label: "Automatic" },
                     { id: "light", label: "Light" },
+                    { id: "dark", label: "Dark" },
                   ]}
                   value={p.appearance.theme}
                   onChange={theme}
                 />
               </Part>
-              <Part title="Icons">
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-around",
-                    paddingVertical: 14,
-                  }}
-                >
-                  {(["mono", "tinted", "filled"] as const).map((style) => (
-                    <IconStyleChoice
-                      key={style}
-                      style={style}
-                      selected={iconStyle === style}
-                      onPress={() => setIconStyle(style)}
-                    />
-                  ))}
-                </View>
-              </Part>
-              <Part title="Folders">
-                <Swatches
-                  items={SYSTEM_COLOURS.map((colour) => ({
-                    id: colour.id,
-                    label: colour.name,
-                    ground: colour.id,
-                  }))}
-                  value={p.appearance.folderColour}
-                  onChange={(folderColour) =>
-                    update({ appearance: { ...p.appearance, folderColour } })
+              <Part title="Personalise">
+                <Line
+                  label="Colour palette"
+                  value={palettePreset?.name ?? "Custom"}
+                  opens
+                  onPress={() =>
+                    router.push({ pathname: "/settings/[section]", params: { section: "palette" } })
                   }
                 />
-              </Part>
-              <Part title="Wallpaper">
                 <Line
-                  label={p.appearance.wallpaperObject ? "Change Wallpaper" : "Choose Wallpaper"}
-                  tone="action"
-                  disabled={busy}
+                  label="Wallpaper"
+                  value={p.appearance.wallpaper && p.appearance.wallpaperObject ? "On" : "Off"}
+                  opens
                   onPress={() =>
-                    void run(async () => {
-                      const objectId = await chooseWallpaper(session);
-                      if (objectId)
-                        update({
-                          appearance: {
-                            ...p.appearance,
-                            wallpaper: true,
-                            wallpaperObject: objectId,
-                          },
-                        });
+                    router.push({
+                      pathname: "/settings/[section]",
+                      params: { section: "wallpaper" },
                     })
                   }
                 />
-                {p.appearance.wallpaperObject ? (
-                  <>
-                    <Toggle
-                      label="Show Wallpaper"
-                      value={p.appearance.wallpaper}
-                      onChange={(wallpaper) =>
-                        update({ appearance: { ...p.appearance, wallpaper } })
-                      }
-                    />
-                    <Segments
-                      options={[
-                        { id: 0, label: "Sharp" },
-                        { id: 8, label: "Soft" },
-                        { id: 20, label: "Deep" },
-                      ]}
-                      value={p.appearance.wallpaperBlur}
-                      onChange={(wallpaperBlur) =>
-                        update({ appearance: { ...p.appearance, wallpaperBlur } })
-                      }
-                    />
-                    <Line
-                      label="Remove Wallpaper"
-                      tone="danger"
-                      onPress={() =>
-                        update({
-                          appearance: { ...p.appearance, wallpaper: false, wallpaperObject: null },
-                        })
-                      }
-                    />
-                  </>
-                ) : null}
               </Part>
             </>
           ) : null}
-          {section === "reading" ? (
-            <>
-              <Part title="Typeface">
-                <Segments
-                  options={[
-                    { id: "serif", label: "Serif" },
-                    { id: "system", label: "System" },
-                  ]}
-                  value={p.axes.face}
-                  onChange={(face) => update({ axes: { ...p.axes, face } })}
-                />
-              </Part>
-              <Part title="Text size">
-                <Segments
-                  options={[14, 16, 18, 20, 22].map((size) => ({ id: size, label: `${size}` }))}
-                  value={p.axes.size}
-                  onChange={(size) => update({ axes: { ...p.axes, size } })}
-                />
-              </Part>
-              <Part title="Reading style">
-                {PRESETS.map((preset) => (
-                  <Choice
-                    key={preset.id}
-                    label={preset.name}
-                    selected={
-                      p.axes.size === preset.axes.size &&
-                      p.axes.leading === preset.axes.leading &&
-                      p.axes.measure === preset.axes.measure
-                    }
-                    onPress={() => update({ axes: { ...p.axes, ...preset.axes } })}
+          {section === "palette" ? (
+            <PaletteChoices
+              value={palettePreset?.id}
+              onChange={(id) => {
+                const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === id)!;
+                update({
+                  appearance: {
+                    ...p.appearance,
+                    theme: preset.theme,
+                    accent: preset.accent,
+                    background: preset.background,
+                    foreground: preset.foreground,
+                  },
+                });
+              }}
+            />
+          ) : null}
+          {section === "wallpaper" ? (
+            <Part title="Wallpaper">
+              <Line
+                label={p.appearance.wallpaperObject ? "Change Wallpaper" : "Choose Wallpaper"}
+                tone="action"
+                disabled={busy}
+                onPress={() =>
+                  void run(async () => {
+                    const objectId = await chooseWallpaper(session);
+                    if (objectId)
+                      update({
+                        appearance: {
+                          ...p.appearance,
+                          wallpaper: true,
+                          wallpaperObject: objectId,
+                        },
+                      });
+                  })
+                }
+              />
+              {p.appearance.wallpaperObject ? (
+                <>
+                  <Toggle
+                    label="Show Wallpaper"
+                    value={p.appearance.wallpaper}
+                    onChange={(wallpaper) => update({ appearance: { ...p.appearance, wallpaper } })}
                   />
-                ))}
-              </Part>
-            </>
+                  <Text style={{ color: palette.ink3, fontSize: 13, marginTop: 12 }}>Blur</Text>
+                  <Segments
+                    options={[
+                      { id: 0, label: "Sharp" },
+                      { id: 8, label: "Soft" },
+                      { id: 20, label: "Deep" },
+                    ]}
+                    value={p.appearance.wallpaperBlur}
+                    onChange={(wallpaperBlur) =>
+                      update({ appearance: { ...p.appearance, wallpaperBlur } })
+                    }
+                  />
+                  <Line
+                    label="Remove Wallpaper"
+                    tone="danger"
+                    onPress={() =>
+                      update({
+                        appearance: { ...p.appearance, wallpaper: false, wallpaperObject: null },
+                      })
+                    }
+                  />
+                </>
+              ) : null}
+            </Part>
           ) : null}
           {section === "writing" ? (
             <>
               <Part>
                 <Toggle
-                  label="Autocorrect"
+                  label="Autocorrection"
                   value={p.autocorrect}
                   onChange={(autocorrect) => update({ autocorrect })}
                 />
               </Part>
               <Part
-                title={`Your colour · ${
+                title={`Your colour in shared notes · ${
                   PRESENCE_PALETTES.find((colour) => colour.id === p.writing.presencePalette)
                     ?.name ?? ""
                 }`}
               >
                 <Swatches
+                  labelled
                   items={PRESENCE_PALETTES.map((colour) => ({
                     id: colour.id,
                     label: colour.name,
@@ -452,18 +405,18 @@ export default function Section() {
           {section === "security" ? (
             <Part>
               <Toggle
-                label="Live Presence"
+                label="Show when I’m online"
                 value={p.presence}
                 onChange={(presence) => update({ presence })}
               />
               <Toggle
-                label="Show Collaborators"
+                label="Show who contributed"
                 value={p.collaborators}
                 onChange={(collaborators) => update({ collaborators })}
               />
               {profile ? (
                 <Toggle
-                  label="Keep Archived Notes Private"
+                  label="Hide my archived notes"
                   value={profile.hideArchived}
                   disabled={busy}
                   onChange={(hideArchived) =>
@@ -480,36 +433,92 @@ export default function Section() {
   );
 }
 
-/** The three ways a glyph can be drawn, each shown the way it would be. */
-function IconStyleChoice({
-  style,
-  selected,
-  onPress,
-}: {
-  style: "mono" | "tinted" | "filled";
-  selected: boolean;
-  onPress: () => void;
-}) {
+function AppearancePreview() {
   const palette = usePalette();
-  const tile = style === "mono" ? { tint: palette.ink } : { fill: palette.folder };
   return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      accessibilityLabel={style}
-      onPress={onPress}
-      style={({ pressed }) => ({ alignItems: "center", gap: 8, opacity: pressed ? 0.6 : 1 })}
+    <View
+      accessibilityLabel="Appearance preview"
+      style={{
+        marginHorizontal: 20,
+        marginBottom: 24,
+        padding: 20,
+        borderRadius: 16,
+        backgroundColor: palette.page,
+        borderWidth: 1,
+        borderColor: palette.rule,
+        gap: 12,
+      }}
     >
-      <Chip icon="folder.fill" {...tile} size={44} look={style} />
-      <Text
+      <Text style={{ color: palette.ink3, fontSize: 12, fontWeight: "600" }}>PREVIEW</Text>
+      <Text style={{ color: palette.ink, fontSize: 24, fontWeight: "700" }}>
+        Your notes, your space
+      </Text>
+      <View
         style={{
-          color: selected ? palette.ink : palette.ink3,
-          fontSize: 15,
-          fontWeight: selected ? "600" : "400",
+          backgroundColor: palette.paper,
+          borderRadius: 10,
+          padding: 14,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
         }}
       >
-        {style[0].toUpperCase() + style.slice(1)}
-      </Text>
-    </Pressable>
+        <Chip icon="folder.fill" fill={palette.folder} size={34} />
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={{ color: palette.ink, fontSize: 16, fontWeight: "600" }}>Ideas</Text>
+          <Text style={{ color: palette.ink3, fontSize: 14 }}>A place to start.</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function PaletteChoices({ value, onChange }: { value?: string; onChange: (id: string) => void }) {
+  const palette = usePalette();
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginHorizontal: 20 }}>
+      {APPEARANCE_PRESETS.map((preset) => {
+        const selected = value === preset.id;
+        return (
+          <Pressable
+            key={preset.id}
+            accessibilityRole="radio"
+            accessibilityLabel={preset.name}
+            accessibilityState={{ checked: selected }}
+            onPress={() => onChange(preset.id)}
+            style={({ pressed }) => ({
+              width: "47%",
+              flexGrow: 1,
+              borderWidth: 2,
+              borderColor: selected ? palette.accent : "transparent",
+              borderRadius: 14,
+              padding: 4,
+              opacity: pressed ? 0.65 : 1,
+            })}
+          >
+            <View
+              style={{ padding: 16, borderRadius: 9, backgroundColor: preset.background, gap: 10 }}
+            >
+              <Text style={{ fontSize: 24, fontWeight: "600", color: preset.foreground }}>Aa</Text>
+              <View
+                style={{ height: 5, width: "65%", borderRadius: 3, backgroundColor: preset.accent }}
+              />
+            </View>
+            <Text
+              style={{
+                color: palette.ink,
+                fontSize: 14,
+                textAlign: "center",
+                paddingVertical: 8,
+                fontWeight: selected ? "600" : "400",
+              }}
+            >
+              {preset.name}
+              {selected ? " ✓" : ""}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }

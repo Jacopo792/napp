@@ -118,7 +118,7 @@ export function ProfileHero() {
 
   const name = profile?.nickname || session.email.split("@")[0];
   return (
-    <View style={{ alignItems: "center", paddingTop: 8, paddingBottom: 30, gap: 6 }}>
+    <View style={{ alignItems: "center", paddingTop: 8, paddingBottom: 24, gap: 8 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={profile?.avatarObject ? "Change Profile Photo" : "Add Profile Photo"}
@@ -136,7 +136,7 @@ export function ProfileHero() {
             avatarObject: profile?.avatarObject ?? null,
           }}
           email={session.email}
-          size={116}
+          size={88}
           ring={palette.dark ? "#ffffff33" : "#00000014"}
         />
         <View
@@ -160,10 +160,9 @@ export function ProfileHero() {
       <Text
         style={{
           color: palette.ink,
-          fontFamily: "Iowan Old Style",
-          fontSize: 30,
+          fontSize: 24,
           fontWeight: "600",
-          marginTop: 14,
+          marginTop: 8,
           textAlign: "center",
           paddingHorizontal: 20,
         }}
@@ -171,7 +170,12 @@ export function ProfileHero() {
       >
         {name}
       </Text>
-      <Text style={{ color: palette.ink3, fontSize: 15, fontWeight: "500" }}>{session.email}</Text>
+      <Text style={{ color: palette.ink3, fontSize: 15, fontWeight: "400" }} numberOfLines={1}>
+        {session.email}
+      </Text>
+      <Pressable accessibilityRole="button" onPress={offer} disabled={!profile || busy}>
+        <Text style={{ color: palette.accent, fontSize: 15, padding: 8 }}>Change photo</Text>
+      </Pressable>
     </View>
   );
 }

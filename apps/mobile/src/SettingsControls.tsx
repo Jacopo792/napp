@@ -12,37 +12,35 @@ import {
 import { Stack } from "expo-router";
 import { SymbolView } from "./icons";
 import { quiet } from "./Grouped";
-import { Backdrop } from "./Backdrop";
 import { usePalette } from "./archive";
 
 export function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
+  const palette = usePalette();
+  const backgroundColor = palette.dark ? "#000000" : "#f2f2f7";
   return (
     <>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen options={{ title, contentStyle: { backgroundColor } }} />
       <ScrollView
+        style={{ backgroundColor }}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: 36 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 36 }}
       >
         {children}
       </ScrollView>
-      <Backdrop />
     </>
   );
 }
 
-/* Settings is a page, not a stack of cards (direction C, chosen by Jacopo on
-   17 October 2026): rows ruled with a hairline straight on the ground, under
-   a small italic heading in the note's own serif, the value each one holds
-   set to the right in the quieter ink. */
-
-export const SERIF = "Iowan Old Style";
+/* Inset groups, system typography and named choices, like iOS Settings. */
 
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const palette = usePalette();
   return (
     <View style={styles.section}>
       {title ? <Text style={[styles.heading, { color: palette.ink3 }]}>{title}</Text> : null}
-      <View style={[styles.rule, { borderTopColor: palette.rule }]}>{children}</View>
+      <View style={[styles.group, { backgroundColor: palette.dark ? "#1c1c1e" : "#ffffff" }]}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -195,8 +193,10 @@ export function Swatches({
   items,
   value,
   onChange,
+  labelled = false,
 }: {
   items: { id: string; label: string; ground: string; dot?: string }[];
+  labelled?: boolean;
   value: string | undefined;
   onChange: (id: string) => void;
 }) {
@@ -214,6 +214,14 @@ export function Swatches({
             onPress={() => onChange(item.id)}
             style={({ pressed }) => [
               styles.swatch,
+              labelled && {
+                width: "30%",
+                flexGrow: 1,
+                alignItems: "center",
+                gap: 6,
+                paddingVertical: 10,
+                borderRadius: 12,
+              },
               { borderColor: on ? palette.accent : "transparent" },
               pressed && { transform: [{ scale: 0.92 }] },
             ]}
@@ -226,6 +234,15 @@ export function Swatches({
             >
               {item.dot ? <View style={[styles.swatchDot, { backgroundColor: item.dot }]} /> : null}
             </View>
+            {labelled ? (
+              <Text
+                style={{ color: palette.ink, fontSize: 13, fontWeight: on ? "600" : "400" }}
+                numberOfLines={1}
+              >
+                {item.label}
+                {on ? " ✓" : ""}
+              </Text>
+            ) : null}
           </Pressable>
         );
       })}
@@ -261,9 +278,9 @@ export async function attempt(action: () => Promise<unknown>) {
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 20, marginBottom: 30 },
-  heading: { fontFamily: SERIF, fontStyle: "italic", fontSize: 16, marginBottom: 6 },
-  rule: { borderTopWidth: StyleSheet.hairlineWidth },
+  section: { marginHorizontal: 20, marginBottom: 24 },
+  heading: { fontSize: 13, fontWeight: "500", marginLeft: 16, marginBottom: 8 },
+  group: { borderRadius: 12, borderCurve: "continuous", overflow: "hidden", paddingHorizontal: 16 },
   line: {
     minHeight: 52,
     paddingVertical: 10,
