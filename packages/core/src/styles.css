@@ -8533,34 +8533,6 @@ body:has(.sidebar-row.is-over) .drag-chip {
   color: var(--ink);
 }
 
-/* A mention is the note's name and one act on it, joined into one chip: the
-   name opens the note at the words, Link makes them a link. */
-.note-mention {
-  display: inline-flex;
-  max-width: 100%;
-}
-
-.note-mention .note-backlink {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.note-mention-link {
-  border: 1px solid var(--rule-soft);
-  border-left: 0;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  padding: 6px 10px;
-  color: var(--accent);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
-.note-mention-link:hover {
-  border-color: var(--rule);
-  background: var(--glass);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .rich-text-content a.note-link {
     transition: none;
