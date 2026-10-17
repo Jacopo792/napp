@@ -5,14 +5,16 @@
   "license": "GPL-3.0-or-later",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --dev-client",
-    "preview": "NAPP_PREVIEW=1 expo start --dev-client --clear",
-    "ios": "expo run:ios",
-    "android": "expo run:android"
+    "editor": "vite build --config editor/vite.config.ts",
+    "start": "pnpm editor && expo start --dev-client",
+    "preview": "NAPP_PREVIEW=1 pnpm editor && NAPP_PREVIEW=1 expo start --dev-client --clear",
+    "ios": "pnpm editor && expo run:ios",
+    "android": "pnpm editor && expo run:android"
   },
   "dependencies": {
     "@notes-app/core": "workspace:*",
     "expo": "~58.0.0",
+    "expo-asset": "~58.0.0",
     "expo-crypto": "~58.0.0",
     "expo-dev-client": "~58.0.0",
     "expo-file-system": "~58.0.0",
@@ -21,10 +23,17 @@
     "expo-status-bar": "~58.0.0",
     "react": "19.3.0",
     "react-native": "0.88.0",
-    "react-native-safe-area-context": "~5.10.1"
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-webview": "14.0.1"
   },
   "devDependencies": {
-    "babel-preset-expo": "~58.0.16"
+    "@tailwindcss/vite": "^4.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "babel-preset-expo": "~58.0.16",
+    "react-dom": "19.3.0",
+    "tailwindcss": "^4.2.1",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^6.0.2"
   },
   "description": "Notes — a shared archive for two",
   "author": "Jacopo792"

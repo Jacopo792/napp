@@ -16,7 +16,9 @@ import {
   type AuthenticationResult,
 } from "@/lib/session";
 import { loadArchive, type ArchiveSnapshot } from "@/lib/supabase";
+import { EMPTY_META } from "@/lib/types";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import { NoteScreen } from "./NoteScreen";
 
 /* ponytail: the three appearance colours as they are, until the derivation in
    applyAppearance is a pure function both interfaces read. */
@@ -118,6 +120,7 @@ function SignIn({ onSession }: { onSession: (session: AppSession) => void }) {
 function Notes({ session }: { session: AppSession }) {
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null);
   const [error, setError] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
   /* Coming back to the foreground is the phone's version of the three signals
      in Notes.tsx: whatever happened while away was never announced, and the
      channel held across a sleep may be listening to nothing. So both are
@@ -153,7 +156,7 @@ function Notes({ session }: { session: AppSession }) {
 
   const notes = useMemo(() => {
     if (!snapshot) return [];
-    const meta = indexOf(snapshot.metas[session.userId] ?? { v: 1, folders: [], notes: [] });
+    const meta = indexOf(snapshot.metas[session.userId] ?? EMPTY_META);
     return snapshot.entries
       .map((entry) => entry.note)
       .filter((note) => (note.ownerId ?? session.userId) === session.userId)
@@ -165,24 +168,43 @@ function Notes({ session }: { session: AppSession }) {
 
   if (error && !snapshot) return <Text style={styles.error}>{error}</Text>;
 
+  const self = snapshot?.members.find((member) => member.isSelf);
+  const lockedBy = open
+    ? snapshot && indexOf(snapshot.metas[session.userId] ?? EMPTY_META).byNote.get(open)?.lockedBy
+    : undefined;
+
+  /* The list stays mounted under an open note, so coming back finds it where
+     it was left. */
   return (
-    <FlatList
-      data={notes}
-      keyExtractor={(note) => note.id}
-      contentInsetAdjustmentBehavior="automatic"
-      ItemSeparatorComponent={() => <View style={styles.rule} />}
-      renderItem={({ item }) => (
-        <View style={styles.row}>
-          <Text style={styles.title} numberOfLines={1}>
-            {item.title || "Untitled"}
-          </Text>
-          <Text style={styles.preview} numberOfLines={1}>
-            <Text style={styles.stamp}>{formatStamp(item.updatedAt)} </Text>
-            {derivedOf(item).preview}
-          </Text>
-        </View>
-      )}
-    />
+    <View style={styles.screen}>
+      <FlatList
+        data={notes}
+        keyExtractor={(note) => note.id}
+        contentInsetAdjustmentBehavior="automatic"
+        ItemSeparatorComponent={() => <View style={styles.rule} />}
+        renderItem={({ item }) => (
+          <Pressable style={styles.row} onPress={() => setOpen(item.id)}>
+            <Text style={styles.title} numberOfLines={1}>
+              {item.title || "Untitled"}
+            </Text>
+            <Text style={styles.preview} numberOfLines={1}>
+              <Text style={styles.stamp}>{formatStamp(item.updatedAt)} </Text>
+              {derivedOf(item).preview}
+            </Text>
+          </Pressable>
+        )}
+      />
+      {open ? (
+        <NoteScreen
+          key={open}
+          session={session}
+          noteId={open}
+          name={self?.nickname || session.email.split("@")[0] || "Someone"}
+          canEdit={!lockedBy || lockedBy === session.userId}
+          onBack={() => setOpen(null)}
+        />
+      ) : null}
+    </View>
   );
 }
 

@@ -1,8 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx", "app.config.ts"],
+  "include": [
+    "index.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "editor/**/*.ts",
+    "editor/**/*.tsx",
+    "app.config.ts"
+  ],
   "compilerOptions": {
-    "lib": ["ES2022", "DOM"],
-    "types": ["../../packages/core/node_modules/vite/client"]
+    "types": [
+      "../../packages/core/node_modules/vite/client",
+      "../../packages/core/node_modules/@types/node"
+    ]
   }
 }

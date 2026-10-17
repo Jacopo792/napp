@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/App.tsx",
     "./platform": "./src/platform.ts",
+    "./hosted": "./src/screens/HostedNote.tsx",
     "./styles.css": "./src/styles.css",
     "./editor/*": "./src/features/editor/lib/*"
   },

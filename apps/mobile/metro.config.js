@@ -24,6 +24,9 @@ const MOCKED = [
 ];
 
 config.watchFolders = [root];
+/* The note page, built by `pnpm editor` into one HTML file, travels as an
+   asset and is read as text by the note screen. */
+config.resolver.assetExts.push("html");
 config.resolver.resolveRequest = (context, name, platform) => {
   if (name.startsWith("@/")) {
     const inside = name.slice(2);
