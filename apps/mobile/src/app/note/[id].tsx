@@ -35,6 +35,9 @@ import { useHostedEditor } from "../../useHostedEditor";
 import { useTextPrompt } from "../../TextPrompt";
 import { attempt } from "../../SettingsControls";
 import { useArchive, usePalette } from "../../archive";
+import { Avatar, Faces } from "../../Avatar";
+import { NoteSheet } from "../../NoteSheet";
+import { Group, Row } from "../../Grouped";
 
 /* Built by `pnpm editor` before Metro runs; read once per launch. */
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -52,7 +55,7 @@ export default function Note() {
   const headerHeight = nativeHeaderHeight + (finding ? 56 : 0);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<SearchStatus>({ current: 0, total: 0 });
-  const [panel, setPanel] = useState<"history" | "comments" | null>(null);
+  const [panel, setPanel] = useState<"history" | "comments" | "people" | null>(null);
   const [anchor, setAnchor] = useState<{ threadId: string; quote: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const prompt = useTextPrompt();
@@ -60,7 +63,9 @@ export default function Note() {
   useEffect(() => {
     if (openComments === "1") setPanel("comments");
   }, [openComments]);
-  const { session, snapshot, metaOf, act, preferences, setOpenNote, refresh } = useArchive();
+  const { session, snapshot, metaOf, act, preferences, setOpenNote, refresh, facesOf } =
+    useArchive();
+  const faces = facesOf(id);
   const palette = usePalette();
   const router = useRouter();
   const [html, setHtml] = useState<string | null>(null);
@@ -263,7 +268,28 @@ export default function Note() {
 
   return (
     <>
-      <Stack.Screen options={{ title: status, headerLargeTitle: false }} />
+      {/* Who else has a hand in this note stands in the bar's middle, as the
+          collaborators do in Notes; a status the reader must know takes it. */}
+      <Stack.Screen
+        options={{
+          title: status,
+          headerLargeTitle: false,
+          contentStyle: { backgroundColor: palette.canvas },
+          headerTitle:
+            status || !faces.length
+              ? undefined
+              : () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="People in this note"
+                    hitSlop={10}
+                    onPress={() => setPanel("people")}
+                  >
+                    <Faces faces={faces} size={28} ring={palette.canvas} />
+                  </Pressable>
+                ),
+        }}
+      />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon={icon("ellipsis")}>
           <Stack.Toolbar.Menu icon={icon("textformat")}>
@@ -301,13 +327,6 @@ export default function Note() {
           </Stack.Toolbar.MenuAction>
           <Stack.Toolbar.MenuAction icon={icon("magnifyingglass")} onPress={() => setFinding(true)}>
             Find in Note
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon={icon("photo")}
-            disabled={!canEdit || busy}
-            onPress={() => attach(true)}
-          >
-            Insert Image
           </Stack.Toolbar.MenuAction>
           <Stack.Toolbar.MenuAction
             icon={icon("paperclip")}
@@ -417,10 +436,10 @@ export default function Note() {
         />
         <Stack.Toolbar.Spacer />
         <Stack.Toolbar.Button
-          icon={icon("paperclip")}
+          icon={icon("photo")}
           disabled={!canEdit || busy}
-          onPress={() => attach(false)}
-          accessibilityLabel="Attach File"
+          onPress={() => attach(true)}
+          accessibilityLabel="Insert Image"
         />
         <Stack.Toolbar.Button
           icon={icon("bubble.left.and.bubble.right")}
@@ -447,6 +466,22 @@ export default function Note() {
             setAnchor(null);
           }}
         />
+      ) : null}
+      {panel === "people" ? (
+        <NoteSheet title="People" onClose={() => setPanel(null)}>
+          <Group>
+            {faces.map((face, at) => (
+              <Row
+                key={face.userId}
+                leading={<Avatar face={face} size={40} ring={palette.paper} />}
+                label={face.name}
+                note={face.online ? "In this note now" : "Has written here"}
+                chevron={false}
+                last={at === faces.length - 1}
+              />
+            ))}
+          </Group>
+        </NoteSheet>
       ) : null}
       {finding ? (
         <View
@@ -514,7 +549,7 @@ export default function Note() {
           onLoadStart={onLoadStart}
           onLoadEnd={updatePage}
           onError={(event) => setPageError(event.nativeEvent.description)}
-          style={[styles.page, { backgroundColor: palette.page }]}
+          style={[styles.page, { backgroundColor: palette.canvas }]}
           source={source}
           originWhitelist={["*"]}
           onMessage={(event) => void onMessage(event)}

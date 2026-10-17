@@ -1,29 +1,108 @@
-/* The inset grouped rows Notes and Settings are made of: a rounded group on the
- * page, rows with a glyph, a name, a count and a chevron, and a hairline that
- * starts where the words do. A row lights up under the finger the way a system
- * row does — instantly in, eased out — which is the press, and the push that
- * follows is the system's. */
+/* The grouped cards Folders and Settings are made of: a rounded card standing
+ * on the reader's ground — translucent over their wallpaper, solid over the
+ * page — and rows that lead with a round chip, a name and a count. A chip is
+ * filled when the row is a place of its own (the archive, the bin, a colour)
+ * and a quiet disc when it is one of many, the way Revolut tells a category
+ * from a line. A row lights up under the finger instantly and lets go eased. */
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type PressableProps } from "react-native";
 import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
-import { usePalette } from "./archive";
+import { usePalette, type Palette } from "./archive";
+import { useCard } from "./Backdrop";
+import { trashGround, useIconStyle } from "./theme";
 
-export function Group({ title, children }: { title?: string; children: ReactNode }) {
+export const CARD_RADIUS = 28;
+
+export function Group({
+  title,
+  leading,
+  children,
+}: {
+  title?: string;
+  /** Drawn before the title: whose group this is. */
+  leading?: ReactNode;
+  children: ReactNode;
+}) {
   const palette = usePalette();
+  const { card } = useCard();
   return (
     <View style={styles.section}>
-      {title ? <Text style={[styles.heading, { color: palette.ink }]}>{title}</Text> : null}
-      <View style={[styles.group, { backgroundColor: palette.paper }]}>{children}</View>
+      {title ? (
+        <View style={styles.header}>
+          {leading}
+          <Text style={[styles.heading, { color: palette.ink }]} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+      ) : null}
+      <View style={[styles.group, { backgroundColor: card }]}>{children}</View>
+    </View>
+  );
+}
+
+/** A disc of the ink at low strength: present on any ground, loud on none. */
+export const quiet = (palette: Palette) => (palette.dark ? "#ffffff1a" : "#0000000f");
+
+export function Chip({
+  icon,
+  tint,
+  fill,
+  size = 34,
+}: {
+  icon?: SFSymbol;
+  tint?: string;
+  fill?: string;
+  size?: number;
+}) {
+  const palette = usePalette();
+  const style = useIconStyle();
+  const hex = !!fill && /^#[\da-f]{6}$/i.test(fill);
+  /* Mono takes the colour off every glyph but the bin's. A swatch — a chip
+     with no glyph or only the tick of the chosen one — is the colour itself
+     and keeps it. */
+  if (style === "mono" && icon && icon !== "checkmark") {
+    tint = fill === trashGround || tint === palette.danger ? palette.danger : palette.ink;
+    fill = undefined;
+  }
+  const tinted = style === "tinted" && hex;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: tinted ? `${fill}33` : (fill ?? quiet(palette)),
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {icon ? (
+        <SymbolView
+          name={icon}
+          size={size * 0.5}
+          weight="semibold"
+          tintColor={tinted ? fill : fill ? "#ffffff" : (tint ?? palette.ink)}
+        />
+      ) : null}
     </View>
   );
 }
 
 interface RowProps extends Omit<PressableProps, "style" | "children"> {
-  icon: SFSymbol;
+  icon?: SFSymbol;
   label: string;
+  /** A second line under the name. */
+  note?: string;
   detail?: string | number;
+  /** The glyph's colour on a quiet disc. */
   tint?: string;
+  /** A filled chip: the glyph goes white on it. */
+  fill?: string;
+  /** In place of the chip: a face, say. */
+  leading?: ReactNode;
+  /** A bare glyph, no disc — a radio's circle and tick. */
+  plain?: boolean;
   depth?: number;
   chevron?: boolean;
   destructive?: boolean;
@@ -34,8 +113,12 @@ interface RowProps extends Omit<PressableProps, "style" | "children"> {
 export function Row({
   icon,
   label,
+  note,
   detail,
   tint,
+  fill,
+  leading,
+  plain,
   depth = 0,
   chevron = true,
   destructive,
@@ -43,24 +126,61 @@ export function Row({
   ...rest
 }: RowProps) {
   const palette = usePalette();
-  const colour = destructive ? palette.danger : palette.ink;
   return (
     <Pressable
       {...rest}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.surface }]}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: quiet(palette) }]}
     >
-      <View style={[styles.lead, { paddingLeft: 16 + depth * 22, width: 54 + depth * 22 }]}>
-        <SymbolView name={icon} tintColor={tint ?? palette.accent} size={22} />
+      <RowFace
+        {...{ icon, label, note, detail, tint, fill, leading, plain, depth, chevron, last }}
+        destructive={destructive}
+      />
+    </Pressable>
+  );
+}
+
+/** A row's insides, shared by `Row` and the folder rows that also swipe. */
+export function RowFace({
+  icon,
+  label,
+  note,
+  detail,
+  tint,
+  fill,
+  leading,
+  plain,
+  depth = 0,
+  chevron = true,
+  destructive,
+  last,
+}: Omit<RowProps, keyof PressableProps>) {
+  const palette = usePalette();
+  const colour = destructive ? palette.danger : palette.ink;
+  return (
+    <View style={styles.face}>
+      <View style={[styles.lead, { paddingLeft: 14 + depth * 20 }]}>
+        {leading ??
+          (plain ? (
+            <View style={{ width: 34, alignItems: "center" }}>
+              {icon ? (
+                <SymbolView name={icon} tintColor={tint ?? palette.accent} size={22} />
+              ) : null}
+            </View>
+          ) : (
+            <Chip icon={icon} tint={destructive ? palette.danger : tint} fill={fill} />
+          ))}
       </View>
-      <View
-        style={[
-          styles.body,
-          !last && { borderBottomColor: palette.rule, borderBottomWidth: StyleSheet.hairlineWidth },
-        ]}
-      >
-        <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
-          {label}
-        </Text>
+      <View style={[styles.body]}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
+            {label}
+          </Text>
+          {note ? (
+            <Text style={[styles.note, { color: palette.ink3 }]} numberOfLines={2}>
+              {note}
+            </Text>
+          ) : null}
+        </View>
         {detail !== undefined ? (
           <Text numberOfLines={1} style={[styles.detail, { color: palette.ink3 }]}>
             {detail}
@@ -70,24 +190,33 @@ export function Row({
           <SymbolView name="chevron.right" tintColor={palette.ink4} size={13} weight="semibold" />
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 16, marginBottom: 24 },
-  heading: { fontSize: 22, fontWeight: "700", marginBottom: 8, marginLeft: 4 },
-  group: { borderRadius: 26, overflow: "hidden" },
-  row: { flexDirection: "row", alignItems: "center", minHeight: 50 },
-  lead: { width: 54, alignItems: "flex-start" },
+  section: { marginHorizontal: 16, marginBottom: 30 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, marginLeft: 4 },
+  heading: { flexShrink: 1, fontSize: 20, fontWeight: "700", letterSpacing: -0.4 },
+  group: {
+    borderRadius: CARD_RADIUS,
+    borderCurve: "continuous",
+    overflow: "hidden",
+    paddingVertical: 4,
+  },
+  row: {},
+  face: { flexDirection: "row", alignItems: "center", minHeight: 64 },
+  lead: { paddingRight: 14 },
   body: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "stretch",
-    paddingRight: 16,
+    paddingVertical: 10,
+    paddingRight: 18,
     gap: 8,
   },
-  label: { flex: 1, fontSize: 17 },
-  detail: { fontSize: 17, flexShrink: 1, maxWidth: "55%" },
+  label: { fontSize: 17, fontWeight: "600", letterSpacing: -0.2 },
+  note: { fontSize: 15 },
+  detail: { fontSize: 17, flexShrink: 1, maxWidth: "50%" },
 });

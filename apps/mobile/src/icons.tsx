@@ -12,8 +12,10 @@ import {
 
 const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   folder: "folder",
-  paperclip: "attach_file",
+  "folder.fill": "folder",
+  "camera.fill": "photo_camera",
   photo: "image",
+  paperclip: "attach_file",
   "square.and.arrow.up": "ios_share",
   "bubble.left.and.bubble.right": "forum",
   magnifyingglass: "search",
@@ -49,8 +51,11 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   plus: "add",
   "book.closed": "book",
   checkmark: "check",
+  "checkmark.circle.fill": "check_circle",
   circle: "radio_button_unchecked",
   "circle.fill": "circle",
+  "circle.lefthalf.filled": "contrast",
+  eye: "visibility",
   "chevron.right": "chevron_right",
   "note.text": "description",
   clock: "schedule",

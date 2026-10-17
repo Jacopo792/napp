@@ -8,7 +8,9 @@ import { createNote } from "@/lib/supabase";
 import { useArchive } from "./archive";
 import { attempt } from "./SettingsControls";
 
-export function useCreateNote(folderId: string | null = null) {
+/** A new note in `owner`'s scope — anybody's, since a scope is a label and
+ *  every member writes every one. */
+export function useCreateNote(folderId: string | null = null, owner?: string) {
   const { session, refresh, snapshot } = useArchive();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -38,7 +40,7 @@ export function useCreateNote(folderId: string | null = null) {
             legacyBody: null,
             photo: null,
             cover: null,
-            ownerId: session.userId,
+            ownerId: owner ?? session.userId,
             createdAt: now,
             updatedAt: now,
           },
@@ -65,7 +67,7 @@ export function useCreateNote(folderId: string | null = null) {
             legacyBody: null,
             photo: null,
             cover: null,
-            ownerId: session.userId,
+            ownerId: owner ?? session.userId,
             createdAt: now,
             updatedAt: now,
           },

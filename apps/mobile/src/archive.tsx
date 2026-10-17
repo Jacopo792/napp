@@ -40,6 +40,8 @@ import {
   type Presence,
 } from "@/lib/presence";
 import { EMPTY_META, type Meta } from "@/lib/types";
+import { loadNoteAuthors } from "@/lib/history";
+import type { Face } from "./Avatar";
 
 interface Archive {
   session: AppSession;
@@ -59,6 +61,9 @@ interface Archive {
   refresh: () => void;
   present: Presence;
   setOpenNote: (id: string | null) => void;
+  /** The other members who have written in a note or are in it now — empty
+   *  when the reader has turned "Collaborators in notes" off. */
+  facesOf: (noteId: string) => Face[];
 }
 
 const Context = createContext<Archive | null>(null);
@@ -123,7 +128,18 @@ export function ArchiveProvider({
     void pullAccountPreferences(session).then(adopt, (reason) => live && setError(String(reason)));
     const channel = subscribeToAccountPreferences(session, adopt);
     void loadSpaces(session).then(
-      (next) => live && setSpaces(next),
+      (next) => {
+        if (!live) return;
+        /* A book is written at a desk: the phone lists only notes archives, and
+         one that opens on a book goes to the first of those instead. The
+         account's first archive is always notes, so there is one. */
+        const notes = next.filter((space) => space.kind !== "document");
+        setSpaces(notes);
+        if (notes[0] && !notes.some((space) => space.archiveId === session.archiveId))
+          void chooseArchive(session, notes[0].archiveId).then(onSession, (reason) =>
+            setError(String(reason)),
+          );
+      },
       (reason) => live && setError(String(reason)),
     );
     void loadProfile(session).then(
@@ -134,7 +150,7 @@ export function ArchiveProvider({
       live = false;
       if (channel) void unsubscribeFromArchive(channel);
     };
-  }, [session, wake]);
+  }, [session, wake, onSession]);
 
   const updatePreferences = useCallback(
     (patch: Partial<AccountPreferences>) => {
@@ -214,6 +230,39 @@ export function ArchiveProvider({
     };
   }, [session, wake]);
 
+  /* Who wrote where is read on opening and on every wake, not on every save:
+     a version is written per ten-minute stretch, so a save is not news. */
+  const [authors, setAuthors] = useState<Map<string, Set<string>>>(new Map());
+  useEffect(() => {
+    let live = true;
+    void loadNoteAuthors(session).then(
+      (next) => live && setAuthors(next),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [session, wake]);
+  const facesOf = useCallback(
+    (noteId: string): Face[] =>
+      !preferences.collaborators
+        ? []
+        : (snapshot?.members ?? [])
+            .filter(
+              (member) =>
+                !member.isSelf &&
+                (present.get(member.userId) === noteId || authors.get(noteId)?.has(member.userId)),
+            )
+            .map((member) => ({
+              userId: member.userId,
+              name: member.nickname || "Member",
+              avatarObject: member.avatarObject,
+              online: present.get(member.userId) === noteId,
+            }))
+            .sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online))),
+    [snapshot, present, authors, preferences.collaborators],
+  );
+
   const metaOf = useCallback((owner: string) => snapshot?.metas[owner] ?? EMPTY_META, [snapshot]);
 
   /* A refusal reads the archive again rather than leaving a list the archive
@@ -261,6 +310,7 @@ export function ArchiveProvider({
       refresh,
       present,
       setOpenNote,
+      facesOf,
     }),
     [
       session,
@@ -279,6 +329,7 @@ export function ArchiveProvider({
       refresh,
       present,
       setOpenNote,
+      facesOf,
     ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
@@ -286,7 +337,11 @@ export function ArchiveProvider({
 
 export interface Palette {
   dark: boolean;
+  /** The ground the cards stand on: the page, taken most of the way to black
+   *  in the dark, so a card reads as an object rather than a lighter grey. */
   page: string;
+  /** The page as the editor paints it — the note's own ground. */
+  canvas: string;
   paper: string;
   surface: string;
   ink: string;
@@ -311,8 +366,9 @@ export function usePalette(): Palette {
     const t = appearanceTokens(appearance, dark);
     return {
       dark,
-      page: t["--page"],
-      paper: t["--paper"],
+      page: dark ? deepen(t["--page"], 0.55) : t["--page"],
+      canvas: t["--page"],
+      paper: dark ? deepen(t["--paper"], 0.2) : t["--paper"],
       surface: t["--surface"],
       ink: t["--ink"],
       ink2: t["--ink-2"],
@@ -325,4 +381,18 @@ export function usePalette(): Palette {
       folder: t["--folder-tint"] ?? t["--accent"],
     };
   }, [appearance, system]);
+}
+
+/** A colour taken `amount` of the way to black. */
+function deepen(hex: string, amount: number): string {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+  if (!match) return hex;
+  return `#${match
+    .slice(1)
+    .map((part) =>
+      Math.round(parseInt(part, 16) * (1 - amount))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }

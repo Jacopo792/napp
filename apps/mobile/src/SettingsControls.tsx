@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { SymbolView } from "./icons";
-import { Row } from "./Grouped";
+import { Chip, Row } from "./Grouped";
+import type { SFSymbol } from "expo-symbols";
+import { Backdrop } from "./Backdrop";
 import { usePalette } from "./archive";
 
 export function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
@@ -15,24 +17,29 @@ export function SettingsPage({ title, children }: { title: string; children: Rea
       >
         {children}
       </ScrollView>
+      <Backdrop />
     </>
   );
 }
 
 export function Toggle({
   label,
+  icon,
   value,
   onChange,
   disabled,
 }: {
   label: string;
+  /** A chip before the name, when the rows around it carry one. */
+  icon?: SFSymbol;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
   const palette = usePalette();
   return (
-    <View style={[styles.toggle, { borderBottomColor: palette.rule }]}>
+    <View style={[styles.toggle, icon && { paddingLeft: 14 }, { borderBottomColor: palette.rule }]}>
+      {icon ? <Chip icon={icon} /> : null}
       <Text style={[styles.label, { color: palette.ink }]}>{label}</Text>
       <Switch
         accessibilityLabel={label}
@@ -60,6 +67,7 @@ export function Choice({
       icon={selected ? "checkmark" : "circle"}
       label={label}
       tint={selected ? palette.accent : palette.ink4}
+      plain
       chevron={false}
       onPress={onPress}
       accessibilityRole="radio"
@@ -97,13 +105,13 @@ export async function attempt(action: () => Promise<unknown>) {
 
 const styles = StyleSheet.create({
   toggle: {
-    minHeight: 54,
+    minHeight: 60,
     paddingHorizontal: 18,
     paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  label: { flex: 1, fontSize: 17 },
+  label: { flex: 1, fontSize: 17, fontWeight: "600", letterSpacing: -0.2 },
 });

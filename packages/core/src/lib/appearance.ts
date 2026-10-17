@@ -81,7 +81,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   frosted: false,
 };
 
-/* Seventeen starting points, each a ground, an ink and one colour to act with.
+/* Eighteen starting points, each a ground, an ink and one colour to act with.
    Every ground carries a little of its accent's hue — a palette whose ground
    is neutral grey reads as one colour dropped onto a grey app — and every
    accent is a colour somebody would choose on purpose, not a tint of the
@@ -117,6 +117,17 @@ export const APPEARANCE_PRESETS = [
     accent: "#2f6fd6",
     background: "#f8f5ee",
     foreground: "#28241e",
+  },
+  /* Ink: a warm black, cream to write in and one terracotta to act with —
+     a notebook at night. The phone darkens its ground further, so cards of
+     paper stand on it. */
+  {
+    id: "ink",
+    name: "Ink",
+    theme: "dark" as const,
+    accent: "#c4643f",
+    background: "#1f1c18",
+    foreground: "#efe7da",
   },
   {
     id: "midnight",

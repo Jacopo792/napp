@@ -122,12 +122,18 @@ export async function saveProfile(session: AppSession, profile: Profile): Promis
   fail(result.error);
 }
 
-export async function uploadAvatar(session: AppSession, file: Blob): Promise<string> {
-  const objectId = crypto.randomUUID();
+/** The phone hands bytes and its own id: Hermes has no `crypto.randomUUID`
+ *  and React Native's Blob cannot be built from an ArrayBuffer. */
+export async function uploadAvatar(
+  session: AppSession,
+  file: Blob | ArrayBuffer,
+  contentType = file instanceof Blob ? file.type : "",
+  objectId: string = crypto.randomUUID(),
+): Promise<string> {
   const result = await supabase.storage
     .from(AVATAR_BUCKET)
     .upload(`${session.userId}/${objectId}`, file, {
-      contentType: file.type || "image/webp",
+      contentType: contentType || "image/webp",
       upsert: false,
     });
   fail(result.error);

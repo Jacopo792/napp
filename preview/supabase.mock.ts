@@ -250,7 +250,14 @@ export async function downloadObject(
 }
 
 export async function uploadObjectBytes(session: AppSession, objectId: string, data: Blob | ArrayBuffer, type = "application/octet-stream") {
-  return uploadObject(session, objectId, data instanceof Blob ? data : new Blob([data], { type }));
+  /* React Native cannot build a Blob from bytes; the phone's own copy of what
+     it uploaded is already cached, so the preview only has to hold a stand-in. */
+  if (!(data instanceof Blob)) {
+    await sleep(160);
+    objects.set(objectId, { arrayBuffer: async () => data, type } as unknown as Blob);
+    return;
+  }
+  return uploadObject(session, objectId, data);
 }
 export const uploadImage = uploadObject;
 
@@ -268,10 +275,14 @@ export async function saveProfile(_session: AppSession, next: Profile): Promise<
   profile = { ...next };
 }
 
-export async function uploadAvatar(_session: AppSession, file: Blob): Promise<string> {
+export async function uploadAvatar(
+  _session: AppSession,
+  file: Blob | ArrayBuffer,
+  _contentType?: string,
+  objectId: string = crypto.randomUUID(),
+): Promise<string> {
   await sleep(240);
-  const objectId = crypto.randomUUID();
-  avatars.set(objectId, file);
+  avatars.set(objectId, file as Blob);
   return objectId;
 }
 

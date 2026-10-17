@@ -130,3 +130,14 @@ export async function loadNamedVersions(session: AppSession) {
       .map((version) => ({ ...version, noteId: note.id, title: note.title })),
   );
 }
+
+export async function loadNoteAuthors(session: AppSession): Promise<Map<string, Set<string>>> {
+  await sleep(60);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return new Map();
+  return new Map(
+    FIXTURE_NOTES.map((note) => [
+      note.id,
+      new Set(seed(note.id).flatMap((version) => version.authorIds)),
+    ]),
+  );
+}

@@ -1,4 +1,5 @@
 import { MenuSurface } from "@/components/MenuSurface";
+import { avatarInitials } from "@/lib/avatarInitials";
 import {
   Archive,
   ArchiveRestore,
@@ -463,17 +464,6 @@ export function NoteContextMenu({
    is the whole difference between a control you understand and four numbers.
    Appearance, reading and account state each get their own clear section. */
 
-/** The letters that stand in for a face nobody has uploaded. */
-function initialsOf(name: string, email: string): string {
-  const source = name.trim() || email.split("@")[0]?.replace(/[._-]+/g, " ") || "";
-  const words = source.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  /* One name, one letter, as Contacts draws it. Two letters of one word —
-     "PR" for Preview — is an abbreviation, not a monogram. */
-  if (words.length === 1) return words[0][0].toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
 export function Avatar({
   url,
   name,
@@ -496,7 +486,7 @@ export function Avatar({
       aria-label={online ? `${name || "Member"} is online` : undefined}
       title={online ? "Online now" : undefined}
     >
-      {url ? <img src={url} alt="" /> : initialsOf(name, email)}
+      {url ? <img src={url} alt="" /> : avatarInitials(name, email)}
     </span>
   );
 }

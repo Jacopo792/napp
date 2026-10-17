@@ -56,7 +56,11 @@ export default function Root() {
                   headerShadowVisible: false,
                   headerTintColor: palette.accent,
                   headerTitleStyle: { color: palette.ink },
-                  headerLargeTitleStyle: { color: palette.ink },
+                  headerLargeTitleStyle: {
+                    color: palette.ink,
+                    fontFamily: "Iowan Old Style",
+                    fontWeight: "700",
+                  },
                   contentStyle: { backgroundColor: palette.page },
                 }}
               />

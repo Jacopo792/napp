@@ -183,3 +183,23 @@ export async function loadNamedVersions(session: AppSession): Promise<NamedVersi
     noteId: row.note_id,
   }));
 }
+
+/** Who has written in each note — the faces a row and a note carry.
+ *  ponytail: the archive's newest 1000 versions; a note last written by two
+ *  hands before that reads as one hand's until it is written in again. */
+export async function loadNoteAuthors(session: AppSession): Promise<Map<string, Set<string>>> {
+  const result = await supabase
+    .from("note_versions")
+    .select("note_id, author_ids")
+    .eq("archive_id", session.archiveId)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  fail(result.error);
+  const authors = new Map<string, Set<string>>();
+  for (const row of (result.data ?? []) as { note_id: string; author_ids: string[] }[]) {
+    const known = authors.get(row.note_id) ?? new Set<string>();
+    for (const id of row.author_ids) known.add(id);
+    authors.set(row.note_id, known);
+  }
+  return authors;
+}

@@ -923,6 +923,35 @@ that transition rather than a second Reanimated page mask. Reanimated still
 owns the row under the finger. The metadata half of every act is
 `lib/noteActs.ts`, shared with the web's `Notes.tsx`.
 
+**The phone's push is Mail's, and that is the one place it leaves the web's
+rule** (Jacopo, 17 October 2026). Right uncovers the bin, left files away; the
+colour is a band attached to the row at full height, and a push past half the
+row arms the act with a tick — letting go there performs it. A short push
+still opens the row on its button, and nothing settles with a bounce. Folder
+rows swipe too: right removes the folder (asks; notes stay), left archives
+every note in its branch (`shelveFolder`). `OPEN` is still the shared number.
+
+**Depth is the reader's picture, never a wash.** The phone darkens the page
+most of the way to black and draws cards solid on it; a wallpaper chosen in
+Appearance is drawn sharp at the top and fades into that ground, Revolut's
+way. Chips are tinted by default and filled on request (Appearance → Icons,
+kept on the device). A held row lifts `NotePreview`, drawn natively from the
+projection — never the WebView. Faces come from `note_versions` authors and
+presence (`facesOf`), gated by Privacy → Show Collaborators.
+
+**Folders shows one member at a time.** The face at the top left is whose
+notes are showing, with the next member's face peeking out behind it, and one
+press turns to them (`WhoseSwitch`): the two faces, each in its own colour,
+trade places without being remounted, the title says whose, and the group
+eases in from the side in place. It stands outside the bar's glass
+(`hidesSharedBackground`); inside it the faces read as a lump. A stacked action sheet and a popover
+were both tried and refused; a double press was considered and is not
+discoverable. That is the You / Partner shelf in the phone's shape; your
+profile is reached from Settings.
+**A book is not on the phone** — writing one is a desk's work. Archives of
+kind `document` are left out of the list, New Archive makes only notes, and a
+phone that opens on a book moves to the first notes archive.
+
 `src/archive.tsx` holds the open archive once for every route: the snapshot,
 roster, Realtime channels, account preferences and the one way metadata changes.
 Folders groups every member's notes under their own name, including the

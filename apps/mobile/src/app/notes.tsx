@@ -10,7 +10,7 @@ import { useToolbarIcon } from "../icons";
  * deletes and archives, the Archive deletes and puts back, the Trash deletes
  * for good and restores. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, SectionList, StyleSheet, Text } from "react-native";
+import { Alert, SectionList, StyleSheet, Text, View } from "react-native";
 import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { fold, formatStamp } from "@/lib/format";
@@ -27,6 +27,10 @@ import { ARCHIVE, entriesInScope, TRASH } from "@/lib/scopes";
 import { deleteNotes } from "@/lib/supabase";
 import { useArchive, usePalette } from "../archive";
 import { SwipeRow, type Act } from "../SwipeRow";
+import { Backdrop } from "../Backdrop";
+import { Faces } from "../Avatar";
+import { NotePreview } from "../NotePreview";
+import { SymbolView } from "../icons";
 import { shelfGround, trashGround } from "../theme";
 import { attempt, Empty } from "../SettingsControls";
 import { useCreateNote } from "../useCreateNote";
@@ -40,13 +44,14 @@ export default function Notes() {
     scope: string;
     title: string;
   }>();
-  const { session, snapshot, metaOf, act, refresh } = useArchive();
+  const { session, snapshot, metaOf, act, refresh, facesOf } = useArchive();
   const palette = usePalette();
   const [query, setQuery] = useState("");
   const meta = metaOf(owner);
   const index = indexOf(meta);
   const { create, creating, importMarkdown } = useCreateNote(
     index.byFolder.has(scope) ? scope : null,
+    owner,
   );
   const [stored, setStored] = useState(() => loadListPreferences(session.archiveId, owner));
   const preferences = preferencesForFolder(stored, scope);
@@ -315,7 +320,7 @@ export default function Notes() {
         <Stack.Toolbar.SearchBarSlot />
         <Stack.Toolbar.Spacer />
         <Stack.Toolbar.Spacer />
-        {owner === session.userId && scope !== TRASH && scope !== ARCHIVE ? (
+        {scope !== TRASH && scope !== ARCHIVE ? (
           <Stack.Toolbar.Button
             icon={icon("square.and.pencil")}
             onPress={create}
@@ -344,24 +349,46 @@ export default function Notes() {
         renderItem={({ item, index: at, section }) => {
           const id = item.note.id;
           const row = index.byNote.get(id);
+          const acts = pair(id);
+          const faces = facesOf(id);
           return (
             <SwipeRow
               href={{ pathname: "/note/[id]", params: { id } }}
-              title={item.note.title || "Untitled"}
-              stamp={formatStamp(item.note.updatedAt)}
-              preview={derivedOf(item.note).preview}
-              pinned={row?.pinned}
-              locked={Boolean(row?.lockedBy)}
-              {...pair(id)}
+              rightward={acts.left}
+              leftward={acts.right}
               menu={menu(id)}
+              preview={<NotePreview note={item.note} faces={faces} />}
               first={at === 0}
               last={at === section.data.length - 1}
               onClaim={() => claim(id)}
               register={(close) => register(id, close)}
-            />
+            >
+              <View style={[styles.text]}>
+                <View style={styles.titleLine}>
+                  <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
+                    {item.note.title || "Untitled"}
+                  </Text>
+                  {row?.lockedBy ? (
+                    <SymbolView name="lock.fill" size={13} tintColor={palette.ink3} />
+                  ) : null}
+                  {row?.pinned ? (
+                    <SymbolView name="pin.fill" size={13} tintColor={palette.accent} />
+                  ) : null}
+                  <View style={{ flex: 1 }} />
+                  <Faces faces={faces} size={22} ring={palette.paper} max={2} />
+                </View>
+                <Text style={[styles.preview, { color: palette.ink3 }]} numberOfLines={1}>
+                  <Text style={{ color: palette.ink2, fontWeight: "500" }}>
+                    {formatStamp(item.note.updatedAt)}{" "}
+                  </Text>
+                  {derivedOf(item.note).preview || "No additional text"}
+                </Text>
+              </View>
+            </SwipeRow>
           );
         }}
       />
+      <Backdrop />
     </>
   );
 }
@@ -370,9 +397,14 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 22,
     fontWeight: "700",
+    letterSpacing: -0.3,
     marginHorizontal: 20,
     marginTop: 20,
     marginBottom: 8,
   },
   count: { fontSize: 13, fontWeight: "500" },
+  text: { paddingVertical: 16, paddingLeft: 20, paddingRight: 18, gap: 5 },
+  titleLine: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 22 },
+  title: { flexShrink: 1, fontSize: 17, fontWeight: "600", letterSpacing: -0.2 },
+  preview: { fontSize: 15 },
 });

@@ -15,6 +15,9 @@ import { platform } from "@/platform";
 import { PRESENCE_PALETTES } from "@/lib/writingPreferences";
 import { useArchive, usePalette } from "../../archive";
 import { Group, Row } from "../../Grouped";
+import { Avatar } from "../../Avatar";
+import { setIconStyle, useIconStyle } from "../../theme";
+import { chooseWallpaper, ProfileHero } from "../../ProfilePhoto";
 import { attempt, Choice, SettingsPage, Status, Toggle } from "../../SettingsControls";
 
 export default function Section() {
@@ -34,6 +37,7 @@ export default function Section() {
     error,
   } = useArchive();
   const palette = usePalette();
+  const iconStyle = useIconStyle();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
@@ -78,8 +82,8 @@ export default function Section() {
       {error ? <Status>{error}</Status> : null}
       {section === "profile" ? (
         <>
-          <Group title="Account">
-            <Row icon="envelope" label={session.email} chevron={false} />
+          <ProfileHero />
+          <Group>
             <Row
               icon="person"
               label="Nickname"
@@ -110,7 +114,7 @@ export default function Section() {
             {spaces.map((space) => (
               <Row
                 key={space.archiveId}
-                icon={space.kind === "document" ? "book.closed" : "folder"}
+                icon="folder"
                 label={space.name}
                 detail={space.archiveId === session.archiveId ? "Current" : space.members.length}
                 disabled={busy}
@@ -171,7 +175,17 @@ export default function Section() {
             {(snapshot?.members ?? []).map((member) => (
               <Row
                 key={member.userId}
-                icon="person.crop.circle"
+                leading={
+                  <Avatar
+                    face={{
+                      userId: member.userId,
+                      name: member.nickname || "Member",
+                      avatarObject: member.avatarObject,
+                    }}
+                    email={member.isSelf ? session.email : undefined}
+                    size={34}
+                  />
+                }
                 label={member.nickname || "Member"}
                 detail={member.isSelf ? "You" : undefined}
                 chevron={false}
@@ -235,6 +249,82 @@ export default function Section() {
         <>
           {section === "appearance" ? (
             <>
+              <Group title="Wallpaper">
+                <Row
+                  icon="photo"
+                  fill={palette.accent}
+                  label={p.appearance.wallpaperObject ? "Change Wallpaper" : "Choose Wallpaper"}
+                  chevron={false}
+                  disabled={busy}
+                  last={!p.appearance.wallpaperObject}
+                  onPress={() =>
+                    void run(async () => {
+                      const objectId = await chooseWallpaper(session);
+                      if (objectId)
+                        update({
+                          appearance: {
+                            ...p.appearance,
+                            wallpaper: true,
+                            wallpaperObject: objectId,
+                          },
+                        });
+                    })
+                  }
+                />
+                {p.appearance.wallpaperObject ? (
+                  <>
+                    <Toggle
+                      icon="eye"
+                      label="Show Wallpaper"
+                      value={p.appearance.wallpaper}
+                      onChange={(wallpaper) =>
+                        update({ appearance: { ...p.appearance, wallpaper } })
+                      }
+                    />
+                    <Row
+                      icon="circle.lefthalf.filled"
+                      label="Blur"
+                      detail={
+                        ["None", "Soft", "Deep"][[0, 8, 20].indexOf(p.appearance.wallpaperBlur)] ??
+                        `${p.appearance.wallpaperBlur}`
+                      }
+                      chevron={false}
+                      onPress={() => {
+                        const steps = [0, 8, 20];
+                        const at = steps.indexOf(p.appearance.wallpaperBlur);
+                        update({
+                          appearance: {
+                            ...p.appearance,
+                            wallpaperBlur: steps[(at + 1) % steps.length],
+                          },
+                        });
+                      }}
+                    />
+                    <Row
+                      icon="trash"
+                      label="Remove Wallpaper"
+                      destructive
+                      chevron={false}
+                      last
+                      onPress={() =>
+                        update({
+                          appearance: { ...p.appearance, wallpaper: false, wallpaperObject: null },
+                        })
+                      }
+                    />
+                  </>
+                ) : null}
+              </Group>
+              <Group title="Icons">
+                {(["mono", "tinted", "filled"] as const).map((style) => (
+                  <Choice
+                    key={style}
+                    label={style[0].toUpperCase() + style.slice(1)}
+                    selected={iconStyle === style}
+                    onPress={() => setIconStyle(style)}
+                  />
+                ))}
+              </Group>
               <Group title="Theme">
                 {(["system", "dark", "light"] as const).map((theme) => (
                   <Choice
@@ -282,8 +372,8 @@ export default function Section() {
                 {SYSTEM_COLOURS.map((colour) => (
                   <Row
                     key={colour.id}
-                    icon={p.appearance.folderColour === colour.id ? "checkmark" : "circle.fill"}
-                    tint={colour.id}
+                    icon={p.appearance.folderColour === colour.id ? "checkmark" : undefined}
+                    fill={colour.id}
                     label={colour.name}
                     chevron={false}
                     onPress={() =>
@@ -345,8 +435,8 @@ export default function Section() {
                 {PRESENCE_PALETTES.map((colour) => (
                   <Row
                     key={colour.id}
-                    icon={p.writing.presencePalette === colour.id ? "checkmark" : "circle.fill"}
-                    tint={colour.color}
+                    icon={p.writing.presencePalette === colour.id ? "checkmark" : undefined}
+                    fill={colour.color}
                     label={colour.name}
                     chevron={false}
                     onPress={() =>
@@ -385,7 +475,7 @@ export default function Section() {
           ) : null}
         </>
       )}
-      <Stack.Screen options={{ headerLargeTitle: true }} />
+      <Stack.Screen options={{ headerLargeTitle: section !== "profile" }} />
     </SettingsPage>
   );
 }
