@@ -7,7 +7,7 @@
  * refresh token: rotating the session is the app's alone, because two
  * clients rotating one refresh token is a reuse Supabase answers by revoking
  * every session in the family — the phone signed out. */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { setAppearance } from "@/lib/appearance";
 import { setAxes } from "@/lib/axes";
 import { setWritingPreferences } from "@/lib/writingPreferences";
@@ -23,7 +23,9 @@ import { supabase } from "@/lib/supabaseClient";
 
 interface Opening {
   session: AppSession;
-  noteId: string;
+  /** Null between notes: the page is the session's, lent to the note in
+   *  front, and shows nothing while nobody holds it. */
+  noteId: string | null;
   name: string;
   canEdit: boolean;
   accessToken: string | null;
@@ -31,10 +33,13 @@ interface Opening {
   headerHeight: number;
 }
 
+type Note = Pick<Opening, "noteId" | "canEdit" | "name" | "preferences" | "headerHeight">;
+
 declare global {
   interface Window {
     napp: Opening;
-    nappUpdate: (next: Pick<Opening, "canEdit" | "name" | "preferences" | "headerHeight">) => void;
+    nappUpdate: (next: Note) => void;
+    nappOpen: (next: Note | null) => void;
     nappToken: (accessToken: string) => void;
     nappCommand: (id: string, command: HostedCommand) => void;
     nappFileResult: (id: string, error?: string) => void;
@@ -105,29 +110,39 @@ function Page() {
         post({ kind: "result", id, error: error instanceof Error ? error.message : String(error) }),
     );
   };
-  window.nappUpdate = (next) => {
+  const adopt = (next: Note) => {
     document.documentElement.style.setProperty("--host-top", `${next.headerHeight}px`);
     setAppearance(next.preferences.appearance);
     setAxes(next.preferences.axes);
     setWritingPreferences(next.preferences.writing);
     setOpening((prev) => ({ ...prev, ...next }));
   };
+  window.nappUpdate = adopt;
+  window.nappOpen = (next) => {
+    if (next) adopt(next);
+    else setOpening((prev) => ({ ...prev, noteId: null }));
+  };
+  /* Once `nappOpen` exists, the app may lend the page to a note. */
+  useEffect(() => post({ kind: "page" }), []);
   const { session, noteId, name, canEdit, preferences } = opening;
-  return (
+  /* Keyed by the note: leaving one unmounts it, which parks its document in
+     collab.ts with no awareness, so a note put down is never a note one is in. */
+  return noteId ? (
     <HostedNote
+      key={noteId}
       ref={editor}
-      onOpenNote={(noteId) => post({ kind: "link", noteId })}
-      onOpenLink={() => post({ kind: "linkPrompt" })}
-      onOpenComment={(threadId) => post({ kind: "commentOpen", threadId })}
+      onOpenNote={(target) => post({ kind: "link", noteId, target })}
+      onOpenLink={() => post({ kind: "linkPrompt", noteId })}
+      onOpenComment={(threadId) => post({ kind: "commentOpen", noteId, threadId })}
       session={session}
       noteId={noteId}
       name={name}
       canEdit={canEdit}
       autocorrectOn={preferences.autocorrect}
       collaboratorsVisible={preferences.collaborators}
-      onState={(state) => window.ReactNativeWebView?.postMessage(JSON.stringify(state))}
+      onState={(state) => post({ ...state, noteId })}
     />
-  );
+  ) : null;
 }
 document.documentElement.style.setProperty("--host-top", `${window.napp.headerHeight}px`);
 setAppearance(window.napp.preferences.appearance);

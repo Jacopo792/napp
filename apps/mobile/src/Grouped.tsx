@@ -10,7 +10,7 @@ import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
 import { usePalette, type Palette } from "./archive";
 import { useCard } from "./Backdrop";
-import { trashGround, useIconStyle } from "./theme";
+import { trashGround, useIconStyle, type IconStyle } from "./theme";
 
 export const CARD_RADIUS = 28;
 
@@ -49,14 +49,18 @@ export function Chip({
   tint,
   fill,
   size = 34,
+  look,
 }: {
   icon?: SFSymbol;
   tint?: string;
   fill?: string;
   size?: number;
+  /** Drawn in this style rather than the reader's: the choice in Settings. */
+  look?: IconStyle;
 }) {
   const palette = usePalette();
-  const style = useIconStyle();
+  const chosen = useIconStyle();
+  const style = look ?? chosen;
   const hex = !!fill && /^#[\da-f]{6}$/i.test(fill);
   /* Mono takes the colour off every glyph but the bin's. A swatch — a chip
      with no glyph or only the tick of the chosen one — is the colour itself

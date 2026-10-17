@@ -12,6 +12,7 @@ import { initAppearance } from "@/lib/appearance";
 import { initAxes } from "@/lib/axes";
 import { ArchiveProvider, usePalette } from "../archive";
 import { SignIn } from "../SignIn";
+import { HostedPageProvider } from "../HostedPage";
 
 initAppearance();
 initAxes();
@@ -48,22 +49,24 @@ export default function Root() {
               onSession={setSession}
               onSignedOut={() => setSession(null)}
             >
-              <Stack
-                screenOptions={{
-                  headerLargeTitle: true,
-                  headerTransparent: true,
-                  headerLargeTitleShadowVisible: false,
-                  headerShadowVisible: false,
-                  headerTintColor: palette.accent,
-                  headerTitleStyle: { color: palette.ink },
-                  headerLargeTitleStyle: {
-                    color: palette.ink,
-                    fontFamily: "Iowan Old Style",
-                    fontWeight: "700",
-                  },
-                  contentStyle: { backgroundColor: palette.page },
-                }}
-              />
+              <HostedPageProvider>
+                <Stack
+                  screenOptions={{
+                    headerLargeTitle: true,
+                    headerTransparent: true,
+                    headerLargeTitleShadowVisible: false,
+                    headerShadowVisible: false,
+                    headerTintColor: palette.accent,
+                    headerTitleStyle: { color: palette.ink },
+                    headerLargeTitleStyle: {
+                      color: palette.ink,
+                      fontFamily: "Iowan Old Style",
+                      fontWeight: "700",
+                    },
+                    contentStyle: { backgroundColor: palette.page },
+                  }}
+                />
+              </HostedPageProvider>
             </ArchiveProvider>
           ) : (
             <SignIn onSession={setSession} />

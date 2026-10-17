@@ -54,7 +54,12 @@ export interface PendingInvite {
 /* No pictures to start with: the preview opens on the monograms a member
    without a photo is drawn with, which is the case the interface has to make
    look good on its own. A picture added from Settings still works. */
-const avatars = new Map<string, Blob>();
+/* Kept on the global object, so a hot reload of this module does not forget
+   a picture uploaded a minute ago while the screens still name it. */
+const kept = <T>(name: string, make: () => T): T =>
+  ((globalThis as Record<string, unknown>)[`__nappPreview_${name}`] ??= make()) as T;
+
+const avatars = kept("avatars", () => new Map<string, Blob>());
 
 const JOINED: Record<string, string> = {
   [PREVIEW_U1]: "2026-05-18T09:00:00.000Z",
@@ -90,7 +95,7 @@ interface ArchiveStore {
   notes: Map<string, NoteEntry>;
   metas: Record<string, Meta>;
 }
-const stores = new Map<string, ArchiveStore>();
+const stores = kept("stores", () => new Map<string, ArchiveStore>());
 
 function storeOf(session: AppSession): ArchiveStore {
   const existing = stores.get(session.archiveId);
@@ -162,7 +167,7 @@ export class NoteConflict extends Error {
 
 /** What a new note was made with, for the collaboration mock to seed from —
  *  the server seeds a new document from the row in the same way. */
-export const createdNotes = new Map<string, Note>();
+export const createdNotes = kept("createdNotes", () => new Map<string, Note>());
 
 export async function createNote(
   session: AppSession,
@@ -227,7 +232,7 @@ export async function persistMetaDiff(
 
 /* Storage, in memory. The preview never encrypts, so an object is stored as the
    blob it arrived as and handed straight back. */
-const objects = new Map<string, Blob>();
+const objects = kept("objects", () => new Map<string, Blob>());
 
 export async function uploadObject(
   _session: AppSession,

@@ -13,7 +13,7 @@
  * `--ease-out`, because an overshoot after the hand has decided reads as the
  * list hesitating. */
 import { useEffect, type ReactNode } from "react";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { LayoutAnimation, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -81,6 +81,10 @@ export function SwipeRow(props: Props) {
   const x = useSharedValue(0);
   const start = useSharedValue(0);
   const armed = useSharedValue(false);
+  /* The row's own height, so a row that leaves can close the gap it leaves:
+     the rows below rise with it instead of jumping when the list re-renders. */
+  const height = useSharedValue(0);
+  const closing = useSharedValue(false);
   const released = useSharedValue(true);
   const canRight = Boolean(rightward && !rightward.disabled);
   const canLeft = Boolean(leftward && !leftward.disabled);
@@ -100,8 +104,26 @@ export function SwipeRow(props: Props) {
     }
     thud();
     x.value = withTiming(Math.sign(direction) * screen, travel, (done) => {
-      if (done) scheduleOnRN(chosen.run);
+      if (!done) return;
+      closing.value = true;
+      height.value = withTiming(0, travel, (shut) => {
+        if (shut) scheduleOnRN(leave, chosen.run);
+      });
     });
+  };
+  /* The act removes the row from the list. One that was refused leaves it
+     standing, so it is put back rather than left as a gap of nothing. */
+  const leave = (run: () => void) => {
+    /* What the act takes away with the row — the heading of a group it was
+       the last of — moves on the same curve, natively, rather than jumping. */
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(travel.duration, LayoutAnimation.Types.easeInEaseOut, "opacity"),
+    );
+    run();
+    setTimeout(() => {
+      closing.value = false;
+      x.value = withTiming(0, travel);
+    }, 700);
   };
 
   const pan = usePanGesture({
@@ -149,6 +171,7 @@ export function SwipeRow(props: Props) {
   });
 
   const face = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const frame = useAnimatedStyle(() => (closing.value ? { height: height.value } : {}));
 
   const corners = {
     borderTopLeftRadius: first ? CARD_RADIUS : 0,
@@ -158,7 +181,12 @@ export function SwipeRow(props: Props) {
   };
 
   return (
-    <View style={[styles.frame, bare && { marginHorizontal: 0 }, corners]}>
+    <Animated.View
+      style={[styles.frame, bare && { marginHorizontal: 0 }, corners, frame]}
+      onLayout={(event) => {
+        if (!closing.value) height.value = event.nativeEvent.layout.height;
+      }}
+    >
       {rightward ? (
         <Band edge="left" act={rightward} x={x} width={width} onPress={() => perform(1)} />
       ) : null}
@@ -188,7 +216,7 @@ export function SwipeRow(props: Props) {
           </Link>
         </Animated.View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 }
 

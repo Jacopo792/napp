@@ -42,11 +42,23 @@ export interface AccountFlags {
   whatsNewSeen: string;
 }
 
+/** How the phone looks, kept apart from how the computer looks. A phone in
+ *  the hand and a window on a desk are read in different light, so changing
+ *  the wallpaper on one must not change it on the other (Jacopo, 17 October
+ *  2026). Still the account's, so a second phone finds it. Absent until the
+ *  phone first changes something; until then it wears the computer's. */
+export interface PhoneLook {
+  appearance?: Appearance;
+  axes?: Axes;
+}
+
 export interface AccountPreferences extends AccountFlags {
   appearance: Appearance;
   axes: Axes;
   writing: WritingPreferences;
   remarksSeen: RemarksSeen;
+  /** Carried through by every client, read only by the phone. */
+  phone?: PhoneLook;
 }
 
 /**
@@ -127,8 +139,9 @@ export function accountPreferences(
   writing: WritingPreferences,
   flags: AccountFlags,
   remarksSeen: RemarksSeen,
+  phone?: PhoneLook,
 ): AccountPreferences {
-  return { appearance, axes, writing, remarksSeen, ...flagsOf(flags) };
+  return { appearance, axes, writing, remarksSeen, ...flagsOf(flags), phone };
 }
 
 function isAutoLock(value: unknown): value is AutoLockMinutes {
@@ -169,7 +182,20 @@ export function mergeAccountPreferences(
       ),
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
+    asPhone(row.phone) ?? local.phone,
   );
+}
+
+/* Only what the phone wrote, each half merged over the defaults like the
+   computer's own, so a field added later reads as its default. */
+function asPhone(value: unknown): PhoneLook | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { appearance, axes } = value as PhoneLook;
+  const look: PhoneLook = {};
+  if (appearance && typeof appearance === "object")
+    look.appearance = { ...DEFAULT_APPEARANCE, ...appearance };
+  if (axes && typeof axes === "object") look.axes = { ...DEFAULT_AXES, ...axes };
+  return look;
 }
 
 function asSeen(value: unknown): RemarksSeen {

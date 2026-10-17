@@ -1,69 +1,99 @@
-import { Link } from "expo-router";
-import type { SFSymbol } from "expo-symbols";
-import { useArchive } from "../../archive";
-import { Group, Row } from "../../Grouped";
+import { Link, useRouter } from "expo-router";
+import { Pressable, Text, View } from "react-native";
+import { APPEARANCE_PRESETS } from "@/lib/appearance";
+import { PRESENCE_PALETTES } from "@/lib/writingPreferences";
+import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
-import { attempt, SettingsPage } from "../../SettingsControls";
+import { attempt, Line, SERIF, Section, SettingsPage } from "../../SettingsControls";
 
+/* The contents page: who you are at the top, then what each section holds,
+   named by its value rather than by a coloured tile. */
 export default function Settings() {
-  const { session, profile, signOut } = useArchive();
-  /* System Settings' tiles, as the web's Settings rail draws them. */
-  const items: { section: string; label: string; icon: SFSymbol; fill: string }[] = [
-    { section: "archives", label: "Archives", icon: "square.stack.3d.up", fill: "#0a84ff" },
-    { section: "members", label: "Members", icon: "person.2", fill: "#30d158" },
-    { section: "appearance", label: "Appearance", icon: "paintpalette", fill: "#5e5ce6" },
-    { section: "reading", label: "Reading", icon: "textformat.size", fill: "#ff9f0a" },
-    { section: "writing", label: "Writing", icon: "pencil", fill: "#bf5af2" },
-    { section: "security", label: "Privacy", icon: "hand.raised", fill: "#0a84ff" },
-  ];
+  const router = useRouter();
+  const { session, snapshot, spaces, profile, preferences: p, signOut } = useArchive();
+  const palette = usePalette();
+  const current = spaces.find((space) => space.archiveId === session.archiveId);
+  const go = (section: string) =>
+    ({ pathname: "/settings/[section]", params: { section } }) as const;
+  const look =
+    APPEARANCE_PRESETS.find(
+      (preset) =>
+        preset.background === p.appearance.background && preset.accent === p.appearance.accent,
+    )?.name ?? "Custom";
+  const name = profile?.nickname || session.email.split("@")[0];
   return (
     <SettingsPage title="Settings">
-      <Group>
-        <Link href={{ pathname: "/settings/[section]", params: { section: "profile" } }} asChild>
-          <Row
-            leading={
-              <Avatar
-                face={{
-                  userId: session.userId,
-                  name: profile?.nickname ?? "",
-                  avatarObject: profile?.avatarObject ?? null,
-                }}
-                email={session.email}
-                size={54}
-              />
-            }
-            label={profile?.nickname || "Profile"}
-            note={session.email}
-            last
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Profile"
+        onPress={() => router.push(go("profile"))}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+          marginHorizontal: 20,
+          marginBottom: 30,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Avatar
+          face={{
+            userId: session.userId,
+            name: profile?.nickname ?? "",
+            avatarObject: profile?.avatarObject ?? null,
+          }}
+          email={session.email}
+          size={58}
+        />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text
+            style={{ color: palette.ink, fontFamily: SERIF, fontSize: 24, fontWeight: "600" }}
+            numberOfLines={1}
+          >
+            {name}
+          </Text>
+          <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
+            {session.email}
+          </Text>
+        </View>
+      </Pressable>
+      <Section title="Archive">
+        <Link href={go("archives")} asChild>
+          <Line label="Archives" value={current?.name} opens />
+        </Link>
+        <Link href={go("members")} asChild>
+          <Line label="Members" value={snapshot?.members.length} opens />
+        </Link>
+      </Section>
+      <Section title="This phone">
+        <Link href={go("appearance")} asChild>
+          <Line label="Appearance" value={look} opens />
+        </Link>
+        <Link href={go("reading")} asChild>
+          <Line
+            label="Reading"
+            value={`${p.axes.face === "serif" ? "Serif" : "System"} · ${p.axes.size}`}
+            opens
           />
         </Link>
-      </Group>
-      <Group>
-        {items.map((item, at) => (
-          <Link
-            key={item.section}
-            href={{ pathname: "/settings/[section]", params: { section: item.section } }}
-            asChild
-          >
-            <Row
-              icon={item.icon}
-              fill={item.fill}
-              label={item.label}
-              last={at === items.length - 1}
-            />
-          </Link>
-        ))}
-      </Group>
-      <Group>
-        <Row
-          icon="rectangle.portrait.and.arrow.right"
-          label="Sign Out"
-          chevron={false}
-          destructive
-          last
-          onPress={() => void attempt(signOut)}
-        />
-      </Group>
+      </Section>
+      <Section title="Account">
+        <Link href={go("writing")} asChild>
+          <Line
+            label="Writing"
+            value={
+              PRESENCE_PALETTES.find((colour) => colour.id === p.writing.presencePalette)?.name
+            }
+            opens
+          />
+        </Link>
+        <Link href={go("security")} asChild>
+          <Line label="Privacy" opens />
+        </Link>
+      </Section>
+      <Section>
+        <Line label="Sign Out" tone="danger" onPress={() => void attempt(signOut)} />
+      </Section>
     </SettingsPage>
   );
 }

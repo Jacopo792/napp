@@ -911,11 +911,26 @@ answers a reuse by revoking every session in the family — the phone signed
 out. The page is given a fresh access token whenever the app's client
 refreshes its own.
 
+**There is one page for the session, lent to the note in front**
+(`src/HostedPage.tsx`). Every `WKWebView` is a WebKit process of its own, and
+measured in the simulator a note waited a second for that process before the
+page was even read — a tiny HTML string waited just as long, so it was never
+the 3.9 MB. So the page is loaded once the archive is open and parked off
+screen, and a note's screen borrows it on focus: `react-native-teleport`
+carries the native view into the screen's `PortalHost` without rebuilding it,
+and `nappOpen` tells the page which note. The page keeps the session's one
+socket and `collab.ts`'s parked documents, which is what that design was for.
+Between notes it shows nothing (`nappOpen(null)` unmounts `HostedNote`, so a
+note put down publishes no awareness), and every message from the page names
+its note, so a word from a note already put down is dropped. A note opened
+from a link in another takes the page and gives it back on the way out.
+
 **The motion is the web's rules on the UI thread.** Reanimated and Gesture
 Handler, with the curves and durations of `styles.css` read as numbers from
 `lib/motionTokens.ts`, whose test fails if the two disagree. A row is pushed
 open exactly as on the web and settles with `--ease-bounce`; the act runs on
-the press, the row leaves the way it was pushed and the list closes the gap.
+the press, the row leaves the way it was pushed and then closes its own
+height, so the rows under it rise rather than jump when the list re-renders.
 The phone's navigation is now `expo-router` over the system's native stack,
 with large collapsing titles, the back gesture, native context menus and Liquid
 Glass bars. `Link.Trigger withAppleZoom` opens a note out of its row; UIKit owns
@@ -936,8 +951,11 @@ most of the way to black and draws cards solid on it; a wallpaper chosen in
 Appearance is drawn sharp at the top and fades into that ground, Revolut's
 way. Chips are tinted by default and filled on request (Appearance → Icons,
 kept on the device). A held row lifts `NotePreview`, drawn natively from the
-projection — never the WebView. Faces come from `note_versions` authors and
-presence (`facesOf`), gated by Privacy → Show Collaborators.
+projection — never the WebView. A face on a row means that member **made the
+note or wrote in it** (`note_versions` authors, `facesOf`), never that they are
+reading it: a partner's face on a note of yours that they only opened said they
+had changed it (Jacopo, 17 October 2026). Presence only adds the dot to a face
+already there. Gated by Privacy → Show Collaborators.
 
 **Folders shows one member at a time.** The face at the top left is whose
 notes are showing, with the next member's face peeking out behind it, and one
@@ -961,7 +979,22 @@ archive remounts the provider by account and archive id, so no old subscription
 or snapshot follows into the new one. Pending metadata writes are ordered; a
 read begun before an edit cannot replace it afterwards.
 
-Settings has Profile, Archives, Members, Appearance, Reading, Writing and
+**The phone looks the way the phone was set, not the way the computer was.**
+Appearance and the reading axes chosen on the phone go into
+`profile_preferences.phone` — still the account's, so a second phone finds
+them — and never into the top-level `appearance` and `axes` the web and the
+desktop wear (Jacopo, 17 October 2026: a wallpaper changed on the phone had
+changed the computer's). Until the phone chooses, it wears the computer's.
+The web and the desktop never read `phone`, but they write the whole blob, so
+`preferencesWith` hands back the branch the row last carried. Writing colour,
+autocorrection and the privacy switches stay account-wide: they are about how
+the others see you, not how this screen looks.
+
+Settings is a page, not a stack of cards (direction "C · Pagina", chosen
+over a single column of cards and a grid of tiles): hairline rows on the
+ground under small italic serif headings, each row's value set right in the
+quieter ink, colours chosen as swatches and short choices as segments.
+It has Profile, Archives, Members, Appearance, Reading, Writing and
 Privacy. It reads and writes through the core's existing modules, including
 account-wide preferences and their own Realtime channel. Reading and writing
 stores keep their values and notify subscribers even without a document; only

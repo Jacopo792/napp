@@ -61,7 +61,8 @@ interface Archive {
   refresh: () => void;
   present: Presence;
   setOpenNote: (id: string | null) => void;
-  /** The other members who have written in a note or are in it now — empty
+  /** The other members who made a note or have written in it — never one who
+   *  is only reading it, which on a note of yours says they changed it. Empty
    *  when the reader has turned "Collaborators in notes" off. */
   facesOf: (noteId: string) => Face[];
 }
@@ -91,8 +92,10 @@ export function ArchiveProvider({
   noteRef.current = openNote;
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [preferences, setPreferences] = useState(() => localPreferences({}, session.userId));
-  const preferencesRef = useRef(preferences);
+  /* The account's row as it stands, and the phone's reading of it: every
+     screen sees the phone's own look in `appearance` and `axes`. */
+  const preferencesRef = useRef(localPreferences({}, session.userId));
+  const [preferences, setPreferences] = useState(() => phoneView(preferencesRef.current));
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null);
   const latest = useRef(snapshot);
@@ -116,9 +119,10 @@ export function ArchiveProvider({
 
   useEffect(() => {
     let live = true;
-    const adopt = (next: AccountPreferences) => {
+    const adopt = (row: AccountPreferences) => {
       if (!live) return;
-      preferencesRef.current = next;
+      preferencesRef.current = row;
+      const next = phoneView(row);
       setPreferences(next);
       setAppearance(next.appearance);
       setAxes(next.axes);
@@ -153,14 +157,24 @@ export function ArchiveProvider({
   }, [session, wake, onSession]);
 
   const updatePreferences = useCallback(
-    (patch: Partial<AccountPreferences>) => {
-      const next = { ...preferencesRef.current, ...patch };
-      preferencesRef.current = next;
+    ({ appearance, axes, ...patch }: Partial<AccountPreferences>) => {
+      const before = preferencesRef.current;
+      const row: AccountPreferences = {
+        ...before,
+        ...patch,
+        phone: {
+          ...before.phone,
+          ...(appearance ? { appearance } : {}),
+          ...(axes ? { axes } : {}),
+        },
+      };
+      preferencesRef.current = row;
+      const next = phoneView(row);
       setPreferences(next);
       setAppearance(next.appearance);
       setAxes(next.axes);
       setWritingPreferences(next.writing);
-      pushAccountPreferences(session, next);
+      pushAccountPreferences(session, row);
     },
     [session],
   );
@@ -243,24 +257,28 @@ export function ArchiveProvider({
       live = false;
     };
   }, [session, wake]);
+  const owners = useMemo(
+    () => new Map(snapshot?.entries.map((entry) => [entry.note.id, entry.note.ownerId])),
+    [snapshot],
+  );
   const facesOf = useCallback(
-    (noteId: string): Face[] =>
-      !preferences.collaborators
-        ? []
-        : (snapshot?.members ?? [])
-            .filter(
-              (member) =>
-                !member.isSelf &&
-                (present.get(member.userId) === noteId || authors.get(noteId)?.has(member.userId)),
-            )
-            .map((member) => ({
-              userId: member.userId,
-              name: member.nickname || "Member",
-              avatarObject: member.avatarObject,
-              online: present.get(member.userId) === noteId,
-            }))
-            .sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online))),
-    [snapshot, present, authors, preferences.collaborators],
+    (noteId: string): Face[] => {
+      if (!preferences.collaborators) return [];
+      const owner = owners.get(noteId);
+      return (snapshot?.members ?? [])
+        .filter(
+          (member) =>
+            !member.isSelf && (member.userId === owner || authors.get(noteId)?.has(member.userId)),
+        )
+        .map((member) => ({
+          userId: member.userId,
+          name: member.nickname || "Member",
+          avatarObject: member.avatarObject,
+          online: present.get(member.userId) === noteId,
+        }))
+        .sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)));
+    },
+    [snapshot, owners, present, authors, preferences.collaborators],
   );
 
   const metaOf = useCallback((owner: string) => snapshot?.metas[owner] ?? EMPTY_META, [snapshot]);
@@ -333,6 +351,16 @@ export function ArchiveProvider({
     ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+/** The account's preferences as the phone wears them: its own look where it
+ *  has chosen one, the computer's until then. */
+function phoneView(row: AccountPreferences): AccountPreferences {
+  return {
+    ...row,
+    appearance: row.phone?.appearance ?? row.appearance,
+    axes: row.phone?.axes ?? row.axes,
+  };
 }
 
 export interface Palette {

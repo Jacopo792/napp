@@ -163,3 +163,21 @@ test("What's New read on one device stays read on the other", () => {
   assert.equal(mergeAccountPreferences({ whatsNewSeen: "0.9.0" }, local).whatsNewSeen, "0.9.0");
   assert.equal(mergeAccountPreferences({ whatsNewSeen: 9 }, read).whatsNewSeen, "0.9.0");
 });
+
+test("the phone's look travels in the row without touching the computer's", () => {
+  const merged = mergeAccountPreferences(
+    { appearance: { accent: "#112233" }, phone: { appearance: { accent: "#c4643f" } } },
+    local,
+  );
+  assert.equal(merged.appearance.accent, "#112233");
+  assert.equal(merged.phone?.appearance?.accent, "#c4643f");
+  assert.equal(merged.phone?.axes, undefined);
+  /* A computer that read it writes it back as it found it. */
+  assert.deepEqual(mergeAccountPreferences(merged, local).phone, merged.phone);
+});
+
+test("a row with no phone branch keeps the one this device holds", () => {
+  const held = { ...local, phone: { axes: { ...DEFAULT_AXES, size: 19 } } };
+  assert.equal(mergeAccountPreferences({}, held).phone?.axes?.size, 19);
+  assert.equal(mergeAccountPreferences({ phone: "nonsense" }, local).phone, undefined);
+});

@@ -19,6 +19,10 @@ const doc = (...paragraphs: string[]): JSONContent => ({
   content: paragraphs.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
 });
 
+/* The partner has written in every third note, not in all of them: a face on
+   every row of your own notes is exactly what the list must not say. */
+const partnerWrote = (noteId: string) => Number(noteId.slice(1)) % 3 === 1;
+
 function seed(noteId: string): NoteVersion[] {
   const existing = lists.get(noteId);
   if (existing) return existing;
@@ -45,7 +49,11 @@ function seed(noteId: string): NoteVersion[] {
       return {
         id,
         createdAt: new Date(Date.now() - stage.ago).toISOString(),
-        authorIds: stage.authors,
+        authorIds: partnerWrote(noteId)
+          ? stage.authors
+          : stage.authors.filter((author) => author !== PREVIEW_U2).concat(
+              stage.authors.includes(PREVIEW_U1) ? [] : [PREVIEW_U1],
+            ),
         title: "Paolo. Lenin del passato",
         label: stage.label,
         wordsAdded: stage.added,

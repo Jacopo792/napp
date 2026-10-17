@@ -46,11 +46,12 @@ export function heldRemarksSeen(): RemarksSeen {
 }
 
 /* The row the preview does not have, kept for the life of the page — so a
-   switch flipped here survives the remount that changing archive is. */
-let held: AccountPreferences | null = null;
+   switch flipped here survives the remount that changing archive is.
+   On the global object, so a hot reload of this module keeps it too. */
+const store = globalThis as { __nappPreview_preferences?: AccountPreferences };
 
 export function localPreferences(seen: RemarksSeen = {}) {
-  return held ?? preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
+  return store.__nappPreview_preferences ?? preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
 }
 
 export async function pullAccountPreferences() {
@@ -58,7 +59,7 @@ export async function pullAccountPreferences() {
 }
 
 export function pushAccountPreferences(_session: unknown, preferences: AccountPreferences): void {
-  held = preferences;
+  store.__nappPreview_preferences = preferences;
 }
 
 export function watchLocalStores(): () => void {

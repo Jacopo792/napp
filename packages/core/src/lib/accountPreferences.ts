@@ -83,8 +83,13 @@ export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}): Ac
     currentWritingPreferences(),
     flags,
     seen,
+    phoneLook,
   );
 }
+
+/* The phone's own look, as the row last said it. The computer never wears it
+   but writes the whole blob, so it has to hand it back unchanged. */
+let phoneLook: AccountPreferences["phone"];
 
 /** What this browser holds right now: what a field the row does not carry
  *  falls back to, and what a fresh account's first change writes. */
@@ -276,6 +281,7 @@ export async function pullAccountPreferences(session: AppSession): Promise<Accou
     localPreferences(heldRemarksSeen(session.userId), session.userId),
   );
   if (unsent) return unsent;
+  phoneLook = preferences.phone;
   held = preferences;
   settled = JSON.stringify(preferences);
   apply(preferences);
@@ -294,6 +300,7 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   const blob = JSON.stringify(preferences);
   if (blob === settled) return;
   settled = blob;
+  phoneLook = preferences.phone;
   held = unsent = preferences;
   holdRemarksSeen(session.userId, preferences.remarksSeen);
   window.clearTimeout(pending);
@@ -391,6 +398,7 @@ export function subscribeToAccountPreferences(
         const blob = JSON.stringify(preferences);
         if (blob === settled) return;
         settled = blob;
+        phoneLook = preferences.phone;
         apply(preferences);
         holdRemarksSeen(session.userId, preferences.remarksSeen);
         void collectWallpaper(session, preferences.appearance.wallpaperObject).catch(

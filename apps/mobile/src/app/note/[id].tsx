@@ -11,15 +11,12 @@ import { useToolbarIcon } from "../../icons";
  * follows it in. The refresh token never crosses — see editor/main.tsx. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, StyleSheet, Text, TextInput, View, Pressable } from "react-native";
-import { WebView } from "react-native-webview";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { Asset } from "expo-asset";
 import { randomUUID } from "expo-crypto";
 import { File } from "expo-file-system";
 import type { HostedNoteState } from "@notes-app/core/hosted";
 import { indexOf } from "@/lib/derived";
 import { fileNote, lockNote, pinNote, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
-import { supabase } from "@/lib/supabaseClient";
 import { deleteNotes, uploadObjectBytes } from "@/lib/supabase";
 import {
   assertAttachable,
@@ -31,22 +28,13 @@ import type { HostedCommand } from "@/lib/hostedCommands";
 import type { SearchStatus } from "@/features/editor/components/RichTextEditor";
 import { NoteHistory } from "../../NoteHistory";
 import { NoteComments } from "../../NoteComments";
-import { useHostedEditor } from "../../useHostedEditor";
+import { useHostedNote } from "../../HostedPage";
 import { useTextPrompt } from "../../TextPrompt";
 import { attempt } from "../../SettingsControls";
 import { useArchive, usePalette } from "../../archive";
 import { Avatar, Faces } from "../../Avatar";
 import { NoteSheet } from "../../NoteSheet";
 import { Group, Row } from "../../Grouped";
-
-/* Built by `pnpm editor` before Metro runs; read once per launch. */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const PAGE: number = require("../../../editor/dist/index.html");
-let page: Promise<string> | null = null;
-const pageHtml = () =>
-  (page ??= Asset.fromModule(PAGE)
-    .downloadAsync()
-    .then((asset) => new File(asset.localUri!).text()));
 
 export default function Note() {
   const icon = useToolbarIcon();
@@ -68,9 +56,6 @@ export default function Note() {
   const faces = facesOf(id);
   const palette = usePalette();
   const router = useRouter();
-  const [html, setHtml] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null | undefined>(undefined);
-  const [pageError, setPageError] = useState("");
   const [state, setState] = useState<HostedNoteState | null>(null);
   const askLink = () =>
     prompt(
@@ -86,17 +71,6 @@ export default function Note() {
       "https://",
       "url",
     );
-  const { web, execute, onMessage, onLoadStart } = useHostedEditor(
-    id,
-    setState,
-    (noteId) => router.push({ pathname: "/note/[id]", params: { id: noteId } }),
-    askLink,
-    () => {
-      setAnchor(null);
-      setPanel("comments");
-    },
-  );
-
   const entry = snapshot?.entries.find((candidate) => candidate.note.id === id);
   const owner = entry?.note.ownerId ?? session.userId;
   const row = indexOf(metaOf(owner)).byNote.get(id);
@@ -109,43 +83,19 @@ export default function Note() {
     !row?.trashedAt &&
     (!row?.lockedBy || row.lockedBy === session.userId);
 
-  useEffect(() => {
-    void pageHtml().then(setHtml, (reason) => setPageError(String(reason)));
-    void supabase.auth.getSession().then(
-      ({ data }) => setAccessToken(data.session?.access_token ?? null),
-      (reason) => setPageError(String(reason)),
-    );
-    const { data } = supabase.auth.onAuthStateChange((event, next) => {
-      if (event === "TOKEN_REFRESHED" && next)
-        web.current?.injectJavaScript(
-          `window.nappToken(${JSON.stringify(next.access_token)});true;`,
-        );
-    });
-    return () => data.subscription.unsubscribe();
-  }, [web]);
-
-  /* Seed once per note; later permissions and preferences use nappUpdate so
-     the hosted page keeps its editor and its Y.Doc. */
-  const opening = useMemo(
-    () =>
-      accessToken === undefined
-        ? null
-        : `window.napp = ${JSON.stringify({ session, noteId: id, name, canEdit, accessToken, preferences, headerHeight }).replace(/</g, "\\u003c")};true;`,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accessToken, id],
-  );
-
-  /* Inline the opening before the page's module script. Android does not
-     guarantee that injectedJavaScriptBeforeContentLoaded runs before it. */
-  const source = useMemo(
-    () =>
-      html && opening
-        ? {
-            html: html.replace("<head>", `<head><script>${opening}</script>`),
-            baseUrl: "https://notes",
-          }
-        : null,
-    [html, opening],
+  const { execute, Host } = useHostedNote(
+    { noteId: id, name, canEdit, preferences, headerHeight },
+    {
+      onState: (next) => {
+        setState(next);
+      },
+      onLink: (noteId) => router.push({ pathname: "/note/[id]", params: { id: noteId } }),
+      onLinkPrompt: askLink,
+      onComment: () => {
+        setAnchor(null);
+        setPanel("comments");
+      },
+    },
   );
 
   useFocusEffect(
@@ -154,17 +104,6 @@ export default function Note() {
       return () => setOpenNote(null);
     }, [id, setOpenNote]),
   );
-  const updatePage = useCallback(
-    () =>
-      web.current?.injectJavaScript(
-        `window.nappUpdate?.(${JSON.stringify({ canEdit, name, preferences, headerHeight })});true;`,
-      ),
-    [canEdit, name, preferences, headerHeight, web],
-  );
-  useEffect(() => {
-    updatePage();
-  }, [updatePage]);
-
   useEffect(() => {
     if (!finding) return;
     let live = true;
@@ -541,37 +480,7 @@ export default function Note() {
           </Pressable>
         </View>
       ) : null}
-      {pageError ? <Text style={{ color: palette.danger, margin: 24 }}>{pageError}</Text> : null}
-      {source ? (
-        <WebView<object>
-          ref={web}
-          key={id}
-          onLoadStart={onLoadStart}
-          onLoadEnd={updatePage}
-          onError={(event) => setPageError(event.nativeEvent.description)}
-          style={[styles.page, { backgroundColor: palette.canvas }]}
-          source={source}
-          originWhitelist={["*"]}
-          onMessage={(event) => void onMessage(event)}
-          onShouldStartLoadWithRequest={(request) => {
-            if (
-              request.url === "about:blank" ||
-              request.url === "https://notes/" ||
-              request.url === "https://notes" ||
-              request.url.startsWith("data:text/html")
-            )
-              return true;
-            if (/^(https?:|mailto:|tel:)/i.test(request.url))
-              void Linking.openURL(request.url).catch(() => {});
-            return false;
-          }}
-          contentInsetAdjustmentBehavior="never"
-          automaticallyAdjustContentInsets={false}
-          keyboardDisplayRequiresUserAction={false}
-          hideKeyboardAccessoryView
-          webviewDebuggingEnabled={__DEV__}
-        />
-      ) : null}
+      <Host style={[styles.page, { backgroundColor: palette.canvas }]} />
     </>
   );
 }

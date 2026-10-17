@@ -160,9 +160,9 @@ export function ProfileHero() {
       <Text
         style={{
           color: palette.ink,
+          fontFamily: "Iowan Old Style",
           fontSize: 30,
-          fontWeight: "800",
-          letterSpacing: -0.6,
+          fontWeight: "600",
           marginTop: 14,
           textAlign: "center",
           paddingHorizontal: 20,
