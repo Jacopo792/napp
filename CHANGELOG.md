@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.43 — 2026-10-17
+
+### Removed
+
+- Mentioned in: the Link button beside each unlinked mention, with `linkPassage`, `PassagePlace.link` / `PlaceRequest.link` and the `.note-mention*` styles. It added a `noteLink` mark to the other note on arrival — a real edit, so a note opened from there was restamped "Edited". The name alone opens the note at the words.
+
 ## 0.9.42 — 2026-10-16
 
 ### Changed

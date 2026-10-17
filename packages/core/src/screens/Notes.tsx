@@ -3294,13 +3294,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      block — so open its chapter and go to the heading. */
   useEffect(() => {
     const open = (event: Event) => {
-      const { noteId, text, target, passage, link, blockId } = (event as CustomEvent<PlaceRequest>)
+      const { noteId, text, target, passage, blockId } = (event as CustomEvent<PlaceRequest>)
         .detail;
       handleSelectNote(noteId);
       const reveal: Place | undefined = blockId
         ? { blockId }
         : passage
-          ? { passage, link }
+          ? { passage }
           : (target ?? text);
       if (reveal) setOpenThen({ noteId, reveal });
     };

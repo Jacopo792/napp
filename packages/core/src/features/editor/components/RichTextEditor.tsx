@@ -194,10 +194,6 @@ export interface RichTextEditorHandle {
   flashPassage: (text: string) => boolean;
   flashBlock: (id: string) => boolean;
   paragraphIdAt: (coords: { left: number; top: number }) => string | null;
-  /** The same, after making the first of these words not already a note link
-   *  into a link to `noteId` — an unlinked mention, linked. Only lit where
-   *  the note cannot be written. */
-  linkPassage: (text: string, noteId: string) => boolean;
   /** Give this chapter's targets the ids references elsewhere cite them by. */
   adopt: (adoptions: Adoption[]) => void;
   focus: () => void;
@@ -440,11 +436,7 @@ const PassageFlash = Extension.create({
 });
 
 /** Where these words stand inside one block of text, or null. */
-function findPassage(
-  doc: ProseMirrorNode,
-  text: string,
-  skip?: (range: { from: number; to: number }) => boolean,
-): { from: number; to: number } | null {
+function findPassage(doc: ProseMirrorNode, text: string): { from: number; to: number } | null {
   let found: { from: number; to: number } | null = null;
   doc.descendants((node, pos) => {
     if (found) return false;
@@ -461,8 +453,7 @@ function findPassage(
           from = pos + 1 + childOffset + (at - offset);
         offset += length;
       });
-      const range = { from, to: from + text.length };
-      if (from >= 0 && !skip?.(range)) found = range;
+      if (from >= 0) found = { from, to: from + text.length };
     }
     return false;
   });
@@ -2623,19 +2614,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           findPassage(editor.state.doc, words) ??
           (words.length > 60 ? findPassage(editor.state.doc, words.slice(0, 60)) : null);
         if (!range) return false;
-        return lightPassage(range);
-      },
-      linkPassage(text, noteId) {
-        if (!editor) return false;
-        const linkType = editor.schema.marks.noteLink;
-        const range = findPassage(editor.state.doc, text, ({ from, to }) =>
-          editor.state.doc.rangeHasMark(from, to, linkType),
-        );
-        if (!range) return false;
-        if (!readOnly)
-          editor.view.dispatch(
-            editor.state.tr.addMark(range.from, range.to, linkType.create({ noteId })),
-          );
         return lightPassage(range);
       },
       commentQuotes() {

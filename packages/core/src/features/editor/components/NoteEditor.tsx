@@ -63,7 +63,7 @@ import type { Editor } from "@tiptap/core";
 import { pageStyle, printPageCss, type PageSetup } from "@/lib/spaceShape";
 import { PageSpread } from "./PageSpread";
 import { snapshotSheet, type SheetSnapshot } from "../lib/pageSnapshot";
-import { openPlace, setLiveTargets, useReferences, type Place } from "@/lib/documentContents";
+import { setLiveTargets, useReferences, type Place } from "@/lib/documentContents";
 import { adoptionsFor, sheetCounters } from "@/lib/references";
 
 /** What a chapter of a document is framed by instead of a note's header:
@@ -424,9 +424,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           : "blockId" in place
             ? editorRef.current?.flashBlock(place.blockId)
             : "passage" in place
-              ? place.link
-                ? editorRef.current?.linkPassage(place.passage, place.link)
-                : editorRef.current?.flashPassage(place.passage)
+              ? editorRef.current?.flashPassage(place.passage)
               : editorRef.current?.revealTarget(place);
       if (found || ++tries > 50) {
         revealing.current = null;
@@ -1929,32 +1927,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               </div>
             )}
             {/* What names this note without reaching for it — Obsidian's
-                unlinked mentions. The name opens the note at the words; Link
-                opens it and makes them a link, as typing `[[` there would. */}
+                unlinked mentions. The name opens the note at the words. A
+                Link button beside it wrote the link into the other note, and
+                read as a way to open it — so opening a note edited it. */}
             {mentions && mentions.length > 0 && (
               <div className={`note-backlinks ${mobile ? "px-0" : ""}`}>
                 <p className="note-backlinks-label">Mentioned in</p>
                 <div className="note-backlinks-list">
                   {mentions.map((note) => (
-                    <span key={note.id} className="note-mention">
-                      <button
-                        type="button"
-                        className="note-backlink press"
-                        onClick={() => onOpenNote?.(note.id, note.words)}
-                      >
-                        <FileText size={12} />
-                        {note.title || "Untitled"}
-                      </button>
-                      <button
-                        type="button"
-                        className="note-mention-link press"
-                        onClick={() =>
-                          openPlace({ noteId: note.id, passage: note.words, link: entry.note.id })
-                        }
-                      >
-                        Link
-                      </button>
-                    </span>
+                    <button
+                      key={note.id}
+                      type="button"
+                      className="note-backlink press"
+                      onClick={() => onOpenNote?.(note.id, note.words)}
+                    >
+                      <FileText size={12} />
+                      {note.title || "Untitled"}
+                    </button>
                   ))}
                 </div>
               </div>

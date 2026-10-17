@@ -151,9 +151,6 @@ export interface PlaceTarget {
  *  never the chapter. */
 export interface PassagePlace {
   passage: string;
-  /** A note to link these words to on arrival — an unlinked mention made a
-   *  link, through the editor's own binding like any other edit. */
-  link?: string;
 }
 
 export interface BlockPlace {
@@ -168,7 +165,6 @@ export interface PlaceRequest {
   text?: string;
   target?: PlaceTarget;
   passage?: string;
-  link?: string;
 }
 
 export function openPlace(request: PlaceRequest): void {
