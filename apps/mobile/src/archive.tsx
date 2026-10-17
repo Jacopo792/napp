@@ -221,7 +221,7 @@ export function ArchiveProvider({
   const act = useCallback(
     (owner: string, change: (prev: Meta) => Meta) => {
       const current = latest.current;
-      if (!current) return;
+      if (!current || current.members.find((member) => member.isSelf)?.role !== "editor") return;
       const before = current.metas[owner] ?? EMPTY_META;
       const after = honourLocks(before, change(before), session.userId);
       latest.current = { ...current, metas: { ...current.metas, [owner]: after } };

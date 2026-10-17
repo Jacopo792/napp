@@ -87,6 +87,11 @@ export default function Folders() {
         {error ? (
           <Text style={{ color: palette.danger, textAlign: "center", padding: 24 }}>{error}</Text>
         ) : null}
+        <Group>
+          <Link href="/remarks" asChild>
+            <Row icon="bubble.left.and.bubble.right" label="Comments" last />
+          </Link>
+        </Group>
         {members.map((member) => {
           const meta = metaOf(member.userId);
           const theirs = (snapshot?.entries ?? []).filter(

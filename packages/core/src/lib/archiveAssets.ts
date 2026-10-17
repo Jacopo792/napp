@@ -9,10 +9,20 @@ export async function uploadObject(
   objectId: string,
   blob: Blob,
 ): Promise<void> {
+  return uploadObjectBytes(session, objectId, blob, blob.type);
+}
+
+/** Native fetch bodies use bytes; keeping the storage rule here serves both hosts. */
+export async function uploadObjectBytes(
+  session: AppSession,
+  objectId: string,
+  data: Blob | ArrayBuffer,
+  contentType = "application/octet-stream",
+): Promise<void> {
   const result = await supabase.storage
     .from(OBJECT_BUCKET)
-    .upload(`${session.archiveId}/${objectId}`, blob, {
-      contentType: blob.type || "application/octet-stream",
+    .upload(`${session.archiveId}/${objectId}`, data, {
+      contentType: contentType || "application/octet-stream",
       upsert: false,
     });
   fail(result.error);

@@ -54,6 +54,7 @@ import {
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
+import { renameFolder, removeFolder } from "@/lib/folderActs";
 import { FOLDER_DRAG, moveFolder } from "@/lib/folderOrder";
 import {
   OPEN_PLACE,
@@ -2853,37 +2854,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }
 
   function handleRenameFolder(id: string, name: string) {
-    handleMetaChange((prev) => ({
-      ...prev,
-      folders: prev.folders.map((folder) => (folder.id === id ? { ...folder, name } : folder)),
-    }));
+    handleMetaChange((prev) => renameFolder(prev, id, name));
   }
 
-  /* Deleting a folder deletes the branch under it. Nothing loses a note: every
-     note anywhere in that branch becomes unfiled, and an unfiled note is in All
-     notes — which is the only reason throwing a folder away is safe. */
   function handleDeleteFolder(id: string) {
     const latest =
       pendingMetaRef.current.get(viewAs)?.after ?? metasRef.current[viewAs] ?? activeMeta;
-    const doomed = new Set([id]);
-    for (let added = true; added; ) {
-      added = false;
-      for (const folder of latest.folders) {
-        const parentId = folder.parentId ?? null;
-        if (parentId && doomed.has(parentId) && !doomed.has(folder.id)) {
-          doomed.add(folder.id);
-          added = true;
-        }
-      }
-    }
-    handleMetaChange((prev) => ({
-      ...prev,
-      folders: prev.folders.filter((folder) => !doomed.has(folder.id)),
-      notes: prev.notes.map((note) =>
-        note.folderId && doomed.has(note.folderId) ? { ...note, folderId: null } : note,
-      ),
-    }));
-    if (doomed.has(selectedFolderId)) handleSelectFolder(ALL);
+    const next = removeFolder(latest, id);
+    handleMetaChange((prev) => removeFolder(prev, id));
+    if (
+      latest.folders.some((folder) => folder.id === selectedFolderId) &&
+      !next.folders.some((folder) => folder.id === selectedFolderId)
+    )
+      handleSelectFolder(ALL);
   }
 
   function handleMoveNote(noteId: string, folderId: string | null) {

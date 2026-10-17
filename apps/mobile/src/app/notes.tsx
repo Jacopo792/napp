@@ -1,3 +1,4 @@
+import { randomUUID } from "expo-crypto";
 import { useToolbarIcon } from "../icons";
 /* One scope's notes, as a folder in Notes reads: grouped by date — Pinned,
  * Today, Previous 7 Days — with the system's search in the toolbar and a count
@@ -10,7 +11,7 @@ import { useToolbarIcon } from "../icons";
  * for good and restores. */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, SectionList, StyleSheet, Text } from "react-native";
-import { Link, Stack, useLocalSearchParams } from "expo-router";
+import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { fold, formatStamp } from "@/lib/format";
 import {
@@ -19,6 +20,8 @@ import {
   saveListPreferences,
   preferencesForFolder,
 } from "@/lib/listPreferences";
+import { renameFolder, removeFolder } from "@/lib/folderActs";
+import { useTextPrompt } from "../TextPrompt";
 import { fileNote, lockNote, pinNote, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
 import { ARCHIVE, entriesInScope, TRASH } from "@/lib/scopes";
 import { deleteNotes } from "@/lib/supabase";
@@ -29,6 +32,8 @@ import { attempt, Empty } from "../SettingsControls";
 import { useCreateNote } from "../useCreateNote";
 
 export default function Notes() {
+  const prompt = useTextPrompt();
+  const router = useRouter();
   const icon = useToolbarIcon();
   const { owner, scope, title } = useLocalSearchParams<{
     owner: string;
@@ -40,7 +45,9 @@ export default function Notes() {
   const [query, setQuery] = useState("");
   const meta = metaOf(owner);
   const index = indexOf(meta);
-  const { create, creating } = useCreateNote(index.byFolder.has(scope) ? scope : null);
+  const { create, creating, importMarkdown } = useCreateNote(
+    index.byFolder.has(scope) ? scope : null,
+  );
   const [stored, setStored] = useState(() => loadListPreferences(session.archiveId, owner));
   const preferences = preferencesForFolder(stored, scope);
   const sort = (patch: Partial<typeof preferences>) => {
@@ -201,6 +208,73 @@ export default function Notes() {
       <Stack.Screen options={{ title }} />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon={icon("ellipsis.circle")}>
+          <Stack.Toolbar.MenuAction
+            icon={icon("arrow.down.doc")}
+            disabled={
+              creating || snapshot?.members.find((member) => member.isSelf)?.role !== "editor"
+            }
+            onPress={importMarkdown}
+          >
+            Import Markdown
+          </Stack.Toolbar.MenuAction>
+          {meta.folders.some((folder) => folder.id === scope) ? (
+            <>
+              <Stack.Toolbar.MenuAction
+                icon={icon("pencil")}
+                onPress={() =>
+                  prompt(
+                    "Folder Name",
+                    undefined,
+                    (name) => act(owner, (prev) => renameFolder(prev, scope, name)),
+                    "plain-text",
+                    meta.folders.find((folder) => folder.id === scope)?.name,
+                  )
+                }
+              >
+                Rename Folder
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                icon={icon("folder.badge.plus")}
+                onPress={() =>
+                  prompt("New Folder", undefined, (name) => {
+                    if (name.trim())
+                      act(owner, (prev) => ({
+                        ...prev,
+                        folders: [
+                          ...prev.folders,
+                          { id: randomUUID(), name: name.trim(), parentId: scope },
+                        ],
+                      }));
+                  })
+                }
+              >
+                New Subfolder
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                icon={icon("trash")}
+                destructive
+                onPress={() =>
+                  Alert.alert(
+                    "Remove Folder?",
+                    "Notes in this folder and its subfolders will remain in All Notes.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Remove",
+                        style: "destructive",
+                        onPress: () => {
+                          act(owner, (prev) => removeFolder(prev, scope));
+                          router.back();
+                        },
+                      },
+                    ],
+                  )
+                }
+              >
+                Remove Folder
+              </Stack.Toolbar.MenuAction>
+            </>
+          ) : null}
           <Stack.Toolbar.MenuAction
             icon={icon("clock")}
             onPress={() => sort({ sortBy: "updated" })}

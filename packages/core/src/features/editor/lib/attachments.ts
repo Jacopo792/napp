@@ -59,7 +59,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function assertAttachable(file: File): void {
+export function assertAttachable(file: Pick<File, "name" | "size">): void {
   if (
     !["application/pdf", "video/mp4", "video/webm", "video/quicktime"].includes(
       attachmentType(file.name),

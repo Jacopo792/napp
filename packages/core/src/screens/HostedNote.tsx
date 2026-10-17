@@ -6,7 +6,7 @@
  * `useCollaborativeNote`, the same `TitleField` and `RichTextEditor` over the
  * same Y.Doc, so the schema and every rule in `writeLocks.ts` stay one.
  * Nothing in this file knows it is in a WebView; the page around it does. */
-import { useCallback, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import {
   RichTextEditor,
   type RichTextEditorHandle,
@@ -18,6 +18,11 @@ import { initAxes } from "@/lib/axes";
 import { useCollaborativeNote, type CollaborativeNote } from "@/lib/collab";
 import type { AppSession } from "@/lib/session";
 import { downloadImage, downloadObject } from "@/lib/supabase";
+import type { HostedCommand, HostedController } from "@/lib/hostedCommands";
+import { restoreKeptVersion } from "@/lib/historyRestore";
+import { nameVersion } from "@/lib/history";
+import { exportFileName, noteToMarkdown } from "@/features/editor/lib/exchange";
+import { platform } from "@/platform";
 import { initWritingPreferences } from "@/lib/writingPreferences";
 
 /* Before React, as App.tsx does: these write the CSS custom properties the
@@ -31,6 +36,7 @@ export interface HostedNoteState {
   ready: boolean;
   refusal: string;
   waking: boolean;
+  available: boolean;
 }
 
 interface Props {
@@ -44,19 +50,28 @@ interface Props {
   onState?: (state: HostedNoteState) => void;
   autocorrectOn?: boolean;
   collaboratorsVisible?: boolean;
+  onOpenNote?: (noteId: string) => void;
+  onOpenLink?: () => void;
+  onOpenComment?: (threadId: string) => void;
 }
 
 const EMPTY = { type: "doc", content: [] };
 
-export function HostedNote({
-  session,
-  noteId,
-  name,
-  canEdit,
-  onState,
-  autocorrectOn = true,
-  collaboratorsVisible = true,
-}: Props) {
+export const HostedNote = forwardRef<HostedController, Props>(function HostedNote(
+  {
+    session,
+    noteId,
+    name,
+    canEdit,
+    onState,
+    autocorrectOn = true,
+    collaboratorsVisible = true,
+    onOpenLink,
+    onOpenNote,
+    onOpenComment,
+  },
+  ref,
+) {
   const note = useCollaborativeNote(noteId, {
     userId: session.userId,
     archiveId: session.archiveId,
@@ -64,11 +79,116 @@ export function HostedNote({
   });
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
+  const writable = useRef(canEdit);
+  writable.current = canEdit;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      async execute(command: HostedCommand) {
+        const editor = editorRef.current;
+        if (!editor || !note.doc) throw new Error("The note is still loading");
+        const title = note.doc.getText(TITLE_TEXT);
+        const body = () => {
+          const content = editor.getContent();
+          if (!content) throw new Error("The note is still loading");
+          return { title: title.toString(), content };
+        };
+        const readonly = [
+          "body",
+          "export",
+          "revealComment",
+          "search",
+          "nextMatch",
+          "previousMatch",
+          "closeSearch",
+        ];
+        if (!writable.current && !readonly.includes(command.type))
+          throw new Error("This note is read-only");
+        switch (command.type) {
+          case "body":
+            return body();
+          case "link":
+            editor.insertLink(editor.getSelectedText(), command.url);
+            break;
+          case "format":
+            editor.format(command.action);
+            break;
+          case "export": {
+            const current = body();
+            if (command.format === "md")
+              await platform().saveFile(
+                exportFileName(current.title),
+                noteToMarkdown(current.title, current.content),
+                "text/markdown",
+              );
+            else await editor.exportNote(command.format, current.title);
+            break;
+          }
+          case "restore": {
+            await restoreKeptVersion({
+              current: body,
+              canWrite: () => writable.current && mounted.current,
+              earlier: command.body,
+              keep: (present) =>
+                nameVersion(session, noteId, "Before restoring a version", present),
+              apply: (earlier) => {
+                note.doc!.transact(() => {
+                  title.delete(0, title.length);
+                  title.insert(0, earlier.title);
+                });
+                editorRef.current?.replaceContent(earlier.content);
+              },
+            });
+            break;
+          }
+          case "attach":
+            if (command.image) editor.insertImage(command.objectId, command.label);
+            else editor.insertAttachment(command.label, command.objectId);
+            break;
+          case "comment":
+            return editor.commentSelection(command.threadId);
+          case "revealComment":
+            return editor.revealComment(command.threadId);
+          case "resolveComment":
+            editor.setCommentResolved(command.threadId, command.resolved);
+            break;
+          case "removeComment":
+            editor.removeComment(command.threadId);
+            break;
+          case "search":
+            return editor.setSearch(command.query);
+          case "nextMatch":
+            return editor.findNext();
+          case "previousMatch":
+            return editor.findPrevious();
+          case "closeSearch":
+            editor.closeSearch();
+            break;
+        }
+        return null;
+      },
+    }),
+    [note.doc, session, noteId],
+  );
 
   const { connection, ready, refusal, waking } = note;
   useEffect(() => {
-    onState?.({ connection, ready, refusal, waking });
-  }, [onState, connection, ready, refusal, waking]);
+    onState?.({
+      connection,
+      ready,
+      refusal,
+      waking,
+      available: Boolean(note.doc && (ready || note.cached)),
+    });
+  }, [onState, connection, ready, refusal, waking, note.doc, note.cached]);
 
   const resolveImage = useCallback((id: string) => downloadImage(session, id), [session]);
   const resolveFile = useCallback(
@@ -112,7 +232,9 @@ export function HostedNote({
             /* Yjs is the writer and the server persists it; the page has
                nothing of its own to keep. */
             onChange={() => {}}
-            onOpenLink={() => {}}
+            onOpenLink={onOpenLink ?? (() => {})}
+            onOpenNote={onOpenNote}
+            onOpenComment={onOpenComment}
             writeLockOwner={canEdit ? session.userId : null}
             resolveImage={resolveImage}
             resolveFile={resolveFile}
@@ -128,4 +250,4 @@ export function HostedNote({
       </div>
     </div>
   );
-}
+});

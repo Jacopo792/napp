@@ -32,6 +32,7 @@ export {
   uploadAvatar,
   uploadImage,
   uploadObject,
+  uploadObjectBytes,
   type PendingInvite,
   type Profile,
 } from "./archiveAssets";

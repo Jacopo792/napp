@@ -62,7 +62,9 @@ export function Row({
           {label}
         </Text>
         {detail !== undefined ? (
-          <Text style={[styles.detail, { color: palette.ink3 }]}>{detail}</Text>
+          <Text numberOfLines={1} style={[styles.detail, { color: palette.ink3 }]}>
+            {detail}
+          </Text>
         ) : null}
         {chevron ? (
           <SymbolView name="chevron.right" tintColor={palette.ink4} size={13} weight="semibold" />
@@ -87,5 +89,5 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: { flex: 1, fontSize: 17 },
-  detail: { fontSize: 17 },
+  detail: { fontSize: 17, flexShrink: 1, maxWidth: "55%" },
 });

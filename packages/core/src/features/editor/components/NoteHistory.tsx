@@ -15,11 +15,12 @@
  *
  * It loads for itself and only when opened, like the comments. */
 import { generateHTML, type JSONContent } from "@tiptap/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, History, X } from "@/components/icons";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { BASE_EXTENSIONS, richTextToPlainText } from "@/features/editor/lib/content";
 import { textChanges, type TextChange } from "@/features/editor/lib/versionDiff";
+import { restoreKeptVersion } from "@/lib/historyRestore";
 import { loadVersionContent, loadVersions, nameVersion, type NoteVersion } from "@/lib/history";
 import { formatDateTime } from "@/lib/format";
 import { dateBucket } from "@/lib/listPreferences";
@@ -67,6 +68,15 @@ export function NoteHistory({
   onRestore,
   onClose,
 }: Props) {
+  const writable = useRef(canEdit);
+  writable.current = canEdit;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [versions, setVersions] = useState<NoteVersion[] | null>(null);
   const [failure, setFailure] = useState("");
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
@@ -158,14 +168,20 @@ export function NoteHistory({
     if (!openBody || !body || !opened) return;
     setBusy(true);
     try {
-      const kept = await nameVersion(
-        session,
-        noteId,
-        `Before restoring ${formatDateTime(opened.createdAt)}`,
-        body,
-      );
+      const kept = await restoreKeptVersion({
+        current,
+        canWrite: () => writable.current && mounted.current,
+        earlier: openBody,
+        keep: (present) =>
+          nameVersion(
+            session,
+            noteId,
+            `Before restoring ${formatDateTime(opened.createdAt)}`,
+            present,
+          ),
+        apply: onRestore,
+      });
       setVersions((list) => [kept, ...(list ?? [])]);
-      onRestore(openBody);
       setConfirming(false);
       setOpenId(null);
     } catch (error) {

@@ -4,6 +4,7 @@
    are written into the bundle where it asks for them — which is what Vite
    does too. */
 const path = require("node:path");
+const mobileCollabUrl = require("./collab-url.cjs");
 
 try {
   process.loadEnvFile(path.join(__dirname, "../../.env.local"));
@@ -20,9 +21,11 @@ function importMetaEnv({ types: t }) {
   const value = (name) =>
     name === "DEV"
       ? t.booleanLiteral(process.env.NODE_ENV !== "production")
-      : process.env[name] === undefined
-        ? t.identifier("undefined")
-        : t.stringLiteral(process.env[name]);
+      : name === "VITE_COLLAB_URL"
+        ? t.stringLiteral(mobileCollabUrl())
+        : process.env[name] === undefined
+          ? t.identifier("undefined")
+          : t.stringLiteral(process.env[name]);
   return {
     visitor: {
       MemberExpression(p) {

@@ -40,7 +40,7 @@ export const mobilePlatform: Platform = {
     return null;
   },
 
-  /* ponytail: nothing to print until the note itself is on screen, in the
-     editor's WebView; Print arrives with it. */
-  async print() {},
+  async print() {
+    throw new Error("Use Share as PDF to print this note");
+  },
 };

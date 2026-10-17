@@ -12,6 +12,17 @@ import {
 
 const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   folder: "folder",
+  paperclip: "attach_file",
+  photo: "image",
+  "square.and.arrow.up": "ios_share",
+  "bubble.left.and.bubble.right": "forum",
+  magnifyingglass: "search",
+  bold: "format_bold",
+  checklist: "checklist",
+  tablecells: "table",
+  link: "link",
+  "arrow.down.doc": "file_download",
+
   "folder.badge.plus": "create_new_folder",
   archivebox: "archive",
   "archivebox.fill": "archive",

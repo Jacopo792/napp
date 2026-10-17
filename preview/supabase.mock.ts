@@ -249,6 +249,9 @@ export async function downloadObject(
   return new Blob([await stored.arrayBuffer()], { type });
 }
 
+export async function uploadObjectBytes(session: AppSession, objectId: string, data: Blob | ArrayBuffer, type = "application/octet-stream") {
+  return uploadObject(session, objectId, data instanceof Blob ? data : new Blob([data], { type }));
+}
 export const uploadImage = uploadObject;
 
 export function downloadImage(session: AppSession, imageId: string): Promise<Blob> {
