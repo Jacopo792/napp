@@ -5,10 +5,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "@/components/icons";
 import { fold } from "@/lib/format";
-import { fuzzyMatch, type Snippet } from "@/lib/spotlight";
+import { rankGroups, type Findable, type Snippet } from "@/lib/spotlight";
 import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 
-export interface Command {
+export interface Command extends Findable {
   id: string;
   /** The heading this sits under. Commands are grouped, never sorted flat. */
   group: string;
@@ -35,31 +35,6 @@ export interface Command {
  *  cap the palette opens as the whole archive, which is the list they already
  *  have on screen. */
 const RESTING_LIMIT = 5;
-
-/* One scale for everything the palette holds, so a chapter, a heading and a
-   line of text can be put in one order: the start of a name, the start of a
-   word in it, anywhere in it, a heading (3, given by the search), the words
-   behind a name, its second line, and last the running text (6). */
-function score(command: Command, query: string): number {
-  if (command.rank !== undefined) return command.rank;
-  const name = fold(command.name);
-  if (name.startsWith(query)) return 0;
-  const word = name.split(/\s+/).some((part) => part.startsWith(query));
-  if (word) return 1;
-  if (name.includes(query)) return 2;
-  /* Held in order rather than whole: "riu cli" for "Riunione cliente". In
-     two runs that each start a word it ranks under every whole match and
-     over a heading. Anything looser is barely the name any more — "oggi" is
-     in "questo passaggio" — and goes under the words a command was given to
-     be found by, and under its own second line. `fuzzyMatch` counts a run
-     starting inside a word as a tenth, so under 1.1 is exactly that. */
-  const loose = fuzzyMatch(name, query);
-  if (loose !== null && loose < 1.1) return 2 + (loose + 1) / 4;
-  if (command.keywords && fold(command.keywords).includes(query)) return 4;
-  if (command.hint && fold(command.hint).includes(query)) return 5;
-  if (loose !== null) return 5.5;
-  return -1;
-}
 
 /** How many characters a query needs before other archives are asked. */
 const REMOTE_FROM = 3;
@@ -121,29 +96,8 @@ export function CommandPalette({
     const q = fold(query.trim());
     const pool = q
       ? [...commands, ...(search?.(q) ?? []), ...(far.query === q ? far.items : [])]
-      : commands.filter((command) => !command.searchOnly);
-    const order = new Map<string, number>();
-    for (const command of pool) if (!order.has(command.group)) order.set(command.group, order.size);
-    const ranked = q
-      ? pool
-          .map((command) => ({ command, rank: score(command, q) }))
-          .filter((entry) => entry.rank >= 0)
-          .sort(
-            (a, b) =>
-              a.rank - b.rank ||
-              order.get(a.command.group)! - order.get(b.command.group)! ||
-              (b.command.at ?? 0) - (a.command.at ?? 0),
-          )
-          .map((entry) => entry.command)
-      : pool;
-
-    const groups: { group: string; items: Command[] }[] = [];
-    for (const command of ranked) {
-      const bucket = groups.find((entry) => entry.group === command.group);
-      if (bucket) bucket.items.push(command);
-      else groups.push({ group: command.group, items: [command] });
-    }
-    return q ? groups : groups.map((g) => ({ ...g, items: g.items.slice(0, RESTING_LIMIT) }));
+      : commands;
+    return rankGroups(pool, q, RESTING_LIMIT);
   }, [commands, search, far, query]);
 
   const flat = useMemo(() => matches.flatMap((group) => group.items), [matches]);

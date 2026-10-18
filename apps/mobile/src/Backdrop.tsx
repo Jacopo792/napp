@@ -3,10 +3,8 @@
  * they set it, so the cards above it read as material standing on something
  * rather than grey on grey. That is where the depth comes from, and it is
  * authored by the reader: with no picture the ground is the plain page, never
- * a wash invented for it. Each screen draws its own, so a pushed screen slides
- * in opaque. It is drawn after the scroller, under it by `zIndex`: the
- * native stack links its large title to the screen's first scroll view, and
- * a view ahead of it breaks the collapse. */
+ * a wash invented for it. Each screen draws its own, first, under its
+ * scroller, so a pushed screen slides in opaque. */
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -26,7 +24,9 @@ export function useCard(): { card: string; wallpaper: boolean } {
   };
 }
 
-export function Backdrop() {
+/** `reach`: how far down the picture stands before it has faded into the
+ *  ground; by default most of the screen. */
+export function Backdrop({ reach }: { reach?: number }) {
   const { session } = useArchive();
   const appearance = useAppearance();
   const palette = usePalette();
@@ -52,10 +52,10 @@ export function Backdrop() {
   return (
     <Animated.View
       entering={FadeIn.duration(320)}
-      style={[StyleSheet.absoluteFill, { backgroundColor: palette.page, zIndex: -1 }]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: palette.page }]}
       pointerEvents="none"
     >
-      <View style={{ height: height * 0.62 }}>
+      <View style={{ height: reach ?? height * 0.62 }}>
         <Image
           source={{ uri }}
           resizeMode={appearance.wallpaperFit === "contain" ? "contain" : "cover"}

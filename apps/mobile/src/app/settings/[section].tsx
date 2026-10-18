@@ -1,7 +1,7 @@
 import { useTextPrompt } from "../../TextPrompt";
 import { useEffect, useState } from "react";
 import { Alert, Image, ScrollView, Share, StyleSheet, Text, View } from "react-native";
-import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { APPEARANCE_PRESETS } from "@/lib/appearance";
 import { createSpace, renameSpace } from "@/lib/spaces";
 import {
@@ -28,6 +28,7 @@ import {
   Swatches,
   Toggle,
 } from "../../SettingsControls";
+import { PillButton, SkeletonCard } from "../../Chrome";
 
 export default function Section() {
   const prompt = useTextPrompt();
@@ -224,23 +225,21 @@ export default function Section() {
                 )
               }
             />
-            <Line
-              icon="plus"
-              label="New Archive"
-              tone="action"
-              disabled={busy}
-              onPress={() =>
-                prompt("New Archive", undefined, (name) => {
-                  if (name?.trim())
-                    void run(async () => {
-                      const id = await createSpace(name.trim());
-                      await switchArchive(id);
-                      router.dismissAll();
-                    });
-                })
-              }
-            />
           </Part>
+          <PillButton
+            label="New Archive"
+            disabled={busy}
+            onPress={() =>
+              prompt("New Archive", undefined, (name) => {
+                if (name?.trim())
+                  void run(async () => {
+                    const id = await createSpace(name.trim());
+                    await switchArchive(id);
+                    router.dismissAll();
+                  });
+              })
+            }
+          />
         </>
       ) : null}
       {section === "members" ? (
@@ -264,16 +263,6 @@ export default function Section() {
                 value={member.isSelf ? "You" : undefined}
               />
             ))}
-          </Part>
-          <Part>
-            <Line
-              icon="person.badge.plus"
-              label="Invite Someone"
-              tone="action"
-              value={`${seated} of ${seats}`}
-              disabled={busy || seated >= seats}
-              onPress={invite}
-            />
           </Part>
           {invites.length ? (
             <Part title="Invitations">
@@ -302,10 +291,15 @@ export default function Section() {
               ))}
             </Part>
           ) : null}
+          <PillButton
+            label={seated >= seats ? `All ${seats} Seats Taken` : "Invite Someone"}
+            disabled={busy || seated >= seats}
+            onPress={invite}
+          />
         </>
       ) : null}
       {!preferencesReady && ["appearance", "wallpaper", "writing", "security"].includes(section) ? (
-        <Text style={{ color: palette.ink3, margin: 20 }}>Loading…</Text>
+        <SkeletonCard rows={3} />
       ) : (
         <>
           {section === "appearance" ? (
@@ -355,33 +349,13 @@ export default function Section() {
           {section === "wallpaper" ? (
             <>
               <WallpaperPicture objectId={p.appearance.wallpaperObject} />
-              <Part>
-                {p.appearance.wallpaperObject ? (
+              {p.appearance.wallpaperObject ? (
+                <Part>
                   <Toggle
                     label="Show Wallpaper"
                     value={p.appearance.wallpaper}
                     onChange={(wallpaper) => setAppearance({ wallpaper })}
                   />
-                ) : null}
-                <Line
-                  label={p.appearance.wallpaperObject ? "Choose New Photo" : "Choose Photo"}
-                  tone="action"
-                  disabled={busy}
-                  onPress={() =>
-                    void run(async () => {
-                      const objectId = await chooseWallpaper(session);
-                      if (objectId)
-                        setAppearance({
-                          wallpaper: true,
-                          wallpaperObject: objectId,
-                          wallpaperBlur: 0,
-                        });
-                    })
-                  }
-                />
-              </Part>
-              {p.appearance.wallpaperObject ? (
-                <Part>
                   <Line
                     label="Remove Wallpaper"
                     tone="danger"
@@ -389,6 +363,21 @@ export default function Section() {
                   />
                 </Part>
               ) : null}
+              <PillButton
+                label={p.appearance.wallpaperObject ? "Choose New Photo" : "Choose Photo"}
+                disabled={busy}
+                onPress={() =>
+                  void run(async () => {
+                    const objectId = await chooseWallpaper(session);
+                    if (objectId)
+                      setAppearance({
+                        wallpaper: true,
+                        wallpaperObject: objectId,
+                        wallpaperBlur: 0,
+                      });
+                  })
+                }
+              />
             </>
           ) : null}
           {section === "writing" ? (
@@ -450,7 +439,6 @@ export default function Section() {
           ) : null}
         </>
       )}
-      <Stack.Screen options={{ headerLargeTitle: section !== "profile" }} />
     </SettingsPage>
   );
 }
@@ -476,17 +464,23 @@ function AppearancePreview() {
     >
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 6,
-          marginBottom: 14,
+          backgroundColor: palette.paper,
+          borderRadius: CARD_RADIUS,
+          borderCurve: "continuous",
+          padding: 16,
+          gap: 4,
+          marginBottom: 10,
         }}
       >
-        <Text style={{ color: palette.ink, fontSize: 26, fontWeight: "700", letterSpacing: -0.6 }}>
-          Your Notes
+        <Text style={{ color: palette.ink3, fontSize: 12, fontWeight: "600" }}>
+          Continue Writing
         </Text>
-        <SymbolView name="square.and.pencil" size={22} weight="medium" tintColor={palette.accent} />
+        <Text style={{ color: palette.ink, fontSize: 19, fontWeight: "700", letterSpacing: -0.4 }}>
+          Ideas for the trip
+        </Text>
+        <Text style={{ color: palette.ink2, fontSize: 14 }} numberOfLines={1}>
+          Start in the north, then follow the coast down.
+        </Text>
       </View>
       <View
         pointerEvents="none"
@@ -497,8 +491,8 @@ function AppearancePreview() {
           paddingVertical: 4,
         }}
       >
-        <RowFace icon="note.text" label="All Notes" detail={12} />
-        <RowFace icon="folder" label="Ideas" detail={4} />
+        <RowFace icon="note.text" label="Aphorisms" note="Appunti" detail="11:24" chevron={false} />
+        <RowFace icon="folder" label="Studio" note="4 notes" chevron={false} />
       </View>
     </View>
   );

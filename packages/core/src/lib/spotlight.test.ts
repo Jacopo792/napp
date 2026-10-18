@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fuzzyMatch, headingsOf, nameMatch, snippetOf } from "./spotlight.ts";
+import { fuzzyMatch, headingsOf, nameMatch, rankGroups, snippetOf } from "./spotlight.ts";
 
 test("a name holding the query in order is found, and the tighter hold ranks first", () => {
   const name = "riunione cliente";
@@ -64,4 +64,21 @@ test("a snippet keeps the match as written, accents included", () => {
 
 test("a match at the very start carries no leading ellipsis", () => {
   assert.deepEqual(snippetOf("Uno", "uno"), { before: "", match: "Uno", after: "" });
+});
+
+test("results rank across groups, and a resting list hides what only a query finds", () => {
+  const items = [
+    { group: "Notes", name: "Grocery list", at: 1 },
+    { group: "Text", name: "Trip" },
+    { group: "Actions", name: "New Note", keywords: "create", searchOnly: true },
+  ];
+  assert.deepEqual(
+    rankGroups(items, "").map((g) => g.group),
+    ["Notes", "Text"],
+  );
+  assert.deepEqual(
+    rankGroups(items, "create").map((g) => g.items[0].name),
+    ["New Note"],
+  );
+  assert.equal(rankGroups(items, "grocry")[0].items[0].name, "Grocery list");
 });

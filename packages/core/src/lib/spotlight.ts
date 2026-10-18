@@ -116,3 +116,81 @@ export function snippetOf(text: string, query: string, radius = 48): Snippet | n
     after: line.slice(end, to) + (to < line.length ? "…" : ""),
   };
 }
+
+/** What can be found: a palette command on the web, a result on the phone. */
+export interface Findable {
+  /** The heading this sits under. Results are grouped, never sorted flat. */
+  group: string;
+  name: string;
+  hint?: string;
+  /** Words that should find this and are not in its name. */
+  keywords?: string;
+  /** Set by a search that has already decided how well this answers the
+   *  query — a heading, a line of text. It is ranked as given. */
+  rank?: number;
+  /** When it last changed, in milliseconds: the last tiebreak. */
+  at?: number;
+  /** Found by a query, never listed at rest. */
+  searchOnly?: boolean;
+}
+
+/* One scale for everything that can be found, so a chapter, a heading and a
+   line of text can be put in one order: the start of a name, the start of a
+   word in it, anywhere in it, a heading (3, given by the search), the words
+   behind a name, its second line, and last the running text (6). */
+export function scoreFor(item: Findable, query: string): number {
+  if (item.rank !== undefined) return item.rank;
+  const name = fold(item.name);
+  if (name.startsWith(query)) return 0;
+  const word = name.split(/\s+/).some((part) => part.startsWith(query));
+  if (word) return 1;
+  if (name.includes(query)) return 2;
+  /* Held in order rather than whole: "riu cli" for "Riunione cliente". In
+     two runs that each start a word it ranks under every whole match and
+     over a heading. Anything looser is barely the name any more — "oggi" is
+     in "questo passaggio" — and goes under the words a command was given to
+     be found by, and under its own second line. `fuzzyMatch` counts a run
+     starting inside a word as a tenth, so under 1.1 is exactly that. */
+  const loose = fuzzyMatch(name, query);
+  if (loose !== null && loose < 1.1) return 2 + (loose + 1) / 4;
+  if (item.keywords && fold(item.keywords).includes(query)) return 4;
+  if (item.hint && fold(item.hint).includes(query)) return 5;
+  if (loose !== null) return 5.5;
+  return -1;
+}
+
+/** At rest (`query` empty), grouped in the order the groups were handed over
+ *  — the order of a resting palette is the caller's editorial decision — and
+ *  each cut to `resting`. With a (folded) query, by how well each answers it,
+ *  then by the kind of thing (the caller's order again), then by how
+ *  recently it changed; and the groups follow their best row, so the heading
+ *  that starts with the word is above the line of text that merely contains
+ *  it. */
+export function rankGroups<T extends Findable>(
+  items: T[],
+  query: string,
+  resting = 5,
+): { group: string; items: T[] }[] {
+  const pool = query ? items : items.filter((item) => !item.searchOnly);
+  const order = new Map<string, number>();
+  for (const item of pool) if (!order.has(item.group)) order.set(item.group, order.size);
+  const ranked = query
+    ? pool
+        .map((item) => ({ item, rank: scoreFor(item, query) }))
+        .filter((entry) => entry.rank >= 0)
+        .sort(
+          (a, b) =>
+            a.rank - b.rank ||
+            order.get(a.item.group)! - order.get(b.item.group)! ||
+            (b.item.at ?? 0) - (a.item.at ?? 0),
+        )
+        .map((entry) => entry.item)
+    : pool;
+  const groups: { group: string; items: T[] }[] = [];
+  for (const item of ranked) {
+    const bucket = groups.find((entry) => entry.group === item.group);
+    if (bucket) bucket.items.push(item);
+    else groups.push({ group: item.group, items: [item] });
+  }
+  return query ? groups : groups.map((g) => ({ ...g, items: g.items.slice(0, resting) }));
+}

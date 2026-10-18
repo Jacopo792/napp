@@ -931,11 +931,49 @@ Handler, with the curves and durations of `styles.css` read as numbers from
 open exactly as on the web and settles with `--ease-bounce`; the act runs on
 the press, the row leaves the way it was pushed and then closes its own
 height, so the rows under it rise rather than jump when the list re-renders.
-The phone's navigation is now `expo-router` over the system's native stack,
-with large collapsing titles, the back gesture, native context menus and Liquid
-Glass bars. `Link.Trigger withAppleZoom` opens a note out of its row; UIKit owns
-that transition rather than a second Reanimated page mask. Reanimated still
-owns the row under the finger. The metadata half of every act is
+**The phone is Revolut's structure and Shop's feed** (Jacopo, 18 October
+2026, from a recording of both — three rounds of "make it like Revolut" in
+words had failed). Three tabs under the system's floating tab bar,
+`app/(tabs)` with `NativeTabs`: Home, Notes, Comments — on iOS the Liquid
+Glass pill, on Android the Material bar tinted from the palette. Settings is
+not a tab: the face at the top left pushes it, and the profile is the card at
+its top (Jacopo, 18 October 2026 — both was one too many).
+**No list has a large title.** A tab page stands under a bar of its own
+(`TopBar` in `Chrome.tsx`): the face, which opens Settings, a wide search
+pill, one round button. **Every search pill in a bar opens `app/search.tsx`,
+the search of everything** — the web's ⌘K on a phone, ranked by the same
+`rankGroups`/`scoreFor` (moved out of `CommandPalette.tsx` into
+`spotlight.ts` so the two cannot rank differently): notes by title, their
+headings, the line of text a word is in with the match marked, the words in
+their pictures and PDFs (`media_text`, one request when it opens), folders,
+open remarks, people, and the app's own places and acts ("dark",
+"wallpaper", "invite"). At rest it is the notes touched last. Only a pushed
+folder keeps a pill of its own, which filters that folder. A pushed page — a folder, a note, a page of Settings
+— keeps the system's transparent bar for its round glass back button and the
+back gesture, and says its own title in the page (`PageTitle`). Every page
+is the same few parts, and they live in `Chrome.tsx` and `Grouped.tsx`, never
+per screen: `Card` (glass over the reader's picture, solid elsewhere),
+`RoundButton`, `SearchPill`, `Chips` (Shop's row; sorting is chips, not a
+menu), `PillButton` (a page's one decisive act, full width at its foot),
+`SkeletonCard` (a page still loading is the shapes it is about to hold, never
+a spinner), `Reveal`, `BottomFade`. `useChoice` in `TextPrompt.tsx` is the
+system's action sheet on iOS and the app's own sheet on Android, for the + and
+a folder's ⋯. `Link.Trigger withAppleZoom` opens a note out of the card it was
+pressed on; UIKit owns that transition, and a `pageSheet` modal — People,
+Comments, History — is the system's, page receding under it as Shop's cart.
+**Every surface that shows a note is a `NoteLink`** (`NoteLink.tsx`): held,
+it lifts `NotePreview` with the note's acts under it (`useNoteActs`, also what
+the list's push uncovers) — iOS lifts it itself, Android gets the same
+preview and acts in the `useChoice` sheet from a gesture-handler long press,
+because inside a folder card the card's own push takes the touch from a plain
+responder first. Reanimated still owns the row under the finger. **Content
+dissolves under both bars instead of being cut:** the top bar's ground fades
+in with the scroll, solid to its foot and gone over 32 points below it; the
+foot of a tab page fades into the ground above the tab bar. **A card grows
+into place as it rises from the bottom of the screen** — `Reveal` reads where
+it is on screen (`measure`, on the UI thread, against the page's scroll) and
+goes from 92% and half-seen to whole over the last 180 points; a row inside a
+card only fades, because a row that shrank would open gaps in its card. The metadata half of every act is
 `lib/noteActs.ts`, shared with the web's `Notes.tsx`.
 
 **The phone's push is Mail's, and that is the one place it leaves the web's
@@ -943,29 +981,39 @@ rule** (Jacopo, 17 October 2026). Right uncovers the bin, left files away; the
 colour is a band attached to the row at full height, and a push past half the
 row arms the act with a tick — letting go there performs it. A short push
 still opens the row on its button, and nothing settles with a bounce. Folder
-rows swipe too: right removes the folder (asks; notes stay), left archives
-every note in its branch (`shelveFolder`). `OPEN` is still the shared number.
+cards on Home swipe too: right removes the folder (asks; notes stay), left
+archives every note in its branch (`shelveFolder`). `OPEN` is still the shared
+number.
 
 **Depth is the reader's picture, never a wash.** The phone darkens the page
 most of the way to black and draws cards solid on it; a wallpaper chosen in
-Appearance is drawn sharp at the top and fades into that ground, Revolut's
-way. Chips are tinted by default and filled on request (Appearance → Icons,
-kept on the device). A held row lifts `NotePreview`, drawn natively from the
+Appearance is drawn sharp at the top of a tab page and fades into that
+ground, Revolut's way, and the cards there are the system's frosted glass
+(`expo-glass-effect`) scrolling over it. No picture, or a system without the
+glass, and they are solid. Every glyph is the palette's ink — the bars'
+`tintColor`, `IconButton`, the theme's `primary` — never the system blue.
+`Appearance.setColorScheme` makes the system's own surfaces (tab bar, glass,
+action sheets) wear the theme the reader chose, not the phone's. A held row lifts `NotePreview`, drawn natively from the
 projection — never the WebView. A face on a row means that member **made the
 note or wrote in it** (`note_versions` authors, `facesOf`), never that they are
 reading it: a partner's face on a note of yours that they only opened said they
 had changed it (Jacopo, 17 October 2026). Presence only adds the dot to a face
 already there. Gated by Privacy → Show Collaborators.
 
-**Folders shows one member at a time.** The face at the top left is whose
-notes are showing, with the next member's face peeking out behind it, and one
-press turns to them (`WhoseSwitch`): the two faces, each in its own colour,
-trade places without being remounted, the title says whose, and the group
-eases in from the side in place. It stands outside the bar's glass
-(`hidesSharedBackground`); inside it the faces read as a lump. A stacked action sheet and a popover
-were both tried and refused; a double press was considered and is not
-discoverable. That is the You / Partner shelf in the phone's shape; your
-profile is reached from Settings.
+**Home is a notes app's front page, never a bank's** (Jacopo, 18 October
+2026: a big "10 notes" over a row of round labelled acts read as a balance).
+Under the bar, whose notes these are: a segmented capsule on the content's
+16-point grid, one segment a member — face and first name, "You" for the
+reader — with a thumb that slides to the one chosen on a spring with no
+overshoot and the others dimmed in step (`WhoseSwitch`); past three members it
+scrolls sideways. Two faces overlapping in a pill read as an accident, and a
+stacked action sheet, a popover and a double press were all refused before
+it. The page under it eases in from the side the next member came from. Then **Continue
+Writing** — the latest note as one large card on the reader's picture — then
+**Pinned**, small cards scrolling sideways, then every folder as a Shop feed
+card (name, ⋯, its three latest notes, "N notes" and a round arrow), and the
+Archive and Recently Deleted in a small card at the foot. New Note, New
+Folder and Import Markdown are the bar's +; Archives is in Settings.
 **A book is not on the phone** — writing one is a desk's work. Archives of
 kind `document` are left out of the list, New Archive makes only notes, and a
 phone that opens on a book moves to the first notes archive.
@@ -1002,8 +1050,10 @@ Privacy splits into what others can see and what I can see, every switch
 phrased so that on means shown. Revoking an invitation asks first.
 
 One shape language for the phone: a thing sits on a rounded square with a
-continuous corner, a person on a circle. Cards are solid, `CARD_RADIUS` 22,
-with no rules between rows. A face without a picture is its letters in a hue
+continuous corner, a person on a circle. Cards are `CARD_RADIUS` 24, carry
+their small grey heading inside them (Revolut's Pocket pages), and have no
+rules between rows; a settings row is a tile, a name, a line under it saying
+what is set, and a chevron. A face without a picture is its letters in a hue
 of its own on a disc of that hue mixed opaque into the card — never blue,
 which is the reader's own. Every press is `Press` in `Grouped.tsx`: a row in a
 card lights, anything standing alone gives 4% under the finger, both on the
@@ -1013,11 +1063,13 @@ seats). Account preferences
 and live editor updates still use the existing core modules. A lock arriving
 while a note is open changes editing permission without rebuilding its Y.Doc.
 
-Navigation uses the native iOS push; a note opens out of its row with
-`Link.Trigger withAppleZoom` and keeps its context menu and preview. Toolbar icons have
-44 pt touch targets. Notes search is the native bottom search bar beside New note;
-the list keeps `contentInsetAdjustmentBehavior="automatic"` so it never overlaps. Mobile note titles use system typography, natural wrapping
-and padding that prevents glyph clipping.
+Toolbar icons have 44 pt touch targets. Search is the pill in the Notes tab's
+bar, and the pill in every other tab's bar is a door to it; a pushed folder
+carries its own pill under its title. iOS insets a scroller under a
+transparent bar by itself (`contentInsetAdjustmentBehavior="automatic"`);
+Android does not, so a pushed page pads by `useHeaderHeight()` there. Mobile
+note titles use system typography, natural wrapping and padding that prevents
+glyph clipping.
 
 Native note controls now call the editor through `lib/hostedCommands.ts`:
 formatting, links, find, private images and file attachments, Markdown/Word/PDF

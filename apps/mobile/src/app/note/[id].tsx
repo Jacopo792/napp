@@ -230,7 +230,7 @@ export default function Note() {
                 ),
         }}
       />
-      <Stack.Toolbar placement="right">
+      <Stack.Toolbar placement="right" tintColor={palette.ink}>
         <Stack.Toolbar.Menu icon={icon("ellipsis")}>
           <Stack.Toolbar.Menu icon={icon("textformat")}>
             <Stack.Toolbar.Label>Format</Stack.Toolbar.Label>
@@ -276,51 +276,55 @@ export default function Note() {
             Attach File
           </Stack.Toolbar.MenuAction>
           {!row?.trashedAt ? (
-            <>
+            <Stack.Toolbar.MenuAction
+              disabled={foreignLock || self?.role !== "editor"}
+              icon={icon(row?.pinned ? "pin.slash" : "pin")}
+              onPress={() => act(owner, (prev) => pinNote(prev, id))}
+            >
+              {row?.pinned ? "Unpin" : "Pin"}
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {!row?.trashedAt ? (
+            <Stack.Toolbar.MenuAction
+              icon={icon(row?.lockedBy === session.userId ? "lock.open" : "lock")}
+              disabled={
+                self?.role !== "editor" || Boolean(row?.lockedBy && row.lockedBy !== session.userId)
+              }
+              onPress={() => act(owner, (prev) => lockNote(prev, id, session.userId))}
+            >
+              {row?.lockedBy === session.userId ? "Unlock" : "Lock"}
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {!row?.trashedAt ? (
+            <Stack.Toolbar.Menu icon={icon("folder")}>
+              <Stack.Toolbar.Label>Move</Stack.Toolbar.Label>
               <Stack.Toolbar.MenuAction
                 disabled={foreignLock || self?.role !== "editor"}
-                icon={icon(row?.pinned ? "pin.slash" : "pin")}
-                onPress={() => act(owner, (prev) => pinNote(prev, id))}
+                onPress={() => act(owner, (prev) => fileNote(prev, id, null))}
               >
-                {row?.pinned ? "Unpin" : "Pin"}
+                No Folder
               </Stack.Toolbar.MenuAction>
-              <Stack.Toolbar.MenuAction
-                icon={icon(row?.lockedBy === session.userId ? "lock.open" : "lock")}
-                disabled={
-                  self?.role !== "editor" ||
-                  Boolean(row?.lockedBy && row.lockedBy !== session.userId)
-                }
-                onPress={() => act(owner, (prev) => lockNote(prev, id, session.userId))}
-              >
-                {row?.lockedBy === session.userId ? "Unlock" : "Lock"}
-              </Stack.Toolbar.MenuAction>
-              <Stack.Toolbar.Menu icon={icon("folder")}>
-                <Stack.Toolbar.Label>Move</Stack.Toolbar.Label>
+              {metaOf(owner).folders.map((folder) => (
                 <Stack.Toolbar.MenuAction
+                  key={folder.id}
                   disabled={foreignLock || self?.role !== "editor"}
-                  onPress={() => act(owner, (prev) => fileNote(prev, id, null))}
+                  onPress={() => act(owner, (prev) => fileNote(prev, id, folder.id))}
                 >
-                  No Folder
+                  {folder.name}
                 </Stack.Toolbar.MenuAction>
-                {metaOf(owner).folders.map((folder) => (
-                  <Stack.Toolbar.MenuAction
-                    key={folder.id}
-                    disabled={foreignLock || self?.role !== "editor"}
-                    onPress={() => act(owner, (prev) => fileNote(prev, id, folder.id))}
-                  >
-                    {folder.name}
-                  </Stack.Toolbar.MenuAction>
-                ))}
-              </Stack.Toolbar.Menu>
-              <Stack.Toolbar.MenuAction
-                disabled={foreignLock || self?.role !== "editor"}
-                icon={icon("archivebox")}
-                onPress={() => leave((prev) => shelveNote(prev, id, !row?.archivedAt))}
-              >
-                {row?.archivedAt ? "Put back" : "Archive"}
-              </Stack.Toolbar.MenuAction>
-            </>
-          ) : (
+              ))}
+            </Stack.Toolbar.Menu>
+          ) : null}
+          {!row?.trashedAt ? (
+            <Stack.Toolbar.MenuAction
+              disabled={foreignLock || self?.role !== "editor"}
+              icon={icon("archivebox")}
+              onPress={() => leave((prev) => shelveNote(prev, id, !row?.archivedAt))}
+            >
+              {row?.archivedAt ? "Put back" : "Archive"}
+            </Stack.Toolbar.MenuAction>
+          ) : null}
+          {row?.trashedAt ? (
             <Stack.Toolbar.MenuAction
               icon={icon("arrow.uturn.backward")}
               disabled={foreignLock || self?.role !== "editor"}
@@ -328,7 +332,7 @@ export default function Note() {
             >
               Restore
             </Stack.Toolbar.MenuAction>
-          )}
+          ) : null}
           <Stack.Toolbar.MenuAction
             disabled={foreignLock || self?.role !== "editor"}
             icon={icon("trash")}
@@ -355,7 +359,7 @@ export default function Note() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
-      <Stack.Toolbar>
+      <Stack.Toolbar tintColor={palette.ink}>
         <Stack.Toolbar.View>
           <IconButton
             icon="bold"
@@ -465,7 +469,7 @@ export default function Note() {
               )
             }
           >
-            <Text style={{ color: palette.accent, fontSize: 22 }}>↑</Text>
+            <Text style={{ color: palette.ink, fontSize: 22 }}>↑</Text>
           </Pressable>
           <Pressable
             accessibilityLabel="Next Match"
@@ -475,7 +479,7 @@ export default function Note() {
               )
             }
           >
-            <Text style={{ color: palette.accent, fontSize: 22 }}>↓</Text>
+            <Text style={{ color: palette.ink, fontSize: 22 }}>↓</Text>
           </Pressable>
           <Pressable
             onPress={() => {

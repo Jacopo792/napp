@@ -1,11 +1,13 @@
-/* The grouped cards Folders and Settings are made of: a solid card with a
- * continuous corner standing on the near-black ground, and rows that lead with
- * a tile, a name and a count. One shape language throughout: a thing (a
+/* The grouped cards Folders and Settings are made of: Revolut's card — glass
+ * over the reader's picture, solid on the near-black ground, a continuous
+ * corner, its small grey heading inside it — and rows that lead with a tile,
+ * a name and a count, with no rule between them. One shape language throughout: a thing (a
  * folder, a setting, the bin) sits on a rounded square, a person on a circle,
  * so a face is never mistaken for a place. A row lights under the finger at
  * once and lets go on a spring, on the UI thread. */
 import type { ReactNode } from "react";
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,11 +25,41 @@ import Animated, {
 import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
 import { usePalette, type Palette } from "./archive";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useCard } from "./Backdrop";
 import { release, trashGround } from "./theme";
 
 /** Every card's corner, drawn continuous. */
-export const CARD_RADIUS = 22;
+export const CARD_RADIUS = 24;
+
+const glassy = Platform.OS === "ios" && isLiquidGlassAvailable();
+
+/** A card: the system's glass over the reader's picture, the card colour
+ *  everywhere else (and on a system without the glass). */
+export function Card({
+  children,
+  style,
+  radius = CARD_RADIUS,
+}: {
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  radius?: number;
+}) {
+  const palette = usePalette();
+  const { card, wallpaper } = useCard();
+  const shape = { borderRadius: radius, borderCurve: "continuous", overflow: "hidden" } as const;
+  if (wallpaper && glassy)
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme={palette.dark ? "dark" : "light"}
+        style={[shape, style]}
+      >
+        {children}
+      </GlassView>
+    );
+  return <View style={[shape, { backgroundColor: card }, style]}>{children}</View>;
+}
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -89,19 +121,18 @@ export function Group({
   children: ReactNode;
 }) {
   const palette = usePalette();
-  const { card } = useCard();
   return (
-    <View style={styles.section}>
+    <Card style={styles.section}>
       {title ? (
         <View style={styles.header}>
           {leading}
-          <Text style={[styles.heading, { color: palette.ink }]} numberOfLines={1}>
+          <Text style={[styles.heading, { color: palette.ink3 }]} numberOfLines={1}>
             {title}
           </Text>
         </View>
       ) : null}
-      <View style={[styles.group, { backgroundColor: card }]}>{children}</View>
-    </View>
+      <View style={styles.group}>{children}</View>
+    </Card>
   );
 }
 
@@ -215,7 +246,7 @@ export function RowFace({
               {icon ? (
                 <SymbolView
                   name={icon}
-                  tintColor={tint ?? palette.accent}
+                  tintColor={tint ?? palette.ink}
                   size={24}
                   weight="semibold"
                 />
@@ -250,15 +281,16 @@ export function RowFace({
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 16, marginBottom: 28 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12, marginLeft: 6 },
-  heading: { flexShrink: 1, fontSize: 20, fontWeight: "700", letterSpacing: -0.4 },
-  group: {
-    borderRadius: CARD_RADIUS,
-    borderCurve: "continuous",
-    overflow: "hidden",
-    paddingVertical: 6,
+  section: { marginHorizontal: 16, marginBottom: 16 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingTop: 16,
   },
+  heading: { flexShrink: 1, fontSize: 13, fontWeight: "600", letterSpacing: -0.1 },
+  group: { paddingVertical: 6 },
   face: { flexDirection: "row", alignItems: "center", minHeight: 62 },
   lead: { paddingRight: 14 },
   body: {
@@ -270,7 +302,7 @@ const styles = StyleSheet.create({
     paddingRight: 18,
     gap: 8,
   },
-  label: { fontSize: 17, fontWeight: "600", letterSpacing: -0.3 },
-  note: { fontSize: 15 },
+  label: { fontSize: 16, fontWeight: "600", letterSpacing: -0.3 },
+  note: { fontSize: 13 },
   detail: { fontSize: 17, flexShrink: 1, maxWidth: "50%" },
 });

@@ -33,7 +33,7 @@ export function IconButton({
         opacity: disabled ? 0.35 : 1,
       }}
     >
-      <SymbolView name={icon} size={24} weight="medium" tintColor={palette.accent} />
+      <SymbolView name={icon} size={24} weight="medium" tintColor={palette.ink} />
     </Press>
   );
 }

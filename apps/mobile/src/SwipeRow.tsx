@@ -12,7 +12,13 @@
  * `--ease-out`, because an overshoot after the hand has decided reads as the
  * list hesitating. */
 import { useEffect, type ReactNode } from "react";
-import { LayoutAnimation, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import {
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -28,7 +34,7 @@ import { OPEN } from "@/lib/swipe";
 import { SymbolView } from "./icons";
 import { usePalette } from "./archive";
 import { useCard } from "./Backdrop";
-import { CARD_RADIUS, quiet } from "./Grouped";
+import { Card, CARD_RADIUS, quiet } from "./Grouped";
 import { travel } from "./theme";
 
 export interface Act {
@@ -52,10 +58,14 @@ interface Props {
   menu: ReactNode;
   /** What a held row lifts above that menu. */
   preview?: ReactNode;
+  /** Android has no lifted preview: a long press calls this instead. */
+  onHold?: () => void;
   first: boolean;
   last: boolean;
   /** Inside a `Group`, which already is the card. */
   bare?: boolean;
+  /** A card of its own, in glass over the reader's picture (a folder). */
+  glass?: boolean;
   /** Close every other row; one row open at a time, as on the web. */
   onClaim: () => void;
   /** Hand the list a way to close this row when another one opens. */
@@ -70,8 +80,8 @@ const tick = () => void Haptics.selectionAsync().catch(() => {});
 const thud = () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
 export function SwipeRow(props: Props) {
-  const { href, children, rightward, leftward, menu, preview, first, last, bare } = props;
-  const { onClaim, register } = props;
+  const { href, children, rightward, leftward, menu, preview, first, last, bare, glass } = props;
+  const { onClaim, register, onHold } = props;
   const palette = usePalette();
   const { card } = useCard();
   const { width: screen } = useWindowDimensions();
@@ -193,7 +203,14 @@ export function SwipeRow(props: Props) {
         <Band edge="right" act={leftward} x={x} width={width} onPress={() => perform(-1)} />
       ) : null}
       <GestureDetector gesture={pan}>
-        <Animated.View style={[{ backgroundColor: bare ? undefined : card }, corners, face]}>
+        <Animated.View
+          style={[
+            { backgroundColor: bare || glass ? undefined : card, overflow: "hidden" },
+            corners,
+            face,
+          ]}
+        >
+          {glass ? <Card style={StyleSheet.absoluteFill} /> : null}
           <Link
             href={href}
             asChild
@@ -206,7 +223,10 @@ export function SwipeRow(props: Props) {
             }}
           >
             <Link.Trigger withAppleZoom>
-              <Pressable style={({ pressed }) => pressed && { backgroundColor: quiet(palette) }}>
+              <Pressable
+                onLongPress={Platform.OS === "android" ? onHold : undefined}
+                style={({ pressed }) => pressed && { backgroundColor: quiet(palette) }}
+              >
                 {children}
               </Pressable>
             </Link.Trigger>

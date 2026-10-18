@@ -107,8 +107,10 @@ export function Avatar({
   const border = ring ? Math.max(1.5, size / 16) : 0;
   const dot = Math.max(7, Math.round(size / 3.6));
   const hue = email ? palette.accent : hueOf(userId);
-  const disc = mix(palette.paper, hue, palette.dark ? 0.32 : 0.2);
-  const letters = palette.dark ? mix(hue, "#ffffff", 0.25) : mix(hue, "#000000", 0.2);
+  /* In the light a tint as faint as the dark one's reads as washed out: the
+     disc takes more of the hue and the letters go deeper. */
+  const disc = mix(palette.paper, hue, palette.dark ? 0.32 : 0.36);
+  const letters = palette.dark ? mix(hue, "#ffffff", 0.25) : mix(hue, "#000000", 0.42);
   return (
     <View
       accessible

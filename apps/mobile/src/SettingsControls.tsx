@@ -1,11 +1,13 @@
-/* Settings' parts, named as iOS Settings names them: a page on the reader's
- * near-black ground, cards of rows with no rules between them, a tile before
- * each name where the row is a place to go, and a choice shown by looking at
- * it rather than described. The cards and the press are Folders' own
- * (`Grouped.tsx`), so the two screens are one material. */
+/* Settings' parts, in the shape of Revolut's Pocket pages: the page's title
+ * in the page under a round back button, cards with their small grey heading
+ * inside them, rows of a tile, a name, a line under it and a chevron, and the
+ * page's one decisive act as a pill at its foot (`PillButton`). A choice is
+ * shown by looking at it rather than described. The cards and the press are
+ * Folders' own (`Grouped.tsx`, `Chrome.tsx`), so every screen is one material. */
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,24 +17,30 @@ import {
   type PressableProps,
 } from "react-native";
 import { Stack } from "expo-router";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import type { SFSymbol } from "expo-symbols";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { SymbolView } from "./icons";
-import { CARD_RADIUS, Chip, Press, quiet } from "./Grouped";
+import { Chip, Press, quiet } from "./Grouped";
 import { usePalette } from "./archive";
 import { glide } from "./theme";
+import { Card, PageTitle } from "./Chrome";
 
 export function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
   const palette = usePalette();
   const backgroundColor = palette.page;
+  /* iOS insets a scroller under a transparent bar by itself; Android does not. */
+  const header = useHeaderHeight();
+  const top = Platform.OS === "android" ? header : 0;
   return (
     <>
-      <Stack.Screen options={{ title, contentStyle: { backgroundColor } }} />
+      <Stack.Screen options={{ title: "", contentStyle: { backgroundColor } }} />
       <ScrollView
         style={{ backgroundColor }}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: 48 }}
+        contentContainerStyle={{ paddingTop: top + 8, paddingBottom: 48 }}
       >
+        <PageTitle>{title}</PageTitle>
         {children}
       </ScrollView>
     </>
@@ -42,19 +50,21 @@ export function SettingsPage({ title, children }: { title: string; children: Rea
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const palette = usePalette();
   return (
-    <View style={styles.section}>
+    <Card style={styles.section}>
       {title ? (
         <Text style={[styles.heading, { color: palette.ink3 }]} numberOfLines={1}>
           {title}
         </Text>
       ) : null}
-      <View style={[styles.group, { backgroundColor: palette.paper }]}>{children}</View>
-    </View>
+      <View style={styles.group}>{children}</View>
+    </Card>
   );
 }
 
 interface LineProps extends Omit<PressableProps, "style" | "children"> {
   label: string;
+  /** A line under the name: what is set there now. */
+  note?: string;
   value?: string | number;
   /** A tile before the name. */
   icon?: SFSymbol;
@@ -70,6 +80,7 @@ interface LineProps extends Omit<PressableProps, "style" | "children"> {
 /* `Link asChild` hands the row its press and its ref through `rest`. */
 export function Line({
   label,
+  note,
   value,
   icon,
   leading,
@@ -89,9 +100,16 @@ export function Line({
       style={[styles.line, rest.disabled && pressable && { opacity: 0.4 }]}
     >
       {icon ? <Chip icon={icon} size={32} tint={tone === "ink" ? undefined : colour} /> : leading}
-      <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
-        {label}
-      </Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
+          {label}
+        </Text>
+        {note ? (
+          <Text style={[styles.note, { color: palette.ink3 }]} numberOfLines={1}>
+            {note}
+          </Text>
+        ) : null}
+      </View>
       {value !== undefined ? (
         <Text style={[styles.value, { color: palette.ink3 }]} numberOfLines={1}>
           {value}
@@ -281,23 +299,19 @@ export async function attempt(action: () => Promise<unknown>) {
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 16, marginBottom: 28 },
-  heading: { fontSize: 15, fontWeight: "600", marginLeft: 6, marginBottom: 10 },
-  group: {
-    borderRadius: CARD_RADIUS,
-    borderCurve: "continuous",
-    overflow: "hidden",
-    paddingVertical: 6,
-  },
+  section: { marginHorizontal: 16, marginBottom: 16 },
+  heading: { fontSize: 13, fontWeight: "600", marginHorizontal: 18, marginTop: 16 },
+  group: { paddingVertical: 6 },
   line: {
-    minHeight: 54,
+    minHeight: 60,
     paddingVertical: 10,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
   },
-  label: { flex: 1, fontSize: 17, letterSpacing: -0.3 },
+  label: { fontSize: 16, fontWeight: "600", letterSpacing: -0.3 },
+  note: { fontSize: 13 },
   value: { fontSize: 17, flexShrink: 1, maxWidth: "55%", letterSpacing: -0.3 },
   segments: {
     flexDirection: "row",

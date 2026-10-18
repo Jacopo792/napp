@@ -1,14 +1,17 @@
 import { TextPromptProvider } from "../TextPrompt";
-/* The phone, laid out the way Notes on the iPhone is: a stack the system
- * draws — large titles that collapse into the bar, the back gesture, Liquid
- * Glass bars and toolbars — over screens that read the archive from one place.
- * Nothing here animates by hand what UIKit already animates. */
+/* The phone: four tabs under the system's floating tab bar — `(tabs)` — and
+ * a stack the system draws over them for everything pushed: a folder, a note,
+ * a page of Settings, each with the back gesture and a round glass back
+ * button and no title in the bar, because the page says its own (Revolut's
+ * shape; see Chrome.tsx). Nothing here animates by hand what UIKit already
+ * animates. */
 import { useEffect, useState } from "react";
+import { Appearance } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { restoreSession, type AppSession } from "@/lib/session";
-import { initAppearance } from "@/lib/appearance";
+import { initAppearance, useAppearance } from "@/lib/appearance";
 import { initAxes } from "@/lib/axes";
 import { ArchiveProvider, usePalette } from "../archive";
 import { SignIn } from "../SignIn";
@@ -23,6 +26,14 @@ export default function Root() {
     restoreSession().then(setSession, () => setSession(null));
   }, []);
   const palette = usePalette();
+  /* The system's own surfaces — the tab bar, the glass, the bar buttons, the
+     menus — wear the theme the reader chose, not the phone's. */
+  const chosen = useAppearance().theme;
+  useEffect(() => {
+    Appearance.setColorScheme(
+      chosen === "system" ? "unspecified" : palette.dark ? "dark" : "light",
+    );
+  }, [chosen, palette.dark]);
 
   const theme = palette.dark ? DarkTheme : DefaultTheme;
   return (
@@ -33,7 +44,7 @@ export default function Root() {
             ...theme,
             colors: {
               ...theme.colors,
-              primary: palette.accent,
+              primary: palette.ink,
               background: palette.page,
               card: palette.page,
               text: palette.ink,
@@ -52,19 +63,17 @@ export default function Root() {
               <HostedPageProvider>
                 <Stack
                   screenOptions={{
-                    headerLargeTitle: true,
+                    title: "",
                     headerTransparent: true,
-                    headerLargeTitleShadowVisible: false,
                     headerShadowVisible: false,
-                    headerTintColor: palette.accent,
+                    headerBackButtonDisplayMode: "minimal",
+                    headerTintColor: palette.ink,
                     headerTitleStyle: { color: palette.ink },
-                    headerLargeTitleStyle: {
-                      color: palette.ink,
-                      fontWeight: "700",
-                    },
                     contentStyle: { backgroundColor: palette.page },
                   }}
-                />
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                </Stack>
               </HostedPageProvider>
             </ArchiveProvider>
           ) : (
