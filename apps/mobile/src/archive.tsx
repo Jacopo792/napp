@@ -25,7 +25,12 @@ import {
 import { APPEARANCE_PRESETS, DEFAULT_APPEARANCE, setAppearance } from "@/lib/appearance";
 import { setAxes } from "@/lib/axes";
 import { setWritingPreferences } from "@/lib/writingPreferences";
-import { chooseArchive } from "@/lib/session";
+import {
+  pauseAccount as leaveForAccount,
+  resumeAccount,
+  chooseArchive,
+  type AuthenticationResult,
+} from "@/lib/session";
 import { loadSpaces, type Space } from "@/lib/spaces";
 import { loadProfile, saveProfile, type Profile } from "@/lib/supabase";
 import { appearanceTokens, useAppearance } from "@/lib/appearance";
@@ -51,6 +56,8 @@ interface Archive {
   act: (owner: string, change: (prev: Meta) => Meta) => void;
   metaOf: (owner: string) => Meta;
   signOut: () => Promise<void>;
+  addAccount: () => Promise<void>;
+  switchAccount: (userId: string) => Promise<void>;
   spaces: Space[];
   preferences: AccountPreferences;
   preferencesReady: boolean;
@@ -79,11 +86,13 @@ export function ArchiveProvider({
   session,
   onSignedOut,
   onSession,
+  onAccountChange,
   children,
 }: {
   session: AppSession;
   onSignedOut: () => void;
   onSession: (session: AppSession) => void;
+  onAccountChange: (action: () => Promise<AuthenticationResult | null>) => Promise<void>;
   children: React.ReactNode;
 }) {
   const [present, setPresent] = useState<Presence>(new Map());
@@ -110,9 +119,16 @@ export function ArchiveProvider({
   const [wake, setWake] = useState(0);
   const [active, setActive] = useState(AppState.currentState !== "background");
   useEffect(() => {
+    let away = AppState.currentState === "background";
     const listener = AppState.addEventListener("change", (state) => {
-      setActive(state === "active");
-      if (state === "active") setWake((count) => count + 1);
+      if (state === "background") {
+        away = true;
+        setActive(false);
+      } else if (state === "active" && away) {
+        away = false;
+        setActive(true);
+        setWake((count) => count + 1);
+      }
     });
     return () => listener.remove();
   }, []);
@@ -135,13 +151,25 @@ export function ArchiveProvider({
       (next) => {
         if (!live) return;
         /* A book is written at a desk: the phone lists only notes archives, and
-         one that opens on a book goes to the first of those instead. The
-         account's first archive is always notes, so there is one. */
+         one that opens on a book goes to a notes archive or the empty chooser. */
         const notes = next.filter((space) => space.kind !== "document");
         setSpaces(notes);
+        if (!notes.length) {
+          void writes.current
+            .then(() =>
+              live
+                ? onAccountChange(async () => ({ session: null, account: session, archives: [] }))
+                : undefined,
+            )
+            .catch((reason) => live && setError(String(reason)));
+          return;
+        }
         if (notes[0] && !notes.some((space) => space.archiveId === session.archiveId))
-          void chooseArchive(session, notes[0].archiveId).then(onSession, (reason) =>
-            setError(String(reason)),
+          void chooseArchive(session, notes[0].archiveId, { notesOnly: true }).then(
+            (nextSession) => {
+              if (live) onSession(nextSession);
+            },
+            (reason) => live && setError(String(reason)),
           );
       },
       (reason) => live && setError(String(reason)),
@@ -154,7 +182,7 @@ export function ArchiveProvider({
       live = false;
       if (channel) void unsubscribeFromArchive(channel);
     };
-  }, [session, wake, onSession]);
+  }, [session, wake, onSession, onAccountChange]);
 
   const updatePreferences = useCallback(
     ({ appearance, axes, ...patch }: Partial<AccountPreferences>) => {
@@ -201,7 +229,7 @@ export function ArchiveProvider({
     async (id: string) => {
       if (id === session.archiveId) return;
       await writes.current;
-      onSession(await chooseArchive(session, id));
+      onSession(await chooseArchive(session, id, { notesOnly: true }));
     },
     [session, onSession],
   );
@@ -304,11 +332,34 @@ export function ArchiveProvider({
     [session],
   );
 
-  const signOut = useCallback(async () => {
-    await writes.current;
-    await clearSession();
-    onSignedOut();
-  }, [onSignedOut]);
+  const changeAccount = useCallback(
+    async (action: () => Promise<AuthenticationResult | null>) => {
+      await writes.current;
+      await onAccountChange(action);
+    },
+    [onAccountChange],
+  );
+  const addAccount = useCallback(
+    () =>
+      changeAccount(async () => {
+        await leaveForAccount();
+        return null;
+      }),
+    [changeAccount],
+  );
+  const switchAccount = useCallback(
+    (userId: string) => changeAccount(() => resumeAccount(userId, { notesOnly: true })),
+    [changeAccount],
+  );
+  const signOut = useCallback(
+    () =>
+      changeAccount(async () => {
+        await clearSession();
+        onSignedOut();
+        return null;
+      }),
+    [changeAccount, onSignedOut],
+  );
 
   const value = useMemo(
     () => ({
@@ -318,6 +369,8 @@ export function ArchiveProvider({
       act,
       metaOf,
       signOut,
+      addAccount,
+      switchAccount,
       spaces,
       profile,
       preferences,
@@ -337,6 +390,8 @@ export function ArchiveProvider({
       act,
       metaOf,
       signOut,
+      addAccount,
+      switchAccount,
       spaces,
       profile,
       preferences,

@@ -40,6 +40,7 @@ import {
 } from "@/features/editor/lib/proofread";
 import {
   adoptWallpaper,
+  DEFAULT_APPEARANCE,
   currentAppearance,
   setAppearance,
   subscribeToAppearance,
@@ -48,7 +49,7 @@ import {
 import { downloadObject, uploadObject } from "./archiveAssets";
 import { prepareImageForNote } from "./image";
 import { loadAutoLock, saveAutoLock } from "./autoLock";
-import { currentAxes, setAxes, subscribeToAxes } from "./axes";
+import { DEFAULT_AXES, currentAxes, setAxes, subscribeToAxes } from "./axes";
 import {
   accountPreferences,
   DEFAULT_FLAGS,
@@ -63,6 +64,7 @@ import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
 import { localWhatsNewSeen } from "./whatsNew.ts";
 import {
+  DEFAULT_WRITING_PREFERENCES,
   currentWritingPreferences,
   setWritingPreferences,
   subscribeToWritingPreferences,
@@ -103,6 +105,31 @@ let unsent: AccountPreferences | null = null;
 /** Whose they are: a window signed out and into another account keeps none
  *  of the first one's. */
 let heldFor: string | null = null;
+let generation = 0;
+let writing: Promise<void> = Promise.resolve();
+
+/** Flush while the old account still owns auth, then forget its live stores.
+ * Native clients remount instead of reloading the JavaScript runtime. */
+export async function releaseAccountPreferences(session?: AppSession): Promise<void> {
+  window.clearTimeout(pending);
+  await writing;
+  if (session && unsent) await write(session, unsent, true);
+  generation += 1;
+  held = unsent = null;
+  heldFor = null;
+  phoneLook = undefined;
+  settled = "";
+  unheard.length = 0;
+  apply(
+    accountPreferences(
+      DEFAULT_APPEARANCE,
+      DEFAULT_AXES,
+      DEFAULT_WRITING_PREFERENCES,
+      DEFAULT_FLAGS,
+      {},
+    ),
+  );
+}
 
 export function localPreferences(seen: RemarksSeen = {}, userId?: string): AccountPreferences {
   if (held && userId && userId === heldFor)
@@ -243,7 +270,10 @@ async function uploadWallpaper(session: AppSession): Promise<void> {
 
 async function collectWallpaper(session: AppSession, objectId: string | null): Promise<void> {
   if (!objectId || objectId === heldWallpaper()) return;
-  await adoptWallpaper(await downloadObject(session, objectId, "image/webp"));
+  const version = generation;
+  const blob = await downloadObject(session, objectId, "image/webp");
+  if (version !== generation) return;
+  await adoptWallpaper(blob);
   holdWallpaper(objectId);
 }
 
@@ -266,6 +296,7 @@ const canonical = (stored: unknown) =>
   JSON.stringify(mergeAccountPreferences(stored, localPreferences()));
 
 export async function pullAccountPreferences(session: AppSession): Promise<AccountPreferences> {
+  const version = generation;
   if (heldFor !== session.userId) held = unsent = null;
   heldFor = session.userId;
   if (unsent) return unsent;
@@ -275,6 +306,7 @@ export async function pullAccountPreferences(session: AppSession): Promise<Accou
     .eq("user_id", session.userId)
     .maybeSingle();
   fail(result.error);
+  if (version !== generation) throw new Error("Account changed");
   const stored = (result.data as { preferences: unknown } | null)?.preferences;
   const preferences = mergeAccountPreferences(
     stored,
@@ -301,16 +333,18 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   if (blob === settled) return;
   settled = blob;
   phoneLook = preferences.phone;
+  heldFor = session.userId;
   held = unsent = preferences;
   holdRemarksSeen(session.userId, preferences.remarksSeen);
   window.clearTimeout(pending);
-  pending = window.setTimeout(
-    () =>
-      void write(session, preferences).finally(() => {
+  pending = window.setTimeout(() => {
+    writing = writing
+      .then(() => write(session, preferences, true))
+      .then(() => {
         if (unsent === preferences) unsent = null;
-      }),
-    500,
-  );
+      })
+      .catch((reason) => console.error("Your preferences could not be saved:", reason));
+  }, 500);
 }
 
 /* **The `await` is the request.** A PostgREST builder is lazy: it is a
@@ -322,7 +356,11 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
    The `void` did the second half of the damage: with no `await` there is no
    result to inspect, so a refusal from the database would have been just as
    silent as sending nothing. Errors are reported here now. */
-async function write(session: AppSession, preferences: AccountPreferences): Promise<void> {
+async function write(
+  session: AppSession,
+  preferences: AccountPreferences,
+  strict = false,
+): Promise<void> {
   /* A picture chosen on this device is uploaded before the row that names it
      is written, so the other browser never reads an id with nothing behind it.
      Its failure must not take the row with it — a wallpaper that did not
@@ -340,6 +378,7 @@ async function write(session: AppSession, preferences: AccountPreferences): Prom
   /* Nothing landed, so nothing is settled: the next change has to try again
      rather than be waved through by a guard that believes this was written. */
   settled = "";
+  if (strict) throw new Error(result.error.message);
   console.error("Your preferences could not be saved:", result.error.message);
 }
 
@@ -374,6 +413,7 @@ export function subscribeToAccountPreferences(
   session: AppSession,
   onChange: (preferences: AccountPreferences) => void,
 ): RealtimeChannel {
+  const version = generation;
   return supabase
     .channel(`preferences:${session.userId}`)
     .on(
@@ -385,6 +425,7 @@ export function subscribeToAccountPreferences(
         filter: `user_id=eq.${session.userId}`,
       },
       (payload) => {
+        if (version !== generation) return;
         const stored = (payload.new as { preferences?: unknown } | null)?.preferences;
         const own = unheard.indexOf(canonical(stored));
         if (own >= 0) {

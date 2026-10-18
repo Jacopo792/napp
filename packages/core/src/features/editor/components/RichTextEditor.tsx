@@ -2767,142 +2767,146 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
       <EditorContent editor={editor} className="rich-text-editor" />
       {editor && !readOnly && (
         <>
-          <BubbleMenu
-            editor={editor}
-            className="popover menu-popover rich-bubble-menu flex items-center gap-1 p-1"
-            shouldShow={({ state }) => {
-              const { selection } = state;
-              if (selection.empty) return false;
-              /* A document formats from its bar, so the bubble keeps only
+          {/* A phone draws its own bar over the keyboard and leaves the
+              selection to the system's edit menu; nothing floats over words. */}
+          {!mobile && (
+            <BubbleMenu
+              editor={editor}
+              className="popover menu-popover rich-bubble-menu flex items-center gap-1 p-1"
+              shouldShow={({ state }) => {
+                const { selection } = state;
+                if (selection.empty) return false;
+                /* A document formats from its bar, so the bubble keeps only
                  what the bar does not carry: the remark and the lock. */
-              if (manuscript && !onComment && !onContinueAsNote && !writeLockOwner) return false;
-              return !(
-                selection instanceof NodeSelection &&
-                ["privateImage", "privateFile", "drawing"].includes(selection.node.type.name)
-              );
-            }}
-          >
-            {!manuscript &&
-              (["bold", "italic", "strike", "code"] as const).map((action) => (
+                if (manuscript && !onComment && !onContinueAsNote && !writeLockOwner) return false;
+                return !(
+                  selection instanceof NodeSelection &&
+                  ["privateImage", "privateFile", "drawing"].includes(selection.node.type.name)
+                );
+              }}
+            >
+              {!manuscript &&
+                (["bold", "italic", "strike", "code"] as const).map((action) => (
+                  <button
+                    key={action}
+                    type="button"
+                    className="toolbar-button press"
+                    aria-label={action}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => format(action)}
+                  >
+                    {action === "bold"
+                      ? "B"
+                      : action === "italic"
+                        ? "I"
+                        : action === "strike"
+                          ? "S"
+                          : "‹›"}
+                  </button>
+                ))}
+              {!manuscript && (
                 <button
-                  key={action}
                   type="button"
                   className="toolbar-button press"
-                  aria-label={action}
+                  aria-label="Link"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => format(action)}
+                  onClick={onOpenLink}
                 >
-                  {action === "bold"
-                    ? "B"
-                    : action === "italic"
-                      ? "I"
-                      : action === "strike"
-                        ? "S"
-                        : "‹›"}
+                  ↗
                 </button>
-              ))}
-            {!manuscript && (
-              <button
-                type="button"
-                className="toolbar-button press"
-                aria-label="Link"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={onOpenLink}
-              >
-                ↗
-              </button>
-            )}
-            {onComment && (
-              <button
-                type="button"
-                className="toolbar-button press"
-                aria-label="Comment on this passage"
-                title="Comment on this passage"
-                /* The selection must survive the click that acts on it: a
+              )}
+              {onComment && (
+                <button
+                  type="button"
+                  className="toolbar-button press"
+                  aria-label="Comment on this passage"
+                  title="Comment on this passage"
+                  /* The selection must survive the click that acts on it: a
                    pressed button takes focus, and taking focus collapses the
                    very range being commented on. */
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={onComment}
-              >
-                <MessageSquarePlus size={16} />
-              </button>
-            )}
-            {onContinueAsNote && (
-              <button
-                type="button"
-                className="toolbar-button press"
-                aria-label="Continue as note"
-                title="Continue as note"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  const { from, to } = editor.state.selection;
-                  const quote = editor.state.doc.textBetween(from, to, " ").trim();
-                  if (quote) onContinueAsNote(quote);
-                }}
-              >
-                <NotebookPen size={16} />
-              </button>
-            )}
-            {writeLockOwner && (
-              <button
-                type="button"
-                className={`toolbar-button press${passageLock === "mine" ? " is-active" : ""}`}
-                aria-pressed={passageLock === "mine"}
-                disabled={passageLock === "theirs"}
-                aria-label={
-                  passageLock === "mine"
-                    ? "Let them write this passage"
-                    : "Only I may write this passage"
-                }
-                title={
-                  passageLock === "mine"
-                    ? "Let them write this passage"
-                    : "Only I may write this passage"
-                }
-                onMouseDown={(event) => event.preventDefault()}
-                onAnimationEnd={() => setLatched(0)}
-                /* The padlock is the state, the way Bold is: shut over a
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={onComment}
+                >
+                  <MessageSquarePlus size={16} />
+                </button>
+              )}
+              {onContinueAsNote && (
+                <button
+                  type="button"
+                  className="toolbar-button press"
+                  aria-label="Continue as note"
+                  title="Continue as note"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    const { from, to } = editor.state.selection;
+                    const quote = editor.state.doc.textBetween(from, to, " ").trim();
+                    if (quote) onContinueAsNote(quote);
+                  }}
+                >
+                  <NotebookPen size={16} />
+                </button>
+              )}
+              {writeLockOwner && (
+                <button
+                  type="button"
+                  className={`toolbar-button press${passageLock === "mine" ? " is-active" : ""}`}
+                  aria-pressed={passageLock === "mine"}
+                  disabled={passageLock === "theirs"}
+                  aria-label={
+                    passageLock === "mine"
+                      ? "Let them write this passage"
+                      : "Only I may write this passage"
+                  }
+                  title={
+                    passageLock === "mine"
+                      ? "Let them write this passage"
+                      : "Only I may write this passage"
+                  }
+                  onMouseDown={(event) => event.preventDefault()}
+                  onAnimationEnd={() => setLatched(0)}
+                  /* The padlock is the state, the way Bold is: shut over a
                    passage that is locked, open over one that is not. The other
                    member's lock is theirs to lift, so the press is refused. */
-                onClick={() => {
-                  setLatched((count) => count + 1);
-                  if (!editor) return;
-                  const chain = editor.chain().focus();
-                  if (editor.isActive(WRITE_LOCK_MARK, { owner: writeLockOwner })) {
-                    chain.unsetMark(WRITE_LOCK_MARK).run();
-                  } else if (!editor.isActive(WRITE_LOCK_MARK)) {
-                    chain.setMark(WRITE_LOCK_MARK, { owner: writeLockOwner }).run();
-                  }
-                }}
-              >
-                {passageLock === "none" ? (
-                  <LockOpen
-                    key={latched}
-                    size={16}
-                    className={latched ? "is-latching" : undefined}
-                  />
-                ) : (
-                  <Lock key={latched} size={16} className={latched ? "is-latching" : undefined} />
-                )}
-              </button>
-            )}
-            {!manuscript && <span className="menu-separator rich-bubble-separator" />}
-            {(manuscript
-              ? []
-              : (["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[])
-            ).map((color) => (
-              <button
-                key={color}
-                type="button"
-                className={`menu-swatch is-${color}`}
-                aria-label={`${color} text`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => format(`color-${color}`)}
-              >
-                A
-              </button>
-            ))}
-          </BubbleMenu>
+                  onClick={() => {
+                    setLatched((count) => count + 1);
+                    if (!editor) return;
+                    const chain = editor.chain().focus();
+                    if (editor.isActive(WRITE_LOCK_MARK, { owner: writeLockOwner })) {
+                      chain.unsetMark(WRITE_LOCK_MARK).run();
+                    } else if (!editor.isActive(WRITE_LOCK_MARK)) {
+                      chain.setMark(WRITE_LOCK_MARK, { owner: writeLockOwner }).run();
+                    }
+                  }}
+                >
+                  {passageLock === "none" ? (
+                    <LockOpen
+                      key={latched}
+                      size={16}
+                      className={latched ? "is-latching" : undefined}
+                    />
+                  ) : (
+                    <Lock key={latched} size={16} className={latched ? "is-latching" : undefined} />
+                  )}
+                </button>
+              )}
+              {!manuscript && <span className="menu-separator rich-bubble-separator" />}
+              {(manuscript
+                ? []
+                : (["yellow", "purple", "pink", "orange", "mint", "blue"] as TextColor[])
+              ).map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`menu-swatch is-${color}`}
+                  aria-label={`${color} text`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format(`color-${color}`)}
+                >
+                  A
+                </button>
+              ))}
+            </BubbleMenu>
+          )}
           {!mobile && (
             <DragHandle editor={editor} className="rich-drag-handle">
               <GripVertical size={16} />

@@ -95,6 +95,7 @@ export function Line({
   const pressable = Boolean(rest.onPress) || opens;
   return (
     <Press
+      accessibilityRole={pressable ? "button" : undefined}
       {...rest}
       disabled={rest.disabled || !pressable}
       style={[styles.line, rest.disabled && pressable && { opacity: 0.4 }]}

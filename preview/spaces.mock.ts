@@ -2,6 +2,7 @@
    has somewhere to go and the archive sheet has seats to count. Each archive
    has its own notes in supabase.mock.ts — the fixture is the first one's, and
    every other archive opens empty. */
+import { uuid } from "./uuid";
 import type { AppSession } from "./session.mock";
 import {
   FIXTURE_NOTES,
@@ -108,7 +109,7 @@ export async function createSpace(
   features: DocumentFeatures = DEFAULT_FEATURES,
 ): Promise<string> {
   await sleep(150);
-  const archiveId = crypto.randomUUID();
+  const archiveId = uuid();
   spaces.push({
     archiveId,
     name: name.trim(),

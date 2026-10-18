@@ -1,18 +1,18 @@
 import { Link } from "expo-router";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { APPEARANCE_PRESETS } from "@/lib/appearance";
 import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
 import { Press } from "../../Grouped";
 import { SymbolView } from "../../icons";
-import { attempt, Line, Section, SettingsPage } from "../../SettingsControls";
-import { Card, PillButton } from "../../Chrome";
+import { Line, Section, SettingsPage } from "../../SettingsControls";
+import { Card } from "../../Chrome";
 
 /* You, then the archive you are in, then how this phone looks and how you
    write, then leaving — the order they are reached for. Every row says where
    it goes and, on the line under its name, what is set there now. */
 export default function Settings() {
-  const { session, snapshot, spaces, profile, preferences: p, signOut } = useArchive();
+  const { session, snapshot, spaces, profile, preferences: p } = useArchive();
   const palette = usePalette();
   const current = spaces.find((space) => space.archiveId === session.archiveId);
   const go = (section: string) =>
@@ -22,7 +22,8 @@ export default function Settings() {
       ? "Automatic"
       : (APPEARANCE_PRESETS.find(
           (preset) =>
-            preset.background === p.appearance.background && preset.accent === p.appearance.accent,
+            preset.background === p.appearance.background &&
+            preset.foreground === p.appearance.foreground,
         )?.name ?? "Custom");
   const name = profile?.nickname || session.email.split("@")[0];
   return (
@@ -88,6 +89,9 @@ export default function Settings() {
         </Link>
       </Section>
       <Section title="Account">
+        <Link href={go("accounts")} asChild>
+          <Line icon="person.crop.circle" label="Accounts" note={session.email} opens />
+        </Link>
         <Link href={go("writing")} asChild>
           <Line
             icon="pencil"
@@ -105,16 +109,6 @@ export default function Settings() {
           />
         </Link>
       </Section>
-      <PillButton
-        label="Sign Out"
-        tone="danger"
-        onPress={() =>
-          Alert.alert("Sign out of Napp?", undefined, [
-            { text: "Cancel", style: "cancel" },
-            { text: "Sign Out", style: "destructive", onPress: () => void attempt(signOut) },
-          ])
-        }
-      />
     </SettingsPage>
   );
 }

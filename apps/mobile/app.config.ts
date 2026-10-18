@@ -5,7 +5,7 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "Napp",
   slug: "napp",
-  icon: "../desktop/build/icon.png",
+  icon: "./assets/icon.png",
   scheme: "napp",
   version: "0.9.43",
   orientation: "default",
@@ -17,7 +17,11 @@ const config: ExpoConfig = {
   },
   android: {
     package: "io.github.jacopo792.napp",
-    adaptiveIcon: { foregroundImage: "../desktop/build/icon.png", backgroundColor: "#1c1c1e" },
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-foreground.png",
+      monochromeImage: "./assets/adaptive-monochrome.png",
+      backgroundColor: "#EDE6D7",
+    },
   },
   plugins: ["expo-sqlite", "expo-sharing", ["expo-router", { root: "./src/app" }]],
 };

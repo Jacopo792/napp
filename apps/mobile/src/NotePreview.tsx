@@ -3,7 +3,7 @@
  * starting a WebView, a Y.Doc and a socket for a glance. Pressing it opens the
  * real note. Pictures, files and drawings are named rather than fetched: a
  * glance is not worth a download. */
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { formatStamp } from "@/lib/format";
 import type { Note } from "@/lib/types";
@@ -82,7 +82,8 @@ function block(
     case "bulletList":
     case "orderedList":
     case "taskList":
-      node.content?.forEach((item, at) => {
+      for (const [at, item] of (node.content ?? []).entries()) {
+        if (out.length >= BLOCKS) break;
         const mark =
           node.type === "taskList" ? (
             <SymbolView
@@ -95,10 +96,11 @@ function block(
               {node.type === "orderedList" ? `${Number(node.attrs?.start ?? 1) + at}.` : "•"}
             </Text>
           );
-        item.content?.forEach((child, i) =>
-          block(child, palette, out, depth + (i ? 1 : 0), i ? undefined : mark),
-        );
-      });
+        for (const [i, child] of (item.content ?? []).entries()) {
+          if (out.length >= BLOCKS) break;
+          block(child, palette, out, depth + (i ? 1 : 0), i ? undefined : mark);
+        }
+      }
       return;
     case "blockquote":
       out.push(
@@ -109,7 +111,7 @@ function block(
             indent,
           ]}
         >
-          {node.content?.map((child, i) => (
+          {node.content?.slice(0, BLOCKS - out.length).map((child, i) => (
             <Text key={i} style={{ color: palette.ink2, fontSize: 16, lineHeight: 23 }}>
               {child.content?.map((grand, j) => inline(grand, palette, j))}
             </Text>
@@ -172,52 +174,72 @@ function block(
       return;
     }
     default:
-      node.content?.forEach((child) => block(child, palette, out, depth));
+      for (const child of node.content ?? []) {
+        if (out.length >= BLOCKS) break;
+        block(child, palette, out, depth);
+      }
   }
 }
 
-export function NotePreview({ note, faces }: { note: Note; faces: Face[] }) {
-  const palette = usePalette();
-  const out: ReactNode[] = [];
-  /* The body opens with the title as a heading more often than not; the page
+export const NotePreview = memo(
+  function NotePreview({ note, faces }: { note: Note; faces: Face[] }) {
+    const palette = usePalette();
+    const out: ReactNode[] = [];
+    /* The body opens with the title as a heading more often than not; the page
      says it once, as the editor does. */
-  const [first, ...rest] = note.content.content ?? [];
-  const echo =
-    first?.type === "heading" &&
-    first.content
-      ?.map((child) => child.text ?? "")
-      .join("")
-      .trim() === note.title.trim();
-  for (const node of echo ? rest : (note.content.content ?? [])) block(node, palette, out);
-  return (
-    <View
-      accessibilityLabel={`Preview of ${note.title || "Untitled"}`}
-      style={{
-        flex: 1,
-        backgroundColor: palette.page,
-        paddingHorizontal: 22,
-        paddingTop: 22,
-        gap: 12,
-        overflow: "hidden",
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Text style={{ flex: 1, color: palette.ink3, fontSize: 13, fontWeight: "500" }}>
-          {formatStamp(note.updatedAt)}
-        </Text>
-        <Faces faces={faces} size={24} ring={palette.page} />
-      </View>
-      <Text
-        style={{ color: palette.ink, fontSize: 26, lineHeight: 31, fontWeight: "700" }}
-        numberOfLines={3}
+    const nodes = note.content.content ?? [];
+    const first = nodes[0];
+    const echo =
+      first?.type === "heading" &&
+      first.content
+        ?.map((child) => child.text ?? "")
+        .join("")
+        .trim() === note.title.trim();
+    for (let at = echo ? 1 : 0; at < nodes.length && out.length < BLOCKS; at++) {
+      block(nodes[at], palette, out);
+    }
+    return (
+      <View
+        accessibilityLabel={`Preview of ${note.title || "Untitled"}`}
+        style={{
+          flex: 1,
+          backgroundColor: palette.page,
+          paddingHorizontal: 22,
+          paddingTop: 22,
+          gap: 12,
+          overflow: "hidden",
+        }}
       >
-        {note.title || "Untitled"}
-      </Text>
-      {out.length ? (
-        out
-      ) : (
-        <Text style={{ color: palette.ink3, fontSize: 16 }}>No additional text</Text>
-      )}
-    </View>
-  );
-}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Text style={{ flex: 1, color: palette.ink3, fontSize: 13, fontWeight: "500" }}>
+            {formatStamp(note.updatedAt)}
+          </Text>
+          <Faces faces={faces} size={24} ring={palette.page} />
+        </View>
+        <Text
+          style={{ color: palette.ink, fontSize: 26, lineHeight: 31, fontWeight: "700" }}
+          numberOfLines={3}
+        >
+          {note.title || "Untitled"}
+        </Text>
+        {out.length ? (
+          out
+        ) : (
+          <Text style={{ color: palette.ink3, fontSize: 16 }}>No additional text</Text>
+        )}
+      </View>
+    );
+  },
+  (before, after) =>
+    before.note === after.note &&
+    before.faces.length === after.faces.length &&
+    before.faces.every((face, at) => {
+      const next = after.faces[at];
+      return (
+        face.userId === next.userId &&
+        face.name === next.name &&
+        face.avatarObject === next.avatarObject &&
+        face.online === next.online
+      );
+    }),
+);

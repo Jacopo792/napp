@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HostedRequests } from "./hostedRequests.ts";
+import { HostedRequests, tokenUsable } from "./hostedRequests.ts";
 
 test("out-of-order responses settle only their own command", async () => {
   const requests = new HostedRequests();
@@ -57,4 +57,16 @@ test("an accidental duplicate id cannot replace the existing recipient", async (
   );
   requests.settle("same", "original");
   assert.equal(await original, "original");
+});
+
+test("an access token is usable only while it has a margin left", () => {
+  const jwt = (claims: object) =>
+    `x.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.y`;
+  const now = 1_800_000_000_000;
+  assert.equal(tokenUsable(jwt({ exp: now / 1000 + 3600 }), now), true);
+  assert.equal(tokenUsable(jwt({ exp: now / 1000 + 30 }), now), false);
+  assert.equal(tokenUsable(jwt({ exp: now / 1000 - 1 }), now), false);
+  assert.equal(tokenUsable(jwt({}), now), false);
+  assert.equal(tokenUsable("not a token", now), false);
+  assert.equal(tokenUsable(null, now), false);
 });

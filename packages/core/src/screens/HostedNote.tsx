@@ -6,7 +6,8 @@
  * `useCollaborativeNote`, the same `TitleField` and `RichTextEditor` over the
  * same Y.Doc, so the schema and every rule in `writeLocks.ts` stay one.
  * Nothing in this file knows it is in a WebView; the page around it does. */
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
 import {
   RichTextEditor,
   type RichTextEditorHandle,
@@ -18,7 +19,7 @@ import { initAxes } from "@/lib/axes";
 import { useCollaborativeNote, type CollaborativeNote } from "@/lib/collab";
 import type { AppSession } from "@/lib/session";
 import { downloadImage, downloadObject } from "@/lib/supabase";
-import type { HostedCommand, HostedController } from "@/lib/hostedCommands";
+import type { HostedCommand, HostedController, HostedFormat } from "@/lib/hostedCommands";
 import { restoreKeptVersion } from "@/lib/historyRestore";
 import { nameVersion } from "@/lib/history";
 import { exportFileName, noteToMarkdown } from "@/features/editor/lib/exchange";
@@ -37,6 +38,37 @@ export interface HostedNoteState {
   refusal: string;
   waking: boolean;
   available: boolean;
+  format: HostedFormat;
+}
+
+const RESTING: HostedFormat = {
+  marks: [],
+  block: "body",
+  list: null,
+  selection: false,
+  canUndo: false,
+  canRedo: false,
+};
+
+function formatOf(editor: Editor): HostedFormat {
+  const marks = (["bold", "italic", "underline", "strike", "code", "link"] as const).filter(
+    (mark) => editor.isActive(mark),
+  );
+  const heading = ([1, 2, 3] as const).find((level) => editor.isActive("heading", { level }));
+  return {
+    marks,
+    block: heading ? `heading-${heading}` : editor.isActive("blockquote") ? "quote" : "body",
+    list: editor.isActive("taskList")
+      ? "checklist"
+      : editor.isActive("orderedList")
+        ? "ordered-list"
+        : editor.isActive("bulletList")
+          ? "bullet-list"
+          : null,
+    selection: !editor.state.selection.empty,
+    canUndo: editor.can().undo(),
+    canRedo: editor.can().redo(),
+  };
 }
 
 interface Props {
@@ -79,6 +111,31 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
   });
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
+  /* The instance itself, for the phone's bar: what the selection is set in,
+     and the few edits the handle has no verb for. */
+  const [instance, setInstance] = useState<Editor | null>(null);
+  const [format, setFormat] = useState<HostedFormat>(RESTING);
+  useEffect(() => {
+    if (!instance) return;
+    let last = "";
+    const read = () => {
+      if (instance.isDestroyed) return;
+      const next = formatOf(instance);
+      const key = JSON.stringify(next);
+      if (key !== last) {
+        last = key;
+        setFormat(next);
+      }
+    };
+    /* The undo stack is Yjs's and fills as the binding writes, a beat after
+       the transaction this hears. */
+    const soon = () => queueMicrotask(read);
+    read();
+    instance.on("transaction", soon);
+    return () => {
+      instance.off("transaction", soon);
+    };
+  }, [instance]);
   const writable = useRef(canEdit);
   writable.current = canEdit;
   const mounted = useRef(true);
@@ -93,6 +150,11 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     ref,
     () => ({
       async execute(command: HostedCommand) {
+        if (command.type === "edit" && command.action === "done") {
+          (document.activeElement as HTMLElement | null)?.blur();
+          window.getSelection()?.removeAllRanges();
+          return null;
+        }
         const editor = editorRef.current;
         if (!editor || !note.doc) throw new Error("The note is still loading");
         const title = note.doc.getText(TITLE_TEXT);
@@ -172,11 +234,23 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
           case "closeSearch":
             editor.closeSearch();
             break;
+          case "edit": {
+            const chain = instance?.chain().focus();
+            if (!chain) break;
+            if (command.action === "undo") chain.undo().run();
+            else if (command.action === "redo") chain.redo().run();
+            else if (command.action === "underline") chain.toggleUnderline().run();
+            else if (command.action === "indent")
+              chain.sinkListItem(instance!.isActive("taskList") ? "taskItem" : "listItem").run();
+            else if (command.action === "outdent")
+              chain.liftListItem(instance!.isActive("taskList") ? "taskItem" : "listItem").run();
+            break;
+          }
         }
         return null;
       },
     }),
-    [note.doc, session, noteId],
+    [note.doc, session, noteId, instance],
   );
 
   const { connection, ready, refusal, waking } = note;
@@ -187,8 +261,9 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
       refusal,
       waking,
       available: Boolean(note.doc && (ready || note.cached)),
+      format,
     });
-  }, [onState, connection, ready, refusal, waking, note.doc, note.cached]);
+  }, [onState, connection, ready, refusal, waking, note.doc, note.cached, format]);
 
   const resolveImage = useCallback((id: string) => downloadImage(session, id), [session]);
   const resolveFile = useCallback(
@@ -239,6 +314,7 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
             resolveImage={resolveImage}
             resolveFile={resolveFile}
             collaboration={collaboration}
+            onEditor={setInstance}
           />
         ) : (
           <div className="note-body-waiting" aria-hidden="true">

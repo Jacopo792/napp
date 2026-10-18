@@ -10,6 +10,8 @@ import { avatarInitials } from "@/lib/avatarInitials";
 import { downloadAvatar } from "@/lib/supabase";
 import { usePalette } from "./archive";
 
+export const clearPictures = () => pictures.clear();
+
 const pictures = new Map<string, Promise<string | null>>();
 
 const asDataUri = (blob: Blob | null) =>

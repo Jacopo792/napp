@@ -1,3 +1,4 @@
+import { uuid } from "./uuid";
 import { projectDocument } from "@/features/editor/lib/ydoc";
 import { richTextToPlainText } from "@/features/editor/lib/content";
 import type { Doc } from "yjs";
@@ -284,7 +285,7 @@ export async function uploadAvatar(
   _session: AppSession,
   file: Blob | ArrayBuffer,
   _contentType?: string,
-  objectId: string = crypto.randomUUID(),
+  objectId: string = uuid(),
 ): Promise<string> {
   await sleep(240);
   avatars.set(objectId, file as Blob);

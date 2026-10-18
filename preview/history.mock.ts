@@ -2,6 +2,7 @@
    named into and restored from with no network. The fixture's notes are
    seeded with a few stretches by both members; a note made in the preview, in
    any archive, starts with no history, as it would. */
+import { uuid } from "./uuid";
 import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { Contribution, FolderVersion, NoteVersion, VersionBody } from "@/lib/history";
@@ -85,7 +86,7 @@ export async function nameVersion(
 ): Promise<NoteVersion> {
   await sleep(120);
   const version: NoteVersion = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     createdAt: new Date().toISOString(),
     authorIds: [session.userId],
     title: current.title,

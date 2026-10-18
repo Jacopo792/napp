@@ -28,7 +28,7 @@ import {
   preferencesForFolder,
 } from "@/lib/listPreferences";
 import { renameFolder, removeFolder } from "@/lib/folderActs";
-import { useTextPrompt } from "./TextPrompt";
+import { useChoice, useTextPrompt } from "./TextPrompt";
 import { ARCHIVE, entriesInScope, TRASH } from "@/lib/scopes";
 import { useArchive, usePalette } from "./archive";
 import { SwipeRow } from "./SwipeRow";
@@ -70,6 +70,7 @@ export function NoteList({
   tab?: boolean;
 }) {
   const prompt = useTextPrompt();
+  const choose = useChoice();
   const router = useRouter();
   const icon = useToolbarIcon();
   const { session, snapshot, metaOf, act, refresh, facesOf } = useArchive();
@@ -169,79 +170,84 @@ export function NoteList({
             <Stack.Toolbar.Button
               icon={icon("square.and.pencil")}
               accessibilityLabel="New Note"
-              disabled={creating}
+              disabled={creating || !editor}
               onPress={create}
             />
           ) : null}
-          <Stack.Toolbar.Menu icon={icon("ellipsis")}>
-            <Stack.Toolbar.MenuAction
-              icon={icon("arrow.down.doc")}
-              disabled={creating || !editor}
-              onPress={importMarkdown}
-            >
-              Import Markdown
-            </Stack.Toolbar.MenuAction>
-            {inFolder ? (
-              <Stack.Toolbar.MenuAction
-                icon={icon("pencil")}
-                onPress={() =>
-                  prompt(
-                    "Folder Name",
-                    undefined,
-                    (name) => act(owner, (prev) => renameFolder(prev, scope, name)),
-                    "plain-text",
-                    meta.folders.find((folder) => folder.id === scope)?.name,
-                  )
-                }
-              >
-                Rename Folder
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-            {inFolder ? (
-              <Stack.Toolbar.MenuAction
-                icon={icon("folder.badge.plus")}
-                onPress={() =>
-                  prompt("New Folder", undefined, (name) => {
-                    if (name.trim())
-                      act(owner, (prev) => ({
-                        ...prev,
-                        folders: [
-                          ...prev.folders,
-                          { id: randomUUID(), name: name.trim(), parentId: scope },
-                        ],
-                      }));
-                  })
-                }
-              >
-                New Subfolder
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-            {inFolder ? (
-              <Stack.Toolbar.MenuAction
-                icon={icon("trash")}
-                destructive
-                onPress={() =>
-                  Alert.alert(
-                    "Remove Folder?",
-                    "Notes in this folder and its subfolders will remain in All Notes.",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Remove",
-                        style: "destructive",
-                        onPress: () => {
-                          act(owner, (prev) => removeFolder(prev, scope));
-                          router.back();
+          <Stack.Toolbar.Button
+            icon={icon("ellipsis")}
+            accessibilityLabel="Folder actions"
+            disabled={!editor || creating}
+            onPress={() =>
+              choose(
+                inFolder ? title : "Notes",
+                [
+                  {
+                    label: "Import Markdown",
+                    icon: "arrow.down.doc",
+                    detail: "Bring a .md file into this folder",
+                    disabled: !canCreate,
+                    run: importMarkdown,
+                  },
+                  ...(inFolder
+                    ? [
+                        {
+                          label: "Rename Folder",
+                          icon: "pencil" as const,
+                          run: () =>
+                            prompt(
+                              "Folder Name",
+                              undefined,
+                              (name) => act(owner, (prev) => renameFolder(prev, scope, name)),
+                              "plain-text",
+                              meta.folders.find((folder) => folder.id === scope)?.name,
+                            ),
                         },
-                      },
-                    ],
-                  )
-                }
-              >
-                Remove Folder
-              </Stack.Toolbar.MenuAction>
-            ) : null}
-          </Stack.Toolbar.Menu>
+                        {
+                          label: "New Subfolder",
+                          icon: "folder.badge.plus" as const,
+                          run: () =>
+                            prompt("New Subfolder", undefined, (name) => {
+                              if (name.trim())
+                                act(owner, (prev) => ({
+                                  ...prev,
+                                  folders: [
+                                    ...prev.folders,
+                                    { id: randomUUID(), name: name.trim(), parentId: scope },
+                                  ],
+                                }));
+                            }),
+                        },
+                        {
+                          label: "Remove Folder",
+                          icon: "trash" as const,
+                          detail: "Your notes stay in All Notes",
+                          destructive: true,
+                          run: () =>
+                            Alert.alert(
+                              "Remove Folder?",
+                              "Notes in this folder and its subfolders stay in All Notes.",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Remove",
+                                  style: "destructive",
+                                  onPress: () => {
+                                    act(owner, (prev) => removeFolder(prev, scope));
+                                    router.back();
+                                  },
+                                },
+                              ],
+                            ),
+                        },
+                      ]
+                    : []),
+                ],
+                undefined,
+                "toolbar",
+              )
+            }
+          />
         </Stack.Toolbar>
       )}
       <Backdrop />

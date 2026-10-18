@@ -22,6 +22,11 @@ export type RegistrationResult =
   | { session: null; confirmationRequired: true }
   | (AuthenticationResult & { confirmationRequired: false });
 
+export interface ArchiveSelection {
+  /** Phone clients cannot open document archives. Desktop leaves this unset. */
+  notesOnly?: boolean;
+}
+
 export interface ArchiveOption {
   archiveId: string;
   name: string;
@@ -62,7 +67,10 @@ function storeSession(userId: string, email: string, archiveId: string): AppSess
   return stored;
 }
 
-async function loadArchiveOptions(userId: string): Promise<ArchiveOption[]> {
+export async function loadArchiveOptions(
+  userId: string,
+  selection: ArchiveSelection = {},
+): Promise<ArchiveOption[]> {
   const memberships = await supabase
     .from("archive_members")
     .select("archive_id, created_at")
@@ -74,25 +82,31 @@ async function loadArchiveOptions(userId: string): Promise<ArchiveOption[]> {
   const archiveIds = rows.map((row) => row.archive_id);
   if (archiveIds.length === 0) return [];
 
-  const archives = await supabase.from("archives").select("id, name").in("id", archiveIds);
+  const archives = await supabase.from("archives").select("id, name, kind").in("id", archiveIds);
   if (archives.error) throw new Error(archives.error.message);
-  const names = new Map(
-    ((archives.data ?? []) as { id: string; name: string }[]).map((archive) => [
-      archive.id,
-      archive.name,
-    ]),
+  const available = new Map(
+    ((archives.data ?? []) as { id: string; name: string; kind?: string }[])
+      .filter((archive) => !selection.notesOnly || archive.kind !== "document")
+      .map((archive) => [archive.id, archive.name]),
   );
-  return rows.map((row) => ({
-    archiveId: row.archive_id,
-    name: names.get(row.archive_id) ?? "Notes",
-    joinedAt: row.created_at,
-  }));
+  return rows.flatMap((row) =>
+    available.has(row.archive_id)
+      ? [
+          {
+            archiveId: row.archive_id,
+            name: available.get(row.archive_id)!,
+            joinedAt: row.created_at,
+          },
+        ]
+      : [],
+  );
 }
 
 async function openAccount(
   userId: string,
   email: string,
   inviteToken?: string,
+  selection: ArchiveSelection = {},
 ): Promise<AuthenticationResult> {
   const bootstrap = await supabase.rpc("ensure_personal_archive");
   if (bootstrap.error || !bootstrap.data) {
@@ -105,9 +119,13 @@ async function openAccount(
   }
 
   await ensureProfile(userId, email);
-  const archives = await loadArchiveOptions(userId);
-  if (archives.length === 0) throw new Error("Could not open this account");
+  const archives = await loadArchiveOptions(userId, selection);
+  if (archives.length === 0 && !selection.notesOnly) throw new Error("Could not open this account");
 
+  if (archives.length !== 1) {
+    localStorage.removeItem(SESSION_KEY);
+    resetArchiveCache();
+  }
   return {
     session: archives.length === 1 ? storeSession(userId, email, archives[0].archiveId) : null,
     account: { userId, email },
@@ -119,11 +137,12 @@ export async function authenticate(
   email: string,
   password: string,
   inviteToken?: string,
+  selection: ArchiveSelection = {},
 ): Promise<AuthenticationResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
-    return await openAccount(data.user.id, data.user.email ?? email, inviteToken);
+    return await openAccount(data.user.id, data.user.email ?? email, inviteToken, selection);
   } catch (reason) {
     localStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
@@ -137,14 +156,19 @@ export async function authenticate(
 export async function chooseArchive(
   account: { userId: string; email: string },
   archiveId: string,
+  selection: ArchiveSelection = {},
 ): Promise<AppSession> {
   const current = await supabase.auth.getUser();
   if (current.error || current.data.user?.id !== account.userId) {
     throw new Error("Session expired");
   }
-  const archives = await loadArchiveOptions(account.userId);
+  const archives = await loadArchiveOptions(account.userId, selection);
   if (!archives.some((archive) => archive.archiveId === archiveId)) {
     throw new Error("That archive is no longer available");
+  }
+  if (selection.notesOnly) {
+    const latest = await supabase.auth.getSession();
+    if (latest.data.session?.user.id !== account.userId) throw new Error("Account changed");
   }
   return storeSession(account.userId, account.email, archiveId);
 }
@@ -197,7 +221,15 @@ interface SavedAccount {
 function savedAccounts(): SavedAccount[] {
   try {
     const list = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) ?? "[]");
-    return Array.isArray(list) ? list : [];
+    return Array.isArray(list)
+      ? list.filter(
+          (account) =>
+            account &&
+            ["userId", "email", "archiveId", "accessToken", "refreshToken"].every(
+              (key) => typeof account[key] === "string" && account[key],
+            ),
+        )
+      : [];
   } catch {
     return [];
   }
@@ -216,10 +248,15 @@ function currentAppSession(): AppSession | null {
 }
 
 /** The signed-in account's tokens, taken now because they rotate. */
-async function stashCurrent(): Promise<void> {
+async function stashCurrent(strict = false): Promise<void> {
   const app = currentAppSession();
   const { data } = await supabase.auth.getSession();
-  if (!app || !data.session) return;
+  if (!app) return;
+  if (!data.session || (strict && data.session.user?.id !== app.userId)) {
+    if (strict)
+      throw new Error("Session expired. Sign in again before adding or switching accounts.");
+    return;
+  }
   saveAccounts([
     ...savedAccounts().filter((a) => a.userId !== app.userId),
     {
@@ -246,9 +283,50 @@ export async function addAccount(): Promise<void> {
   await supabase.auth.signOut({ scope: "local" });
 }
 
-/** Swaps to a saved account and reloads, so every channel, provider and cache
- *  of the old one is rebuilt rather than reset. A token the server no longer
- *  honours drops the account and throws. */
+/** Native account addition keeps the refresh token valid. signOut({scope:"local"})
+ * revokes it on the server, which would make the saved account unusable. */
+export async function pauseAccount(): Promise<void> {
+  await supabase.auth.stopAutoRefresh();
+  await stashCurrent(true);
+  localStorage.removeItem(SESSION_KEY);
+  resetArchiveCache();
+  await clearNoteStore();
+}
+
+/** Returns a validated saved session without browser navigation. */
+export async function resumeAccount(
+  userId: string,
+  selection: ArchiveSelection = {},
+): Promise<AuthenticationResult> {
+  await stashCurrent(true);
+  const target = savedAccounts().find((a) => a.userId === userId);
+  if (!target) throw new Error("That account is no longer saved");
+  // The SDK may have rotated this account since it was saved (including on restart).
+  const current = await supabase.auth.getSession();
+  const { data, error } =
+    current.data.session?.user?.id === userId
+      ? { data: { user: current.data.session.user }, error: null }
+      : await supabase.auth.setSession({
+          access_token: target.accessToken,
+          refresh_token: target.refreshToken,
+        });
+  if (error || data.user?.id !== userId) {
+    saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
+    throw new Error(`Sign in to ${target.email} again`);
+  }
+  // Once auth changes, no old archive may remain associated with it, even if a read fails.
+  localStorage.removeItem(SESSION_KEY);
+  const archives = await loadArchiveOptions(userId, selection);
+  const archive = archives.find((item) => item.archiveId === target.archiveId) ?? archives[0];
+  resetArchiveCache();
+  await clearNoteStore();
+  return {
+    account: { userId, email: target.email },
+    archives,
+    session: archive ? storeSession(userId, target.email, archive.archiveId) : null,
+  };
+}
+
 export async function switchAccount(userId: string): Promise<void> {
   await stashCurrent();
   const target = savedAccounts().find((a) => a.userId === userId);

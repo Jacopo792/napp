@@ -16,7 +16,22 @@ export type HostedCommand =
   | { type: "search"; query: string }
   | { type: "nextMatch" }
   | { type: "previousMatch" }
-  | { type: "closeSearch" };
+  | { type: "closeSearch" }
+  /** What a phone's keyboard bar asks for beyond `format`: the history, the
+   *  underline the desktop has no button for, list depth, and putting the
+   *  keyboard away. */
+  | { type: "edit"; action: "undo" | "redo" | "underline" | "indent" | "outdent" | "done" };
+
+/** What the selection is set in, for a host that draws the format bar. */
+export interface HostedFormat {
+  marks: ("bold" | "italic" | "underline" | "strike" | "code" | "link")[];
+  block: "heading-1" | "heading-2" | "heading-3" | "quote" | "body";
+  list: "bullet-list" | "ordered-list" | "checklist" | null;
+  /** Words are chosen, not just a caret. */
+  selection: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+}
 
 export interface HostedBody {
   title: string;

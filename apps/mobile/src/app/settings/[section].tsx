@@ -1,3 +1,4 @@
+import { Accounts } from "../../Accounts";
 import { useTextPrompt } from "../../TextPrompt";
 import { useEffect, useState } from "react";
 import { Alert, Image, ScrollView, Share, StyleSheet, Text, View } from "react-native";
@@ -77,6 +78,7 @@ export default function Section() {
     (
       {
         profile: "Profile",
+        accounts: "Accounts",
         archives: "Archives",
         members: "Members",
         appearance: "Appearance",
@@ -131,7 +133,8 @@ export default function Section() {
   };
   const palettePreset = APPEARANCE_PRESETS.find(
     (preset) =>
-      preset.background === p.appearance.background && preset.accent === p.appearance.accent,
+      preset.background === p.appearance.background &&
+      preset.foreground === p.appearance.foreground,
   );
 
   if (["reading", "icons", "folders", "palette"].includes(section))
@@ -145,6 +148,7 @@ export default function Section() {
   return (
     <SettingsPage title={title}>
       {error ? <Status>{error}</Status> : null}
+      {section === "accounts" ? <Accounts /> : null}
       {section === "profile" ? (
         <>
           <ProfileHero />

@@ -40,3 +40,20 @@ export class HostedRequests {
     for (const id of this.pending.keys()) this.settle(id, null, message);
   }
 }
+
+/** Whether an access token will still be honoured `marginMs` from `now`.
+ *  The hosted page holds an access token and no refresh token, so a token it
+ *  cannot use is one it must ask the app for — never one it tries to refresh,
+ *  because that refresh fails, signs the page out and drops every open note. */
+export function tokenUsable(token: string | null, now: number, marginMs = 60_000): boolean {
+  try {
+    const part = token?.split(".")[1];
+    if (!part) return false;
+    const { exp } = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/"))) as {
+      exp?: unknown;
+    };
+    return typeof exp === "number" && exp * 1000 - now > marginMs;
+  } catch {
+    return false;
+  }
+}

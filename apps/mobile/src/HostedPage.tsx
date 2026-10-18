@@ -26,7 +26,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Linking, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { AppState, Linking, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Portal, PortalHost, PortalProvider } from "react-native-teleport";
 import { useFocusEffect } from "expo-router";
@@ -39,6 +39,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { HostedRequests } from "@/lib/hostedRequests";
 import type { HostedCommand } from "@/lib/hostedCommands";
 import type { AccountPreferences } from "@/lib/accountPreferences";
+import type { Note as StoredNote } from "@/lib/types";
 import { useArchive, usePalette } from "./archive";
 
 /* Built by `pnpm editor` before Metro runs; read once per launch. */
@@ -50,6 +51,13 @@ const pageHtml = () =>
     .downloadAsync()
     .then((asset) => new File(asset.localUri!).text()));
 
+/* Builds before the page answered getSession itself kept a session in the
+   page's own storage, with a stand-in refresh token that can only fail. Left
+   there, auth-js would recover it on load, try that refresh, and sign the page
+   out from under the first note. The page persists nothing of its own now. */
+const FORGET_PAGE_AUTH =
+  "try{Object.keys(localStorage).filter(function(k){return k.indexOf('sb-')===0}).forEach(function(k){localStorage.removeItem(k)})}catch(e){}";
+
 const literal = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 
 /** What the note in front says about itself; the page's own `Opening` less
@@ -60,6 +68,8 @@ export interface NoteOpening {
   canEdit: boolean;
   preferences: AccountPreferences;
   headerHeight: number;
+  /** Preview stores live in separate JS processes; production reads the server. */
+  previewSeed?: StoredNote;
 }
 
 export interface NoteHandlers {
@@ -113,7 +123,20 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
       if (event === "TOKEN_REFRESHED" && next)
         web.current?.injectJavaScript(`window.nappToken(${literal(next.access_token)});true;`);
     });
-    return () => data.subscription.unsubscribe();
+    /* Back from the background, the page's one socket may be a corpse that
+       never closes — the phone's version of the wake path in Notes.tsx. */
+    let away = false;
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "background") away = true;
+      else if (state === "active" && away) {
+        away = false;
+        web.current?.injectJavaScript("window.nappWake?.();true;");
+      }
+    });
+    return () => {
+      data.subscription.unsubscribe();
+      listener.remove();
+    };
   }, []);
 
   const inject = (script: string) => web.current?.injectJavaScript(`${script};true;`);
@@ -135,7 +158,10 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
     /* Inlined before the page's module script: Android does not promise that
        injectedJavaScriptBeforeContentLoaded runs first. */
     return {
-      html: html.replace("<head>", `<head><script>window.napp=${literal(napp)};</script>`),
+      html: html.replace(
+        "<head>",
+        `<head><script>${FORGET_PAGE_AUTH}window.napp=${literal(napp)};</script>`,
+      ),
       baseUrl: "https://notes",
     };
   }, [html, token, session, firstPreferences]);
@@ -186,6 +212,13 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!message || typeof message !== "object") return;
+    if (message.kind === "token") {
+      /* The page's token is about to lapse: this client is the one that may
+         refresh, and getSession does so when it has to. */
+      const { data } = await supabase.auth.getSession();
+      if (data.session) inject(`window.nappToken(${literal(data.session.access_token)})`);
+      return;
+    }
     if (message.kind === "page") {
       loaded.current = true;
       open(borrower.current?.opening ?? null);
@@ -321,10 +354,10 @@ export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
       });
     }, [borrow, key]),
   );
-  const { noteId, name, canEdit, preferences, headerHeight } = resolvedOpening;
+  const { noteId, name, canEdit, preferences, headerHeight, previewSeed } = resolvedOpening;
   useEffect(() => {
-    update(key, { noteId, name, canEdit, preferences, headerHeight });
-  }, [update, key, noteId, name, canEdit, preferences, headerHeight]);
+    update(key, { noteId, name, canEdit, preferences, headerHeight, previewSeed });
+  }, [update, key, noteId, name, canEdit, preferences, headerHeight, previewSeed]);
 
   const run = shared.execute;
   const execute = useCallback(

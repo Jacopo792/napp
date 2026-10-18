@@ -62,7 +62,13 @@ export async function announceNote(
   await channel.track({ userId: session.userId, onlineAt: new Date().toISOString(), noteId });
 }
 
+/** Leaving is what untracks: the server drops a channel's presence with it.
+ *  Never `await channel.untrack()` first — that keeps the channel joined for a
+ *  round trip, and a subscribe in that gap (an effect re-run by a refresh, or
+ *  the phone going inactive and active again) is handed the same joined
+ *  channel back by `supabase.channel()`, whose `.on("presence")` then throws.
+ *  Thrown in an effect, that is a fatal JavaScript error: the phone app closed
+ *  on every pull to refresh. Removing first leaves the topic free at once. */
 export async function unsubscribeFromPresence(channel: RealtimeChannel): Promise<void> {
-  await channel.untrack();
   await supabase.removeChannel(channel);
 }

@@ -204,3 +204,38 @@ export function tally(
     .map(([emoji, found]) => ({ emoji, ...found }))
     .sort((a, b) => rank(a.emoji) - rank(b.emoji));
 }
+
+/** Every thread's passage, read off a document's JSON — the shape a host
+ *  outside the editor holds (the phone's sheet asks the hosted page for the
+ *  body). The editor's own `commentQuotes` reads the ProseMirror node; this
+ *  is the same answer without one: marked words joined inside a block, and a
+ *  space where the passage crosses into the next block. */
+interface QuoteNode {
+  type?: string;
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  content?: QuoteNode[];
+}
+export function quotesOf(document: QuoteNode): Map<string, string> {
+  const parts = new Map<string, { block: number; text: string }>();
+  let block = 0;
+  const walk = (node: QuoteNode) => {
+    if (node.text !== undefined) {
+      for (const mark of node.marks ?? []) {
+        const id = mark.type === "comment" ? mark.attrs?.threadId : undefined;
+        if (typeof id !== "string" || !id) continue;
+        const found = parts.get(id);
+        if (!found) parts.set(id, { block, text: node.text });
+        else {
+          found.text += (found.block === block ? "" : " ") + node.text;
+          found.block = block;
+        }
+      }
+      return;
+    }
+    block += 1;
+    for (const child of node.content ?? []) walk(child);
+  };
+  walk(document);
+  return new Map([...parts].map(([id, { text }]) => [id, text.replace(/\s+/g, " ").trim()]));
+}

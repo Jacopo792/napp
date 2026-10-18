@@ -5,18 +5,25 @@
  * sideways at a fixed width each, the same capsule. (Jacopo, 18 October 2026:
  * two faces overlapping in a pill under the bar read as an accident.) */
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
-  type SharedValue,
+  type DerivedValue,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { usePalette } from "./archive";
 import { Avatar, type Face } from "./Avatar";
 import { Card } from "./Grouped";
-import { glide } from "./theme";
+/* The thumb's two edges ride two critically damped springs: the edge in
+   front leaves first and the one behind follows, so the plate stretches in
+   the direction it travels and gathers itself as it lands — no overshoot,
+   and a tap mid-flight carries each edge's speed into the new target. */
+const lead = { dampingRatio: 1, duration: 300 } as const;
+const trail = { dampingRatio: 1, duration: 460 } as const;
 
 export interface Whose {
   face: Face;
@@ -42,14 +49,18 @@ function Segment({
 }: {
   who: Whose;
   at: number;
-  place: SharedValue<number>;
+  place: DerivedValue<number>;
   width: number;
   selected: boolean;
   onPress: () => void;
 }) {
   const palette = usePalette();
-  const dim = useAnimatedStyle(() => ({
-    opacity: 1 - 0.5 * Math.min(1, Math.abs(place.value - at)),
+  /* How much of the thumb is over this segment, 0 to 1: the face brightens
+     and the label's ink crosses from quiet to full as the plate arrives. */
+  const nearness = useDerivedValue(() => Math.max(0, 1 - Math.min(1, Math.abs(place.value - at))));
+  const dim = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * nearness.value }));
+  const ink = useAnimatedStyle(() => ({
+    color: interpolateColor(nearness.value, [0, 1], [palette.ink3, palette.ink]),
   }));
   return (
     <Pressable
@@ -66,12 +77,12 @@ function Segment({
         ]}
       >
         <Avatar face={who.face} email={who.email} size={26} />
-        <Text
+        <Animated.Text
           numberOfLines={1}
-          style={{ color: palette.ink, fontSize: 15, fontWeight: "600", flexShrink: 1 }}
+          style={[{ fontSize: 15, fontWeight: "600", flexShrink: 1 }, ink]}
         >
           {who.label}
-        </Text>
+        </Animated.Text>
       </Animated.View>
     </Pressable>
   );
@@ -96,11 +107,19 @@ export function WhoseSwitch({
   );
   /* Where the thumb stands, in segments: set without motion on the first
      frame and sprung to after, so the page opening does not slide it in. */
-  const place = useSharedValue(at);
+  const left = useSharedValue(at);
+  const right = useSharedValue(at + 1);
   useEffect(() => {
-    place.value = withSpring(at, glide);
-  }, [at, place]);
-  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: place.value * segment }] }));
+    const forward = at + 1 > right.value;
+    right.value = withSpring(at + 1, forward ? lead : trail);
+    left.value = withSpring(at, forward ? trail : lead);
+  }, [at, left, right]);
+  /* The plate's centre, in segments: what the labels read. */
+  const place = useDerivedValue(() => (left.value + right.value - 1) / 2);
+  const thumb = useAnimatedStyle(() => ({
+    width: (right.value - left.value) * segment,
+    transform: [{ translateX: left.value * segment }],
+  }));
 
   const row = (
     <View style={{ flexDirection: "row" }}>

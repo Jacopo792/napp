@@ -12,6 +12,14 @@ import type {
 } from "@/lib/collab";
 import { FIXTURE_NOTES, PREVIEW_U2, THESIS_NOTES } from "./fixture";
 import { createdNotes, projectPreviewNote } from "./supabase.mock";
+import type { Note } from "@/lib/types";
+
+// The native preview and its WebView cannot share this in-memory map.
+// Installed only by the preview alias; production has no hook to call.
+(globalThis as typeof globalThis & { nappPreviewSeed?: (note: Note) => void }).nappPreviewSeed =
+  (note) => {
+    if (!createdNotes.has(note.id)) createdNotes.set(note.id, note);
+  };
 
 export { collaborationColor };
 export type { CollaborationIdentity, CollaborativeNote, ConnectionState, Peer } from "@/lib/collab";

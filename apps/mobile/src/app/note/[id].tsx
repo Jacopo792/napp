@@ -9,8 +9,18 @@ import { useToolbarIcon } from "../../icons";
  * other way sends `null` and is refused. What crosses into it is which note,
  * as whom, and the access token, set before its script runs; a refreshed token
  * follows it in. The refresh token never crosses — see editor/main.tsx. */
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, StyleSheet, Text, TextInput, View, Pressable } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
+import {
+  Alert,
+  Keyboard,
+  Linking,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  Pressable,
+} from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { File } from "expo-file-system";
@@ -36,6 +46,7 @@ import { useArchive, usePalette } from "../../archive";
 import { Avatar, Faces } from "../../Avatar";
 import { NoteSheet } from "../../NoteSheet";
 import { Group, Row } from "../../Grouped";
+import { WritingBar } from "../../WritingBar";
 
 export default function Note() {
   const icon = useToolbarIcon();
@@ -58,6 +69,24 @@ export default function Note() {
   const palette = usePalette();
   const router = useRouter();
   const [state, setState] = useState<HostedNoteState | null>(null);
+  /* Writing is the keyboard being up, as in Notes: the bar rides on it, the
+     header grows undo and Done, and Done is what puts it away. */
+  const [keyboard, setKeyboard] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === "ios";
+    const shown = Keyboard.addListener(ios ? "keyboardWillShow" : "keyboardDidShow", () =>
+      setKeyboard(true),
+    );
+    const hidden = Keyboard.addListener(ios ? "keyboardWillHide" : "keyboardDidHide", () =>
+      setKeyboard(false),
+    );
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  const frame = useRef<ComponentRef<typeof View>>(null);
+  const [frameTop, setFrameTop] = useState(0);
   const askLink = () =>
     prompt(
       "Insert Link",
@@ -85,7 +114,14 @@ export default function Note() {
     (!row?.lockedBy || row.lockedBy === session.userId);
 
   const { execute, Host } = useHostedNote(
-    { noteId: id, name, canEdit, preferences, headerHeight },
+    {
+      noteId: id,
+      name,
+      canEdit,
+      preferences,
+      headerHeight,
+      previewSeed: import.meta.env.NAPP_PREVIEW === "1" ? entry?.note : undefined,
+    },
     {
       onState: (next) => {
         setState(next);
@@ -201,6 +237,8 @@ export default function Note() {
             ? "Waking the server"
             : "Connecting");
 
+  const writing = keyboard && canEdit && !panel && !finding;
+
   const leave = (change: Parameters<typeof act>[1]) => {
     act(owner, change);
     router.back();
@@ -224,13 +262,33 @@ export default function Note() {
                     accessibilityLabel="People in this note"
                     hitSlop={10}
                     onPress={() => setPanel("people")}
+                    style={{ height: 36, alignItems: "center", justifyContent: "center" }}
                   >
-                    <Faces faces={faces} size={28} ring={palette.canvas} />
+                    <Faces faces={faces} size={30} ring={palette.canvas} />
                   </Pressable>
                 ),
         }}
       />
       <Stack.Toolbar placement="right" tintColor={palette.ink}>
+        <Stack.Toolbar.Button
+          icon={icon("arrow.uturn.backward")}
+          accessibilityLabel="Undo"
+          hidden={!writing || !state?.format?.canUndo}
+          separateBackground
+          onPress={() => run({ type: "edit", action: "undo" })}
+        />
+        <Stack.Toolbar.Menu icon={icon("square.and.arrow.up")} hidden={!writing}>
+          <Stack.Toolbar.Label>Share as</Stack.Toolbar.Label>
+          {(["md", "pdf", "docx"] as const).map((format) => (
+            <Stack.Toolbar.MenuAction
+              key={format}
+              disabled={busy}
+              onPress={() => run({ type: "export", format })}
+            >
+              {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
+            </Stack.Toolbar.MenuAction>
+          ))}
+        </Stack.Toolbar.Menu>
         <Stack.Toolbar.Menu icon={icon("ellipsis")}>
           <Stack.Toolbar.Menu icon={icon("textformat")}>
             <Stack.Toolbar.Label>Format</Stack.Toolbar.Label>
@@ -358,45 +416,49 @@ export default function Note() {
             {row?.trashedAt ? "Delete Forever" : "Delete"}
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
+        <Stack.Toolbar.Button
+          icon={icon("checkmark")}
+          accessibilityLabel="Done"
+          hidden={!writing}
+          variant="prominent"
+          tintColor={palette.accent}
+          onPress={() => run({ type: "edit", action: "done" })}
+        />
       </Stack.Toolbar>
-      <Stack.Toolbar tintColor={palette.ink}>
-        <Stack.Toolbar.View>
-          <IconButton
-            icon="bold"
-            label="Bold"
-            disabled={!canEdit || busy}
-            onPress={() => run({ type: "format", action: "bold" })}
-          />
-        </Stack.Toolbar.View>
-        <Stack.Toolbar.View>
-          <IconButton
-            icon="checklist"
-            label="Checklist"
-            disabled={!canEdit || busy}
-            onPress={() => run({ type: "format", action: "checklist" })}
-          />
-        </Stack.Toolbar.View>
-        <Stack.Toolbar.View>
-          <IconButton
-            icon="tablecells"
-            label="Table"
-            disabled={!canEdit || busy}
-            onPress={() => run({ type: "format", action: "table-3" })}
-          />
-        </Stack.Toolbar.View>
-        <Stack.Toolbar.Spacer />
-        <Stack.Toolbar.View>
-          <IconButton
-            icon="photo"
-            label="Insert image"
-            disabled={!canEdit || busy}
-            onPress={() => attach(true)}
-          />
-        </Stack.Toolbar.View>
-        <Stack.Toolbar.View>
-          <IconButton icon="bubble.left.and.bubble.right" label="Comments" onPress={comments} />
-        </Stack.Toolbar.View>
-      </Stack.Toolbar>
+      {/* At rest, Notes' own row; while writing it gives way to the bar on
+          the keyboard. */}
+      {!keyboard ? (
+        <Stack.Toolbar tintColor={palette.ink}>
+          <Stack.Toolbar.View>
+            <IconButton
+              icon="checklist"
+              label="Checklist"
+              disabled={!canEdit || busy}
+              onPress={() => run({ type: "format", action: "checklist" })}
+            />
+          </Stack.Toolbar.View>
+          <Stack.Toolbar.View>
+            <IconButton
+              icon="paperclip"
+              label="Attach"
+              disabled={!canEdit || busy}
+              onPress={() => attach(true)}
+            />
+          </Stack.Toolbar.View>
+          <Stack.Toolbar.View>
+            <IconButton
+              icon="pencil.tip.crop.circle"
+              label="Markup"
+              disabled={!canEdit || busy}
+              onPress={() => run({ type: "format", action: "drawing-page" })}
+            />
+          </Stack.Toolbar.View>
+          <Stack.Toolbar.Spacer />
+          <Stack.Toolbar.View>
+            <IconButton icon="bubble.left.and.bubble.right" label="Comments" onPress={comments} />
+          </Stack.Toolbar.View>
+        </Stack.Toolbar>
+      ) : null}
       {panel === "history" ? (
         <NoteHistory
           noteId={id}
@@ -492,6 +554,34 @@ export default function Note() {
         </View>
       ) : null}
       <Host style={[styles.page, { backgroundColor: palette.canvas }]} />
+      <View
+        ref={frame}
+        pointerEvents="box-none"
+        style={StyleSheet.absoluteFill}
+        onLayout={() => frame.current?.measureInWindow((_x, y) => setFrameTop(y))}
+      >
+        {/* Mounted while the note can be written, so it hears the keyboard
+            arrive; it shows itself only on top of it. */}
+        {canEdit && !panel && !finding ? (
+          <WritingBar
+            format={
+              state?.format ?? {
+                marks: [],
+                block: "body",
+                list: null,
+                selection: false,
+                canUndo: false,
+                canRedo: false,
+              }
+            }
+            run={run}
+            onLink={askLink}
+            onAttach={attach}
+            onComment={comments}
+            frameTop={frameTop}
+          />
+        ) : null}
+      </View>
     </>
   );
 }

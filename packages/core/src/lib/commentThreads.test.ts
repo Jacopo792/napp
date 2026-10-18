@@ -167,3 +167,30 @@ test("reactions are counted per emoji, in the offered order, with your own marke
     { emoji: "✅", count: 1, mine: true },
   ]);
 });
+
+test("quotesOf reads each thread's passage across blocks", async () => {
+  const { quotesOf } = await import("./commentThreads.ts");
+  const mark = (threadId: string) => [{ type: "comment", attrs: { threadId } }];
+  const doc = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Before " },
+          { type: "text", text: "questo ", marks: mark("a") },
+          { type: "text", text: "passaggio", marks: [{ type: "bold" }, ...mark("a")] },
+        ],
+      },
+      { type: "paragraph", content: [{ type: "text", text: "segue", marks: mark("a") }] },
+      { type: "paragraph", content: [{ type: "text", text: "altro", marks: mark("b") }] },
+    ],
+  };
+  assert.deepEqual(
+    [...quotesOf(doc)],
+    [
+      ["a", "questo passaggio segue"],
+      ["b", "altro"],
+    ],
+  );
+});

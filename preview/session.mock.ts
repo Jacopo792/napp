@@ -1,93 +1,59 @@
-import { PREVIEW_ARCHIVE, PREVIEW_U1 } from "./fixture";
+import { PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import { loadSpaces } from "./spaces.mock";
+import type { AppSession, ArchiveOption, ArchiveSelection, AuthenticationResult } from "../packages/core/src/lib/session";
+export type { AppSession, ArchiveOption, ArchiveSelection, AuthenticationResult };
 
-/* Preview-only stand-in for src/lib/session.ts. The archive is already open, so
-   the notes surface can be inspected without credentials. There is no key of any
-   kind: the preview mirrors the account-protected format the app now uses. */
+/* Native QA uses genuine account transitions against disposable fixture state.
+   No password or real auth endpoint is involved. */
+let current: AppSession | null = { userId: PREVIEW_U1, email: "preview@example.invalid", archiveId: PREVIEW_ARCHIVE };
+let active: AppSession | null = current;
+const saved = new Map<string, AppSession>([[PREVIEW_U2, { userId: PREVIEW_U2, email: "second@example.invalid", archiveId: PREVIEW_ARCHIVE }]]);
+let booksOnly = false;
 
-export interface AppSession {
-  userId: string;
-  email: string;
-  archiveId: string;
+export async function loadArchiveOptions(userId: string, selection: ArchiveSelection = {}): Promise<ArchiveOption[]> {
+  const spaces = await loadSpaces({ userId, email: "preview@example.invalid", archiveId: PREVIEW_ARCHIVE });
+  return spaces.filter((space) => (!booksOnly || space.kind === "document" || ![PREVIEW_ARCHIVE, "00000000-0000-4000-8000-000000000002"].includes(space.archiveId)) && (!selection.notesOnly || space.kind !== "document") && space.members.some((member) => member.userId === userId)).map((space) => ({ archiveId: space.archiveId, name: space.name, joinedAt: "2026-05-18" }));
 }
-
-export interface ArchiveOption {
-  archiveId: string;
-  name: string;
-  joinedAt: string;
+export async function authenticate(email: string, _password?: string, _invite?: string, selection: ArchiveSelection = {}): Promise<AuthenticationResult> {
+  booksOnly = email.startsWith("books");
+  const userId = email.startsWith("second") ? PREVIEW_U2 : PREVIEW_U1;
+  active = { userId, email, archiveId: PREVIEW_ARCHIVE };
+  const archives = await loadArchiveOptions(userId, selection);
+  current = archives.length === 1 ? { ...active, archiveId: archives[0].archiveId } : null;
+  return { session: current, account: active, archives };
 }
-
-export interface AuthenticationResult {
-  session: AppSession | null;
-  account: { userId: string; email: string };
-  archives: ArchiveOption[];
+export async function chooseArchive(account: { userId: string; email: string }, archiveId: string, selection: ArchiveSelection = {}): Promise<AppSession> {
+  const options = await loadArchiveOptions(account.userId, selection);
+  if (!options.some((item) => item.archiveId === archiveId)) throw new Error("That archive is no longer available");
+  current = active = { ...account, archiveId };
+  return current;
 }
-
-const ARCHIVE_ID = PREVIEW_ARCHIVE;
-const EMAIL = "preview@example.invalid";
-let signedOut = false;
-/* The archive chosen last, so switching from the sidebar reopens on it. */
-let currentArchive = ARCHIVE_ID;
-
-async function previewSession(email = EMAIL): Promise<AppSession> {
-  return {
-    userId: PREVIEW_U1,
-    email,
-    archiveId: currentArchive,
-  };
-}
-
-export async function authenticate(email: string): Promise<AuthenticationResult> {
-  signedOut = false;
-  const session = await previewSession(email || EMAIL);
-  const archives: ArchiveOption[] = [
-    { archiveId: session.archiveId, name: "Preview archive", joinedAt: "2026-05-18" },
-  ];
-  if (email.startsWith("multi")) {
-    archives.push({
-      archiveId: "00000000-0000-4000-8000-000000000002",
-      name: "Study group",
-      joinedAt: "2026-08-29",
-    });
-  }
-  return {
-    session: archives.length === 1 ? session : null,
-    account: { userId: session.userId, email: session.email },
-    archives,
-  };
-}
-
-export async function chooseArchive(
-  account: { userId: string; email: string },
-  archiveId: string,
-): Promise<AppSession> {
-  currentArchive = archiveId;
-  return { userId: account.userId, email: account.email, archiveId };
-}
-
-export async function registerAccount(): Promise<{
-  session: AppSession | null;
-  confirmationRequired: boolean;
-}> {
-  return { session: null, confirmationRequired: true };
-}
-
-export async function restoreSession(): Promise<AppSession | null> {
-  return signedOut ? null : previewSession();
-}
-
+export async function registerAccount() { return { session: null, confirmationRequired: true }; }
+export async function restoreSession(): Promise<AppSession | null> { return current; }
 export async function clearSession(): Promise<void> {
-  signedOut = true;
+  if (active) saved.delete(active.userId);
+  current = active = null;
 }
-
-/* One other account, so the switch menu has something to show. */
-export function otherAccounts(): { userId: string; email: string }[] {
-  return [{ userId: "preview-other", email: "second@example.invalid" }];
+export function otherAccounts(userId: string) {
+  return [...saved.values()].filter((account) => account.userId !== userId).map(({ userId, email }) => ({ userId, email }));
 }
-
-export async function addAccount(): Promise<void> {
-  signedOut = true;
+export async function pauseAccount(): Promise<void> {
+  if (current) saved.set(current.userId, current);
+  current = null;
 }
-
-export async function switchAccount(): Promise<void> {
+export const addAccount = pauseAccount;
+export async function resumeAccount(userId: string, selection: ArchiveSelection = {}): Promise<AuthenticationResult> {
+  const target = saved.get(userId);
+  if (!target) throw new Error("That account is no longer saved");
+  if (current) saved.set(current.userId, current);
+  booksOnly = false;
+  active = target;
+  const archives = await loadArchiveOptions(userId, selection);
+  const archive = archives.find((item) => item.archiveId === target.archiveId) ?? archives[0];
+  current = archive ? { ...target, archiveId: archive.archiveId } : null;
+  return { session: current, account: target, archives };
+}
+export async function switchAccount(userId: string): Promise<void> {
+  await resumeAccount(userId);
   window.location.reload();
 }

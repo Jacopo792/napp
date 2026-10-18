@@ -957,8 +957,12 @@ per screen: `Card` (glass over the reader's picture, solid elsewhere),
 menu), `PillButton` (a page's one decisive act, full width at its foot),
 `SkeletonCard` (a page still loading is the shapes it is about to hold, never
 a spinner), `Reveal`, `BottomFade`. `useChoice` in `TextPrompt.tsx` is the
-system's action sheet on iOS and the app's own sheet on Android, for the + and
-a folder's ⋯. `Link.Trigger withAppleZoom` opens a note out of the card it was
+app's anchored glass popover on both platforms, for the + and a folder's ⋯, with icon tiles, labels only and 50-point targets. It grows from the
+button with a spring without overshoot and closes in 150 ms. Naming uses a
+focused field in a compact card. Context callbacks stay stable while a sheet changes, so
+opening one does not redraw every screen that can open it. The content stays
+mounted through native dismissal; a naming sheet, share sheet or system picker
+waits for that dismissal. Permission prompts and file pickers remain native. `Link.Trigger withAppleZoom` opens a note out of the card it was
 pressed on; UIKit owns that transition, and a `pageSheet` modal — People,
 Comments, History — is the system's, page receding under it as Shop's cart.
 **Every surface that shows a note is a `NoteLink`** (`NoteLink.tsx`): held,
@@ -1004,11 +1008,16 @@ already there. Gated by Privacy → Show Collaborators.
 2026: a big "10 notes" over a row of round labelled acts read as a balance).
 Under the bar, whose notes these are: a segmented capsule on the content's
 16-point grid, one segment a member — face and first name, "You" for the
-reader — with a thumb that slides to the one chosen on a spring with no
-overshoot and the others dimmed in step (`WhoseSwitch`); past three members it
-scrolls sideways. Two faces overlapping in a pill read as an accident, and a
-stacked action sheet, a popover and a double press were all refused before
-it. The page under it eases in from the side the next member came from. Then **Continue
+reader — with a thumb whose two edges ride two critically damped springs, the
+leading edge quicker, so it stretches toward where it is going and gathers
+as it lands, never overshooting; labels cross from quiet to full ink as it
+arrives (`WhoseSwitch`); past three members it scrolls sideways. Two faces
+overlapping in a pill read as an accident, and a stacked action sheet, a
+popover and a double press were all refused before it. The page under it is
+not remounted: the old page slides 24 pt away from the side being gone to and
+fades, then the new one comes in from that side on the same spring, each
+block a beat behind the one above (`Turning`, one driver, so a tap mid-turn
+continues from where the page is). Then **Continue
 Writing** — the latest note as one large card on the reader's picture — then
 **Pinned**, small cards scrolling sideways, then every folder as a Shop feed
 card (name, ⋯, its three latest notes, "N notes" and a round arrow), and the
@@ -1039,8 +1048,9 @@ use the default colour and icons use one system-symbol style.
 
 **Settings is in the order things are reached for** (Jacopo, 18 October
 2026, "you can't understand anything"): the profile card, then Archive
-(Archives, Members — "2 of 8"), This Phone (Appearance), Account (Writing,
-Privacy), and Sign Out alone at the foot. Every index row leads with a tile
+(Archives, Members — "2 of 8"), This Phone (Appearance), Account (Accounts,
+Writing, Privacy). Accounts shows the current identity, saved accounts and Add
+Account, with Sign Out of This Account last and apart. Every index row leads with a tile
 and says what is set now; rows on the pages under it carry no tile. A page
 has one purpose and its destructive act last and apart. Appearance is the
 real rows in a live preview, then Theme, then Palette as named cards in one
@@ -1048,6 +1058,29 @@ horizontal strip — choosing one is never a trip to another page — then
 Wallpaper, a page that shows the picture itself; there is no blur choice.
 Privacy splits into what others can see and what I can see, every switch
 phrased so that on means shown. Revoking an invitation asks first.
+
+**Mobile account changes remount, never reload.** `pauseAccount` stores tokens,
+never passwords, and leaves the server session valid when adding an account;
+`signOut` would revoke the saved refresh token. `resumeAccount` validates the
+available archives and returns a session; mobile never calls the desktop's
+`switchAccount` reload helper. Pending metadata and preferences finish under
+the old identity before the provider, hosted editor and channels unmount.
+Live preference stores and private image caches are reset before the next
+identity opens; a generation guard rejects late preference reads and events.
+Settings returns to Home after an account or archive change.
+
+The notes-only selection is enforced in `session.ts` for mobile authentication,
+archive choice, saved-account return and startup. It filters by `archives.kind`,
+including the chooser immediately after login, while retaining every ordinary
+shared archive. A Books-only or empty account gets an explicit empty chooser
+and Create Notes Archive; no document archive is opened as a fallback.
+Desktop callers leave `notesOnly` unset.
+
+The mobile icon lives in `apps/mobile/assets`, independently of desktop: original
+SVG paper-stack artwork and 1024 px exports, an opaque RGB iOS/general icon,
+a transparent Android adaptive foreground, and an alpha-mask monochrome icon.
+Android's background is the same warm paper. Regenerate native projects to
+pick up these `app.config.ts` asset paths before a release build.
 
 One shape language for the phone: a thing sits on a rounded square with a
 continuous corner, a person on a circle. Cards are `CARD_RADIUS` 24, carry
@@ -1079,8 +1112,29 @@ late responses cannot reach the next note. Export bytes travel back to the
 native cache and then Quick Look or the share sheet. The current title and
 body always come from the live editor, never its saved projection.
 
-Comments use native sheets and the existing core comments/reactions/assignment
-APIs, including anchored passages, mentions, edits, deletion and resolution.
+**Writing is Apple Notes' shape** (Jacopo, 18 October 2026). Nothing floats
+over the words: `RichTextEditor` draws no `BubbleMenu` when `mobile`, and a
+selection gets the system's own edit menu. The keyboard being up is writing:
+`WritingBar.tsx` is one glass capsule standing on the keyboard's top edge (read
+from the keyboard frame event, not `useAnimatedKeyboard`, and parked off
+screen rather than faded — a `GlassView` brought back from opacity 0 has no
+material), and its row swaps in place: tools → B I U S, ink, link, lists →
+styles / lists / inks. What is pressed is `HostedNoteState.format`, which the
+page reports from the live selection; undo, underline, indent and Done are the
+`edit` command. The header grows undo (only when there is one), share and an
+accent ✓ that blurs the page. WebKit keeps the caret clear of the keyboard
+only, so `editor/main.tsx` scrolls it clear of the bar too.
+
+Comments are a messaging thread, not a form (Jacopo, 18 October 2026): Open /
+Resolved as segments, each thread a card led by its passage — read from the
+live body with `quotesOf`, pressed to show it in the note — then remarks with
+face, name and "2m"-style time, one face for a run by the same author, @names
+in the accent. Reactions appear only once given; giving one, Reply, Edit and
+Delete are the long press on a remark, which lifts it under the six reactions.
+The thread's foot is the assignee chip, Reply, Resolve and ⋯ (Assign, Delete
+Thread for the author of every remark). The composer is a pill pinned over the
+keyboard whose @ offers the members. All of it on the existing core
+comments/reactions/assignment APIs.
 The archive's Comments route lists open conversations and marks readings in
 account preferences. Its Realtime subscription follows route focus, so it does
 not compete with the note's sheet while underneath it in the native stack.
@@ -1113,8 +1167,7 @@ press highlight.
 The glyphs are SF Symbols on iOS and their Material counterparts on Android,
 mapped in `src/icons.tsx`. Android's native toolbar takes image sources, not SF
 names; `useToolbarIcon` supplies them from `expo-symbols`. Text prompts use the
-iOS system dialog and an Android modal, because `Alert.prompt` exists only on
-iOS. Neither platform gets empty toolbar buttons or inert naming controls.
+same focused naming card on both platforms. Neither platform gets empty toolbar buttons or inert naming controls.
 
 **Its origin is `https://notes`**, and it has to be in `ALLOWED_ORIGINS` on
 Render — set by hand in the dashboard, like `app://notes`. The editor's

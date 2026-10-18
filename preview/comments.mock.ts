@@ -1,6 +1,7 @@
 /* Comments against an in-memory archive, so the panel can be opened, written
    in and resolved with no credentials and no network. Threads live for as long
    as the tab, like everything else in the preview. */
+import { uuid } from "./uuid";
 import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type { ArchiveComment, NoteComment, Reaction } from "@/lib/commentThreads";
@@ -68,7 +69,7 @@ export async function addComment(
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
-    id: crypto.randomUUID(),
+    id: uuid(),
     threadId,
     authorId: session.userId,
     body: body.trim(),
