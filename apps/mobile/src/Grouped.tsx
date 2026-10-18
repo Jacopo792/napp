@@ -1,18 +1,82 @@
-/* The grouped cards Folders and Settings are made of: a rounded card standing
- * on the reader's ground — translucent over their wallpaper, solid over the
- * page — and rows that lead with a round chip, a name and a count. A chip is
- * filled when the row is a place of its own (the archive, the bin, a colour)
- * and a quiet disc when it is one of many, the way Revolut tells a category
- * from a line. A row lights up under the finger instantly and lets go eased. */
+/* The grouped cards Folders and Settings are made of: a solid card with a
+ * continuous corner standing on the near-black ground, and rows that lead with
+ * a tile, a name and a count. One shape language throughout: a thing (a
+ * folder, a setting, the bin) sits on a rounded square, a person on a circle,
+ * so a face is never mistaken for a place. A row lights under the finger at
+ * once and lets go on a spring, on the UI thread. */
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, type PressableProps } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
 import { usePalette, type Palette } from "./archive";
 import { useCard } from "./Backdrop";
-import { trashGround } from "./theme";
+import { release, trashGround } from "./theme";
 
-export const CARD_RADIUS = 18;
+/** Every card's corner, drawn continuous. */
+export const CARD_RADIUS = 22;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** A pressable that answers the finger on the UI thread: a row inside a card
+ *  lights up (`highlight`); something standing on its own — a card, a swatch,
+ *  a button — gives a little under it (`scale`). Never a bounce: the press
+ *  goes in quickly and comes back on a spring with no overshoot.
+ *  `Link asChild` hands it its press and its ref through `rest`. */
+export function Press({
+  feedback = "highlight",
+  style,
+  children,
+  onPressIn,
+  onPressOut,
+  ...rest
+}: Omit<PressableProps, "style" | "children"> & {
+  feedback?: "highlight" | "scale";
+  style?: StyleProp<ViewStyle>;
+  children?: ReactNode;
+}) {
+  const palette = usePalette();
+  const down = useSharedValue(0);
+  const give = useAnimatedStyle(() =>
+    feedback === "scale" ? { transform: [{ scale: 1 - 0.04 * down.value }] } : {},
+  );
+  const glow = useAnimatedStyle(() => ({ opacity: down.value }));
+  return (
+    <AnimatedPressable
+      {...rest}
+      onPressIn={(event) => {
+        down.value = withTiming(1, { duration: 90 });
+        onPressIn?.(event);
+      }}
+      onPressOut={(event) => {
+        down.value = withSpring(0, release);
+        onPressOut?.(event);
+      }}
+      style={[style, give]}
+    >
+      {feedback === "highlight" ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: quiet(palette) }, glow]}
+        />
+      ) : null}
+      {children}
+    </AnimatedPressable>
+  );
+}
 
 export function Group({
   title,
@@ -41,14 +105,14 @@ export function Group({
   );
 }
 
-/** A disc of the ink at low strength: present on any ground, loud on none. */
-export const quiet = (palette: Palette) => (palette.dark ? "#ffffff1a" : "#0000000f");
+/** The ink at low strength: present on any ground, loud on none. */
+export const quiet = (palette: Palette) => (palette.dark ? "#ffffff17" : "#0000000d");
 
 export function Chip({
   icon,
   tint,
   fill,
-  size = 40,
+  size = 38,
 }: {
   icon?: SFSymbol;
   tint?: string;
@@ -65,14 +129,15 @@ export function Chip({
       style={{
         width: size,
         height: size,
-        borderRadius: size / 2,
+        borderRadius: Math.round(size * 0.3),
+        borderCurve: "continuous",
         backgroundColor: quiet(palette),
         alignItems: "center",
         justifyContent: "center",
       }}
     >
       {icon ? (
-        <SymbolView name={icon} size={size * 0.6} weight="semibold" tintColor={colour} />
+        <SymbolView name={icon} size={Math.round(size * 0.52)} weight="medium" tintColor={colour} />
       ) : null}
     </View>
   );
@@ -114,17 +179,13 @@ export function Row({
   last,
   ...rest
 }: RowProps) {
-  const palette = usePalette();
   return (
-    <Pressable
-      {...rest}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: quiet(palette) }]}
-    >
+    <Press {...rest}>
       <RowFace
         {...{ icon, label, note, detail, tint, fill, leading, plain, depth, chevron, last }}
         destructive={destructive}
       />
-    </Pressable>
+    </Press>
   );
 }
 
@@ -147,15 +208,15 @@ export function RowFace({
   const colour = destructive ? palette.danger : palette.ink;
   return (
     <View style={styles.face}>
-      <View style={[styles.lead, { paddingLeft: 14 + depth * 20 }]}>
+      <View style={[styles.lead, { paddingLeft: 16 + depth * 20 }]}>
         {leading ??
           (plain ? (
-            <View style={{ width: 40, alignItems: "center" }}>
+            <View style={{ width: 38, alignItems: "center" }}>
               {icon ? (
                 <SymbolView
                   name={icon}
                   tintColor={tint ?? palette.accent}
-                  size={25}
+                  size={24}
                   weight="semibold"
                 />
               ) : null}
@@ -181,7 +242,7 @@ export function RowFace({
           </Text>
         ) : null}
         {chevron ? (
-          <SymbolView name="chevron.right" tintColor={palette.ink4} size={13} weight="semibold" />
+          <SymbolView name="chevron.right" tintColor={palette.ink4} size={14} weight="semibold" />
         ) : null}
       </View>
     </View>
@@ -189,17 +250,16 @@ export function RowFace({
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 16, marginBottom: 30 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, marginLeft: 4 },
+  section: { marginHorizontal: 16, marginBottom: 28 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12, marginLeft: 6 },
   heading: { flexShrink: 1, fontSize: 20, fontWeight: "700", letterSpacing: -0.4 },
   group: {
     borderRadius: CARD_RADIUS,
     borderCurve: "continuous",
     overflow: "hidden",
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
-  row: {},
-  face: { flexDirection: "row", alignItems: "center", minHeight: 64 },
+  face: { flexDirection: "row", alignItems: "center", minHeight: 62 },
   lead: { paddingRight: 14 },
   body: {
     flex: 1,
@@ -210,7 +270,7 @@ const styles = StyleSheet.create({
     paddingRight: 18,
     gap: 8,
   },
-  label: { fontSize: 17, fontWeight: "600", letterSpacing: -0.2 },
+  label: { fontSize: 17, fontWeight: "600", letterSpacing: -0.3 },
   note: { fontSize: 15 },
   detail: { fontSize: 17, flexShrink: 1, maxWidth: "50%" },
 });

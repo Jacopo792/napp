@@ -1,4 +1,9 @@
-import type { ReactNode } from "react";
+/* Settings' parts, named as iOS Settings names them: a page on the reader's
+ * near-black ground, cards of rows with no rules between them, a tile before
+ * each name where the row is a place to go, and a choice shown by looking at
+ * it rather than described. The cards and the press are Folders' own
+ * (`Grouped.tsx`), so the two screens are one material. */
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Pressable,
@@ -10,20 +15,23 @@ import {
   type PressableProps,
 } from "react-native";
 import { Stack } from "expo-router";
+import type { SFSymbol } from "expo-symbols";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { SymbolView } from "./icons";
-import { quiet } from "./Grouped";
+import { CARD_RADIUS, Chip, Press, quiet } from "./Grouped";
 import { usePalette } from "./archive";
+import { glide } from "./theme";
 
 export function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
   const palette = usePalette();
-  const backgroundColor = palette.dark ? "#000000" : "#f2f2f7";
+  const backgroundColor = palette.page;
   return (
     <>
       <Stack.Screen options={{ title, contentStyle: { backgroundColor } }} />
       <ScrollView
         style={{ backgroundColor }}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 36 }}
+        contentContainerStyle={{ paddingTop: 20, paddingBottom: 48 }}
       >
         {children}
       </ScrollView>
@@ -31,16 +39,16 @@ export function SettingsPage({ title, children }: { title: string; children: Rea
   );
 }
 
-/* Inset groups, system typography and named choices, like iOS Settings. */
-
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
   const palette = usePalette();
   return (
     <View style={styles.section}>
-      {title ? <Text style={[styles.heading, { color: palette.ink3 }]}>{title}</Text> : null}
-      <View style={[styles.group, { backgroundColor: palette.dark ? "#1c1c1e" : "#ffffff" }]}>
-        {children}
-      </View>
+      {title ? (
+        <Text style={[styles.heading, { color: palette.ink3 }]} numberOfLines={1}>
+          {title}
+        </Text>
+      ) : null}
+      <View style={[styles.group, { backgroundColor: palette.paper }]}>{children}</View>
     </View>
   );
 }
@@ -48,7 +56,9 @@ export function Section({ title, children }: { title?: string; children: ReactNo
 interface LineProps extends Omit<PressableProps, "style" | "children"> {
   label: string;
   value?: string | number;
-  /** Before the name: a face, a swatch. */
+  /** A tile before the name. */
+  icon?: SFSymbol;
+  /** Before the name, in place of a tile: a face, a swatch. */
   leading?: ReactNode;
   /** Where the value would be: a switch, a tick. */
   trailing?: ReactNode;
@@ -58,23 +68,27 @@ interface LineProps extends Omit<PressableProps, "style" | "children"> {
 }
 
 /* `Link asChild` hands the row its press and its ref through `rest`. */
-export function Line({ label, value, leading, trailing, opens, tone = "ink", ...rest }: LineProps) {
+export function Line({
+  label,
+  value,
+  icon,
+  leading,
+  trailing,
+  opens,
+  tone = "ink",
+  ...rest
+}: LineProps) {
   const palette = usePalette();
   const colour =
     tone === "danger" ? palette.danger : tone === "action" ? palette.accent : palette.ink;
   const pressable = Boolean(rest.onPress) || opens;
   return (
-    <Pressable
+    <Press
       {...rest}
       disabled={rest.disabled || !pressable}
-      style={({ pressed }) => [
-        styles.line,
-        { borderBottomColor: palette.rule },
-        pressed && { backgroundColor: quiet(palette) },
-        rest.disabled && pressable && { opacity: 0.45 },
-      ]}
+      style={[styles.line, rest.disabled && pressable && { opacity: 0.4 }]}
     >
-      {leading}
+      {icon ? <Chip icon={icon} size={32} tint={tone === "ink" ? undefined : colour} /> : leading}
       <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
         {label}
       </Text>
@@ -85,19 +99,21 @@ export function Line({ label, value, leading, trailing, opens, tone = "ink", ...
       ) : null}
       {trailing}
       {opens ? (
-        <SymbolView name="chevron.right" tintColor={palette.ink4} size={12} weight="semibold" />
+        <SymbolView name="chevron.right" tintColor={palette.ink4} size={14} weight="semibold" />
       ) : null}
-    </Pressable>
+    </Press>
   );
 }
 
 export function Toggle({
   label,
+  icon,
   value,
   onChange,
   disabled,
 }: {
   label: string;
+  icon?: SFSymbol;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -106,6 +122,7 @@ export function Toggle({
   return (
     <Line
       label={label}
+      icon={icon}
       trailing={
         <Switch
           accessibilityLabel={label}
@@ -119,33 +136,8 @@ export function Toggle({
   );
 }
 
-/** One of a list, ticked. */
-export function Choice({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const palette = usePalette();
-  return (
-    <Line
-      label={label}
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      trailing={
-        selected ? (
-          <SymbolView name="checkmark" tintColor={palette.accent} size={16} weight="semibold" />
-        ) : null
-      }
-    />
-  );
-}
-
-/** A few words, one of them chosen: the theme, the typeface, the size. */
+/** A few words, one of them chosen: the theme. The chosen one is a solid
+ *  plate that glides to it, as the system's segmented control does. */
 export function Segments<T extends string | number>({
   options,
   value,
@@ -156,11 +148,35 @@ export function Segments<T extends string | number>({
   onChange: (id: T) => void;
 }) {
   const palette = usePalette();
+  const at = Math.max(
+    0,
+    options.findIndex((option) => option.id === value),
+  );
+  const [width, setWidth] = useState(0);
+  const step = (width - 6) / options.length;
+  /* Where the plate stands, in segments; set without motion on the first
+     frame and sprung to after, so a page opening does not slide it in. */
+  const place = useSharedValue(at);
+  useEffect(() => {
+    place.value = withSpring(at, glide);
+  }, [at, place]);
+  const plate = useAnimatedStyle(() => ({ transform: [{ translateX: place.value * step }] }));
   return (
     <View
       accessibilityRole="radiogroup"
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       style={[styles.segments, { backgroundColor: quiet(palette) }]}
     >
+      {width ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.plate,
+            { width: step, backgroundColor: palette.dark ? "#ffffff2b" : "#ffffff" },
+            plate,
+          ]}
+        />
+      ) : null}
       {options.map((option) => {
         const on = option.id === value;
         return (
@@ -169,7 +185,7 @@ export function Segments<T extends string | number>({
             accessibilityRole="radio"
             accessibilityState={{ checked: on }}
             onPress={() => onChange(option.id)}
-            style={[styles.segment, on && { backgroundColor: palette.paper }]}
+            style={styles.segment}
           >
             <Text
               style={{
@@ -187,16 +203,14 @@ export function Segments<T extends string | number>({
   );
 }
 
-/** Colours to choose by looking at them: the ground with its accent on it,
- *  or a colour alone. The one chosen wears a ring of the accent. */
+/** Colours to choose by looking at them, each named under its disc. The one
+ *  chosen wears a ring of its own colour. */
 export function Swatches({
   items,
   value,
   onChange,
-  labelled = false,
 }: {
-  items: { id: string; label: string; ground: string; dot?: string }[];
-  labelled?: boolean;
+  items: { id: string; label: string; ground: string }[];
   value: string | undefined;
   onChange: (id: string) => void;
 }) {
@@ -206,44 +220,33 @@ export function Swatches({
       {items.map((item) => {
         const on = item.id === value;
         return (
-          <Pressable
+          <Press
             key={item.id}
+            feedback="scale"
             accessibilityRole="radio"
             accessibilityLabel={item.label}
             accessibilityState={{ checked: on }}
             onPress={() => onChange(item.id)}
-            style={({ pressed }) => [
-              styles.swatch,
-              labelled && {
-                width: "30%",
-                flexGrow: 1,
-                alignItems: "center",
-                gap: 6,
-                paddingVertical: 10,
-                borderRadius: 12,
-              },
-              { borderColor: on ? palette.accent : "transparent" },
-              pressed && { transform: [{ scale: 0.92 }] },
-            ]}
+            style={styles.swatch}
           >
-            <View
-              style={[
-                styles.swatchFace,
-                { backgroundColor: item.ground, borderColor: palette.rule },
-              ]}
-            >
-              {item.dot ? <View style={[styles.swatchDot, { backgroundColor: item.dot }]} /> : null}
+            <View style={[styles.swatchRing, { borderColor: on ? item.ground : "transparent" }]}>
+              <View style={[styles.swatchFace, { backgroundColor: item.ground }]}>
+                {on ? (
+                  <SymbolView name="checkmark" tintColor="#ffffff" size={16} weight="bold" />
+                ) : null}
+              </View>
             </View>
-            {labelled ? (
-              <Text
-                style={{ color: palette.ink, fontSize: 13, fontWeight: on ? "600" : "400" }}
-                numberOfLines={1}
-              >
-                {item.label}
-                {on ? " ✓" : ""}
-              </Text>
-            ) : null}
-          </Pressable>
+            <Text
+              style={{
+                color: on ? palette.ink : palette.ink3,
+                fontSize: 13,
+                fontWeight: on ? "600" : "500",
+              }}
+              numberOfLines={1}
+            >
+              {item.label}
+            </Text>
+          </Press>
         );
       })}
     </View>
@@ -278,36 +281,55 @@ export async function attempt(action: () => Promise<unknown>) {
 }
 
 const styles = StyleSheet.create({
-  section: { marginHorizontal: 20, marginBottom: 24 },
-  heading: { fontSize: 13, fontWeight: "500", marginLeft: 16, marginBottom: 8 },
-  group: { borderRadius: 12, borderCurve: "continuous", overflow: "hidden", paddingHorizontal: 16 },
+  section: { marginHorizontal: 16, marginBottom: 28 },
+  heading: { fontSize: 15, fontWeight: "600", marginLeft: 6, marginBottom: 10 },
+  group: {
+    borderRadius: CARD_RADIUS,
+    borderCurve: "continuous",
+    overflow: "hidden",
+    paddingVertical: 6,
+  },
   line: {
-    minHeight: 52,
+    minHeight: 54,
     paddingVertical: 10,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 14,
   },
-  label: { flex: 1, fontSize: 17, letterSpacing: -0.2 },
-  value: { fontSize: 17, flexShrink: 1, maxWidth: "55%" },
-  segments: { flexDirection: "row", borderRadius: 12, padding: 3, marginVertical: 12 },
-  segment: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 9,
+  label: { flex: 1, fontSize: 17, letterSpacing: -0.3 },
+  value: { fontSize: 17, flexShrink: 1, maxWidth: "55%", letterSpacing: -0.3 },
+  segments: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderCurve: "continuous",
+    padding: 3,
+    marginHorizontal: 12,
+    marginVertical: 8,
+  },
+  plate: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: 3,
+    borderRadius: 11,
     borderCurve: "continuous",
   },
-  swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingVertical: 14 },
-  swatch: { padding: 3, borderRadius: 24, borderWidth: 2 },
+  segment: { flex: 1, alignItems: "center", paddingVertical: 9 },
+  swatches: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+  },
+  swatch: { width: "25%", alignItems: "center", gap: 6 },
+  swatchRing: { padding: 3, borderRadius: 30, borderWidth: 2.5 },
   swatchFace: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  swatchDot: { width: 13, height: 13, borderRadius: 7 },
 });

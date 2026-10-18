@@ -181,3 +181,12 @@ test("a row with no phone branch keeps the one this device holds", () => {
   assert.equal(mergeAccountPreferences({}, held).phone?.axes?.size, 19);
   assert.equal(mergeAccountPreferences({ phone: "nonsense" }, local).phone, undefined);
 });
+
+test("the phone's wallpaper and palette never come from the computer's appearance", () => {
+  const merged = mergeAccountPreferences(
+    { appearance: { accent: "#112233", wallpaper: true, wallpaperObject: "abc" } },
+    local,
+  );
+  assert.equal(merged.appearance.wallpaperObject, "abc");
+  assert.equal(merged.phone, undefined);
+});

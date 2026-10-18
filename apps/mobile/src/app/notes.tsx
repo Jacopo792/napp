@@ -10,7 +10,7 @@ import { useToolbarIcon } from "../icons";
  * deletes and archives, the Archive deletes and puts back, the Trash deletes
  * for good and restores. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, SectionList, StyleSheet, Text, View } from "react-native";
 import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { fold, formatStamp } from "@/lib/format";
@@ -32,7 +32,6 @@ import { Faces } from "../Avatar";
 import { IconButton } from "../IconButton";
 import { NotePreview } from "../NotePreview";
 import { SymbolView } from "../icons";
-import { quiet } from "../Grouped";
 import { shelfGround, trashGround } from "../theme";
 import { attempt, Empty } from "../SettingsControls";
 import { useCreateNote } from "../useCreateNote";
@@ -314,7 +313,12 @@ export default function Notes() {
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
       </Stack.Toolbar>
+      <Stack.SearchBar
+        placeholder="Search"
+        onChangeText={(event) => setQuery(event.nativeEvent.text)}
+      />
       <Stack.Toolbar>
+        <Stack.Toolbar.SearchBarSlot />
         <Stack.Toolbar.Spacer />
         {scope !== TRASH && scope !== ARCHIVE ? (
           <Stack.Toolbar.View>
@@ -329,43 +333,7 @@ export default function Notes() {
       </Stack.Toolbar>
       <SectionList
         sections={sections}
-        keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        ListHeaderComponent={
-          <View
-            style={{
-              marginHorizontal: 16,
-              marginTop: 8,
-              marginBottom: 12,
-              paddingHorizontal: 12,
-              borderRadius: 12,
-              backgroundColor: quiet(palette),
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <SymbolView name="magnifyingglass" size={21} tintColor={palette.ink3} />
-            <TextInput
-              accessibilityLabel="Search notes"
-              placeholder="Search notes"
-              placeholderTextColor={palette.ink3}
-              value={query}
-              onChangeText={setQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-              style={{
-                flex: 1,
-                minHeight: 44,
-                paddingVertical: 10,
-                color: palette.ink,
-                fontSize: 17,
-              }}
-            />
-          </View>
-        }
         ListEmptyComponent={<Empty label={query ? "No Results" : "No Notes"} />}
         ListFooterComponent={
           <Text style={[styles.count, { color: palette.ink3, textAlign: "center", padding: 24 }]}>

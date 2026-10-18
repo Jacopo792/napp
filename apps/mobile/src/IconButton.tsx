@@ -1,9 +1,10 @@
-import { Pressable } from "react-native";
 import type { SFSymbol } from "expo-symbols";
 import { SymbolView } from "./icons";
 import { usePalette } from "./archive";
+import { Press } from "./Grouped";
 
-/** A legible system symbol inside a full 44-point touch target. */
+/** A legible system symbol inside a full 44-point touch target, giving a
+ *  little under the finger. */
 export function IconButton({
   icon,
   label,
@@ -17,20 +18,22 @@ export function IconButton({
 }) {
   const palette = usePalette();
   return (
-    <Pressable
+    <Press
+      feedback="scale"
       accessibilityRole="button"
       accessibilityLabel={label}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => ({
+      hitSlop={4}
+      style={{
         width: 44,
         height: 44,
         alignItems: "center",
         justifyContent: "center",
-        opacity: disabled ? 0.35 : pressed ? 0.5 : 1,
-      })}
+        opacity: disabled ? 0.35 : 1,
+      }}
     >
-      <SymbolView name={icon} size={26} weight="semibold" tintColor={palette.accent} />
-    </Pressable>
+      <SymbolView name={icon} size={24} weight="medium" tintColor={palette.accent} />
+    </Press>
   );
 }

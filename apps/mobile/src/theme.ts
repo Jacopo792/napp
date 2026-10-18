@@ -15,3 +15,10 @@ const curve = (points: readonly number[]) =>
 export const settle = { duration: DURATION.swipe, easing: curve(EASE.bounce) };
 /** Something leaving or arriving, with no overshoot. */
 export const travel = { duration: DURATION.slow, easing: curve(EASE.out) };
+
+/** A spring with no overshoot: whatever the finger let go of arrives and
+ *  stops, the way Revolut's surfaces do. Physical rather than a curve, so an
+ *  animation interrupted halfway carries its speed into the next one. */
+export const glide = { dampingRatio: 1, duration: 420 } as const;
+/** The same spring, quicker: a press giving back. */
+export const release = { dampingRatio: 1, duration: 260 } as const;

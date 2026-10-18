@@ -1,4 +1,4 @@
-/* A row that goes somewhere: pressed, it opens with the native stack push; held, it lifts a preview with the system's menu under it; pushed
+/* A row that goes somewhere: pressed, it opens with the system's zoom out of the row; held, it lifts a preview with the system's menu under it; pushed
  * sideways, it uncovers its acts. Notes and folders are both this row — what
  * is drawn inside it is the caller's.
  *
@@ -205,7 +205,7 @@ export function SwipeRow(props: Props) {
               }
             }}
           >
-            <Link.Trigger>
+            <Link.Trigger withAppleZoom>
               <Pressable style={({ pressed }) => pressed && { backgroundColor: quiet(palette) }}>
                 {children}
               </Pressable>

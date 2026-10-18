@@ -1,6 +1,6 @@
 import { useTextPrompt } from "../../TextPrompt";
 import { useEffect, useState } from "react";
-import { Pressable, Share, Text, View } from "react-native";
+import { Alert, Image, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { APPEARANCE_PRESETS } from "@/lib/appearance";
 import { createSpace, renameSpace } from "@/lib/spaces";
@@ -13,12 +13,13 @@ import {
 import { platform } from "@/platform";
 import { PRESENCE_PALETTES } from "@/lib/writingPreferences";
 import { useArchive, usePalette } from "../../archive";
-import { Chip } from "../../Grouped";
-import { Avatar } from "../../Avatar";
+import { downloadObject } from "@/lib/supabase";
+import { CARD_RADIUS, Press, RowFace } from "../../Grouped";
+import { Avatar, Faces, picture } from "../../Avatar";
+import { SymbolView } from "../../icons";
 import { chooseWallpaper, ProfileHero } from "../../ProfilePhoto";
 import {
   attempt,
-  Choice,
   Line,
   Section as Part,
   Segments,
@@ -80,14 +81,13 @@ export default function Section() {
         appearance: "Appearance",
         writing: "Writing",
         security: "Privacy",
-        palette: "Colour Palette",
         wallpaper: "Wallpaper",
       } as Record<string, string>
     )[section] ?? "Settings";
 
   const nickname = () =>
     prompt(
-      "Display name",
+      "Name",
       undefined,
       (name) => {
         if (profile && name?.trim())
@@ -98,7 +98,7 @@ export default function Section() {
     );
   const invite = () =>
     prompt(
-      "Invite Member",
+      "Invite Someone",
       "Email",
       (email) => {
         if (email?.trim())
@@ -133,7 +133,13 @@ export default function Section() {
       preset.background === p.appearance.background && preset.accent === p.appearance.accent,
   );
 
-  if (["reading", "icons", "folders"].includes(section)) return <Redirect href="/settings" />;
+  if (["reading", "icons", "folders", "palette"].includes(section))
+    return <Redirect href={section === "palette" ? "/settings/appearance" : "/settings"} />;
+
+  const seats = snapshot?.seatLimit ?? 8;
+  const seated = snapshot?.members.length ?? 0;
+  const setAppearance = (patch: Partial<typeof p.appearance>) =>
+    update({ appearance: { ...p.appearance, ...patch } });
 
   return (
     <SettingsPage title={title}>
@@ -143,49 +149,63 @@ export default function Section() {
           <ProfileHero />
           <Part>
             <Line
-              label="Display name"
+              label="Name"
               value={profile?.nickname || ""}
               disabled={!profile || busy}
               onPress={nickname}
+              opens
             />
           </Part>
         </>
       ) : null}
       {section === "archives" ? (
         <>
-          <Part title="Switch archive">
-            {spaces.map((space) => (
-              <Choice
-                key={space.archiveId}
-                label={space.name}
-                selected={space.archiveId === session.archiveId}
-                onPress={() =>
-                  void run(async () => {
-                    await switchArchive(space.archiveId);
-                    router.dismissAll();
-                  })
-                }
-              />
-            ))}
+          <Part title="Your Archives">
+            {spaces.map((space) => {
+              const on = space.archiveId === session.archiveId;
+              return (
+                <Line
+                  key={space.archiveId}
+                  icon="archivebox"
+                  label={space.name}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
+                  disabled={busy}
+                  onPress={() =>
+                    on
+                      ? undefined
+                      : void run(async () => {
+                          await switchArchive(space.archiveId);
+                          router.dismissAll();
+                        })
+                  }
+                  trailing={
+                    <>
+                      <Faces
+                        faces={space.members.map((member) => ({
+                          userId: member.userId,
+                          name: member.nickname,
+                          avatarObject: member.avatarObject,
+                        }))}
+                        size={24}
+                        ring={palette.paper}
+                      />
+                      <SymbolView
+                        name={on ? "checkmark.circle.fill" : "circle"}
+                        tintColor={on ? palette.accent : palette.ink4}
+                        size={22}
+                        weight="medium"
+                      />
+                    </>
+                  }
+                />
+              );
+            })}
           </Part>
           <Part>
             <Line
-              label="Create archive"
-              tone="action"
-              disabled={busy}
-              onPress={() =>
-                prompt("New Archive", undefined, (name) => {
-                  if (name?.trim())
-                    void run(async () => {
-                      const id = await createSpace(name.trim());
-                      await switchArchive(id);
-                      router.dismissAll();
-                    });
-                })
-              }
-            />
-            <Line
-              label="Rename current archive"
+              icon="pencil"
+              label={current ? `Rename “${current.name}”` : "Rename Archive"}
               tone="action"
               disabled={busy || !current}
               onPress={() =>
@@ -204,12 +224,28 @@ export default function Section() {
                 )
               }
             />
+            <Line
+              icon="plus"
+              label="New Archive"
+              tone="action"
+              disabled={busy}
+              onPress={() =>
+                prompt("New Archive", undefined, (name) => {
+                  if (name?.trim())
+                    void run(async () => {
+                      const id = await createSpace(name.trim());
+                      await switchArchive(id);
+                      router.dismissAll();
+                    });
+                })
+              }
+            />
           </Part>
         </>
       ) : null}
       {section === "members" ? (
         <>
-          <Part title={current?.name}>
+          <Part title={current ? `In “${current.name}”` : undefined}>
             {(snapshot?.members ?? []).map((member) => (
               <Line
                 key={member.userId}
@@ -221,34 +257,46 @@ export default function Section() {
                       avatarObject: member.avatarObject,
                     }}
                     email={member.isSelf ? session.email : undefined}
-                    size={32}
+                    size={36}
                   />
                 }
                 label={member.nickname || "Member"}
                 value={member.isSelf ? "You" : undefined}
               />
             ))}
+          </Part>
+          <Part>
             <Line
-              label="Invite member"
+              icon="person.badge.plus"
+              label="Invite Someone"
               tone="action"
-              value={`${snapshot?.members.length ?? 0} of ${snapshot?.seatLimit ?? 2}`}
-              disabled={busy || (snapshot?.members.length ?? 0) >= (snapshot?.seatLimit ?? 2)}
+              value={`${seated} of ${seats}`}
+              disabled={busy || seated >= seats}
               onPress={invite}
             />
           </Part>
           {invites.length ? (
-            <Part title="Waiting to join">
+            <Part title="Invitations">
               {invites.map((pending) => (
                 <Line
                   key={pending.id}
+                  icon="envelope"
                   label={pending.email}
-                  value="Revoke"
+                  value="Pending"
                   disabled={busy}
                   onPress={() =>
-                    void run(async () => {
-                      await revokeArchiveInvite(pending.id);
-                      setInvites(await loadPendingInvites(session));
-                    })
+                    Alert.alert(`Revoke the invitation for ${pending.email}?`, undefined, [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Revoke",
+                        style: "destructive",
+                        onPress: () =>
+                          void run(async () => {
+                            await revokeArchiveInvite(pending.id);
+                            setInvites(await loadPendingInvites(session));
+                          }),
+                      },
+                    ])
                   }
                 />
               ))}
@@ -256,9 +304,8 @@ export default function Section() {
           ) : null}
         </>
       ) : null}
-      {!preferencesReady &&
-      ["appearance", "palette", "wallpaper", "writing", "security"].includes(section) ? (
-        <Text style={{ color: palette.ink3, margin: 20 }}>Loading preferences…</Text>
+      {!preferencesReady && ["appearance", "wallpaper", "writing", "security"].includes(section) ? (
+        <Text style={{ color: palette.ink3, margin: 20 }}>Loading…</Text>
       ) : (
         <>
           {section === "appearance" ? (
@@ -275,16 +322,23 @@ export default function Section() {
                   onChange={theme}
                 />
               </Part>
-              <Part title="Personalise">
-                <Line
-                  label="Colour palette"
-                  value={palettePreset?.name ?? "Custom"}
-                  opens
-                  onPress={() =>
-                    router.push({ pathname: "/settings/[section]", params: { section: "palette" } })
-                  }
+              <Part title="Palette">
+                <PaletteChoices
+                  value={palettePreset?.id}
+                  onChange={(id) => {
+                    const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === id)!;
+                    setAppearance({
+                      theme: preset.theme,
+                      accent: preset.accent,
+                      background: preset.background,
+                      foreground: preset.foreground,
+                    });
+                  }}
                 />
+              </Part>
+              <Part>
                 <Line
+                  icon="photo"
                   label="Wallpaper"
                   value={p.appearance.wallpaper && p.appearance.wallpaperObject ? "On" : "Off"}
                   opens
@@ -298,74 +352,44 @@ export default function Section() {
               </Part>
             </>
           ) : null}
-          {section === "palette" ? (
-            <PaletteChoices
-              value={palettePreset?.id}
-              onChange={(id) => {
-                const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === id)!;
-                update({
-                  appearance: {
-                    ...p.appearance,
-                    theme: preset.theme,
-                    accent: preset.accent,
-                    background: preset.background,
-                    foreground: preset.foreground,
-                  },
-                });
-              }}
-            />
-          ) : null}
           {section === "wallpaper" ? (
-            <Part title="Wallpaper">
-              <Line
-                label={p.appearance.wallpaperObject ? "Change Wallpaper" : "Choose Wallpaper"}
-                tone="action"
-                disabled={busy}
-                onPress={() =>
-                  void run(async () => {
-                    const objectId = await chooseWallpaper(session);
-                    if (objectId)
-                      update({
-                        appearance: {
-                          ...p.appearance,
-                          wallpaper: true,
-                          wallpaperObject: objectId,
-                        },
-                      });
-                  })
-                }
-              />
-              {p.appearance.wallpaperObject ? (
-                <>
+            <>
+              <WallpaperPicture objectId={p.appearance.wallpaperObject} />
+              <Part>
+                {p.appearance.wallpaperObject ? (
                   <Toggle
                     label="Show Wallpaper"
                     value={p.appearance.wallpaper}
-                    onChange={(wallpaper) => update({ appearance: { ...p.appearance, wallpaper } })}
+                    onChange={(wallpaper) => setAppearance({ wallpaper })}
                   />
-                  <Text style={{ color: palette.ink3, fontSize: 13, marginTop: 12 }}>Blur</Text>
-                  <Segments
-                    options={[
-                      { id: 0, label: "Sharp" },
-                      { id: 8, label: "Soft" },
-                      { id: 20, label: "Deep" },
-                    ]}
-                    value={p.appearance.wallpaperBlur}
-                    onChange={(wallpaperBlur) =>
-                      update({ appearance: { ...p.appearance, wallpaperBlur } })
-                    }
-                  />
+                ) : null}
+                <Line
+                  label={p.appearance.wallpaperObject ? "Choose New Photo" : "Choose Photo"}
+                  tone="action"
+                  disabled={busy}
+                  onPress={() =>
+                    void run(async () => {
+                      const objectId = await chooseWallpaper(session);
+                      if (objectId)
+                        setAppearance({
+                          wallpaper: true,
+                          wallpaperObject: objectId,
+                          wallpaperBlur: 0,
+                        });
+                    })
+                  }
+                />
+              </Part>
+              {p.appearance.wallpaperObject ? (
+                <Part>
                   <Line
                     label="Remove Wallpaper"
                     tone="danger"
-                    onPress={() =>
-                      update({
-                        appearance: { ...p.appearance, wallpaper: false, wallpaperObject: null },
-                      })
-                    }
+                    onPress={() => setAppearance({ wallpaper: false, wallpaperObject: null })}
                   />
-                </>
+                </Part>
               ) : null}
-            </Part>
+            </>
           ) : null}
           {section === "writing" ? (
             <>
@@ -376,14 +400,8 @@ export default function Section() {
                   onChange={(autocorrect) => update({ autocorrect })}
                 />
               </Part>
-              <Part
-                title={`Your colour in shared notes · ${
-                  PRESENCE_PALETTES.find((colour) => colour.id === p.writing.presencePalette)
-                    ?.name ?? ""
-                }`}
-              >
+              <Part title="Your Colour in Shared Notes">
                 <Swatches
-                  labelled
                   items={PRESENCE_PALETTES.map((colour) => ({
                     id: colour.id,
                     label: colour.name,
@@ -403,28 +421,32 @@ export default function Section() {
             </>
           ) : null}
           {section === "security" ? (
-            <Part>
-              <Toggle
-                label="Show when I’m online"
-                value={p.presence}
-                onChange={(presence) => update({ presence })}
-              />
-              <Toggle
-                label="Show who contributed"
-                value={p.collaborators}
-                onChange={(collaborators) => update({ collaborators })}
-              />
-              {profile ? (
+            <>
+              <Part title="Others Can See">
                 <Toggle
-                  label="Hide my archived notes"
-                  value={profile.hideArchived}
-                  disabled={busy}
-                  onChange={(hideArchived) =>
-                    void run(() => updateProfile({ ...profile, hideArchived }))
-                  }
+                  label="When I’m Online"
+                  value={p.presence}
+                  onChange={(presence) => update({ presence })}
                 />
-              ) : null}
-            </Part>
+                {profile ? (
+                  <Toggle
+                    label="My Archived Notes"
+                    value={!profile.hideArchived}
+                    disabled={busy}
+                    onChange={(shown) =>
+                      void run(() => updateProfile({ ...profile, hideArchived: !shown }))
+                    }
+                  />
+                ) : null}
+              </Part>
+              <Part title="I Can See">
+                <Toggle
+                  label="Collaborators on Notes"
+                  value={p.collaborators}
+                  onChange={(collaborators) => update({ collaborators })}
+                />
+              </Part>
+            </>
           ) : null}
         </>
       )}
@@ -433,41 +455,50 @@ export default function Section() {
   );
 }
 
+/** The screens as they will look: the real rows, in the reader's palette. */
 function AppearancePreview() {
   const palette = usePalette();
   return (
     <View
       accessibilityLabel="Appearance preview"
       style={{
-        marginHorizontal: 20,
-        marginBottom: 24,
-        padding: 20,
-        borderRadius: 16,
+        marginHorizontal: 16,
+        marginBottom: 28,
+        paddingTop: 22,
+        paddingBottom: 14,
+        paddingHorizontal: 12,
+        borderRadius: CARD_RADIUS + 6,
+        borderCurve: "continuous",
         backgroundColor: palette.page,
         borderWidth: 1,
-        borderColor: palette.rule,
-        gap: 12,
+        borderColor: palette.dark ? "#ffffff1f" : "#0000001a",
       }}
     >
-      <Text style={{ color: palette.ink3, fontSize: 12, fontWeight: "600" }}>PREVIEW</Text>
-      <Text style={{ color: palette.ink, fontSize: 24, fontWeight: "700" }}>
-        Your notes, your space
-      </Text>
       <View
         style={{
-          backgroundColor: palette.paper,
-          borderRadius: 10,
-          padding: 14,
           flexDirection: "row",
           alignItems: "center",
-          gap: 12,
+          justifyContent: "space-between",
+          paddingHorizontal: 6,
+          marginBottom: 14,
         }}
       >
-        <Chip icon="folder.fill" fill={palette.folder} size={34} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={{ color: palette.ink, fontSize: 16, fontWeight: "600" }}>Ideas</Text>
-          <Text style={{ color: palette.ink3, fontSize: 14 }}>A place to start.</Text>
-        </View>
+        <Text style={{ color: palette.ink, fontSize: 26, fontWeight: "700", letterSpacing: -0.6 }}>
+          Your Notes
+        </Text>
+        <SymbolView name="square.and.pencil" size={22} weight="medium" tintColor={palette.accent} />
+      </View>
+      <View
+        pointerEvents="none"
+        style={{
+          backgroundColor: palette.paper,
+          borderRadius: CARD_RADIUS,
+          borderCurve: "continuous",
+          paddingVertical: 4,
+        }}
+      >
+        <RowFace icon="note.text" label="All Notes" detail={12} />
+        <RowFace icon="folder" label="Ideas" detail={4} />
       </View>
     </View>
   );
@@ -476,49 +507,106 @@ function AppearancePreview() {
 function PaletteChoices({ value, onChange }: { value?: string; onChange: (id: string) => void }) {
   const palette = usePalette();
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginHorizontal: 20 }}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 6, paddingHorizontal: 10, paddingVertical: 10 }}
+    >
       {APPEARANCE_PRESETS.map((preset) => {
         const selected = value === preset.id;
         return (
-          <Pressable
+          <Press
             key={preset.id}
+            feedback="scale"
             accessibilityRole="radio"
             accessibilityLabel={preset.name}
             accessibilityState={{ checked: selected }}
             onPress={() => onChange(preset.id)}
-            style={({ pressed }) => ({
-              width: "47%",
-              flexGrow: 1,
-              borderWidth: 2,
-              borderColor: selected ? palette.accent : "transparent",
-              borderRadius: 14,
-              padding: 4,
-              opacity: pressed ? 0.65 : 1,
-            })}
+            style={{ alignItems: "center", gap: 8, width: 84 }}
           >
             <View
-              style={{ padding: 16, borderRadius: 9, backgroundColor: preset.background, gap: 10 }}
+              style={{
+                padding: 3,
+                borderRadius: 19,
+                borderCurve: "continuous",
+                borderWidth: 2.5,
+                borderColor: selected ? palette.accent : "transparent",
+              }}
             >
-              <Text style={{ fontSize: 24, fontWeight: "600", color: preset.foreground }}>Aa</Text>
               <View
-                style={{ height: 5, width: "65%", borderRadius: 3, backgroundColor: preset.accent }}
-              />
+                style={{
+                  width: 70,
+                  height: 82,
+                  borderRadius: 14,
+                  borderCurve: "continuous",
+                  backgroundColor: preset.background,
+                  borderWidth: 1,
+                  borderColor: palette.dark ? "#ffffff1a" : "#00000014",
+                  padding: 10,
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text style={{ fontSize: 22, fontWeight: "700", color: preset.foreground }}>
+                  Aa
+                </Text>
+                <View
+                  style={{ height: 6, width: 30, borderRadius: 3, backgroundColor: preset.accent }}
+                />
+              </View>
             </View>
             <Text
               style={{
-                color: palette.ink,
-                fontSize: 14,
-                textAlign: "center",
-                paddingVertical: 8,
-                fontWeight: selected ? "600" : "400",
+                color: selected ? palette.ink : palette.ink3,
+                fontSize: 13,
+                fontWeight: selected ? "600" : "500",
               }}
+              numberOfLines={1}
             >
               {preset.name}
-              {selected ? " ✓" : ""}
             </Text>
-          </Pressable>
+          </Press>
         );
       })}
+    </ScrollView>
+  );
+}
+
+/** The chosen picture itself, so the page says what is set by showing it. */
+function WallpaperPicture({ objectId }: { objectId: string | null }) {
+  const { session } = useArchive();
+  const palette = usePalette();
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setUri(null);
+    if (objectId)
+      void picture(objectId, () => downloadObject(session, objectId, "image/jpeg")).then(
+        (next) => live && setUri(next),
+      );
+    return () => {
+      live = false;
+    };
+  }, [session, objectId]);
+  return (
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginBottom: 28,
+        alignSelf: "stretch",
+        height: 220,
+        borderRadius: CARD_RADIUS,
+        borderCurve: "continuous",
+        overflow: "hidden",
+        backgroundColor: palette.paper,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {uri ? (
+        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        <SymbolView name="photo" size={44} weight="light" tintColor={palette.ink4} />
+      )}
     </View>
   );
 }

@@ -52,8 +52,6 @@ export default function Root() {
               <HostedPageProvider>
                 <Stack
                   screenOptions={{
-                    animation: "simple_push",
-                    animationDuration: 200,
                     headerLargeTitle: true,
                     headerTransparent: true,
                     headerLargeTitleShadowVisible: false,

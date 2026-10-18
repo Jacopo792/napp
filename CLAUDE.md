@@ -981,23 +981,42 @@ read begun before an edit cannot replace it afterwards.
 
 **Phone appearance stays independent from the computer.** Appearance chosen
 on the phone goes into `profile_preferences.phone`; web and desktop preserve
-that branch without applying it. Writing colour, autocorrection and privacy
+that branch without applying it. Until the phone chooses something, it wears
+the defaults and its own cache — never the computer's theme, palette or
+wallpaper, and nothing the phone does reaches them. Writing colour, autocorrection and privacy
 remain account-wide. Phone text uses the Apple system font and fixed reading
 defaults (17 pt, weight 400, leading 1.55). Reading, Icon Style and Folder Colour
 controls were removed at Jacopo's request on 17 October 2026; phone folders
 use the default colour and icons use one system-symbol style.
 
-Settings uses system typography, an aligned profile card and native-style
-inset groups. Its pages are Profile, Archives, Members, Appearance, Writing
-and Privacy. Appearance has an actual preview, Automatic/Light/Dark theme,
-named palette previews and a separate wallpaper page. Account preferences
+**Settings is in the order things are reached for** (Jacopo, 18 October
+2026, "you can't understand anything"): the profile card, then Archive
+(Archives, Members — "2 of 8"), This Phone (Appearance), Account (Writing,
+Privacy), and Sign Out alone at the foot. Every index row leads with a tile
+and says what is set now; rows on the pages under it carry no tile. A page
+has one purpose and its destructive act last and apart. Appearance is the
+real rows in a live preview, then Theme, then Palette as named cards in one
+horizontal strip — choosing one is never a trip to another page — then
+Wallpaper, a page that shows the picture itself; there is no blur choice.
+Privacy splits into what others can see and what I can see, every switch
+phrased so that on means shown. Revoking an invitation asks first.
+
+One shape language for the phone: a thing sits on a rounded square with a
+continuous corner, a person on a circle. Cards are solid, `CARD_RADIUS` 22,
+with no rules between rows. A face without a picture is its letters in a hue
+of its own on a disc of that hue mixed opaque into the card — never blue,
+which is the reader's own. Every press is `Press` in `Grouped.tsx`: a row in a
+card lights, anything standing alone gives 4% under the finger, both on the
+UI thread and back on `release`, a spring with no overshoot; `glide` is its
+slower sibling for things that travel (the theme plate, the faces trading
+seats). Account preferences
 and live editor updates still use the existing core modules. A lock arriving
 while a note is open changes editing permission without rebuilding its Y.Doc.
 
-Navigation uses a short native `simple_push` transition; note links retain
-context menus and previews without Apple zoom transitions. Toolbar icons have
-44 pt touch targets. Notes search sits above the list, avoiding the overlapping
-bottom search field. Mobile note titles use system typography, natural wrapping
+Navigation uses the native iOS push; a note opens out of its row with
+`Link.Trigger withAppleZoom` and keeps its context menu and preview. Toolbar icons have
+44 pt touch targets. Notes search is the native bottom search bar beside New note;
+the list keeps `contentInsetAdjustmentBehavior="automatic"` so it never overlaps. Mobile note titles use system typography, natural wrapping
 and padding that prevents glyph clipping.
 
 Native note controls now call the editor through `lib/hostedCommands.ts`:

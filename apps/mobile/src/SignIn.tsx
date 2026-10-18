@@ -1,7 +1,7 @@
 /* Signing in: the core's `authenticate`, and the archive chooser for an
  * account in several, as on the web. */
 import { useState } from "react";
-import { KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   authenticate,
@@ -10,6 +10,7 @@ import {
   type AuthenticationResult,
 } from "@/lib/session";
 import { usePalette } from "./archive";
+import { Press } from "./Grouped";
 
 export function SignIn({ onSession }: { onSession: (session: AppSession) => void }) {
   const palette = usePalette();
@@ -40,20 +41,17 @@ export function SignIn({ onSession }: { onSession: (session: AppSession) => void
     });
 
   const field = [styles.field, { color: palette.ink, backgroundColor: palette.paper }];
-  const button = ({ pressed }: { pressed: boolean }) => [
-    styles.button,
-    { backgroundColor: palette.accent, opacity: pressed ? 0.75 : 1 },
-  ];
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: palette.page }]}>
       <KeyboardAvoidingView behavior="padding" style={styles.form}>
         {choosing ? (
           choosing.archives.map((archive) => (
-            <Pressable
+            <Press
               key={archive.archiveId}
+              feedback="scale"
               disabled={busy}
-              style={({ pressed }) => [...field, pressed && { backgroundColor: palette.surface }]}
+              style={[styles.field, { backgroundColor: palette.paper }]}
               onPress={() =>
                 attempt(async () =>
                   onSession(await chooseArchive(choosing.account, archive.archiveId)),
@@ -61,7 +59,7 @@ export function SignIn({ onSession }: { onSession: (session: AppSession) => void
               }
             >
               <Text style={[styles.label, { color: palette.ink }]}>{archive.name}</Text>
-            </Pressable>
+            </Press>
           ))
         ) : (
           <>
@@ -85,11 +83,16 @@ export function SignIn({ onSession }: { onSession: (session: AppSession) => void
               onChangeText={setPassword}
               onSubmitEditing={submit}
             />
-            <Pressable style={button} disabled={busy} onPress={submit}>
+            <Press
+              feedback="scale"
+              style={[styles.button, { backgroundColor: palette.accent, opacity: busy ? 0.6 : 1 }]}
+              disabled={busy}
+              onPress={submit}
+            >
               <Text style={[styles.label, { color: palette.onAccent }]}>
-                {busy ? "Signing in…" : "Sign in"}
+                {busy ? "Signing In…" : "Sign In"}
               </Text>
-            </Pressable>
+            </Press>
           </>
         )}
         {error ? (
@@ -105,8 +108,19 @@ export function SignIn({ onSession }: { onSession: (session: AppSession) => void
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   form: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
-  field: { fontSize: 17, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14 },
-  button: { borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+  field: {
+    fontSize: 17,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderCurve: "continuous",
+  },
+  button: {
+    borderRadius: 16,
+    borderCurve: "continuous",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
   label: { fontSize: 17, fontWeight: "600" },
   error: { textAlign: "center", fontSize: 15 },
 });

@@ -1,91 +1,107 @@
-import { Link, useRouter } from "expo-router";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Link } from "expo-router";
+import { Alert, Text, View } from "react-native";
 import { APPEARANCE_PRESETS } from "@/lib/appearance";
 import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
+import { CARD_RADIUS, Press } from "../../Grouped";
 import { SymbolView } from "../../icons";
 import { attempt, Line, Section, SettingsPage } from "../../SettingsControls";
 
-/* Account first, then grouped settings for this phone and this archive. */
+/* You, then the archive you are in, then how this phone looks and how you
+   write, then leaving — the order they are reached for. Every row says where
+   it goes and what is set there now. */
 export default function Settings() {
-  const router = useRouter();
   const { session, snapshot, spaces, profile, preferences: p, signOut } = useArchive();
   const palette = usePalette();
   const current = spaces.find((space) => space.archiveId === session.archiveId);
   const go = (section: string) =>
     ({ pathname: "/settings/[section]", params: { section } }) as const;
   const look =
-    APPEARANCE_PRESETS.find(
-      (preset) =>
-        preset.background === p.appearance.background && preset.accent === p.appearance.accent,
-    )?.name ?? "Custom";
+    p.appearance.theme === "system"
+      ? "Automatic"
+      : (APPEARANCE_PRESETS.find(
+          (preset) =>
+            preset.background === p.appearance.background && preset.accent === p.appearance.accent,
+        )?.name ?? "Custom");
   const name = profile?.nickname || session.email.split("@")[0];
   return (
     <SettingsPage title="Settings">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Profile"
-        onPress={() => router.push(go("profile"))}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 14,
-          padding: 16,
-          borderRadius: 12,
-          backgroundColor: palette.dark ? "#1c1c1e" : "#ffffff",
-          marginHorizontal: 20,
-          marginBottom: 24,
-          opacity: pressed ? 0.6 : 1,
-        })}
-      >
-        <Avatar
-          face={{
-            userId: session.userId,
-            name: profile?.nickname ?? "",
-            avatarObject: profile?.avatarObject ?? null,
+      <Link href={go("profile")} asChild>
+        <Press
+          feedback="scale"
+          accessibilityRole="button"
+          accessibilityLabel={`${name}, Profile`}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 16,
+            paddingVertical: 18,
+            paddingHorizontal: 18,
+            borderRadius: CARD_RADIUS,
+            borderCurve: "continuous",
+            backgroundColor: palette.paper,
+            marginHorizontal: 16,
+            marginBottom: 28,
           }}
-          email={session.email}
-          size={58}
-        />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ color: palette.ink, fontSize: 20, fontWeight: "600" }} numberOfLines={1}>
-            {name}
-          </Text>
-          <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
-            {session.email}
-          </Text>
-        </View>
-        <SymbolView name="chevron.right" tintColor={palette.ink4} size={14} />
-      </Pressable>
-      <Section title="This phone">
-        <Link href={go("appearance")} asChild>
-          <Line label="Appearance" value={look} opens />
-        </Link>
-      </Section>
+        >
+          <Avatar
+            face={{
+              userId: session.userId,
+              name: profile?.nickname ?? "",
+              avatarObject: profile?.avatarObject ?? null,
+            }}
+            email={session.email}
+            size={60}
+          />
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text
+              style={{ color: palette.ink, fontSize: 21, fontWeight: "700", letterSpacing: -0.4 }}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
+              {session.email}
+            </Text>
+          </View>
+          <SymbolView name="chevron.right" tintColor={palette.ink4} size={14} weight="semibold" />
+        </Press>
+      </Link>
       <Section title="Archive">
         <Link href={go("archives")} asChild>
-          <Line label="Archives" value={current?.name} opens />
+          <Line icon="archivebox" label="Archives" value={current?.name} opens />
         </Link>
         <Link href={go("members")} asChild>
-          <Line label="Members" value={snapshot?.members.length} opens />
+          <Line
+            icon="person.2"
+            label="Members"
+            value={snapshot ? `${snapshot.members.length} of ${snapshot.seatLimit}` : undefined}
+            opens
+          />
         </Link>
       </Section>
-      <Section title="Writing & privacy">
+      <Section title="This Phone">
+        <Link href={go("appearance")} asChild>
+          <Line icon="paintpalette" label="Appearance" value={look} opens />
+        </Link>
+      </Section>
+      <Section title="Account">
         <Link href={go("writing")} asChild>
-          <Line label="Writing" opens />
+          <Line icon="pencil" label="Writing" opens />
         </Link>
         <Link href={go("security")} asChild>
-          <Line label="Privacy" opens />
+          <Line icon="hand.raised" label="Privacy" opens />
         </Link>
       </Section>
       <Section>
         <Line
-          label="Sign out"
+          label="Sign Out"
           tone="danger"
+          icon="rectangle.portrait.and.arrow.right"
           onPress={() =>
             Alert.alert("Sign out of Napp?", undefined, [
               { text: "Cancel", style: "cancel" },
-              { text: "Sign out", style: "destructive", onPress: () => void attempt(signOut) },
+              { text: "Sign Out", style: "destructive", onPress: () => void attempt(signOut) },
             ])
           }
         />

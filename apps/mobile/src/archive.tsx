@@ -22,7 +22,7 @@ import {
   subscribeToAccountPreferences,
   type AccountPreferences,
 } from "@/lib/accountPreferences";
-import { APPEARANCE_PRESETS, setAppearance } from "@/lib/appearance";
+import { APPEARANCE_PRESETS, DEFAULT_APPEARANCE, setAppearance } from "@/lib/appearance";
 import { setAxes } from "@/lib/axes";
 import { setWritingPreferences } from "@/lib/writingPreferences";
 import { chooseArchive } from "@/lib/session";
@@ -354,11 +354,12 @@ export function ArchiveProvider({
 }
 
 /** The account's preferences as the phone wears them: its own look where it
- *  has chosen one, the computer's until then. */
+ *  has chosen one, the defaults until then — never the computer's, wallpaper
+ *  included. */
 function phoneView(row: AccountPreferences): AccountPreferences {
   return {
     ...row,
-    appearance: { ...(row.phone?.appearance ?? row.appearance), folderColour: "auto" },
+    appearance: { ...(row.phone?.appearance ?? DEFAULT_APPEARANCE), folderColour: "auto" },
     axes: { size: 17, measure: 68, weight: 400, leading: 1.55, face: "system" },
   };
 }

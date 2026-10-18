@@ -4,6 +4,8 @@
  * places: the one behind comes forward and grows, the one in front steps back
  * and shrinks, passing on either side of each other so the swap reads as a
  * swap. Both stay mounted for it; remounting the front face only ever zoomed.
+ * The trade is a spring with no overshoot: a face that sails past its seat
+ * and comes back reads as the switch wobbling.
  * Not a double press, which nobody finds and which makes every single press
  * wait to learn it was not one. With more than two members the press goes
  * round them in order.
@@ -15,13 +17,13 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
   type SharedValue,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { usePalette } from "./archive";
 import { Avatar, type Face } from "./Avatar";
-import { settle } from "./theme";
+import { glide } from "./theme";
 
 export interface Whose {
   face: Face;
@@ -41,7 +43,7 @@ function Seat({ who, front, seat }: { who: Whose; front: SharedValue<number>; se
   const side = seat === 0 ? -1 : 1;
   const style = useAnimatedStyle(() => {
     const t = seat === 0 ? front.value : 1 - front.value;
-    const bow = Math.sin(Math.PI * t) * 7 * side;
+    const bow = Math.sin(Math.PI * Math.min(1, Math.max(0, t))) * 5 * side;
     return {
       zIndex: t < 0.5 ? 2 : 1,
       transform: [
@@ -79,7 +81,7 @@ export function WhoseSwitch({
   const forward = pair[1]?.face.userId === selected ? 1 : 0;
   const front = useSharedValue(forward);
   useEffect(() => {
-    front.value = withTiming(forward, settle);
+    front.value = withSpring(forward, glide);
   }, [forward, front]);
 
   if (!shown) return null;
@@ -98,7 +100,7 @@ export function WhoseSwitch({
       style={({ pressed }) => ({
         width: next ? SIZE + BEHIND.x * 0.9 : SIZE,
         height: SIZE + 6,
-        opacity: pressed ? 0.75 : 1,
+        opacity: pressed ? 0.7 : 1,
       })}
     >
       {pair[1] ? <Seat who={pair[1]} front={front} seat={1} /> : null}

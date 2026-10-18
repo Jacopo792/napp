@@ -49,12 +49,34 @@ export interface Face {
   online?: boolean;
 }
 
-/* Initials stand on the accent for the reader's own face and on a quiet tone
-   of their own for everybody else, picked from the id so a person keeps it on
-   every screen: two faces side by side must not read as one. */
-const TONES = ["#7d8f6a", "#6b7f99", "#8e6f8f", "#a8834a", "#5f8a86"];
-const toneOf = (userId: string) =>
-  TONES[[...userId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % TONES.length];
+/* A face without a picture is its letters in a hue of its own, on a disc of
+   that same hue tinted into the ground — Revolut's contact chips, never a loud
+   filled circle. The reader's own face takes the accent; everybody else's hue
+   is picked from the id — never blue, the accent most readers keep — so a
+   person keeps it on every screen and two faces
+   side by side never read as one. The disc is mixed opaque rather than drawn
+   translucent, because faces overlap and one must not show through another. */
+const HUES = ["#f5b83d", "#ff9f43", "#c77dff", "#3ecf8e", "#ff6b8b", "#4dc9e6"];
+const hueOf = (userId: string) =>
+  HUES[[...userId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % HUES.length];
+
+const rgb = (hex: string) => {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(hex);
+  return match ? match.slice(1).map((part) => parseInt(part, 16)) : null;
+};
+/** `a` taken `t` of the way to `b`; `a` itself when either is not a hex. */
+const mix = (a: string, b: string, t: number) => {
+  const from = rgb(a);
+  const to = rgb(b);
+  if (!from || !to) return a;
+  return `#${from
+    .map((part, at) =>
+      Math.round(part + (to[at] - part) * t)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+};
 
 export function Avatar({
   face,
@@ -84,6 +106,9 @@ export function Avatar({
   }, [userId, avatarObject]);
   const border = ring ? Math.max(1.5, size / 16) : 0;
   const dot = Math.max(7, Math.round(size / 3.6));
+  const hue = email ? palette.accent : hueOf(userId);
+  const disc = mix(palette.paper, hue, palette.dark ? 0.32 : 0.2);
+  const letters = palette.dark ? mix(hue, "#ffffff", 0.25) : mix(hue, "#000000", 0.2);
   return (
     <View
       accessible
@@ -97,7 +122,7 @@ export function Avatar({
           borderRadius: size / 2,
           borderWidth: border,
           borderColor: ring,
-          backgroundColor: email ? palette.accent : toneOf(userId),
+          backgroundColor: disc,
           alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
@@ -105,9 +130,10 @@ export function Avatar({
       >
         <Text
           style={{
-            color: email ? palette.onAccent : "#ffffff",
-            fontSize: size * 0.4,
+            color: letters,
+            fontSize: size * 0.42,
             fontWeight: "600",
+            letterSpacing: -0.2,
           }}
           allowFontScaling={false}
         >
@@ -132,7 +158,7 @@ export function Avatar({
       </View>
       {online ? (
         <Animated.View
-          entering={ZoomIn.springify()}
+          entering={ZoomIn.duration(220)}
           style={{
             position: "absolute",
             right: -1,

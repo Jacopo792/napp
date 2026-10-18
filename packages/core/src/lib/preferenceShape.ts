@@ -46,7 +46,8 @@ export interface AccountFlags {
  *  the hand and a window on a desk are read in different light, so changing
  *  the wallpaper on one must not change it on the other (Jacopo, 17 October
  *  2026). Still the account's, so a second phone finds it. Absent until the
- *  phone first changes something; until then it wears the computer's. */
+ *  phone first changes something; until then it wears the defaults, never the
+ *  computer's — wallpaper, theme and palette do not cross in either direction. */
 export interface PhoneLook {
   appearance?: Appearance;
   axes?: Axes;

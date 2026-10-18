@@ -7,7 +7,7 @@
  * The wallpaper is picked here too: the same picker, uncropped, into the
  * archive's own bucket, named in the account's appearance as the web names it. */
 import { useState } from "react";
-import { ActionSheetIOS, Alert, Platform, Pressable, Text, View } from "react-native";
+import { ActionSheetIOS, Alert, Platform, Text, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { File } from "expo-file-system";
 import { launchImageLibraryAsync } from "expo-image-picker";
@@ -17,6 +17,7 @@ import { useArchive, usePalette } from "./archive";
 import { Avatar, rememberPicture } from "./Avatar";
 import { attempt } from "./SettingsControls";
 import { SymbolView } from "./icons";
+import { Press } from "./Grouped";
 
 const AVATAR_EDGE = 512;
 const MAX_AVATAR_BYTES = 1.5 * 1024 * 1024;
@@ -118,16 +119,14 @@ export function ProfileHero() {
 
   const name = profile?.nickname || session.email.split("@")[0];
   return (
-    <View style={{ alignItems: "center", paddingTop: 8, paddingBottom: 24, gap: 8 }}>
-      <Pressable
+    <View style={{ alignItems: "center", paddingTop: 4, paddingBottom: 28, gap: 4 }}>
+      <Press
+        feedback="scale"
         accessibilityRole="button"
-        accessibilityLabel={profile?.avatarObject ? "Change Profile Photo" : "Add Profile Photo"}
+        accessibilityLabel={profile?.avatarObject ? "Edit Photo" : "Add Photo"}
         disabled={!profile || busy}
         onPress={offer}
-        style={({ pressed }) => ({
-          transform: [{ scale: pressed ? 0.96 : 1 }],
-          opacity: busy ? 0.5 : 1,
-        })}
+        style={{ opacity: busy ? 0.5 : 1, marginBottom: 12 }}
       >
         <Avatar
           face={{
@@ -136,33 +135,32 @@ export function ProfileHero() {
             avatarObject: profile?.avatarObject ?? null,
           }}
           email={session.email}
-          size={88}
-          ring={palette.dark ? "#ffffff33" : "#00000014"}
+          size={104}
         />
         <View
           style={{
             position: "absolute",
-            right: 0,
-            bottom: 2,
+            right: -2,
+            bottom: 0,
             width: 34,
             height: 34,
             borderRadius: 17,
-            backgroundColor: palette.accent,
+            backgroundColor: palette.paper,
             borderWidth: 3,
             borderColor: palette.page,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <SymbolView name="camera.fill" size={14} tintColor={palette.onAccent} />
+          <SymbolView name="camera.fill" size={15} tintColor={palette.ink} />
         </View>
-      </Pressable>
+      </Press>
       <Text
         style={{
           color: palette.ink,
-          fontSize: 24,
-          fontWeight: "600",
-          marginTop: 8,
+          fontSize: 26,
+          fontWeight: "700",
+          letterSpacing: -0.5,
           textAlign: "center",
           paddingHorizontal: 20,
         }}
@@ -170,12 +168,27 @@ export function ProfileHero() {
       >
         {name}
       </Text>
-      <Text style={{ color: palette.ink3, fontSize: 15, fontWeight: "400" }} numberOfLines={1}>
+      <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
         {session.email}
       </Text>
-      <Pressable accessibilityRole="button" onPress={offer} disabled={!profile || busy}>
-        <Text style={{ color: palette.accent, fontSize: 15, padding: 8 }}>Change photo</Text>
-      </Pressable>
+      <Press
+        feedback="scale"
+        accessibilityRole="button"
+        disabled={!profile || busy}
+        onPress={offer}
+        hitSlop={8}
+        style={{
+          marginTop: 14,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          borderRadius: 18,
+          backgroundColor: palette.paper,
+        }}
+      >
+        <Text style={{ color: palette.accent, fontSize: 15, fontWeight: "600" }}>
+          {profile?.avatarObject ? "Edit Photo" : "Add Photo"}
+        </Text>
+      </Press>
     </View>
   );
 }
