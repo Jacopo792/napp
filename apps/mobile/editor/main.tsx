@@ -207,4 +207,30 @@ document.addEventListener("selectionchange", () => {
       window.scrollBy({ top: caret.bottom - limit, behavior: "smooth" });
   }, 320);
 });
+/* As in Notes: pulling the page down while writing puts the keyboard away.
+   The words scroll inside the page's own box, so the web view's scroll view
+   never sees the drag and its own dismiss mode cannot answer it; the page
+   watches the finger instead. A drag that has travelled down far enough,
+   with the keyboard up, is the reader done writing for now. */
+let dragFrom: number | null = null;
+document.addEventListener(
+  "touchstart",
+  (event) => {
+    dragFrom = event.touches.length === 1 ? event.touches[0]!.clientY : null;
+  },
+  { passive: true },
+);
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    const viewport = window.visualViewport;
+    if (dragFrom === null || !viewport || viewport.height > window.innerHeight - 150) return;
+    if (event.touches[0]!.clientY - dragFrom > 48) {
+      dragFrom = null;
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+  },
+  { passive: true },
+);
+document.addEventListener("touchend", () => (dragFrom = null), { passive: true });
 createRoot(document.getElementById("root")!).render(<Page />);

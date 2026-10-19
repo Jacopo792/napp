@@ -32,7 +32,6 @@ import {
   assertAttachable,
   attachmentLabel,
   attachmentType,
-  MAX_ATTACHMENT_BYTES,
 } from "@/features/editor/lib/attachments";
 import type { HostedCommand } from "@/lib/hostedCommands";
 import type { SearchStatus } from "@/features/editor/components/RichTextEditor";
@@ -47,6 +46,7 @@ import { Avatar, Faces } from "../../Avatar";
 import { NoteSheet } from "../../NoteSheet";
 import { Group, Row } from "../../Grouped";
 import { WritingBar } from "../../WritingBar";
+import { pickPhoto } from "../../ProfilePhoto";
 import { Bone } from "../../Chrome";
 import Animated, { FadeOut } from "react-native-reanimated";
 
@@ -174,16 +174,21 @@ export default function Note() {
   const attach = (image: boolean) =>
     void attempt(async () => {
       if (!canEdit || busy) return;
-      const picked = await File.pickFileAsync({
-        mimeTypes: image
-          ? ["image/jpeg", "image/png", "image/webp", "image/gif"]
-          : ["application/pdf", "video/mp4", "video/webm", "video/quicktime"],
-      });
-      if (picked.canceled) return;
-      const file = picked.result;
+      /* A picture comes from the photo library, as everywhere on a phone; a
+         PDF or a video from Files. */
+      let file: File;
       if (image) {
-        if (file.size > MAX_ATTACHMENT_BYTES) throw new Error("Images must be smaller than 100 MB");
-      } else assertAttachable(file);
+        const photo = await pickPhoto();
+        if (!photo) return;
+        file = photo;
+      } else {
+        const picked = await File.pickFileAsync({
+          mimeTypes: ["application/pdf", "video/mp4", "video/webm", "video/quicktime"],
+        });
+        if (picked.canceled) return;
+        file = picked.result;
+        assertAttachable(file);
+      }
       setBusy(true);
       try {
         const objectId = randomUUID();
@@ -191,7 +196,7 @@ export default function Note() {
           session,
           objectId,
           await file.arrayBuffer(),
-          image ? file.type : attachmentType(file.name),
+          image ? "image/jpeg" : attachmentType(file.name),
         );
         await execute({ type: "attach", objectId, label: attachmentLabel(file.name), image });
       } finally {
@@ -441,8 +446,8 @@ export default function Note() {
           </Stack.Toolbar.View>
           <Stack.Toolbar.View>
             <IconButton
-              icon="paperclip"
-              label="Attach"
+              icon="photo"
+              label="Add Photo"
               disabled={!canEdit || busy}
               onPress={() => attach(true)}
             />

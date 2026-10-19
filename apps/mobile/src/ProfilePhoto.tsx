@@ -47,6 +47,9 @@ async function pick(square: boolean): Promise<File | null> {
   }
 }
 
+/** A picture from the photo library, scaled to what a note needs. */
+export const pickPhoto = () => pick(false);
+
 /** Three choices, asked the way each system asks. */
 function ask(title: string, options: { label: string; destructive?: boolean; run: () => void }[]) {
   if (Platform.OS === "ios")
