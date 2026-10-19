@@ -244,7 +244,7 @@ export default function Home() {
         <Animated.View entering={arrival}>
           {latest ? (
             <Turning at={0} x={turnX} o={turnO} style={styles.continue}>
-              <NoteLink entry={latest} zoom feedback="scale">
+              <NoteLink entry={latest} feedback="scale">
                 <Card style={styles.continueCard}>
                   <Text style={[styles.label, { color: palette.ink3 }]}>Continue Writing</Text>
                   <Text style={[styles.continueTitle, { color: palette.ink }]} numberOfLines={2}>

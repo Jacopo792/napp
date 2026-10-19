@@ -212,7 +212,7 @@ export function useNoteActs(scope: string = ALL) {
 export function NoteLink({
   entry,
   scope,
-  zoom,
+  zoom = true,
   feedback = "highlight",
   comments,
   style,
@@ -222,7 +222,9 @@ export function NoteLink({
   comments?: boolean;
   entry: NoteEntry;
   scope?: string;
-  /** Open with the system's zoom out of this view. */
+  /** Open with the system's zoom out of this view — every note does, so the
+   *  way in and the way out are one motion wherever it was pressed (Jacopo,
+   *  19 October 2026: a slide here and a zoom there read as two apps). */
   zoom?: boolean;
   feedback?: "highlight" | "scale";
   style?: StyleProp<ViewStyle>;
