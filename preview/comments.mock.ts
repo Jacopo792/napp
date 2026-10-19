@@ -58,6 +58,11 @@ export async function loadComments(
   return [...(store.get(noteId) ?? [])];
 }
 
+export async function loadThreadIds(_session: AppSession, noteId: string): Promise<Set<string>> {
+  await sleep(60);
+  return new Set((store.get(noteId) ?? []).map((row) => row.threadId));
+}
+
 export async function addComment(
   session: AppSession,
   noteId: string,

@@ -19,6 +19,7 @@ import {
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
 import { countWords } from "@/lib/format";
+import { loadThreadIds } from "@/lib/comments";
 import { PointMenu } from "@/components/ContextMenu";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
@@ -30,6 +31,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useMemo,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -267,6 +269,9 @@ interface Props {
   onContinueAsNote?: (quote: string) => void;
   /** A remark was added, resolved or deleted here. */
   onRemarksChanged?: () => void;
+  /** Every thread in the archive somebody has written in, kept live by the
+   *  archive's remarks channel. Absent, every anchored passage is drawn. */
+  saidThreads?: ReadonlySet<string>;
   /** A chapter of a document rather than a note: a page and a writing bar
    *  instead of a cover, a header and a foot of links. */
   manuscript?: ManuscriptFrame;
@@ -379,6 +384,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     mentions,
     onOpenNote,
     onRemarksChanged,
+    saidThreads,
     onContinueAsNote,
     manuscript,
   },
@@ -519,6 +525,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      held here rather than being read back with the rest. */
   const [pendingThread, setPendingThread] = useState<string | null>(null);
   const [passageMenu, setPassageMenu] = useState<MenuPoint | null>(null);
+  /* The archive-wide set is the newest remarks only, so an old thread is
+     asked of this note directly, once, when it opens. */
+  const [noteThreads, setNoteThreads] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    setNoteThreads(null);
+    const noteId = entry?.note.id;
+    if (!session || !noteId || !saidThreads) return;
+    let live = true;
+    loadThreadIds(session, noteId)
+      .then((ids) => live && setNoteThreads(ids))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per note; the live set follows the rest
+  }, [session, entry?.note.id]);
+  const knownThreads = useMemo(() => {
+    if (!noteThreads || !saidThreads) return null;
+    const known = new Set([...noteThreads, ...saidThreads]);
+    if (pendingThread) known.add(pendingThread);
+    return known;
+  }, [noteThreads, saidThreads, pendingThread]);
 
   /* The writing bar steps back while somebody is writing on the sheet and
      comes back the moment the pointer moves: tools are for between
@@ -1045,6 +1073,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   function startComment() {
     const threadId = crypto.randomUUID();
+    /* A second selection replaces a pending thread that never got a remark;
+       left in the document it would be a highlight no panel lists. */
+    if (pendingThread) editorRef.current?.removeComment(pendingThread);
     const anchored = editorRef.current?.commentSelection(threadId);
     if (!anchored) return;
     setQuotes(editorRef.current?.commentQuotes() ?? new Map());
@@ -1278,7 +1309,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         authors={commentAuthors}
         quotes={quotes}
         pendingThread={pendingThread}
-        onPendingHandled={() => setPendingThread(null)}
+        onPendingHandled={() => {
+          /* Said now: it stays drawn while the archive's set catches up. */
+          if (pendingThread) setNoteThreads((ids) => ids && new Set(ids).add(pendingThread));
+          setPendingThread(null);
+        }}
         focusThread={focusThread}
         onFocusHandled={() => setFocusThread(null)}
         onClose={closeComments}
@@ -1567,6 +1602,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   onComment={canComment ? startComment : undefined}
                   onContinueAsNote={onContinueAsNote}
                   writeLockOwner={canEdit && session ? session.userId : null}
+                  saidThreads={knownThreads}
                   mobile={mobile}
                   autocorrectOn={autocorrectEnabled}
                   resolveImage={resolveImage}
@@ -1892,6 +1928,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                    and it is offered on the same terms: only where this account
                    may write at all. */
                 writeLockOwner={canEdit && session ? session.userId : null}
+                saidThreads={knownThreads}
                 mobile={mobile}
                 autocorrectOn={autocorrectEnabled}
                 resolveImage={resolveImage}

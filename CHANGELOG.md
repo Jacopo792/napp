@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.44 — 2026-10-19
+
+### Fixed
+
+- Comment anchors with no remark: a `CommentAnchor` whose thread has no row in `note_comments` (a comment started and abandoned by reload, closing the tab or switching note) stayed underlined for every member while the panel listed nothing. `RichTextEditor` takes `saidThreads` and decorates such anchors `comment-unsaid` (drawn like a resolved one, not clickable) — a decoration, never a write, because the mark may be the other member's still being typed. The set is this note's thread ids (`loadThreadIds`, once per open) plus the archive's live remarks from `Notes.tsx`, plus the local pending thread. Starting a second comment removes the first pending anchor.
+
 ## 0.9.43 — 2026-10-17
 
 ### Removed

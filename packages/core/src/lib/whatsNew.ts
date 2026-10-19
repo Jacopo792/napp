@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.44",
+    date: "2026-10-19",
+    headline: "No comment without words",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Only passages with a conversation are underlined",
+            text: "A comment started and never written no longer leaves its underline in the note, for you or for anybody else in the archive. Choosing other words while one is still empty puts the first back as it was.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.43",
     date: "2026-10-17",
     headline: "Opening is only opening",

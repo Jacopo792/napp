@@ -1200,6 +1200,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      whole archive could only be moved by looking at the list, which left the
      dot up after you had read the one remark under it. */
   const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
+  const saidThreads = useMemo(
+    () => new Set(archiveComments.map((comment) => comment.threadId)),
+    [archiveComments],
+  );
   /* Reading a note is having read its remarks. Written to the account, not to
      this browser: it is a thing the person did, and a badge that says "unread"
      for every conversation already read on the other device is a badge nobody
@@ -5662,6 +5666,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           linkable={linkableNotes}
           onOpenNote={handleOpenRecent}
           onRemarksChanged={refreshRemarks}
+          saidThreads={saidThreads}
           onContinueAsNote={
             chapterAt >= 0 && canWriteArchive
               ? (quote) => continueAsNote(selected.note.id, quote)
@@ -5909,6 +5914,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     mentions={mentions}
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
+                    saidThreads={saidThreads}
                   />
                 </Suspense>
               </section>
@@ -6159,6 +6165,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               mentions={mentions}
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
+              saidThreads={saidThreads}
             />
           </Suspense>
 
@@ -6201,6 +6208,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   linkable={linkableNotes}
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
+                  saidThreads={saidThreads}
                   headerActions={
                     <button
                       type="button"

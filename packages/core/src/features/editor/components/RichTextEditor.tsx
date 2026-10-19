@@ -229,6 +229,11 @@ interface Props {
    *  against. Null where locking is not on offer — Trash, the preview, a note
    *  somebody else has taken back whole. */
   writeLockOwner?: string | null;
+  /** Every thread somebody has said something in. A passage anchored to any
+   *  other thread is drawn as plain text: its comment was started and never
+   *  written, and an underline with no conversation under it is a dead end.
+   *  Absent while unknown, which draws every anchor. */
+  saidThreads?: ReadonlySet<string> | null;
   mobile?: boolean;
   /** Whether the small accent-and-apostrophe correction runs while you type.
    *  A setting, so it arrives as a value and is read through a ref inside —
@@ -395,6 +400,46 @@ function writeLockGuardExtension(owner: { current: string | null }) {
               });
               return held;
             });
+          },
+        }),
+      ];
+    },
+  });
+}
+
+/* A comment never written. A decoration rather than a write: the mark may be
+   the other member's, who is still typing the first remark, and the document
+   is theirs too. The class lands inside the anchor's span, so the stylesheet
+   reaches the anchor with `:has`. */
+const unsaidKey = new PluginKey("unsaidComments");
+function unsaidCommentsExtension(said: { current: ReadonlySet<string> | null | undefined }) {
+  return Extension.create({
+    name: "unsaidComments",
+    addProseMirrorPlugins() {
+      return [
+        new Plugin<DecorationSet>({
+          key: unsaidKey,
+          state: {
+            init: () => DecorationSet.empty,
+            apply(transaction, set, _old, state) {
+              if (!transaction.docChanged && !transaction.getMeta(unsaidKey)) return set;
+              const known = said.current;
+              if (!known) return DecorationSet.empty;
+              const found: Decoration[] = [];
+              state.doc.descendants((node, pos) => {
+                if (!node.isText) return true;
+                const mark = node.marks.find((m) => m.type.name === "comment");
+                if (mark?.attrs.threadId && !known.has(mark.attrs.threadId as string))
+                  found.push(
+                    Decoration.inline(pos, pos + node.nodeSize, { class: "comment-unsaid" }),
+                  );
+                return true;
+              });
+              return DecorationSet.create(state.doc, found);
+            },
+          },
+          props: {
+            decorations: (state) => unsaidKey.getState(state) as DecorationSet,
           },
         }),
       ];
@@ -2093,6 +2138,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     onComment,
     onContinueAsNote,
     writeLockOwner = null,
+    saidThreads,
     notes,
     onOpenNote,
     onOpenComment,
@@ -2169,6 +2215,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const writeLockOwnerRef = useRef<string | null>(writeLockOwner);
   writeLockOwnerRef.current = writeLockOwner;
   const writeLockGuard = useMemo(() => writeLockGuardExtension(writeLockOwnerRef), []);
+  const saidThreadsRef = useRef(saidThreads);
+  saidThreadsRef.current = saidThreads;
+  const unsaidComments = useMemo(() => unsaidCommentsExtension(saidThreadsRef), []);
 
   const noteIdRef = useRef(noteId);
   noteIdRef.current = noteId;
@@ -2237,6 +2286,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         noteLinks,
         UniqueBlockAnchors,
         writeLockGuard,
+        unsaidComments,
         PassageFlash,
         sentenceCapitalize,
         autocorrect,
@@ -2307,7 +2357,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
              not stop being a way to start typing there. */
           const commented = target?.closest?.("span[data-comment-thread]");
           const threadId = commented?.getAttribute("data-comment-thread");
-          if (threadId && onOpenCommentRef.current) {
+          if (
+            threadId &&
+            onOpenCommentRef.current &&
+            !commented?.querySelector(".comment-unsaid")
+          ) {
             onOpenCommentRef.current(threadId);
             return false;
           }
@@ -2346,6 +2400,12 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     },
     [collaboration?.document, collaboration?.provider],
   );
+
+  /* The set arrived or changed: draw the anchors again against it. */
+  useEffect(() => {
+    if (editor && !editor.isDestroyed)
+      editor.view.dispatch(editor.state.tr.setMeta(unsaidKey, true).setMeta("addToHistory", false));
+  }, [editor, saidThreads]);
 
   /* What the selection's passage lock is, so the bubble's padlock can say it.
      The editor does not re-render per transaction; this re-renders only when

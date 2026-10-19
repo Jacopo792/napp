@@ -41,6 +41,18 @@ export async function loadComments(session: AppSession, noteId: string): Promise
   return ((result.data ?? []) as CommentRow[]).map(toComment);
 }
 
+/** Which threads on a note have had anything said in them. A passage whose
+ *  thread is not here was anchored and then abandoned before its first remark. */
+export async function loadThreadIds(session: AppSession, noteId: string): Promise<Set<string>> {
+  const result = await supabase
+    .from("note_comments")
+    .select("thread_id")
+    .eq("archive_id", session.archiveId)
+    .eq("note_id", noteId);
+  fail(result.error);
+  return new Set(((result.data ?? []) as { thread_id: string }[]).map((row) => row.thread_id));
+}
+
 /** Open a thread, or reply to one. The author is the caller and the database
  *  refuses any other — `author_id = auth.uid()` is in the insert policy, not
  *  merely in this call. */
