@@ -4,7 +4,7 @@
  * page's one decisive act as a pill at its foot (`PillButton`). A choice is
  * shown by looking at it rather than described. The cards and the press are
  * Folders' own (`Grouped.tsx`, `Chrome.tsx`), so every screen is one material. */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import {
   Alert,
   Platform,
@@ -16,7 +16,7 @@ import {
   View,
   type PressableProps,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Link, Stack, type Href } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import type { SFSymbol } from "expo-symbols";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -385,3 +385,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
+/** Every page of Settings grows out of the row that was pressed and folds back
+ *  into it, as the profile does — one way in and out, never a slide for some
+ *  pages and a zoom for others (Jacopo, 19 October 2026). */
+export function ZoomLink({ href, children }: { href: Href; children: ReactElement }) {
+  return (
+    <Link href={href} asChild>
+      <Link.Trigger withAppleZoom>{children}</Link.Trigger>
+    </Link>
+  );
+}

@@ -158,6 +158,9 @@ importers:
       expo-sharing:
         specifier: ~58.0.0
         version: 58.0.18(expo@58.0.12)(react-native@0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)(typescript@5.9.3)
+      expo-splash-screen:
+        specifier: ~58.0.10
+        version: 58.0.10(expo@58.0.12)(supports-color@8.1.1)(typescript@5.9.3)
       expo-sqlite:
         specifier: ~58.0.0
         version: 58.0.13(expo@58.0.12)(react-native@0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -3501,6 +3504,11 @@ packages:
       expo: '*'
       react: '*'
       react-native: '*'
+
+  expo-splash-screen@58.0.10:
+    resolution: {integrity: sha512-rjzCLKo7SHSOkaFnVnh+bYWK/pO/vC05qvJe++AjaQidTSGLxD2buj7zWFLlbEEpkqP+wZYQHRyx2mvHyZrUQw==}
+    peerDependencies:
+      expo: '*'
 
   expo-sqlite@58.0.13:
     resolution: {integrity: sha512-EqYQTJUJ2Ub+Q/PwM8UTQBeg1/+piuhG8KQTO8HOhZfYu8e34bB3sOkGsM0HQ7KNesvWLlN8UmbrajRQRyE3gg==}
@@ -9134,6 +9142,16 @@ snapshots:
       expo: 58.0.12(e90322b4e8bd459a94b1a847f4ea02ee)
       react: 19.3.0
       react-native: 0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.0(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
+  expo-splash-screen@58.0.10(expo@58.0.12)(supports-color@8.1.1)(typescript@5.9.3):
+    dependencies:
+      '@expo/config-plugins': 58.0.9(supports-color@8.1.1)(typescript@5.9.3)
+      '@expo/image-utils': 0.12.5(supports-color@8.1.1)(typescript@5.9.3)
+      expo: 58.0.12(e90322b4e8bd459a94b1a847f4ea02ee)
+      xml2js: 0.6.0
     transitivePeerDependencies:
       - supports-color
       - typescript

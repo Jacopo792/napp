@@ -11,7 +11,6 @@ import { useToolbarIcon } from "../../icons";
  * follows it in. The refresh token never crosses — see editor/main.tsx. */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import {
-  Alert,
   Keyboard,
   Linking,
   Platform,
@@ -21,13 +20,12 @@ import {
   View,
   Pressable,
 } from "react-native";
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { File } from "expo-file-system";
 import type { HostedNoteState } from "@notes-app/core/hosted";
 import { indexOf } from "@/lib/derived";
-import { fileNote, lockNote, pinNote, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
-import { deleteNotes, uploadObjectBytes } from "@/lib/supabase";
+import { uploadObjectBytes } from "@/lib/supabase";
 import {
   assertAttachable,
   attachmentLabel,
@@ -38,13 +36,12 @@ import type { SearchStatus } from "@/features/editor/components/RichTextEditor";
 import { IconButton } from "../../IconButton";
 import { NoteHistory } from "../../NoteHistory";
 import { NoteComments } from "../../NoteComments";
+import { NotePeople } from "../../NotePeople";
 import { useHostedNote } from "../../HostedPage";
 import { useTextPrompt } from "../../TextPrompt";
 import { attempt } from "../../SettingsControls";
 import { useArchive, usePalette } from "../../archive";
-import { Avatar, Faces } from "../../Avatar";
-import { NoteSheet } from "../../NoteSheet";
-import { Group, Row } from "../../Grouped";
+import { Faces } from "../../Avatar";
 import { WritingBar } from "../../WritingBar";
 import { pickPhoto } from "../../ProfilePhoto";
 import { Bone } from "../../Chrome";
@@ -62,11 +59,26 @@ export default function Note() {
   const [busy, setBusy] = useState(false);
   const prompt = useTextPrompt();
   const { id, comments: openComments } = useLocalSearchParams<{ id: string; comments?: string }>();
+  /* Opened from Comments, the sheet waits for the push to land: two native
+     transitions at once is the stutter that read as lag. The timer is for a
+     push that had no animation to end. */
+  const navigation = useNavigation();
   useEffect(() => {
-    if (openComments === "1") setPanel("comments");
-  }, [openComments]);
-  const { session, snapshot, metaOf, act, preferences, setOpenNote, refresh, facesOf } =
-    useArchive();
+    if (openComments !== "1") return;
+    let shown = false;
+    const show = () => {
+      if (shown) return;
+      shown = true;
+      setPanel("comments");
+    };
+    const off = navigation.addListener("transitionEnd" as never, show);
+    const timer = setTimeout(show, 700);
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [openComments, navigation]);
+  const { session, snapshot, metaOf, preferences, setOpenNote, facesOf } = useArchive();
   const faces = facesOf(id);
   const palette = usePalette();
   const router = useRouter();
@@ -108,7 +120,6 @@ export default function Note() {
   const row = indexOf(metaOf(owner)).byNote.get(id);
   const self = snapshot?.members.find((member) => member.isSelf);
   const name = self?.nickname || session.email.split("@")[0] || "Someone";
-  const foreignLock = Boolean(row?.lockedBy && row.lockedBy !== session.userId);
   const canEdit =
     Boolean(entry) &&
     self?.role === "editor" &&
@@ -137,11 +148,18 @@ export default function Note() {
     },
   );
 
+  /* Leaving the note puts the pen down: coming back is coming back to read,
+     and drawing again is asked for again. */
+  const drawingNow = useRef(false);
+  drawingNow.current = Boolean(state?.drawing);
   useFocusEffect(
     useCallback(() => {
       setOpenNote(id);
-      return () => setOpenNote(null);
-    }, [id, setOpenNote]),
+      return () => {
+        setOpenNote(null);
+        if (drawingNow.current) void execute({ type: "putDownPen" }).catch(() => {});
+      };
+    }, [id, setOpenNote, execute]),
   );
   useEffect(() => {
     if (!finding) return;
@@ -215,24 +233,6 @@ export default function Note() {
       setAnchor(selected);
       setPanel("comments");
     });
-  const formatActions = [
-    ["body", "Body"],
-    ["heading-1", "Heading"],
-    ["heading-2", "Subheading"],
-    ["bold", "Bold"],
-    ["italic", "Italic"],
-    ["strike", "Strikethrough"],
-    ["code", "Code"],
-    ["checklist", "Checklist"],
-    ["bullet-list", "Bulleted List"],
-    ["ordered-list", "Numbered List"],
-    ["quote", "Quote"],
-    ["divider", "Divider"],
-    ["table-3", "Table"],
-    ["drawing", "Drawing"],
-    ["drawing-page", "Drawing Page"],
-  ] as const;
-
   const status = !state
     ? ""
     : state.refusal ||
@@ -245,11 +245,9 @@ export default function Note() {
             : "Connecting");
 
   const writing = keyboard && canEdit && !panel && !finding;
-
-  const leave = (change: Parameters<typeof act>[1]) => {
-    act(owner, change);
-    router.back();
-  };
+  /* The pen in hand is Markup: the page is the ink's, so both bars make way
+     and the header is Done alone, as in Notes. */
+  const drawing = Boolean(state?.drawing);
 
   return (
     <>
@@ -259,6 +257,9 @@ export default function Note() {
         options={{
           title: status,
           headerLargeTitle: false,
+          /* A stroke to the right is not "go back": the system reads a swipe
+             from anywhere on the page as one, and a note closed mid-line. */
+          gestureEnabled: !drawing,
           contentStyle: { backgroundColor: palette.canvas },
           headerTitle:
             status || !faces.length
@@ -266,8 +267,9 @@ export default function Note() {
               : () => (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="People in this note"
-                    hitSlop={10}
+                    accessibilityLabel="In this note now"
+                    accessibilityHint="Opens People"
+                    hitSlop={8}
                     onPress={() => setPanel("people")}
                     style={{ height: 36, alignItems: "center", justifyContent: "center" }}
                   >
@@ -280,11 +282,11 @@ export default function Note() {
         <Stack.Toolbar.Button
           icon={icon("arrow.uturn.backward")}
           accessibilityLabel="Undo"
-          hidden={!writing || !state?.format?.canUndo}
+          hidden={!writing || drawing || !state?.format?.canUndo}
           separateBackground
           onPress={() => run({ type: "edit", action: "undo" })}
         />
-        <Stack.Toolbar.Menu icon={icon("square.and.arrow.up")} hidden={!writing}>
+        <Stack.Toolbar.Menu icon={icon("square.and.arrow.up")} hidden={drawing}>
           <Stack.Toolbar.Label>Share as</Stack.Toolbar.Label>
           {(["md", "pdf", "docx"] as const).map((format) => (
             <Stack.Toolbar.MenuAction
@@ -296,145 +298,33 @@ export default function Note() {
             </Stack.Toolbar.MenuAction>
           ))}
         </Stack.Toolbar.Menu>
-        <Stack.Toolbar.Menu icon={icon("ellipsis")}>
-          <Stack.Toolbar.Menu icon={icon("textformat")}>
-            <Stack.Toolbar.Label>Format</Stack.Toolbar.Label>
-            {formatActions.map(([action, label]) => (
-              <Stack.Toolbar.MenuAction
-                key={action}
-                disabled={!canEdit || busy}
-                onPress={() => run({ type: "format", action })}
-              >
-                {label}
-              </Stack.Toolbar.MenuAction>
-            ))}
-            <Stack.Toolbar.MenuAction disabled={!canEdit || busy} onPress={askLink}>
-              Insert Link
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-          <Stack.Toolbar.Menu icon={icon("square.and.arrow.up")}>
-            <Stack.Toolbar.Label>Share as</Stack.Toolbar.Label>
-            {(["md", "pdf", "docx"] as const).map((format) => (
-              <Stack.Toolbar.MenuAction
-                key={format}
-                disabled={busy}
-                onPress={() => run({ type: "export", format })}
-              >
-                {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
-              </Stack.Toolbar.MenuAction>
-            ))}
-          </Stack.Toolbar.Menu>
-          <Stack.Toolbar.MenuAction icon={icon("clock")} onPress={() => setPanel("history")}>
-            History
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction icon={icon("bubble.left.and.bubble.right")} onPress={comments}>
-            Comments
-          </Stack.Toolbar.MenuAction>
+        {/* Only what is nowhere else. Pin, Lock, Move, Archive and Delete are
+            the held note's; Format is the writing bar's; Comments, attaching
+            and sharing have buttons of their own. A second door to the same
+            act is a second thing to read past (Jacopo, 19 October 2026). */}
+        <Stack.Toolbar.Menu icon={icon("ellipsis")} hidden={drawing}>
           <Stack.Toolbar.MenuAction icon={icon("magnifyingglass")} onPress={() => setFinding(true)}>
             Find in Note
           </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon={icon("paperclip")}
-            disabled={!canEdit || busy}
-            onPress={() => attach(false)}
-          >
-            Attach File
+          <Stack.Toolbar.MenuAction icon={icon("clock")} onPress={() => setPanel("history")}>
+            History
           </Stack.Toolbar.MenuAction>
-          {!row?.trashedAt ? (
-            <Stack.Toolbar.MenuAction
-              disabled={foreignLock || self?.role !== "editor"}
-              icon={icon(row?.pinned ? "pin.slash" : "pin")}
-              onPress={() => act(owner, (prev) => pinNote(prev, id))}
-            >
-              {row?.pinned ? "Unpin" : "Pin"}
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-          {!row?.trashedAt ? (
-            <Stack.Toolbar.MenuAction
-              icon={icon(row?.lockedBy === session.userId ? "lock.open" : "lock")}
-              disabled={
-                self?.role !== "editor" || Boolean(row?.lockedBy && row.lockedBy !== session.userId)
-              }
-              onPress={() => act(owner, (prev) => lockNote(prev, id, session.userId))}
-            >
-              {row?.lockedBy === session.userId ? "Unlock" : "Lock"}
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-          {!row?.trashedAt ? (
-            <Stack.Toolbar.Menu icon={icon("folder")}>
-              <Stack.Toolbar.Label>Move</Stack.Toolbar.Label>
-              <Stack.Toolbar.MenuAction
-                disabled={foreignLock || self?.role !== "editor"}
-                onPress={() => act(owner, (prev) => fileNote(prev, id, null))}
-              >
-                No Folder
-              </Stack.Toolbar.MenuAction>
-              {metaOf(owner).folders.map((folder) => (
-                <Stack.Toolbar.MenuAction
-                  key={folder.id}
-                  disabled={foreignLock || self?.role !== "editor"}
-                  onPress={() => act(owner, (prev) => fileNote(prev, id, folder.id))}
-                >
-                  {folder.name}
-                </Stack.Toolbar.MenuAction>
-              ))}
-            </Stack.Toolbar.Menu>
-          ) : null}
-          {!row?.trashedAt ? (
-            <Stack.Toolbar.MenuAction
-              disabled={foreignLock || self?.role !== "editor"}
-              icon={icon("archivebox")}
-              onPress={() => leave((prev) => shelveNote(prev, id, !row?.archivedAt))}
-            >
-              {row?.archivedAt ? "Put back" : "Archive"}
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-          {row?.trashedAt ? (
-            <Stack.Toolbar.MenuAction
-              icon={icon("arrow.uturn.backward")}
-              disabled={foreignLock || self?.role !== "editor"}
-              onPress={() => leave((prev) => restoreNote(prev, id))}
-            >
-              Restore
-            </Stack.Toolbar.MenuAction>
-          ) : null}
-          <Stack.Toolbar.MenuAction
-            disabled={foreignLock || self?.role !== "editor"}
-            icon={icon("trash")}
-            destructive
-            onPress={() =>
-              row?.trashedAt
-                ? Alert.alert("Delete Forever?", "This note will be permanently deleted.", [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete Forever",
-                      style: "destructive",
-                      onPress: () =>
-                        void attempt(async () => {
-                          await deleteNotes(session, [id]);
-                          refresh();
-                          router.back();
-                        }),
-                    },
-                  ])
-                : leave((prev) => trashNote(prev, id))
-            }
-          >
-            {row?.trashedAt ? "Delete Forever" : "Delete"}
+          <Stack.Toolbar.MenuAction icon={icon("person.2")} onPress={() => setPanel("people")}>
+            People
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
         <Stack.Toolbar.Button
           icon={icon("checkmark")}
           accessibilityLabel="Done"
-          hidden={!writing}
+          hidden={!writing && !drawing}
           variant="prominent"
           tintColor={palette.accent}
-          onPress={() => run({ type: "edit", action: "done" })}
+          onPress={() => run(drawing ? { type: "putDownPen" } : { type: "edit", action: "done" })}
         />
       </Stack.Toolbar>
       {/* At rest, Notes' own row; while writing it gives way to the bar on
           the keyboard. */}
-      {!keyboard ? (
+      {!keyboard && !drawing ? (
         <Stack.Toolbar tintColor={palette.ink}>
           <Stack.Toolbar.View>
             <IconButton
@@ -444,14 +334,14 @@ export default function Note() {
               onPress={() => run({ type: "format", action: "checklist" })}
             />
           </Stack.Toolbar.View>
-          <Stack.Toolbar.View>
-            <IconButton
-              icon="photo"
-              label="Add Photo"
-              disabled={!canEdit || busy}
-              onPress={() => attach(true)}
-            />
-          </Stack.Toolbar.View>
+          <Stack.Toolbar.Menu icon={icon("paperclip")} disabled={!canEdit || busy}>
+            <Stack.Toolbar.MenuAction icon={icon("photo")} onPress={() => attach(true)}>
+              Choose Photo
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction icon={icon("doc")} onPress={() => attach(false)}>
+              Attach File
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
           <Stack.Toolbar.View>
             <IconButton
               icon="pencil.tip.crop.circle"
@@ -474,6 +364,14 @@ export default function Note() {
           onClose={() => setPanel(null)}
         />
       ) : null}
+      {panel === "people" ? (
+        <NotePeople
+          noteId={id}
+          canEdit={canEdit}
+          execute={execute}
+          onClose={() => setPanel(null)}
+        />
+      ) : null}
       {panel === "comments" ? (
         <NoteComments
           noteId={id}
@@ -485,22 +383,6 @@ export default function Note() {
             setAnchor(null);
           }}
         />
-      ) : null}
-      {panel === "people" ? (
-        <NoteSheet title="People" onClose={() => setPanel(null)}>
-          <Group>
-            {faces.map((face, at) => (
-              <Row
-                key={face.userId}
-                leading={<Avatar face={face} size={40} ring={palette.paper} />}
-                label={face.name}
-                note={face.online ? "In this note now" : "Has written here"}
-                chevron={false}
-                last={at === faces.length - 1}
-              />
-            ))}
-          </Group>
-        </NoteSheet>
       ) : null}
       {finding ? (
         <View
@@ -572,7 +454,7 @@ export default function Note() {
       >
         {/* Mounted while the note can be written, so it hears the keyboard
             arrive; it shows itself only on top of it. */}
-        {canEdit && !panel && !finding ? (
+        {canEdit && !panel && !finding && !drawing ? (
           <WritingBar
             format={
               state?.format ?? {

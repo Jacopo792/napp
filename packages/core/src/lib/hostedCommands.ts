@@ -17,6 +17,7 @@ export type HostedCommand =
   | { type: "nextMatch" }
   | { type: "previousMatch" }
   | { type: "closeSearch" }
+  | { type: "putDownPen" }
   /** What a phone's keyboard bar asks for beyond `format`: the history, the
    *  underline the desktop has no button for, list depth, and putting the
    *  keyboard away. */

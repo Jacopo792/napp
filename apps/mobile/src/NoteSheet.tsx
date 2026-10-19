@@ -25,7 +25,12 @@ export function NoteSheet({
   const palette = usePalette();
   const inset = useSafeAreaInsets();
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      animationType="slide"
+      presentationStyle="pageSheet"
+      backdropColor={palette.page}
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: palette.page }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

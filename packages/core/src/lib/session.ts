@@ -298,6 +298,10 @@ export async function resumeAccount(
   userId: string,
   selection: ArchiveSelection = {},
 ): Promise<AuthenticationResult> {
+  /* A refresh that fires between the stash and the swap rotates the token
+     just saved, and the next return to this account is then a reuse that
+     Supabase answers by revoking it: "sign in again". */
+  await supabase.auth.stopAutoRefresh();
   await stashCurrent(true);
   const target = savedAccounts().find((a) => a.userId === userId);
   if (!target) throw new Error("That account is no longer saved");
@@ -311,6 +315,8 @@ export async function resumeAccount(
           refresh_token: target.refreshToken,
         });
   if (error || data.user?.id !== userId) {
+    if (!error || !refusedToken(error))
+      throw new Error(`Couldn't reach ${target.email}. Try again`);
     saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
     throw new Error(`Sign in to ${target.email} again`);
   }
@@ -327,6 +333,13 @@ export async function resumeAccount(
   };
 }
 
+/** Only the server saying no to the token forgets an account. A dropped
+ *  connection is not a verdict on the token, and forgetting the account over
+ *  one made the next switch ask for a password it never needed. */
+function refusedToken(error: { status?: number }): boolean {
+  return typeof error.status === "number" && error.status >= 400 && error.status < 500;
+}
+
 export async function switchAccount(userId: string): Promise<void> {
   await stashCurrent();
   const target = savedAccounts().find((a) => a.userId === userId);
@@ -336,6 +349,7 @@ export async function switchAccount(userId: string): Promise<void> {
     refresh_token: target.refreshToken,
   });
   if (error) {
+    if (!refusedToken(error)) throw new Error(`Couldn't reach ${target.email}. Try again`);
     saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
     throw new Error(`Sign in to ${target.email} again`);
   }

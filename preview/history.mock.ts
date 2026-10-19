@@ -34,11 +34,17 @@ function seed(noteId: string): NoteVersion[] {
   }
   const hour = 3_600_000;
   const stages = [
+    { ago: 40 * 24 * hour, authors: [PREVIEW_U1], added: null, removed: null, label: null,
+      words: ["Il pensiero militante."] },
+    { ago: 9 * 24 * hour, authors: [PREVIEW_U2], added: 41, removed: 2, label: null,
+      words: ["Il pensiero militante nasce con Paolo."] },
     { ago: 30 * hour, authors: [PREVIEW_U1], added: null, removed: null, label: null,
       words: ["Il pensiero militante nasce con Paolo."] },
     { ago: 26 * hour, authors: [PREVIEW_U2], added: 9, removed: 0, label: null,
       words: ["Il pensiero militante nasce con Paolo.", "La rivelazione diventa un programma."] },
     { ago: 5 * hour, authors: [PREVIEW_U1, PREVIEW_U2], added: 14, removed: 3, label: "Inviata alla relatrice",
+      words: ["Il pensiero militante, insieme fascinoso e orribile, nasce con Paolo.", "La rivelazione diventa un programma politico."] },
+    { ago: 2 * hour, authors: [PREVIEW_U1], added: null, removed: null, label: "Before restoring a version",
       words: ["Il pensiero militante, insieme fascinoso e orribile, nasce con Paolo.", "La rivelazione diventa un programma politico."] },
     { ago: hour / 3, authors: [PREVIEW_U2], added: 6, removed: 1, label: null,
       words: ["Il pensiero militante, insieme fascinoso e orribile, nasce con Paolo.", "La rivelazione diventa un programma politico, e Paolo il suo Lenin."] },

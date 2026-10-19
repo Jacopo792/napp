@@ -9,6 +9,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
+  PEN_STATE,
+  PUT_DOWN_THE_PEN,
   RichTextEditor,
   type RichTextEditorHandle,
 } from "@/features/editor/components/RichTextEditor";
@@ -39,6 +41,8 @@ export interface HostedNoteState {
   waking: boolean;
   available: boolean;
   format: HostedFormat;
+  /** The pen is in hand on the page: the host's bars make way for the ink. */
+  drawing: boolean;
 }
 
 const RESTING: HostedFormat = {
@@ -136,6 +140,17 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
       instance.off("transaction", soon);
     };
   }, [instance]);
+  const [drawing, setDrawing] = useState(false);
+  useEffect(() => {
+    if (!instance) return;
+    const dom = instance.view.dom;
+    const heard = (event: Event) => setDrawing(Boolean((event as CustomEvent<boolean>).detail));
+    dom.addEventListener(PEN_STATE, heard);
+    return () => {
+      dom.removeEventListener(PEN_STATE, heard);
+      setDrawing(false);
+    };
+  }, [instance]);
   const writable = useRef(canEdit);
   writable.current = canEdit;
   const mounted = useRef(true);
@@ -150,6 +165,10 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     ref,
     () => ({
       async execute(command: HostedCommand) {
+        if (command.type === "putDownPen") {
+          instance?.view.dom.dispatchEvent(new Event(PUT_DOWN_THE_PEN));
+          return null;
+        }
         if (command.type === "edit" && command.action === "done") {
           (document.activeElement as HTMLElement | null)?.blur();
           window.getSelection()?.removeAllRanges();
@@ -262,8 +281,9 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
       waking,
       available: Boolean(note.doc && (ready || note.cached)),
       format,
+      drawing,
     });
-  }, [onState, connection, ready, refusal, waking, note.doc, note.cached, format]);
+  }, [onState, connection, ready, refusal, waking, note.doc, note.cached, format, drawing]);
 
   const resolveImage = useCallback((id: string) => downloadImage(session, id), [session]);
   const resolveFile = useCallback(
@@ -278,7 +298,10 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
 
   return (
     <div className="editor-scroll min-h-0 flex-1">
-      <header className="px-5 pt-5 pb-3">
+      {/* The ink covers the body only; with the pen in hand the title is not a
+          place to start typing, or a stray touch raises the keyboard over the
+          tools. */}
+      <header className="px-5 pt-5 pb-3" style={drawing ? { pointerEvents: "none" } : undefined}>
         <div className="measure note-frontispiece-measure">
           <TitleField
             mobile

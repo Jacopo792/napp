@@ -1067,6 +1067,11 @@ function PrivateAttachmentView({ node, extension, deleteNode, editor }: NodeView
 
 /** Asking for the pen again on a note that already has a drawing layer. */
 const TAKE_UP_THE_PEN = "napp:take-up-the-pen";
+/** The other half, for a host that draws its own Done: a phone's bar. */
+export const PUT_DOWN_THE_PEN = "napp:put-down-the-pen";
+/** Said on the editor's element whenever the pen is picked up or put down,
+ *  with `detail` the answer, so a host can make way for the ink. */
+export const PEN_STATE = "napp:pen";
 
 /** Set for the one layer being created right now, and read once by the view
  *  that mounts for it.
@@ -1084,7 +1089,7 @@ let penWanted = false;
  *  picture, or on the other surface. Module-level because it is a fact about
  *  the hand, not about any document — nothing here is ever written to a note. */
 let lastInk: string = DRAWING_INKS[0];
-let lastNib = 5;
+let lastNib = 6; // one of DRAWING_NIBS, so a nib reads as chosen from the start
 let lastMarker = false;
 
 /** What the hand is doing. `null` is the pen — the absence of a shape rather
@@ -1171,7 +1176,12 @@ function useInk({
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
   const [marker, setMarker] = useState<boolean>(lastMarker);
-  const [shape, setShape] = useState<InkTool | null>(lastShape);
+  /* A shape is kept for the next drawing; writing a caption and moving a
+     mark are not ways of drawing, and picked up again they turned the next
+     stroke into a text field or into nothing. */
+  const [shape, setShape] = useState<InkTool | null>(() =>
+    lastShape === "text" || lastShape === "move" ? null : lastShape,
+  );
   const [filling, setFilling] = useState<boolean>(lastFilling);
   const [erasing, setErasing] = useState(false);
   const [selectedStroke, setSelectedStroke] = useState<{
@@ -1213,6 +1223,57 @@ function useInk({
   const snapped = useRef<string | null>(null);
   const live = useRef(strokes);
   live.current = strokes;
+  /* The gesture in progress, so a second finger can call it off: one finger
+     draws and two scroll, as in Markup. A line that went on drawing while the
+     hand was trying to reach the foot of the page was minutes of erasing. */
+  const abandon = useRef<(() => void) | null>(null);
+  const scrolling = useRef(false);
+  useEffect(() => {
+    const element = surface.current;
+    if (!element) return;
+    let lastY: number | null = null;
+    let scroller: HTMLElement | null = null;
+    const middle = (event: TouchEvent) => (event.touches[0].clientY + event.touches[1].clientY) / 2;
+    const begin = (event: TouchEvent) => {
+      if (event.touches.length < 2) return;
+      abandon.current?.();
+      scrolling.current = true;
+      lastY = middle(event);
+      scroller = null;
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowY;
+        if (
+          (overflow === "auto" || overflow === "scroll") &&
+          node.scrollHeight > node.clientHeight
+        ) {
+          scroller = node;
+          break;
+        }
+      }
+    };
+    const follow = (event: TouchEvent) => {
+      if (lastY === null || event.touches.length < 2) return;
+      event.preventDefault();
+      const y = middle(event);
+      const target = scroller ?? document.scrollingElement;
+      if (target) target.scrollTop += lastY - y;
+      lastY = y;
+    };
+    const end = (event: TouchEvent) => {
+      if (event.touches.length < 2) lastY = null;
+      if (event.touches.length === 0) scrolling.current = false;
+    };
+    element.addEventListener("touchstart", begin, { passive: true });
+    element.addEventListener("touchmove", follow, { passive: false });
+    element.addEventListener("touchend", end);
+    element.addEventListener("touchcancel", end);
+    return () => {
+      element.removeEventListener("touchstart", begin);
+      element.removeEventListener("touchmove", follow);
+      element.removeEventListener("touchend", end);
+      element.removeEventListener("touchcancel", end);
+    };
+  }, []);
 
   /* Cleared once the committed stroke is on screen, never before it: clearing
      it in the same breath as the write leaves a frame with neither, and a line
@@ -1308,9 +1369,35 @@ function useInk({
 
   function start(event: React.PointerEvent) {
     if (!editable || event.button !== 0) return;
+    /* A second finger while one is drawing is the hand scrolling, and so is
+       every finger until the last of them lifts. */
+    if (scrolling.current) return;
+    if (abandon.current) {
+      abandon.current();
+      return;
+    }
     const point = at(event);
     if (!point) return;
     event.preventDefault();
+    /* Every gesture below hangs its listeners on the window and leaves by
+       `finish`; this is the same exit without the write. */
+    const listening: [string, EventListener][] = [];
+    const listen = (type: string, handler: EventListener) => {
+      listening.push([type, handler]);
+      window.addEventListener(type, handler);
+    };
+    const quiet = () => {
+      for (const [type, handler] of listening) window.removeEventListener(type, handler);
+      listening.length = 0;
+      abandon.current = null;
+    };
+    abandon.current = () => {
+      quiet();
+      path.current = "";
+      trail.current = [];
+      snapped.current = null;
+      paint("");
+    };
 
     if (erasing) {
       rub(point);
@@ -1319,13 +1406,11 @@ function useInk({
         if (step) rub(step);
       };
       const finish = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", finish);
-        window.removeEventListener("pointercancel", finish);
+        quiet();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", finish);
-      window.addEventListener("pointercancel", finish);
+      listen("pointermove", move as EventListener);
+      listen("pointerup", finish);
+      listen("pointercancel", finish);
       return;
     }
 
@@ -1344,6 +1429,7 @@ function useInk({
        does, so it costs none of the three surfaces a `position: relative` of
        their own. */
     if (shape === "text") {
+      abandon.current = null;
       setComposing({ x: point.x, y: point.y, left: event.clientX, top: event.clientY });
       return;
     }
@@ -1354,7 +1440,10 @@ function useInk({
        can be drawn across a line already there, and that is exactly the rule
        that has to be lifted to pick one up. A press on bare surface with it
        held is a press on nothing. */
-    if (shape === "move") return;
+    if (shape === "move") {
+      abandon.current = null;
+      return;
+    }
 
     if (shape) {
       let last = point;
@@ -1365,9 +1454,7 @@ function useInk({
         paint(shapeStroke(shape, point, step, width));
       };
       const finish = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", finish);
-        window.removeEventListener("pointercancel", finish);
+        quiet();
         /* A press that never travelled is somebody changing their mind, not a
            shape of no size — which on the page would be an invisible mark
            only the eraser could find. */
@@ -1384,9 +1471,9 @@ function useInk({
         paint("");
       };
       paint(shapeStroke(shape, point, point, width));
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", finish);
-      window.addEventListener("pointercancel", finish);
+      listen("pointermove", move as EventListener);
+      listen("pointerup", finish);
+      listen("pointercancel", finish);
       return;
     }
 
@@ -1410,6 +1497,11 @@ function useInk({
       }, STRAIGHTEN_AFTER_MS);
     };
     rearm();
+    const dropped = abandon.current;
+    abandon.current = () => {
+      window.clearTimeout(idle);
+      dropped?.();
+    };
 
     const move = (next: PointerEvent) => {
       const step = at(next);
@@ -1426,9 +1518,7 @@ function useInk({
     };
     const finish = () => {
       window.clearTimeout(idle);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
+      quiet();
       /* A tap that never moved is a dot, and a dot is a stroke of one point —
          which draws nothing without a second. Give it one. */
       const committed =
@@ -1441,9 +1531,9 @@ function useInk({
       // A page stroke may have moved entirely to media, leaving this layer unchanged.
       paint("");
     };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
+    listen("pointermove", move as EventListener);
+    listen("pointerup", finish);
+    listen("pointercancel", finish);
   }
 
   /* Pressing a mark already meant "this one" — it is how the menu that throws
@@ -1779,10 +1869,30 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
   });
   useEffect(() => {
     if (!onPage) return;
+    const dom = editor.view.dom;
     const take = () => setPen(true);
-    editor.view.dom.addEventListener(TAKE_UP_THE_PEN, take);
-    return () => editor.view.dom.removeEventListener(TAKE_UP_THE_PEN, take);
+    const put = () => setPen(false);
+    dom.addEventListener(TAKE_UP_THE_PEN, take);
+    dom.addEventListener(PUT_DOWN_THE_PEN, put);
+    return () => {
+      dom.removeEventListener(TAKE_UP_THE_PEN, take);
+      dom.removeEventListener(PUT_DOWN_THE_PEN, put);
+    };
   }, [onPage, editor]);
+  /* A pen in hand is not a caret: on a phone a focused editor is a keyboard
+     over the ink and a writing bar over the tools. */
+  useEffect(() => {
+    if (!onPage) return;
+    const dom = editor.view.dom;
+    if (pen) {
+      editor.commands.blur();
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+    dom.dispatchEvent(new CustomEvent(PEN_STATE, { detail: pen }));
+    return () => {
+      if (pen) dom.dispatchEvent(new CustomEvent(PEN_STATE, { detail: false }));
+    };
+  }, [onPage, editor, pen]);
 
   const write = useCallback(
     (next: DrawingMark[]) => {
@@ -1882,11 +1992,24 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
              only decides how far down the surface takes a pen. */
           preserveAspectRatio="xMinYMin meet"
           onPointerDown={start}
+          /* WebKit on a phone still sends a tap's mouse events after a
+             pointerdown that was refused, and their default focuses the
+             editor under the ink: the keyboard over a pen in hand. */
+          onMouseDown={pen ? (event) => event.preventDefault() : undefined}
         >
           {inked}
         </svg>
         {editor.isEditable && (
-          <span className={`drawing-overlay-tools ${pen ? "" : "is-put-away"}`}>
+          <span
+            className={`drawing-overlay-tools ${pen ? "" : "is-put-away"}`}
+            /* A press on a tool must not move focus: a button inside the
+               note hands it to the editor around it, and on a phone that is
+               the keyboard coming up over the pen. The colour well is a label
+               and keeps its default, or its picker never opens. */
+            onMouseDown={(event) => {
+              if (!(event.target as Element).closest("label")) event.preventDefault();
+            }}
+          >
             {pen ? (
               <>
                 {tools}
@@ -2368,7 +2491,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const format = useCallback(
     (action: FormatAction) => {
       if (!editor || readOnly) return;
-      const chain = editor.chain().focus();
+      /* Asking for the pen is not asking for the caret, and a focus here is
+         a keyboard rising over the page about to be drawn on. */
+      const chain = action === "drawing-page" ? editor.chain() : editor.chain().focus();
       if (action === "bold") chain.toggleBold().run();
       else if (action === "italic") chain.toggleItalic().run();
       else if (action === "strike") chain.toggleStrike().run();

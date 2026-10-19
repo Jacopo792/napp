@@ -998,11 +998,30 @@ glass, and they are solid. Every glyph is the palette's ink — the bars'
 `tintColor`, `IconButton`, the theme's `primary` — never the system blue.
 `Appearance.setColorScheme` makes the system's own surfaces (tab bar, glass,
 action sheets) wear the theme the reader chose, not the phone's. A held row lifts `NotePreview`, drawn natively from the
-projection — never the WebView. A face on a row means that member **made the
-note or wrote in it** (`note_versions` authors, `facesOf`), never that they are
-reading it: a partner's face on a note of yours that they only opened said they
-had changed it (Jacopo, 17 October 2026). Presence only adds the dot to a face
-already there. Gated by Privacy → Show Collaborators.
+projection — never the WebView. A face on a row, a card or a note's bar means that member is **in that note
+now** (the archive presence channel's `noteId`, `facesOf`) and nothing else:
+a face for having made or written in a note read as being there, on notes
+nobody had open (Jacopo, 19 October 2026). Who wrote what is History's to say.
+Whether a member is online at all is the dot on their face in the Home switch.
+A note's People (⋯, or the faces in its bar) is a sibling of Comments and
+History: who is here now, then the note's activity by day from
+`note_versions` — edits with their words, restores, named versions — as the
+web's note and person sheets say it. A bare list of names was refused.
+Gated by Privacy → Show Collaborators.
+
+**A note's ⋯ holds only what is nowhere else** (Jacopo, 19 October 2026): Find
+in Note, History, People. Pin, Lock, Move, Archive and Delete are the held
+note's menu; Format is the writing bar's; sharing, attaching (the paperclip at
+rest) and Comments have buttons of their own. A second door to the same act is
+not added. Format left the ⋯ with this (Aa on the writing bar covers it while
+writing); it is the one entry that had no other door at rest.
+
+**Markup is a mode.** Asking for the pen never focuses the editor (no keyboard);
+the page reports `drawing` and the screen answers by hiding both bars, showing
+Done alone (`putDownPen`) and turning off the back swipe, which otherwise took a
+stroke to the right as "go back". One finger draws, two scroll — a second finger
+calls off the stroke in progress (`abandon` in `useInk`). Every Settings page
+opens out of its row with the system zoom (`ZoomLink`), as the profile does.
 
 **Home is a notes app's front page, never a bank's** (Jacopo, 18 October
 2026: a big "10 notes" over a row of round labelled acts read as a balance).

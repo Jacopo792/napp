@@ -1,11 +1,10 @@
 /* Everything about the account, behind the profile card: the account's title
  * page, then one card for you and one for the accounts on this phone. */
 import { useState } from "react";
-import { Link } from "expo-router";
 import { useArchive } from "../../archive";
 import { useAccountCards } from "../../Accounts";
 import { ProfileHero } from "../../ProfilePhoto";
-import { attempt, Line, Section, SettingsPage } from "../../SettingsControls";
+import { attempt, Line, Section, SettingsPage, ZoomLink } from "../../SettingsControls";
 import { useTextPrompt } from "../../TextPrompt";
 
 export default function Account() {
@@ -41,14 +40,14 @@ export default function Account() {
           onPress={rename}
           opens
         />
-        <Link href={go("security")} asChild>
+        <ZoomLink href={go("security")}>
           <Line
             icon="hand.raised"
             label="Privacy"
             note={p.presence ? "Online status shown" : "Online status hidden"}
             opens
           />
-        </Link>
+        </ZoomLink>
       </Section>
       {accounts}
     </SettingsPage>

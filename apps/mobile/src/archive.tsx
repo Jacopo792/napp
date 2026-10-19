@@ -45,7 +45,6 @@ import {
   type Presence,
 } from "@/lib/presence";
 import { EMPTY_META, type Meta } from "@/lib/types";
-import { loadNoteAuthors } from "@/lib/history";
 import type { Face } from "./Avatar";
 
 interface Archive {
@@ -199,9 +198,12 @@ export function ArchiveProvider({
       preferencesRef.current = row;
       const next = phoneView(row);
       setPreferences(next);
-      setAppearance(next.appearance);
-      setAxes(next.axes);
-      setWritingPreferences(next.writing);
+      /* Only what the patch touched: a fresh appearance object is a new
+         palette, every screen redrawn and the open note re-themed — which a
+         remark being marked read has no business causing. */
+      if (appearance) setAppearance(next.appearance);
+      if (axes) setAxes(next.axes);
+      if (patch.writing) setWritingPreferences(next.writing);
       pushAccountPreferences(session, row);
     },
     [session],
@@ -272,41 +274,22 @@ export function ArchiveProvider({
     };
   }, [session, wake]);
 
-  /* Who wrote where is read on opening and on every wake, not on every save:
-     a version is written per ten-minute stretch, so a save is not news. */
-  const [authors, setAuthors] = useState<Map<string, Set<string>>>(new Map());
-  useEffect(() => {
-    let live = true;
-    void loadNoteAuthors(session).then(
-      (next) => live && setAuthors(next),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [session, wake]);
-  const owners = useMemo(
-    () => new Map(snapshot?.entries.map((entry) => [entry.note.id, entry.note.ownerId])),
-    [snapshot],
-  );
+  /* A face on a note means that member is in it now — nothing else. A face
+     for having written there read as being there, on notes nobody had open
+     (Jacopo, 19 October 2026). Who wrote what is History's to say. */
   const facesOf = useCallback(
     (noteId: string): Face[] => {
       if (!preferences.collaborators) return [];
-      const owner = owners.get(noteId);
       return (snapshot?.members ?? [])
-        .filter(
-          (member) =>
-            !member.isSelf && (member.userId === owner || authors.get(noteId)?.has(member.userId)),
-        )
+        .filter((member) => !member.isSelf && present.get(member.userId) === noteId)
         .map((member) => ({
           userId: member.userId,
           name: member.nickname || "Member",
           avatarObject: member.avatarObject,
-          online: present.get(member.userId) === noteId,
-        }))
-        .sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)));
+          online: true,
+        }));
     },
-    [snapshot, owners, present, authors, preferences.collaborators],
+    [snapshot, present, preferences.collaborators],
   );
 
   const metaOf = useCallback((owner: string) => snapshot?.metas[owner] ?? EMPTY_META, [snapshot]);

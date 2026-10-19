@@ -37,6 +37,7 @@ import { Faces } from "../../Avatar";
 import { Group, Row, quiet } from "../../Grouped";
 import { SwipeRow } from "../../SwipeRow";
 import { NoteLink } from "../../NoteLink";
+import { ZoomLink } from "../../SettingsControls";
 import { glide, shelfGround, trashGround } from "../../theme";
 import { useCreateNote } from "../../useCreateNote";
 import { WhoseSwitch } from "../../WhoseSwitch";
@@ -458,15 +459,15 @@ export default function Home() {
           <Turning key={owner} at={3 + meta.folders.length} x={turnX} o={turnO}>
             <Reveal>
               <Group>
-                <Link href={href(ARCHIVE, "Archive")} asChild>
+                <ZoomLink href={href(ARCHIVE, "Archive")}>
                   <Row
                     icon="archivebox.fill"
                     label="Archive"
                     detail={inScope(ARCHIVE).length}
                     tint={shelfGround}
                   />
-                </Link>
-                <Link href={href(TRASH, "Recently Deleted")} asChild>
+                </ZoomLink>
+                <ZoomLink href={href(TRASH, "Recently Deleted")}>
                   <Row
                     icon="trash.fill"
                     fill={trashGround}
@@ -474,7 +475,7 @@ export default function Home() {
                     detail={inScope(TRASH).length}
                     last
                   />
-                </Link>
+                </ZoomLink>
               </Group>
             </Reveal>
           </Turning>

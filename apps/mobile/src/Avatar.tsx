@@ -59,7 +59,7 @@ export interface Face {
    side by side never read as one. The disc is mixed opaque rather than drawn
    translucent, because faces overlap and one must not show through another. */
 const HUES = ["#f5b83d", "#ff9f43", "#c77dff", "#3ecf8e", "#ff6b8b", "#4dc9e6"];
-const hueOf = (userId: string) =>
+export const hueOf = (userId: string) =>
   HUES[[...userId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % HUES.length];
 
 const rgb = (hex: string) => {

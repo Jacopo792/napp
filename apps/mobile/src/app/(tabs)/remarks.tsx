@@ -15,11 +15,18 @@ import { Avatar } from "../../Avatar";
 import { NoteLink } from "../../NoteLink";
 import { Empty, Status } from "../../SettingsControls";
 import { Card, Chips, Reveal, SkeletonCard, TabPage, useArrival } from "../../Chrome";
+import { rememberArchiveComments } from "../../NoteComments";
+
+/* The last read, per archive: coming back to the tab draws it at once and
+   the network corrects it, instead of bars on every return. */
+const lastRead = new Map<string, ArchiveComment[]>();
 
 export default function Remarks() {
   const { session, snapshot, preferences, metaOf } = useArchive();
   const palette = usePalette();
-  const [comments, setComments] = useState<ArchiveComment[] | null>(null);
+  const [comments, setComments] = useState<ArchiveComment[] | null>(
+    () => lastRead.get(session.archiveId) ?? null,
+  );
   const [error, setError] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
   const arrival = useArrival(Boolean(comments && snapshot));
@@ -27,11 +34,14 @@ export default function Remarks() {
     useCallback(() => {
       let live = true;
       let revision = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const refresh = () => {
         const request = ++revision;
         void loadArchiveComments(session).then(
           (list) => {
             if (live && revision === request) {
+              lastRead.set(session.archiveId, list);
+              rememberArchiveComments(list, list.length < 300);
               setComments(list);
               setError("");
             }
@@ -42,9 +52,14 @@ export default function Remarks() {
         );
       };
       refresh();
-      const channel = subscribeToComments(session.archiveId, refresh);
+      /* One read per burst: resolving a thread is a Realtime event a row. */
+      const channel = subscribeToComments(session.archiveId, () => {
+        clearTimeout(timer);
+        timer = setTimeout(refresh, 400);
+      });
       return () => {
         live = false;
+        clearTimeout(timer);
         void unsubscribeFromArchive(channel);
       };
     }, [session]),

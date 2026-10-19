@@ -49,6 +49,7 @@ import {
   REACTIONS,
   tally,
   threadsOf,
+  type ArchiveComment,
   type CommentThread,
   type NoteComment,
   type Reaction,
@@ -118,6 +119,38 @@ function Words({ body, members, palette }: { body: string; members: Member[]; pa
   );
 }
 
+/* What a note's conversation said the last time it was read, so the sheet
+   opens on it at once and the network only corrects it — a page sheet that
+   slides up onto bars and then rebuilds itself reads as lag. The Comments
+   tab seeds it from the archive-wide read it already made. */
+interface Known {
+  comments: NoteComment[];
+  reactions: Reaction[];
+  quotes: Map<string, string>;
+}
+const known = new Map<string, Known>();
+
+/** The archive-wide read, handed down per note. Only when the read is whole:
+ *  `loadArchiveComments` stops at 300, and a thread drawn short and then
+ *  completed is worse than bars. */
+export function rememberArchiveComments(list: ArchiveComment[], whole: boolean) {
+  if (!whole) return;
+  const byNote = new Map<string, NoteComment[]>();
+  for (const comment of list) {
+    const rows = byNote.get(comment.noteId) ?? [];
+    rows.push(comment);
+    byNote.set(comment.noteId, rows);
+  }
+  for (const [noteId, rows] of byNote) {
+    const before = known.get(noteId);
+    known.set(noteId, {
+      comments: rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      reactions: before?.reactions ?? [],
+      quotes: before?.quotes ?? new Map(),
+    });
+  }
+}
+
 /** Where a long-pressed remark stood, so the menu opens over it. */
 interface Held {
   comment: NoteComment;
@@ -146,9 +179,13 @@ export function NoteComments({
   const inset = useSafeAreaInsets();
   const prompt = useTextPrompt();
   const choose = useChoice();
-  const [comments, setComments] = useState<NoteComment[] | null>(null);
-  const [reactions, setReactions] = useState<Reaction[]>([]);
-  const [quotes, setQuotes] = useState<Map<string, string>>(new Map());
+  const [comments, setComments] = useState<NoteComment[] | null>(
+    () => known.get(noteId)?.comments ?? null,
+  );
+  const [reactions, setReactions] = useState<Reaction[]>(() => known.get(noteId)?.reactions ?? []);
+  const [quotes, setQuotes] = useState<Map<string, string>>(
+    () => known.get(noteId)?.quotes ?? new Map(),
+  );
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [caret, setCaret] = useState(0);
@@ -159,6 +196,8 @@ export function NoteComments({
   const [held, setHeld] = useState<Held | null>(null);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const root = useRef<ComponentRef<typeof View>>(null);
+  /** Somebody else said something past this note's line while it was open. */
+  const owed = useRef(false);
 
   const members: Member[] = (snapshot?.members ?? []).map((member) => ({
     userId: member.userId,
@@ -204,6 +243,7 @@ export function NoteComments({
   useEffect(() => {
     let live = true;
     let revision = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
       const request = ++revision;
       readQuotes();
@@ -213,12 +253,9 @@ export function NoteComments({
             setComments(rows);
             setReactions(answers);
             setError("");
-            updatePreferences({
-              remarksSeen: {
-                ...latestPreferences.current.remarksSeen,
-                [noteId]: new Date().toISOString(),
-              },
-            });
+            const seen = latestPreferences.current.remarksSeen[noteId] ?? "";
+            if (rows.some((row) => row.authorId !== session.userId && row.createdAt > seen))
+              owed.current = true;
           }
         },
         (reason) => {
@@ -227,12 +264,38 @@ export function NoteComments({
       );
     };
     refresh();
-    const channel = subscribeToComments(session.archiveId, refresh);
+    /* Realtime announces every row of a resolve separately; one read answers
+       the burst, as `refreshRemarks` does on the web. */
+    const channel = subscribeToComments(session.archiveId, () => {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 400);
+    });
     return () => {
       live = false;
+      clearTimeout(timer);
       void unsubscribeFromArchive(channel);
     };
-  }, [load, readQuotes, session.archiveId, noteId, updatePreferences]);
+  }, [load, readQuotes, session.archiveId, session.userId, noteId]);
+  /* Having read it is written once, as the sheet goes, and only when
+     somebody else had said something past the line: a preferences write
+     redraws every screen and re-sends the open note its preferences, and
+     doing that as the remarks landed — and again per Realtime event — was
+     the stall the sheet arrived with. */
+  useEffect(
+    () => () => {
+      if (!owed.current) return;
+      updatePreferences({
+        remarksSeen: {
+          ...latestPreferences.current.remarksSeen,
+          [noteId]: new Date().toISOString(),
+        },
+      });
+    },
+    [noteId, updatePreferences],
+  );
+  useEffect(() => {
+    if (comments) known.set(noteId, { comments, reactions, quotes });
+  }, [noteId, comments, reactions, quotes]);
   const refresh = async () => {
     const { rows, answers } = await load();
     setComments(rows);
@@ -422,7 +485,12 @@ export function NoteComments({
   const ready = Boolean(draft.trim()) && !busy;
 
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+    <Modal
+      animationType="slide"
+      presentationStyle="pageSheet"
+      backdropColor={palette.page}
+      onRequestClose={close}
+    >
       <View ref={root} style={{ flex: 1, backgroundColor: palette.page }}>
         <Animated.View style={[{ flex: 1 }, lifted]}>
           <View

@@ -28,6 +28,7 @@ import { SymbolView } from "../icons";
 import { NoteLink } from "../NoteLink";
 import { useTextPrompt } from "../TextPrompt";
 import { useCreateNote } from "../useCreateNote";
+import { ZoomLink } from "../SettingsControls";
 
 interface Result extends Findable {
   id: string;
@@ -37,6 +38,8 @@ interface Result extends Findable {
   entry?: NoteEntry;
   comments?: boolean;
   open?: () => void;
+  /** A place: it grows out of its row, as every page does. */
+  to?: Href;
 }
 
 export default function Search() {
@@ -82,9 +85,10 @@ export default function Search() {
     [snapshot, metaOf, session.userId],
   );
 
-  const go = (href: Href) => () => router.push(href);
-  const section = (name: string) =>
-    go({ pathname: "/settings/[section]", params: { section: name } });
+  const section = (name: string): Href => ({
+    pathname: "/settings/[section]",
+    params: { section: name },
+  });
 
   /* Everything that is found by its name, in the order the groups stand at
      rest and break ties with a query. */
@@ -113,10 +117,10 @@ export default function Search() {
           hint: member.isSelf ? "Your folder" : `${nameOf(member.userId)}’s folder`,
           searchOnly: true,
           icon: "folder",
-          open: go({
+          to: {
             pathname: "/notes",
             params: { owner: member.userId, scope: folder.id, title: folder.name },
-          }),
+          },
         });
     for (const remark of remarks) {
       if (remark.resolvedAt) continue;
@@ -143,9 +147,9 @@ export default function Search() {
         keywords: "member partner people",
         searchOnly: true,
         icon: "person",
-        open: section("members"),
+        to: section("members"),
       });
-    const acts: [string, SFSymbol, string, () => void][] = [
+    const acts: [string, SFSymbol, string, (() => void) | Href][] = [
       ["New Note", "square.and.pencil", "create write add compose", create],
       [
         "New Folder",
@@ -161,7 +165,7 @@ export default function Search() {
           }),
       ],
       ["Import Markdown", "arrow.down.doc", "obsidian file md", importMarkdown],
-      ["Settings", "gearshape", "preferences options", go("/settings")],
+      ["Settings", "gearshape", "preferences options", "/settings"],
       ["Profile", "person.crop.circle", "name photo avatar nickname", section("profile")],
       [
         "Appearance",
@@ -179,7 +183,7 @@ export default function Search() {
         "online presence hidden archived collaborators",
         section("security"),
       ],
-      ["Comments", "bubble.left.and.bubble.right", "remarks conversations", go("/remarks")],
+      ["Comments", "bubble.left.and.bubble.right", "remarks conversations", "/remarks"],
     ];
     for (const [name, icon, keywords, run] of acts)
       out.push({
@@ -189,10 +193,10 @@ export default function Search() {
         keywords,
         searchOnly: true,
         icon,
-        open: run,
+        ...(typeof run === "function" ? { open: run } : { to: run }),
       });
     return out;
-    // `go`, `section` and the acts close over the router and the archive only.
+    // `section` and the acts close over the archive only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, members, remarks, metaOf, session]);
 
@@ -342,11 +346,12 @@ function Hit({ item }: { item: Result }) {
         {face}
       </NoteLink>
     );
-  return (
+  const row = (
     <Press accessibilityRole="button" onPress={item.open} style={styles.row}>
       {face}
     </Press>
   );
+  return item.to ? <ZoomLink href={item.to}>{row}</ZoomLink> : row;
 }
 
 const styles = StyleSheet.create({

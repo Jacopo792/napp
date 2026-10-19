@@ -52,11 +52,14 @@ export function NoteHistory({
   canEdit,
   execute,
   onClose,
+  initial,
 }: {
   noteId: string;
   canEdit: boolean;
   execute: Execute;
   onClose: () => void;
+  /** A version to open straight away — People's activity hands one over. */
+  initial?: string;
 }) {
   const { session, snapshot } = useArchive();
   const palette = usePalette();
@@ -71,7 +74,10 @@ export function NoteHistory({
     let live = true;
     void loadVersions(session, noteId).then(
       (list) => {
-        if (live) setVersions(list);
+        if (!live) return;
+        setVersions(list);
+        if (initial && revision === 0)
+          setSelected((open) => open ?? list.find((v) => v.id === initial) ?? null);
       },
       (reason) => {
         if (live) setError(String(reason));
@@ -80,7 +86,7 @@ export function NoteHistory({
     return () => {
       live = false;
     };
-  }, [session, noteId, revision]);
+  }, [session, noteId, revision, initial]);
   useEffect(() => {
     setBody(null);
     if (!selected) return;

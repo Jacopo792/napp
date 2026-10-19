@@ -29,6 +29,7 @@ import {
   Status,
   Swatches,
   Toggle,
+  ZoomLink,
 } from "../../SettingsControls";
 import { PillButton, SkeletonCard } from "../../Chrome";
 
@@ -312,18 +313,16 @@ export default function Section() {
                 />
               </Part>
               <Part>
-                <Line
-                  icon="photo"
-                  label="Wallpaper"
-                  value={p.appearance.wallpaper && p.appearance.wallpaperObject ? "On" : "Off"}
-                  opens
-                  onPress={() =>
-                    router.push({
-                      pathname: "/settings/[section]",
-                      params: { section: "wallpaper" },
-                    })
-                  }
-                />
+                <ZoomLink
+                  href={{ pathname: "/settings/[section]", params: { section: "wallpaper" } }}
+                >
+                  <Line
+                    icon="photo"
+                    label="Wallpaper"
+                    value={p.appearance.wallpaper && p.appearance.wallpaperObject ? "On" : "Off"}
+                    opens
+                  />
+                </ZoomLink>
               </Part>
             </>
           ) : null}

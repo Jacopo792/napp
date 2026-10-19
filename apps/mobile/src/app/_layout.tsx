@@ -26,7 +26,7 @@ import { clearPictures } from "../Avatar";
 import { initAxes } from "@/lib/axes";
 import { ArchiveProvider, usePalette } from "../archive";
 import { SignIn } from "../SignIn";
-import { SkeletonCard } from "../Chrome";
+import { ArchiveOpened, Launch } from "../Launch";
 import { HostedPageProvider } from "../HostedPage";
 
 initAppearance();
@@ -42,6 +42,12 @@ export default function Root() {
     setChoosing(null);
     setSession(next);
   }, []);
+  /* The launch stands until the archive it opened has its notes: which
+     archive that was, so a change of account waits for the new one. */
+  const [openedKey, setOpenedKey] = useState<string | null>(null);
+  const sessionKey = session ? `${session.userId}:${session.archiveId}` : null;
+  const archiveOpened = useCallback(() => setOpenedKey(sessionKey), [sessionKey]);
+  const waiting = session === undefined || (sessionKey !== null && openedKey !== sessionKey);
   const userId = session?.userId;
   const archiveId = session?.archiveId;
   useEffect(() => {
@@ -164,22 +170,7 @@ export default function Root() {
             </View>
           ) : null}
           {session === undefined ? (
-            <View
-              accessibilityLabel="Opening account"
-              style={{ flex: 1, paddingTop: 90, backgroundColor: palette.page }}
-            >
-              <Text
-                style={{
-                  color: palette.ink3,
-                  fontSize: 16,
-                  paddingHorizontal: 24,
-                  marginBottom: 20,
-                }}
-              >
-                Opening account…
-              </Text>
-              <SkeletonCard rows={3} />
-            </View>
+            <View style={{ flex: 1 }} />
           ) : session ? (
             <ArchiveProvider
               key={`${session.userId}:${session.archiveId}`}
@@ -188,6 +179,7 @@ export default function Root() {
               onAccountChange={changeAccount}
               onSignedOut={() => setSession(null)}
             >
+              <ArchiveOpened onOpened={archiveOpened} />
               <HostedPageProvider>
                 <Stack
                   screenOptions={{
@@ -211,6 +203,7 @@ export default function Root() {
               onResume={(userId) => changeAccount(() => resumeAccount(userId, { notesOnly: true }))}
             />
           )}
+          <Launch waiting={waiting} />
         </ThemeProvider>
       </TextPromptProvider>
     </GestureHandlerRootView>

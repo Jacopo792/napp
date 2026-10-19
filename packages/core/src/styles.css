@@ -9246,6 +9246,118 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .drawing-overlay-tools.is-put-away {
   display: none;
 }
+
+/* On a phone the tools are Markup's palette: one opaque panel above the home
+   indicator, the hand's tools on the first row and the inks and nibs on the
+   second, so every tool is in sight without scrolling for it. The order is
+   the stylesheet's (`order`), not the markup's, so the column on a computer
+   keeps its one wrapping pill. Done is the host's bar, so the tick is not
+   said twice. A phone has one note on screen, which is what the sticky
+   placement above was protecting against. */
+@media (pointer: coarse) and (max-width: 767px) {
+  .drawing-overlay-tools {
+    /* Opaque, and a step off the page: the words under a translucent panel
+       read as part of it. Both terms are solid, so the mix is too. */
+    --tools-ground: color-mix(in srgb, var(--ink) 7%, var(--paper));
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: max(env(safe-area-inset-bottom), 12px);
+    max-width: none;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0;
+    padding: 4px 12px 6px;
+    border: 0.5px solid var(--rule);
+    border-radius: 24px;
+    background: var(--tools-ground);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.28);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .drawing-overlay-tools > * {
+    flex: none;
+  }
+  /* The line between the two rows. */
+  .drawing-overlay-tools::after {
+    content: "";
+    order: 1;
+    flex: 0 0 100%;
+    height: 0.5px;
+    margin: 2px 0 4px;
+    background: var(--rule);
+  }
+  .drawing-overlay-tools > .drawing-ink,
+  .drawing-overlay-tools > .drawing-nib,
+  .drawing-overlay-tools > .drawing-ink + .drawing-tools-rule {
+    order: 2;
+  }
+  /* Tools are spaced by the row, not divided by rules. */
+  .drawing-overlay-tools > .drawing-tools-rule {
+    display: none;
+  }
+  .drawing-overlay-tools > .drawing-ink + .drawing-tools-rule {
+    display: block;
+    height: 20px;
+    margin: 0;
+  }
+
+  .drawing-overlay-tools .rich-media-file-action {
+    width: 32px;
+    height: 40px;
+    border-radius: 10px;
+    color: var(--ink-2);
+  }
+  .drawing-overlay-tools .rich-media-file-action svg {
+    width: 20px;
+    height: 20px;
+  }
+  .drawing-overlay-tools .rich-media-file-action:hover {
+    background: none;
+    color: var(--ink-2);
+  }
+  .drawing-overlay-tools .rich-media-file-action.is-active {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .drawing-overlay-tools .rich-media-file-action:disabled {
+    opacity: 0.3;
+  }
+  .drawing-overlay-tools .rich-media-file-action.is-danger {
+    color: var(--danger);
+  }
+
+  .drawing-overlay-tools .drawing-ink {
+    width: 28px;
+    height: 28px;
+    margin: 6px 0;
+    border: 0;
+    box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 0.2);
+  }
+  /* Chosen is a ring in the ink of the page, set off by a gap of the panel. */
+  .drawing-overlay-tools .drawing-ink.is-chosen {
+    box-shadow:
+      0 0 0 2.5px var(--tools-ground),
+      0 0 0 4.5px var(--ink);
+  }
+  .drawing-overlay-tools .drawing-nib {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    color: var(--ink-3);
+  }
+  .drawing-overlay-tools .drawing-nib:hover {
+    background: none;
+  }
+  .drawing-overlay-tools .drawing-nib.is-chosen {
+    background: color-mix(in srgb, var(--ink) 14%, transparent);
+    color: var(--ink);
+  }
+
+  .drawing-overlay-tools [aria-label="Put the pen down"] {
+    display: none;
+  }
+}
 /* A mark is pressed by its own line, not by the box around it: a rectangle
    drawn on a board would otherwise take every click inside it. A caption has
    no line to hit, so it is pressed by the words. */

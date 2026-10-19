@@ -5,7 +5,7 @@ import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
 import { Press } from "../../Grouped";
 import { SymbolView } from "../../icons";
-import { Line, Section, SettingsPage } from "../../SettingsControls";
+import { Line, Section, SettingsPage, ZoomLink } from "../../SettingsControls";
 import { Card } from "../../Chrome";
 
 /* You — and everything about the account, behind your card — then how this
@@ -84,23 +84,23 @@ export default function Settings() {
         </Link.Trigger>
       </Link>
       <Section title="This Phone">
-        <Link href={go("appearance")} asChild>
+        <ZoomLink href={go("appearance")}>
           <Line icon="paintpalette" label="Appearance" note={look} opens />
-        </Link>
-        <Link href={go("writing")} asChild>
+        </ZoomLink>
+        <ZoomLink href={go("writing")}>
           <Line
             icon="pencil"
             label="Writing"
             note={p.autocorrect ? "Autocorrection on" : "Autocorrection off"}
             opens
           />
-        </Link>
+        </ZoomLink>
       </Section>
       <Section title="Archive">
-        <Link href={go("archives")} asChild>
+        <ZoomLink href={go("archives")}>
           <Line icon="archivebox" label="Archives" note={current?.name} opens />
-        </Link>
-        <Link href={go("members")} asChild>
+        </ZoomLink>
+        <ZoomLink href={go("members")}>
           <Line
             icon="person.2"
             label="Members"
@@ -109,7 +109,7 @@ export default function Settings() {
             }
             opens
           />
-        </Link>
+        </ZoomLink>
       </Section>
     </SettingsPage>
   );

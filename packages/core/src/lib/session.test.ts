@@ -20,6 +20,7 @@ function accountFlow(
     claimError?: string;
     archives?: { id: string; kind: string }[];
     expired?: boolean;
+    offline?: boolean;
     readError?: boolean;
   } = {},
 ) {
@@ -42,7 +43,10 @@ function accountFlow(
         calls.push({ name: "sign-out" });
       },
       setSession: async () => {
-        if (options.expired) return { data: { user: null }, error: { message: "Expired" } };
+        if (options.expired)
+          return { data: { user: null }, error: { message: "Expired", status: 400 } };
+        if (options.offline)
+          return { data: { user: null }, error: { message: "Failed to fetch", status: 0 } };
         activeUser = { id: "second", email: "second@example.invalid" };
         tokens = { access_token: "rotated-access", refresh_token: "rotated-refresh" };
         return { data: { user: activeUser }, error: null };
@@ -245,6 +249,13 @@ test("an expired saved token is removed while the current account remains recove
   await assert.rejects(flow.api.resumeAccount("second", { notesOnly: true }), /Sign in to second/);
   assert.equal(flow.api.otherAccounts(user.id).length, 0);
   assert.equal(JSON.parse(flow.storage.get("session")!).userId, user.id);
+});
+test("a dropped connection keeps the saved account instead of asking for a password", async () => {
+  const flow = accountFlow({ offline: true });
+  await flow.api.authenticate(user.email, "test-password");
+  saveSecond(flow.storage);
+  await assert.rejects(flow.api.resumeAccount("second", { notesOnly: true }), /Try again/);
+  assert.equal(flow.api.otherAccounts(user.id).length, 1);
 });
 test("switching to a Books-only account produces an empty chooser, not a stale session", async () => {
   const flow = accountFlow({ archives: [{ id: "book", kind: "document" }] });
