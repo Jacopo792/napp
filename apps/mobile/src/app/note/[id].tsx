@@ -47,6 +47,8 @@ import { Avatar, Faces } from "../../Avatar";
 import { NoteSheet } from "../../NoteSheet";
 import { Group, Row } from "../../Grouped";
 import { WritingBar } from "../../WritingBar";
+import { Bone } from "../../Chrome";
+import Animated, { FadeOut } from "react-native-reanimated";
 
 export default function Note() {
   const icon = useToolbarIcon();
@@ -554,6 +556,9 @@ export default function Note() {
         </View>
       ) : null}
       <Host style={[styles.page, { backgroundColor: palette.canvas }]} />
+      {/* Until the editor holds the note, the shape of a note in the page's
+          own colour; it dissolves into the words as they arrive. */}
+      {!state?.available && !state?.refusal ? <NoteSkeleton top={headerHeight} /> : null}
       <View
         ref={frame}
         pointerEvents="box-none"
@@ -586,6 +591,34 @@ export default function Note() {
   );
 }
 
+const LINES = ["92%", "100%", "86%", "97%", "64%", null, "100%", "90%", "95%", "48%"] as const;
+
+function NoteSkeleton({ top }: { top: number }) {
+  const palette = usePalette();
+  return (
+    <Animated.View
+      exiting={FadeOut.duration(260)}
+      pointerEvents="none"
+      accessibilityLabel="Loading"
+      style={[
+        StyleSheet.absoluteFill,
+        styles.skeleton,
+        { paddingTop: top + 18, backgroundColor: palette.canvas },
+      ]}
+    >
+      <Bone style={{ width: "58%", height: 30, borderRadius: 10, marginBottom: 26 }} />
+      {LINES.map((width, at) =>
+        width ? (
+          <Bone key={at} style={{ width, height: 15, borderRadius: 7, marginBottom: 14 }} />
+        ) : (
+          <View key={at} style={{ height: 14 }} />
+        ),
+      )}
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   page: { flex: 1 },
+  skeleton: { paddingHorizontal: 20 },
 });

@@ -10,7 +10,7 @@
  * Every motion here runs on the UI thread. The reveal reads where the view is
  * on screen (`measure`) against the scroll it is told about, so a card nested
  * anywhere in a page — or a row in a virtualised list — reveals the same way. */
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import {
   Platform,
   Pressable,
@@ -25,11 +25,17 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  FadeOut,
   interpolate,
+  makeMutable,
   measure,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -37,7 +43,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import type { SFSymbol } from "expo-symbols";
 import { useArchive, usePalette } from "./archive";
 import { Avatar } from "./Avatar";
@@ -179,7 +185,6 @@ export function TopBar({
 }) {
   const { session, profile } = useArchive();
   const palette = usePalette();
-  const router = useRouter();
   const inset = useSafeAreaInsets();
   const ground = useAnimatedStyle(() => ({
     opacity: interpolate(scroll.value, [0, 48], [0, 1], "clamp"),
@@ -200,23 +205,27 @@ export function TopBar({
         ]}
       />
       <View style={styles.barRow}>
-        <Press
-          feedback="scale"
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          hitSlop={6}
-          onPress={() => router.push("/settings")}
-        >
-          <Avatar
-            face={{
-              userId: session.userId,
-              name: profile?.nickname ?? "",
-              avatarObject: profile?.avatarObject ?? null,
-            }}
-            email={session.email}
-            size={40}
-          />
-        </Press>
+        {/* Settings grows out of the face, as Revolut's profile does. */}
+        <Link href="/settings" asChild>
+          <Link.Trigger withAppleZoom>
+            <Press
+              feedback="scale"
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              hitSlop={6}
+            >
+              <Avatar
+                face={{
+                  userId: session.userId,
+                  name: profile?.nickname ?? "",
+                  avatarObject: profile?.avatarObject ?? null,
+                }}
+                email={session.email}
+                size={40}
+              />
+            </Press>
+          </Link.Trigger>
+        </Link>
         {search}
         {right}
       </View>
@@ -294,37 +303,115 @@ export function Reveal({
 
 /* ── Loading ────────────────────────────────────────────────────────────── */
 
-/** One breath shared by every placeholder on screen, so they pulse together. */
-function usePulse() {
-  const pulse = useSharedValue(1);
+/** One light sweeping across every placeholder on screen at once, measured
+ *  in screen points, so the bones of two cards read as one surface catching
+ *  it rather than each blinking on its own. It runs only while a placeholder
+ *  is mounted, and not at all under Reduce Motion. */
+const sweep = makeMutable(0);
+let sweepers = 0;
+const BAND = 180;
+
+function useSweep() {
+  const still = useReducedMotion();
   useEffect(() => {
-    pulse.value = withRepeat(withTiming(0.45, { duration: 900 }), -1, true);
-  }, [pulse]);
-  return useAnimatedStyle(() => ({ opacity: pulse.value }));
+    if (still) return;
+    sweepers += 1;
+    if (sweepers === 1) {
+      sweep.value = 0;
+      sweep.value = withRepeat(
+        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        -1,
+        false,
+      );
+    }
+    return () => {
+      sweepers -= 1;
+      if (sweepers === 0) cancelAnimation(sweep);
+    };
+  }, [still]);
+  return !still;
+}
+
+/** One shape of something not here yet: a quiet block the sweep passes over. */
+export function Bone({ style }: { style?: StyleProp<ViewStyle> }) {
+  const palette = usePalette();
+  const moving = useSweep();
+  const { width } = useWindowDimensions();
+  const ref = useAnimatedRef<Animated.View>();
+  const band = useAnimatedStyle(() => {
+    if (!(globalThis as { _WORKLET?: boolean })._WORKLET) return { opacity: 0 };
+    const box = measure(ref);
+    if (!box) return { opacity: 0 };
+    return {
+      opacity: 1,
+      transform: [{ translateX: -BAND + sweep.value * (width + 2 * BAND) - box.pageX }],
+    };
+  });
+  const light = palette.dark ? "#ffffff14" : "#ffffffa6";
+  return (
+    <Animated.View
+      ref={ref}
+      style={[{ backgroundColor: quiet(palette), borderRadius: 8, overflow: "hidden" }, style]}
+    >
+      {moving ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: BAND,
+              backgroundImage: `linear-gradient(to right, ${light.slice(0, 7)}00 0%, ${light} 50%, ${light.slice(0, 7)}00 100%)`,
+            },
+            band,
+          ]}
+        />
+      ) : null}
+    </Animated.View>
+  );
 }
 
 /** Rows that are not here yet: a disc, a name and a line under it, a value at
- *  the end — the shape of what will arrive, inside a card. */
+ *  the end — the shape of what will arrive, inside a card. It fades where it
+ *  stood as what it stood for arrives (see `useArrival`). */
 export function SkeletonCard({ rows = 3, style }: { rows?: number; style?: StyleProp<ViewStyle> }) {
-  const palette = usePalette();
-  const pulse = usePulse();
-  const bone = { backgroundColor: quiet(palette), borderRadius: 8 };
   return (
-    <Card style={[{ marginHorizontal: 16, marginBottom: 16, paddingVertical: 8 }, style]}>
-      <Animated.View style={pulse} accessibilityLabel="Loading">
+    <Animated.View
+      exiting={FadeOut.duration(220)}
+      accessibilityLabel="Loading"
+      style={[{ marginHorizontal: 16, marginBottom: 16 }, style]}
+    >
+      <Card style={{ flexGrow: 1, paddingVertical: 8 }}>
         {Array.from({ length: rows }, (_, at) => (
           <View key={at} style={styles.boneRow}>
-            <View style={[bone, { width: 40, height: 40, borderRadius: 20 }]} />
+            <Bone style={{ width: 40, height: 40, borderRadius: 20 }} />
             <View style={{ flex: 1, gap: 8 }}>
-              <View style={[bone, { width: "62%", height: 14 }]} />
-              <View style={[bone, { width: "38%", height: 11 }]} />
+              <Bone style={{ width: at % 2 ? "54%" : "66%", height: 14 }} />
+              <Bone style={{ width: at % 2 ? "30%" : "40%", height: 11 }} />
             </View>
-            <View style={[bone, { width: 36, height: 12 }]} />
+            <Bone style={{ width: 36, height: 12 }} />
           </View>
         ))}
-      </Animated.View>
-    </Card>
+      </Card>
+    </Animated.View>
   );
+}
+
+const ARRIVE = FadeIn.duration(320);
+
+/** The entrance for what replaces a skeleton: a fade over the shapes fading
+ *  out, for the moment after the wait only — what mounts later (a row
+ *  scrolled into a list, a tab come back to) simply is there. */
+export function useArrival(ready: boolean) {
+  const [fresh, setFresh] = useState(!ready);
+  useEffect(() => {
+    if (!ready || !fresh) return;
+    const timer = setTimeout(() => setFresh(false), 600);
+    return () => clearTimeout(timer);
+  }, [ready, fresh]);
+  return ready && fresh ? ARRIVE : undefined;
 }
 
 /* ── Pages ──────────────────────────────────────────────────────────────── */

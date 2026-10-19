@@ -22,7 +22,7 @@ import { loadMediaText } from "@/lib/mediaText";
 import { readableMedia } from "@/lib/mediaTextShape";
 import { headingsOf, rankGroups, snippetOf, type Findable, type Snippet } from "@/lib/spotlight";
 import { useArchive, usePalette } from "../archive";
-import { Card, SearchPill } from "../Chrome";
+import { Card, SearchPill, SkeletonCard } from "../Chrome";
 import { Press, quiet } from "../Grouped";
 import { SymbolView } from "../icons";
 import { NoteLink } from "../NoteLink";
@@ -277,6 +277,12 @@ export default function Search() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingTop: 8, paddingBottom: inset.bottom + 40 }}
       >
+        {!snapshot ? (
+          <>
+            <SkeletonCard rows={4} />
+            <SkeletonCard rows={2} />
+          </>
+        ) : null}
         {groups.map((group) => (
           <Card key={group.group} style={styles.card}>
             <Text style={[styles.heading, { color: palette.ink3 }]}>

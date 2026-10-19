@@ -20,6 +20,8 @@ import { SymbolView } from "./icons";
 import { Press } from "./Grouped";
 
 const AVATAR_EDGE = 512;
+/** The face on the account page, large and centred. */
+const HERO = 72;
 const MAX_AVATAR_BYTES = 1.5 * 1024 * 1024;
 
 /** A picked picture, scaled and re-encoded on the phone. Null when cancelled. */
@@ -69,7 +71,7 @@ function ask(title: string, options: { label: string; destructive?: boolean; run
 }
 
 export function ProfileHero() {
-  const { session, profile, updateProfile } = useArchive();
+  const { session, profile, updateProfile, snapshot } = useArchive();
   const palette = usePalette();
   const [busy, setBusy] = useState(false);
   const work = (job: () => Promise<void>) =>
@@ -118,77 +120,81 @@ export function ProfileHero() {
       : choose();
 
   const name = profile?.nickname || session.email.split("@")[0];
+  /* What only a notes app can say about you: how much you have written. */
+  const mine = (snapshot?.entries ?? []).filter(
+    (entry) => (entry.note.ownerId ?? session.userId) === session.userId,
+  );
+  const words = mine.reduce((sum, entry) => sum + (entry.note.body.match(/\S+/g)?.length ?? 0), 0);
+  const count = (n: number, one: string, many: string) =>
+    `${n.toLocaleString()} ${n === 1 ? one : many}`;
   return (
-    <View style={{ alignItems: "center", paddingTop: 4, paddingBottom: 28, gap: 4 }}>
-      <Press
-        feedback="scale"
-        accessibilityRole="button"
-        accessibilityLabel={profile?.avatarObject ? "Edit Photo" : "Add Photo"}
-        disabled={!profile || busy}
-        onPress={offer}
-        style={{ opacity: busy ? 0.5 : 1, marginBottom: 12 }}
-      >
-        <Avatar
-          face={{
-            userId: session.userId,
-            name: profile?.nickname ?? "",
-            avatarObject: profile?.avatarObject ?? null,
-          }}
-          email={session.email}
-          size={104}
-        />
-        <View
-          style={{
-            position: "absolute",
-            right: -2,
-            bottom: 0,
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            backgroundColor: palette.paper,
-            borderWidth: 3,
-            borderColor: palette.page,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+    /* The account as a note's title page: set from the left like the title
+       of a note, the face beside the name, and under them what was written. */
+    <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 26, gap: 14 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+        <Press
+          feedback="scale"
+          accessibilityRole="button"
+          accessibilityLabel={profile?.avatarObject ? "Edit Photo" : "Add Photo"}
+          disabled={!profile || busy}
+          onPress={offer}
+          style={{ opacity: busy ? 0.5 : 1 }}
         >
-          <SymbolView name="camera.fill" size={15} tintColor={palette.ink} />
+          <View
+            style={{
+              borderRadius: HERO,
+              boxShadow: palette.dark
+                ? "0 8px 22px rgba(0,0,0,0.5)"
+                : "0 8px 20px rgba(0,0,0,0.12)",
+            }}
+          >
+            <Avatar
+              face={{
+                userId: session.userId,
+                name: profile?.nickname ?? "",
+                avatarObject: profile?.avatarObject ?? null,
+              }}
+              email={session.email}
+              size={HERO}
+            />
+          </View>
+          <View
+            style={{
+              position: "absolute",
+              right: -4,
+              bottom: -2,
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: palette.paper,
+              borderWidth: 2.5,
+              borderColor: palette.page,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <SymbolView name="camera.fill" size={12} tintColor={palette.ink} />
+          </View>
+        </Press>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text
+            style={{ color: palette.ink, fontSize: 28, fontWeight: "700", letterSpacing: -0.7 }}
+            numberOfLines={2}
+          >
+            {name}
+          </Text>
+          <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
+            {session.email}
+          </Text>
         </View>
-      </Press>
-      <Text
-        style={{
-          color: palette.ink,
-          fontSize: 26,
-          fontWeight: "700",
-          letterSpacing: -0.5,
-          textAlign: "center",
-          paddingHorizontal: 20,
-        }}
-        numberOfLines={2}
-      >
-        {name}
-      </Text>
-      <Text style={{ color: palette.ink3, fontSize: 15 }} numberOfLines={1}>
-        {session.email}
-      </Text>
-      <Press
-        feedback="scale"
-        accessibilityRole="button"
-        disabled={!profile || busy}
-        onPress={offer}
-        hitSlop={8}
-        style={{
-          marginTop: 14,
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          borderRadius: 18,
-          backgroundColor: palette.paper,
-        }}
-      >
-        <Text style={{ color: palette.accent, fontSize: 15, fontWeight: "600" }}>
-          {profile?.avatarObject ? "Edit Photo" : "Add Photo"}
+      </View>
+      {snapshot ? (
+        <Text style={{ color: palette.ink2, fontSize: 15, fontWeight: "500" }}>
+          {count(mine.length, "note", "notes")}
+          <Text style={{ color: palette.ink4 }}>{"  ·  "}</Text>
+          {count(words, "word written", "words written")}
         </Text>
-      </Press>
+      ) : null}
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { Alert, Text, View } from "react-native";
 import type { HostedBody, HostedCommand } from "@/lib/hostedCommands";
 import { loadVersionContent, loadVersions, nameVersion, type NoteVersion } from "@/lib/history";
 import { formatDateTime } from "@/lib/format";
+import { Bone, SkeletonCard } from "./Chrome";
 import { Group, Row } from "./Grouped";
 import { NoteSheet } from "./NoteSheet";
 import { attempt, Empty, Status } from "./SettingsControls";
@@ -153,7 +154,11 @@ export function NoteHistory({
                 <VersionText node={body.content} />
               </Text>
             ) : (
-              <Text style={{ color: palette.ink3 }}>Loading…</Text>
+              <View style={{ gap: 12, paddingTop: 4 }} accessibilityLabel="Loading">
+                {["100%", "94%", "100%", "72%", "88%", "46%"].map((width, at) => (
+                  <Bone key={at} style={{ width: width as `${number}%`, height: 14 }} />
+                ))}
+              </View>
             )}
           </View>
           {canEdit && body ? (
@@ -203,7 +208,7 @@ export function NoteHistory({
           ))}
         </Group>
       ) : (
-        <Empty label="Loading…" />
+        <SkeletonCard rows={4} />
       )}
     </NoteSheet>
   );

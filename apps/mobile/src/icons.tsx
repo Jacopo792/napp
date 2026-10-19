@@ -60,6 +60,7 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   pencil: "edit",
   "rectangle.portrait.and.arrow.right": "logout",
   envelope: "mail",
+  "exclamationmark.circle.fill": "error",
   plus: "add",
   "book.closed": "book",
   checkmark: "check",
@@ -90,7 +91,9 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
 };
 
 export function SymbolView({ name, ...props }: Omit<SymbolViewProps, "name"> & { name: SFSymbol }) {
-  return <NativeSymbol {...props} name={{ ios: name, android: names[name] ?? "description" }} />;
+  /* A solid form Android has no name for draws its outline. */
+  const android = names[name] ?? names[name.replace(/\.fill$/, "") as SFSymbol] ?? "description";
+  return <NativeSymbol {...props} name={{ ios: name, android }} />;
 }
 
 let sources: Partial<Record<SFSymbol, ImageSourcePropType>> = {};

@@ -25,8 +25,10 @@ export function useCard(): { card: string; wallpaper: boolean } {
 }
 
 /** `reach`: how far down the picture stands before it has faded into the
- *  ground; by default most of the screen. */
-export function Backdrop({ reach }: { reach?: number }) {
+ *  ground; by default most of the screen. `veil`: the picture is the whole
+ *  ground, out of focus and dark — Revolut's profile, where the cards stand
+ *  on the light of the reader's picture rather than on black. */
+export function Backdrop({ reach, veil }: { reach?: number; veil?: boolean }) {
   const { session } = useArchive();
   const appearance = useAppearance();
   const palette = usePalette();
@@ -45,6 +47,32 @@ export function Backdrop({ reach }: { reach?: number }) {
     };
   }, [session, objectId]);
   if (!uri) return null;
+  /* Blurred is the reader's choice for every page: the whole ground the
+     picture out of focus, as Settings always has it. */
+  if (veil || appearance.wallpaperBlur > 0)
+    return (
+      <Animated.View
+        entering={FadeIn.duration(320)}
+        style={[StyleSheet.absoluteFill, { backgroundColor: palette.page }]}
+        pointerEvents="none"
+      >
+        <Image
+          source={{ uri }}
+          resizeMode="cover"
+          blurRadius={60}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: palette.dark ? "#000" : "#fff",
+              opacity: Math.max(0.62, appearance.wallpaperDim / 100),
+            },
+          ]}
+        />
+      </Animated.View>
+    );
   /* Revolut's hero: the picture whole and sharp at the top, fading into the
      ground the cards stand on, so what is read sits on the dark and what is
      glanced at sits on the picture. The fade is a scrim over a photograph,
@@ -59,7 +87,6 @@ export function Backdrop({ reach }: { reach?: number }) {
         <Image
           source={{ uri }}
           resizeMode={appearance.wallpaperFit === "contain" ? "contain" : "cover"}
-          blurRadius={appearance.wallpaperBlur * 2}
           style={StyleSheet.absoluteFill}
         />
         <View

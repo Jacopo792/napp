@@ -41,7 +41,16 @@ import { glide, shelfGround, trashGround } from "../../theme";
 import { useCreateNote } from "../../useCreateNote";
 import { WhoseSwitch } from "../../WhoseSwitch";
 import { SymbolView } from "../../icons";
-import { BAR, Card, Heading, Reveal, RoundButton, SkeletonCard, TabPage } from "../../Chrome";
+import {
+  BAR,
+  Card,
+  Heading,
+  Reveal,
+  RoundButton,
+  SkeletonCard,
+  TabPage,
+  useArrival,
+} from "../../Chrome";
 
 /** Folders in the order the web draws them: each followed by its children. */
 function nested(folders: Folder[]): Folder[] {
@@ -69,6 +78,7 @@ export default function Home() {
   const { session, snapshot, error, metaOf, act, refresh, present, facesOf } = useArchive();
   const palette = usePalette();
   const editor = snapshot?.members.find((member) => member.isSelf)?.role === "editor";
+  const arrival = useArrival(Boolean(snapshot));
 
   /* One card open at a time across the whole screen. */
   const closers = useRef(new Map<string, () => void>());
@@ -230,7 +240,7 @@ export default function Home() {
           <SkeletonCard rows={3} />
         </>
       ) : (
-        <>
+        <Animated.View entering={arrival}>
           {latest ? (
             <Turning at={0} x={turnX} o={turnO} style={styles.continue}>
               <NoteLink entry={latest} zoom feedback="scale">
@@ -468,7 +478,7 @@ export default function Home() {
               </Group>
             </Reveal>
           </Turning>
-        </>
+        </Animated.View>
       )}
     </TabPage>
   );

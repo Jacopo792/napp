@@ -4,6 +4,7 @@
  * open and what is yours to deal with. */
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { useFocusEffect } from "expo-router";
 import { loadArchiveComments } from "@/lib/comments";
 import { isForYou, threadsOf, unreadRemarks, type ArchiveComment } from "@/lib/commentThreads";
@@ -13,7 +14,7 @@ import { useArchive, usePalette } from "../../archive";
 import { Avatar } from "../../Avatar";
 import { NoteLink } from "../../NoteLink";
 import { Empty, Status } from "../../SettingsControls";
-import { Card, Chips, Reveal, SkeletonCard, TabPage } from "../../Chrome";
+import { Card, Chips, Reveal, SkeletonCard, TabPage, useArrival } from "../../Chrome";
 
 export default function Remarks() {
   const { session, snapshot, preferences, metaOf } = useArchive();
@@ -21,6 +22,7 @@ export default function Remarks() {
   const [comments, setComments] = useState<ArchiveComment[] | null>(null);
   const [error, setError] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+  const arrival = useArrival(Boolean(comments && snapshot));
   useFocusEffect(
     useCallback(() => {
       let live = true;
@@ -94,49 +96,51 @@ export default function Remarks() {
         ]}
       />
       {error ? <Status>{error}</Status> : null}
-      {!comments ? (
+      {!comments || !snapshot ? (
         <SkeletonCard rows={5} />
       ) : entries.length ? (
-        <Reveal>
-          <Card style={styles.card}>
-            {entries.map((entry) => {
-              const said = latest.get(entry.note.id)!;
-              const author = memberOf(said.authorId);
-              return (
-                <NoteLink key={entry.note.id} entry={entry} comments style={styles.row}>
-                  <Avatar
-                    face={{
-                      userId: said.authorId,
-                      name: author?.nickname || "Member",
-                      avatarObject: author?.avatarObject ?? null,
-                    }}
-                    email={said.authorId === session.userId ? session.email : undefined}
-                    size={44}
-                  />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
-                      {entry.note.title || "Untitled"}
-                    </Text>
-                    <Text style={{ color: palette.ink3, fontSize: 14 }} numberOfLines={1}>
-                      {said.body}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: "flex-end", gap: 6, alignSelf: "flex-start" }}>
-                    <Text style={{ color: palette.ink3, fontSize: 12 }}>
-                      {formatStamp(said.createdAt)}
-                    </Text>
-                    {unread.has(entry.note.id) ? (
-                      <View
-                        accessibilityLabel="New"
-                        style={[styles.dot, { backgroundColor: palette.accent }]}
-                      />
-                    ) : null}
-                  </View>
-                </NoteLink>
-              );
-            })}
-          </Card>
-        </Reveal>
+        <Animated.View entering={arrival}>
+          <Reveal>
+            <Card style={styles.card}>
+              {entries.map((entry) => {
+                const said = latest.get(entry.note.id)!;
+                const author = memberOf(said.authorId);
+                return (
+                  <NoteLink key={entry.note.id} entry={entry} comments style={styles.row}>
+                    <Avatar
+                      face={{
+                        userId: said.authorId,
+                        name: author?.nickname || "Member",
+                        avatarObject: author?.avatarObject ?? null,
+                      }}
+                      email={said.authorId === session.userId ? session.email : undefined}
+                      size={44}
+                    />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
+                        {entry.note.title || "Untitled"}
+                      </Text>
+                      <Text style={{ color: palette.ink3, fontSize: 14 }} numberOfLines={1}>
+                        {said.body}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 6, alignSelf: "flex-start" }}>
+                      <Text style={{ color: palette.ink3, fontSize: 12 }}>
+                        {formatStamp(said.createdAt)}
+                      </Text>
+                      {unread.has(entry.note.id) ? (
+                        <View
+                          accessibilityLabel="New"
+                          style={[styles.dot, { backgroundColor: palette.accent }]}
+                        />
+                      ) : null}
+                    </View>
+                  </NoteLink>
+                );
+              })}
+            </Card>
+          </Reveal>
+        </Animated.View>
       ) : (
         <Empty label={onlyMine ? "Nothing for you" : "No open comments"} />
       )}

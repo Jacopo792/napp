@@ -22,11 +22,13 @@ import type { SFSymbol } from "expo-symbols";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { SymbolView } from "./icons";
 import { Chip, Press, quiet } from "./Grouped";
+import { Backdrop } from "./Backdrop";
 import { usePalette } from "./archive";
 import { glide } from "./theme";
 import { Card, PageTitle } from "./Chrome";
 
-export function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
+/** A page of Settings. */
+export function SettingsPage({ title, children }: { title?: string; children: ReactNode }) {
   const palette = usePalette();
   const backgroundColor = palette.page;
   /* iOS insets a scroller under a transparent bar by itself; Android does not. */
@@ -35,12 +37,12 @@ export function SettingsPage({ title, children }: { title: string; children: Rea
   return (
     <>
       <Stack.Screen options={{ title: "", contentStyle: { backgroundColor } }} />
+      <Backdrop veil />
       <ScrollView
-        style={{ backgroundColor }}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingTop: top + 8, paddingBottom: 48 }}
       >
-        <PageTitle>{title}</PageTitle>
+        {title ? <PageTitle>{title}</PageTitle> : null}
         {children}
       </ScrollView>
     </>
@@ -78,6 +80,21 @@ interface LineProps extends Omit<PressableProps, "style" | "children"> {
 }
 
 /* `Link asChild` hands the row its press and its ref through `rest`. */
+/** Glyphs whose `.fill` form exists in SF Symbols. */
+const SOLID = new Set<string>([
+  "archivebox",
+  "envelope",
+  "folder",
+  "hand.raised",
+  "paintpalette",
+  "person",
+  "person.2",
+  "person.badge.plus",
+  "person.crop.circle",
+  "photo",
+  "rectangle.portrait.and.arrow.right",
+]);
+
 export function Line({
   label,
   note,
@@ -100,7 +117,20 @@ export function Line({
       disabled={rest.disabled || !pressable}
       style={[styles.line, rest.disabled && pressable && { opacity: 0.4 }]}
     >
-      {icon ? <Chip icon={icon} size={32} tint={tone === "ink" ? undefined : colour} /> : leading}
+      {/* Revolut's row: a solid glyph standing on the card itself, not a
+          grey tile — the tile was the flattest thing on the page. */}
+      {icon ? (
+        <View style={styles.glyph}>
+          <SymbolView
+            name={(SOLID.has(icon) ? `${icon}.fill` : icon) as SFSymbol}
+            size={21}
+            weight="semibold"
+            tintColor={colour}
+          />
+        </View>
+      ) : (
+        leading
+      )}
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[styles.label, { color: colour }]} numberOfLines={1}>
           {label}
@@ -301,8 +331,15 @@ export async function attempt(action: () => Promise<unknown>) {
 
 const styles = StyleSheet.create({
   section: { marginHorizontal: 16, marginBottom: 16 },
-  heading: { fontSize: 13, fontWeight: "600", marginHorizontal: 18, marginTop: 16 },
+  heading: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: -0.1,
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
   group: { paddingVertical: 6 },
+  glyph: { width: 32, alignItems: "center", justifyContent: "center" },
   line: {
     minHeight: 60,
     paddingVertical: 10,

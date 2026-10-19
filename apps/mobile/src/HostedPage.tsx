@@ -105,6 +105,16 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
   const loaded = useRef(false);
   const borrower = useRef<Borrower | null>(null);
   const [holder, setHolder] = useState<string | null>(null);
+  /* Bumped when the system takes the page's process back. A page loaded from
+     a string has no address to reload from — `reload()` asks for
+     https://notes, which nothing answers, and the view sat on a white
+     spinner for every note after — so it is built again from the string. */
+  const [generation, setGeneration] = useState(0);
+  const rebuild = useCallback(() => {
+    loaded.current = false;
+    waiting.current.reset("The note page was reloaded");
+    setGeneration((value) => value + 1);
+  }, []);
   const waiting = useRef(new HostedRequests());
   /* The first preferences, for the page's first paint; later ones travel with
      each opening. */
@@ -272,7 +282,9 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
         {children}
         {/* Parked off to the side while no note holds it: alive, out of sight. */}
         <View style={styles.parked} pointerEvents="none">
-          <Portal hostName={holder ?? undefined}>
+          {/* Keyed with the page: a view rebuilt inside a portal that stays
+              is left where it was made, off screen, under the note's host. */}
+          <Portal key={generation} hostName={holder ?? undefined}>
             {source ? (
               <WebView<object>
                 ref={web}
@@ -285,8 +297,13 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
                 }}
                 onMessage={(event) => void onMessage(event)}
                 /* iOS may take the page's process back under memory pressure;
-                   a page that is gone is loaded again, and its note reopened. */
-                onContentProcessDidTerminate={() => web.current?.reload()}
+                   a page that is gone is built again, and its note reopened
+                   when it says it is ready. */
+                onContentProcessDidTerminate={rebuild}
+                onRenderProcessGone={rebuild}
+                renderLoading={() => (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.canvas }]} />
+                )}
                 onShouldStartLoadWithRequest={(request) => {
                   if (
                     request.url === "about:blank" ||

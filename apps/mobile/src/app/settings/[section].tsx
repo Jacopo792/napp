@@ -18,7 +18,8 @@ import { downloadObject } from "@/lib/supabase";
 import { CARD_RADIUS, Press, RowFace } from "../../Grouped";
 import { Avatar, Faces, picture } from "../../Avatar";
 import { SymbolView } from "../../icons";
-import { chooseWallpaper, ProfileHero } from "../../ProfilePhoto";
+import { chooseWallpaper } from "../../ProfilePhoto";
+import Account from "./account";
 import {
   attempt,
   Line,
@@ -77,7 +78,6 @@ export default function Section() {
   const title =
     (
       {
-        profile: "Profile",
         accounts: "Accounts",
         archives: "Archives",
         members: "Members",
@@ -88,17 +88,6 @@ export default function Section() {
       } as Record<string, string>
     )[section] ?? "Settings";
 
-  const nickname = () =>
-    prompt(
-      "Name",
-      undefined,
-      (name) => {
-        if (profile && name?.trim())
-          void run(() => updateProfile({ ...profile, nickname: name.trim().slice(0, 40) }));
-      },
-      "plain-text",
-      profile?.nickname,
-    );
   const invite = () =>
     prompt(
       "Invite Someone",
@@ -137,6 +126,8 @@ export default function Section() {
       preset.foreground === p.appearance.foreground,
   );
 
+  /* The profile is the account page now; search still asks for it by name. */
+  if (section === "profile") return <Account />;
   if (["reading", "icons", "folders", "palette"].includes(section))
     return <Redirect href={section === "palette" ? "/settings/appearance" : "/settings"} />;
 
@@ -149,20 +140,6 @@ export default function Section() {
     <SettingsPage title={title}>
       {error ? <Status>{error}</Status> : null}
       {section === "accounts" ? <Accounts /> : null}
-      {section === "profile" ? (
-        <>
-          <ProfileHero />
-          <Part>
-            <Line
-              label="Name"
-              value={profile?.nickname || ""}
-              disabled={!profile || busy}
-              onPress={nickname}
-              opens
-            />
-          </Part>
-        </>
-      ) : null}
       {section === "archives" ? (
         <>
           <Part title="Your Archives">
@@ -354,18 +331,32 @@ export default function Section() {
             <>
               <WallpaperPicture objectId={p.appearance.wallpaperObject} />
               {p.appearance.wallpaperObject ? (
-                <Part>
-                  <Toggle
-                    label="Show Wallpaper"
-                    value={p.appearance.wallpaper}
-                    onChange={(wallpaper) => setAppearance({ wallpaper })}
-                  />
-                  <Line
-                    label="Remove Wallpaper"
-                    tone="danger"
-                    onPress={() => setAppearance({ wallpaper: false, wallpaperObject: null })}
-                  />
-                </Part>
+                <>
+                  <Part title="Style">
+                    <Segments
+                      options={[
+                        { id: "sharp", label: "Sharp" },
+                        { id: "blurred", label: "Blurred" },
+                      ]}
+                      value={p.appearance.wallpaperBlur > 0 ? "blurred" : "sharp"}
+                      onChange={(style) =>
+                        setAppearance({ wallpaperBlur: style === "blurred" ? 30 : 0 })
+                      }
+                    />
+                  </Part>
+                  <Part>
+                    <Toggle
+                      label="Show Wallpaper"
+                      value={p.appearance.wallpaper}
+                      onChange={(wallpaper) => setAppearance({ wallpaper })}
+                    />
+                    <Line
+                      label="Remove Wallpaper"
+                      tone="danger"
+                      onPress={() => setAppearance({ wallpaper: false, wallpaperObject: null })}
+                    />
+                  </Part>
+                </>
               ) : null}
               <PillButton
                 label={p.appearance.wallpaperObject ? "Choose New Photo" : "Choose Photo"}
@@ -377,7 +368,6 @@ export default function Section() {
                       setAppearance({
                         wallpaper: true,
                         wallpaperObject: objectId,
-                        wallpaperBlur: 0,
                       });
                   })
                 }

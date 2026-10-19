@@ -48,18 +48,32 @@ export function Card({
   const palette = usePalette();
   const { card, wallpaper } = useCard();
   const shape = { borderRadius: radius, borderCurve: "continuous", overflow: "hidden" } as const;
+  /* The picture fades into the ground a little way down the page, and the
+     system's glass over that ground is the ground: a card there was text
+     floating on nothing. So the glass carries the card's own colour as its
+     tint — through it the picture still shows, on the bare ground it is the
+     card — and a hairline edge, which is what the eye reads as an object. */
   if (wallpaper && glassy)
     return (
       <GlassView
         glassEffectStyle="regular"
         colorScheme={palette.dark ? "dark" : "light"}
-        style={[shape, style]}
+        tintColor={tint(palette)}
+        style={[
+          shape,
+          { borderWidth: StyleSheet.hairlineWidth, borderColor: edge(palette) },
+          style,
+        ]}
       >
         {children}
       </GlassView>
     );
   return <View style={[shape, { backgroundColor: card }, style]}>{children}</View>;
 }
+
+const tint = (palette: Palette) =>
+  /^#[\da-f]{6}$/i.test(palette.paper) ? `${palette.paper}b3` : undefined;
+const edge = (palette: Palette) => (palette.dark ? "#ffffff1f" : "#00000014");
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
