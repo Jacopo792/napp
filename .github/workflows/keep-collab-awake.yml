@@ -78,6 +78,10 @@ jobs:
       - name: Ping the collaboration server for the rest of the window
         run: |
           fail=0
+          # A firing delayed past midnight is outside the window, and to it
+          # "today 23:00" is the coming evening: it pinged until the ceiling,
+          # six hours of the budget overnight (00:11–05:52 on 20 October).
+          if [ "$(date -u +%-H)" -lt 6 ]; then exit 0; fi
           # The window closes at 23:00 UTC; a job is killed at six hours. Stop
           # at whichever comes first, with twenty minutes in hand so the run
           # ends rather than being cut off mid-ping.

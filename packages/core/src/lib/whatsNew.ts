@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.45",
+    date: "2026-10-20",
+    headline: "The server rests at night",
+    sections: [
+      {
+        heading: "Behind the scenes",
+        items: [
+          {
+            title: "No more keeping the server up overnight",
+            text: "A late check after midnight kept Napp's server awake until dawn, spending hours the free plan needs for the day. It now leaves it to sleep, so notes keep opening quickly when you write.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.44",
     date: "2026-10-19",
     headline: "No comment without words",

@@ -3,6 +3,12 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.45 — 2026-10-20
+
+### Fixed
+
+- `keep-collab-awake.yml`: a scheduled firing delayed past midnight UTC read `today 23:00` as the coming evening and pinged until the ~5.7-hour ceiling (run 159, 00:11–05:52), outside the 06:00–22:59 window and against the 750 free instance-hours. The loop now exits at once before 06:00 UTC.
+
 ## 0.9.44 — 2026-10-19
 
 ### Fixed
