@@ -22,9 +22,10 @@ import {
   subscribeToAccountPreferences,
   type AccountPreferences,
 } from "@/lib/accountPreferences";
-import { APPEARANCE_PRESETS, DEFAULT_APPEARANCE, setAppearance } from "@/lib/appearance";
-import { setAxes } from "@/lib/axes";
-import { setWritingPreferences } from "@/lib/writingPreferences";
+import { APPEARANCE_PRESETS, currentAppearance, setAppearance } from "@/lib/appearance";
+import { phonePreferences as phoneView } from "@/lib/preferenceShape";
+import { currentAxes, setAxes } from "@/lib/axes";
+import { currentWritingPreferences, setWritingPreferences } from "@/lib/writingPreferences";
 import {
   pauseAccount as leaveForAccount,
   resumeAccount,
@@ -171,9 +172,11 @@ export function ArchiveProvider({
       preferencesRef.current = row;
       const next = phoneView(row);
       setPreferences(next);
-      setAppearance(next.appearance);
-      setAxes(next.axes);
-      setWritingPreferences(next.writing);
+      if (JSON.stringify(currentAppearance()) !== JSON.stringify(next.appearance))
+        setAppearance(next.appearance);
+      if (JSON.stringify(currentAxes()) !== JSON.stringify(next.axes)) setAxes(next.axes);
+      if (JSON.stringify(currentWritingPreferences()) !== JSON.stringify(next.writing))
+        setWritingPreferences(next.writing);
       setPreferencesReady(true);
     };
     void pullAccountPreferences(session).then(adopt, (reason) => live && setError(String(reason)));
@@ -442,17 +445,6 @@ export function ArchiveProvider({
     ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
-}
-
-/** The account's preferences as the phone wears them: its own look where it
- *  has chosen one, the defaults until then — never the computer's, wallpaper
- *  included. */
-function phoneView(row: AccountPreferences): AccountPreferences {
-  return {
-    ...row,
-    appearance: { ...(row.phone?.appearance ?? DEFAULT_APPEARANCE), folderColour: "auto" },
-    axes: { size: 17, measure: 68, weight: 400, leading: 1.55, face: "system" },
-  };
 }
 
 export interface Palette {

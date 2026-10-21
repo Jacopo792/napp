@@ -23,10 +23,13 @@ const custom = shape.accountPreferences(
   {},
   { appearance: { ...DEFAULT_APPEARANCE, background: "#abcdef" } },
 );
-function fixture() {
+function fixture(kind: "desktop" | "mobile" = "desktop") {
   let appearance = { ...DEFAULT_APPEARANCE };
   let axes = { ...DEFAULT_AXES };
   let writing = { ...DEFAULT_WRITING_PREFERENCES };
+  const appearances: (typeof appearance)[] = [];
+  const downloads: string[] = [];
+  const adopted: Blob[] = [];
   const writes: { user_id: string; preferences: shape.AccountPreferences }[] = [];
   const timers = new Map<number, () => void>();
   const storage = new Map<string, string>();
@@ -77,6 +80,7 @@ function fixture() {
     },
     require: (name: string) => {
       if (name === "./preferenceShape.ts") return shape;
+      if (name === "../platform") return { platform: () => ({ kind }) };
       if (name === "./supabaseClient")
         return {
           supabase,
@@ -90,8 +94,12 @@ function fixture() {
           currentAppearance: () => appearance,
           setAppearance: (value: typeof appearance) => {
             appearance = value;
+            appearances.push(value);
           },
           wallpaperBlob: async () => null,
+          adoptWallpaper: async (blob: Blob) => {
+            adopted.push(blob);
+          },
         };
       if (name === "./axes")
         return {
@@ -115,7 +123,14 @@ function fixture() {
         return { loadAutocorrectPreference: () => true, saveAutocorrectPreference: () => {} };
       if (name === "./autoLock") return { loadAutoLock: () => 0, saveAutoLock: () => {} };
       if (name === "./whatsNew.ts") return { localWhatsNewSeen: () => "" };
-      if (["./archiveAssets", "./image"].includes(name)) return {};
+      if (name === "./archiveAssets")
+        return {
+          downloadObject: async (_session: unknown, id: string) => {
+            downloads.push(id);
+            return new Blob([id]);
+          },
+        };
+      if (name === "./image") return {};
       throw new Error(`Unexpected dependency ${name}`);
     },
   });
@@ -125,6 +140,9 @@ function fixture() {
     timers,
     controls,
     appearance: () => appearance,
+    appearances,
+    downloads,
+    adopted,
     receive: (preferences: shape.AccountPreferences) => receive?.({ new: { preferences } }),
   };
 }
@@ -168,4 +186,122 @@ test("a refused preference flush keeps the current account and its pending value
   f.controls.fail = true;
   await assert.rejects(f.api.releaseAccountPreferences(session), /Write refused/);
   assert.equal(f.api.localPreferences({}, session.userId).collaborators, false);
+});
+
+test("phone pulls and foreground refreshes never apply the desktop look", async () => {
+  const f = fixture("mobile");
+  const row = {
+    ...custom,
+    appearance: {
+      ...custom.appearance,
+      theme: "light" as const,
+      wallpaper: true,
+      wallpaperObject: "desktop-picture",
+    },
+    phone: {
+      appearance: {
+        ...DEFAULT_APPEARANCE,
+        theme: "dark" as const,
+        accent: "#c4643f",
+        wallpaper: true,
+        wallpaperObject: "phone-picture",
+      },
+    },
+  };
+  f.controls.read = Promise.resolve({ data: { preferences: row }, error: null });
+  const first = await f.api.pullAccountPreferences(session);
+  // The native provider can legitimately skip an unchanged row on wake.
+  assert.equal(JSON.stringify(await f.api.pullAccountPreferences(session)), JSON.stringify(first));
+  assert.equal(f.appearances.length, 1);
+  for (const applied of f.appearances) {
+    assert.equal(applied.theme, "dark");
+    assert.equal(applied.accent, "#c4643f");
+    assert.equal(applied.wallpaperObject, "phone-picture");
+  }
+  assert.equal(f.downloads.length, 0);
+  assert.equal(f.adopted.length, 0);
+  // Selecting the phone view must not mutate the account's desktop branch.
+  assert.equal(first.appearance.wallpaperObject, "desktop-picture");
+});
+
+test("desktop Realtime changes leave the phone theme and wallpaper intact", async () => {
+  const f = fixture("mobile");
+  await f.api.pullAccountPreferences(session);
+  let heard = 0;
+  f.api.subscribeToAccountPreferences(session, () => {
+    heard += 1;
+  });
+  f.receive({
+    ...custom,
+    appearance: {
+      ...custom.appearance,
+      theme: "light",
+      wallpaper: true,
+      wallpaperObject: "desktop-changed",
+    },
+    collaborators: false,
+  });
+  assert.equal(heard, 1);
+  assert.equal(f.appearances.length, 1);
+  assert.equal(f.appearance().theme, custom.phone!.appearance!.theme);
+  assert.equal(f.appearance().background, "#abcdef");
+  assert.equal(f.appearance().wallpaperObject, null);
+  assert.equal(f.downloads.length, 0);
+  // Other account preferences still sync, and subsequent native writes retain
+  // the latest desktop branch rather than restoring its stale cached values.
+  const current = f.api.localPreferences({}, session.userId);
+  assert.equal(current.collaborators, false);
+  assert.equal(current.appearance.wallpaperObject, "desktop-changed");
+  f.api.pushAccountPreferences(session, { ...current, collaborators: true });
+  await f.api.releaseAccountPreferences(session);
+  assert.equal(f.writes[0].preferences.appearance.wallpaperObject, "desktop-changed");
+  assert.equal(f.writes[0].preferences.phone?.appearance?.background, "#abcdef");
+});
+
+test("a phone without its own look uses defaults instead of the desktop wallpaper", async () => {
+  const f = fixture("mobile");
+  f.controls.read = Promise.resolve({
+    data: {
+      preferences: {
+        ...custom,
+        phone: undefined,
+        appearance: {
+          ...custom.appearance,
+          theme: "light" as const,
+          wallpaper: true,
+          wallpaperObject: "desktop-only",
+        },
+      },
+    },
+    error: null,
+  });
+  await f.api.pullAccountPreferences(session);
+  assert.equal(f.appearance().theme, DEFAULT_APPEARANCE.theme);
+  assert.equal(f.appearance().wallpaper, false);
+  assert.equal(f.appearance().wallpaperObject, null);
+  assert.equal(f.downloads.length, 0);
+});
+
+test("desktop still applies and downloads its own wallpaper, independently of phone look", async () => {
+  const f = fixture();
+  f.controls.read = Promise.resolve({
+    data: {
+      preferences: {
+        ...custom,
+        appearance: {
+          ...custom.appearance,
+          theme: "light" as const,
+          wallpaper: true,
+          wallpaperObject: "desktop-only",
+        },
+      },
+    },
+    error: null,
+  });
+  await f.api.pullAccountPreferences(session);
+  assert.equal(f.appearance().theme, "light");
+  assert.equal(f.appearance().wallpaperObject, "desktop-only");
+  assert.equal(f.downloads[0], "desktop-only");
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(f.adopted.length, 1);
 });

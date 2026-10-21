@@ -29,6 +29,7 @@
  * the browser — with no way to clear it but opening every note again. So they
  * travel in the blob, and they are the one field in it that is not
  * last-write-wins; see `mergeRemarksSeen`. */
+import { platform } from "../platform";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   loadAutocorrectPreference,
@@ -56,6 +57,7 @@ import {
   flagsOf,
   mergeAccountPreferences,
   mergeRemarksSeen,
+  phonePreferences,
   type AccountFlags,
   type AccountPreferences,
   type RemarksSeen,
@@ -197,9 +199,12 @@ function holdRemarksSeen(userId: string, seen: RemarksSeen): void {
  *  are the same ones Settings calls, so applying is one code path and not a
  *  second copy of "what a preference does when it changes". */
 function apply(preferences: AccountPreferences): void {
-  setAppearance(preferences.appearance);
-  setAxes(preferences.axes);
-  setWritingPreferences(preferences.writing);
+  const look = platform().kind === "mobile" ? phonePreferences(preferences) : preferences;
+  if (JSON.stringify(currentAppearance()) !== JSON.stringify(look.appearance))
+    setAppearance(look.appearance);
+  if (JSON.stringify(currentAxes()) !== JSON.stringify(look.axes)) setAxes(look.axes);
+  if (JSON.stringify(currentWritingPreferences()) !== JSON.stringify(preferences.writing))
+    setWritingPreferences(preferences.writing);
   saveProofreaderPreference(preferences.proofreader);
   saveAutocorrectPreference(preferences.autocorrect);
   saveAutoLock(preferences.autoLock);
@@ -244,6 +249,8 @@ function holdWallpaper(objectId: string | null): void {
 let sharingWallpaper = false;
 
 async function shareWallpaper(session: AppSession): Promise<void> {
+  // Native Settings uploads its own picture; browser wallpaper bytes are unrelated.
+  if (platform().kind === "mobile") return;
   const appearance = currentAppearance();
   if (!appearance.wallpaper || appearance.wallpaperObject || sharingWallpaper) return;
   sharingWallpaper = true;
@@ -269,6 +276,9 @@ async function uploadWallpaper(session: AppSession): Promise<void> {
 }
 
 async function collectWallpaper(session: AppSession, objectId: string | null): Promise<void> {
+  // The native backdrop loads phone.appearance.wallpaperObject itself. Never
+  // download or adopt the desktop picture into the phone's shared stores.
+  if (platform().kind === "mobile") return;
   if (!objectId || objectId === heldWallpaper()) return;
   const version = generation;
   const blob = await downloadObject(session, objectId, "image/webp");
@@ -440,6 +450,7 @@ export function subscribeToAccountPreferences(
         if (blob === settled) return;
         settled = blob;
         phoneLook = preferences.phone;
+        held = preferences;
         apply(preferences);
         holdRemarksSeen(session.userId, preferences.remarksSeen);
         void collectWallpaper(session, preferences.appearance.wallpaperObject).catch(

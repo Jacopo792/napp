@@ -972,6 +972,16 @@ preview and acts in the `useChoice` sheet from a gesture-handler long press,
 because inside a folder card the card's own push takes the touch from a plain
 responder first. Reanimated still owns the row under the finger.
 
+**Phone appearance must be selected before applying shared preferences.** Both
+`pullAccountPreferences` (including foreground refreshes) and Realtime callbacks
+apply `phonePreferences` on the mobile platform, never the desktop appearance.
+The native provider uses the same projection. An unchanged row can skip its
+provider callback, so correcting the look only there is insufficient. Native
+wallpapers are uploaded by Settings and loaded by Backdrop; the shared browser
+wallpaper upload/download path must not run on mobile. Desktop changes preserve
+the phone branch, native changes preserve the latest desktop branch, and equal
+looks are not re-applied just because another preference changed.
+
 **Changing whose notes are shown keeps the native pages.** Home gives each
 member a memoised `MemberContent` in a permanently mounted, absolutely
 positioned view. Both pages stay laid out at full width; switching changes

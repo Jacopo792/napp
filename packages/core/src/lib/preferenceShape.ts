@@ -62,6 +62,16 @@ export interface AccountPreferences extends AccountFlags {
   phone?: PhoneLook;
 }
 
+/** The same phone view is used by the native provider and shared store
+ * application, including foreground refreshes and Realtime events. */
+export function phonePreferences(row: AccountPreferences): AccountPreferences {
+  return {
+    ...row,
+    appearance: { ...(row.phone?.appearance ?? DEFAULT_APPEARANCE), folderColour: "auto" },
+    axes: { size: 17, measure: 68, weight: 400, leading: 1.55, face: "system" },
+  };
+}
+
 /**
  * The later of two readings, note by note.
  *
