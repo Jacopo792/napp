@@ -973,10 +973,13 @@ because inside a folder card the card's own push takes the touch from a plain
 responder first. Reanimated still owns the row under the finger.
 
 **Changing whose notes are shown keeps the native pages.** Home gives each
-member a memoised `MemberContent` inside React's `Activity`: hidden pages are
-prepared at lower priority and retain their native note links, menus and
-folder views. Switching visibility must not remount every card or replay a
-staggered entrance. `WhoseSwitch` moves its plate on the UI thread in 220 ms;
+member a memoised `MemberContent` in a permanently mounted, absolutely
+positioned view. Both pages stay laid out at full width; switching changes
+opacity, hit testing and accessibility visibility, while the outer scroll
+container takes the selected page's measured height. Do not use `Activity`
+here: it disconnects/reconnects effects on each switch; that version made
+switching worse on the physical iPhone. Do not use `display:none` or remount
+cards/replay staggered entrances when changing member. `WhoseSwitch` moves its plate on the UI thread in 220 ms;
 the press and the selected prop share one target, so neither restarts the
 other's spring. Do not synchronously read shared values on the JS thread in
 this path. The preview has populated catalogues for both members, including

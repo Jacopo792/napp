@@ -9,7 +9,7 @@
  * A folder card swipes as a note row does, with its own pair: right to remove
  * the folder (its notes stay, unfiled), left to file everything in it away.
  * Its ⋯ and a long press offer the rest. */
-import { Activity, memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import Animated from "react-native-reanimated";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,6 +75,7 @@ export default function Home() {
     a.isSelf === b.isSelf ? 0 : a.isSelf ? -1 : 1,
   );
   const [showing, setShowing] = useState<string | null>(null);
+  const [heights, setHeights] = useState<Record<string, number>>({});
   const shown = members.find((member) => member.userId === showing) ?? members[0];
   const nameOf = (member: (typeof members)[number]) =>
     member.isSelf ? "You" : member.nickname || "Partner";
@@ -151,21 +152,41 @@ export default function Home() {
           <SkeletonCard rows={3} />
         </>
       ) : (
-        <Animated.View entering={arrival}>
-          {members.map((member) => (
-            <Activity key={member.userId} mode={member.userId === owner ? "visible" : "hidden"}>
-              <MemberContent owner={member.userId} />
-            </Activity>
-          ))}
+        <Animated.View entering={arrival} style={{ height: heights[owner] ?? 0 }}>
+          {members.map((member) => {
+            const visible = member.userId === owner;
+            return (
+              <View
+                key={member.userId}
+                collapsable={false}
+                pointerEvents={visible ? "auto" : "none"}
+                accessibilityElementsHidden={!visible}
+                importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+                style={[styles.memberPage, { opacity: visible ? 1 : 0 }]}
+                onLayout={(event) => {
+                  const height = event.nativeEvent.layout.height;
+                  setHeights((previous) =>
+                    previous[member.userId] === height
+                      ? previous
+                      : { ...previous, [member.userId]: height },
+                  );
+                }}
+              >
+                <MemberContent owner={member.userId} />
+              </View>
+            );
+          })}
         </Animated.View>
       )}
     </TabPage>
   );
 }
 
-/* Each member's native cards are retained. Switching changes Activity
- * visibility rather than rebuilding Link previews, menus and folder views on
- * the tap. Hidden pages are prepared at lower priority by React. */
+/* Keep the native trees laid out at full width. Activity disconnects and
+ * reconnects effects when switching, including native preview registrations;
+ * display:none also invalidates their layout. Opacity leaves both intact.
+ * Only the selected page contributes its measured height to the scroll view.
+ * The inactive page receives neither touches nor accessibility focus. */
 const MemberContent = memo(function MemberContent({ owner }: { owner: string }) {
   const prompt = useTextPrompt();
   const choose = useChoice();
@@ -470,6 +491,7 @@ function Arrow() {
 }
 
 const styles = StyleSheet.create({
+  memberPage: { position: "absolute", top: 0, left: 0, right: 0 },
   whoseRow: { marginHorizontal: 16, marginTop: 2, marginBottom: 22 },
   continue: { marginHorizontal: 16, marginBottom: 16 },
   continueCard: { padding: 18, gap: 6 },
