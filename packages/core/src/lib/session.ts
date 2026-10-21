@@ -239,6 +239,61 @@ function saveAccounts(list: SavedAccount[]): void {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
 }
 
+/* A saved account's copy of its tokens has to follow every rotation, whoever
+   caused it. A refresh is a rotation: the old refresh token is spent, and
+   presenting it again after the reuse window is a reuse, which Supabase
+   answers by revoking the whole family — the live session included. The copy
+   used to be written only when the account was left, so any refresh after
+   that (a launch, a `getSession` on the sign-in page, the account coming back
+   in `resumeAccount`) left a spent token on the shelf, and the next return to
+   that account killed it. Following the client's own announcements keeps the
+   shelf on the token the SDK holds. */
+supabase.auth.onAuthStateChange((event, next) => {
+  if (!next?.user || (event !== "TOKEN_REFRESHED" && event !== "SIGNED_IN")) return;
+  const list = savedAccounts();
+  const saved = list.find((a) => a.userId === next.user.id);
+  if (!saved || saved.refreshToken === next.refresh_token) return;
+  saved.accessToken = next.access_token;
+  saved.refreshToken = next.refresh_token;
+  saveAccounts(list);
+});
+
+/** The server has refused this account's token: only its password brings it
+ *  back. Carries the address so the sign-in page can be filled in for it. */
+export class SignInAgain extends Error {
+  constructor(readonly email: string) {
+    super(`Sign in to ${email} again`);
+    this.name = "SignInAgain";
+  }
+}
+
+/** Forgets an account saved on this device. Its tokens go with it. */
+export function forgetAccount(userId: string): void {
+  saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
+}
+
+/** The phone's archives for an account, believed only when they are there.
+ *  Row level security answers a request that carries no token for this
+ *  account — the SDK's refresh failed, or the session is gone — with no rows
+ *  rather than an error, and "no archives" was then shown to somebody who had
+ *  twelve notes. An empty list is checked against who the server says is
+ *  signed in: the same account reads again (`getUser` has refreshed by now),
+ *  nobody is a password to ask for, and a dropped connection is said. */
+export async function notesArchives(account: {
+  userId: string;
+  email: string;
+}): Promise<ArchiveOption[]> {
+  const archives = await loadArchiveOptions(account.userId, { notesOnly: true });
+  if (archives.length) return archives;
+  const { data, error } = await supabase.auth.getUser();
+  if (data.user?.id === account.userId)
+    return loadArchiveOptions(account.userId, { notesOnly: true });
+  if (error && !refusedToken(error)) throw new Error("Couldn't reach the server. Try again");
+  localStorage.removeItem(SESSION_KEY);
+  forgetAccount(account.userId);
+  throw new SignInAgain(account.email);
+}
+
 function currentAppSession(): AppSession | null {
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
@@ -247,16 +302,15 @@ function currentAppSession(): AppSession | null {
   }
 }
 
-/** The signed-in account's tokens, taken now because they rotate. */
-async function stashCurrent(strict = false): Promise<void> {
+/** The signed-in account's tokens, taken now because they rotate. A session
+ *  the SDK no longer holds for this account has nothing worth keeping, and
+ *  saying so used to stop Add Account and every switch — the one way out of a
+ *  dead session was closed by it. */
+async function stashCurrent(): Promise<void> {
   const app = currentAppSession();
-  const { data } = await supabase.auth.getSession();
   if (!app) return;
-  if (!data.session || (strict && data.session.user?.id !== app.userId)) {
-    if (strict)
-      throw new Error("Session expired. Sign in again before adding or switching accounts.");
-    return;
-  }
+  const { data } = await supabase.auth.getSession();
+  if (!data.session || data.session.user?.id !== app.userId) return;
   saveAccounts([
     ...savedAccounts().filter((a) => a.userId !== app.userId),
     {
@@ -287,7 +341,7 @@ export async function addAccount(): Promise<void> {
  * revokes it on the server, which would make the saved account unusable. */
 export async function pauseAccount(): Promise<void> {
   await supabase.auth.stopAutoRefresh();
-  await stashCurrent(true);
+  await stashCurrent();
   localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();
   await clearNoteStore();
@@ -302,7 +356,7 @@ export async function resumeAccount(
      just saved, and the next return to this account is then a reuse that
      Supabase answers by revoking it: "sign in again". */
   await supabase.auth.stopAutoRefresh();
-  await stashCurrent(true);
+  await stashCurrent();
   const target = savedAccounts().find((a) => a.userId === userId);
   if (!target) throw new Error("That account is no longer saved");
   // The SDK may have rotated this account since it was saved (including on restart).
@@ -317,12 +371,14 @@ export async function resumeAccount(
   if (error || data.user?.id !== userId) {
     if (!error || !refusedToken(error))
       throw new Error(`Couldn't reach ${target.email}. Try again`);
-    saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
-    throw new Error(`Sign in to ${target.email} again`);
+    forgetAccount(userId);
+    throw new SignInAgain(target.email);
   }
   // Once auth changes, no old archive may remain associated with it, even if a read fails.
   localStorage.removeItem(SESSION_KEY);
-  const archives = await loadArchiveOptions(userId, selection);
+  const archives = selection.notesOnly
+    ? await notesArchives({ userId, email: target.email })
+    : await loadArchiveOptions(userId, selection);
   const archive = archives.find((item) => item.archiveId === target.archiveId) ?? archives[0];
   resetArchiveCache();
   await clearNoteStore();

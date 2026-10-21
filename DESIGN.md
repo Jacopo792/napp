@@ -238,3 +238,17 @@ application and a page that has been given a frame.
 - Motion is restrained. Opening a note uses the single authored entrance: a 420 ms fade with a 4 px upward settle. Ordinary state changes use short color transitions. The full-size image view fades its scrim in over 220 ms while the picture settles up from 4 px; the phone's maintenance sheet rises from the bottom edge over 320 ms.
 - Respect `prefers-reduced-motion`: remove page entrance and skeleton pulsing. Never make motion necessary to understand save, selection, or deletion state.
 - Animate `transform` and `opacity`, and nothing else that runs per frame. A scaled entrance on text re-rasterises every glyph, and `filter: blur(0)` still promotes a layer and still costs a pass — the wallpaper declares `filter: none` when there is no blur rather than a blur of zero.
+
+## Napp identity — 21 October 2026
+
+Use the designer-supplied black tile with a white arch and five horizontal
+lines. The original reference and scalable source are in `docs/branding/`.
+Preserve its proportions and black/white colours. Native app icons, adaptive
+icons, splash and launch, web favicons and installed web-app icons, desktop
+resources and both sign-in surfaces share it. The logo conveys identity,
+not the security properties of the notes.
+
+Mobile swipe actions are quiet labelled paper tabs with continuous corners
+and a hairline rule, in the current palette. Only destructive actions use
+danger ink. No bright circular buttons, bouncing discs or presence pulses.
+Do not repeat a date in a row when its group already names that date.

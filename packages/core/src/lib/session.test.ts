@@ -22,6 +22,10 @@ function accountFlow(
     expired?: boolean;
     offline?: boolean;
     readError?: boolean;
+    /** The first membership read carries no token: RLS answers with no rows. */
+    emptyOnce?: boolean;
+    /** The server no longer knows this session. */
+    lost?: boolean;
   } = {},
 ) {
   const calls: { name: string; token?: string }[] = [];
@@ -29,13 +33,22 @@ function accountFlow(
   const archiveIds = options.archives?.map((archive) => archive.id) ?? ["personal"];
   let activeUser = user;
   let tokens = { access_token: "current-access", refresh_token: "current-refresh" };
+  let listener: (event: string, session: unknown) => void = () => {};
+  let emptyReads = options.emptyOnce ? 1 : 0;
   const authData = { data: { user, session: options.confirmation ? null : {} }, error: null };
   const supabase = {
     auth: {
       signUp: async () => authData,
       signInWithPassword: async () => authData,
       getSession: async () => ({ data: { session: { ...tokens, user: activeUser } } }),
-      getUser: async () => ({ data: { user: activeUser }, error: null }),
+      getUser: async () =>
+        options.lost
+          ? { data: { user: null }, error: { message: "Auth session missing!", status: 400 } }
+          : { data: { user: activeUser }, error: null },
+      onAuthStateChange: (callback: typeof listener) => {
+        listener = callback;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
       stopAutoRefresh: async () => {
         calls.push({ name: "pause-refresh" });
       },
@@ -66,7 +79,10 @@ function accountFlow(
         select: () => query,
         eq: () => query,
         order: async () => ({
-          data: archiveIds.map((archive_id) => ({ archive_id, created_at: "2026-10-04" })),
+          data: (emptyReads-- > 0 ? [] : archiveIds).map((archive_id) => ({
+            archive_id,
+            created_at: "2026-10-04",
+          })),
           error: null,
         }),
         in: async () => ({
@@ -112,7 +128,12 @@ function accountFlow(
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
-  return { api: exports, calls, storage };
+  return {
+    api: exports,
+    calls,
+    storage,
+    announce: (event: string, session: unknown) => listener(event, session),
+  };
 }
 
 test("invited registration claims the invitation and returns both archives for selection", async () => {
@@ -282,4 +303,53 @@ test("a membership read failure after auth changes cannot leave the old archive 
   saveSecond(flow.storage);
   await assert.rejects(flow.api.resumeAccount("second", { notesOnly: true }), /Unavailable/);
   assert.equal(flow.storage.has("session"), false);
+});
+
+test("a refresh after the account was left is followed onto the shelf", async () => {
+  const flow = accountFlow();
+  saveSecond(flow.storage);
+  flow.announce("TOKEN_REFRESHED", {
+    user: { id: "second" },
+    access_token: "next-access",
+    refresh_token: "next-refresh",
+  });
+  const [saved] = JSON.parse(flow.storage.get("napp:accounts")!);
+  assert.equal(saved.refreshToken, "next-refresh");
+  flow.announce("TOKEN_REFRESHED", {
+    user: { id: "stranger" },
+    access_token: "x",
+    refresh_token: "y",
+  });
+  assert.equal(JSON.parse(flow.storage.get("napp:accounts")!).length, 1);
+});
+test("no rows read without a token is read again, never shown as no archives", async () => {
+  const flow = accountFlow({ emptyOnce: true });
+  const archives = await flow.api.notesArchives({ userId: user.id, email: user.email });
+  assert.deepEqual(
+    Array.from(archives, (item) => item.archiveId),
+    ["personal"],
+  );
+});
+test("a session the server no longer knows asks for that account's password", async () => {
+  const flow = accountFlow({ emptyOnce: true, lost: true });
+  flow.storage.set(
+    "session",
+    JSON.stringify({ userId: user.id, email: user.email, archiveId: "personal" }),
+  );
+  await assert.rejects(
+    flow.api.notesArchives({ userId: user.id, email: user.email }),
+    (reason: Error & { email?: string }) =>
+      reason.name === "SignInAgain" && reason.email === user.email,
+  );
+  assert.equal(flow.storage.has("session"), false);
+});
+test("adding an account from a dead session still reaches the sign-in page", async () => {
+  const flow = accountFlow();
+  flow.storage.set(
+    "session",
+    JSON.stringify({ userId: "gone", email: "gone@example.invalid", archiveId: "personal" }),
+  );
+  await flow.api.pauseAccount();
+  assert.equal(flow.storage.has("session"), false);
+  assert.equal(flow.storage.has("napp:accounts"), false);
 });

@@ -1,0 +1,24 @@
+diff --git a/ios/LinkPreview/LinkPreviewNativeView.swift b/ios/LinkPreview/LinkPreviewNativeView.swift
+index 1b7d9be178f9487ea97f93540aeaebf37872ca2a..aa3db7d1d137c40b04f33430586ad288125321a3 100644
+--- a/ios/LinkPreview/LinkPreviewNativeView.swift
++++ b/ios/LinkPreview/LinkPreviewNativeView.swift
+@@ -113,7 +113,9 @@ class NativeLinkPreviewView: RouterViewWithLogger, UIContextMenuInteractionDeleg
+     _ interaction: UIContextMenuInteraction,
+     configurationForMenuAtLocation location: CGPoint
+   ) -> UIContextMenuConfiguration? {
+-    cancelReactNativeTouches()
++    // Napp: not here. UIKit asks for the configuration as soon as a press is
++    // held (~0.15 s), well before it knows whether it is a tap: cancelling
++    // React Native's touches now ate every ordinary finger tap on a link.
+     linkPreviewNativeNavigation.beginInteraction()
+     onWillPreviewOpen()
+     return UIContextMenuConfiguration(
+@@ -155,6 +157,8 @@ class NativeLinkPreviewView: RouterViewWithLogger, UIContextMenuInteractionDeleg
+   ) {
+     // This happens when preview starts to become visible.
+     // It is not yet fully extended at this moment though
++    // Napp: the press has become a menu, so it is no longer a tap.
++    cancelReactNativeTouches()
+     self.onDidPreviewOpen()
+     animator?.addCompletion {
+       // This happens around a second after the preview is opened and thus gives us no real value

@@ -5,7 +5,7 @@
  * is a new id, so nothing here ever needs invalidating. */
 import { useEffect, useState } from "react";
 import { Image, Text, View } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { avatarInitials } from "@/lib/avatarInitials";
 import { downloadAvatar } from "@/lib/supabase";
 import { usePalette } from "./archive";
@@ -85,10 +85,12 @@ export function Avatar({
   email,
   size = 30,
   ring,
+  neutral = false,
 }: {
   face: Face;
   email?: string;
   size?: number;
+  neutral?: boolean;
   /** The ground the face stands on, drawn as a ring where faces overlap. */
   ring?: string;
 }) {
@@ -126,7 +128,7 @@ export function Avatar({
           borderRadius: size / 2,
           borderWidth: border,
           borderColor: ring,
-          backgroundColor: disc,
+          backgroundColor: neutral ? palette.page : disc,
           alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
@@ -134,7 +136,7 @@ export function Avatar({
       >
         <Text
           style={{
-            color: letters,
+            color: neutral ? palette.ink2 : letters,
             fontSize: size * 0.42,
             fontWeight: "600",
             letterSpacing: -0.2,
@@ -161,8 +163,7 @@ export function Avatar({
         ) : null}
       </View>
       {online ? (
-        <Animated.View
-          entering={ZoomIn.duration(220)}
+        <View
           style={{
             position: "absolute",
             right: -1,

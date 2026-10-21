@@ -129,16 +129,108 @@ setPlatform({
   },
 });
 
+/* The picture the app's viewer is showing, and the place it came out of. It
+   is hidden from the note once the viewer has drawn its copy over it, so the
+   picture is seen to leave rather than to be duplicated, and it comes back
+   when the copy has flown home. */
+let shown: HTMLImageElement | null = null;
+async function openImage(noteId: string, image: HTMLImageElement, src: string, alt: string) {
+  const blob = await (await fetch(src)).blob();
+  const uri = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  /* Where the picture itself is drawn: `object-fit: contain` leaves bands in
+     the element's box when the picture is taller than the cap. */
+  const box = image.getBoundingClientRect();
+  const width = image.naturalWidth || box.width;
+  const height = image.naturalHeight || box.height;
+  const scale = Math.min(box.width / width, box.height / height);
+  shown?.style.removeProperty("visibility");
+  shown = image;
+  post({
+    kind: "image",
+    noteId,
+    uri,
+    alt,
+    width,
+    height,
+    editable: image.closest(".rich-media-image")?.querySelector(".rich-media-remove") !== null,
+    rect: {
+      x: box.left + (box.width - width * scale) / 2,
+      y: box.top + (box.height - height * scale) / 2,
+      width: width * scale,
+      height: height * scale,
+    },
+  });
+}
+function imageCommand(action: "shown" | "closed" | "markup" | "remove") {
+  const image = shown;
+  if (!image) return;
+  if (action === "shown") image.style.visibility = "hidden";
+  else image.style.removeProperty("visibility");
+  if (action === "closed" || action === "shown") {
+    if (action === "closed") shown = null;
+    return;
+  }
+  shown = null;
+  const frame = image.closest(".rich-media-image");
+  frame
+    ?.querySelector<HTMLButtonElement>(
+      action === "markup" ? ".rich-media-remove.is-ink" : ".rich-media-remove:not(.is-ink)",
+    )
+    ?.click();
+}
+
+/* The current match of Find in Note, brought to the middle of what the
+   keyboard and the find bar leave of the page. The page cannot see the
+   app's keyboard, so the bottom of that space is the share of the screen a
+   phone keyboard and the bar above it leave. */
+/* The current match is the one being read: Notes and Safari draw it solid
+   yellow under dark ink, the others only tinted. */
+const findStyle = document.createElement("style");
+findStyle.textContent =
+  ".rich-text-content .find-and-replace-result-current{background:var(--tint-yellow);color:#1c1c1e;box-shadow:0 0 0 2px var(--tint-yellow)}";
+document.head.appendChild(findStyle);
+function centreMatch() {
+  const match = document.querySelector(".find-and-replace-result-current");
+  if (!match) return;
+  const box = match.getBoundingClientRect();
+  const top =
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--host-top")) || 0;
+  // ponytail: estimated keyboard edge; pass the real one in the command if it ever misses.
+  const bottom = window.innerHeight * 0.55;
+  let scroller = match.parentElement;
+  while (
+    scroller &&
+    !(
+      scroller.scrollHeight > scroller.clientHeight &&
+      /(auto|scroll)/.test(getComputedStyle(scroller).overflowY)
+    )
+  )
+    scroller = scroller.parentElement;
+  (scroller ?? document.scrollingElement ?? document.documentElement).scrollBy({
+    top: box.top + box.height / 2 - (top + bottom) / 2,
+    behavior: "smooth",
+  });
+}
+
 function Page() {
   const [opening, setOpening] = useState(window.napp);
   const editor = useRef<HostedController>(null);
   window.nappCommand = (id, command) => {
     const execute = async () => {
+      if (command.type === "image") return imageCommand(command.action);
       if (!editor.current) throw new Error("The note is still loading");
-      return editor.current.execute(command);
+      const value = await editor.current.execute(command);
+      if (["search", "nextMatch", "previousMatch"].includes(command.type))
+        requestAnimationFrame(centreMatch);
+      return value;
     };
     void execute().then(
-      (value) => post({ kind: "result", id, value }),
+      (value) => post({ kind: "result", id, value: value ?? null }),
       (error: unknown) =>
         post({ kind: "result", id, error: error instanceof Error ? error.message : String(error) }),
     );
@@ -172,6 +264,7 @@ function Page() {
       onOpenNote={(target) => post({ kind: "link", noteId, target })}
       onOpenLink={() => post({ kind: "linkPrompt", noteId })}
       onOpenComment={(threadId) => post({ kind: "commentOpen", noteId, threadId })}
+      onOpenImage={(image, src, alt) => void openImage(noteId, image, src, alt).catch(() => {})}
       session={session}
       noteId={noteId}
       name={name}

@@ -23,7 +23,7 @@ import {
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import { platform } from "@/platform";
-import logoUrl from "../assets/logo-n-botanical-transparent.png";
+import logoUrl from "../assets/napp-logo.png";
 
 type Mode = "sign-in" | "sign-up";
 

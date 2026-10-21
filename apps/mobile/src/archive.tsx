@@ -29,6 +29,8 @@ import {
   pauseAccount as leaveForAccount,
   resumeAccount,
   chooseArchive,
+  notesArchives,
+  SignInAgain,
   type AuthenticationResult,
 } from "@/lib/session";
 import { loadSpaces, type Space } from "@/lib/spaces";
@@ -45,6 +47,7 @@ import {
   type Presence,
 } from "@/lib/presence";
 import { EMPTY_META, type Meta } from "@/lib/types";
+import { adoptArchiveCache, noteCache } from "@/lib/noteStore";
 import type { Face } from "./Avatar";
 
 interface Archive {
@@ -71,6 +74,8 @@ interface Archive {
    *  is only reading it, which on a note of yours says they changed it. Empty
    *  when the reader has turned "Collaborators in notes" off. */
   facesOf: (noteId: string) => Face[];
+  /** The first paint came from this phone's copy of the archive. */
+  warm: boolean;
 }
 
 const Context = createContext<Archive | null>(null);
@@ -94,7 +99,22 @@ export function ArchiveProvider({
   onAccountChange: (action: () => Promise<AuthenticationResult | null>) => Promise<void>;
   children: React.ReactNode;
 }) {
-  const [present, setPresent] = useState<Presence>(new Map());
+  const [present, setPresentState] = useState<Presence>(new Map());
+  /* Only the other members, and only when where they are has changed. The
+     channel says "sync" for every track, ours included — opening a note and
+     closing it was each a new Map, and so a render of every screen mounted
+     under the provider at the very moment the hand was reaching for the next
+     thing. Nothing reads where this account is; the faces are the others'. */
+  const setPresent = useCallback(
+    (next: Presence) =>
+      setPresentState((prev) => {
+        const others = new Map([...next].filter(([userId]) => userId !== session.userId));
+        if (others.size === prev.size && [...others].every(([id, at]) => prev.get(id) === at))
+          return prev;
+        return others;
+      }),
+    [session.userId],
+  );
   const [openNote, setOpenNote] = useState<string | null>(null);
   const noteRef = useRef(openNote);
   noteRef.current = openNote;
@@ -105,7 +125,13 @@ export function ArchiveProvider({
   const preferencesRef = useRef(localPreferences({}, session.userId));
   const [preferences, setPreferences] = useState(() => phoneView(preferencesRef.current));
   const [preferencesReady, setPreferencesReady] = useState(false);
-  const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(null);
+  /* What this phone saw of the archive last time, drawn at once and replaced
+     when Postgres answers: the launch waited ~6 s for a catalogue the phone
+     already had. Its notes also seed the core's note cache, so the first read
+     asks only for the payloads that moved — the phone has no IndexedDB to
+     keep them in as the web does. */
+  const [warm] = useState(() => warmUp(session));
+  const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(warm);
   const latest = useRef(snapshot);
   latest.current = snapshot;
   const revision = useRef(0);
@@ -136,6 +162,12 @@ export function ArchiveProvider({
     let live = true;
     const adopt = (row: AccountPreferences) => {
       if (!live) return;
+      /* Every wake pulls the row again; the same row is not a new look, and a
+         new appearance object is every screen redrawn and the page re-themed. */
+      if (JSON.stringify(row) === JSON.stringify(preferencesRef.current)) {
+        setPreferencesReady(true);
+        return;
+      }
       preferencesRef.current = row;
       const next = phoneView(row);
       setPreferences(next);
@@ -154,11 +186,23 @@ export function ArchiveProvider({
         const notes = next.filter((space) => space.kind !== "document");
         setSpaces(notes);
         if (!notes.length) {
+          /* Row level security answers a refused token with no rows, not an
+             error: asked again through the check that tells the two apart.
+             Archives after all is a stale read, left to the next one; a
+             refused token is the sign-in page, on this account's address. */
           void writes.current
-            .then(() =>
-              live
-                ? onAccountChange(async () => ({ session: null, account: session, archives: [] }))
-                : undefined,
+            .then(() => (live ? notesArchives(session) : null))
+            .then(
+              (archives) =>
+                live && archives && !archives.length
+                  ? onAccountChange(async () => ({ session: null, account: session, archives: [] }))
+                  : undefined,
+              (reason) =>
+                !live
+                  ? undefined
+                  : reason instanceof SignInAgain
+                    ? onAccountChange(() => Promise.reject(reason))
+                    : setError(reason instanceof Error ? reason.message : String(reason)),
             )
             .catch((reason) => live && setError(String(reason)));
           return;
@@ -221,7 +265,7 @@ export function ArchiveProvider({
       presenceChannel.current = null;
       void unsubscribeFromPresence(channel);
     };
-  }, [session, preferencesReady, preferences.presence, wake, active]);
+  }, [session, preferencesReady, preferences.presence, wake, active, setPresent]);
   useEffect(() => {
     if (presenceChannel.current) void announceNote(presenceChannel.current, session, openNote);
   }, [session, openNote]);
@@ -252,9 +296,15 @@ export function ArchiveProvider({
       await writes.current;
       if (!live || version !== revision.current) return;
       try {
-        const next = await loadArchive(session);
+        const next = sameSnapshot(latest.current, await loadArchive(session));
         if (live && version === revision.current) {
-          setSnapshot(next);
+          /* Our own write coming back over Realtime reads an archive that has
+             not changed: the same object, and nothing re-renders. */
+          if (next !== latest.current) {
+            latest.current = next;
+            setSnapshot(next);
+            keepSnapshot(session, next);
+          }
           setError("");
         }
       } catch (reason) {
@@ -337,11 +387,12 @@ export function ArchiveProvider({
   const signOut = useCallback(
     () =>
       changeAccount(async () => {
+        forgetSnapshot(session);
         await clearSession();
         onSignedOut();
         return null;
       }),
-    [changeAccount, onSignedOut],
+    [changeAccount, onSignedOut, session],
   );
 
   const value = useMemo(
@@ -365,6 +416,7 @@ export function ArchiveProvider({
       present,
       setOpenNote,
       facesOf,
+      warm: Boolean(warm),
     }),
     [
       session,
@@ -386,6 +438,7 @@ export function ArchiveProvider({
       present,
       setOpenNote,
       facesOf,
+      warm,
     ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
@@ -471,4 +524,72 @@ function deepen(hex: string, amount: number): string {
         .padStart(2, "0"),
     )
     .join("")}`;
+}
+
+/* ── This phone's copy of the archive ─────────────────────────────────────
+   One key per account and archive in the synchronous localStorage
+   (expo-sqlite), which is what lets the first frame have notes in it. The
+   words are already on this device in the editor's own caches; signing out
+   takes this copy with it. */
+const snapshotKey = (session: AppSession) =>
+  `napp:phone-snapshot:v1:${session.userId}:${session.archiveId}`;
+
+/** The kept copy, its notes handed to the core's cache before the first read. */
+function warmUp(session: AppSession): ArchiveSnapshot | null {
+  const kept = readSnapshot(session);
+  if (!kept) return null;
+  adoptArchiveCache(session.archiveId);
+  for (const entry of kept.entries)
+    if (!noteCache.has(entry.note.id))
+      noteCache.set(entry.note.id, { version: entry.version, note: entry.note });
+  return kept;
+}
+
+function readSnapshot(session: AppSession): ArchiveSnapshot | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(snapshotKey(session)) ?? "null");
+    return stored && Array.isArray(stored.entries) && stored.metas && Array.isArray(stored.members)
+      ? (stored as ArchiveSnapshot)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+let keeping: ReturnType<typeof setTimeout> | undefined;
+/** Written a beat after the screen has it: never in the frame that draws it. */
+function keepSnapshot(session: AppSession, snapshot: ArchiveSnapshot) {
+  clearTimeout(keeping);
+  keeping = setTimeout(() => {
+    try {
+      localStorage.setItem(snapshotKey(session), JSON.stringify(snapshot));
+    } catch {
+      /* A full disk costs the next launch its head start, nothing more. */
+    }
+  }, 1500);
+}
+
+function forgetSnapshot(session: AppSession) {
+  clearTimeout(keeping);
+  try {
+    localStorage.removeItem(snapshotKey(session));
+  } catch {
+    /* Nothing kept. */
+  }
+}
+
+/** The archive as it was, when a read found nothing new: the note objects
+ *  are the core's cached ones, so identity says whether a note moved. */
+function sameSnapshot(before: ArchiveSnapshot | null, after: ArchiveSnapshot): ArchiveSnapshot {
+  if (!before || before.entries.length !== after.entries.length) return after;
+  for (let at = 0; at < after.entries.length; at += 1) {
+    const a = before.entries[at]!;
+    const b = after.entries[at]!;
+    if (a.version !== b.version || a.note !== b.note) return after;
+  }
+  return before.seatLimit === after.seatLimit &&
+    JSON.stringify(before.metas) === JSON.stringify(after.metas) &&
+    JSON.stringify(before.members) === JSON.stringify(after.members)
+    ? before
+    : after;
 }

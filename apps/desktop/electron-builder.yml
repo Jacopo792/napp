@@ -48,6 +48,7 @@ files:
 afterPack: build/adhoc-sign.cjs
 
 mac:
+  icon: build/icon-mac.png
   category: public.app-category.productivity
   identity: null
   target: dmg
@@ -59,6 +60,7 @@ dmg:
   artifactName: Napp-mac-${arch}.${ext}
 
 win:
+  icon: build/icon.png
   target: nsis
 
 nsis:

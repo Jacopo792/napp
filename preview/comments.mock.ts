@@ -3,7 +3,13 @@
    as the tab, like everything else in the preview. */
 import { uuid } from "./uuid";
 import type { AppSession } from "./session.mock";
-import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
+import {
+  FIXTURE_NOTES,
+  LONG_REMARKS,
+  PREVIEW_ARCHIVE,
+  PREVIEW_U1,
+  PREVIEW_U2,
+} from "./fixture";
 import type { ArchiveComment, NoteComment, Reaction } from "@/lib/commentThreads";
 
 export {
@@ -50,6 +56,23 @@ function seed(noteId: string): void {
 }
 
 seed(FIXTURE_NOTES[0].id);
+
+/* One thread on each passage of the long note, to try the jump both ways. */
+const LONG_NOTE = FIXTURE_NOTES[FIXTURE_NOTES.length - 1]!.id;
+archiveOf.set(LONG_NOTE, PREVIEW_ARCHIVE);
+store.set(
+  LONG_NOTE,
+  LONG_REMARKS.map((remark, at) => ({
+    id: `long-${at}`,
+    threadId: remark.threadId,
+    authorId: at === 1 ? PREVIEW_U1 : PREVIEW_U2,
+    body: ["Questo è l'inizio, lo teniamo?", "Qui a metà va tagliato.", "E la chiusa?"][at]!,
+    createdAt: new Date(Date.now() - (3 - at) * 900_000).toISOString(),
+    resolvedAt: null,
+    mentions: [],
+    assigneeId: null,
+  })),
+);
 
 export async function loadComments(
   _session: AppSession,

@@ -25,6 +25,8 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
   cancelAnimation,
   Easing,
   FadeIn,
@@ -52,6 +54,13 @@ import { Card, Press, quiet } from "./Grouped";
 
 export { Card };
 import { SymbolView } from "./icons";
+
+/* `measure` warns, from the UI thread to the JS one, every time it is asked
+   about a view that is not on screen — and the reveals and the skeleton's
+   light ask every frame, including on a tab that is not in front. That was
+   tens of thousands of messages queued on the thread every press waits for.
+   A null measurement is an answer here, not a fault. */
+configureReanimatedLogger({ level: ReanimatedLogLevel.error, strict: false });
 
 export const glassy = Platform.OS === "ios" && isLiquidGlassAvailable();
 /** The bar's own height under the status bar. */
@@ -448,6 +457,7 @@ export function TabPage({
           scrollEventThrottle={16}
           contentInsetAdjustmentBehavior="never"
           keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             paddingTop: title ? inset.top + 16 : inset.top + BAR + 8,
             paddingBottom: 140,

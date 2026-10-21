@@ -34,6 +34,12 @@ function inline(): Plugin {
   return {
     name: "napp-inline",
     enforce: "post",
+    transformIndexHtml(html) {
+      return html.replace(
+        "</head>",
+        `<meta name="napp-editor-mode" content="${process.env.NAPP_PREVIEW === "1" ? "preview" : "production"}"></head>`,
+      );
+    },
     // Vite resolves dynamic-import preload markers in its generateBundle.
     // Inline only after that pass, or lazy exports retain __VITE_PRELOAD__.
     generateBundle: {

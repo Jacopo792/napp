@@ -226,7 +226,7 @@ success states retain their semantic meaning in every palette.
 - Real note corpus readable via the Apple Notes connector — use it to size titles,
   previews, and reading measure honestly. Do not invent placeholder note content that
   is shorter or tidier than the real thing.
-- No logo, no wordmark, no brand imagery exists for this app. Do not fabricate one.
+- Jacopo supplied the Napp logo on 21 October 2026: the reference and scalable source live in `docs/branding/`. Use that artwork consistently across shells.
 - No users beyond the archive's own members. No testimonials, metrics, or adoption
   claims exist.
 

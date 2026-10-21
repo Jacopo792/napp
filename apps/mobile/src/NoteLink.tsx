@@ -24,7 +24,6 @@ import { NotePreview } from "./NotePreview";
 import { attempt } from "./SettingsControls";
 import type { Act } from "./SwipeRow";
 import { useChoice } from "./TextPrompt";
-import { shelfGround, trashGround } from "./theme";
 
 export function useNoteActs(scope: string = ALL) {
   const { session, metaOf, act, refresh, facesOf } = useArchive();
@@ -40,7 +39,7 @@ export function useNoteActs(scope: string = ALL) {
     const remove: Act = {
       label: "Delete",
       icon: "trash.fill",
-      colour: trashGround,
+      destructive: true,
       disabled: Boolean(row?.lockedBy && row.lockedBy !== session.userId),
       run: () => act(owner, (prev) => trashNote(prev, id)),
     };
@@ -68,7 +67,6 @@ export function useNoteActs(scope: string = ALL) {
           disabled: remove.disabled,
           label: "Restore",
           icon: "arrow.uturn.backward",
-          colour: shelfGround,
           run: () => act(owner, (prev) => restoreNote(prev, id)),
         },
       };
@@ -80,14 +78,12 @@ export function useNoteActs(scope: string = ALL) {
               disabled: remove.disabled,
               label: "Put Back",
               icon: "arrow.uturn.backward",
-              colour: shelfGround,
               run: () => act(owner, (prev) => shelveNote(prev, id, false)),
             }
           : {
               disabled: remove.disabled,
               label: "Archive",
               icon: "archivebox.fill",
-              colour: shelfGround,
               run: () => act(owner, (prev) => shelveNote(prev, id, true)),
             },
     };

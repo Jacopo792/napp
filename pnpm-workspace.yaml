@@ -11,3 +11,6 @@ allowBuilds:
   electron-winstaller: true
   core-js: false
   tesseract.js: false
+
+patchedDependencies:
+  expo-router@58.0.21: patches/expo-router@58.0.21.patch

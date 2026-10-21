@@ -28,6 +28,7 @@ import {
   preferencesForFolder,
 } from "@/lib/listPreferences";
 import { renameFolder, removeFolder } from "@/lib/folderActs";
+import { pinNote } from "@/lib/noteActs";
 import { useChoice, useTextPrompt } from "./TextPrompt";
 import { ARCHIVE, entriesInScope, TRASH } from "@/lib/scopes";
 import { useArchive, usePalette } from "./archive";
@@ -257,6 +258,7 @@ export function NoteList({
           onScroll={onScroll}
           scrollEventThrottle={16}
           keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           contentInsetAdjustmentBehavior={tab ? "never" : "automatic"}
           contentContainerStyle={{
             paddingTop: tab ? inset.top + BAR + 8 : (Platform.OS === "android" ? header : 0) + 8,
@@ -307,6 +309,9 @@ export function NoteList({
           )}
           renderItem={({ item, index: at, section }) => {
             const id = item.note.id;
+            const stamp = formatStamp(
+              preferences.sortBy === "created" ? item.note.createdAt : item.note.updatedAt,
+            );
             const row = index.byNote.get(id);
             const acts = pair(item);
             const faces = facesOf(id);
@@ -314,8 +319,19 @@ export function NoteList({
               <Reveal row>
                 <SwipeRow
                   href={{ pathname: "/note/[id]", params: { id } }}
-                  rightward={acts.left}
-                  leftward={acts.right}
+                  trailing={[acts.right, acts.left]}
+                  leading={
+                    scope === TRASH
+                      ? undefined
+                      : {
+                          label: row?.pinned ? "Unpin" : "Pin",
+                          icon: row?.pinned ? "pin.slash.fill" : "pin.fill",
+                          stationary: true,
+                          disabled: acts.left.disabled,
+                          run: () =>
+                            act(item.note.ownerId ?? session.userId, (prev) => pinNote(prev, id)),
+                        }
+                  }
                   menu={menu(item)}
                   onHold={() => hold(item)}
                   preview={<NotePreview note={item.note} faces={faces} />}
@@ -336,9 +352,9 @@ export function NoteList({
                         <SymbolView name="pin.fill" size={13} tintColor={palette.ink2} />
                       ) : null}
                       <View style={{ flex: 1 }} />
-                      <Text style={[styles.stamp, { color: palette.ink3 }]}>
-                        {formatStamp(item.note.updatedAt)}
-                      </Text>
+                      {stamp !== section.title ? (
+                        <Text style={[styles.stamp, { color: palette.ink3 }]}>{stamp}</Text>
+                      ) : null}
                     </View>
                     <View style={styles.titleLine}>
                       <Text
@@ -347,7 +363,17 @@ export function NoteList({
                       >
                         {derivedOf(item.note).preview || "No additional text"}
                       </Text>
-                      <Faces faces={faces} size={20} ring={card} max={2} />
+                      <View
+                        style={{
+                          width: 40,
+                          height: 22,
+                          marginLeft: 8,
+                          alignItems: "flex-end",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Faces faces={faces} size={20} ring={card} max={2} />
+                      </View>
                     </View>
                   </View>
                 </SwipeRow>

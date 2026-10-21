@@ -9,7 +9,8 @@
     "start": "pnpm editor && expo start --dev-client",
     "preview": "NAPP_PREVIEW=1 pnpm editor && NAPP_PREVIEW=1 expo start --dev-client --clear",
     "ios": "pnpm editor && expo run:ios",
-    "android": "pnpm editor && expo run:android"
+    "android": "pnpm editor && expo run:android",
+    "build:android": "node scripts/build-android.cjs"
   },
   "dependencies": {
     "@expo/ui": "~58.0.0",

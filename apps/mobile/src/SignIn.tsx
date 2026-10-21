@@ -18,6 +18,7 @@
  * fade alone under Reduce Motion. */
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import {
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -425,10 +426,13 @@ function Glass({ children }: { children: ReactNode }) {
 export function SignIn({
   onSession,
   initialChoosing = null,
+  initialEmail = "",
   onResume,
 }: {
   onSession: (session: AppSession) => void;
   initialChoosing?: AuthenticationResult | null;
+  /** The address of an account whose token was refused. */
+  initialEmail?: string;
   onResume: (userId: string) => Promise<void>;
 }) {
   const prompt = useTextPrompt();
@@ -440,7 +444,7 @@ export function SignIn({
   const [mode, setMode] = useState<Mode>("sign-in");
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -601,8 +605,13 @@ export function SignIn({
       >
         <Animated.View style={[styles.content, page]}>
           <Arrive order={0} style={styles.brand}>
+            {/* Metro asset number, as in Launch.tsx. */}
+            <Image
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              source={require("../assets/splash-mark.png")}
+              style={{ width: 44, height: 44 }}
+            />
             <Text style={[styles.wordmark, { color: palette.ink }]}>napp</Text>
-            <View style={[styles.brandDot, { backgroundColor: palette.ink }]} />
           </Arrive>
           <View style={styles.air} />
 
@@ -925,10 +934,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#0f0e0c" },
   scroll: { flexGrow: 1, paddingHorizontal: 12 },
   content: { width: "100%", maxWidth: 440, alignSelf: "center", flexGrow: 1 },
-  brand: { flexDirection: "row", alignItems: "baseline", gap: 3, paddingHorizontal: 16 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16 },
   air: { flexGrow: 1, minHeight: 24 },
   wordmark: { fontSize: 30, fontWeight: "700", letterSpacing: -1.6 },
-  brandDot: { width: 6, height: 6, borderRadius: 3 },
   intro: { paddingHorizontal: 16, paddingBottom: 20 },
   title: { fontSize: 40, fontWeight: "700", letterSpacing: -1.6, lineHeight: 46 },
   lede: { fontSize: 16, lineHeight: 23, marginTop: 5 },

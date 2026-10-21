@@ -15,6 +15,8 @@ import { EMPTY_META, type Meta, type Note, type NoteMeta } from "@/lib/types";
 import {
   FIXTURE_META,
   FIXTURE_NOTES,
+  PARTNER_NOTES,
+  PARTNER_META,
   PREVIEW_ARCHIVE,
   PREVIEW_THESIS,
   PREVIEW_U1,
@@ -105,14 +107,11 @@ function storeOf(session: AppSession): ArchiveStore {
     session.archiveId === PREVIEW_ARCHIVE
       ? {
           notes: new Map(
-            FIXTURE_NOTES.map((note) => [note.id, { note: { ...note }, version: 1 }]),
+            [...FIXTURE_NOTES, ...PARTNER_NOTES].map((note) => [note.id, { note: { ...note }, version: 1 }]),
           ),
           metas: {
             [PREVIEW_U1]: structuredClone(FIXTURE_META),
-            [PREVIEW_U2]: {
-              ...structuredClone(EMPTY_META),
-              partnerName: FIXTURE_META.partnerName,
-            },
+            [PREVIEW_U2]: structuredClone(PARTNER_META),
           },
         }
       : session.archiveId === PREVIEW_THESIS

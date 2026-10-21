@@ -220,8 +220,8 @@ puts back, the Trash deletes for good and restores. Deleting for good was once
 the one act a full swipe was not allowed to perform on its own; every act is
 that act now, so there is no flag on the pair and no exception to remember.
 
-`OPEN` and `MAX` in `lib/swipe.ts` are the whole of the tuning — the web's
-list and the phone's read the same two numbers — and **the clamp
+`OPEN` and `MAX` in `lib/swipe.ts` are the whole of the web's tuning — the
+phone sizes its own push to its circles, see _The phone app_ — and **the clamp
 is load-bearing**: a trackpad keeps sending decaying momentum after the fingers
 lift, so unclamped travel takes the row half the column. Clamped, a flick
 arrives at the give and springs back to open.
@@ -970,7 +970,28 @@ it lifts `NotePreview` with the note's acts under it (`useNoteActs`, also what
 the list's push uncovers) — iOS lifts it itself, Android gets the same
 preview and acts in the `useChoice` sheet from a gesture-handler long press,
 because inside a folder card the card's own push takes the touch from a plain
-responder first. Reanimated still owns the row under the finger. **Content
+responder first. Reanimated still owns the row under the finger.
+
+**Changing whose notes are shown keeps the native pages.** Home gives each
+member a memoised `MemberContent` inside React's `Activity`: hidden pages are
+prepared at lower priority and retain their native note links, menus and
+folder views. Switching visibility must not remount every card or replay a
+staggered entrance. `WhoseSwitch` moves its plate on the UI thread in 220 ms;
+the press and the selected prop share one target, so neither restarts the
+other's spring. Do not synchronously read shared values on the JS thread in
+this path. The preview has populated catalogues for both members, including
+long notes; an empty partner page cannot validate switching performance.
+
+**A tap on a link that can be held is a tap**, and that took a patch to
+expo-router (`patches/expo-router@58.0.21.patch`). UIKit asks a
+`UIContextMenuInteraction` for its configuration as soon as a press is held —
+about 0.15 s, which is an ordinary finger tap — and expo-router cancelled
+React Native's touches right there, so the Pressable under every note, row and
+folder card lost its press and nothing opened; the second, quicker tap did.
+The simulator's instant taps never showed it. The patch cancels the touches
+when the menu begins to display instead, which is the moment the press stops
+being a tap. Re-apply it (or drop it) when expo-router is upgraded, and run
+`pod install` after: the patched package lives at a different path. **Content
 dissolves under both bars instead of being cut:** the top bar's ground fades
 in with the scroll, solid to its foot and gone over 32 points below it; the
 foot of a tab page fades into the ground above the tab bar. **A card grows
@@ -980,14 +1001,18 @@ goes from 92% and half-seen to whole over the last 180 points; a row inside a
 card only fades, because a row that shrank would open gaps in its card. The metadata half of every act is
 `lib/noteActs.ts`, shared with the web's `Notes.tsx`.
 
-**The phone's push is Mail's, and that is the one place it leaves the web's
-rule** (Jacopo, 17 October 2026). Right uncovers the bin, left files away; the
-colour is a band attached to the row at full height, and a push past half the
-row arms the act with a tick — letting go there performs it. A short push
-still opens the row on its button, and nothing settles with a bounce. Folder
-cards on Home swipe too: right removes the folder (asks; notes stay), left
-archives every note in its branch (`shelveFolder`). `OPEN` is still the shared
-number.
+**The phone's swipe belongs to Napp** (Jacopo, 21 October 2026). The
+Messages copy was rejected: no bright circular buttons or growing discs.
+A moved note reveals compact paper tabs, continuous corners, a hairline rule,
+a glyph and a name. They wear the current palette; destructive acts alone use
+danger ink. They slide and fade into their places, without scaling. Left
+reveals Archive / Delete (or the scope's restore actions), right Pin. A tap on
+the row closes it; a full swipe retains the existing action and confirmation
+rules. Folder cards use the same tabs. A member in a note is a still face and
+a still presence dot; do not bounce or pulse either. The list reserves the
+face's space so arrivals do not shift the preview. When the group already
+says the row's date ("Yesterday"), the row omits it; Created sorting reads the
+creation stamp, Edited reads the update stamp.
 
 **Depth is the reader's picture, never a wash.** The phone darkens the page
 most of the way to black and draws cards solid on it; a wallpaper chosen in
@@ -1010,11 +1035,43 @@ web's note and person sheets say it. A bare list of names was refused.
 Gated by Privacy → Show Collaborators.
 
 **A note's ⋯ holds only what is nowhere else** (Jacopo, 19 October 2026): Find
-in Note, History, People. Pin, Lock, Move, Archive and Delete are the held
-note's menu; Format is the writing bar's; sharing, attaching (the paperclip at
-rest) and Comments have buttons of their own. A second door to the same act is
-not added. Format left the ⋯ with this (Aa on the writing bar covers it while
-writing); it is the one entry that had no other door at rest.
+in Note, History, People, and Export (Markdown, PDF, Word) as a submenu. Pin,
+Lock, Move, Archive and Delete are the held note's menu; Format is the writing
+bar's; sharing, attaching (the paperclip at rest) and Comments have buttons of
+their own. A second door to the same act is not added. Format left the ⋯ with
+this (Aa on the writing bar covers it while writing); it is the one entry that
+had no other door at rest. **Share is the system's share sheet with the note
+as text** (title, then the body through `richTextToPlainText`), because that is
+what the share button means everywhere else on the phone; it was a menu of
+three file formats, which is exporting, and exporting moved into the ⋯ where
+nothing else offered it (Jacopo, 21 October 2026).
+
+**The note's bars are ours, in the system's glass** (`NoteBars.tsx`). At rest a
+52-point capsule — checklist, paperclip, Markup, 22-point glyphs — and
+Comments in a circle of the same height, both 16 points from the edges and on
+one line, as Notes and Messages stand theirs. It was the native bottom
+toolbar, which would not take that size and, mounted and unmounted with the
+keyboard while a picker or a share sheet was over the screen, came back empty:
+the page had no tools until it was left and entered again. The page also asks
+`Keyboard.isVisible()` again when it is back in front, because a sheet can
+swallow the keyboard's goodbye. **Find in Note stands on the keyboard**, as in
+Safari: a glass field with "2 of 7", the two steps and a close in glass
+circles, palette ink, never the system blue. The page brings the current
+match to the middle of what the keyboard leaves (`centreMatch` in
+`editor/main.tsx`); the current one is the more strongly tinted.
+
+**A picture opens as in Photos** (`ImageViewer.tsx`). A tap on one in the note
+is taken on the touch's end and prevented (`touch` on the image extension,
+the phone only), so no caret, no keyboard and no edit menu; the page hands the
+bytes and the picture's rectangle out (`onOpenImage`), and the viewer flies it
+from that rectangle to the screen while the ground darkens with the flight.
+Pinch and a double tap zoom; pulled down it follows the finger and flies home
+on release. The picture in the note is hidden once the copy is drawn over it
+(`image` command, `shown`) and shown again when it lands, so it is seen to
+leave rather than to be doubled. Markup and Delete are buttons in the viewer
+and act on that picture in the note. A video is handed to the system's own
+player, which grows out of it. The web and the desktop keep their lightbox:
+without `onOpenImage` the editor opens it as before.
 
 **Markup is a mode.** Asking for the pen never focuses the editor (no keyboard);
 the page reports `drawing` and the screen answers by hiding both bars, showing
@@ -1033,10 +1090,12 @@ as it lands, never overshooting; labels cross from quiet to full ink as it
 arrives (`WhoseSwitch`); past three members it scrolls sideways. Two faces
 overlapping in a pill read as an accident, and a stacked action sheet, a
 popover and a double press were all refused before it. The page under it is
-not remounted: the old page slides 24 pt away from the side being gone to and
-fades, then the new one comes in from that side on the same spring, each
-block a beat behind the one above (`Turning`, one driver, so a tap mid-turn
-continues from where the page is). Then **Continue
+not remounted, and it does not wait for the old page to leave: the new one is
+drawn at once and comes in 24 pt from the side being gone to on the same
+spring, each block a beat behind the one above (`Turning`, one driver). The
+old page used to play out first, which was 150 ms of a blank column before the
+new one was even rendered, and read as lag. The thumb moves from the press
+itself, not from the render the press causes. Then **Continue
 Writing** — the latest note as one large card on the reader's picture — then
 **Pinned**, small cards scrolling sideways, then every folder as a Shop feed
 card (name, ⋯, its three latest notes, "N notes" and a round arrow), and the
@@ -1054,6 +1113,27 @@ account belongs to, using the core's `loadSpaces` and `chooseArchive`. Changing
 archive remounts the provider by account and archive id, so no old subscription
 or snapshot follows into the new one. Pending metadata writes are ordered; a
 read begun before an edit cannot replace it afterwards.
+
+**Nothing re-renders the app for nothing.** The provider's value is read by
+every mounted screen — three tabs and whatever is pushed — so each new value
+is all of them drawn again, and it was happening at the worst moments:
+presence answers every track, ours included, so opening and closing a note
+each redrew everything as the hand reached for the next thing; every wake
+re-pulled an unchanged preferences row into a new appearance object; and our
+own metadata write came back over Realtime as a "new" archive. So presence
+keeps only the other members and is replaced only when one of them moved,
+an unchanged row is not adopted, and a read whose notes are the same objects
+(the core's cache hands back the same `Note` for an unmoved version) keeps
+the snapshot it had.
+
+**The archive opens from this phone's copy.** The last snapshot is kept in
+localStorage (expo-sqlite, synchronous) per account and archive, drawn on the
+first frame and replaced when Postgres answers; its notes seed the core's
+note cache, so that first read fetches only payloads whose version moved —
+the phone has no IndexedDB to keep them in as the web does. The launch waits
+for preferences only on a phone that has never opened the archive. Signing
+out deletes the copy. And `_layout.tsx` asks for the archive list beside the
+token check rather than after it.
 
 **Phone appearance stays independent from the computer.** Appearance chosen
 on the phone goes into `profile_preferences.phone`; web and desktop preserve
@@ -1088,6 +1168,22 @@ Live preference stores and private image caches are reset before the next
 identity opens; a generation guard rejects late preference reads and events.
 Settings returns to Home after an account or archive change.
 
+**A saved account's tokens follow every rotation.** A refresh spends the old
+refresh token, and presenting a spent one after the reuse window makes
+Supabase revoke the whole family. The shelf in `napp:accounts` used to be
+written only when an account was left, so any refresh after that — a launch,
+a `getSession` on the sign-in page — left a spent token there and the next
+return killed the account. `session.ts` now follows `TOKEN_REFRESHED` and
+`SIGNED_IN` onto the shelf. And **an empty archive list is not believed**:
+RLS answers a request that went out without the account's token (a failed
+refresh makes `getSession` return nothing, and PostgREST then sends the anon
+key) with no rows rather than an error, which showed "No notes archives yet"
+to an account with twelve notes. `notesArchives()` asks `getUser`: the same
+account reads again, a refused token throws `SignInAgain` and the sign-in page
+opens on that address, a dropped connection is said. The profile's Accounts
+card lists the account in front, ticked, and every saved one with its last
+seen face; ⋯ or a long press removes one from the phone.
+
 The notes-only selection is enforced in `session.ts` for mobile authentication,
 archive choice, saved-account return and startup. It filters by `archives.kind`,
 including the chooser immediately after login, while retaining every ordinary
@@ -1095,11 +1191,18 @@ shared archive. A Books-only or empty account gets an explicit empty chooser
 and Create Notes Archive; no document archive is opened as a fallback.
 Desktop callers leave `notesOnly` unset.
 
-The mobile icon lives in `apps/mobile/assets`, independently of desktop: original
-SVG paper-stack artwork and 1024 px exports, an opaque RGB iOS/general icon,
-a transparent Android adaptive foreground, and an alpha-mask monochrome icon.
-Android's background is the same warm paper. Regenerate native projects to
-pick up these `app.config.ts` asset paths before a release build.
+**One designer-supplied logo on every shell** (Jacopo, 21 October 2026).
+`docs/branding/napp-logo.svg` is the scalable source traced from the supplied
+reference alongside it: white arch and five lines on black, with its proportions
+kept. `apps/mobile/assets` exports the opaque app icon, transparent Android
+foreground and monochrome mask, and the shared splash / launch mark. Android's
+adaptive background is black. Web favicons, installed-web-app icons, the
+shared sign-in page, the mobile sign-in and the desktop build resources use
+this mark. The desktop Mac artwork is 824 px centred in a transparent 1024 px
+canvas. Launch shows the same mark as the native splash, standing still until
+the archive opens, then fading; the old paper-stack animation is retired.
+Regenerate native projects after asset changes before building an installer.
+The logo is brand artwork, not a claim that note content is encrypted.
 
 One shape language for the phone: a thing sits on a rounded square with a
 continuous corner, a person on a circle. Cards are `CARD_RADIUS` 24, carry
@@ -1144,16 +1247,31 @@ page reports from the live selection; undo, underline, indent and Done are the
 accent ✓ that blurs the page. WebKit keeps the caret clear of the keyboard
 only, so `editor/main.tsx` scrolls it clear of the bar too.
 
-Comments are a messaging thread, not a form (Jacopo, 18 October 2026): Open /
-Resolved as segments, each thread a card led by its passage — read from the
-live body with `quotesOf`, pressed to show it in the note — then remarks with
-face, name and "2m"-style time, one face for a run by the same author, @names
-in the accent. Reactions appear only once given; giving one, Reply, Edit and
-Delete are the long press on a remark, which lifts it under the six reactions.
-The thread's foot is the assignee chip, Reply, Resolve and ⋯ (Assign, Delete
-Thread for the author of every remark). The composer is a pill pinned over the
-keyboard whose @ offers the members. All of it on the existing core
-comments/reactions/assignment APIs.
+Comments are document annotations (Jacopo, 21 October 2026). The Messages
+layout and bright blue/gold colours were rejected. Each neutral thread card
+keeps a recessed, tappable passage, left-aligned remarks, explicit author
+(including You), timestamp and quiet Reply / Resolve / More controls together.
+Monogram avatars and send controls are neutral. Reactions and long-press
+editing remain available; the composer still offers @mentions. Quotes come
+from the live `commentQuotes` bridge, without transferring the whole note.
+All operations use the existing core comments/reactions/assignment APIs.
+
+**The jump goes both ways.** A thread's passage or bubble, pressed, closes the
+sheet at once and sends `revealComment`, which in the page is `showComment`:
+the passage to the middle of the page and lit with the `passageFlash`
+decoration, **without focus or caret** — the desktop's `revealComment` focuses,
+and on a phone focus is the keyboard rising over the very words asked for. It
+waits up to ten seconds for a note still arriving, and answers "not found" only
+once the note has synced. The other way, a tap on a commented passage at rest
+opens the sheet already scrolled to that thread (laid out, then `scrollTo`
+without motion while the sheet is still rising) and lights it. `HostedNote`
+takes that tap on `touchend` and prevents it — no focus, no synthesised click —
+and passes no `onOpenComment` to the editor, whose click path would open the
+sheet while writing too; with the caret already in the page the tap only moves
+it, because a commented passage has to stay editable. The note screen reads its
+conversation as it opens (`preloadComments`), and the list is drawn only once
+remarks and passages are both in hand: light bars crossfading into an empty
+state was the flash the sheet used to arrive with.
 The archive's Comments route lists open conversations and marks readings in
 account preferences. Its Realtime subscription follows route focus, so it does
 not compete with the note's sheet while underneath it in the native stack.

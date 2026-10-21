@@ -163,6 +163,10 @@ export interface RichTextEditorHandle {
   commentSelection: (threadId: string) => { threadId: string; quote: string } | null;
   /** Put the caret in a commented passage, and scroll it into view. */
   revealComment: (threadId: string) => boolean;
+  /** Bring a commented passage to the middle of the page and light it for a
+   *  moment, touching neither the caret nor the focus — a phone would raise
+   *  its keyboard over the very words it was asked to show. */
+  showComment: (threadId: string) => boolean;
   /** The passage each open thread is attached to, read from the live document
    *  in one pass — a comment without the words it is about is a note nobody
    *  can place. */
@@ -240,6 +244,9 @@ interface Props {
   /** The instance itself, for a toolbar that has to read what the selection
    *  is set in — a font menu that cannot say which font it is in is a guess. */
   onEditor?: (editor: Editor | null) => void;
+  /** A host that shows a picture itself — the phone's own viewer, which flies
+   *  it out of its place in the note. Without it the page's lightbox opens. */
+  onOpenImage?: (image: HTMLImageElement, src: string, alt: string) => void;
   /** A chapter of a document: the paragraph keys Word has, which a note
    *  never needed and does not get. */
   manuscript?: boolean;
@@ -288,11 +295,16 @@ type Resolver = (objectId: string) => Promise<Blob>;
 
 interface PrivateImageOptions {
   resolve: Resolver;
-  open: (src: string, alt: string) => void;
+  open: (src: string, alt: string, image: HTMLImageElement) => void;
+  /** A finger: the picture opens on the touch's end, which is prevented, so
+   *  WebKit neither puts the caret beside it nor raises the keyboard. */
+  touch: boolean;
 }
 
 interface PrivateFileOptions {
   resolve: Resolver;
+  /** As a picture's: a video in a note is drawn by the same view. */
+  touch: boolean;
 }
 
 interface SlashCommand {
@@ -839,6 +851,7 @@ function PrivateImageView({
     [updateAttributes],
   );
   const [pen, setPen] = useState(false);
+  const tapFrom = useRef<{ x: number; y: number } | null>(null);
   const ink = useInk({
     strokes,
     write: writeInk,
@@ -885,18 +898,77 @@ function PrivateImageView({
       <span className="rich-media-image-frame" contentEditable={false}>
         {src && video ? (
           <video
-            src={src}
-            controls
+            /* On a phone the first frame stands for the video, and a tap hands
+               it to the system's own player, which grows out of it. */
+            src={options.touch ? `${src}#t=0.1` : src}
+            controls={!options.touch}
             preload="metadata"
             onError={() => setError("This video could not be played")}
+            onTouchStart={
+              options.touch
+                ? (event) => {
+                    const touch = event.touches[0];
+                    tapFrom.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+                  }
+                : undefined
+            }
+            onTouchEnd={
+              options.touch
+                ? (event) => {
+                    const from = tapFrom.current;
+                    const touch = event.changedTouches[0];
+                    tapFrom.current = null;
+                    if (!from || !touch) return;
+                    if (Math.hypot(touch.clientX - from.x, touch.clientY - from.y) > 10) return;
+                    event.preventDefault();
+                    const player = event.currentTarget as HTMLVideoElement & {
+                      webkitEnterFullscreen?: () => void;
+                    };
+                    if (player.webkitEnterFullscreen) player.webkitEnterFullscreen();
+                    else void player.requestFullscreen?.().catch(() => {});
+                    void player.play().catch(() => {});
+                  }
+                : undefined
+            }
           />
         ) : src ? (
           <button
             type="button"
             className="rich-media-image-open"
-            onClick={() => options.open(src, alt || "Image")}
+            onClick={(event) => {
+              const image = event.currentTarget.querySelector("img");
+              if (image) options.open(src, alt || "Image", image);
+            }}
+            onTouchStart={
+              options.touch
+                ? (event) => {
+                    const touch = event.touches[0];
+                    tapFrom.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+                  }
+                : undefined
+            }
+            onTouchEnd={
+              options.touch
+                ? (event) => {
+                    const from = tapFrom.current;
+                    const touch = event.changedTouches[0];
+                    tapFrom.current = null;
+                    /* A finger that travelled was scrolling the note. */
+                    if (!from || !touch) return;
+                    if (Math.hypot(touch.clientX - from.x, touch.clientY - from.y) > 10) return;
+                    event.preventDefault();
+                    const image = event.currentTarget.querySelector("img");
+                    if (image) options.open(src, alt || "Image", image);
+                  }
+                : undefined
+            }
           >
-            <img src={src} alt={alt || "Image"} draggable={false} />
+            <img
+              src={src}
+              alt={alt || "Image"}
+              draggable={false}
+              style={options.touch ? { WebkitTouchCallout: "none", userSelect: "none" } : undefined}
+            />
           </button>
         ) : (
           <span className="rich-media-loading">
@@ -2068,9 +2140,13 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
 
 /* The schema lives in `content.ts`, where the collaboration server can read it
    without React. What is added here is only what a browser can do with it. */
-function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["open"]) {
+function privateImageExtension(
+  resolve: Resolver,
+  open: PrivateImageOptions["open"],
+  touch: boolean,
+) {
   return PrivateImage.extend<PrivateImageOptions>({
-    addOptions: () => ({ resolve, open }),
+    addOptions: () => ({ resolve, open, touch }),
     addNodeView() {
       return ReactNodeViewRenderer(PrivateImageView);
     },
@@ -2128,9 +2204,9 @@ const VIEWED_ELSEWHERE = new Set([
   "bibliography",
 ]);
 
-function privateFileExtension(resolve: Resolver) {
+function privateFileExtension(resolve: Resolver, touch: boolean) {
   return PrivateFile.extend<PrivateFileOptions>({
-    addOptions: () => ({ resolve }),
+    addOptions: () => ({ resolve, touch }),
     addNodeView() {
       return ReactNodeViewRenderer(PrivateFileView);
     },
@@ -2225,6 +2301,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     resolveFile,
     collaboration = null,
     onEditor,
+    onOpenImage,
     manuscript = false,
     writing,
     noteId = "",
@@ -2245,6 +2322,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   const onChangeRef = useRef(onChange);
   const onLocalEditRef = useRef(onLocalEdit);
   const onPasteImageRef = useRef(onPasteImage);
+  const onOpenImageRef = useRef(onOpenImage);
+  onOpenImageRef.current = onOpenImage;
   const pasteSourceRef = useRef(onPasteImageSource);
   pasteSourceRef.current = onPasteImageSource;
   const pasteErrorRef = useRef(onPasteError);
@@ -2257,8 +2336,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   const mediaExtensions = useMemo(
     () => [
-      privateImageExtension(resolveImage, (src, alt) => setPreview({ src, alt })),
-      privateFileExtension(resolveFile),
+      privateImageExtension(
+        resolveImage,
+        (src, alt, image) =>
+          onOpenImageRef.current
+            ? onOpenImageRef.current(image, src, alt)
+            : setPreview({ src, alt }),
+        mobile,
+      ),
+      privateFileExtension(resolveFile, mobile),
       drawingExtension(),
       mediaPaste({
         upload: (file) => onPasteImageRef.current?.(file) ?? Promise.resolve(null),
@@ -2266,7 +2352,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         error: (message) => pasteErrorRef.current?.(message),
       }),
     ],
-    [resolveFile, resolveImage],
+    [resolveFile, resolveImage, mobile],
   );
 
   const slashMenu = useMemo(
@@ -2596,9 +2682,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
 
   /* Light a range for a moment, the caret left at its end. */
   const lightPassage = useCallback(
-    (range: { from: number; to: number }) => {
+    (range: { from: number; to: number }, caret = true) => {
       if (!editor) return false;
-      editor.chain().focus().setTextSelection(range.to).run();
+      if (caret) editor.chain().focus().setTextSelection(range.to).run();
       editor.view.dispatch(editor.state.tr.setMeta(passageFlashKey, range));
       const { node } = editor.view.domAtPos(range.from);
       (node instanceof Element ? node : node.parentElement)?.scrollIntoView({
@@ -2706,6 +2792,18 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run();
         return true;
       },
+      showComment(threadId) {
+        if (!editor) return false;
+        let range: { from: number; to: number } | null = null;
+        editor.state.doc.descendants((node, pos) => {
+          if (!node.isText) return true;
+          if (node.marks.some((m) => m.type.name === "comment" && m.attrs.threadId === threadId))
+            range = { from: range?.from ?? pos, to: pos + node.nodeSize };
+          return true;
+        });
+        const found = range as { from: number; to: number } | null;
+        return found ? lightPassage(found, false) : false;
+      },
       flashBlock(id) {
         if (!editor) return false;
         const range = anchoredBlock(editor.state.doc, id);
@@ -2792,6 +2890,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         if (!editor) return { current: 0, total: 0 };
         editor.commands.setSearchTerm(query);
         if (query && editor.storage.findAndReplace.results.length > 0) {
+          /* A fresh search already stands on the first match without having
+             selected or scrolled to it; stepping forward alone skipped it and
+             said "2 of 9". Back and forward again lands on the first. */
+          editor.commands.goToPreviousResult();
           editor.commands.goToNextResult();
         }
         return searchStatus(editor);

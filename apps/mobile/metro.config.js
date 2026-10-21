@@ -3,6 +3,8 @@
    Supabase for the in-memory stand-ins in preview/ — the same files, the same
    fixture, that `pnpm preview:ui` mounts the web app against. */
 const path = require("node:path");
+const { readFileSync } = require("node:fs");
+const assertEditorMode = require("./editor-mode.cjs");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const root = path.resolve(__dirname, "../..");
@@ -10,6 +12,10 @@ const core = path.join(root, "packages/core/src");
 const config = getDefaultConfig(__dirname);
 
 const PREVIEW = process.env.NAPP_PREVIEW === "1";
+if (PREVIEW && process.env.NODE_ENV === "production") {
+  throw new Error("A release must use the real backend: set NAPP_PREVIEW=0.");
+}
+assertEditorMode(readFileSync(path.join(__dirname, "editor/dist/index.html"), "utf8"), PREVIEW);
 const MOCKED = [
   "supabase",
   "session",

@@ -10,7 +10,11 @@ export type HostedCommand =
   | { type: "restore"; body: HostedBody }
   | { type: "attach"; objectId: string; label: string; image: boolean }
   | { type: "comment"; threadId: string }
+  /** Bring the passage to the middle of the page and light it, without the
+   *  caret or the keyboard; waits for the note to arrive. True if found. */
   | { type: "revealComment"; threadId: string }
+  /** The passage of every thread in the live document, by thread id. */
+  | { type: "commentQuotes" }
   | { type: "resolveComment"; threadId: string; resolved: boolean }
   | { type: "removeComment"; threadId: string }
   | { type: "search"; query: string }
@@ -18,6 +22,10 @@ export type HostedCommand =
   | { type: "previousMatch" }
   | { type: "closeSearch" }
   | { type: "putDownPen" }
+  /** The picture the phone's viewer shows: drawn over its place (hide it),
+   *  closed (put it back),
+   *  or one of the two edits the viewer offers on it. Answered by the page. */
+  | { type: "image"; action: "shown" | "closed" | "markup" | "remove" }
   /** What a phone's keyboard bar asks for beyond `format`: the history, the
    *  underline the desktop has no button for, list depth, and putting the
    *  keyboard away. */

@@ -211,7 +211,16 @@ export const NotePreview = memo(
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Text style={{ flex: 1, color: palette.ink3, fontSize: 13, fontWeight: "500" }}>
+          {/* Messages' lifted thread opens on a small centred line saying when. */}
+          <Text
+            style={{
+              flex: 1,
+              color: palette.ink3,
+              fontSize: 12,
+              fontWeight: "500",
+              textAlign: "center",
+            }}
+          >
             {formatStamp(note.updatedAt)}
           </Text>
           <Faces faces={faces} size={24} ring={palette.page} />

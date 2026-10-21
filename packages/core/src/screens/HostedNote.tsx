@@ -89,6 +89,8 @@ interface Props {
   onOpenNote?: (noteId: string) => void;
   onOpenLink?: () => void;
   onOpenComment?: (threadId: string) => void;
+  /** A picture was tapped: the host shows it, out of its place in the note. */
+  onOpenImage?: (image: HTMLImageElement, src: string, alt: string) => void;
 }
 
 const EMPTY = { type: "doc", content: [] };
@@ -105,6 +107,7 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     onOpenLink,
     onOpenNote,
     onOpenComment,
+    onOpenImage,
   },
   ref,
 ) {
@@ -113,6 +116,8 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     archiveId: session.archiveId,
     name,
   });
+  const current = useRef(note);
+  current.current = note;
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   /* The instance itself, for the phone's bar: what the selection is set in,
@@ -151,6 +156,51 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
       setDrawing(false);
     };
   }, [instance]);
+  /* A tap on a commented passage, read at rest, opens its conversation —
+     the underline is the only sign one exists. Taken on the touch's end and
+     prevented there, so WebKit neither focuses the page (the keyboard would
+     rise under the sheet) nor synthesises the click the editor would also
+     answer. While writing, the same tap only moves the caret: a commented
+     passage has to stay editable. A finger that travelled was scrolling. */
+  const page = useRef<HTMLDivElement>(null);
+  const openComment = useRef(onOpenComment);
+  openComment.current = onOpenComment;
+  useEffect(() => {
+    const root = page.current;
+    if (!root) return;
+    let start: { x: number; y: number; writing: boolean } | null = null;
+    const down = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      const active = document.activeElement;
+      start =
+        event.touches.length === 1 && touch
+          ? {
+              x: touch.clientX,
+              y: touch.clientY,
+              writing: Boolean(active && root.contains(active)),
+            }
+          : null;
+    };
+    const up = (event: TouchEvent) => {
+      const from = start;
+      start = null;
+      const touch = event.changedTouches[0];
+      if (!from || from.writing || !touch || !openComment.current) return;
+      if (Math.hypot(touch.clientX - from.x, touch.clientY - from.y) > 10) return;
+      const threadId = (event.target as Element | null)
+        ?.closest?.("span[data-comment-thread]")
+        ?.getAttribute("data-comment-thread");
+      if (!threadId) return;
+      event.preventDefault();
+      openComment.current(threadId);
+    };
+    root.addEventListener("touchstart", down, { passive: true });
+    root.addEventListener("touchend", up, { passive: false });
+    return () => {
+      root.removeEventListener("touchstart", down);
+      root.removeEventListener("touchend", up);
+    };
+  }, []);
   const writable = useRef(canEdit);
   writable.current = canEdit;
   const mounted = useRef(true);
@@ -174,6 +224,19 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
           window.getSelection()?.removeAllRanges();
           return null;
         }
+        /* Asked from the Comments sheet, perhaps before the note has arrived
+           — opened from the Comments tab, or a long note still syncing. A
+           passage not there yet may be on its way; one absent from a synced
+           note is not. */
+        if (command.type === "revealComment") {
+          for (const until = Date.now() + 10000; Date.now() < until; ) {
+            const ready = editorRef.current;
+            if (ready?.showComment(command.threadId)) return true;
+            if (ready && current.current.ready) return false;
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
+          return false;
+        }
         const editor = editorRef.current;
         if (!editor || !note.doc) throw new Error("The note is still loading");
         const title = note.doc.getText(TITLE_TEXT);
@@ -185,7 +248,7 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
         const readonly = [
           "body",
           "export",
-          "revealComment",
+          "commentQuotes",
           "search",
           "nextMatch",
           "previousMatch",
@@ -236,8 +299,8 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
             break;
           case "comment":
             return editor.commentSelection(command.threadId);
-          case "revealComment":
-            return editor.revealComment(command.threadId);
+          case "commentQuotes":
+            return Object.fromEntries(editor.commentQuotes());
           case "resolveComment":
             editor.setCommentResolved(command.threadId, command.resolved);
             break;
@@ -297,7 +360,7 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
       : null;
 
   return (
-    <div className="editor-scroll min-h-0 flex-1">
+    <div ref={page} className="editor-scroll min-h-0 flex-1">
       {/* The ink covers the body only; with the pen in hand the title is not a
           place to start typing, or a stray touch raises the keyboard over the
           tools. */}
@@ -332,12 +395,12 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
             onChange={() => {}}
             onOpenLink={onOpenLink ?? (() => {})}
             onOpenNote={onOpenNote}
-            onOpenComment={onOpenComment}
             writeLockOwner={canEdit ? session.userId : null}
             resolveImage={resolveImage}
             resolveFile={resolveFile}
             collaboration={collaboration}
             onEditor={setInstance}
+            onOpenImage={onOpenImage}
           />
         ) : (
           <div className="note-body-waiting" aria-hidden="true">

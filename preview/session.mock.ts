@@ -57,3 +57,15 @@ export async function switchAccount(userId: string): Promise<void> {
   await resumeAccount(userId);
   window.location.reload();
 }
+export class SignInAgain extends Error {
+  constructor(readonly email: string) {
+    super(`Sign in to ${email} again`);
+    this.name = "SignInAgain";
+  }
+}
+export async function notesArchives(account: { userId: string }): Promise<ArchiveOption[]> {
+  return loadArchiveOptions(account.userId, { notesOnly: true });
+}
+export function forgetAccount(userId: string): void {
+  saved.delete(userId);
+}

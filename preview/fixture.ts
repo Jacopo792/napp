@@ -35,7 +35,27 @@ type Seed = {
   /* Strokes for a drawing appended to the note, as the document stores them:
      a JSON string, not an array. See `Drawing` in content.ts for why. */
   sketch?: string;
+  /* Passages carrying a comment mark, as the editor leaves one: the first
+     text that contains the words is cut around them. */
+  remarks?: { words: string; threadId: string }[];
 };
+
+/** Three passages in a note of some 50,000 words, far apart, so jumping
+ *  between a comment and its passage is tried where it is hard. */
+export const LONG_REMARKS = [
+  { words: "the first marked passage", threadId: "long-thread-0001" },
+  { words: "the middle marked passage", threadId: "long-thread-0002" },
+  { words: "the last marked passage", threadId: "long-thread-0003" },
+];
+const LONG_FILLER =
+  "Every paragraph of this note is the same length on purpose, so that a jump from a comment has a long way to travel and nothing on the way to recognise; the words are there to be scrolled past, and they say so plainly, one sentence after another, until the page has run on for a very long time and the reader has stopped counting.";
+const longBody = () =>
+  Array.from({ length: 820 }, (_, at) => {
+    const remark = at === 30 ? 0 : at === 410 ? 1 : at === 790 ? 2 : -1;
+    return remark < 0
+      ? `Paragraph ${at + 1}: ${LONG_FILLER}`
+      : `Paragraph ${at + 1}: here is ${LONG_REMARKS[remark]!.words}, which a comment is about. ${LONG_FILLER}`;
+  }).join("\n\n");
 
 const SEEDS: Seed[] = [
   {
@@ -206,7 +226,38 @@ acts is the same self that reaps the result.`,
     days: 40,
     body: "",
   },
+  {
+    title: "A Very Long Note with Comments Far Apart",
+    folder: null,
+    days: 2,
+    body: longBody(),
+    remarks: LONG_REMARKS,
+  },
 ];
+
+type Json = { type?: string; text?: string; marks?: unknown[]; content?: Json[] };
+function markWords(node: Json, words: string, threadId: string): boolean {
+  const children = node.content ?? [];
+  for (let at = 0; at < children.length; at++) {
+    const child = children[at]!;
+    const start = child.text?.indexOf(words) ?? -1;
+    if (child.text !== undefined && start >= 0) {
+      const piece = (text: string, marks: unknown[] = child.marks ?? []) => ({ ...child, text, marks });
+      children.splice(
+        at,
+        1,
+        ...[
+          piece(child.text.slice(0, start)),
+          piece(words, [...(child.marks ?? []), { type: "comment", attrs: { threadId } }]),
+          piece(child.text.slice(start + words.length)),
+        ].filter((part) => part.text),
+      );
+      return true;
+    }
+    if (markWords(child, words, threadId)) return true;
+  }
+  return false;
+}
 
 export const FIXTURE_META: Meta = {
   v: 1,
@@ -231,6 +282,7 @@ export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
       ...(content.content ?? []),
       { type: "drawing", attrs: { strokes: seed.sketch, surface: "board" } },
     ];
+  for (const remark of seed.remarks ?? []) markWords(content as Json, remark.words, remark.threadId);
   return {
     id: `n${index}`,
     title: seed.title,
@@ -245,6 +297,29 @@ export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
     updatedAt: iso(seed.days),
   };
 });
+
+/* A second populated catalogue: switching to an empty partner page hides the
+   expensive path. Keep long notes and folders on both sides of the preview. */
+const partnerId = (id: string) => `partner-${id}`;
+export const PARTNER_NOTES: Note[] = FIXTURE_NOTES.map((note) => ({
+  ...note,
+  id: partnerId(note.id),
+  title: `Partner · ${note.title}`,
+  ownerId: PREVIEW_U2,
+}));
+export const PARTNER_META: Meta = {
+  ...FIXTURE_META,
+  folders: FIXTURE_META.folders.map((folder) => ({
+    ...folder,
+    id: partnerId(folder.id),
+    parentId: folder.parentId ? partnerId(folder.parentId) : null,
+  })),
+  notes: FIXTURE_META.notes.map((note) => ({
+    ...note,
+    id: partnerId(note.id),
+    folderId: note.folderId ? partnerId(note.folderId) : null,
+  })),
+};
 
 /* ── The thesis archive ─────────────────────────────────────────────────────
    Two parts and five chapters with an explicit order, and one note not yet

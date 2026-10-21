@@ -4,7 +4,7 @@
  * with it. Two or three members share the width of the content; more scroll
  * sideways at a fixed width each, the same capsule. (Jacopo, 18 October 2026:
  * two faces overlapping in a pill under the bar read as an accident.) */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -14,16 +14,14 @@ import Animated, {
   withSpring,
   type DerivedValue,
 } from "react-native-reanimated";
+import { scheduleOnUI } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
 import { usePalette } from "./archive";
 import { Avatar, type Face } from "./Avatar";
 import { Card } from "./Grouped";
-/* The thumb's two edges ride two critically damped springs: the edge in
-   front leaves first and the one behind follows, so the plate stretches in
-   the direction it travels and gathers itself as it lands — no overshoot,
-   and a tap mid-flight carries each edge's speed into the new target. */
-const lead = { dampingRatio: 1, duration: 300 } as const;
-const trail = { dampingRatio: 1, duration: 460 } as const;
+/* One short glide. Reading a shared value on the JS thread can block on the
+   UI thread; the gesture's visual response stays on the UI thread instead. */
+const glide = { dampingRatio: 1, duration: 220 } as const;
 
 export interface Whose {
   face: Face;
@@ -109,11 +107,24 @@ export function WhoseSwitch({
      frame and sprung to after, so the page opening does not slide it in. */
   const left = useSharedValue(at);
   const right = useSharedValue(at + 1);
-  useEffect(() => {
-    const forward = at + 1 > right.value;
-    right.value = withSpring(at + 1, forward ? lead : trail);
-    left.value = withSpring(at, forward ? trail : lead);
-  }, [at, left, right]);
+  const target = useSharedValue(at);
+  /* Sent from the press itself, before the page under it renders the new
+     member's notes: the plate leaves under the finger, not a render later. */
+  const slide = useCallback(
+    (to: number) => {
+      scheduleOnUI((next: number) => {
+        "worklet";
+        // The press and the selected prop can announce the same target.
+        // Do not restart a spring that is already going there.
+        if (target.value === next) return;
+        target.value = next;
+        right.value = withSpring(next + 1, glide);
+        left.value = withSpring(next, glide);
+      }, to);
+    },
+    [left, right, target],
+  );
+  useEffect(() => slide(at), [at, slide]);
   /* The plate's centre, in segments: what the labels read. */
   const place = useDerivedValue(() => (left.value + right.value - 1) / 2);
   const thumb = useAnimatedStyle(() => ({
@@ -156,6 +167,7 @@ export function WhoseSwitch({
               selected={index === at}
               onPress={() => {
                 if (index === at) return;
+                slide(index);
                 void Haptics.selectionAsync().catch(() => {});
                 onChoose(who.face.userId);
               }}

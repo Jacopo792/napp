@@ -10,16 +10,7 @@ import { useToolbarIcon } from "../../icons";
  * as whom, and the access token, set before its script runs; a refreshed token
  * follows it in. The refresh token never crosses — see editor/main.tsx. */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import {
-  Keyboard,
-  Linking,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Pressable,
-} from "react-native";
+import { Keyboard, Linking, Platform, Pressable, Share, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { File } from "expo-file-system";
@@ -31,13 +22,15 @@ import {
   attachmentLabel,
   attachmentType,
 } from "@/features/editor/lib/attachments";
-import type { HostedCommand } from "@/lib/hostedCommands";
+import type { HostedBody, HostedCommand } from "@/lib/hostedCommands";
 import type { SearchStatus } from "@/features/editor/components/RichTextEditor";
-import { IconButton } from "../../IconButton";
+import { richTextToPlainText } from "@/features/editor/lib/content";
+import { FindBar, NoteBar } from "../../NoteBars";
+import { ImageViewer } from "../../ImageViewer";
 import { NoteHistory } from "../../NoteHistory";
-import { NoteComments } from "../../NoteComments";
+import { NoteComments, preloadComments } from "../../NoteComments";
 import { NotePeople } from "../../NotePeople";
-import { useHostedNote } from "../../HostedPage";
+import { useHostedNote, type ShownImage } from "../../HostedPage";
 import { useTextPrompt } from "../../TextPrompt";
 import { attempt } from "../../SettingsControls";
 import { useArchive, usePalette } from "../../archive";
@@ -51,12 +44,16 @@ export default function Note() {
   const icon = useToolbarIcon();
   const nativeHeaderHeight = useHeaderHeight();
   const [finding, setFinding] = useState(false);
-  const headerHeight = nativeHeaderHeight + (finding ? 56 : 0);
+  const headerHeight = nativeHeaderHeight;
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<SearchStatus>({ current: 0, total: 0 });
   const [panel, setPanel] = useState<"history" | "comments" | "people" | null>(null);
   const [anchor, setAnchor] = useState<{ threadId: string; quote: string } | null>(null);
+  /* The thread whose passage was tapped in the note: the sheet opens on it. */
+  const [thread, setThread] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The picture in the note the viewer is showing. */
+  const [shownImage, setShownImage] = useState<ShownImage | null>(null);
   const prompt = useTextPrompt();
   const { id, comments: openComments } = useLocalSearchParams<{ id: string; comments?: string }>();
   /* Opened from Comments, the sheet waits for the push to land: two native
@@ -79,6 +76,7 @@ export default function Note() {
     };
   }, [openComments, navigation]);
   const { session, snapshot, metaOf, preferences, setOpenNote, facesOf } = useArchive();
+  useEffect(() => preloadComments(session, id), [session, id]);
   const faces = facesOf(id);
   const palette = usePalette();
   const router = useRouter();
@@ -94,11 +92,19 @@ export default function Note() {
     const hidden = Keyboard.addListener(ios ? "keyboardWillHide" : "keyboardDidHide", () =>
       setKeyboard(false),
     );
+    /* A sheet or a picker presented over the page can swallow the keyboard's
+       goodbye, and a page that still believed it was writing kept its tools
+       away until it was left and entered again. The keyboard's own word on
+       whether it is up is asked again whenever the page is back in front. */
+    const settled = Keyboard.addListener("keyboardDidHide", () => setKeyboard(false));
+    const back = navigation.addListener("focus" as never, () => setKeyboard(Keyboard.isVisible()));
     return () => {
       shown.remove();
       hidden.remove();
+      settled.remove();
+      back();
     };
-  }, []);
+  }, [navigation]);
   const frame = useRef<ComponentRef<typeof View>>(null);
   const [frameTop, setFrameTop] = useState(0);
   const askLink = () =>
@@ -141,8 +147,10 @@ export default function Note() {
       },
       onLink: (noteId) => router.push({ pathname: "/note/[id]", params: { id: noteId } }),
       onLinkPrompt: askLink,
-      onComment: () => {
+      onImage: setShownImage,
+      onComment: (threadId) => {
         setAnchor(null);
+        setThread(threadId);
         setPanel("comments");
       },
     },
@@ -233,6 +241,18 @@ export default function Note() {
       setAnchor(selected);
       setPanel("comments");
     });
+  /* Share is the system's sheet with the note in it, as words: Messages,
+     Mail, AirDrop, Notes and the rest all take text. A file of the note is
+     Export's, in the ⋯ — writing one first would hold the sheet back. */
+  const share = () =>
+    void attempt(async () => {
+      const { title, content } = await execute<HostedBody>({ type: "body" });
+      const text = richTextToPlainText(content);
+      await Share.share({
+        title: title || "Untitled",
+        message: [title, text].filter(Boolean).join("\n\n"),
+      });
+    });
   const status = !state
     ? ""
     : state.refusal ||
@@ -244,6 +264,10 @@ export default function Note() {
             ? "Waking the server"
             : "Connecting");
 
+  const showImage = useCallback(
+    () => void execute({ type: "image", action: "shown" }).catch(() => {}),
+    [execute],
+  );
   const writing = keyboard && canEdit && !panel && !finding;
   /* The pen in hand is Markup: the page is the ink's, so both bars make way
      and the header is Done alone, as in Notes. */
@@ -286,18 +310,12 @@ export default function Note() {
           separateBackground
           onPress={() => run({ type: "edit", action: "undo" })}
         />
-        <Stack.Toolbar.Menu icon={icon("square.and.arrow.up")} hidden={drawing}>
-          <Stack.Toolbar.Label>Share as</Stack.Toolbar.Label>
-          {(["md", "pdf", "docx"] as const).map((format) => (
-            <Stack.Toolbar.MenuAction
-              key={format}
-              disabled={busy}
-              onPress={() => run({ type: "export", format })}
-            >
-              {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
-            </Stack.Toolbar.MenuAction>
-          ))}
-        </Stack.Toolbar.Menu>
+        <Stack.Toolbar.Button
+          icon={icon("square.and.arrow.up")}
+          accessibilityLabel="Share"
+          hidden={drawing}
+          onPress={share}
+        />
         {/* Only what is nowhere else. Pin, Lock, Move, Archive and Delete are
             the held note's; Format is the writing bar's; Comments, attaching
             and sharing have buttons of their own. A second door to the same
@@ -312,6 +330,17 @@ export default function Note() {
           <Stack.Toolbar.MenuAction icon={icon("person.2")} onPress={() => setPanel("people")}>
             People
           </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.Menu icon={icon("arrow.down.doc")} disabled={busy}>
+            <Stack.Toolbar.Label>Export</Stack.Toolbar.Label>
+            {(["md", "pdf", "docx"] as const).map((format) => (
+              <Stack.Toolbar.MenuAction
+                key={format}
+                onPress={() => run({ type: "export", format })}
+              >
+                {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
+              </Stack.Toolbar.MenuAction>
+            ))}
+          </Stack.Toolbar.Menu>
         </Stack.Toolbar.Menu>
         <Stack.Toolbar.Button
           icon={icon("checkmark")}
@@ -322,40 +351,7 @@ export default function Note() {
           onPress={() => run(drawing ? { type: "putDownPen" } : { type: "edit", action: "done" })}
         />
       </Stack.Toolbar>
-      {/* At rest, Notes' own row; while writing it gives way to the bar on
-          the keyboard. */}
-      {!keyboard && !drawing ? (
-        <Stack.Toolbar tintColor={palette.ink}>
-          <Stack.Toolbar.View>
-            <IconButton
-              icon="checklist"
-              label="Checklist"
-              disabled={!canEdit || busy}
-              onPress={() => run({ type: "format", action: "checklist" })}
-            />
-          </Stack.Toolbar.View>
-          <Stack.Toolbar.Menu icon={icon("paperclip")} disabled={!canEdit || busy}>
-            <Stack.Toolbar.MenuAction icon={icon("photo")} onPress={() => attach(true)}>
-              Choose Photo
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction icon={icon("doc")} onPress={() => attach(false)}>
-              Attach File
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-          <Stack.Toolbar.View>
-            <IconButton
-              icon="pencil.tip.crop.circle"
-              label="Markup"
-              disabled={!canEdit || busy}
-              onPress={() => run({ type: "format", action: "drawing-page" })}
-            />
-          </Stack.Toolbar.View>
-          <Stack.Toolbar.Spacer />
-          <Stack.Toolbar.View>
-            <IconButton icon="bubble.left.and.bubble.right" label="Comments" onPress={comments} />
-          </Stack.Toolbar.View>
-        </Stack.Toolbar>
-      ) : null}
+
       {panel === "history" ? (
         <NoteHistory
           noteId={id}
@@ -378,70 +374,15 @@ export default function Note() {
           canEdit={canEdit}
           execute={execute}
           anchor={anchor}
+          thread={thread}
           onClose={() => {
             setPanel(null);
             setAnchor(null);
+            setThread(null);
           }}
         />
       ) : null}
-      {finding ? (
-        <View
-          style={{
-            position: "absolute",
-            zIndex: 1,
-            top: nativeHeaderHeight,
-            left: 0,
-            right: 0,
-            height: 56,
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            gap: 12,
-            backgroundColor: palette.paper,
-          }}
-        >
-          <TextInput
-            accessibilityLabel="Find in Note"
-            autoFocus
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Find in Note"
-            placeholderTextColor={palette.ink3}
-            style={{ flex: 1, color: palette.ink, fontSize: 17 }}
-          />
-          <Text style={{ color: palette.ink3 }}>
-            {matches.current}/{matches.total}
-          </Text>
-          <Pressable
-            accessibilityLabel="Previous Match"
-            onPress={() =>
-              void attempt(async () =>
-                setMatches(await execute<SearchStatus>({ type: "previousMatch" })),
-              )
-            }
-          >
-            <Text style={{ color: palette.ink, fontSize: 22 }}>↑</Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Next Match"
-            onPress={() =>
-              void attempt(async () =>
-                setMatches(await execute<SearchStatus>({ type: "nextMatch" })),
-              )
-            }
-          >
-            <Text style={{ color: palette.ink, fontSize: 22 }}>↓</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setFinding(false);
-              run({ type: "closeSearch" });
-            }}
-          >
-            <Text style={{ color: palette.accent }}>Done</Text>
-          </Pressable>
-        </View>
-      ) : null}
+
       <Host style={[styles.page, { backgroundColor: palette.canvas }]} />
       {/* Until the editor holds the note, the shape of a note in the page's
           own colour; it dissolves into the words as they arrive. */}
@@ -473,7 +414,54 @@ export default function Note() {
             frameTop={frameTop}
           />
         ) : null}
+        {/* At rest, the page's own bar; while writing it gives way to the bar
+            on the keyboard. */}
+        {!keyboard && !drawing && !finding ? (
+          <NoteBar
+            canEdit={canEdit}
+            busy={busy}
+            onChecklist={() => run({ type: "format", action: "checklist" })}
+            onAttach={attach}
+            onMarkup={() => run({ type: "format", action: "drawing-page" })}
+            onComments={comments}
+          />
+        ) : null}
+        {finding ? (
+          <FindBar
+            query={query}
+            onQuery={setQuery}
+            current={matches.current}
+            total={matches.total}
+            onPrevious={() =>
+              void attempt(async () =>
+                setMatches(await execute<SearchStatus>({ type: "previousMatch" })),
+              )
+            }
+            onNext={() =>
+              void attempt(async () =>
+                setMatches(await execute<SearchStatus>({ type: "nextMatch" })),
+              )
+            }
+            onClose={() => {
+              setFinding(false);
+              setQuery("");
+              setMatches({ current: 0, total: 0 });
+              run({ type: "closeSearch" });
+            }}
+          />
+        ) : null}
       </View>
+      {shownImage ? (
+        <ImageViewer
+          image={shownImage}
+          top={frameTop}
+          onShown={showImage}
+          onClosed={(then) => {
+            setShownImage(null);
+            void execute({ type: "image", action: then ?? "closed" }).catch(() => {});
+          }}
+        />
+      ) : null}
     </>
   );
 }

@@ -7,6 +7,7 @@ import { DURATION, EASE } from "@/lib/motionTokens";
 
 export const trashGround = "#ff453a";
 export const shelfGround = "#a970ff";
+export const pinGround = "#ff9f0a";
 
 const curve = (points: readonly number[]) =>
   Easing.bezier(points[0], points[1], points[2], points[3]);

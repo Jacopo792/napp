@@ -77,6 +77,19 @@ export interface NoteHandlers {
   onLink: (noteId: string) => void;
   onLinkPrompt: () => void;
   onComment: (threadId: string) => void;
+  /** A picture in the note was tapped; see `ImageViewer`. */
+  onImage: (image: ShownImage) => void;
+}
+
+/** A picture handed out of the page: its bytes, and where it stands in the
+ *  page, in the page's points. */
+export interface ShownImage {
+  uri: string;
+  alt: string;
+  width: number;
+  height: number;
+  editable: boolean;
+  rect: { x: number; y: number; width: number; height: number };
 }
 
 interface Borrower {
@@ -267,6 +280,8 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
       /* A word from a note that has since been put down. */
     } else if (message.kind === "commentOpen" && typeof message.threadId === "string") {
       current.handlers.onComment(message.threadId);
+    } else if (message.kind === "image" && typeof message.uri === "string") {
+      current.handlers.onImage(message as unknown as ShownImage);
     } else if (message.kind === "linkPrompt") {
       current.handlers.onLinkPrompt();
     } else if (message.kind === "link" && typeof message.target === "string") {
@@ -367,6 +382,7 @@ export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
           onLink: (id) => latest.current.handlers.onLink(id),
           onLinkPrompt: () => latest.current.handlers.onLinkPrompt(),
           onComment: (id) => latest.current.handlers.onComment(id),
+          onImage: (image) => latest.current.handlers.onImage(image),
         },
       });
     }, [borrow, key]),

@@ -20,7 +20,7 @@ const config: ExpoConfig = {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-foreground.png",
       monochromeImage: "./assets/adaptive-monochrome.png",
-      backgroundColor: "#EDE6D7",
+      backgroundColor: "#000000",
     },
   },
   plugins: [

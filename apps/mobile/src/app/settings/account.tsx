@@ -11,7 +11,7 @@ export default function Account() {
   const { profile, updateProfile, preferences: p } = useArchive();
   const prompt = useTextPrompt();
   const [busy, setBusy] = useState(false);
-  const accounts = useAccountCards(false);
+  const accounts = useAccountCards();
   const go = (section: string) =>
     ({ pathname: "/settings/[section]", params: { section } }) as const;
   const rename = () =>

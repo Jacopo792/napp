@@ -10,12 +10,14 @@ import { Appearance, Pressable, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabaseClient";
+import { SESSION_KEY } from "@/lib/sessionRestore";
 import { StatusBar } from "expo-status-bar";
 import {
   chooseArchive,
+  notesArchives,
   otherAccounts,
-  loadArchiveOptions,
   resumeAccount,
+  SignInAgain,
   restoreSession,
   type AuthenticationResult,
   type AppSession,
@@ -37,9 +39,17 @@ export default function Root() {
   const [choosing, setChoosing] = useState<AuthenticationResult | null>(null);
   const changing = useRef(false);
   const [error, setError] = useState("");
+  /* An account whose token the server refused: the sign-in page opens on its
+     address, never on "no archives". */
+  const [prefill, setPrefill] = useState("");
+  const fail = useCallback((reason: unknown) => {
+    setError(reason instanceof Error ? reason.message : String(reason));
+    if (reason instanceof SignInAgain) setPrefill(reason.email);
+  }, []);
   const router = useRouter();
   const accept = useCallback((next: AppSession) => {
     setChoosing(null);
+    setPrefill("");
     setSession(next);
   }, []);
   /* The launch stands until the archive it opened has its notes: which
@@ -57,12 +67,19 @@ export default function Root() {
   }, [router, userId, archiveId]);
   useEffect(() => {
     void (async () => {
+      /* The archives are asked for beside the token check, not after it: the
+         two were round trips in series before anything could be drawn. A
+         list fetched for an account that is not the one restored is dropped. */
+      const stored = storedSession();
+      const early = stored ? notesArchives(stored) : null;
+      early?.catch(() => {});
       const restored = await restoreSession();
       if (!restored) {
         await releaseAccountPreferences();
         return setSession(null);
       }
-      const archives = await loadArchiveOptions(restored.userId, { notesOnly: true });
+      const archives =
+        early && stored?.userId === restored.userId ? await early : await notesArchives(restored);
       const target = archives.find((item) => item.archiveId === restored.archiveId) ?? archives[0];
       if (target)
         setSession(
@@ -75,10 +92,10 @@ export default function Root() {
         setSession(null);
       }
     })().catch((reason) => {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      fail(reason);
       setSession(null);
     });
-  }, []);
+  }, [fail]);
 
   const changeAccount = useCallback(
     async (action: () => Promise<AuthenticationResult | null>) => {
@@ -96,11 +113,26 @@ export default function Root() {
         );
         clearPictures();
         try {
-          const result = await action();
+          let result = await action();
+          /* An empty list may be a read made without the account's token
+             (the archive screen's own read on a wake, say): asked again. */
+          if (result && !result.session && !result.archives.length) {
+            const archives = await notesArchives(result.account);
+            result = {
+              ...result,
+              archives,
+              session: archives[0]
+                ? await chooseArchive(result.account, archives[0].archiveId, { notesOnly: true })
+                : null,
+            };
+          }
           setChoosing(result?.session ? null : result);
           setSession(result?.session ?? null);
         } catch (reason) {
-          setError(reason instanceof Error ? reason.message : String(reason));
+          fail(reason);
+          /* A refused account is asked for its password; the one left is
+             saved and waits under the form. */
+          if (reason instanceof SignInAgain) return setSession(null);
           let recovered: AppSession | null = null;
           if (session && otherAccounts("").some((account) => account.userId === session.userId)) {
             recovered =
@@ -113,7 +145,7 @@ export default function Root() {
         changing.current = false;
       }
     },
-    [router, session],
+    [router, session, fail],
   );
   const palette = usePalette();
   /* The system's own surfaces — the tab bar, the glass, the bar buttons, the
@@ -198,6 +230,8 @@ export default function Root() {
             </ArchiveProvider>
           ) : (
             <SignIn
+              key={prefill}
+              initialEmail={prefill}
               onSession={accept}
               initialChoosing={choosing}
               onResume={(userId) => changeAccount(() => resumeAccount(userId, { notesOnly: true }))}
@@ -208,4 +242,17 @@ export default function Root() {
       </TextPromptProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** The account this phone was last open on, as it was written down — read
+ *  before the server has confirmed it, and only to start asking early. */
+function storedSession(): AppSession | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
+    return stored && typeof stored.userId === "string" && typeof stored.email === "string"
+      ? stored
+      : null;
+  } catch {
+    return null;
+  }
 }
