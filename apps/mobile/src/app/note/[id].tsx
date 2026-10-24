@@ -31,7 +31,7 @@ import { NoteHistory } from "../../NoteHistory";
 import { NoteComments, preloadComments } from "../../NoteComments";
 import { NotePeople } from "../../NotePeople";
 import { useHostedNote, type ShownImage } from "../../HostedPage";
-import { useTextPrompt } from "../../TextPrompt";
+import { useChoice, useTextPrompt } from "../../TextPrompt";
 import { attempt } from "../../SettingsControls";
 import { useArchive, usePalette } from "../../archive";
 import { Faces } from "../../Avatar";
@@ -55,6 +55,7 @@ export default function Note() {
   /** The picture in the note the viewer is showing. */
   const [shownImage, setShownImage] = useState<ShownImage | null>(null);
   const prompt = useTextPrompt();
+  const choose = useChoice();
   const { id, comments: openComments } = useLocalSearchParams<{ id: string; comments?: string }>();
   /* Opened from Comments, the sheet waits for the push to land: two native
      transitions at once is the stutter that read as lag. The timer is for a
@@ -320,28 +321,64 @@ export default function Note() {
             the held note's; Format is the writing bar's; Comments, attaching
             and sharing have buttons of their own. A second door to the same
             act is a second thing to read past (Jacopo, 19 October 2026). */}
-        <Stack.Toolbar.Menu icon={icon("ellipsis")} hidden={drawing}>
-          <Stack.Toolbar.MenuAction icon={icon("magnifyingglass")} onPress={() => setFinding(true)}>
-            Find in Note
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction icon={icon("clock")} onPress={() => setPanel("history")}>
-            History
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction icon={icon("person.2")} onPress={() => setPanel("people")}>
-            People
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.Menu icon={icon("arrow.down.doc")} disabled={busy}>
-            <Stack.Toolbar.Label>Export</Stack.Toolbar.Label>
-            {(["md", "pdf", "docx"] as const).map((format) => (
-              <Stack.Toolbar.MenuAction
-                key={format}
-                onPress={() => run({ type: "export", format })}
-              >
-                {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
-              </Stack.Toolbar.MenuAction>
-            ))}
+        {Platform.OS === "android" ? (
+          /* The header's own dropdown (Compose, in expo-router) never opens on
+             Android; the app's popover, which the folder's ⋯ already uses,
+             carries the same acts, Export a submenu of its three formats. */
+          <Stack.Toolbar.Button
+            icon={icon("ellipsis")}
+            accessibilityLabel="More"
+            hidden={drawing}
+            onPress={() =>
+              choose(
+                undefined,
+                [
+                  { label: "Find in Note", icon: "magnifyingglass", run: () => setFinding(true) },
+                  { label: "History", icon: "clock", run: () => setPanel("history") },
+                  { label: "People", icon: "person.2", run: () => setPanel("people") },
+                  {
+                    label: "Export",
+                    icon: "arrow.down.doc",
+                    disabled: busy,
+                    submenu: (["md", "pdf", "docx"] as const).map((format) => ({
+                      label: format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word",
+                      icon: "arrow.down.doc" as const,
+                      run: () => run({ type: "export", format }),
+                    })),
+                  },
+                ],
+                undefined,
+                "toolbar",
+              )
+            }
+          />
+        ) : (
+          <Stack.Toolbar.Menu icon={icon("ellipsis")} hidden={drawing}>
+            <Stack.Toolbar.MenuAction
+              icon={icon("magnifyingglass")}
+              onPress={() => setFinding(true)}
+            >
+              Find in Note
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction icon={icon("clock")} onPress={() => setPanel("history")}>
+              History
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction icon={icon("person.2")} onPress={() => setPanel("people")}>
+              People
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.Menu icon={icon("arrow.down.doc")} disabled={busy}>
+              <Stack.Toolbar.Label>Export</Stack.Toolbar.Label>
+              {(["md", "pdf", "docx"] as const).map((format) => (
+                <Stack.Toolbar.MenuAction
+                  key={format}
+                  onPress={() => run({ type: "export", format })}
+                >
+                  {format === "md" ? "Markdown" : format === "pdf" ? "PDF" : "Word"}
+                </Stack.Toolbar.MenuAction>
+              ))}
+            </Stack.Toolbar.Menu>
           </Stack.Toolbar.Menu>
-        </Stack.Toolbar.Menu>
+        )}
         <Stack.Toolbar.Button
           icon={icon("checkmark")}
           accessibilityLabel="Done"

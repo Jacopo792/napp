@@ -299,11 +299,18 @@ export function NoteList({
           progressViewOffset={tab ? inset.top + BAR : undefined}
           keyExtractor={(entry) => entry.note.id}
           stickySectionHeadersEnabled={false}
-          SectionSeparatorComponent={({ leadingItem, trailingSection }) => (
-            <View style={{ height: leadingItem && trailingSection ? 16 : 0 }} />
-          )}
+          /* The air between two cards belongs to the heading, never to a
+             SectionSeparatorComponent: a section's cells keep the separator
+             props they were first rendered with, so a note moving into the
+             first row of a group kept the gap it had as a second row, and
+             the card broke in two under its title. */
           renderSectionHeader={({ section }) => (
-            <View style={[styles.heading, { backgroundColor: card }]}>
+            <View
+              style={[
+                styles.heading,
+                { backgroundColor: card, marginTop: section === sections[0] ? 0 : 16 },
+              ]}
+            >
               <Text style={[styles.headingText, { color: palette.ink3 }]}>{section.title}</Text>
             </View>
           )}

@@ -58,6 +58,7 @@ import {
   mergeAccountPreferences,
   mergeRemarksSeen,
   phonePreferences,
+  withOwnLook,
   type AccountFlags,
   type AccountPreferences,
   type RemarksSeen,
@@ -94,6 +95,34 @@ export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}): Ac
 /* The phone's own look, as the row last said it. The computer never wears it
    but writes the whole blob, so it has to hand it back unchanged. */
 let phoneLook: AccountPreferences["phone"];
+
+/* The phone keeps its own look on the device as well, because a computer still
+   running a release from before the phone branch existed writes the blob
+   without one — and a phone that trusted the row alone went back to the
+   defaults at its next launch. The row wins whenever it carries a branch. */
+const phoneLookKey = (userId: string) => `napp:phone-look:${userId}`;
+
+function heldPhoneLook(userId: string): AccountPreferences["phone"] {
+  if (platform().kind !== "mobile") return undefined;
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(phoneLookKey(userId)) ?? "null");
+    return stored && typeof stored === "object"
+      ? (stored as AccountPreferences["phone"])
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function holdPhoneLook(userId: string, look: AccountPreferences["phone"]): void {
+  phoneLook = look;
+  if (platform().kind !== "mobile" || !look?.appearance) return;
+  try {
+    localStorage.setItem(phoneLookKey(userId), JSON.stringify(look));
+  } catch {
+    /* Without storage the row is the only copy, as before. */
+  }
+}
 
 /** What this browser holds right now: what a field the row does not carry
  *  falls back to, and what a fresh account's first change writes. */
@@ -136,6 +165,7 @@ export async function releaseAccountPreferences(session?: AppSession): Promise<v
 export function localPreferences(seen: RemarksSeen = {}, userId?: string): AccountPreferences {
   if (held && userId && userId === heldFor)
     return { ...held, remarksSeen: { ...held.remarksSeen, ...seen } };
+  if (userId && !phoneLook) phoneLook = heldPhoneLook(userId);
   return preferencesWith(
     {
       ...DEFAULT_FLAGS,
@@ -323,7 +353,7 @@ export async function pullAccountPreferences(session: AppSession): Promise<Accou
     localPreferences(heldRemarksSeen(session.userId), session.userId),
   );
   if (unsent) return unsent;
-  phoneLook = preferences.phone;
+  holdPhoneLook(session.userId, preferences.phone);
   held = preferences;
   settled = JSON.stringify(preferences);
   apply(preferences);
@@ -342,7 +372,7 @@ export function pushAccountPreferences(session: AppSession, preferences: Account
   const blob = JSON.stringify(preferences);
   if (blob === settled) return;
   settled = blob;
-  phoneLook = preferences.phone;
+  holdPhoneLook(session.userId, preferences.phone);
   heldFor = session.userId;
   held = unsent = preferences;
   holdRemarksSeen(session.userId, preferences.remarksSeen);
@@ -376,12 +406,27 @@ async function write(
      Its failure must not take the row with it — a wallpaper that did not
      upload is not a reason to lose a palette. */
   await shareWallpaper(session).catch(() => undefined);
+  /* The other side's look is read from the row now, never sent from memory:
+     see `withOwnLook`. A read that fails writes nothing, rather than guess. */
+  const current = await supabase
+    .from("profile_preferences")
+    .select("preferences")
+    .eq("user_id", session.userId)
+    .maybeSingle();
+  if (!current.error)
+    preferences = withOwnLook(
+      preferences,
+      (current.data as { preferences: unknown } | null)?.preferences,
+      platform().kind === "mobile",
+    );
   const heard = canonical(preferences);
   unheard.push(heard);
   if (unheard.length > 20) unheard.shift();
-  const result = await supabase
-    .from("profile_preferences")
-    .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
+  const result = current.error
+    ? current
+    : await supabase
+        .from("profile_preferences")
+        .upsert({ user_id: session.userId, preferences }, { onConflict: "user_id" });
   if (!result.error) return;
   const written = unheard.lastIndexOf(heard);
   if (written >= 0) unheard.splice(written, 1);
@@ -449,7 +494,7 @@ export function subscribeToAccountPreferences(
         const blob = JSON.stringify(preferences);
         if (blob === settled) return;
         settled = blob;
-        phoneLook = preferences.phone;
+        holdPhoneLook(session.userId, preferences.phone);
         held = preferences;
         apply(preferences);
         holdRemarksSeen(session.userId, preferences.remarksSeen);

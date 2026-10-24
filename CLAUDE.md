@@ -1152,7 +1152,21 @@ token check rather than after it.
 on the phone goes into `profile_preferences.phone`; web and desktop preserve
 that branch without applying it. Until the phone chooses something, it wears
 the defaults and its own cache — never the computer's theme, palette or
-wallpaper, and nothing the phone does reaches them. Writing colour, autocorrection and privacy
+wallpaper, and nothing the phone does reaches them.
+
+"Preserve" meant "send back what it last heard", and that was the bug
+(Jacopo, 24 October 2026: Paper chosen on the phone, grey again two days
+later). The blob is written whole, so a desktop window whose channel went
+quiet with the lid wrote its stale copy of the phone's branch with every
+remark it read — and the released web and desktop, cut before the branch
+existed, wrote no branch at all: the row read with no `phone` key, last
+written by a computer. So `write()` reads the row just before the upsert and
+`withOwnLook` takes the other side's half from it: the phone owns `phone`,
+the computer owns `appearance` and `axes`, and neither writes the other's
+from memory. A failed read writes nothing. And the phone keeps its own look
+on the device (`napp:phone-look:<user>`), which a row without a branch falls
+back to, so an old computer still out there cannot put the phone back to
+the defaults; the phone's next write restores the branch. Writing colour, autocorrection and privacy
 remain account-wide. Phone text uses the Apple system font and fixed reading
 defaults (17 pt, weight 400, leading 1.55). Reading, Icon Style and Folder Colour
 controls were removed at Jacopo's request on 17 October 2026; phone folders
@@ -1212,9 +1226,20 @@ foreground and monochrome mask, and the shared splash / launch mark. Android's
 adaptive background is black. Web favicons, installed-web-app icons, the
 shared sign-in page, the mobile sign-in and the desktop build resources use
 this mark. The desktop Mac artwork is 824 px centred in a transparent 1024 px
-canvas. Launch shows the same mark as the native splash, standing still until
-the archive opens, then fading; the old paper-stack animation is retired.
-Regenerate native projects after asset changes before building an installer.
+canvas. Launch is that mark as a combination lock, because that is what the
+wait is: the archive is shut while it is being opened. Its first frame is the
+native splash to the pixel — the tile, the arch and the five rules drawn as
+Views of the svg's own geometry, the arch cut out of the splash png itself
+because a border-radius is not the svg's curve — and then the rules turn as
+cylinders, each drifting a few points either way inside the tile so the mark
+is still the mark in every frame, while the arch stays closed. The lock is
+timed on the UI thread: the Home mounts on the JS thread at the same moment,
+and a lock timed there landed after the arch had opened. When the archive is open they fall into line top to bottom, a tick
+each, the arch springs up and the tile gives way to the Home; a warm start
+does the same in under a second, and reduced motion only opens the arch and
+fades. The paper stack, a still mark, a handwritten word and an ink drop were
+all tried and refused before it. Regenerate native projects after asset
+changes before building an installer.
 The logo is brand artwork, not a claim that note content is encrypted.
 
 One shape language for the phone: a thing sits on a rounded square with a

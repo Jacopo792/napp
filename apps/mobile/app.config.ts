@@ -28,8 +28,8 @@ const config: ExpoConfig = {
     "expo-sharing",
     ["expo-router", { root: "./src/app" }],
     /* The mark on the default palette's page, light and dark — the first frame
-       of `src/Launch.tsx`, which draws the same sheets at the same size and
-       centre, so the hand-off from the system to the app is not seen. */
+       of `src/Launch.tsx`, which draws the same tile, arch and rules at the
+       same size and centre, so the hand-off from the system is not seen. */
     [
       "expo-splash-screen",
       {

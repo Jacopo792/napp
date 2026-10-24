@@ -65,6 +65,10 @@ configureReanimatedLogger({ level: ReanimatedLogLevel.error, strict: false });
 export const glassy = Platform.OS === "ios" && isLiquidGlassAvailable();
 /** The bar's own height under the status bar. */
 export const BAR = 56;
+/** What stands in the bar — face, search pill, round button — is one height,
+ *  iOS 26's 44, so the three read as one row rather than a pill between two
+ *  smaller things. */
+const CONTROL = 44;
 const FADE = 32;
 
 /** A round button: glass where the system has it, a quiet disc elsewhere. */
@@ -72,7 +76,7 @@ export function RoundButton({
   icon,
   label,
   onPress,
-  size = 40,
+  size = CONTROL,
   disabled,
 }: {
   icon: SFSymbol;
@@ -96,7 +100,7 @@ export function RoundButton({
       <Disc style={disc}>
         <SymbolView
           name={icon}
-          size={Math.round(size * 0.46)}
+          size={Math.round(size * 0.5)}
           weight="semibold"
           tintColor={palette.ink}
         />
@@ -143,7 +147,7 @@ export function SearchPill({
   const inner = (
     <Disc style={styles.pill}>
       <View style={styles.pillRow}>
-        <SymbolView name="magnifyingglass" size={17} weight="semibold" tintColor={palette.ink3} />
+        <SymbolView name="magnifyingglass" size={19} weight="semibold" tintColor={palette.ink3} />
         {onChange ? (
           <TextInput
             accessibilityLabel="Search"
@@ -230,7 +234,7 @@ export function TopBar({
                   avatarObject: profile?.avatarObject ?? null,
                 }}
                 email={session.email}
-                size={40}
+                size={CONTROL}
               />
             </Press>
           </Link.Trigger>
@@ -664,7 +668,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
   },
-  pill: { height: 40, borderRadius: 20, justifyContent: "center" },
+  pill: { height: CONTROL, borderRadius: CONTROL / 2, justifyContent: "center" },
   pillRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   boneRow: {
     flexDirection: "row",

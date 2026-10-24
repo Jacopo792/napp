@@ -73,6 +73,44 @@ export function phonePreferences(row: AccountPreferences): AccountPreferences {
 }
 
 /**
+ * What one client writes: its own half of the look, and the other half exactly
+ * as the row holds it at the moment of writing.
+ *
+ * The blob is written whole, so a client that sends the other side's look from
+ * its own memory sends whatever it last heard — and a desktop window open for
+ * a week, whose Realtime channel went quiet with the lid, last heard of the
+ * phone days ago. Its next write of anything (a remark read, a release read)
+ * put the phone back to that. The phone owns `phone`; the computer owns
+ * `appearance` and `axes`; neither may write the other's from memory.
+ *
+ * On the phone its own branch is laid over the row's half by half, so a phone
+ * that has lost its copy (a launch whose read came back empty) cannot write an
+ * empty branch over the one it chose.
+ */
+export function withOwnLook(
+  mine: AccountPreferences,
+  stored: unknown,
+  onPhone: boolean,
+): AccountPreferences {
+  if (!stored || typeof stored !== "object") return mine;
+  const row = mergeAccountPreferences(stored, mine);
+  const theirs = asPhone((stored as { phone?: unknown }).phone);
+  return onPhone
+    ? accountPreferences(row.appearance, row.axes, mine.writing, mine, mine.remarksSeen, {
+        ...theirs,
+        ...mine.phone,
+      })
+    : accountPreferences(
+        mine.appearance,
+        mine.axes,
+        mine.writing,
+        mine,
+        mine.remarksSeen,
+        row.phone,
+      );
+}
+
+/**
  * The later of two readings, note by note.
  *
  * The one place in this blob that is not last-write-wins, and it has to be:

@@ -47,7 +47,7 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   gearshape: "settings",
   "ellipsis.circle": "more_horiz",
   ellipsis: "more_horiz",
-  "arrow.uturn.backward": "restore",
+  "arrow.uturn.backward": "undo",
   "arrow.up.arrow.down": "swap_vert",
   "person.crop.circle": "account_circle",
   person: "person",

@@ -33,6 +33,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  FadeIn,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -72,7 +73,10 @@ export interface Choice {
   icon?: SFSymbol;
   /** Read to VoiceOver as a hint; never drawn under the label. */
   detail?: string;
-  run: () => void;
+  /** Absent on a row that only opens its `submenu`. */
+  run?: () => void;
+  /** One level: pressed, the popover swaps to these, with a way back on top. */
+  submenu?: Choice[];
   destructive?: boolean;
   disabled?: boolean;
 }
@@ -114,6 +118,7 @@ export function TextPromptProvider({ children }: { children: ReactNode }) {
     choices: Choice[];
     preview?: ReactNode;
     place: Place;
+    rows: number;
   } | null>(null);
   const [visible, setVisible] = useState<"offer" | "request" | null>(null);
   const afterDismiss = useRef<(() => void) | null>(null);
@@ -159,15 +164,21 @@ export function TextPromptProvider({ children }: { children: ReactNode }) {
         anchor !== "toolbar" && touch.current && Date.now() - touch.current.at < FRESH_MS
           ? touch.current
           : null;
+      /* The popover keeps one size while a submenu swaps in, so it is laid out
+         for the longest list it will show (a submenu adds its way-back row). */
+      const rows = Math.max(
+        choices.length,
+        ...choices.map((choice) => (choice.submenu ? choice.submenu.length + 1 : 0)),
+      );
       const place = placeMenu({
-        rows: choices.length,
+        rows,
         titled: Boolean(title),
         preview: Boolean(preview),
         at: recent,
         screen,
         inset,
       });
-      setOffer({ title, choices, preview, place });
+      setOffer({ title, choices, preview, place, rows });
       shown.value = 0;
       setVisible("offer");
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -363,13 +374,15 @@ function Popover({
   onClose,
   onChoose,
 }: {
-  offer: { title?: string; choices: Choice[]; preview?: ReactNode; place: Place };
+  offer: { title?: string; choices: Choice[]; preview?: ReactNode; place: Place; rows: number };
   shown: SharedValue<number>;
   palette: Palette;
   onClose: () => void;
   onChoose: (choice: Choice) => void;
 }) {
   const { place } = offer;
+  /* The row whose submenu is showing, if one is. */
+  const [inside, setInside] = useState<Choice | null>(null);
   // Grows once it is on screen; the Modal mounts it in the same breath.
   useEffect(() => {
     shown.value = withSpring(1, grow);
@@ -384,7 +397,8 @@ function Popover({
     opacity: shown.value,
     transform: [{ scale: 0.94 + 0.06 * shown.value }],
   }));
-  const fits = place.height >= offer.choices.length * ROW + (offer.title ? HEAD : 0) + PAD * 2;
+  const fits = place.height >= offer.rows * ROW + (offer.title ? HEAD : 0) + PAD * 2;
+  const list = inside?.submenu?.filter((choice) => !choice.disabled) ?? offer.choices;
   const shape = {
     width: place.width,
     height: place.height,
@@ -398,40 +412,70 @@ function Popover({
       bounces={false}
       contentContainerStyle={{ paddingVertical: PAD }}
     >
-      {offer.title ? (
-        <Text
-          accessibilityRole="header"
-          numberOfLines={1}
-          style={[styles.menuTitle, { color: palette.ink3 }]}
-        >
-          {offer.title}
-        </Text>
-      ) : null}
-      {offer.choices.map((choice) => {
-        const tint = choice.destructive ? palette.danger : palette.ink;
-        return (
+      <Animated.View key={inside?.label ?? "menu"} entering={FadeIn.duration(160)}>
+        {inside ? (
           <Press
-            key={choice.label}
             accessibilityRole="button"
-            accessibilityLabel={choice.label}
-            accessibilityHint={choice.detail}
+            accessibilityLabel={`Back from ${inside.label}`}
             style={styles.menuRow}
-            onPress={() => onChoose(choice)}
+            onPress={() => setInside(null)}
           >
             <View style={[styles.menuTile, { backgroundColor: quiet(palette) }]}>
               <SymbolView
-                name={choice.icon ?? actionIcon(choice.label)}
+                name="chevron.backward"
                 size={17}
                 weight="medium"
-                tintColor={tint}
+                tintColor={palette.ink}
               />
             </View>
-            <Text numberOfLines={1} style={[styles.menuLabel, { color: tint }]}>
-              {choice.label}
+            <Text numberOfLines={1} style={[styles.menuLabel, { color: palette.ink }]}>
+              {inside.label}
             </Text>
           </Press>
-        );
-      })}
+        ) : null}
+        {!inside && offer.title ? (
+          <Text
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={[styles.menuTitle, { color: palette.ink3 }]}
+          >
+            {offer.title}
+          </Text>
+        ) : null}
+        {list.map((choice) => {
+          const tint = choice.destructive ? palette.danger : palette.ink;
+          return (
+            <Press
+              key={choice.label}
+              accessibilityRole="button"
+              accessibilityLabel={choice.label}
+              accessibilityHint={choice.detail}
+              style={styles.menuRow}
+              onPress={() => (choice.submenu ? setInside(choice) : onChoose(choice))}
+            >
+              <View style={[styles.menuTile, { backgroundColor: quiet(palette) }]}>
+                <SymbolView
+                  name={choice.icon ?? actionIcon(choice.label)}
+                  size={17}
+                  weight="medium"
+                  tintColor={tint}
+                />
+              </View>
+              <Text numberOfLines={1} style={[styles.menuLabel, { color: tint }]}>
+                {choice.label}
+              </Text>
+              {choice.submenu ? (
+                <SymbolView
+                  name="chevron.right"
+                  size={14}
+                  weight="semibold"
+                  tintColor={palette.ink3}
+                />
+              ) : null}
+            </Press>
+          );
+        })}
+      </Animated.View>
     </ScrollView>
   );
   return (

@@ -23,7 +23,7 @@ const custom = shape.accountPreferences(
   {},
   { appearance: { ...DEFAULT_APPEARANCE, background: "#abcdef" } },
 );
-function fixture(kind: "desktop" | "mobile" = "desktop") {
+function fixture(kind: "desktop" | "mobile" = "desktop", storage = new Map<string, string>()) {
   let appearance = { ...DEFAULT_APPEARANCE };
   let axes = { ...DEFAULT_AXES };
   let writing = { ...DEFAULT_WRITING_PREFERENCES };
@@ -32,7 +32,6 @@ function fixture(kind: "desktop" | "mobile" = "desktop") {
   const adopted: Blob[] = [];
   const writes: { user_id: string; preferences: shape.AccountPreferences }[] = [];
   const timers = new Map<number, () => void>();
-  const storage = new Map<string, string>();
   const controls = {
     fail: false,
     read: Promise.resolve({ data: { preferences: custom }, error: null }),
@@ -252,6 +251,7 @@ test("desktop Realtime changes leave the phone theme and wallpaper intact", asyn
   const current = f.api.localPreferences({}, session.userId);
   assert.equal(current.collaborators, false);
   assert.equal(current.appearance.wallpaperObject, "desktop-changed");
+  f.controls.read = Promise.resolve({ data: { preferences: current }, error: null });
   f.api.pushAccountPreferences(session, { ...current, collaborators: true });
   await f.api.releaseAccountPreferences(session);
   assert.equal(f.writes[0].preferences.appearance.wallpaperObject, "desktop-changed");
@@ -304,4 +304,44 @@ test("desktop still applies and downloads its own wallpaper, independently of ph
   assert.equal(f.downloads[0], "desktop-only");
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(f.adopted.length, 1);
+});
+
+const paper = { ...DEFAULT_APPEARANCE, theme: "light" as const, background: "#fbfaf7" };
+
+test("a computer that missed the phone's choice writes the row's phone branch, not its own memory", async () => {
+  const f = fixture();
+  await f.api.pullAccountPreferences(session);
+  // The phone chooses Paper while this window's channel hears nothing.
+  f.controls.read = Promise.resolve({
+    data: { preferences: { ...custom, phone: { appearance: paper } } },
+    error: null,
+  });
+  f.api.pushAccountPreferences(session, f.api.preferencesWith(shape.DEFAULT_FLAGS, { n: "x" }));
+  await f.api.releaseAccountPreferences(session);
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].preferences.phone?.appearance?.background, "#fbfaf7");
+  assert.equal(f.writes[0].preferences.remarksSeen.n, "x");
+});
+
+test("a phone keeps its own look when an older computer wrote the row without it", async () => {
+  const storage = new Map<string, string>();
+  const before = fixture("mobile", storage);
+  before.controls.read = Promise.resolve({
+    data: { preferences: { ...custom, phone: { appearance: paper } } },
+    error: null,
+  });
+  await before.api.pullAccountPreferences(session);
+  // Days later: the row has been rewritten by a computer that knows no phone.
+  const after = fixture("mobile", storage);
+  after.controls.read = Promise.resolve({
+    data: { preferences: { ...custom, phone: undefined } },
+    error: null,
+  });
+  const pulled = await after.api.pullAccountPreferences(session);
+  assert.equal(after.appearance().background, "#fbfaf7");
+  // And its next write of anything puts the branch back, over the row's desktop half.
+  after.api.pushAccountPreferences(session, { ...pulled, collaborators: false });
+  await after.api.releaseAccountPreferences(session);
+  assert.equal(after.writes[0].preferences.phone?.appearance?.background, "#fbfaf7");
+  assert.equal(after.writes[0].preferences.appearance.accent, "#123456");
 });
