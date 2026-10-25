@@ -80,8 +80,10 @@ export function originAtPress(el: HTMLElement) {
  *  opened from the keyboard, a link or ⌘K, there is nothing it came out of,
  *  and the page arrives as it always did. Once per element. */
 const zoomed = new WeakSet<Element>();
-/* The things a note is opened out of: a row of the list, and Home's cards. */
-const NOTE_OPENERS = "[data-note-row], .home-continue, .home-note, .home-wait, .home-lately-row";
+/* The things a note is opened out of: Home's cards, which the note replaces.
+   A row of the list is not one — the note opens beside it, in a pane that
+   never moved, and a page growing out of the row read as the window bouncing. */
+const NOTE_OPENERS = ".home-continue, .home-note, .home-wait, .home-lately-row";
 
 export function zoomNote(el: HTMLElement | null) {
   if (!el || zoomed.has(el) || reduced()) return;
@@ -342,27 +344,6 @@ export function sendNotes(moves: { id: string; to: string | null; leaves: boolea
        only a row that is leaving it may be seen to go. */
     if (move.leaves) vanish(move.id, delay);
   });
-}
-
-/* ── Which way a note came from ─────────────────────────────────────────────
-   Opening the next note down the list is moving down a long page, so the new
-   note rises into place and the old one leaves upward; the note above comes
-   the other way. Set on the root, where the page's entrance and the view
-   transition's exit both read it. Opened from anything that is not a row —
-   a link, ⌘K, a reload — there is no direction and the note only fades. */
-export function aimNote(fromId: string | null, toId: string) {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  const row = (id: string | null) =>
-    id ? document.querySelector(`[data-note-row="${CSS.escape(id)}"]`) : null;
-  const from = row(fromId);
-  const to = row(toId);
-  if (!from || !to || from === to) {
-    delete root.dataset.noteDirection;
-    return;
-  }
-  root.dataset.noteDirection =
-    to.getBoundingClientRect().top > from.getBoundingClientRect().top ? "down" : "up";
 }
 
 /* ── A wheel that rolls ─────────────────────────────────────────────────────

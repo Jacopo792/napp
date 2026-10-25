@@ -1877,13 +1877,15 @@ not a request for less motion. So:
   press gives 4% (`scale(0.96)`), the phone's `Press`, never a bounce.
 - **Sidebar glyphs never move on hover.** They move when something happens to
   their place: held over, given to, pressed. Do not put the hover wiggles back.
-- **A note opens out of what was pressed**, as on the phone, where it zooms
-  out of its card: a row of the list or of Comments, or a card on Home
-  (`zoomNote` on the editor body). The page grows from 0.94 over `--dur-slow`
-  with its origin on that row or card, and the column's staggered entrance
-  stands down while it does. The page being left still goes the way of
-  `aimNote`. From a link, ⌘K or the keyboard there is nothing it came out of,
-  and it arrives as before. The book's chapters are left as they were.
+- **A note opened from a list only fades in place.** The note pane is beside
+  the list and never moved, so there is nothing for it to travel from: a zoom
+  out of the row, the page sliding up or down with the row's direction and the
+  staggered entrance all ran together and read as the window bouncing (Jacopo,
+  25 October 2026). The old page fades over the new one (the view transition)
+  and the column's `page-in` is opacity only. Only a card on Home, which the
+  note _replaces_, still grows out of what was pressed (`zoomNote`, from 0.94
+  over `--dur-slow`). Do not put the row zoom or the directional slide back.
+  The book's chapters are left as they were.
 - A notched mouse wheel glides (trackpads untouched), columns fade under the
   chrome (not on Windows: a mask costs ClearType), and the title rises into the
   strip once it has scrolled away.

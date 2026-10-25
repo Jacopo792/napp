@@ -6033,33 +6033,6 @@
    was on: the next note down rises into place, the one above comes down, the
    way the page would move if the notes were one long scroll. Opened from
    anywhere else — a link, ⌘K, a reload — it has no direction and only fades. */
-@keyframes page-in-below {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-}
-
-@keyframes page-in-above {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-}
-
-/* The old page is out of the way before the new one moves in: two texts
-   crossing each other in the same place read as a double exposure, not as a
-   page turning. */
-:root[data-note-direction="down"] .page-in > * {
-  animation-name: page-in-below;
-  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
-}
-
-:root[data-note-direction="up"] .page-in > * {
-  animation-name: page-in-above;
-  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
-}
-
 /* Opening another note, raised by `handleSelectNote`. The page being left is
    a picture that fades in 160ms over the new one, which arrives through its
    own `page-in` underneath — so the old words leave rather than being cut.
@@ -6083,33 +6056,6 @@
 .is-opening-note::view-transition-old(note-body) {
   animation: fade-out 160ms var(--ease-out) both;
   mix-blend-mode: normal;
-}
-
-/* The page being left goes the other way from the one arriving. */
-.is-opening-note[data-note-direction="down"]::view-transition-old(note-body) {
-  animation-name: page-out-above;
-  animation-duration: 110ms;
-  animation-timing-function: var(--ease-press);
-}
-
-.is-opening-note[data-note-direction="up"]::view-transition-old(note-body) {
-  animation-name: page-out-below;
-  animation-duration: 110ms;
-  animation-timing-function: var(--ease-press);
-}
-
-@keyframes page-out-above {
-  to {
-    opacity: 0;
-    transform: translateY(-14px);
-  }
-}
-
-@keyframes page-out-below {
-  to {
-    opacity: 0;
-    transform: translateY(14px);
-  }
 }
 
 /* A note opened out of what was pressed (`zoomNote`): the page grows from
