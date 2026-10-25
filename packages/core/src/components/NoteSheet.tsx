@@ -35,6 +35,7 @@ import { loadVersions, type NoteVersion } from "@/lib/history";
 import { formatDateTime } from "@/lib/format";
 import { useStoredImage } from "@/lib/media";
 import type { AppSession } from "@/lib/session";
+import { SafetyActions } from "./SafetyActions";
 
 export interface SheetPerson {
   userId: string;
@@ -322,6 +323,9 @@ export function NoteSheet({
             </>
           )}
 
+          {note.owner?.userId !== session.userId ? (
+            <SafetyActions noteId={note.id} userId={note.owner?.userId} />
+          ) : null}
           <h3>Dates</h3>
           <dl className="sheet-facts">
             <dt>Created</dt>

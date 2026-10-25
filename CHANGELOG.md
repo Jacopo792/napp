@@ -3,6 +3,32 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.46 – 2026-10-25
+
+### Added
+
+- Account deletion, policy acceptance and public policy/recovery pages; reporting,
+  blocking and moderation controls backed by the existing deployed migrations.
+- Browser smoke and full-stack tests for writing, persistence, invitations,
+  unauthorized access, offline convergence, locks, history and account deletion.
+- Explicit device-content removal with account-scoped Yjs cleanup, cross-tab
+  coordination, blocked/aborted transaction handling and interrupted-removal recovery.
+- Deployment revision, readiness and origin checks before Pages publication.
+- A refreshed project overview and web/desktop branding.
+
+### Fixed
+
+- A concurrent edit during persistence could pair an older projection with a newer
+  Yjs binary. Both are now captured together before asynchronous database work.
+- Late cache writes and new document opens cannot recreate local copies during removal.
+- Sign-in distinguishes service outages and request limits from refused credentials.
+- Readiness tolerates slow backend responses without expensive exact counts.
+
+### Distribution
+
+- This release contains the web, desktop, shared core and collaboration server only.
+  The separate mobile client and its commit history are excluded from main.
+
 ## 0.9.45 — 2026-10-20
 
 ### Fixed

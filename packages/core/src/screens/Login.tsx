@@ -23,7 +23,9 @@ import {
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
 import { platform } from "@/platform";
-import logoUrl from "../assets/logo-n-botanical-transparent.png";
+import logoUrl from "../assets/napp-logo.png";
+import { PolicyLinks } from "@/components/PolicyLinks";
+import { passwordRecoveryUrl } from "@/lib/passwordRecovery";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -55,6 +57,7 @@ export default function Login() {
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [policiesAccepted, setPoliciesAccepted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [archiveChoice, setArchiveChoice] = useState<{
@@ -103,7 +106,7 @@ export default function Login() {
       let result;
       if (mode === "sign-up") {
         if (password.length < 8) throw new Error("Use at least 8 characters");
-        result = await registerAccount(email.trim(), password);
+        result = await registerAccount(email.trim(), password, policiesAccepted);
         if (result.confirmationRequired) {
           setConfirmation(email.trim());
           setPassword("");
@@ -331,9 +334,36 @@ export default function Login() {
           </button>
         </div>
 
+        {mode === "sign-up" ? (
+          <label
+            className="login-note"
+            style={{ display: "flex", gap: 10, alignItems: "flex-start" }}
+          >
+            <input
+              type="checkbox"
+              checked={policiesAccepted}
+              onChange={(event) => setPoliciesAccepted(event.target.checked)}
+              disabled={loading}
+            />
+            I agree to the Terms of Use and have read the Privacy Policy.
+          </label>
+        ) : null}
+        {mode === "sign-in" ? (
+          <a
+            href={passwordRecoveryUrl()}
+            className="login-note"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Forgot password?
+          </a>
+        ) : null}
+        <PolicyLinks />
         <button
           type="submit"
-          disabled={loading || !email.trim() || !password}
+          disabled={
+            loading || !email.trim() || !password || (mode === "sign-up" && !policiesAccepted)
+          }
           className="login-submit label"
         >
           {loading ? (

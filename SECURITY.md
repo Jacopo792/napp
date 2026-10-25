@@ -38,8 +38,8 @@ client has been published and checked.
 
 Supabase Auth identifies the account. Postgres row-level security authorizes
 database access through `archive_members`, and private Storage applies the same
-archive-membership boundary. `owner_id` is organizational metadata, not an
-authorization boundary.
+archive-membership boundary. `owner_id` identifies the author for account erasure and safety filtering;
+archive members can otherwise edit shared writing.
 
 There is one exception, and it is enforced in the same place. A note its owner
 has archived is withheld from the other members when that owner sets
@@ -154,9 +154,21 @@ is Postgres: the client opens an editor only for a note present in the
 catalogue row level security returned for this session, so a former member, a
 signed-out browser or an offline tab with a stale store is handed no row and
 gets no editor. Writing is unchanged and remains the collaboration server's
-decision, taken per document and repeated on every message. The current PP implementation deliberately does not
-delete these stores on logout, because doing so can destroy offline edits; this
-retention must be resolved before production deployment.
+decision, taken per document and repeated on every message.
+
+Explicit sign-out asks for consent to remove this account's local copies,
+including edits that have not reached the server. It closes the account's
+providers, waits for IndexedDB deletion to complete, clears the note and image
+caches, and only then removes the session. Another open tab is asked to release
+its documents; a blocked or failed deletion is an error, not reported as
+successful sign-out. Saved accounts belonging
+to other people are not removed.
+
+Automatic inactivity locking and account switching retain Yjs stores so offline
+edits can be recovered after signing in again. The inactivity lock hides the
+archive immediately without waiting for a network flush. These retained copies
+are still plaintext; locking is not disk encryption. Browser coverage and the device-content policy are documented in
+`docs/quality-hardening.md`.
 
 Two further caches hold archive content on the device. `napp:notes` (IndexedDB,
 `packages/core/src/lib/noteStore.ts`) keeps the note payloads `loadArchive` would otherwise
@@ -164,10 +176,34 @@ re-fetch in full on every visit, and `napp:image:v1` (Cache API,
 `packages/core/src/lib/media.ts`) keeps note photographs and cover pictures. Neither is ever
 consulted for a permission: a cached note is redrawn only after Postgres has
 returned the row under RLS, and a cached picture only for an object the archive
-still names. The note store is emptied by `clearSession()` on sign-out, which
-is the retention the Yjs stores above still owe.
+still names. `clearSession()` empties the note store on sign-out. Explicit
+device-content removal additionally clears the image cache and the account's
+Yjs databases.
 
 The browser receives only the Supabase project URL, publishable key and public
 collaboration URL. Service role keys, account passwords, session tokens, and
 migration credentials must never be committed, placed in Vite variables, or
 included in a build.
+
+## Account erasure and abuse controls
+
+Deletion requires a valid Auth identity, fresh password and explicit confirmation.
+A service-only transaction prepares a Storage manifest and removes owned content;
+the Edge worker deletes files through the API before removing Auth. Durable jobs
+retry each minute. Other authors' documents, edits and necessary files remain.
+The requesting device attempts to remove the erased account's sessions, snapshots
+and Yjs/image/note caches; exported copies and offline devices cannot be recalled.
+Tombstones and write guards prevent stale clients from recreating erased data.
+See `docs/account-deletion-handoff.md` for the deployed contract and fixture tests.
+
+Reports are private, operator review is service-only, and restrictive RLS filters
+notes/comments/files. Blocks stop direct invitations and hide the parties' own
+content, while existing shared memberships and third-party documents remain.
+Already downloaded files cannot be recalled; fresh authenticated Storage requests
+are tested independently of cached responses. The collaboration server reads
+authorization through the caller's token and rechecks it with a bounded TTL.
+
+Production mail remains a launch blocker: public Auth was confirmed to auto-confirm
+email on 24 October 2026. Store-readiness and moderation operations are tracked in
+`docs/quality-hardening.md` and `docs/moderation-operations.md`; this code
+does not establish staffing, mail delivery, backup retention or store approval.

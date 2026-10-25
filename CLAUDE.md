@@ -2039,3 +2039,14 @@ result and asked for this shape back. Do not re-propose it.
 - A shortcut nobody is told about is a shortcut nobody has. `⌘K`, `⌘/` and Focus
   mode are all named in the ⋯ menus that already open, and `packages/core/src/lib/shortcuts.ts`
   is the single list both the shortcuts sheet and the Settings section read.
+
+## Public source boundary and quality checks
+
+The commercial mobile client is developed separately. Do not add its source,
+artifacts, private documentation or commit history to main or PP. Public releases
+start from main and contain only the web, desktop, shared core and server.
+
+`docs/quality-hardening.md` documents browser integration tests, explicit device
+content removal, and deployment revision/origin checks. Run `pnpm healthcheck`
+before a push. Full-stack browser tests require local Supabase; no production
+credentials may be used for their fixtures.

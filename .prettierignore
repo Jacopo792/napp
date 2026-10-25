@@ -13,3 +13,7 @@ supabase/.temp
 tmp
 preview/
 vite.preview.config.ts
+
+apps/mobile
+test-results
+playwright-report

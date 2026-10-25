@@ -21,6 +21,7 @@
  * a corrupt store must cost a slower load and never a failed one, so every
  * path resolves to "nothing cached" rather than rejecting. */
 import type { Note } from "./types";
+import { accountContentRemovalKey } from "./accountContentShape";
 
 export interface CachedNote {
   version: number;
@@ -77,12 +78,20 @@ export async function readCachedNotes(archiveId: string): Promise<Map<string, Ca
 /** Write the notes whose version moved, and forget the ones that are gone.
  *  Never awaited by a render path: the words are already on screen. */
 export async function writeCachedNotes(
+  userId: string,
   archiveId: string,
   changed: Iterable<CachedNote>,
   removed: Iterable<string> = [],
 ): Promise<void> {
   try {
+    if (localStorage.getItem(accountContentRemovalKey(userId))) return;
     const db = await openDb();
+    // A load started before sign-out may finish after its final clear. Check
+    // again after opening the database and before creating a write transaction.
+    if (localStorage.getItem(accountContentRemovalKey(userId))) {
+      db.close();
+      return;
+    }
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE, "readwrite");
       const store = transaction.objectStore(STORE);
@@ -99,20 +108,28 @@ export async function writeCachedNotes(
   }
 }
 
-/** Sign-out. The archive's words do not stay on a machine nobody is signed in
- *  to, which is the one thing this store does that the Yjs caches do not. */
-export async function clearNoteStore(): Promise<void> {
+/** Ordinary cache eviction is best-effort. Explicit device-content removal
+ * uses strict mode so an aborted clear cannot be reported as success. */
+export async function clearNoteStore(options: { strict?: boolean } = {}): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  let db: IDBDatabase | undefined;
   try {
-    const db = await openDb();
+    db = await openDb();
     await new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(STORE, "readwrite");
+      const transaction = db!.transaction(STORE, "readwrite");
       transaction.objectStore(STORE).clear();
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error ?? new Error("Cache removal aborted"));
     });
-    db.close();
-  } catch {
+  } catch (reason) {
+    if (options.strict)
+      throw new Error("Could not remove downloaded notes. Reload and try signing out again.", {
+        cause: reason,
+      });
     /* Nothing to clear, or nothing that can be. */
+  } finally {
+    db?.close();
   }
 }
 

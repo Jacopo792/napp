@@ -1,3 +1,5 @@
+import { accountContentRemovalKey } from "./accountContentShape.ts";
+
 export interface AppSession {
   userId: string;
   email: string;
@@ -34,6 +36,13 @@ export async function restoreArchiveSession(
     )
       throw new Error("Invalid saved archive");
   } catch {
+    storage.removeItem(SESSION_KEY);
+    return null;
+  }
+
+  if (storage.getItem(accountContentRemovalKey(stored.userId))) {
+    // A crash during explicit device removal must not restore a permanently
+    // blocked editor. A fresh sign-in is required to start using caches again.
     storage.removeItem(SESSION_KEY);
     return null;
   }

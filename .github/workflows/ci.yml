@@ -52,6 +52,23 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      - name: Install the browser for UI smoke tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test workspace navigation and writing
+        run: pnpm test:e2e
+
+      - name: Upload UI failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-ui-failures
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
       # Placeholders, not the real project. vite.config.ts refuses to build
       # without these two, by design — a bundle that silently shipped with no
       # backend would be worse than a failed build. What this step proves is
@@ -158,6 +175,19 @@ jobs:
       # Applies every migration in `supabase/migrations/` to a fresh database,
       # which is also the dry run: a migration that cannot be applied fails the
       # job here rather than against the linked project.
+      - name: Allow disposable fixture sign-ins in local CI Auth
+        # Server and browser fixtures share one loopback IP. This edit belongs
+        # only to the disposable CI checkout; never push this config to Auth.
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('supabase/config.toml')
+          config, count = re.subn(r'^sign_in_sign_ups = \d+$', 'sign_in_sign_ups = 120', path.read_text(), flags=re.MULTILINE)
+          assert count == 1, 'Expected one local Auth fixture quota'
+          path.write_text(config)
+          PY
+
       - name: Start Supabase
         run: supabase start
 
@@ -169,6 +199,23 @@ jobs:
           REQUIRE_INTEGRATION: "1"
           REDIS_URL: redis://127.0.0.1:6380
         run: pnpm test:server
+
+      - name: Install the browser for full-stack tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test real writing, invitations, permissions and reconnect
+        run: pnpm test:e2e:full
+
+      - name: Upload full-stack failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-fullstack-failures
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
 
       # The image is what Render runs, so a Dockerfile that no longer builds is
       # a broken deploy waiting for somebody to notice.
@@ -255,15 +302,6 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/web/dist
-
-      - uses: actions/deploy-pages@v4
-        id: deploy
-
       # The collaboration server, from the run that has just proved it. Render's
       # own auto-deploy has never fired: the service was created through its API,
       # so nothing on this repository subscribes to a push — no webhook, no
@@ -275,6 +313,7 @@ jobs:
       # variable. Absent, this step says so and passes: a fork cannot read it,
       # and neither can a clone nobody has given it to.
       - name: Deploy the collaboration server
+        id: collab
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
@@ -285,3 +324,20 @@ jobs:
           echo "asked Render for a deploy, HTTP $(curl --fail --silent \
             --max-time 60 --request POST --output /dev/null \
             --write-out '%{http_code}' "$HOOK")"
+          echo "requested=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the deployed revision and native origins
+        if: steps.collab.outputs.requested == 'true'
+        env:
+          EXPECTED_REVISION: ${{ github.sha }}
+          DEPLOY_WAIT_MS: "600000"
+        run: pnpm verify:deployment
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - uses: actions/deploy-pages@v4
+        id: deploy

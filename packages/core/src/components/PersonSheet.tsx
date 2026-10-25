@@ -25,6 +25,7 @@ import { loadContributions, type Contribution } from "@/lib/history";
 import { memberSince } from "@/lib/format";
 import { dateBucket } from "@/lib/listPreferences";
 import type { AppSession } from "@/lib/session";
+import { SafetyActions } from "./SafetyActions";
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -173,6 +174,7 @@ export function PersonSheet({
           )}
           {!work && !failure && <p className="sheet-quiet">Loading…</p>}
           {work?.length === 0 && <p className="sheet-quiet">Nothing written yet.</p>}
+          {!isSelf ? <SafetyActions userId={userId} /> : null}
           {days.map((day) => (
             <section key={day.label} className="sheet-day">
               <p>{day.label}</p>

@@ -45,6 +45,39 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.46",
+    date: "2026-10-25",
+    headline: "Your notes, with clearer control",
+    sections: [
+      {
+        heading: "Your account and this device",
+        items: [
+          {
+            title: "Choose what leaves the device",
+            text: "Signing out now asks before removing this account’s local note copies, including changes that have not reached the server. Automatic locking keeps offline work available for your next sign-in.",
+          },
+          {
+            title: "Account controls in one place",
+            text: "Privacy, terms and support are linked from the account flow. You can request permanent account deletion, report content and manage blocked people from the app.",
+          },
+        ],
+      },
+      {
+        heading: "Reliability",
+        items: [
+          {
+            title: "A clearer answer when a service is unavailable",
+            text: "A temporary sign-in outage is no longer described as an incorrect password. Local-copy removal reports a problem instead of claiming success when another window is still holding a database.",
+          },
+          {
+            title: "The same words in the editor and the archive",
+            text: "A save now keeps the document and its list preview together, even when another edit arrives while the database is answering.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.45",
     date: "2026-10-20",
     headline: "The server rests at night",

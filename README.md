@@ -1,267 +1,241 @@
 # Napp
 
-A private place for your notes and your writing, shared with the people you choose.
+A place for notes, shared writing and longer work – in your browser and on your
+desktop.
 
-![App preview](docs/app-preview.png)
+![Napp workspace](docs/app-preview.png)
 
 ## Why I built it
 
 Writing is lonely work. For years I wrote on my own, in a diary nobody else would
 ever open, and I kept wondering how good it would be if someone could look over my
-shoulder — read what I had just written, stop on a sentence, tell me what they
+shoulder – read what I had just written, stop on a sentence, tell me what they
 thought of it.
 
-Napp is that, in a way: an answer to the writer's solitude. A calm place to write,
-from a quick list to a whole book, where the people you choose can be in the same
-page with you, see the words arrive and leave a remark beside the line they are
-about. Everyone else stays out.
+Napp began there. It has grown into a workspace for everything from a quick note
+to a thesis or a book, while keeping that original idea: the people you choose can
+write beside you, see the words arrive and leave a remark where it belongs.
 
-## What is in it
+## What you can do
 
-- A rich editor for writing, checklists, tables, links, images, PDFs and videos
-  (MP4, WebM and MOV up to 100 MB).
-- Folders, pins, search, Archive and Trash so notes do not get lost as they pile up.
-- Live editing when two people are in the same note, plus comments on a specific
-  sentence or paragraph.
-- Separate **My notes** and shared views inside one archive, and more than one
-  archive per account, switched without signing out.
-- A history for every note: who wrote what, words added and removed, named
-  versions, and a restore that keeps the present first.
-- Sheets for a note, a person and a folder — hold a row still to see everything
-  about it in one place.
-- Covers, avatars, themes and reading settings that each person can make their own.
-- Markdown import and export, PDF text import, and local translation and proofreading
-  tools.
-- A **Book** archive for long writing — a thesis, a novel: chapters and parts on a
-  printable page, footnotes, numbered captions, cross-references, and notes left on
-  a passage with a right-click.
+- **Write and organise.** Rich text, checklists, tables, links, drawings, images
+  and attachments, with folders, pins, search, Archive and Trash.
+- **Share a space.** Create several archives, invite people to the ones you want
+  to share, and edit the same note live. An archive can hold up to eight members.
+  Lock a note or a passage when you want to keep control of its writing.
+- **Have a conversation beside the words.** Comment on a passage, reply, react,
+  assign a thread and resolve it. Unread remarks lead back to the relevant note.
+- **Keep the history.** Compare earlier versions, name a moment worth keeping and
+  restore it while preserving the current version first.
+- **Make room for longer work.** Book archives on web and desktop add chapters,
+  parts, an organising board, word goals, footnotes, captions, cross-references
+  and a printable page. Themes, covers and reading settings make the workspace
+  your own; Markdown import/export and PDF tools help move work in and out.
 
-It is for keeping notes, not for running a team. The useful collaboration is there
-when you need it; the rest stays out of the way while you write.
+Already-open collaborative notes remain editable during a disconnect and merge
+with the archive after reconnecting. This is recovery for work in progress;
+opening an archive still depends on its account and access checks.
 
-## Get the app
+## Use Napp
 
-Use it in the browser at <https://jacopo792.github.io/napp/>: there is
-nothing to install and it is always up to date. If you would rather have it in its own
-window, there is a desktop app too.
+| Client      | Availability                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web**     | [Open Napp in your browser](https://jacopo792.github.io/napp/).                                                                                                                       |
+| **macOS**   | [Apple Silicon](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-arm64.dmg) · [Intel](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-x64.dmg) |
+| **Windows** | [Download the installer](https://github.com/Jacopo792/napp/releases/latest/download/Napp-windows-setup.exe)                                                                           |
 
-![Sign-in screen](docs/sign-in-preview.png)
+The desktop clients share the web application's interface, with native menus,
+file actions, keyboard shortcuts and an unread-comment badge. Installers are
+currently unsigned; [the desktop guide](DESKTOP.md) covers installation and
+troubleshooting.
 
-**Download:
-[Mac, Apple Silicon](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-arm64.dmg) ·
-[Mac, Intel](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-x64.dmg) ·
-[Windows](https://github.com/Jacopo792/napp/releases/latest/download/Napp-windows-setup.exe)**
+A separate mobile client is under development. Its source is not included on the
+`main` branch.
 
-The desktop version is the same app, with its own menu bar, shortcuts and Dock badge for
-unread comments. Notes already open keep working if the connection drops.
+## A workspace for longer writing
 
-The first launch needs one extra step, because the app is not signed with an
-Apple Developer ID. Open it, let macOS refuse, then go to System Settings →
-Privacy & Security and press **Open Anyway**; on macOS 14 and earlier,
-Control-click the app in Applications and choose **Open**. Once only.
+![A chapter with a comment in the margin](docs/book-preview.png)
 
-Intel Macs and Windows have their own file on the same release page.
-[`DESKTOP.md`](DESKTOP.md) has installation help and the practical details.
+A Book archive is laid out like the page it will be printed on. The book and
+chapter stay in view, with word counts and goals close to the writing. Chapters
+and parts also have a board: arrange cards, describe what happens in each one and
+change its status without opening the page.
 
-## Writing a book
+![The chapter board](docs/book-board-preview.png)
 
-![A chapter on the page, with a comment in the margin](docs/book-preview.png)
-
-A **Book** archive is set like the page it will be printed on: white paper on a
-desk, the book and the chapter named across the top, and a bar underneath with the
-page you are on, the words in the chapter and how far the book is from its goal.
-Press the chapter's name to go to any other.
-
-![The board](docs/book-board-preview.png)
-
-Organizing is the board: every chapter as a card, in order and grouped by part.
-Drag a card to move it, write on it what happens there, right-click it for its
-status, its word goal or its part.
-
-## Remarks in the margin
+## Conversations and versions
 
 ![Comments in the margin](docs/comments-preview.png)
 
-Select a passage and leave a remark on it. When the window has room, the
-conversation stands in the margin beside the words it is about and scrolls with
-them, in a book and in a note alike; the one you are reading moves next to its
-passage. Reply, react, hand a thread to someone, resolve it when it is done.
-
-## Make it yours
-
-![Appearance settings](docs/appearance-settings-preview.png)
-
-Start with a ready-made palette or choose your own colours, theme and wallpaper. You
-can also change the reading width, text size, line spacing and weight until longer
-notes feel right. Your settings follow your account to every browser and to the
-desktop app, and stay yours: the person sharing the archive does not have to look at
-it the way you do.
-
-## Every version of a note
+Select a passage and leave a remark. When the window has room, the conversation
+stands in the margin beside the words it is about. Replies, reactions and resolved
+threads stay attached to that context.
 
 ![Note history](docs/history-preview.png)
 
-A note keeps its own history: who wrote each stretch, how many words came and went,
-and the moments you chose to name. Any version can be compared with the present and
-restored, and restoring keeps the present as a named version first, so nothing is lost
-by trying.
+History keeps earlier stretches of writing and the versions you name yourself.
+Restoring an earlier version keeps the present as a named version first.
 
-## Everything about a note in one place
-
-![Note sheet](docs/note-sheet-preview.png)
-
-Hold a note's row still, or choose **Note info** from its menu, and its sheet opens:
-folder, owner, words, versions, open remarks, who wrote in it and when. A person's face
-and a folder open sheets of their own, and every name inside one leads to the next.
-
-## More than one archive
+## Your spaces, your settings
 
 ![Archive switch](docs/spaces-preview.png)
 
-One account can belong to several archives — your notes with a partner, a study group,
-a thesis — and move between them without signing out. Each archive keeps its own
-members, folders and list order, and a new archive starts with everyone you already
-share one with. Make new ones and turn on the switch at the top of
-the sidebar from **Settings → Archives**.
+One account can belong to several archives: personal notes, a study group, shared
+writing or a book. Each archive has its own members, folders and organisation.
+Invitations come from **Settings → Members** and expire after seven days.
 
-## Accounts and shared archives
+![Appearance settings](docs/appearance-settings-preview.png)
 
-Everyone has their own account. On first sign-in, you get a private archive; to share
-one, send an invitation from **Settings → Members**. An archive holds up to
-eight people, and invitations expire after seven days.
+Choose a palette, colours, wallpaper and reading settings. Preferences follow the
+account across browsers and desktop clients. A note, folder or person's sheet
+brings related details and activity together.
 
-Every member can read and edit the shared archive. If a note needs to stay yours, you
-can lock the whole thing or just a passage. Accounts outside the archive cannot see its
-notes or files.
+![Note information sheet](docs/note-sheet-preview.png)
 
-## Running it locally
+## Accounts, access and local data
 
-Everything below is for working on the app rather than using it.
+Supabase Auth identifies accounts; Postgres Row Level Security enforces archive
+membership. The collaboration server checks access when a note is opened and
+while its connection remains active. Note and passage locks protect writing,
+not secrecy from other members who can already read the note.
+
+The app includes password recovery, account deletion, content reporting and user
+blocking. Deletion removes the account's own data while preserving work belonging
+to other members. Abuse reports have a separate moderation workflow.
+
+Explicit sign-out asks before removing local copies, including unsynced edits.
+Automatic locking and account switching retain collaborative document stores for
+recovery. Stored documents are **not end-to-end encrypted**. Production email
+configuration and moderation operations still require operational setup; the
+[security guide](SECURITY.md) records those limits.
+
+See [SECURITY.md](SECURITY.md) for the access model, cache policy, current limits
+and private vulnerability reporting.
+
+## How the project is structured
+
+Napp is a TypeScript pnpm monorepo. The application logic and editor live in one
+core; each client supplies the platform integration it needs.
+
+| Path                      | Responsibility                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `packages/core/`          | Shared domain logic, web/desktop interface, rich-text editor, collaboration client, account flows and preferences. |
+| `apps/web/`               | Vite browser entry point, published to GitHub Pages.                                                               |
+| `apps/desktop/`           | Electron shell, operating-system integration and macOS/Windows packaging.                                          |
+| `packages/collab-server/` | Hocuspocus server, live-document authorisation, persistence, version history and health checks.                    |
+| `supabase/`               | Database migrations, RLS policies, Storage rules and account-deletion functions.                                   |
+| `e2e/`                    | Browser smoke tests and full-stack tests against disposable local data.                                            |
+| `ops/`                    | Expected collaboration-server origins checked against deployment configuration.                                    |
+
+React, TanStack Router, Vite and Tailwind CSS provide the web/desktop interface.
+Tiptap edits Yjs documents; Hocuspocus distributes live changes and persists them
+in Postgres. Redis/Valkey connects overlapping server instances. Supabase supplies
+Auth, Postgres, Realtime and private Storage.
+
+Architecture boundaries are checked by ESLint: core cannot import a client shell,
+and the web and desktop shells mount the same application rather than
+implementing separate editors. Notes have a structured Tiptap representation and
+a plain-text projection for search and previews; Markdown is an exchange format.
+
+## Development
+
+Use Node.js from [`.nvmrc`](.nvmrc) and pnpm 11 or later.
 
 ```bash
 cp .env.example .env.local
 pnpm install
-pnpm dev            # in a browser
-pnpm dev:desktop    # in its own window
+pnpm dev            # web
+pnpm dev:desktop    # Electron
 ```
 
-`.env.local` needs these public browser values:
+Set the public client configuration in `.env.local`:
 
 ```dotenv
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_COLLAB_URL=ws://127.0.0.1:8080
-# Only the desktop build needs this one: where an invitation link has to point,
-# since the link is opened on a machine that may not have the app.
-VITE_WEB_ORIGIN=https://jacopo792.github.io/napp/
+VITE_WEB_ORIGIN=http://localhost:5173/
 ```
 
-Run the collaboration server separately:
+Use a Supabase project with the repository's migrations applied, or start a local
+stack with the Supabase CLI and Docker. Run the collaboration server separately;
+it reads its configuration from the process environment:
 
 ```bash
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... pnpm --filter @notes-app/collab-server start
+export SUPABASE_URL="http://127.0.0.1:54321"
+export SUPABASE_PUBLISHABLE_KEY="<local-publishable-or-anon-key>"
+export SUPABASE_SERVICE_ROLE_KEY="<local-service-role-key>"
+export ALLOWED_ORIGINS="http://localhost:5173,http://localhost:5174,app://notes"
+# Optional for a single instance; required when instances overlap:
+# export REDIS_URL="redis://127.0.0.1:6379"
+pnpm --filter @notes-app/collab-server start
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` belongs only on the server. Access to an archive is checked
-against the signed-in user's membership.
+The service-role key belongs only to server processes. Never place it in a
+`VITE_*` variable or a client bundle.
 
-### Preview without Supabase
+### Interface preview without a backend
 
 ```bash
 pnpm preview:ui
+# pnpm preview:desktop-ui
 ```
 
-This starts the full interface with in-memory demo data at
-<http://localhost:5199>. You can sign in with any credentials.
+The web preview runs at [localhost:5199](http://localhost:5199) with in-memory demo
+data and accepts any credentials. Preview data does not prove backend permissions
+or persistence.
 
-## Checks
+## Checks and tests
 
 ```bash
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:server
-VITE_BASE_PATH=/napp/ pnpm build
+pnpm healthcheck                 # format, lint, types, core/SQL tests and web build
+pnpm exec playwright install chromium
+pnpm test:e2e                    # UI smoke tests with preview data
+supabase start
+pnpm test:e2e:full               # real Auth, RLS and collaboration on local fixtures
 ```
 
-## How it is built
+`pnpm test:server` runs the collaboration-server suite. Start local Supabase and
+Valkey for integration coverage; `REQUIRE_INTEGRATION=1` makes missing dependencies
+fail instead of skipping those tests. The CI backend job supplies both services.
 
-- **Frontend:** React 19, TanStack Router, Vite and Tailwind CSS.
-- **Editor:** Tiptap with Yjs documents for the title and body.
-- **Collaboration:** Hocuspocus over WebSocket, with Redis/Valkey when more than one
-  server instance is running.
-- **Backend:** Supabase Auth, Postgres, Row Level Security, Realtime and private
-  Storage.
-- **Offline support:** IndexedDB keeps an already authorised open document usable
-  during a disconnect and syncs it after reconnecting.
+CI checks formatting, types, unit and database logic, collaboration behavior,
+full-stack browser flows and web/desktop builds.
+The browser suite covers persistence, access denial, invitations, offline
+reconnection, version restore, deletion and cache removal. Failures retain traces
+and screenshots. These checks establish their tested scope, rather than a
+guarantee about every environment or future deployment.
 
-The repository is a pnpm workspace of two packages and two shells:
+The [quality guide](docs/quality-hardening.md) records the verified scope and
+remaining release checks.
 
-- `packages/core/` is the application. Both shells mount it and neither may
-  fork it – `eslint.config.js` forbids the core from importing a shell, and
-  `packages/core/src/platform.ts` is the six-member interface each shell
-  answers instead.
-- `apps/web/` is the browser build, published to GitHub Pages.
-- `apps/desktop/` is the Electron window: `pnpm build:desktop` writes a macOS
-  `.dmg` and a Windows `.exe` into `apps/desktop/release/`, and
-  `.github/workflows/release.yml` builds both on a tag. See
-  [the desktop guide](DESKTOP.md). The renderer is served from
-  `app://notes` rather than `file://`, because the collaboration server refuses
-  a socket whose origin it does not know and a `file://` page sends none.
+## Releases and deployment
 
-The main areas of the repository are:
+Web changes on `main` pass the CI gates before GitHub Pages is updated. The
+collaboration service is deployed separately; its commit, readiness and accepted
+origins are checked before the new web artifact is published when a server deploy
+is requested. `render.yaml` documents the service configuration but does not apply
+changes to the existing live service by itself.
 
-- `packages/core/src/screens/Notes.tsx` for workspace and note metadata state.
-- `packages/core/src/components/` for the sidebar, note list and workspace menus.
-- `packages/core/src/features/editor/` for the editor, comments, imports, attachments and language
-  tools.
-- `packages/core/src/lib/` for sessions, Supabase access, presence, appearance and collaboration.
-- `packages/collab-server/` for the Hocuspocus service, persistence and health checks.
-- `supabase/migrations/` for the database schema and policies.
-
-Notes are stored as Tiptap JSON with a plain-text projection for search and previews.
-Markdown is supported as an import/export format, not as the editor's internal format.
-
-## Deployment
-
-The app runs at <https://jacopo792.github.io/napp/>. There is no other
-deployment.
-
-The frontend is published through GitHub Pages after the frontend checks, local
-Supabase integration tests, Redis tests and server image build pass. It needs the
-repository variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and
-`VITE_COLLAB_URL`.
-
-Desktop installers are built on a tag, from a matrix of macOS and Windows
-runners, because electron-builder cannot cross-compile them. Every push to `main` is a release: bump
-the version in `apps/web` and `apps/desktop`'s `package.json`, add its entry to
-`RELEASES` in `packages/core/src/lib/whatsNew.ts` (the test fails otherwise), then:
-
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-The workflow publishes both installers to the repository's Releases.
-
-The collaboration server runs separately on Render with Valkey. `render.yaml`
-documents that service. Database migrations must be applied before deploying a client
-that reads new columns, while destructive schema changes must wait until old clients
-no longer depend on them.
+Desktop release tags trigger macOS and Windows builds and publish the installers
+to [GitHub Releases](https://github.com/Jacopo792/napp/releases). Version changes
+also update the in-app What's New and [CHANGELOG.md](CHANGELOG.md). Database
+migrations must precede clients that require them; destructive schema changes
+must wait until older clients no longer depend on the removed fields.
 
 ## Documentation
 
-| File                           | Contents                                          |
-| ------------------------------ | ------------------------------------------------- |
-| [`PRODUCT.md`](PRODUCT.md)     | Product scope and behaviour                       |
-| [`DESKTOP.md`](DESKTOP.md)     | The downloadable app: install and troubleshooting |
-| [`DESIGN.md`](DESIGN.md)       | Interface rules and design decisions              |
-| [`CLAUDE.md`](CLAUDE.md)       | Repository, deployment and migration notes        |
-| [`SECURITY.md`](SECURITY.md)   | Security model and vulnerability reporting        |
-| [`CHANGELOG.md`](CHANGELOG.md) | User-visible and security-relevant changes        |
+| Guide                                | Contents                                                   |
+| ------------------------------------ | ---------------------------------------------------------- |
+| [Product](PRODUCT.md)                | Scope and behaviour.                                       |
+| [Design](DESIGN.md)                  | Interface rules and design decisions.                      |
+| [Desktop](DESKTOP.md)                | Installation and troubleshooting.                          |
+| [Repository guide](CLAUDE.md)        | Architecture, development and release conventions.         |
+| [Security](SECURITY.md)              | Access boundaries, local data and vulnerability reporting. |
+| [Quality](docs/quality-hardening.md) | Automated coverage and validation limits.                  |
+| [Changelog](CHANGELOG.md)            | Release history.                                           |
 
 ## Licence
 
-This project is licensed under the GNU General Public License, version 3 or later. See
-[`LICENSE`](LICENSE).
+Napp is licensed under the GNU General Public License, version 3 or later.
+See [LICENSE](LICENSE).

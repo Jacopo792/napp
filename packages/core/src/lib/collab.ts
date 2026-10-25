@@ -27,6 +27,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { BODY_FRAGMENT, collaborationColor, TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import { supabase } from "./supabaseClient";
+import { accountContentRemovalInProgress, registerAccountContentCleanup } from "./accountContent";
 
 const COLLAB_URL = import.meta.env.VITE_COLLAB_URL as string;
 
@@ -164,6 +165,35 @@ interface Held {
 
 const held = new Map<string, Held>();
 
+registerAccountContentCleanup(async (userId) => {
+  const entries = [...held.values()].filter((entry) => entry.key.split(":")[1] === userId);
+  for (const entry of entries) {
+    held.delete(entry.key);
+    entry.state = { ...CLOSED };
+    for (const listener of entry.listeners) listener(entry.state);
+    entry.provider.destroy();
+  }
+  await Promise.all(
+    entries.map(async (entry) => {
+      await entry.local.destroy();
+      entry.doc.destroy();
+    }),
+  );
+  if (!held.size && shared) {
+    shared.destroy();
+    shared = null;
+  }
+});
+
+window.addEventListener("napp:erase-account", (event) => {
+  const userId = (event as CustomEvent<string>).detail;
+  for (const entry of [...held.values()])
+    if (entry.key.includes(`:${userId}:`)) {
+      void entry.local.clearData().catch(() => {});
+      drop(entry);
+    }
+});
+
 function drop(entry: Held): void {
   held.delete(entry.key);
   entry.provider.destroy();
@@ -185,7 +215,8 @@ supabase.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") for (const entry of [...held.values()]) drop(entry);
 });
 
-function acquire(archiveId: string, userId: string, noteId: string): Held {
+function acquire(archiveId: string, userId: string, noteId: string): Held | null {
+  if (accountContentRemovalInProgress(userId)) return null;
   const scope = `${archiveId}:${userId}:`;
   const key = scope + noteId;
   const existing = held.get(key);
@@ -285,7 +316,8 @@ let lastPrefetched = "";
 export function prefetchNote(noteId: string): void {
   if (!current || noteId === lastPrefetched) return;
   lastPrefetched = noteId;
-  release(acquire(current.archiveId, current.userId, noteId));
+  const entry = acquire(current.archiveId, current.userId, noteId);
+  if (entry) release(entry);
 }
 
 export function useCollaborativeNote(
@@ -308,6 +340,10 @@ export function useCollaborativeNote(
       return;
     }
     const entry = acquire(archiveId, userId, noteId);
+    if (!entry) {
+      setState(CLOSED);
+      return;
+    }
     entry.listeners.add(setState);
     setState(entry.state);
     return () => {

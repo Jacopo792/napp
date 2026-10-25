@@ -52,6 +52,9 @@ import {
   Target,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
+import { AccountDeletionForm } from "@/components/AccountDeletionForm";
+import { PolicyLinks } from "@/components/PolicyLinks";
+import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
 import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
@@ -319,6 +322,7 @@ export function SettingsPanel({
   kind = "notes",
   document,
   email,
+  onAccountDeleted,
   reading,
   autoLock,
   profile,
@@ -377,6 +381,7 @@ export function SettingsPanel({
   };
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
+  onAccountDeleted: () => void;
   /** Whose notes the window is currently pointed at. */
   reading: string;
   autoLock: AutoLockMinutes;
@@ -836,6 +841,13 @@ export function SettingsPanel({
                       {leaveStatus}
                     </p>
                   )}
+                  <BlockedAccounts />
+                  <h3>Delete account</h3>
+                  <PolicyLinks />
+                  <details>
+                    <summary>Delete account permanently</summary>
+                    <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
+                  </details>
                 </section>
               )}
 

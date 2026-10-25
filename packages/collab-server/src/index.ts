@@ -1,5 +1,6 @@
 /* Bootstrap: read the environment, start the server, stop it cleanly. */
 import { createCollaborationServer } from "./server.ts";
+import { deploymentRevision, parseAllowedOrigins } from "./config.ts";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -20,10 +21,8 @@ const server = createCollaborationServer({
   supabaseUrl: required("SUPABASE_URL"),
   publishableKey: required("SUPABASE_PUBLISHABLE_KEY"),
   serviceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
-  allowedOrigins: required("ALLOWED_ORIGINS")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  allowedOrigins: parseAllowedOrigins(required("ALLOWED_ORIGINS")),
+  revision: deploymentRevision(process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT),
   port,
   /* The bus between instances. Absent, this process assumes it is the only
      one — which is true of a single Render instance and false the moment a

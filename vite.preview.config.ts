@@ -31,6 +31,10 @@ export default defineConfig({
   server: desktop ? { port: 5174, strictPort: true } : { port: Number(process.env.PORT) || 5199 },
   resolve: {
     alias: [
+      {
+        find: /^@\/components\/PolicyGate$/,
+        replacement: here("./preview/PolicyGate.mock.tsx"),
+      },
       { find: /^@\/lib\/supabase$/, replacement: here("./preview/supabase.mock.ts") },
       { find: /^@\/lib\/session$/, replacement: here("./preview/session.mock.ts") },
       { find: /^@\/lib\/sync$/, replacement: here("./preview/sync.mock.ts") },

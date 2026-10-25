@@ -6,6 +6,7 @@
 import { supabase } from "./supabaseClient";
 import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
+import { POLICY_VERSION } from "./storePolicies";
 import { restoreArchiveSession, SESSION_KEY, type AppSession } from "./sessionRestore";
 export type { AppSession } from "./sessionRestore";
 
@@ -105,6 +106,8 @@ async function openAccount(
   }
 
   await ensureProfile(userId, email);
+  const { restoreAccountContent } = await import("./accountContent");
+  restoreAccountContent(userId);
   const archives = await loadArchiveOptions(userId);
   if (archives.length === 0) throw new Error("Could not open this account");
 
@@ -121,6 +124,9 @@ export async function authenticate(
   inviteToken?: string,
 ): Promise<AuthenticationResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error?.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
+  if (error && (!error.status || error.status >= 500))
+    throw new Error("Could not reach the sign-in service. Check your connection and try again.");
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
     return await openAccount(data.user.id, data.user.email ?? email, inviteToken);
@@ -155,7 +161,10 @@ export async function chooseArchive(
 export async function registerAccount(
   email: string,
   password: string,
+  acceptedPolicies = false,
 ): Promise<RegistrationResult> {
+  if (!acceptedPolicies)
+    throw new Error("Accept the Terms of Use and read the Privacy Policy first");
   const redirect = new URL(platform().webOrigin());
   const inviteToken = platform().inviteToken();
   if (inviteToken) redirect.searchParams.set("invite", inviteToken);
@@ -163,7 +172,14 @@ export async function registerAccount(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo },
+    options: {
+      emailRedirectTo,
+      data: {
+        napp_terms_version: POLICY_VERSION,
+        napp_privacy_version: POLICY_VERSION,
+        napp_policies_accepted_at: new Date().toISOString(),
+      },
+    },
   });
   if (error) throw new Error(error.message);
 
@@ -258,6 +274,8 @@ export async function switchAccount(userId: string): Promise<void> {
     refresh_token: target.refreshToken,
   });
   if (error) {
+    if (error.status !== 400 && error.status !== 401 && error.status !== 403)
+      throw new Error(`Couldn't reach ${target.email}. Try again`);
     saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
     throw new Error(`Sign in to ${target.email} again`);
   }
@@ -269,8 +287,12 @@ export async function switchAccount(userId: string): Promise<void> {
   window.location.reload();
 }
 
-export async function clearSession(): Promise<void> {
+export async function clearSession(options: { removeLocalContent?: boolean } = {}): Promise<void> {
   const leaving = currentAppSession();
+  if (options.removeLocalContent && leaving) {
+    const { removeAccountContent } = await import("./accountContent");
+    await removeAccountContent(leaving.userId);
+  }
   if (leaving) saveAccounts(savedAccounts().filter((a) => a.userId !== leaving.userId));
   localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();

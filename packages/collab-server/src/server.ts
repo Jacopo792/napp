@@ -21,6 +21,7 @@ import { Redis } from "@hocuspocus/extension-redis";
 import { Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
 import IORedis from "ioredis";
+import { setTimeout, clearTimeout } from "node:timers";
 import {
   broken as lockBroken,
   guard as lockGuard,
@@ -28,6 +29,7 @@ import {
   type Guard,
 } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
+import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
 import { loadDocument, storeDocument } from "./documents.ts";
@@ -39,6 +41,8 @@ export interface CollaborationConfig {
   serviceRoleKey: string;
   allowedOrigins: string[];
   port: number;
+  /** The exact source revision running here; absent for ordinary local dev. */
+  revision?: string | null;
   /** How long a burst of keystrokes is gathered before it becomes one save. */
   debounce?: number;
   /** How long an authorisation answer is trusted before the archive is asked
@@ -74,13 +78,18 @@ function respond(
 /** Every dependency probe is bounded, so an unreachable backend answers the
  *  probe with "not ready" rather than making the platform wait on a socket
  *  that will never reply. */
-const PROBE_MS = 1200;
-
 async function within<T>(work: PromiseLike<T>): Promise<T | null> {
-  return Promise.race([
-    Promise.resolve(work).catch(() => null),
-    new Promise<null>((resolve) => setTimeout(resolve, PROBE_MS)),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(work).catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), PROBE_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface Context {
@@ -361,6 +370,9 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        a database that is briefly away. */
     async onRequest({ request, response }) {
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (url.pathname === "/version") {
+        return respond(response, 200, { revision: config.revision ?? null });
+      }
       if (url.pathname === "/import-image") {
         const origin = request.headers.origin;
         if (!originAllowed(origin, config.allowedOrigins))
@@ -400,21 +412,13 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         return respond(response, 200, { status: "ok" });
       }
       if (request.url === "/readyz") {
-        const [supabaseOk, redisOk] = await Promise.all([
-          within(
-            service
-              .from("archives")
-              .select("id", { head: true, count: "exact" })
-              .limit(1)
-              .then((result) => !result.error),
-          ),
-          probeRedis(),
-        ]);
-        const checks = { supabase: supabaseOk === true, redis: redisOk };
+        const [supabaseProbe, redisOk] = await Promise.all([probeSupabase(service), probeRedis()]);
+        const checks = { supabase: supabaseProbe.ok, redis: redisOk };
         const ready = checks.supabase && checks.redis !== false;
         const state = ready ? "ready" : `unavailable: ${JSON.stringify(checks)}`;
         if (state !== readinessState) {
-          if (!ready) console.warn(`readiness ${state}`);
+          if (!ready)
+            console.warn(`readiness ${state}; supabase: ${supabaseProbe.failure ?? "ok"}`);
           else if (readinessState !== null) console.info("readiness recovered");
           readinessState = state;
         }

@@ -977,6 +977,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [readSnapshot]);
 
   useEffect(() => {
+    const safetyChanged = () => {
+      setSheets([]);
+      refreshRemote();
+    };
+    window.addEventListener("napp:safety-change", safetyChanged);
+    return () => window.removeEventListener("napp:safety-change", safetyChanged);
+  }, [refreshRemote]);
+
+  useEffect(() => {
     if (!session) return;
     let cancelled = false;
 
@@ -3507,11 +3516,33 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [whatsNewUnseen, loading, openWhatsNew]);
   const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
 
-  function handleLock() {
+  async function handleLock(removeLocalContent = true) {
+    if (
+      removeLocalContent &&
+      !window.confirm(
+        "Sign out and remove this account’s local notes? Changes that have not reached the server will be deleted.",
+      )
+    )
+      return;
     saveNow();
-    clearDrafts();
-    void clearSession();
-    navigate({ to: "/" });
+    try {
+      if (!removeLocalContent) {
+        // An inactivity lock hides the archive immediately, even offline.
+        // Its recoverable Yjs stores are deliberately retained.
+        const signingOut = clearSession();
+        navigate({ to: "/" });
+        await signingOut;
+        return;
+      }
+      await drain();
+      await clearSession({ removeLocalContent });
+      clearDrafts();
+      navigate({ to: "/" });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Could not sign out. Try again.";
+      if (removeLocalContent) window.alert(message);
+      else setError(message);
+    }
   }
 
   function handleSwitchAccount(userId: string) {
@@ -3730,7 +3761,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
-  useAutoLock(autoLock, handleLock);
+  useAutoLock(autoLock, () => void handleLock(false));
 
   if (!session) return null;
 
@@ -4900,7 +4931,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         setFoldersOpen(false);
         setSettingsOpen(true);
       }}
-      onLock={handleLock}
+      onLock={() => void handleLock()}
       accountEmail={session?.email ?? ""}
       accounts={() => (session ? otherAccounts(session.userId) : [])}
       onSwitchAccount={handleSwitchAccount}
@@ -4993,6 +5024,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             : undefined
         }
         email={session.email}
+        onAccountDeleted={() => {
+          clearDrafts();
+          setSession(null);
+          void navigate({ to: "/" });
+        }}
         reading={readingLabel}
         autoLock={autoLock}
         profile={profile}
@@ -5048,7 +5084,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsOpen(false);
           setSettingsSection(undefined);
         }}
-        onLock={handleLock}
+        onLock={() => void handleLock()}
       />
     </Suspense>
   );

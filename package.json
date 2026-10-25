@@ -16,8 +16,8 @@
     "preview:ui": "vite dev --config vite.preview.config.ts",
     "preview:desktop-ui": "NAPP_SHELL=desktop vite dev --config vite.preview.config.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/desktop && tsc --noEmit -p packages/collab-server && tsc --noEmit -p scripts && tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/desktop && tsc --noEmit -p packages/collab-server && tsc --noEmit -p scripts && tsc --noEmit && tsc --noEmit -p supabase/functions && tsc --noEmit -p e2e",
+    "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\" \"supabase/functions/delete-account/*.test.ts\" && node scripts/verify-account-erasure-postgres.mjs",
     "test:server": "pnpm --filter @notes-app/collab-server test",
     "format": "prettier --write '**/*.{js,mjs,cjs,ts,tsx,json,css,md,yml,yaml,html}'",
     "format:check": "prettier --check '**/*.{js,mjs,cjs,ts,tsx,json,css,md,yml,yaml,html}'",
@@ -28,7 +28,10 @@
     "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs",
     "verify:supabase:local": "node --experimental-strip-types scripts/verify-supabase-local.mjs",
     "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/napp/ pnpm build && git diff --check",
-    "healthcheck:full": "pnpm healthcheck && REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server && pnpm verify:supabase:local"
+    "healthcheck:full": "pnpm healthcheck && REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server && pnpm verify:supabase:local",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:full": "NAPP_E2E_FULLSTACK=1 playwright test -c e2e/playwright.config.ts",
+    "verify:deployment": "node packages/collab-server/check-deployment.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -51,7 +54,9 @@
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1",
     "vite-tsconfig-paths": "^6.0.2",
-    "yjs": "13.6.32"
+    "yjs": "13.6.32",
+    "@electric-sql/pglite": "0.5.11",
+    "@playwright/test": "^1.64.1"
   },
   "engines": {
     "node": ">=22.6",
