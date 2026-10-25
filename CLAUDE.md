@@ -1998,7 +1998,11 @@ printing.
   "Your Notes", "Ada's Notes", the open one in ink over a 2px line
   (`NotebookIndex.tsx`). A sidebar has to say that the row scrolls, so it fades
   at the edge that has more behind it, a wheel moves it sideways, the open
-  title is kept in view and ← → walk it. The book's title strip draws its
+  title is kept in view and ← → walk it. The line is one element, not one per title:
+  it glides from the title that was open to the one that is, both ends
+  together over 260 ms on the phone's curve (`WhoseSwitch.tsx`) — no fade, no
+  stretch, no spring — while the titles trade ink over 180 ms; its first place
+  is taken without travel, and reduced motion moves it at once. The book's title strip draws its
   whose-switch in the same words and keeps the faces and the here/typing marks,
   because in a shared book they are the point.
 - **Names.** Remarks is Comments and Trash is Recently Deleted, on screen only:

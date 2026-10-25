@@ -14009,25 +14009,37 @@ button.sheet-chip:hover,
   transition: color 180ms var(--ease);
 }
 
-.notebook-index-title::after {
+.notebook-index-title.is-active {
+  color: var(--ink);
+}
+
+/* The open title's line. The titles trade ink over 180 ms while it travels
+   260 — the phone's two numbers. */
+.notebook-index {
+  position: relative;
+}
+
+.notebook-index-line {
   position: absolute;
-  right: 0;
   bottom: 0;
   left: 0;
   height: 2px;
   border-radius: 1px;
   background: var(--accent);
-  content: "";
-  opacity: 0;
-  transition: opacity 260ms var(--ease);
+  pointer-events: none;
 }
 
-.notebook-index-title.is-active {
-  color: var(--ink);
+.notebook-index-line.is-gliding {
+  transition:
+    transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    width 260ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-.notebook-index-title.is-active::after {
-  opacity: 1;
+@media (prefers-reduced-motion: reduce) {
+  .notebook-index-title,
+  .notebook-index-line.is-gliding {
+    transition: none;
+  }
 }
 
 /* ── Home ────────────────────────────────────────────────────────────────────
