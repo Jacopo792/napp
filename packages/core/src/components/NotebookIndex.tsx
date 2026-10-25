@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useIndexLine, type IndexLinePlace } from "@/lib/useIndexLine";
 
 /* ── Whose notes ─────────────────────────────────────────────────────────────
    The phone's notebook index at the top of the sidebar: "Your Notes",
@@ -32,22 +33,7 @@ export function NotebookIndex({
 }) {
   const row = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
-  /* One line, not one per title: it glides from the title that was open to
-     the one that is, both ends together over 260 ms on the phone's curve
-     (`WhoseSwitch.tsx`) — no stretch, no spring. Its first place is taken
-     without travel, so arriving on the sidebar is not a movement. */
-  const [line, setLine] = useState<{ x: number; width: number; glide: boolean } | null>(null);
-  const placeLine = useRef<() => void>(() => undefined);
-  placeLine.current = () => {
-    const title = row.current?.querySelector<HTMLElement>(".notebook-index-title.is-active");
-    if (!title) return setLine(null);
-    setLine((was) =>
-      was && was.x === title.offsetLeft && was.width === title.offsetWidth
-        ? was
-        : { x: title.offsetLeft, width: title.offsetWidth, glide: was !== null },
-    );
-  };
-
+  const [line, placeLine] = useIndexLine(row, ".notebook-index-title.is-active");
   useEffect(() => {
     const element = row.current;
     if (!element) return;
@@ -60,7 +46,7 @@ export function NotebookIndex({
     measure();
     const observer = new ResizeObserver(() => {
       measure();
-      placeLine.current();
+      placeLine();
     });
     observer.observe(element);
     element.addEventListener("scroll", measure, { passive: true });
@@ -79,11 +65,11 @@ export function NotebookIndex({
       element.removeEventListener("scroll", measure);
       element.removeEventListener("wheel", wheel);
     };
-  }, [titles.length]);
+  }, [titles.length, placeLine]);
 
   /* The open notebook is never the one behind the fade. */
   useLayoutEffect(() => {
-    placeLine.current();
+    placeLine();
     const element = row.current;
     const title = element?.querySelector<HTMLElement>(".notebook-index-title.is-active");
     if (!element || !title) return;
@@ -92,7 +78,7 @@ export function NotebookIndex({
     if (left < element.scrollLeft) element.scrollLeft = left;
     else if (right > element.scrollLeft + element.clientWidth)
       element.scrollLeft = right - element.clientWidth;
-  }, [active, titles]);
+  }, [active, titles, placeLine]);
 
   function step(event: React.KeyboardEvent, from: number) {
     const by = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -128,14 +114,20 @@ export function NotebookIndex({
             </button>
           );
         })}
-        {line && (
-          <span
-            aria-hidden="true"
-            className={`notebook-index-line ${line.glide ? "is-gliding" : ""}`}
-            style={{ width: line.width, transform: `translateX(${line.x}px)` }}
-          />
-        )}
+        <IndexLine line={line} className="notebook-index-line" />
       </div>
     </div>
+  );
+}
+
+/** The line itself, where `useIndexLine` placed it. */
+export function IndexLine({ line, className }: { line: IndexLinePlace; className: string }) {
+  if (!line) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={`${className} ${line.glide ? "is-gliding" : ""}`}
+      style={{ width: line.width, transform: `translateX(${line.x}px)` }}
+    />
   );
 }

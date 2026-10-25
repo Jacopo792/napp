@@ -296,7 +296,8 @@ function faceOrigin(element: Element): SheetOrigin {
 }
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { HomePage, type HomeChange, type HomeRemark } from "@/components/HomePage";
-import { NotebookIndex } from "@/components/NotebookIndex";
+import { IndexLine, NotebookIndex } from "@/components/NotebookIndex";
+import { useIndexLine } from "@/lib/useIndexLine";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
 import { WhatsNewButton } from "@/components/WhatsNewButton";
@@ -616,6 +617,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      switch on its way out. */
   const holdRef = useRef<number | undefined>(undefined);
   const heldRef = useRef(false);
+  /* Whose manuscript, in the book's title strip: the notebook index's
+     gliding line under the open name. */
+  const peopleRef = useRef<HTMLDivElement>(null);
+  const [peopleLine, placePeopleLine] = useIndexLine(peopleRef, ".people-face.is-active");
+  /* Every render, because the shelf comes and goes with the book's strip
+     and its names change width as faces and typing marks arrive; placing is a
+     query and a comparison, and sets nothing when nothing moved. */
+  useLayoutEffect(() => placePeopleLine());
 
   function holdStart(event: React.PointerEvent, userId: string) {
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -4609,6 +4618,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }
   const peopleShelf = (
     <div
+      ref={peopleRef}
       role="group"
       aria-label="Whose notes"
       className="people-shelf"
@@ -4623,6 +4633,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       }
     >
       <span className="people-thumb" aria-hidden="true" />
+      <IndexLine line={peopleLine} className="people-line" />
       {roster.map((member) => {
         const active = viewAs === member.userId;
         const online =

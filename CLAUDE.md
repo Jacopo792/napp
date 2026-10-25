@@ -2115,7 +2115,10 @@ printing.
   the system's `NSMenu` wherever `popUpMenu` already hands a menu over.
 - **The book's chrome** wears the same tokens — corkboard cards of `--card`, 16
   round, on the page's ground; the writing bar's fields a card's ground with a
-  hairline, 8 round — and nothing inside `.manuscript-sheet` changed.
+  hairline, 8 round — and nothing inside `.manuscript-sheet` changed. The
+  title strip's whose-manuscript names carry the notebook index's own gliding
+  line (`useIndexLine` in `lib/useIndexLine.ts`, drawn by `IndexLine`), and the
+  writing bar's words — Pages, Edit — are set at the bar's one size.
 
 ## Interface notes worth knowing
 

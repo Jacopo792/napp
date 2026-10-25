@@ -11322,25 +11322,36 @@ button.sheet-chip:hover,
   color: var(--ink-4);
 }
 
-.manuscript-titlebar-end .people-face::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
-  content: "";
-  opacity: 0;
-  transition: opacity 260ms var(--ease);
-}
-
 .manuscript-titlebar-end .people-face.is-active {
   color: var(--ink);
 }
 
-.manuscript-titlebar-end .people-face.is-active::after {
-  opacity: 1;
+/* The notebook index's line, gliding between the names (`useIndexLine`). */
+.people-line {
+  display: none;
+}
+
+.manuscript-titlebar-end .people-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.manuscript-titlebar-end .people-line.is-gliding {
+  transition:
+    transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    width 260ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manuscript-titlebar-end .people-line.is-gliding {
+    transition: none;
+  }
 }
 
 /* ── The writing bar ── */
@@ -11423,7 +11434,8 @@ button.sheet-chip:hover,
   padding: 0 3px;
 }
 
-.ribbon-word {
+.ribbon-word,
+.manuscript-bar-end .ribbon-tool > span {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
 }
