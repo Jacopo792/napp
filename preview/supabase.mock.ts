@@ -1,5 +1,9 @@
 import { projectDocument } from "@/features/editor/lib/ydoc";
-import { richTextToPlainText } from "@/features/editor/lib/content";
+import {
+  richTextToPlainText,
+  sameReadableDocument,
+  withoutInvisibleDocumentEnding,
+} from "@/features/editor/lib/content";
 import type { Doc } from "yjs";
 /* Preview-only stand-in for src/lib/supabase.ts. An in-memory archive built from
    the fixture, with enough latency that "Saving" and "Saved" are actually
@@ -321,16 +325,33 @@ export async function leaveArchive(_session: AppSession): Promise<void> {
   await sleep(160);
 }
 
-/** The local equivalent of the collaboration server projecting a changed document. */
+/** The local equivalent of the collaboration server projecting a changed
+ *  document — with its rule for what counts as an edit. Comparing raw JSON
+ *  restamped a note merely opened, because the binding gives every mark an
+ *  empty `attrs` and the editor a trailing paragraph that the fixture lacks. */
 export function projectPreviewNote(noteId: string, document: Doc): void {
- for (const [archiveId, store] of stores) {
-  const previous = store.notes.get(noteId);
-  if (!previous) continue;
-  const projection = projectDocument(document);
-  const body = richTextToPlainText(projection.content);
-  if (previous.note.title === projection.title && JSON.stringify(previous.note.content) === JSON.stringify(projection.content)) return;
-  store.notes.set(noteId, {note: {...previous.note, ...projection, body, updatedAt: new Date().toISOString()}, version: previous.version + 1});
-  window.dispatchEvent(new CustomEvent("napp:preview-archive-changed", {detail: archiveId}));
-  return;
- }
+  for (const [archiveId, store] of stores) {
+    const previous = store.notes.get(noteId);
+    if (!previous) continue;
+    const projection = projectDocument(document);
+    const content = withoutInvisibleDocumentEnding(projection.content);
+    if (
+      previous.note.title === projection.title.trimEnd() &&
+      sameReadableDocument(previous.note.content, content)
+    )
+      return;
+    const body = richTextToPlainText(content);
+    store.notes.set(noteId, {
+      note: {
+        ...previous.note,
+        title: projection.title.trimEnd(),
+        content,
+        body,
+        updatedAt: new Date().toISOString(),
+      },
+      version: previous.version + 1,
+    });
+    window.dispatchEvent(new CustomEvent("napp:preview-archive-changed", { detail: archiveId }));
+    return;
+  }
 }

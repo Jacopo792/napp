@@ -1316,7 +1316,14 @@ The collaboration server is part of the authorization boundary:
   `storeDocument` therefore compares the projection with the row minus `null`
   attributes (`withoutNullAttributes`) and, when that is the only difference,
   hands the row's own content back. Pinned by `storeNoEdit.test.ts`; expect to
-  meet it again with the next attribute added to a mark or node.
+  meet it again with the next attribute added to a mark or node. The same
+  went for the `attrs: {}` the binding gives every mark (`italic`), which a row
+  written outside it — an import, a template, a continued passage — lacks:
+  merely opening such a note restamped it, in split view or not. The question
+  is now one function, `sameReadableDocument()` in `content.ts` — null and
+  empty attributes off and the invisible ending cut, **on both sides**, since
+  the row may end in the empty paragraph too — and the preview's
+  `projectPreviewNote` asks it as well, where it used to compare raw JSON.
 
 The old draft/three-way merge path is compatibility code for a pre-Yjs client,
 not the live writer. Do not call saveNote() from the collaborative editor.

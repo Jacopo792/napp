@@ -1635,17 +1635,44 @@ export function withoutInvisibleDocumentEnding(content: JSONContent): JSONConten
   }
 }
 
-/** The same document, minus attributes that are `null`. A projection out of
- *  Yjs spells a default as `null` (`noteLink.blockId`) where the row written
- *  before that attribute existed says nothing — the same words, a different
- *  jsonb, and so an "edit" the first time any such note is stored. */
+/** The same document, minus attributes that are `null` — and minus an
+ *  `attrs` left empty by that. A projection out of Yjs spells a default as
+ *  `null` (`noteLink.blockId`) where the row written before that attribute
+ *  existed says nothing, and it gives every mark an `attrs: {}` (`italic`)
+ *  where a row written outside the binding — an import, a template, a note
+ *  continued from a passage — has none: the same words, a different jsonb, and
+ *  so an "edit" the first time any such note was opened in an editor. */
 export function withoutNullAttributes(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(withoutNullAttributes);
   if (value && typeof value === "object")
     return Object.fromEntries(
       Object.entries(value)
         .filter(([, v]) => v !== null)
-        .map(([k, v]) => [k, withoutNullAttributes(v)]),
+        .map(([k, v]) => [k, withoutNullAttributes(v)] as const)
+        .filter(
+          ([k, v]) => !(k === "attrs" && v && typeof v === "object" && !Object.keys(v).length),
+        ),
+    );
+  return value;
+}
+
+/** Whether two documents say the same thing to a reader: the question
+ *  `storeDocument` asks before it lets `save_note_document` restamp a note.
+ *  Both sides are normalised, because the stored row may itself carry the
+ *  trailing empty paragraph a projection is cut free of. */
+export function sameReadableDocument(left: JSONContent, right: JSONContent): boolean {
+  const readable = (content: JSONContent) =>
+    JSON.stringify(canonical(withoutNullAttributes(withoutInvisibleDocumentEnding(content))));
+  return readable(left) === readable(right);
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
     );
   return value;
 }
