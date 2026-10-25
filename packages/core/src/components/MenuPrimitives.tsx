@@ -19,7 +19,7 @@ export function MenuButton({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`menu-row ${danger ? "text-danger" : active ? "text-accent" : "text-ink-2"}`}
+      className={`menu-row ${danger ? "is-danger text-danger" : active ? "text-accent" : "text-ink"}`}
     >
       {children}
       {active && <Check size={16} className="ml-auto" />}
@@ -37,10 +37,12 @@ export function MenuItems({ items, close }: { items: MenuItem[]; close: () => vo
 
   return (
     <div className="menu-section" key={inside ?? "root"}>
+      {/* The way back names where you are, as the phone's popover does:
+          "‹ Move note" says which section this is and how to leave it. */}
       {open && (
         <MenuButton onClick={() => setInside(null)}>
           <ChevronRight size={16} className="rotate-180" />
-          Back
+          <span className="truncate">{open.kind === "item" ? open.label : "Back"}</span>
         </MenuButton>
       )}
       {open?.kind === "item" && open.submenu?.length === 0 && (

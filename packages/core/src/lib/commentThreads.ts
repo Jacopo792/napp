@@ -109,6 +109,21 @@ export function notesWithOpenRemarks(comments: ArchiveComment[]): Set<string> {
   return notes;
 }
 
+/** The last thing said in a thread still open, per note — what the
+ *  Comments scope shows in a row, as the phone's tab does: whoever spoke
+ *  last, their words, and when. */
+export function lastOpenRemarks(comments: ArchiveComment[]): Map<string, ArchiveComment> {
+  const resolvedThreads = new Set<string>();
+  for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
+  const last = new Map<string, ArchiveComment>();
+  for (const comment of comments) {
+    if (resolvedThreads.has(comment.threadId)) continue;
+    const before = last.get(comment.noteId);
+    if (!before || before.createdAt < comment.createdAt) last.set(comment.noteId, comment);
+  }
+  return last;
+}
+
 /** When this browser last read each note's remarks, keyed by note. */
 export type RemarksSeen = Record<string, string>;
 

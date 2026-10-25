@@ -143,6 +143,7 @@ import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from 
 import {
   loadArchiveComments,
   notesWithOpenRemarks,
+  lastOpenRemarks,
   unreadRemarks,
   type RemarksSeen,
   type ArchiveComment,
@@ -208,7 +209,7 @@ import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
-import { NoteList, type ActiveFilter } from "@/components/NoteList";
+import { NoteList, type ActiveFilter, type RowRemark } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import {
   announceTyping,
@@ -289,6 +290,7 @@ function faceOrigin(element: Element): SheetOrigin {
 }
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { HomePage } from "@/components/HomePage";
+import { NotebookIndex } from "@/components/NotebookIndex";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
 import { WhatsNewButton } from "@/components/WhatsNewButton";
@@ -651,6 +653,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const splitTitleRef = useRef<HTMLTextAreaElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
+  /* The second note's editor, so its ⋯ can find in it and show its outline. */
+  const splitEditorRef = useRef<NoteEditorHandle>(null);
+  /** A note asked to open with its outline beside it, from a menu about a
+   *  note that was not the open one. */
+  const [outlineFor, setOutlineFor] = useState<string | null>(null);
   useEffect(() => {
     if (!openThen || selectedId !== openThen.noteId) return;
     /* The editor is a lazy chunk, so on the first note of a visit it is not
@@ -1255,6 +1262,22 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [session, refreshRemarks, awake]);
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
+  /* The Comments scope, row for row as the phone's tab: whoever spoke last in
+     a note's open threads, what they said, when. */
+  const lastRemarks = useMemo(() => lastOpenRemarks(archiveComments), [archiveComments]);
+  const remarkRows = useMemo(() => {
+    const rows = new Map<string, RowRemark>();
+    for (const [noteId, said] of lastRemarks) {
+      const member = members.find((one) => one.userId === said.authorId);
+      const name = member?.nickname || "Member";
+      rows.set(noteId, {
+        face: <Avatar url={avatarUrls[said.authorId] ?? null} name={name} email="" compact />,
+        body: said.authorId === selfId ? `You: ${said.body}` : said.body,
+        at: said.createdAt,
+      });
+    }
+    return rows;
+  }, [lastRemarks, members, avatarUrls, selfId]);
   const unreadRemarkNotes = useMemo(
     () =>
       new Set(
@@ -1367,11 +1390,26 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   ]);
 
   const noteGroups = useMemo(() => {
+    /* Comments is a conversation list, newest word first, in one card under
+       "Open" as the phone's tab has it — a date heading over it would date
+       the note, not what was said. */
+    if (selectedFolderId === REMARKS)
+      return [
+        {
+          id: "remarks",
+          label: "Open",
+          entries: [...visible].sort((a, b) =>
+            (lastRemarks.get(b.note.id)?.createdAt ?? "").localeCompare(
+              lastRemarks.get(a.note.id)?.createdAt ?? "",
+            ),
+          ),
+        },
+      ];
     const pinnedIds = new Set(
       activeMeta.notes.filter((note) => note.pinned).map((note) => note.id),
     );
     return groupEntries(visible, pinnedIds, activeListPreferences);
-  }, [visible, activeMeta.notes, activeListPreferences]);
+  }, [visible, activeMeta.notes, activeListPreferences, selectedFolderId, lastRemarks]);
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   /* ── A document ──────────────────────────────────────────────────────────
@@ -3363,6 +3401,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (selectedId) setHomeOpen(false);
   }, [selectedId]);
 
+  /** A note's outline, asked for from a menu about the note (its row's, or
+   *  the editor's): the open note shows or hides it, another note opens
+   *  with it showing. */
+  function openWithOutline(id: string) {
+    if (id === selectedIdRef.current) {
+      noteEditorRef.current?.toggleOutline();
+      return;
+    }
+    setOutlineFor(id);
+    handleSelectNote(id);
+  }
+  useEffect(() => {
+    if (outlineFor && selectedId !== outlineFor) setOutlineFor(null);
+  }, [selectedId, outlineFor]);
+
   function goHome() {
     setHomeOpen(true);
     setSelectedId(null);
@@ -4609,30 +4662,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      in the content's own voice, the chosen one underlined in the accent. The
      book keeps the shelf above. Right-click a title for that person's sheet. */
   const notebookIndex = (
-    <div role="group" aria-label="Whose notes" className="notebook-index">
-      {roster.map((member) => {
-        const active = viewAs === member.userId;
-        return (
-          <button
-            key={member.userId}
-            type="button"
-            onClick={() => handleViewChange(member.userId)}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              openSheet({
-                ...faceOrigin(event.currentTarget),
-                kind: "person",
-                userId: member.userId,
-              });
-            }}
-            aria-pressed={active}
-            className={`notebook-index-title ${active ? "is-active" : ""}`}
-          >
-            {member.isSelf ? "Your Notes" : `${nameOf(member)}’s Notes`}
-          </button>
-        );
-      })}
-    </div>
+    <NotebookIndex
+      titles={roster.map((member) => ({
+        id: member.userId,
+        label: member.isSelf ? "Your Notes" : `${nameOf(member)}’s Notes`,
+      }))}
+      active={viewAs}
+      onSelect={handleViewChange}
+      onInfo={(userId, element) => openSheet({ ...faceOrigin(element), kind: "person", userId })}
+    />
   );
 
   /* Home's faces: somebody else in that note now, as the archive's presence
@@ -5242,6 +5280,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onSavePdf={() => noteEditorRef.current?.savePdf()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
+        onOutline={() => noteEditorRef.current?.toggleOutline()}
         onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}
@@ -5940,6 +5979,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
+                  remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
                   peerNoteIds={peerNoteIds}
                   peerTypingNoteIds={peerTypingNoteIds}
                   peerColor={presenceColor}
@@ -5957,6 +5997,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
+                  onOutline={openWithOutline}
                   resolveImage={resolveImage}
                 />
               </section>
@@ -5977,6 +6018,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     canEdit={canEdit}
                     lock={selected ? lockFor(selected.note.id) : undefined}
                     startWithComments={selectedFolderId === REMARKS}
+                    startWithOutline={outlineFor === selected?.note.id}
                     proofreaderEnabled={proofreaderEnabled}
                     autocorrectEnabled={autocorrectEnabled}
                     viewingAsPartner={viewAs === "u2"}
@@ -6122,6 +6164,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 };
                 window.setTimeout(focus, 50);
               }}
+              onSearch={() => {
+                setPaletteQuery("");
+                setPaletteOpen(true);
+              }}
               onFolderInfo={(folderId, origin) =>
                 openSheet({ ...origin, kind: "folder", folderId })
               }
@@ -6156,10 +6202,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                       view="list"
                       leading={sidebarToggle}
                       toolbarActions={collectionActions}
-                      sort={{
-                        preferences: activeListPreferences,
-                        onChange: handleListPreferencesChange,
-                      }}
+                      /* Comments is ordered by what was said last, so the
+                         sort chips would be buttons that do nothing there. */
+                      sort={
+                        selectedFolderId === REMARKS
+                          ? undefined
+                          : {
+                              preferences: activeListPreferences,
+                              onChange: handleListPreferencesChange,
+                            }
+                      }
                       filters={activeFilters}
                       meta={activeMeta}
                       showFolder={
@@ -6174,6 +6226,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                       scopeLabel={scopeTag}
                       trashMode={selectedFolderId === TRASH}
                       unreadIds={unreadRemarkNotes}
+                      remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
                       peerNoteIds={peerNoteIds}
                       peerTypingNoteIds={peerTypingNoteIds}
                       peerColor={presenceColor}
@@ -6191,6 +6244,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                       onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                       onMoveToFolder={handleMoveNote}
                       onSetPhoto={handleNotePhoto}
+                      onOutline={openWithOutline}
                       resolveImage={resolveImage}
                     />
                   </div>
@@ -6223,6 +6277,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   canEdit={canEdit}
                   lock={selected ? lockFor(selected.note.id) : undefined}
                   startWithComments={selectedFolderId === REMARKS}
+                  startWithOutline={outlineFor === selected?.note.id}
                   proofreaderEnabled={proofreaderEnabled}
                   autocorrectEnabled={autocorrectEnabled}
                   viewingAsPartner={viewAs === "u2"}
@@ -6320,6 +6375,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   <div className="split-seam" />
                   <Suspense fallback={<div className="soft-pane pane-page min-w-0 flex-1" />}>
                     <NoteEditor
+                      ref={splitEditorRef}
                       key={`split:${splitEntry.note.id}`}
                       entry={splitEntry}
                       syncRevision={syncRevision}
@@ -6351,16 +6407,39 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                       onOpenNote={handleOpenRecent}
                       onRemarksChanged={refreshRemarks}
                       saidThreads={saidThreads}
+                      /* Its own ⋯ with what reading it needs — Find and the
+                         outline, which phase two moved off the strip and
+                         this pane then had no way back to — and its close. */
                       headerActions={
-                        <button
-                          type="button"
-                          onClick={() => setSplitId(null)}
-                          aria-label="Close the second note"
-                          title="Close the second note"
-                          className="toolbar-button press"
-                        >
-                          <X size={16} />
-                        </button>
+                        <>
+                          <DotsMenu
+                            items={[
+                              {
+                                kind: "item",
+                                id: "find",
+                                label: "Find in note",
+                                icon: <Search size={16} />,
+                                run: () => splitEditorRef.current?.openFind(),
+                              },
+                              {
+                                kind: "item",
+                                id: "outline",
+                                label: "Outline",
+                                icon: <ListTree size={16} />,
+                                run: () => splitEditorRef.current?.toggleOutline(),
+                              },
+                            ]}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSplitId(null)}
+                            aria-label="Close the second note"
+                            title="Close the second note"
+                            className="toolbar-button press"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
                       }
                     />
                   </Suspense>

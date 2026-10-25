@@ -1193,15 +1193,21 @@
    time. So: no border at rest, a ground that separates the card from the page,
    and the accent spent on exactly one card — the one being read or replied
    to. */
+/* ── A thread, in the phone's annotation language ──────────────────────────
+   One neutral card — `--card`, a hairline, 16 round — holding the passage it
+   is about, recessed into it with a rule down its side; then each remark as a
+   byline (a neutral face, the name, "You" for your own, how long ago) over
+   its words in ink; then the thread's foot in quiet words: Reply, Resolve, ⋯.
+   The open thread is said by its passage lighting in the note, and here by a
+   ring of ink rather than of accent — the accent stays for small signals. */
 .note-comment-thread {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: var(--paper);
-  box-shadow: var(--shadow-soft);
+  gap: 12px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 16px;
+  padding: 14px 14px 4px;
+  background: var(--card);
   cursor: default;
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -1209,76 +1215,102 @@
 }
 
 .note-comment-thread:hover {
-  border-color: var(--rule-soft);
+  border-color: var(--rule);
 }
 
 .note-comment-thread.is-active {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow:
-    var(--shadow-soft),
-    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 /* A thread nobody needs to act on any more steps back rather than disappearing:
    what was said stays readable, and stops asking to be read. */
 .note-comment-thread.is-resolved {
-  opacity: 0.58;
+  opacity: 0.62;
 }
 
 .note-comment-thread.is-pending {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  padding-bottom: 14px;
 }
 
-/* The quotation is the thread's title, so it is set like one — and clipped,
-   because a comment on three paragraphs must not push the remark off screen. */
+/* The passage, recessed: a well of ink at 6% with a 2px rule of ink-3 down its
+   side, two lines at most, and the arrow that says pressing it goes there. */
 .note-comment-quote {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 9px 12px 9px 16px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-comment-quote::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ink-3);
+  content: "";
+}
+
+.note-comment-quote > span {
   display: -webkit-box;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  padding-left: 8px;
-  color: var(--ink-3);
-  font-family: var(--font-reading);
-  font-size: var(--text-xs);
-  line-height: 1.45;
-  text-align: left;
 }
 
-.note-comment-quote.is-link:hover {
-  color: var(--ink);
+.note-comment-quote > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.note-comment-quote:hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
 }
 
 /* A thread whose passage has been deleted has nothing to point at, so it stops
-   pretending to: no accent rule, and the sentence says what happened. */
+   pretending to: no rule, and the sentence says what happened. */
 .note-comment-quote.is-orphan {
-  border-left-color: var(--rule);
   color: var(--ink-4);
   font-style: italic;
+  cursor: default;
 }
 
-/* A remark is a line saying who and when, with what can be done at its right
-   end, and the words under it at the card's full width — Docs' card. The tools
-   used to be a row of words under the last remark, so Resolve, the act a
-   thread exists to end in, was the thing furthest from the eye; and a reply sat
-   on a rail of its own, which made a conversation of two lines look like an
-   outline. A reply is now the same shape after a hairline. */
+.note-comment-quote.is-orphan::before {
+  display: none;
+}
+
+/* A remark is its byline over its words; a reply is the same shape after a
+   hairline. */
 .note-comment {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .note-comment.is-reply {
   border-top: 1px solid var(--rule-soft);
-  padding-top: 10px;
+  padding-top: 12px;
 }
 
 .note-comment-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
+  min-height: 24px;
 }
 
 .note-comment-head > .avatar.is-compact {
@@ -1286,29 +1318,85 @@
   height: 24px;
   flex-shrink: 0;
   font-size: 9px;
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--author, var(--rule)) 70%, transparent);
 }
 
 .note-comment-who {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  line-height: 1.25;
+  align-items: baseline;
+  gap: 8px;
 }
 
-/* Who said it, in the colour this person's caret already has in the text —
-   a second colour system would be worse than none. */
 .note-comment-name {
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
-  color: var(--author, var(--ink-2));
 }
 
 .note-comment-stamp {
-  color: var(--ink-4);
+  flex-shrink: 0;
+  color: var(--ink-3);
   font-size: var(--text-2xs);
+}
+
+/* The thread's foot: who it is for, then quiet words, then ⋯ at the end. */
+.note-comment-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 38px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.note-comment-word {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.note-comment-word:hover {
+  color: var(--ink);
+}
+
+.note-comment-foot .note-comment-more-acts {
+  margin-left: auto;
+  opacity: 1;
+  color: var(--ink-3);
+}
+
+.note-comment-foot .note-comment-assignee {
+  display: inline-flex;
+  min-width: 0;
+  flex-shrink: 1;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.note-comment-foot .note-comment-assignee .avatar.is-compact {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
+
+/* The face of whoever spoke last, in a Comments row: where the leading slot
+   says what you are about to open. */
+.note-row-face {
+  display: flex;
+  flex-shrink: 0;
+  align-self: center;
+  order: -1;
+}
+
+.note-row-face .avatar.is-compact {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
 }
 
 .note-comment-tools {
@@ -2917,8 +3005,17 @@
   border-radius: var(--radius-lg);
 }
 
+/* The phone's popover, at a desk's scale: 14 round rather than 24, rows of
+   30 rather than 50, the glyph standing in a quiet tile of its own and the
+   words in ink. The tile is what makes a list of acts read as the phone's
+   menu and not a web dropdown; the measure is what keeps it a Mac menu. */
 .popover {
-  border-radius: var(--radius-md);
+  border-radius: 14px;
+}
+
+.menu-popover,
+.context-menu.popover {
+  padding: 5px;
 }
 
 .glass-sheet {
@@ -2949,11 +3046,11 @@
 .menu-row {
   display: flex;
   width: 100%;
-  min-height: 28px;
+  min-height: 30px;
   align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-xs);
-  padding: 4px 8px;
+  gap: 9px;
+  border-radius: 8px;
+  padding: 3px 8px 3px 4px;
   text-align: left;
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
@@ -2964,8 +3061,23 @@
 
 .menu-row:hover,
 .menu-row:focus-visible {
-  background: var(--accent-wash);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink);
+}
+
+.menu-row.is-danger:hover,
+.menu-row.is-danger:focus-visible {
+  color: var(--danger);
+}
+
+/* The glyph's tile: 22 square, 6 round, ink at 7% — the phone's 32/10. An
+   outer <svg> takes padding and a background like any replaced element. */
+.menu-row > svg:first-child {
+  box-sizing: content-box;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 
 .menu-separator {
@@ -3667,7 +3779,7 @@
 .settings-body {
   display: grid;
   flex: 1;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -3680,14 +3792,45 @@
   background: color-mix(in srgb, var(--ink) 3%, var(--paper));
 }
 
-/* The account, at the head of the rail. */
-.settings-identity {
+/* The account, at the head of the rail: the phone's profile card, and the
+   way into Profile. A card of `--card` with the face at 40, because it is a
+   person and the rows under it are places. The marker still travels to it,
+   so its own ground steps aside while it is the chosen row. */
+.settings-nav .settings-identity {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
-  border-radius: var(--radius-md);
-  padding: 8px 8px 12px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--rule-soft);
+}
+
+.settings-nav .settings-identity.is-active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-identity .avatar {
+  width: 40px;
+  height: 40px;
+}
+
+/* A row says what it is and, under it, what is set there now. */
+.settings-nav-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.settings-nav-text small {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-identity b {
@@ -4775,7 +4918,9 @@
 
   .settings-nav-list button svg,
   .settings-nav-group,
-  .settings-identity {
+  .settings-identity .avatar,
+  .settings-identity small,
+  .settings-nav-text small {
     display: none;
   }
 
@@ -11135,7 +11280,7 @@ button.sheet-chip:hover,
 .board-desk {
   overflow: auto;
   padding: 32px 32px 96px;
-  background: color-mix(in srgb, var(--surface) 86%, #000);
+  background: var(--page);
 }
 
 .board-grid {
@@ -11169,7 +11314,7 @@ button.sheet-chip:hover,
   justify-content: center;
   margin: 0;
   border: 1px dashed var(--rule);
-  border-radius: var(--radius-md);
+  border-radius: 16px;
   padding: 16px;
   color: var(--ink-2);
   font-family: var(--font-reading);
@@ -11191,9 +11336,8 @@ button.sheet-chip:hover,
   min-height: 132px;
   flex-direction: column;
   border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  box-shadow: var(--shadow-soft);
+  border-radius: 16px;
+  background: var(--card);
   transition:
     opacity var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
@@ -11252,8 +11396,7 @@ button.sheet-chip:hover,
   display: flex;
   align-items: baseline;
   gap: 8px;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 10px 12px 8px;
+  padding: 14px 14px 2px;
   color: var(--ink);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -11279,10 +11422,10 @@ button.sheet-chip:hover,
   min-height: 3em;
   margin: 0;
   border: 0;
-  padding: 8px 12px;
+  padding: 6px 14px 8px;
   resize: none;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--ink-3);
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.45;
@@ -11291,15 +11434,15 @@ button.sheet-chip:hover,
 
 .board-card-synopsis:focus {
   outline: none;
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .board-card-foot {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 12px 10px;
-  color: var(--ink-4);
+  padding: 6px 14px 12px;
+  color: var(--ink-3);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -11406,9 +11549,47 @@ button.sheet-chip:hover,
   margin-left: auto;
 }
 
+/* Whose manuscript, in the notebook index's words rather than a segmented
+   switch: the names side by side, the open one in ink with the 2px line
+   under it, the faces and the here/typing marks kept because in a shared
+   book they are the point. */
 .manuscript-titlebar-end .people-shelf {
-  width: 250px;
+  width: auto;
   margin: 0;
+  gap: 14px;
+  background: transparent;
+  padding: 0 4px;
+}
+
+.manuscript-titlebar-end .people-thumb {
+  display: none;
+}
+
+.manuscript-titlebar-end .people-face {
+  flex: 0 0 auto;
+  padding: 6px 0;
+  color: var(--ink-4);
+}
+
+.manuscript-titlebar-end .people-face::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  opacity: 0;
+  transition: opacity 260ms var(--ease);
+}
+
+.manuscript-titlebar-end .people-face.is-active {
+  color: var(--ink);
+}
+
+.manuscript-titlebar-end .people-face.is-active::after {
+  opacity: 1;
 }
 
 /* ── The writing bar ── */
@@ -11513,7 +11694,7 @@ button.sheet-chip:hover,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   color: var(--ink-2);
   transition: background-color var(--dur-fast) var(--ease);
 }
@@ -11532,11 +11713,13 @@ button.sheet-chip:hover,
   opacity: 0.35;
 }
 
+/* The bar's fields are the family's controls: a card's ground, a hairline,
+   8 round — the search pill's material at a toolbar's height. */
 .ribbon-select {
   height: 28px;
-  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  background: var(--card);
   padding: 0 6px;
   color: var(--ink);
   font-size: var(--text-sm);
@@ -11551,8 +11734,8 @@ button.sheet-chip:hover,
 .ribbon-tool.is-style {
   width: 128px;
   justify-content: space-between;
-  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--rule-soft);
+  background: var(--card);
   padding: 0 8px 0 10px;
   color: var(--ink);
   font-size: var(--text-sm);
@@ -13834,13 +14017,73 @@ button.sheet-chip:hover,
 /* The phone's notebook index at the head of the notes sidebar: titles, not
    faces; the chosen one in ink with a 2px accent line under it, the others
    quiet. Nothing scales or bounces; the ink and the line fade. */
+/* The row scrolls; the frame fades the edge that has more behind it
+   (`NotebookIndex.tsx`). 15px, not the phone's 17: a sidebar is read at a
+   desk's distance, and at 17 two titles already overran its default width. */
+.notebook-index-frame {
+  position: relative;
+  margin: 2px 0 10px;
+}
+
 .notebook-index {
   display: flex;
-  gap: 18px;
-  margin: 2px 0 10px;
+  gap: 16px;
   overflow-x: auto;
   padding: 0 8px;
   scrollbar-width: none;
+}
+
+.notebook-index::-webkit-scrollbar {
+  display: none;
+}
+
+.notebook-index-frame[data-fade-start="true"] .notebook-index {
+  --fade-start: 28px;
+}
+
+.notebook-index-frame[data-fade-end="true"] .notebook-index {
+  --fade-end: 28px;
+}
+
+.notebook-index-frame:is([data-fade-start="true"], [data-fade-end="true"]) .notebook-index {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade-start, 0px),
+    #000 calc(100% - var(--fade-end, 0px)),
+    transparent 100%
+  );
+}
+
+/* Windows: no mask (ClearType), the sidebar's ground laid over the edge. */
+[data-shell="windows"] .notebook-index-frame .notebook-index {
+  mask-image: none;
+}
+
+[data-shell="windows"] .notebook-index-frame::before,
+[data-shell="windows"] .notebook-index-frame::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-shell="windows"] .notebook-index-frame::before {
+  left: 0;
+  background: linear-gradient(to right, var(--paper), transparent);
+}
+
+[data-shell="windows"] .notebook-index-frame::after {
+  right: 0;
+  background: linear-gradient(to left, var(--paper), transparent);
+}
+
+[data-shell="windows"] .notebook-index-frame[data-fade-start="true"]::before,
+[data-shell="windows"] .notebook-index-frame[data-fade-end="true"]::after {
+  opacity: 1;
 }
 
 .notebook-index-title {
@@ -13848,7 +14091,7 @@ button.sheet-chip:hover,
   flex-shrink: 0;
   padding: 4px 0 8px;
   color: var(--ink-4);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -13922,6 +14165,22 @@ button.sheet-chip:hover,
 
 [data-shell] .home-strip {
   -webkit-app-region: drag;
+}
+
+/* The strip names the page, as the list's strip names its scope, and keeps
+   a new note and search at its end where the other strips keep them. */
+.home-strip-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.home-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
 }
 
 [data-shell] .home-strip > * {
@@ -14059,11 +14318,6 @@ button.sheet-chip:hover,
   color: var(--accent);
 }
 
-.home-folder .home-arrow {
-  width: 32px;
-  height: 32px;
-}
-
 .home-section {
   display: flex;
   flex-direction: column;
@@ -14121,7 +14375,7 @@ button.sheet-chip:hover,
 
 .home-folders {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 14px;
 }
 
@@ -14143,6 +14397,41 @@ button.sheet-chip:hover,
   font-weight: var(--weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A folder's name is the way into it: a link, underlined only under the
+   pointer, as a heading in Finder's sidebar or Music's "See All" are. */
+.home-folder-name {
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-folder-name:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.home-show-all {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  border-radius: 6px;
+  padding: 2px 4px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+}
+
+.home-show-all:hover {
+  color: var(--ink);
 }
 
 .home-more {
@@ -14185,42 +14474,6 @@ button.sheet-chip:hover,
   color: var(--ink-3);
 }
 
-.home-places {
-  padding: 6px 0;
-}
-
-.home-place {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 20px;
-  font-size: 16px;
-  text-align: left;
-}
-
-.home-place-tile {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-
-.home-place-tile[data-tone="archive"] {
-  color: #a970ff;
-}
-
-.home-place-tile[data-tone="trash"] {
-  color: #ff453a;
-}
-
-.home-place-count {
-  margin-left: auto;
-  color: var(--ink-3);
-}
-
 .home-faces {
   display: inline-flex;
   flex-shrink: 0;
@@ -14233,7 +14486,7 @@ button.sheet-chip:hover,
   font-size: 9px;
 }
 
-:is(.home-continue, .home-pin, .home-well-row, .home-place):focus-visible {
+:is(.home-continue, .home-pin, .home-well-row, .home-folder-name, .home-show-all):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

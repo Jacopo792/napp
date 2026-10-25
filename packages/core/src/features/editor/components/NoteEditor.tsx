@@ -219,6 +219,9 @@ interface Props {
   /** Open the conversation with the note. True when the note was reached from
    *  Remarks, where the remark is the reason you are here at all. */
   startWithComments?: boolean;
+  /** Open with the outline beside the note: it was asked for from a menu
+   *  about a note that was not the open one. */
+  startWithOutline?: boolean;
   /** Whether this browser offers the on-device proofreader at all. */
   proofreaderEnabled: boolean;
   /** Whether the accent-and-apostrophe correction runs while you type. */
@@ -358,6 +361,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     canEdit,
     lock,
     startWithComments = false,
+    startWithOutline = false,
     proofreaderEnabled,
     autocorrectEnabled,
     viewingAsPartner,
@@ -449,7 +453,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [status, setStatus] = useState("");
   const [failure, setFailure] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(startWithComments);
-  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(startWithOutline);
   /* A note's tools stand at its foot, as on the phone: one capsule of writing
      tools and Comments beside it. The phone's own page and the book keep the
      strip they have. */

@@ -287,7 +287,7 @@ for the archive could not say "I have read this one", so the badge stayed up
 after you had read the only thing under it, and the sidebar row's tally of
 notes-being-talked-about — which clears only when the last thread is resolved —
 took the badge's place in the same slot and read as a stuck count. The Remarks
-row now carries the dot and no tally.
+row — called Comments on screen — now carries the dot and no tally.
 
 The badge says how many are waiting; **the dot on the row says which**. Without
 it the count is a number with nothing under it — the note that produced it looks
@@ -600,7 +600,10 @@ swapped for the stand-ins in `preview/`. No credentials, no network. Sign in
 with anything. Change a mock whenever you change the real module's shape —
 `preview/supabase.mock.ts` must return a **fresh** roster array from
 `loadArchive`, because handing back the same object makes every roster change
-invisible to React.
+invisible to React. `@/lib/supabaseClient` is swapped too, for the few modules that
+import the shared client directly (`pastedImage.ts` asks it for a token):
+without it the editor's chunk built a real client with no URL and the preview
+fell over the moment a list of notes opened.
 
 `pnpm preview:desktop-ui` is the same harness against the **desktop** renderer,
 on 5174 — the port `electron/main.js` loads in development. It is one config
@@ -1935,6 +1938,83 @@ and a list as rounded panels inset on the page's ground, framed capsules,
 capsules centred on one line across the window: Jacopo did not like the
 result and asked for this shape back. Do not re-propose it.
 
+## One family: the desktop and the phone
+
+The desktop is the phone's sibling, not its copy — the way Notes on a Mac and
+Notes on an iPhone are one app. **What crosses is the language: palettes, type,
+the card and the row, the names, the features. What does not cross is the
+layout**: a window keeps a sidebar for places, menus, the keyboard, a pointer
+and a desk's density. The phone (`apps/mobile`) is not changed to make the two
+agree; the desktop learns from it. And the book is the desktop's reason for
+being — nothing below reaches the sheet's paper, the page set-up, pagination or
+printing.
+
+- **Palettes.** Settings → Appearance offers the phone's five (`PHONE_PALETTES`
+  in `appearance.ts`: Paper, Graphite, Fjord, Rosewood, Pine), each a light and
+  a dark side, and Theme is a segmented control — Automatic, Light, Dark.
+  `wornSide` turns one of the five with the display; the eighteen older presets
+  still read exactly as stored. **Graphite is worn monochrome on the desktop**:
+  its accent is its ink, because Jacopo does not want the blue. Headings are
+  ink; the accent is for small signals only — a dot, a 2px line, a ring.
+  `--card` is the token a card in a column is drawn in.
+- **Type.** A note is set in the system face, 17/400/1.55, as on the phone;
+  Literata is the book's alone. So the reading face and its weight live under
+  Settings → Document → Text, the one place they still do anything; leading
+  and size there are the page set-up's. A note's column width (the measure) is
+  the one reading axis a note still answers to, under Writing → Page.
+- **The list** is dated cards under a search pill, a round new-note button and
+  sort chips (Edited, Created, Title, Reverse) — the phone's bar. In Comments
+  the chips go, because that list is ordered by what was said last.
+- **Whose notes** is the phone's notebook index at the top of the sidebar —
+  "Your Notes", "Ada's Notes", the open one in ink over a 2px line
+  (`NotebookIndex.tsx`). A sidebar has to say that the row scrolls, so it fades
+  at the edge that has more behind it, a wheel moves it sideways, the open
+  title is kept in view and ← → walk it. The book's title strip draws its
+  whose-switch in the same words and keeps the faces and the here/typing marks,
+  because in a shared book they are the point.
+- **Names.** Remarks is Comments and Trash is Recently Deleted, on screen only:
+  `REMARKS`, `TRASH` and the code say what they always said.
+- **Home** (`HomePage.tsx`) is the phone's first tab as the desktop's front
+  page, and the window opens on it: Continue Writing, Pinned, every folder as a
+  card with its newest three. It is a window's page, not the phone's tab:
+  **Archive and Recently Deleted are not on it** — they stand at the foot of
+  the sidebar, as in Notes and Mail, and a second door in the content is a
+  second thing to keep agreeing with the first. Its strip names it and carries
+  a new note and search like every strip; a folder is opened by its name or
+  "Show All" and right-clicked for the same menu as in the sidebar.
+- **The note's tools** stand at its foot, as on the phone: one glass capsule
+  (Aa, checklist, table, paperclip, pen) and Comments in a circle beside it.
+  The strip keeps one ⋯, which holds Find (⌘F) and Outline. **Every menu
+  about a note offers Outline** — the strip's ⋯, the editor's right-click, the
+  row's right-click (which opens the note with its outline showing,
+  `startWithOutline`) and the second note of a split, whose own ⋯ holds Find
+  and Outline beside its close.
+- **Comments** read as the phone's annotations: one neutral card a thread, the
+  passage recessed into it with a rule down its side (pressed, it lights its
+  words), each remark a byline — a neutral face, the name, "You" for your own,
+  "2m"/"3h"/the list's stamp — over its words in ink, and the thread's foot in
+  quiet words: who it is for, Reply, Resolve, ⋯ (Show in Note, Assign To,
+  Delete Thread for whoever wrote every remark in it). The caret colours that
+  used to tint each name are gone from the card. The Comments scope is the
+  phone's tab row for row: the face of whoever spoke last, what they said, when
+  (`lastOpenRemarks`), newest first under one "Open" heading.
+- **Settings** is the phone's index in System Settings' shape: the profile
+  card at the head of the rail; "This Mac" (named after the shell: "This PC" on
+  Windows, "This Computer" in a tab — `deviceGroupName`) with Appearance —
+  Style is inside it now, as on the phone — Writing and Shortcuts; "Archive"
+  with Privacy, Members, Archives and, in a book, Document. Each rail row says
+  what is set there now ("Graphite, Dark", "2 of 8 seats"). There is no chevron
+  in the rail — the travelling selection does that job in a column that is
+  always open. The phone's Safety row is not here: its content is the store
+  work, which is not on this branch.
+- **Menus the page draws** are the phone's glass popover at a desk's scale: 14
+  round, rows of 30, each glyph in a quiet tile of its own, words in ink, a
+  neutral hover, and the way back out of a section named after it. macOS keeps
+  the system's `NSMenu` wherever `popUpMenu` already hands a menu over.
+- **The book's chrome** wears the same tokens — corkboard cards of `--card`, 16
+  round, on the page's ground; the writing bar's fields a card's ground with a
+  hairline, 8 round — and nothing inside `.manuscript-sheet` changed.
+
 ## Interface notes worth knowing
 
 - **The sign-in page does not scroll.** It carries no wordmark and no tagline —
@@ -1965,11 +2045,14 @@ result and asked for this shape back. Do not re-propose it.
 - **Shadows are contact, not atmosphere.** `--shadow-soft` is a hairline plus a
   negatively spread pass, so it stays under the card. A wide even blur reads as
   soot ringing a card once there is a wallpaper behind it.
-- Settings is System Settings' shape: coloured tiles in the rail, the pane
-  titled with its section, rows with no glyph — a name, one line at most, the
-  control flush right — in recessed groups with no shadow. The profile opens on
-  the face, name and address centred. The standing summary column that used to
-  sit opposite is gone, because everything it said the form said too.
+- Settings is System Settings' shape with the phone's index in it: the
+  profile card at the head of the rail, then "This Mac" and "Archive" (see
+  _One family_ below), each rail row a tile, a name and the one line saying
+  what is set there now; the pane titled with its section, its rows with no
+  glyph — a name, one line at most, the control flush right — in recessed
+  groups with no shadow. The profile opens on the face, name and address
+  centred. The standing summary column that used to sit opposite is gone,
+  because everything it said the form said too.
 - **Every glyph comes from `components/icons.ts`**, which re-exports Phosphor
   under the names the call sites use. Never import an icon library directly.
   Lucide was retired because its stroke had been forced to 1px to land on the

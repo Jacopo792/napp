@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isForYou,
+  lastOpenRemarks,
   mentionQuery,
   mentionedIn,
   notesWithOpenRemarks,
@@ -82,6 +83,25 @@ test("a note leaves the remarks list when its last thread is dealt with", () => 
     remark({ id: "2", noteId: "n2", threadId: "t2" }),
   ];
   assert.deepEqual([...notesWithOpenRemarks(settled)], ["n2"]);
+});
+
+test("a Comments row shows the last word said in a thread still open", () => {
+  const rows = [
+    remark({ id: "1", noteId: "n1", threadId: "t1", createdAt: "2026-09-01T10:00:00Z" }),
+    remark({ id: "2", noteId: "n1", threadId: "t1", createdAt: "2026-09-03T10:00:00Z" }),
+    /* Later, but settled: not what is waiting. */
+    remark({
+      id: "3",
+      noteId: "n1",
+      threadId: "t2",
+      createdAt: "2026-09-04T10:00:00Z",
+      resolvedAt: "2026-09-05T10:00:00Z",
+    }),
+    remark({ id: "4", noteId: "n2", threadId: "t3", resolvedAt: "2026-09-05T10:00:00Z" }),
+  ];
+  const last = lastOpenRemarks(rows);
+  assert.equal(last.get("n1")?.id, "2");
+  assert.equal(last.has("n2"), false);
 });
 
 /* Resolution is written to every row in a thread, but a reply that arrived

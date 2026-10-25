@@ -26,22 +26,18 @@ import {
   NotebookText,
   ArrowDownUp,
   CalendarDays,
-  ChevronRight,
   Clock3,
   FolderInput,
   ImagePlus,
   Lock,
   LockOpen,
-  Monitor,
   MoreHorizontal,
-  Moon,
   Pin,
   Printer,
   Search,
   Settings,
   RotateCcw,
   SpellCheck,
-  Sun,
   Trash2,
   UserRound,
   Wand2,
@@ -53,7 +49,12 @@ import {
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
-import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
+import {
+  PAGE_SIZES,
+  type ArchiveKind,
+  type DocumentFeatures,
+  type PageSetup,
+} from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
@@ -61,16 +62,7 @@ import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
-import {
-  AXIS_SPECS,
-  PRESETS,
-  READING_FACES,
-  applyPreset,
-  matchingPreset,
-  setAxis,
-  useAxes,
-  type Axes,
-} from "@/lib/axes";
+import { AXIS_SPECS, READING_FACES, setAxis, useAxes, type Axes } from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
 import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
@@ -124,6 +116,20 @@ import { emerge } from "@/lib/motion";
  * first load paid for the roster, the invitations, the appearance sliders and
  * the shortcut sheet before it could draw a list of notes. It lives here so
  * `notes.tsx` can ask for it only when somebody opens it. */
+
+const weightAxis = AXIS_SPECS.find((spec) => spec.key === "weight")!;
+const measureAxis = {
+  ...AXIS_SPECS.find((spec) => spec.key === "measure")!,
+  label: "Column width",
+};
+
+/** What the computer's half of Settings is called, after the shell it is in:
+ *  the phone says "This Phone". Read off `data-shell`, which only the desktop
+ *  shell writes. */
+function deviceGroupName(): string {
+  const shell = globalThis.document?.documentElement.dataset.shell;
+  return shell === "mac" ? "This Mac" : shell === "windows" ? "This PC" : "This Computer";
+}
 
 function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: Axes }) {
   const value = axes[spec.key];
@@ -432,9 +438,7 @@ export function SettingsPanel({
   onLock: () => void;
 }) {
   const axes = useAxes();
-  const preset = matchingPreset(axes);
   const appearance = useAppearance();
-  const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
   const [closing, setClosing] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
@@ -531,7 +535,6 @@ export function SettingsPanel({
   useEffect(() => {
     if (!open) {
       setClosing(false);
-      setTuning(false);
       setSection("profile");
       setLeaveConfirm(false);
       setLeaveBusy(false);
@@ -590,10 +593,10 @@ export function SettingsPanel({
     }
   }
 
-  const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
-    { id: "system", name: "Automatic", icon: <Monitor size={20} /> },
-    { id: "light", name: "Light", icon: <Sun size={20} /> },
-    { id: "dark", name: "Dark", icon: <Moon size={20} /> },
+  const themeChoices: { id: ThemeMode; name: string }[] = [
+    { id: "system", name: "Automatic" },
+    { id: "light", name: "Light" },
+    { id: "dark", name: "Dark" },
   ];
 
   const sections = settingsSectionsFor(kind);
@@ -605,6 +608,23 @@ export function SettingsPanel({
     sections
       .flatMap((group): readonly { id: string; name: string }[] => group.items)
       .find((item) => item.id === section)?.name ?? "Settings";
+
+  /* The line under each row of the rail: what is set there now, as the
+     phone's index says it. A row with nothing worth saying says nothing. */
+  const worn = PHONE_PALETTES.find((one) => one.id === phonePaletteOf(appearance));
+  const summaries: Partial<Record<SettingsSection, string>> = {
+    appearance: `${wornSide(appearance, true) && worn ? worn.name : "Custom"}, ${
+      themeChoices.find((choice) => choice.id === appearance.theme)?.name ?? "Automatic"
+    }`,
+    writing: autocorrectEnabled ? "Autocorrection on" : "Autocorrection off",
+    shortcuts: `${shortcutsFor(kind).length} keys`,
+    security: presenceEnabled ? "Online status shown" : "Online status hidden",
+    members: `${members.length} of ${seatLimit} seats`,
+    spaces: spaces.find((space) => space.archiveId === currentArchiveId)?.name,
+    document: document
+      ? `${PAGE_SIZES[document.page.size].name}, ${document.page.fontSize} pt`
+      : undefined,
+  };
 
   /* The sheet leaves the way it came, rather than vanishing between two
      frames: a window that only ever animates in reads as one that was
@@ -643,14 +663,6 @@ export function SettingsPanel({
                 form, and everything it said the form said too — the one thing
                 it added was the answer to "which account is this?", which
                 belongs beside the way out, not beside the controls. */}
-            <div className="settings-identity">
-              <Avatar url={avatarUrl} name={profile.nickname} email={email} />
-              <div className="min-w-0">
-                <b>{profile.nickname || email.split("@")[0]}</b>
-                <small>{email}</small>
-              </div>
-            </div>
-
             <div ref={navList} className="settings-nav-list">
               {marker && (
                 <span
@@ -659,25 +671,52 @@ export function SettingsPanel({
                   style={{ transform: `translateY(${marker.top}px)`, height: marker.height }}
                 />
               )}
-              {sections.map((group) => (
-                <Fragment key={group.group}>
-                  <p className="settings-nav-group">{group.group}</p>
-                  {group.items.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-current={section === item.id ? "page" : undefined}
-                      className={section === item.id ? "is-active" : ""}
-                      onClick={() => setSection(item.id)}
-                    >
-                      <span className="settings-nav-tile" data-tone={item.tone} aria-hidden="true">
-                        {item.icon}
-                      </span>
-                      {item.name}
-                    </button>
-                  ))}
-                </Fragment>
-              ))}
+              {/* You, as the phone's Settings opens: a card with your face,
+                  your name and the address you sign in with. It is the way
+                  into Profile, so it is a row of the rail like the others —
+                  the marker travels to it. */}
+              <button
+                type="button"
+                aria-current={section === "profile" ? "page" : undefined}
+                className={`settings-identity ${section === "profile" ? "is-active" : ""}`}
+                onClick={() => setSection("profile")}
+              >
+                <Avatar url={avatarUrl} name={profile.nickname} email={email} />
+                <span className="min-w-0">
+                  <b>{profile.nickname || email.split("@")[0]}</b>
+                  <small>{email}</small>
+                </span>
+              </button>
+              {sections
+                .filter((group) => group.group !== "Account")
+                .map((group) => (
+                  <Fragment key={group.group}>
+                    <p className="settings-nav-group">
+                      {group.group === "This Mac" ? deviceGroupName() : group.group}
+                    </p>
+                    {group.items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        aria-current={section === item.id ? "page" : undefined}
+                        className={section === item.id ? "is-active" : ""}
+                        onClick={() => setSection(item.id)}
+                      >
+                        <span
+                          className="settings-nav-tile"
+                          data-tone={item.tone}
+                          aria-hidden="true"
+                        >
+                          {item.icon}
+                        </span>
+                        <span className="settings-nav-text">
+                          {item.name}
+                          {summaries[item.id] && <small>{summaries[item.id]}</small>}
+                        </span>
+                      </button>
+                    ))}
+                  </Fragment>
+                ))}
             </div>
 
             {/* Leaving is not a section of Settings, so it does not sit in the
@@ -845,25 +884,12 @@ export function SettingsPanel({
               {section === "appearance" && (
                 <section>
                   <h3>Theme</h3>
-                  <div className="theme-picker" role="radiogroup" aria-label="Theme">
-                    {themeChoices.map((choice) => (
-                      <button
-                        key={choice.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={appearance.theme === choice.id}
-                        className={appearance.theme === choice.id ? "is-active" : ""}
-                        onClick={() => setTheme(choice.id)}
-                      >
-                        <span className={`theme-preview is-${choice.id}`}>
-                          {choice.icon}
-                          <i />
-                          <b />
-                        </span>
-                        {choice.name}
-                      </button>
-                    ))}
-                  </div>
+                  <Segmented
+                    label="Theme"
+                    value={appearance.theme}
+                    options={themeChoices}
+                    onChange={(id) => setTheme(id as ThemeMode)}
+                  />
 
                   <h3>Palette</h3>
                   <div className="palette-presets" role="group" aria-label="Colour palettes">
@@ -1068,20 +1094,12 @@ export function SettingsPanel({
                       </div>
                     </>
                   )}
-
-                  <button
-                    type="button"
-                    className="settings-reset"
-                    onClick={() =>
-                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
-                    }
-                  >
-                    Reset appearance
-                  </button>
                 </section>
               )}
 
-              {section === "style" && (
+              {/* What was Style, under the palette: the phone has one
+                  Appearance, and so does this. */}
+              {section === "appearance" && (
                 <section>
                   <h3>Icon style</h3>
                   <div className="icon-style-picker" role="radiogroup" aria-label="Icon style">
@@ -1177,52 +1195,15 @@ export function SettingsPanel({
                       />
                     )}
                   </div>
-                </section>
-              )}
-
-              {section === "reading" && (
-                <section>
-                  <div className="settings-specimen" aria-hidden="true">
-                    <p>
-                      Set the page for the way you read. Every note follows these choices instantly.
-                    </p>
-                  </div>
-                  <Segmented
-                    label="Reading face"
-                    value={axes.face}
-                    options={READING_FACES}
-                    onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
-                  />
-                  <Segmented
-                    label="Reading preset"
-                    value={preset?.id ?? null}
-                    options={PRESETS.map((item) => ({
-                      id: item.id,
-                      name: item.name,
-                      hint: item.role,
-                    }))}
-                    onChange={(id) => {
-                      const chosen = PRESETS.find((item) => item.id === id);
-                      if (chosen) applyPreset(chosen);
-                    }}
-                  />
                   <button
                     type="button"
-                    className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
-                    aria-expanded={tuning}
-                    onClick={() => setTuning((current) => !current)}
+                    className="settings-reset"
+                    onClick={() =>
+                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
+                    }
                   >
-                    <ChevronRight size={16} />
-                    <span>Fine-tune</span>
-                    <small>{preset ? preset.name : "Custom"}</small>
+                    Reset appearance
                   </button>
-                  {tuning && (
-                    <div className="settings-sliders">
-                      {AXIS_SPECS.map((spec) => (
-                        <AxisSlider key={spec.key} spec={spec} axes={axes} />
-                      ))}
-                    </div>
-                  )}
                 </section>
               )}
 
@@ -1241,6 +1222,24 @@ export function SettingsPanel({
                       disabled={document.disabled}
                       onChange={document.onPage}
                     />
+                  </div>
+                  {/* The reading face and its weight reach the book alone now:
+                      a note is set in the system face at the phone's size.
+                      Size and leading are the page's (above); the measure is
+                      the sheet's width. */}
+                  <h3>Text</h3>
+                  <div className="appearance-controls">
+                    <div className="appearance-row is-stacked">
+                      <Segmented
+                        label="Face"
+                        value={axes.face}
+                        options={READING_FACES}
+                        onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
+                      />
+                    </div>
+                    <div className="appearance-row is-stacked">
+                      <AxisSlider spec={weightAxis} axes={axes} />
+                    </div>
                   </div>
                   <h3>References</h3>
                   <div className="appearance-controls settings-page-setup">
@@ -1318,6 +1317,19 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
+
+                  {/* How wide a note's column runs: the one reading axis a
+                      note still answers to. */}
+                  {!isDocument && (
+                    <>
+                      <h3>Page</h3>
+                      <div className="appearance-controls">
+                        <div className="appearance-row is-stacked">
+                          <AxisSlider spec={measureAxis} axes={axes} />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {isDocument && (
                     <>

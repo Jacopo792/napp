@@ -35,6 +35,7 @@ import {
   Trash2,
   Type,
   X,
+  ListTree,
 } from "@/components/icons";
 import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
@@ -149,6 +150,8 @@ interface Props {
    *  is a number with nothing under it, and the honest answer to "I have read
    *  them all" is a note nobody could find. */
   unreadIds?: Set<string>;
+  /** In the Comments scope: the last word said in each note's open threads. */
+  remarks?: Map<string, RowRemark>;
   /** Notes the other member has open right now, and the colour she wears. */
   peerNoteIds?: Set<string>;
   peerTypingNoteIds?: Set<string>;
@@ -167,6 +170,8 @@ interface Props {
   onMoveToFolder: (noteId: string, folderId: string | null) => void;
   /** A picture for the note itself. A null file takes the current one off. */
   onSetPhoto: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
+  /** The note opened with its outline beside it. */
+  onOutline?: (noteId: string) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
 }
 
@@ -218,6 +223,15 @@ function PeerDot({ here, typing, color }: { here: boolean; typing: boolean; colo
   );
 }
 
+/** What the Comments scope shows in a row instead of the note's own first
+ *  line: the face of whoever spoke last, what they said, and when — the
+ *  phone's Comments tab, row for row. */
+export interface RowRemark {
+  face: ReactNode;
+  body: string;
+  at: string;
+}
+
 const Row = memo(function Row({
   mobile,
   gallery,
@@ -242,6 +256,7 @@ const Row = memo(function Row({
   onHold,
   resolveImage,
   byCreated = false,
+  remark,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -270,9 +285,10 @@ const Row = memo(function Row({
   resolveImage: (objectId: string) => Promise<Blob>;
   /** Sorted by creation, the row says when it was made, as the phone's does. */
   byCreated?: boolean;
+  remark?: RowRemark;
 }) {
   const listRow = !mobile && !gallery;
-  const stamp = byCreated ? entry.note.createdAt : entry.note.updatedAt;
+  const stamp = remark?.at ?? (byCreated ? entry.note.createdAt : entry.note.updatedAt);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
     disabled: mobile || trashMode || archiveMode || !canWrite,
@@ -512,7 +528,7 @@ const Row = memo(function Row({
     if (from?.live) settle(slid);
   }
 
-  const { preview } = derivedOf(entry.note);
+  const preview = remark ? remark.body : derivedOf(entry.note).preview;
   const pinned = noteMeta?.pinned === true;
   const folderName = noteMeta?.folderId
     ? indexOf(meta).byFolder.get(noteMeta.folderId)?.name
@@ -608,7 +624,9 @@ const Row = memo(function Row({
           because a card without one is a blank square. What is unread is a dot
           in the leading margin, where Mail keeps it. */}
       {!gallery && unread && <span className="note-row-dot" aria-label="Unread remarks" />}
-      {entry.note.photo ? (
+      {listRow && remark ? (
+        <span className="note-row-face">{remark.face}</span>
+      ) : entry.note.photo ? (
         <span
           className={`note-photo is-row ${gallery ? "is-gallery" : "is-thumb"} ${
             gallery && unread ? "has-unread" : ""
@@ -938,6 +956,7 @@ export function NoteList({
   trashMode,
   archiveMode,
   unreadIds,
+  remarks,
   peerNoteIds,
   peerTypingNoteIds,
   peerColor,
@@ -953,6 +972,7 @@ export function NoteList({
   lockOf,
   onMoveToFolder,
   onSetPhoto,
+  onOutline,
   resolveImage,
 }: Props) {
   const hasQuery = query.trim().length > 0;
@@ -1056,14 +1076,29 @@ export function NoteList({
   const rowMenuItems = ((): MenuItem[] => {
     if (!menuEntry) return [];
     const entry = menuEntry;
-    const open: MenuItem = {
-      kind: "item",
-      id: "open",
-      label: "Open note",
-      icon: <FileText size={16} />,
-      run: () => onSelect(entry.note.id),
-    };
-    if (!canWrite) return [open, ...infoItem(entry)];
+    const opening: MenuItem[] = [
+      {
+        kind: "item",
+        id: "open",
+        label: "Open note",
+        icon: <FileText size={16} />,
+        run: () => onSelect(entry.note.id),
+      },
+      /* The page's ⋯ has the outline; the row's menu is the same note, so
+         it does too — opening the note with its headings beside it. */
+      ...(onOutline
+        ? [
+            {
+              kind: "item" as const,
+              id: "outline",
+              label: "Outline",
+              icon: <ListTree size={16} />,
+              run: () => onOutline(entry.note.id),
+            },
+          ]
+        : []),
+    ];
+    if (!canWrite) return [...opening, ...infoItem(entry)];
     if (trashMode)
       return [
         ...infoItem(entry),
@@ -1095,7 +1130,7 @@ export function NoteList({
       ];
     if (archiveMode)
       return [
-        open,
+        ...opening,
         ...infoItem(entry),
         {
           kind: "item",
@@ -1115,7 +1150,7 @@ export function NoteList({
         },
       ];
     return [
-      open,
+      ...opening,
       ...infoItem(entry),
       pinItem(menuPinned, () => onTogglePin(entry.note.id)),
       ...lockItems(lockOf?.(entry.note.id)),
@@ -1268,6 +1303,7 @@ export function NoteList({
                 onHold={holdEntry}
                 resolveImage={resolveImage}
                 byCreated={sort?.preferences.sortBy === "created"}
+                remark={remarks?.get(entry.note.id)}
               />
             ))}
           </div>

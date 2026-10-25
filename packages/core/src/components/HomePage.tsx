@@ -1,5 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Archive, ArrowRight, Info, MoreHorizontal, Pencil, FolderPlus, Trash2 } from "./icons";
+import {
+  ArrowRight,
+  ChevronRight,
+  Info,
+  MoreHorizontal,
+  Pencil,
+  FolderPlus,
+  Search,
+  SquarePen,
+  Trash2,
+} from "./icons";
 import { PointMenu } from "./ContextMenu";
 import { FOLDER_ACT, type FolderAct } from "./Sidebar";
 import type { SheetOrigin } from "./Sheet";
@@ -7,16 +17,25 @@ import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { NoteEntry } from "@/lib/entries";
 import type { Folder, Meta } from "@/lib/types";
-import { ALL, ARCHIVE, TRASH, entriesInScope } from "@/lib/scopes";
+import { ALL, entriesInScope } from "@/lib/scopes";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { formatStamp } from "@/lib/format";
 
 /* ── Home ────────────────────────────────────────────────────────────────────
    The phone's first tab, on the computer: the notebook's front page. What was
-   written last, what is pinned, every folder with its newest three, and the
-   two places a note goes away to. Read from the archive already in memory —
-   nothing here asks the database anything. It takes the place of the list and
-   the note; opening anything from it leaves it for them. */
+   written last, what is pinned, every folder with its newest three. Read from
+   the archive already in memory — nothing here asks the database anything. It
+   takes the place of the list and the note; opening anything from it leaves
+   it for them.
+
+   It is the desktop's page, not the phone's tab. Archive and Recently Deleted
+   are not on it: they stand at the foot of the sidebar, as they do in Notes
+   and Mail, and a second door to them in the content is a second thing to
+   keep agreeing with the first. The strip is a window's toolbar — its name,
+   and the two acts every other strip offers (a new note, finding one). A
+   folder is opened by its name, as a link, with "Show All" at its foot where
+   the phone had a round arrow, and right-clicked for its menu like every
+   other folder in the window. */
 
 const newest = (entries: NoteEntry[]) =>
   [...entries].sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
@@ -54,6 +73,7 @@ export function HomePage({
   onOpenNote,
   onOpenScope,
   onNew,
+  onSearch,
   onFolderInfo,
   onDeleteFolder,
 }: {
@@ -70,6 +90,8 @@ export function HomePage({
   onOpenNote: (id: string) => void;
   onOpenScope: (scope: string) => void;
   onNew: () => void;
+  /** The window's search (⌘K). */
+  onSearch: () => void;
   onFolderInfo: (id: string, origin: SheetOrigin) => void;
   onDeleteFolder: (id: string) => void;
 }) {
@@ -85,14 +107,39 @@ export function HomePage({
         folder,
         inside: newest(inScope(folder.id)),
       })),
-      archived: inScope(ARCHIVE).length,
-      trashed: inScope(TRASH).length,
     };
   }, [entries, meta, index]);
   const folderName = new Map(meta.folders.map((folder) => [folder.id, folder.name]));
   const latest = page.all[0];
 
-  const strip = <header className="home-strip">{leading}</header>;
+  const strip = (
+    <header className="home-strip">
+      {leading}
+      <h1 className="home-strip-title">Home</h1>
+      <span className="home-strip-actions">
+        {canWrite && own && (
+          <button
+            type="button"
+            onClick={onNew}
+            aria-label="New note"
+            title="New note · ⌘N"
+            className="toolbar-button press"
+          >
+            <SquarePen size={18} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label="Search notes"
+          title="Search · ⌘K"
+          className="toolbar-button press"
+        >
+          <Search size={18} />
+        </button>
+      </span>
+    </header>
+  );
 
   /* Nothing written yet: the first line, waiting. Your page only — a
      partner's empty page is simply empty. */
@@ -121,9 +168,12 @@ export function HomePage({
       </section>
     );
 
-  function folderMenu(event: React.MouseEvent<HTMLElement>, folder: Folder) {
+  /** The folder's menu, from its ⋯ (under the button) or a right-click on its
+   *  card (at the pointer). */
+  function folderMenu(event: React.MouseEvent<HTMLElement>, folder: Folder, atPointer = false) {
     const button = event.currentTarget;
     const { left, bottom } = button.getBoundingClientRect();
+    const point = atPointer ? { x: event.clientX, y: event.clientY } : { x: left, y: bottom + 4 };
     const act = (kind: FolderAct["act"]) =>
       window.dispatchEvent(
         new CustomEvent<FolderAct>(FOLDER_ACT, { detail: { id: folder.id, act: kind } }),
@@ -173,7 +223,7 @@ export function HomePage({
           ] satisfies MenuItem[])
         : []),
     ];
-    setMenu({ x: left, y: bottom + 4, items });
+    setMenu({ ...point, items });
   }
 
   return (
@@ -237,9 +287,25 @@ export function HomePage({
               <h2>Folders</h2>
               <div className="home-folders">
                 {page.folders.map(({ folder, inside }) => (
-                  <div key={folder.id} className="home-card home-folder">
+                  <div
+                    key={folder.id}
+                    className="home-card home-folder"
+                    onContextMenu={(event) => {
+                      if ((event.target as HTMLElement).closest(".home-well-row")) return;
+                      event.preventDefault();
+                      folderMenu(event, folder, true);
+                    }}
+                  >
                     <div className="home-folder-head">
-                      <h3>{folder.name}</h3>
+                      <h3>
+                        <button
+                          type="button"
+                          className="home-folder-name"
+                          onClick={() => onOpenScope(folder.id)}
+                        >
+                          {folder.name}
+                        </button>
+                      </h3>
                       <button
                         type="button"
                         aria-label={`${folder.name} actions`}
@@ -274,11 +340,12 @@ export function HomePage({
                       <span className="home-where">{tally(inside.length)}</span>
                       <button
                         type="button"
-                        aria-label={`Open ${folder.name}`}
-                        className="home-arrow press"
+                        aria-label={`Show all of ${folder.name}`}
+                        className="home-show-all"
                         onClick={() => onOpenScope(folder.id)}
                       >
-                        <ArrowRight size={16} />
+                        Show All
+                        <ChevronRight size={14} />
                       </button>
                     </div>
                   </div>
@@ -286,23 +353,6 @@ export function HomePage({
               </div>
             </section>
           )}
-
-          <div className="home-card home-places">
-            <button type="button" className="home-place press" onClick={() => onOpenScope(ARCHIVE)}>
-              <span className="home-place-tile" data-tone="archive">
-                <Archive size={18} />
-              </span>
-              Archive
-              <span className="home-place-count">{page.archived}</span>
-            </button>
-            <button type="button" className="home-place press" onClick={() => onOpenScope(TRASH)}>
-              <span className="home-place-tile" data-tone="trash">
-                <Trash2 size={18} />
-              </span>
-              Recently Deleted
-              <span className="home-place-count">{page.trashed}</span>
-            </button>
-          </div>
         </div>
       </div>
       {menu && <PointMenu point={menu} items={menu.items} close={() => setMenu(null)} />}
