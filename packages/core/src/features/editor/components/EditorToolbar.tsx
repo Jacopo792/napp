@@ -66,8 +66,9 @@ interface Props {
   linkForm?: ReactNode;
   linkOpen?: boolean;
   onCloseLink?: () => void;
-  /** Standing at the foot of the note: the menus open upward. */
-  rise?: boolean;
+  /** Standing at the right of the strip: every menu hangs leftward from its
+      button, or the last ones would run off the window's edge. */
+  atEnd?: boolean;
 }
 
 const COLOR_LABEL: Record<TextColor, string> = {
@@ -119,7 +120,7 @@ export function EditorToolbar({
   linkForm,
   linkOpen = false,
   onCloseLink,
-  rise = false,
+  atEnd = false,
 }: Props) {
   const [open, setOpen] = useState<Tool | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -181,9 +182,9 @@ export function EditorToolbar({
         id={`${id}-${tool}`}
         role="menu"
         aria-label={label}
-        className={`popover menu-popover editor-tool-menu absolute z-40 p-1.5 ${
-          rise ? "bottom-full mb-2" : "top-full mt-2"
-        } ${align === "left" ? "left-0" : "right-0"}`}
+        className={`popover menu-popover editor-tool-menu absolute top-full z-40 mt-2 p-1.5 ${
+          align === "left" && !atEnd ? "left-0" : "right-0"
+        }`}
       >
         {children}
       </MenuSurface>

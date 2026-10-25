@@ -1883,7 +1883,7 @@ not a request for less motion. So:
   staggered entrance all ran together and read as the window bouncing (Jacopo,
   25 October 2026). The old page fades over the new one (the view transition)
   and the column's `page-in` is opacity only. Only a card on Home, which the
-  note _replaces_, still grows out of what was pressed (`zoomNote`, from 0.94
+  note _replaces_ in the same pane, still grows out of what was pressed (`zoomNote`, from 0.94
   over `--dur-slow`). Do not put the row zoom or the directional slide back.
   The book's chapters are left as they were.
 - A notched mouse wheel glides (trackpads untouched), columns fade under the
@@ -1991,31 +1991,55 @@ printing.
   because in a shared book they are the point.
 - **Names.** Remarks is Comments and Trash is Recently Deleted, on screen only:
   `REMARKS`, `TRASH` and the code say what they always said.
-- **Home** (`HomePage.tsx`) is the desktop's front page, and the window opens
-  on it. **It carries no folders**: the sidebar is where places live, and
-  folder cards on Home with their newest three were the sidebar drawn twice.
-  Home earns its place by what the sidebar cannot say — time, people, what is
-  waiting — in this order: Continue Writing; **Waiting for You**, one card per
-  open thread with a remark somebody else wrote since this account last opened
-  the note (the badge's rule, `unreadRemarks`), pressed to open the note with
-  that thread up (`openComments(threadId)`); Pinned; **Recent**, the eight
-  newest notes across every folder, minus Continue Writing and whatever is
-  pinned; **Lately**, the others' latest stretches of writing in this notebook
-  from `note_versions` (`loadLately`: one bounded read each time Home opens,
+- **Home** (`HomePage.tsx`) is what the note pane shows when no note is open
+  in it — at launch (the window opens with nothing selected unless a link, a
+  capture or ⌘K from another archive names a note), after Esc closes the note,
+  and whenever the open note leaves the list (deleted, moved, another folder or
+  notebook). **It is not a place**: there is no Home row in the sidebar, no
+  Home in ⌘K and no state of its own — `homeShown` is "no note selected". It
+  was a row above All notes that replaced the list and the note, and two places
+  that both meant "my notes" was the confusion (Jacopo, 25 October 2026). Do
+  not put the row back. The list stands beside it the whole time; a card opens
+  its note in the same pane, in the list as it stands when the list holds it
+  (`openFromHome`), and the note grows out of the card it replaces. **It
+  carries no folders**: the sidebar is where places live, and folder cards on
+  Home with their newest three were the sidebar drawn twice. Home earns its
+  place by what the sidebar cannot say — time, people, what is waiting — in
+  this order: Continue Writing; **Waiting for You**, one card per open thread
+  with a remark somebody else wrote since this account last opened the note
+  (the badge's rule, `unreadRemarks`), pressed to open the note with that
+  thread up (`openComments(threadId)`); Pinned; **Recent**, the eight newest
+  notes across every folder, minus Continue Writing and whatever is pinned, two
+  across; **Lately**, the others' latest stretches of writing in this notebook
+  from `note_versions` (`loadLately`: one bounded read each time Home comes up,
   named versions and the reader's own left out). Every section but Continue
-  Writing is omitted when empty; a face on a card is somebody in that note
-  now, never who wrote it. The partner's notebook gets the same page from
-  their scope. It is a window's page, not the phone's tab: **Archive and
-  Recently Deleted are not on it** — they stand at the foot of the sidebar, as
-  in Notes and Mail. Its strip names it and carries a new note and search
-  like every strip. Do not put the folder cards back.
-- **The note's tools** stand at its foot, as on the phone: one glass capsule
-  (Aa, checklist, table, paperclip, pen) and Comments in a circle beside it.
-  The strip keeps one ⋯, which holds Find (⌘F) and Outline. **Every menu
-  about a note offers Outline** — the strip's ⋯, the editor's right-click, the
-  row's right-click (which opens the note with its outline showing,
-  `startWithOutline`) and the second note of a split, whose own ⋯ holds Find
-  and Outline beside its close.
+  Writing is omitted when empty; a face on a card is somebody in that note now,
+  never who wrote it. An empty notebook of your own shows Write something; a
+  partner's empty notebook is quiet ground. The measure is 720, the note's own,
+  and the cards go one across in a pane under 520. **Archive and Recently
+  Deleted are not on it** — they stand at the foot of the sidebar, as in Notes
+  and Mail. Its strip is the note's strip with nothing open: the line across
+  the window, and the columns' way back while they are away. Do not put the
+  folder cards back.
+- **Esc closes the note.** Once to leave the text (the editor's own), again —
+  with no menu, popover or dialog up — to close the note and bring Home back.
+  ⌘W stays the window's: it is a system role in the macOS menu.
+- **The note's tools stand at the right of its strip**, where Notes and Pages
+  put a Mac window's tools: one capsule 32px tall (Aa, checklist, table,
+  paperclip, pen — 16px glyphs, 34px targets), then Comments and the ⋯ as 32px
+  round buttons. `--card` and a hairline, no shadow; every menu opens downward
+  and hangs leftward from its button (`atEnd`). They stood at the foot of the
+  pane as the phone's floating bars for a day, and on a Mac the proportions
+  were wrong (Jacopo, 25 October 2026) — do not put them back there. A pane
+  narrower than `STRIP_ROOM` (400) gives the capsule a centred row of its own
+  under the strip; a split on a 1440 window keeps one row in each pane. The
+  title that rises on scroll stands at the strip's left. Recently Deleted has
+  no capsule and keeps Comments and the ⋯. The book's `ManuscriptToolbar` is a
+  different strip and is not this one. The ⋯ holds Find (⌘F) and Outline.
+  **Every menu about a note offers Outline** — the strip's ⋯, the editor's
+  right-click, the row's right-click (which opens the note with its outline
+  showing, `startWithOutline`) and the second note of a split, whose own ⋯
+  holds Find and Outline beside its close.
 - **Comments** read as the phone's annotations: one neutral card a thread, the
   passage recessed into it with a rule down its side (pressed, it lights its
   words), each remark a byline — a neutral face, the name, "You" for your own,

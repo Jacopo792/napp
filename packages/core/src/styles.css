@@ -14109,15 +14109,12 @@ button.sheet-chip:hover,
 }
 
 /* ── Home ────────────────────────────────────────────────────────────────────
-   The phone's first tab as a column of its own, where the list and the note
-   stand otherwise: one 52px strip like theirs, then the notebook's front page
-   on the palette's ground at a measure of 920. Cards are `--card`, 24 and 20
-   round, rows inside them have no rules. It arrives by fading — nothing here
-   has a direction to come from — and nothing in it moves under the pointer. */
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="home"] {
-  --tone: #2f7cf6;
-}
-
+   The phone's first tab, standing in the note pane while no note is open: one
+   52px strip like the note's, then the notebook's front page on the palette's
+   ground at a measure of 720 — the note's own, near enough, so that a note
+   opened from it lands where Home stood. Cards are `--card`, 24 and 20 round,
+   rows inside them have no rules. It arrives by fading — nothing here has a
+   direction to come from — and nothing in it moves under the pointer. */
 .home-page {
   display: flex;
   min-width: 0;
@@ -14143,22 +14140,6 @@ button.sheet-chip:hover,
   -webkit-app-region: drag;
 }
 
-/* The strip names the page, as the list's strip names its scope, and keeps
-   a new note and search at its end where the other strips keep them. */
-.home-strip-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.01em;
-}
-
-.home-strip-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-}
-
 [data-shell] .home-strip > * {
   -webkit-app-region: no-drag;
 }
@@ -14167,11 +14148,12 @@ button.sheet-chip:hover,
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  container-type: inline-size;
 }
 
 .home-measure {
   display: flex;
-  max-width: 920px;
+  max-width: 720px;
   flex-direction: column;
   gap: 26px;
   margin: 0 auto;
@@ -14302,17 +14284,28 @@ button.sheet-chip:hover,
   font-weight: var(--weight-bold);
 }
 
-/* Cards in a grid, as a window has room for: four across at the measure,
-   fewer as the column narrows. Waiting cards are wider — a remark is a
-   sentence, not a title. */
+/* Cards two across at the measure — the pane is a note's width, not a
+   window's — and one across once the pane is narrower than two cards can
+   read in. Waiting cards are a column of their own: a remark is a sentence,
+   not a title. */
 .home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .home-grid.is-wide {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (width < 520px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-measure {
+    padding-inline: 20px;
+  }
 }
 
 .home-note,
@@ -14477,146 +14470,66 @@ button.sheet-chip:hover,
   outline-offset: 2px;
 }
 
-/* ── The note's bars ─────────────────────────────────────────────────────────
-   The phone's two, at the foot of the pane and on the writing column: one
-   capsule of writing tools and Comments in a circle of the same height. They
-   are the last thing in the scroll box and sticky to its bottom, so they ride
-   16px above the foot while there is note below and come to rest under the
-   run-out after its last line. Glass from the palette's card colour on a layer
-   behind each — the capsule holds the menus it opens, and a filter on it would
-   make it the backdrop root of every one of them. */
-.note-bars-dock {
-  position: sticky;
-  z-index: 30;
-  bottom: 16px;
-  margin-top: 8px;
-  pointer-events: none;
-}
-
-.note-bars {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.note-bars > * {
-  pointer-events: auto;
-}
-
-.note-bars .editor-tool-cluster,
-.note-bars-comments {
-  position: relative;
-  height: 48px;
+/* ── The note's strip ────────────────────────────────────────────────────────
+   A desktop note keeps its tools where a Mac window keeps them: at the right of
+   the strip over the page, in the order the phone gives them. One capsule of
+   writing tools 32px tall, then Comments and the ⋯ as round buttons of the
+   same height. The palette's card is the surface and a hairline its edge —
+   a toolbar in the window, not a pane floating over the page, so no shadow. */
+.note-strip-tools .editor-tool-cluster.glass-toolbar,
+.note-strip-round,
+.note-strip-actions .toolbar-button {
   border: 0;
-  background: transparent;
-  box-shadow:
-    0 0 0 1px var(--rule),
-    0 1px 2px rgb(0 0 0 / 0.12),
-    0 8px 24px -10px rgb(0 0 0 / 0.35);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--rule);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
-.note-bars .editor-tool-cluster {
-  gap: 2px;
-  border-radius: 24px;
-  padding: 0 4px;
+.note-strip-tools .editor-tool-cluster {
+  height: 32px;
+  align-items: center;
+  gap: 0;
+  padding: 0 2px;
+  border-radius: 16px;
 }
 
-.note-bars .editor-tool-cluster::before,
-.note-bars-comments::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--card) 80%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  backdrop-filter: blur(24px) saturate(1.4);
-  content: "";
-  pointer-events: none;
+.note-strip-tools .editor-tool-button {
+  width: 34px;
+  height: 28px;
+  border-radius: 14px;
 }
 
-.note-bars .editor-tool-button {
-  width: 44px;
-  height: 40px;
+.note-strip-tools .editor-tool-button svg,
+.note-strip-round svg,
+.note-strip-actions .toolbar-button svg {
+  width: 16px;
+  height: 16px;
 }
 
-.note-bars .editor-tool-button svg {
-  width: 20px;
-  height: 20px;
+.note-strip-tools .editor-tool-letters {
+  font-size: 15px;
 }
 
-.note-bars .editor-tool-letters {
-  font-size: 16px;
-}
-
-.note-bars-comments {
+.note-strip-round,
+.note-strip-actions .toolbar-button {
   display: grid;
-  width: 48px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
   flex-shrink: 0;
-  margin-left: auto;
   place-items: center;
   border-radius: 50%;
+  color: var(--ink-2);
+}
+
+.note-strip-round:hover,
+.note-strip-actions .toolbar-button:hover {
+  background: color-mix(in srgb, var(--ink) 7%, var(--card));
   color: var(--ink);
 }
 
-.note-bars-comments.is-active {
-  color: var(--accent);
-}
-
-/* The menus a foot capsule opens rise over the page; the list stays a list. */
-.note-bars .editor-tool-menu {
-  max-height: min(70vh, 34rem);
-  overflow-y: auto;
-}
-
-@media print {
-  .note-bars-dock {
-    display: none !important;
-  }
-}
-
-/* A short note still has its bars on the foot of the pane: the column is a
-   flex column and the dock takes the slack above it. */
-.editor-scroll:has(> .note-bars-dock) {
-  display: flex;
-  flex-direction: column;
-}
-
-.editor-scroll:has(> .note-bars-dock) > * {
-  flex-shrink: 0;
-}
-
-.editor-scroll > .note-bars-dock {
-  margin-top: auto;
-  padding-top: 8px;
-}
-
-/* Focus mode quiets the bars with the strip: same fade, same way back. */
-.workspace-shell.is-focus .note-bars {
-  transition: opacity var(--dur-slow) var(--ease);
-}
-
-.workspace-shell.is-focus.is-quiet .note-bars:not(:hover, :focus-within) {
-  opacity: 0.12;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-shell.is-focus .note-bars {
-    transition: none;
-  }
-}
-
-/* A narrow pane — half of a split, a small window — closes the tools up
-   rather than pushing Comments past the column. */
-.note-bars-dock {
-  container-type: inline-size;
-}
-
-@container (width < 400px) {
-  .note-bars {
-    gap: 8px;
-  }
-
-  .note-bars .editor-tool-button {
-    width: 36px;
-  }
+.note-strip-round.is-active {
+  color: var(--accent-strong);
 }

@@ -38,7 +38,6 @@ import {
   Copy,
   FileDown,
   History,
-  Home,
   ListTree,
   Printer,
   Structure,
@@ -471,9 +470,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [entries, setEntries] = useState<NoteEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ALL);
-  /* The notebook's front page, as the phone opens on it — unless the window
-     arrived here to open a particular note. */
-  const [homeOpen, setHomeOpen] = useState(() => openOnArrival === null);
   const [query, setQuery] = useState("");
 
   /** One scope of folders and note placement per member. */
@@ -1429,9 +1425,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      changes what a notes archive reads or writes. */
   const currentSpace = spaces.find((space) => space.archiveId === session?.archiveId);
   const docMode = currentSpace?.kind === "document";
-  const homeShown = homeOpen && !docMode && !compact;
-  /* Home's Lately: what the others wrote, read once each time Home is
-     opened. A failure leaves the section out, never the page. */
+  /* Home is what the note pane shows with no note in it — at launch, after a
+     note is closed, and whenever the open note leaves the list. It is not a
+     place of its own: the list stands beside it the whole time. */
+  const homeShown = !selectedId && !docMode && !compact;
+  /* Home's Lately: what the others wrote, read once each time Home comes
+     up. A failure leaves the section out, never the page. */
   const [lately, setLately] = useState<FolderVersion[]>([]);
   useEffect(() => {
     if (!homeShown || !session) return;
@@ -2933,6 +2932,22 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       /* The bare keys below walk a note list, and a document has none. */
       if (docKeys.current.docMode) return;
 
+      /* Esc leaves the text; pressed again, with nothing else open to close,
+         it closes the note and the pane goes back to Home. ⌘W stays the
+         window's. */
+      if (
+        e.key === "Escape" &&
+        selectedId &&
+        !compact &&
+        !e.defaultPrevented &&
+        !document.querySelector(".popover, [role='dialog'], [role='menu']")
+      ) {
+        e.preventDefault();
+        saveNow();
+        setSelectedId(null);
+        return;
+      }
+
       if (e.key === "n") {
         e.preventDefault();
         void handleNew();
@@ -3319,7 +3334,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }
 
   function handleSelectFolder(id: string) {
-    setHomeOpen(false);
     setSelectedFolderId(id);
     setSelectedId(null);
     if (compact) setMobileScreen("collection");
@@ -3408,11 +3422,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [paletteOpen, session]);
 
-  /* Opening a note from anywhere is leaving Home for the list and the note. */
-  useEffect(() => {
-    if (selectedId) setHomeOpen(false);
-  }, [selectedId]);
-
   /** A note's outline, asked for from a menu about the note (its row's, or
    *  the editor's): the open note shows or hides it, another note opens
    *  with it showing. */
@@ -3428,11 +3437,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (outlineFor && selectedId !== outlineFor) setOutlineFor(null);
   }, [selectedId, outlineFor]);
 
-  function goHome() {
-    setHomeOpen(true);
-    setSelectedId(null);
-    setSelectedFolderId(ALL);
-    setQuery("");
+  /** A note opened from Home: in the list as it stands when the list holds
+   *  it, so opening something from the pane does not move the column beside
+   *  it; otherwise in every note, as a link does. */
+  function openFromHome(id: string) {
+    if (visible.some((entry) => entry.note.id === id)) handleSelectNote(id);
+    else handleOpenRecent(id);
   }
 
   /** A link to a note, pressed. One made by Continue as note carries the
@@ -4120,18 +4130,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             },
           ]
         : [
-            ...(compact
-              ? []
-              : [
-                  {
-                    id: "go:home",
-                    group: "Go to",
-                    name: "Home",
-                    keywords: "front page start",
-                    icon: <Home size={16} />,
-                    run: goHome,
-                  },
-                ]),
             ...scopes.map((scope) => ({
               id: `scope:${scope.id}`,
               group: "Go to",
@@ -5092,7 +5090,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       onAddAccount={handleAddAccount}
       spaceSwitch={spaceSwitch}
       peopleShelf={notebookIndex}
-      home={docMode || compact ? undefined : { active: homeShown, onSelect: goHome }}
       scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
     />
   );
@@ -5264,6 +5261,50 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* One ⋯ in the strip, as on the phone: Find and the outline are in it, and
      the writing tools and Comments stand at the foot of the note. A reader
      who may not write still finds and reads the outline from it. */
+  const paneNavigation = !listOpen ? (
+    <>
+      {/* With the columns away this strip is the only chrome in
+                        the window, so it carries what the columns did: getting
+                        them back, a new note, and finding one — the three acts
+                        nobody should have to reopen a column for. One capsule,
+                        like every group of toolbar items here. */}
+      <span className="editor-tool-group glass-toolbar flex items-center">
+        <button
+          type="button"
+          onClick={() => changeNavigation(true)}
+          aria-label="Show the sidebar"
+          title={"Show the sidebar · ⌘\\"}
+          className="toolbar-button press"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+        {canWriteArchive && (
+          <button
+            type="button"
+            onClick={handleNew}
+            aria-label="New note"
+            title="New note · ⌘N"
+            className="toolbar-button press"
+          >
+            <SquarePen size={18} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setPaletteQuery("");
+            setPaletteOpen(true);
+          }}
+          aria-label="Search notes"
+          title="Search · ⌘K"
+          className="toolbar-button press"
+        >
+          <Search size={18} />
+        </button>
+      </span>
+    </>
+  ) : null;
+
   const noteActions = selected ? (
     <>
       {canWriteArchive ? (
@@ -6202,9 +6243,88 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               />
             </div>
           </div>
+          <div
+            className={`pane-slide is-list ${listOpen ? "" : "is-collapsed"}`}
+            style={{ width: listOpen ? listShown + 1 : 0 }}
+            aria-hidden={!listOpen}
+            inert={!listOpen}
+          >
+            <div className="pane-slide-track flex h-full min-h-0" style={{ width: listShown + 1 }}>
+              <div
+                className="pane-frame"
+                data-scope-direction={scopeDirection ?? undefined}
+                style={{ width: listShown }}
+              >
+                {/* Keyed on the scope, so changing whose notes these are re-runs
+                    the list's own entrance instead of swapping the rows in
+                    place. Nothing is lost by the remount: `handleViewChange`
+                    already clears the query, the folder and the selection. */}
+                <NoteList
+                  key={viewAs}
+                  archiveId={session.archiveId}
+                  entries={visible}
+                  groups={noteGroups}
+                  view="list"
+                  leading={sidebarToggle}
+                  toolbarActions={collectionActions}
+                  /* Comments is ordered by what was said last, so the
+                         sort chips would be buttons that do nothing there. */
+                  sort={
+                    selectedFolderId === REMARKS
+                      ? undefined
+                      : {
+                          preferences: activeListPreferences,
+                          onChange: handleListPreferencesChange,
+                        }
+                  }
+                  filters={activeFilters}
+                  meta={activeMeta}
+                  showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
+                  selectedId={selectedId}
+                  query={query}
+                  loading={loading}
+                  busy={saving}
+                  canWrite={canWriteArchive}
+                  folderLabel={folderLabel}
+                  scopeLabel={scopeTag}
+                  trashMode={selectedFolderId === TRASH}
+                  unreadIds={unreadRemarkNotes}
+                  remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
+                  peerNoteIds={peerNoteIds}
+                  peerTypingNoteIds={peerTypingNoteIds}
+                  peerColor={presenceColor}
+                  archiveMode={selectedFolderId === ARCHIVE}
+                  searchRef={searchRef}
+                  onQueryChange={setQuery}
+                  onSelect={handleSelectNote}
+                  onNew={handleNew}
+                  onMoveToTrash={handleMoveToTrash}
+                  onRestore={handleRestore}
+                  onArchiveChange={handleArchiveChange}
+                  onDeleteForever={handleDeleteForever}
+                  onTogglePin={handleTogglePin}
+                  lockOf={lockFor}
+                  onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
+                  onMoveToFolder={handleMoveNote}
+                  onSetPhoto={handleNotePhoto}
+                  onOutline={openWithOutline}
+                  resolveImage={resolveImage}
+                />
+              </div>
+              <PaneResizer
+                label="Resize notes list"
+                value={listShown}
+                min={LIST_MIN}
+                max={listMax}
+                defaultValue={LIST_DEFAULT}
+                onChange={setListWidth}
+              />
+            </div>
+          </div>
+
           {homeShown ? (
             <HomePage
-              leading={sidebarToggle}
+              leading={paneNavigation}
               entries={ownedEntries}
               meta={activeMeta}
               own={viewedMember?.isSelf ?? true}
@@ -6212,9 +6332,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               faces={homeFaces}
               waiting={homeWaiting}
               lately={homeLately}
-              onOpenNote={handleOpenRecent}
+              onOpenNote={openFromHome}
               onOpenThread={(noteId, threadId) => {
-                handleOpenRecent(noteId);
+                openFromHome(noteId);
                 setOpenThen({ noteId, comments: threadId });
               }}
               onNew={() => {
@@ -6227,122 +6347,93 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 };
                 window.setTimeout(focus, 50);
               }}
-              onSearch={() => {
-                setPaletteQuery("");
-                setPaletteOpen(true);
-              }}
             />
           ) : (
-            <>
-              <div
-                className={`pane-slide is-list ${listOpen ? "" : "is-collapsed"}`}
-                style={{ width: listOpen ? listShown + 1 : 0 }}
-                aria-hidden={!listOpen}
-                inert={!listOpen}
-              >
-                <div
-                  className="pane-slide-track flex h-full min-h-0"
-                  style={{ width: listShown + 1 }}
-                >
-                  <div
-                    className="pane-frame"
-                    data-scope-direction={scopeDirection ?? undefined}
-                    style={{ width: listShown }}
-                  >
-                    {/* Keyed on the scope, so changing whose notes these are re-runs
-                    the list's own entrance instead of swapping the rows in
-                    place. Nothing is lost by the remount: `handleViewChange`
-                    already clears the query, the folder and the selection. */}
-                    <NoteList
-                      key={viewAs}
-                      archiveId={session.archiveId}
-                      entries={visible}
-                      groups={noteGroups}
-                      view="list"
-                      leading={sidebarToggle}
-                      toolbarActions={collectionActions}
-                      /* Comments is ordered by what was said last, so the
-                         sort chips would be buttons that do nothing there. */
-                      sort={
-                        selectedFolderId === REMARKS
-                          ? undefined
-                          : {
-                              preferences: activeListPreferences,
-                              onChange: handleListPreferencesChange,
-                            }
-                      }
-                      filters={activeFilters}
-                      meta={activeMeta}
-                      showFolder={
-                        !activeMeta.folders.some((folder) => folder.id === selectedFolderId)
-                      }
-                      selectedId={selectedId}
-                      query={query}
-                      loading={loading}
-                      busy={saving}
-                      canWrite={canWriteArchive}
-                      folderLabel={folderLabel}
-                      scopeLabel={scopeTag}
-                      trashMode={selectedFolderId === TRASH}
-                      unreadIds={unreadRemarkNotes}
-                      remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
-                      peerNoteIds={peerNoteIds}
-                      peerTypingNoteIds={peerTypingNoteIds}
-                      peerColor={presenceColor}
-                      archiveMode={selectedFolderId === ARCHIVE}
-                      searchRef={searchRef}
-                      onQueryChange={setQuery}
-                      onSelect={handleSelectNote}
-                      onNew={handleNew}
-                      onMoveToTrash={handleMoveToTrash}
-                      onRestore={handleRestore}
-                      onArchiveChange={handleArchiveChange}
-                      onDeleteForever={handleDeleteForever}
-                      onTogglePin={handleTogglePin}
-                      lockOf={lockFor}
-                      onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
-                      onMoveToFolder={handleMoveNote}
-                      onSetPhoto={handleNotePhoto}
-                      onOutline={openWithOutline}
-                      resolveImage={resolveImage}
-                    />
+            <Suspense
+              fallback={
+                <div className="soft-pane pane-page flex min-w-0 flex-1 flex-col gap-4 px-10 pt-10">
+                  <div className="measure">
+                    <div className="skeleton h-9 w-2/3" />
+                    <div className="skeleton mt-5 h-2.5 w-40" />
                   </div>
-                  <PaneResizer
-                    label="Resize notes list"
-                    value={listShown}
-                    min={LIST_MIN}
-                    max={listMax}
-                    defaultValue={LIST_DEFAULT}
-                    onChange={setListWidth}
-                  />
                 </div>
-              </div>
-
-              <Suspense
-                fallback={
-                  <div className="soft-pane pane-page flex min-w-0 flex-1 flex-col gap-4 px-10 pt-10">
-                    <div className="measure">
-                      <div className="skeleton h-9 w-2/3" />
-                      <div className="skeleton mt-5 h-2.5 w-40" />
-                    </div>
-                  </div>
+              }
+            >
+              <NoteEditor
+                ref={noteEditorRef}
+                key={selected?.note.id ?? "empty"}
+                entry={selected}
+                syncRevision={syncRevision}
+                canEdit={canEdit}
+                lock={selected ? lockFor(selected.note.id) : undefined}
+                startWithComments={selectedFolderId === REMARKS}
+                startWithOutline={outlineFor === selected?.note.id}
+                proofreaderEnabled={proofreaderEnabled}
+                autocorrectEnabled={autocorrectEnabled}
+                viewingAsPartner={viewAs === "u2"}
+                partnerName={partnerName}
+                titleRef={titleRef}
+                onEdited={handleEdited}
+                onNew={handleNew}
+                onImportMarkdown={() => importRef.current?.click()}
+                onUploadImage={handleUploadImage}
+                onUploadFile={handleUploadFile}
+                resolveImage={resolveImage}
+                resolveFile={resolveFile}
+                onUpdatePageProperties={handleUpdatePageProperties}
+                onSetPhoto={handleNotePhoto}
+                collaboration={
+                  (collaborative.ready || collaborative.cached) && collaborative.doc
+                    ? {
+                        document: collaborative.doc,
+                        provider: flags.collaborators ? collaborative.provider : null,
+                      }
+                    : null
                 }
-              >
+                onContextMenu={
+                  canWriteArchive
+                    ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
+                    : undefined
+                }
+                navigationAction={paneNavigation}
+                headerStatus={noteStatus}
+                /* The faces on the sidebar's shelf say who is here and who is
+                 writing; the header does not say it a second time. */
+                headerPresence={null}
+                headerActions={noteActions}
+                synced={collaborative.ready}
+                session={session}
+                commentAuthors={commentAuthors}
+                linkable={linkableNotes}
+                mentions={mentions}
+                onOpenNote={handleOpenRecent}
+                onRemarksChanged={refreshRemarks}
+                saidThreads={saidThreads}
+              />
+            </Suspense>
+          )}
+
+          {/* The second note. It closes itself and does nothing else from its
+              own header: one note is the one you are working in, and giving
+              both a full set of page controls would mean two of everything
+              claiming to be the note. */}
+          {splitEntry && !homeShown && (
+            <>
+              <div className="split-seam" />
+              <Suspense fallback={<div className="soft-pane pane-page min-w-0 flex-1" />}>
                 <NoteEditor
-                  ref={noteEditorRef}
-                  key={selected?.note.id ?? "empty"}
-                  entry={selected}
+                  ref={splitEditorRef}
+                  key={`split:${splitEntry.note.id}`}
+                  entry={splitEntry}
                   syncRevision={syncRevision}
-                  canEdit={canEdit}
-                  lock={selected ? lockFor(selected.note.id) : undefined}
-                  startWithComments={selectedFolderId === REMARKS}
-                  startWithOutline={outlineFor === selected?.note.id}
+                  canEdit={splitCanEdit(splitEntry.note.id)}
+                  lock={lockFor(splitEntry.note.id)}
                   proofreaderEnabled={proofreaderEnabled}
                   autocorrectEnabled={autocorrectEnabled}
                   viewingAsPartner={viewAs === "u2"}
                   partnerName={partnerName}
-                  titleRef={titleRef}
-                  onEdited={handleEdited}
+                  titleRef={splitTitleRef}
+                  onEdited={handleSplitEdited}
                   onNew={handleNew}
                   onImportMarkdown={() => importRef.current?.click()}
                   onUploadImage={handleUploadImage}
@@ -6352,158 +6443,53 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onUpdatePageProperties={handleUpdatePageProperties}
                   onSetPhoto={handleNotePhoto}
                   collaboration={
-                    (collaborative.ready || collaborative.cached) && collaborative.doc
-                      ? {
-                          document: collaborative.doc,
-                          provider: flags.collaborators ? collaborative.provider : null,
-                        }
+                    (splitCollaborative.ready || splitCollaborative.cached) &&
+                    splitCollaborative.doc
+                      ? { document: splitCollaborative.doc, provider: null }
                       : null
                   }
-                  onContextMenu={
-                    canWriteArchive
-                      ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
-                      : undefined
-                  }
-                  navigationAction={
-                    !listOpen ? (
-                      <>
-                        {/* With the columns away this strip is the only chrome in
-                        the window, so it carries what the columns did: getting
-                        them back, a new note, and finding one — the three acts
-                        nobody should have to reopen a column for. One capsule,
-                        like every group of toolbar items here. */}
-                        <span className="editor-tool-group glass-toolbar flex items-center">
-                          <button
-                            type="button"
-                            onClick={() => changeNavigation(true)}
-                            aria-label="Show the sidebar"
-                            title={"Show the sidebar · ⌘\\"}
-                            className="toolbar-button press"
-                          >
-                            <PanelLeftOpen size={18} />
-                          </button>
-                          {canWriteArchive && (
-                            <button
-                              type="button"
-                              onClick={handleNew}
-                              aria-label="New note"
-                              title="New note · ⌘N"
-                              className="toolbar-button press"
-                            >
-                              <SquarePen size={18} />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPaletteQuery("");
-                              setPaletteOpen(true);
-                            }}
-                            aria-label="Search notes"
-                            title="Search · ⌘K"
-                            className="toolbar-button press"
-                          >
-                            <Search size={18} />
-                          </button>
-                        </span>
-                      </>
-                    ) : null
-                  }
-                  headerStatus={noteStatus}
-                  /* The faces on the sidebar's shelf say who is here and who is
-                 writing; the header does not say it a second time. */
-                  headerPresence={null}
-                  headerActions={noteActions}
-                  synced={collaborative.ready}
+                  synced={splitCollaborative.ready}
                   session={session}
-                  commentAuthors={commentAuthors}
                   linkable={linkableNotes}
-                  mentions={mentions}
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
                   saidThreads={saidThreads}
-                />
-              </Suspense>
-
-              {/* The second note. It closes itself and does nothing else from its
-              own header: one note is the one you are working in, and giving
-              both a full set of page controls would mean two of everything
-              claiming to be the note. */}
-              {splitEntry && (
-                <>
-                  <div className="split-seam" />
-                  <Suspense fallback={<div className="soft-pane pane-page min-w-0 flex-1" />}>
-                    <NoteEditor
-                      ref={splitEditorRef}
-                      key={`split:${splitEntry.note.id}`}
-                      entry={splitEntry}
-                      syncRevision={syncRevision}
-                      canEdit={splitCanEdit(splitEntry.note.id)}
-                      lock={lockFor(splitEntry.note.id)}
-                      proofreaderEnabled={proofreaderEnabled}
-                      autocorrectEnabled={autocorrectEnabled}
-                      viewingAsPartner={viewAs === "u2"}
-                      partnerName={partnerName}
-                      titleRef={splitTitleRef}
-                      onEdited={handleSplitEdited}
-                      onNew={handleNew}
-                      onImportMarkdown={() => importRef.current?.click()}
-                      onUploadImage={handleUploadImage}
-                      onUploadFile={handleUploadFile}
-                      resolveImage={resolveImage}
-                      resolveFile={resolveFile}
-                      onUpdatePageProperties={handleUpdatePageProperties}
-                      onSetPhoto={handleNotePhoto}
-                      collaboration={
-                        (splitCollaborative.ready || splitCollaborative.cached) &&
-                        splitCollaborative.doc
-                          ? { document: splitCollaborative.doc, provider: null }
-                          : null
-                      }
-                      synced={splitCollaborative.ready}
-                      session={session}
-                      linkable={linkableNotes}
-                      onOpenNote={handleOpenRecent}
-                      onRemarksChanged={refreshRemarks}
-                      saidThreads={saidThreads}
-                      /* Its own ⋯ with what reading it needs — Find and the
+                  /* Its own ⋯ with what reading it needs — Find and the
                          outline, which phase two moved off the strip and
                          this pane then had no way back to — and its close. */
-                      headerActions={
-                        <>
-                          <DotsMenu
-                            items={[
-                              {
-                                kind: "item",
-                                id: "find",
-                                label: "Find in note",
-                                icon: <Search size={16} />,
-                                run: () => splitEditorRef.current?.openFind(),
-                              },
-                              {
-                                kind: "item",
-                                id: "outline",
-                                label: "Outline",
-                                icon: <ListTree size={16} />,
-                                run: () => splitEditorRef.current?.toggleOutline(),
-                              },
-                            ]}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setSplitId(null)}
-                            aria-label="Close the second note"
-                            title="Close the second note"
-                            className="toolbar-button press"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      }
-                    />
-                  </Suspense>
-                </>
-              )}
+                  headerActions={
+                    <>
+                      <DotsMenu
+                        items={[
+                          {
+                            kind: "item",
+                            id: "find",
+                            label: "Find in note",
+                            icon: <Search size={16} />,
+                            run: () => splitEditorRef.current?.openFind(),
+                          },
+                          {
+                            kind: "item",
+                            id: "outline",
+                            label: "Outline",
+                            icon: <ListTree size={16} />,
+                            run: () => splitEditorRef.current?.toggleOutline(),
+                          },
+                        ]}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSplitId(null)}
+                        aria-label="Close the second note"
+                        title="Close the second note"
+                        className="toolbar-button press"
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  }
+                />
+              </Suspense>
             </>
           )}
         </div>

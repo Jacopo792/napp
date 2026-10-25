@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { ArrowRight, Search, SquarePen } from "./icons";
+import { ArrowRight } from "./icons";
 import type { NoteEntry } from "@/lib/entries";
 import type { Meta } from "@/lib/types";
 import { ALL, entriesInScope } from "@/lib/scopes";
@@ -12,13 +12,19 @@ import { formatStamp } from "@/lib/format";
    carries no folders: it answers time, people and what is waiting. What was
    written last, what somebody said that this account has not read, what is
    pinned, what changed lately across every folder, and what the others wrote
-   while this reader was away. It takes the place of the list and the note;
-   opening anything from it leaves it for them.
+   while this reader was away.
+
+   It is not a place. It is what the note pane shows when no note is open in
+   it — at launch, after a note is closed, when the open note leaves the
+   list — with the list beside it the whole time; opening anything from it
+   puts that note in the same pane. A Home row beside All notes was two
+   places that both meant "my notes", and that was the confusion.
 
    Archive and Recently Deleted are not on it: they stand at the foot of the
-   sidebar, as they do in Notes and Mail. The strip is a window's toolbar —
-   its name, and the two acts every other strip offers. Nothing here asks the
-   database anything but Lately, which is one bounded read the caller makes. */
+   sidebar, as they do in Notes and Mail. The strip is the note's strip with
+   nothing open in it: the line across the window, and the columns' way back
+   when they are away. Nothing here asks the database anything but Lately,
+   which is one bounded read the caller makes. */
 
 /** A remark somebody else wrote, in an open thread, since this account last
  *  opened its note — the badge's rule, one card per thread. */
@@ -61,9 +67,9 @@ export function HomePage({
   onOpenNote,
   onOpenThread,
   onNew,
-  onSearch,
 }: {
-  /** What stands at the start of the strip: the sidebar's toggle. */
+  /** What stands at the start of the strip: the columns' way back, when
+   *  they are away. */
   leading?: ReactNode;
   /** The chosen member's whole catalogue. */
   entries: NoteEntry[];
@@ -80,8 +86,6 @@ export function HomePage({
   onOpenNote: (id: string) => void;
   onOpenThread: (noteId: string, threadId: string) => void;
   onNew: () => void;
-  /** The window's search (⌘K). */
-  onSearch: () => void;
 }) {
   const index = indexOf(meta);
   const page = useMemo(() => {
@@ -106,34 +110,7 @@ export function HomePage({
   const shownWaiting = waiting.filter((remark) => page.byId.has(remark.noteId));
   const shownLately = lately.filter((change) => page.byId.has(change.noteId)).slice(0, 6);
 
-  const strip = (
-    <header className="home-strip">
-      {leading}
-      <h1 className="home-strip-title">Home</h1>
-      <span className="home-strip-actions">
-        {canWrite && own && (
-          <button
-            type="button"
-            onClick={onNew}
-            aria-label="New note"
-            title="New note · ⌘N"
-            className="toolbar-button press"
-          >
-            <SquarePen size={18} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Search notes"
-          title="Search · ⌘K"
-          className="toolbar-button press"
-        >
-          <Search size={18} />
-        </button>
-      </span>
-    </header>
-  );
+  const strip = <header className="home-strip">{leading}</header>;
 
   /* Nothing written yet: the first line, waiting. Your page only — a
      partner's empty page is simply empty. */

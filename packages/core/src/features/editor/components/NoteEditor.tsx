@@ -298,6 +298,14 @@ const TOOLBAR_ROOM = 700;
    window with both columns open can make. */
 const TOOLBAR_ROW_ROOM = 460;
 
+/* A note's strip on a desktop holds, on its right, the writing capsule
+   (174px), Comments and the ⋯ (32 each) and the save readout beside them —
+   about 290 before the readout, with the gaps and the strip's padding — and
+   on its left the title that rises into it, which gives way first. A pane of
+   a split on a 1440 window is about 400, and keeps one row; only a pane too
+   narrow for the readout as well gives the capsule a row of its own. */
+const STRIP_ROOM = 400;
+
 export interface NoteEditorHandle {
   getContent: () => JSONContent | null;
   openFind: (query?: string) => void;
@@ -456,10 +464,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [failure, setFailure] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(startWithComments);
   const [outlineOpen, setOutlineOpen] = useState(startWithOutline);
-  /* A note's tools stand at its foot, as on the phone: one capsule of writing
-     tools and Comments beside it. The phone's own page and the book keep the
-     strip they have. */
-  const bars = !mobile && !manuscript;
+  /* A note's tools stand at the right of its strip, where a Mac puts a
+     window's tools: one capsule of writing tools, then Comments and the ⋯ as
+     round buttons of the same height. The phone's own page and the book keep
+     the strips they have. */
+  const stripTools = !mobile && !manuscript;
   /* The comments' column, not a second one beside it: one panel at a time. */
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyFocus, setHistoryFocus] = useState<string | null>(null);
@@ -857,8 +866,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   const linkForm = (
     <div
-      className={`popover editor-tool-menu absolute left-0 z-40 w-72 p-3 ${
-        bars ? "bottom-full mb-2" : "top-full mt-2"
+      className={`popover editor-tool-menu absolute top-full z-40 mt-2 w-72 p-3 ${
+        stripTools ? "right-0" : "left-0"
       }`}
     >
       <p className="label mb-2 text-ink-2">Insert link</p>
@@ -922,7 +931,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       linkForm={linkForm}
       linkOpen={linkOpen}
       onCloseLink={closeLink}
-      rise={bars}
+      atEnd={stripTools}
     />
   ) : null;
 
@@ -944,9 +953,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   /* Centred over the pane while there is room for that, then on the one strip
      beside the other groups, and only then a row of its own — never two rows
      of its own: the save state stays on the first row and gives up letters
-     rather than taking a third. A note with no toolbar is one row always. */
-  const toolbarLayout: "centred" | "row" | "stacked" =
-    !toolbar || bars
+     rather than taking a third. A note with no toolbar is one row always.
+     A desktop note's strip is its own shape: everything that acts stands on
+     the right, and only a pane too narrow for that gives the capsule a row. */
+  const toolbarLayout: "centred" | "row" | "stacked" | "strip" = stripTools
+    ? toolbar && shellWidth !== null && shellWidth < STRIP_ROOM
+      ? "stacked"
+      : "strip"
+    : !toolbar
       ? "row"
       : mobile
         ? "stacked"
@@ -1730,7 +1744,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const commentsButton = session && commentAuthors && (
     <button
       type="button"
-      className={`note-bars-comments press ${commentsOpen ? "is-active" : ""}`}
+      className={`note-strip-round press ${commentsOpen ? "is-active" : ""}`}
       aria-label="Comments"
       aria-pressed={commentsOpen}
       title="Comments"
@@ -1743,7 +1757,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         setCommentsOpen(true);
       }}
     >
-      <MessageSquare size={20} />
+      <MessageSquare size={16} />
     </button>
   );
 
@@ -1759,9 +1773,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         className={`editor-toolbar relative shrink-0 px-4 ${
           toolbarLayout === "centred"
             ? "grid h-13 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2"
-            : toolbarLayout === "row"
-              ? "grid h-13 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
-              : "editor-toolbar-stacked grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2"
+            : toolbarLayout === "strip"
+              ? "grid h-13 grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+              : toolbarLayout === "row"
+                ? "grid h-13 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
+                : "editor-toolbar-stacked grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2"
         }`}
       >
         {/* What the window is doing, and nothing else. Add cover stood here
@@ -1773,7 +1789,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           {headerPresence}
           {/* Only where the strip keeps a column of its own on this side; in a
               narrow pane it would run under the buttons opposite. */}
-          {!mobile && (toolbarLayout === "centred" || bars) && (
+          {!mobile && (toolbarLayout === "centred" || toolbarLayout === "strip") && (
             <span className="editor-strip-title" data-shown={titleAway || undefined} aria-hidden>
               {entry.note.title || "Untitled"}
             </span>
@@ -1785,8 +1801,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             absolute` used to, and unlike absolute it occupies room: centred
             over a 632px editor the cluster ran fifteen pixels underneath the
             save readout, and no width of readout could have avoided it. */}
-        {toolbarLayout !== "stacked" &&
-          (toolbar && !bars ? (
+        {(toolbarLayout === "centred" || toolbarLayout === "row") &&
+          (toolbar ? (
             <div ref={centreRef} className="justify-self-center">
               {toolbar}
             </div>
@@ -1797,7 +1813,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         {/* In a narrow pane the writing controls have a centred row of their
             own, leaving the status and page actions unobstructed. */}
         {toolbarLayout === "stacked" && (
-          <div className="editor-toolbar-compact-tools">{toolbar}</div>
+          <div className={`editor-toolbar-compact-tools ${stripTools ? "note-strip-tools" : ""}`}>
+            {toolbar}
+          </div>
         )}
 
         <span
@@ -1818,12 +1836,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               reason: a dock carrying them would be moving its icons around
               three things that are not icons. */}
           <span className="flex min-w-0 items-center gap-2">{headerStatus}</span>
+          {stripTools && toolbarLayout === "strip" && toolbar && (
+            <span className="note-strip-tools flex shrink-0">{toolbar}</span>
+          )}
+          {stripTools && commentsButton}
           <span
             className={`flex shrink-0 items-center justify-end gap-1 ${
-              mobile ? "gap-1" : "editor-tool-group glass-toolbar"
+              stripTools
+                ? "note-strip-actions gap-2"
+                : mobile
+                  ? "gap-1"
+                  : "editor-tool-group glass-toolbar"
             }`}
           >
-            {!bars && (
+            {!stripTools && (
               <>
                 <button
                   type="button"
@@ -2032,19 +2058,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               </div>
             )}
           </div>
-
-          {/* The phone's bars, standing on the foot of the page. Sticky at the
-              end of the column, so they ride the bottom of the pane while
-              there is note below and come to rest after its last line — the
-              run-out is above them, never under them. */}
-          {bars && (toolbar || commentsButton) && (
-            <div className="note-bars-dock px-10">
-              <div className="measure note-bars">
-                {toolbar}
-                {commentsButton}
-              </div>
-            </div>
-          )}
         </div>
 
         {sidePanels}
