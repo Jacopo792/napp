@@ -81,7 +81,7 @@ export function originAtPress(el: HTMLElement) {
  *  and the page arrives as it always did. Once per element. */
 const zoomed = new WeakSet<Element>();
 /* The things a note is opened out of: a row of the list, and Home's cards. */
-const NOTE_OPENERS = "[data-note-row], .home-continue, .home-pin, .home-well-row";
+const NOTE_OPENERS = "[data-note-row], .home-continue, .home-note, .home-wait, .home-lately-row";
 
 export function zoomNote(el: HTMLElement | null) {
   if (!el || zoomed.has(el) || reduced()) return;

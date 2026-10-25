@@ -77,7 +77,13 @@ import {
   targetsOf,
   type ChapterTargets,
 } from "@/lib/references";
-import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
+import {
+  loadContributions,
+  loadLately,
+  loadNamedVersions,
+  type FolderVersion,
+  type NamedVersion,
+} from "@/lib/history";
 import {
   DndContext,
   DragEndEvent,
@@ -289,7 +295,7 @@ function faceOrigin(element: Element): SheetOrigin {
   return { x, y, width, height };
 }
 import { Sidebar, type Scope } from "@/components/Sidebar";
-import { HomePage } from "@/components/HomePage";
+import { HomePage, type HomeChange, type HomeRemark } from "@/components/HomePage";
 import { NotebookIndex } from "@/components/NotebookIndex";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
@@ -600,7 +606,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [openThen, setOpenThen] = useState<{
     noteId: string;
     history?: string | true;
-    comments?: boolean;
+    /** True for the conversation, or a thread id for that one. */
+    comments?: boolean | string;
     /** Words to go to once the note is open — a heading or a line ⌘K found —
      *  or a footnote, a caption, a cited heading. */
     reveal?: Place;
@@ -673,7 +680,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       }
       if (openThen.history)
         editor?.openHistory(openThen.history === true ? undefined : openThen.history);
-      else if (openThen.comments) editor?.openComments();
+      else if (openThen.comments)
+        editor?.openComments(typeof openThen.comments === "string" ? openThen.comments : undefined);
       else if (openThen.reveal) editor?.reveal(openThen.reveal);
       setOpenThen(null);
     };
@@ -1422,6 +1430,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const currentSpace = spaces.find((space) => space.archiveId === session?.archiveId);
   const docMode = currentSpace?.kind === "document";
   const homeShown = homeOpen && !docMode && !compact;
+  /* Home's Lately: what the others wrote, read once each time Home is
+     opened. A failure leaves the section out, never the page. */
+  const [lately, setLately] = useState<FolderVersion[]>([]);
+  useEffect(() => {
+    if (!homeShown || !session) return;
+    let current = true;
+    loadLately(session)
+      .then((rows) => current && setLately(rows))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [homeShown, session]);
   const docFeatures = currentSpace?.features ?? DEFAULT_FEATURES;
   const manuscriptOwner =
     docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
@@ -4692,6 +4713,52 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     ) : null;
   };
 
+  const homeFace = (userId: string) => {
+    const member = members.find((one) => one.userId === userId);
+    const name = member ? nameOf(member) : "Member";
+    return {
+      name,
+      face: <Avatar url={avatarUrls[userId] ?? null} name={name} email="" compact />,
+    };
+  };
+
+  /* Waiting for You: the badge's own remarks, the newest of each thread. */
+  const homeWaiting: HomeRemark[] = [];
+  if (homeShown && selfId) {
+    const seenThreads = new Set<string>();
+    const unread = unreadRemarks(archiveComments, selfId, remarksSeen).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    for (const remark of unread) {
+      if (seenThreads.has(remark.threadId)) continue;
+      seenThreads.add(remark.threadId);
+      homeWaiting.push({
+        threadId: remark.threadId,
+        noteId: remark.noteId,
+        body: remark.body,
+        at: remark.createdAt,
+        ...homeFace(remark.authorId),
+      });
+    }
+  }
+
+  /* Lately, named by the first of the others who wrote it. */
+  const homeLately: HomeChange[] = lately.flatMap((version) => {
+    const author = version.authorIds.find((id) => id !== selfId);
+    return author
+      ? [
+          {
+            id: version.id,
+            noteId: version.noteId,
+            added: version.wordsAdded,
+            removed: version.wordsRemoved,
+            at: version.createdAt,
+            ...homeFace(author),
+          },
+        ]
+      : [];
+  });
+
   /* A door out of a sheet: the note, in whoever's scope it sits, and then
      its history or its conversation if that is what was pressed. */
   function openFromSheet(noteId: string, then?: { history?: string | true; comments?: boolean }) {
@@ -6152,8 +6219,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               own={viewedMember?.isSelf ?? true}
               canWrite={canWriteArchive}
               faces={homeFaces}
+              waiting={homeWaiting}
+              lately={homeLately}
               onOpenNote={handleOpenRecent}
-              onOpenScope={handleSelectFolder}
+              onOpenThread={(noteId, threadId) => {
+                handleOpenRecent(noteId);
+                setOpenThen({ noteId, comments: threadId });
+              }}
               onNew={() => {
                 handleNew();
                 /* The editor is not mounted until Home gives way to it. */
@@ -6168,10 +6240,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 setPaletteQuery("");
                 setPaletteOpen(true);
               }}
-              onFolderInfo={(folderId, origin) =>
-                openSheet({ ...origin, kind: "folder", folderId })
-              }
-              onDeleteFolder={handleDeleteFolder}
             />
           ) : (
             <>

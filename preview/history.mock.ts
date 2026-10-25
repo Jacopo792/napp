@@ -121,6 +121,24 @@ export async function loadFolderVersions(_session: AppSession, noteIds: string[]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** The fixture's stretches by anybody but the reader, newest first. */
+export async function loadLately(session: AppSession): Promise<FolderVersion[]> {
+  await sleep(160);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return [];
+  return FIXTURE_NOTES.slice(0, 6)
+    .flatMap((note, index) =>
+      seed(note.id).map((version) => ({
+        ...version,
+        id: `${version.id}-l`,
+        noteId: note.id,
+        createdAt: new Date(Date.parse(version.createdAt) - index * 5_400_000).toISOString(),
+      })),
+    )
+    .filter((version) => !version.label && !version.authorIds.includes(session.userId))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 40);
+}
+
 export async function loadNamedVersions(session: AppSession) {
   await sleep(140);
   if (session.archiveId !== PREVIEW_ARCHIVE) return [];

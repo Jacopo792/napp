@@ -305,7 +305,8 @@ export interface NoteEditorHandle {
   saveDocx: () => void;
   /** With a version id, that version is opened in the list. */
   openHistory: (versionId?: string) => void;
-  openComments: () => void;
+  /** With a thread id, that conversation is the one shown. */
+  openComments: (threadId?: string) => void;
   /** The note's outline beside it, now asked for from the ⋯. */
   toggleOutline: () => void;
   openLink: () => void;
@@ -676,9 +677,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       setHistoryFocus(versionId ?? null);
       setHistoryOpen(true);
     },
-    openComments() {
+    openComments(threadId) {
       setQuotes(editorRef.current?.commentQuotes() ?? new Map());
       setCommentsOpen(true);
+      if (threadId) setFocusThread(threadId);
     },
     toggleOutline() {
       setOutlineOpen((open) => !open);

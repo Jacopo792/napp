@@ -1,67 +1,53 @@
-import { useMemo, useState, type ReactNode } from "react";
-import {
-  ArrowRight,
-  ChevronRight,
-  Info,
-  MoreHorizontal,
-  Pencil,
-  FolderPlus,
-  Search,
-  SquarePen,
-  Trash2,
-} from "./icons";
-import { PointMenu } from "./ContextMenu";
-import { FOLDER_ACT, type FolderAct } from "./Sidebar";
-import type { SheetOrigin } from "./Sheet";
-import type { MenuItem } from "@/lib/menuShape";
-import type { MenuPoint } from "@/lib/contextMenu";
+import { useMemo, type ReactNode } from "react";
+import { ArrowRight, Search, SquarePen } from "./icons";
 import type { NoteEntry } from "@/lib/entries";
-import type { Folder, Meta } from "@/lib/types";
+import type { Meta } from "@/lib/types";
 import { ALL, entriesInScope } from "@/lib/scopes";
 import { derivedOf, indexOf } from "@/lib/derived";
 import { formatStamp } from "@/lib/format";
 
 /* ── Home ────────────────────────────────────────────────────────────────────
-   The phone's first tab, on the computer: the notebook's front page. What was
-   written last, what is pinned, every folder with its newest three. Read from
-   the archive already in memory — nothing here asks the database anything. It
-   takes the place of the list and the note; opening anything from it leaves
-   it for them.
+   The notebook's front page, and only what the sidebar cannot say. The
+   sidebar is where places live — every folder and what is in it — so Home
+   carries no folders: it answers time, people and what is waiting. What was
+   written last, what somebody said that this account has not read, what is
+   pinned, what changed lately across every folder, and what the others wrote
+   while this reader was away. It takes the place of the list and the note;
+   opening anything from it leaves it for them.
 
-   It is the desktop's page, not the phone's tab. Archive and Recently Deleted
-   are not on it: they stand at the foot of the sidebar, as they do in Notes
-   and Mail, and a second door to them in the content is a second thing to
-   keep agreeing with the first. The strip is a window's toolbar — its name,
-   and the two acts every other strip offers (a new note, finding one). A
-   folder is opened by its name, as a link, with "Show All" at its foot where
-   the phone had a round arrow, and right-clicked for its menu like every
-   other folder in the window. */
+   Archive and Recently Deleted are not on it: they stand at the foot of the
+   sidebar, as they do in Notes and Mail. The strip is a window's toolbar —
+   its name, and the two acts every other strip offers. Nothing here asks the
+   database anything but Lately, which is one bounded read the caller makes. */
+
+/** A remark somebody else wrote, in an open thread, since this account last
+ *  opened its note — the badge's rule, one card per thread. */
+export interface HomeRemark {
+  threadId: string;
+  noteId: string;
+  face: ReactNode;
+  name: string;
+  body: string;
+  at: string;
+}
+
+/** A stretch of somebody else's writing in this notebook. */
+export interface HomeChange {
+  id: string;
+  noteId: string;
+  face: ReactNode;
+  name: string;
+  added: number | null;
+  removed: number | null;
+  at: string;
+}
+
+const RECENT = 8;
 
 const newest = (entries: NoteEntry[]) =>
   [...entries].sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
 
-/** Folders in the order the sidebar draws them: each followed by its children. */
-function nested(folders: Folder[]): Folder[] {
-  const known = new Set(folders.map((folder) => folder.id));
-  const out: Folder[] = [];
-  const walk = (parent: string | null) => {
-    for (const folder of folders) {
-      const under = folder.parentId && known.has(folder.parentId) ? folder.parentId : null;
-      if (under !== parent) continue;
-      out.push(folder);
-      walk(folder.id);
-    }
-  };
-  walk(null);
-  return out;
-}
-
-const tally = (count: number) => (count === 1 ? "1 note" : `${count} notes`);
-
-function originOf(element: Element): SheetOrigin {
-  const { x, y, width, height } = element.getBoundingClientRect();
-  return { x, y, width, height };
-}
+const titleOf = (entry: NoteEntry | undefined) => entry?.note.title || "Untitled";
 
 export function HomePage({
   leading,
@@ -70,12 +56,12 @@ export function HomePage({
   own,
   canWrite,
   faces,
+  waiting,
+  lately,
   onOpenNote,
-  onOpenScope,
+  onOpenThread,
   onNew,
   onSearch,
-  onFolderInfo,
-  onDeleteFolder,
 }: {
   /** What stands at the start of the strip: the sidebar's toggle. */
   leading?: ReactNode;
@@ -87,30 +73,38 @@ export function HomePage({
   canWrite: boolean;
   /** The faces of whoever is in a note now, or nothing. */
   faces: (noteId: string) => ReactNode;
+  /** Unread remarks on this notebook's notes, newest first. */
+  waiting: HomeRemark[];
+  /** The others' latest writing in this notebook, newest first. */
+  lately: HomeChange[];
   onOpenNote: (id: string) => void;
-  onOpenScope: (scope: string) => void;
+  onOpenThread: (noteId: string, threadId: string) => void;
   onNew: () => void;
   /** The window's search (⌘K). */
   onSearch: () => void;
-  onFolderInfo: (id: string, origin: SheetOrigin) => void;
-  onDeleteFolder: (id: string) => void;
 }) {
-  const [menu, setMenu] = useState<(MenuPoint & { items: MenuItem[] }) | null>(null);
   const index = indexOf(meta);
   const page = useMemo(() => {
-    const inScope = (scope: string) => entriesInScope(entries, meta, scope);
-    const all = newest(inScope(ALL));
+    const all = newest(entriesInScope(entries, meta, ALL));
+    const pinned = all.filter((entry) => index.byNote.get(entry.note.id)?.pinned);
+    const pinnedIds = new Set(pinned.map((entry) => entry.note.id));
     return {
       all,
-      pinned: all.filter((entry) => index.byNote.get(entry.note.id)?.pinned),
-      folders: nested(meta.folders).map((folder) => ({
-        folder,
-        inside: newest(inScope(folder.id)),
-      })),
+      pinned,
+      /* Pinned notes are already up the page; a second card for the same
+         note is the repetition this page exists to avoid. */
+      recent: all
+        .slice(1)
+        .filter((entry) => !pinnedIds.has(entry.note.id))
+        .slice(0, RECENT),
+      byId: new Map(all.map((entry) => [entry.note.id, entry])),
     };
   }, [entries, meta, index]);
   const folderName = new Map(meta.folders.map((folder) => [folder.id, folder.name]));
+  const folderOf = (noteId: string) => folderName.get(index.byNote.get(noteId)?.folderId ?? "");
   const latest = page.all[0];
+  const shownWaiting = waiting.filter((remark) => page.byId.has(remark.noteId));
+  const shownLately = lately.filter((change) => page.byId.has(change.noteId)).slice(0, 6);
 
   const strip = (
     <header className="home-strip">
@@ -168,64 +162,6 @@ export function HomePage({
       </section>
     );
 
-  /** The folder's menu, from its ⋯ (under the button) or a right-click on its
-   *  card (at the pointer). */
-  function folderMenu(event: React.MouseEvent<HTMLElement>, folder: Folder, atPointer = false) {
-    const button = event.currentTarget;
-    const { left, bottom } = button.getBoundingClientRect();
-    const point = atPointer ? { x: event.clientX, y: event.clientY } : { x: left, y: bottom + 4 };
-    const act = (kind: FolderAct["act"]) =>
-      window.dispatchEvent(
-        new CustomEvent<FolderAct>(FOLDER_ACT, { detail: { id: folder.id, act: kind } }),
-      );
-    const items: MenuItem[] = [
-      {
-        kind: "item",
-        id: "folder:info",
-        label: "Folder info",
-        icon: <Info size={16} />,
-        run: () => onFolderInfo(folder.id, originOf(button)),
-      },
-      ...(canWrite
-        ? ([
-            { kind: "separator" },
-            {
-              kind: "item",
-              id: "folder:rename",
-              label: "Rename folder",
-              icon: <Pencil size={16} />,
-              run: () => act("rename"),
-            },
-            {
-              kind: "item",
-              id: "folder:subfolder",
-              label: "New folder inside",
-              icon: <FolderPlus size={16} />,
-              run: () => act("subfolder"),
-            },
-            { kind: "separator" },
-            {
-              kind: "item",
-              id: "folder:delete",
-              label: "Delete folder",
-              icon: <Trash2 size={16} />,
-              danger: true,
-              submenu: [
-                {
-                  kind: "item",
-                  id: "folder:delete:confirm",
-                  label: `Delete “${folder.name}”`,
-                  danger: true,
-                  run: () => onDeleteFolder(folder.id),
-                },
-              ],
-            },
-          ] satisfies MenuItem[])
-        : []),
-    ];
-    setMenu({ ...point, items });
-  }
-
   return (
     <section className="home-page" aria-label="Home">
       {strip}
@@ -238,16 +174,13 @@ export function HomePage({
               onClick={() => onOpenNote(latest.note.id)}
             >
               <span className="home-label">Continue Writing</span>
-              <span className="home-continue-title">{latest.note.title || "Untitled"}</span>
+              <span className="home-continue-title">{titleOf(latest)}</span>
               {derivedOf(latest.note).preview && (
                 <span className="home-continue-preview">{derivedOf(latest.note).preview}</span>
               )}
               <span className="home-foot">
                 <span className="home-where">
-                  {[
-                    folderName.get(index.byNote.get(latest.note.id)?.folderId ?? ""),
-                    formatStamp(latest.note.updatedAt),
-                  ]
+                  {[folderOf(latest.note.id), formatStamp(latest.note.updatedAt)]
                     .filter(Boolean)
                     .join(" · ")}
                   {faces(latest.note.id)}
@@ -259,103 +192,130 @@ export function HomePage({
             </button>
           )}
 
-          {page.pinned.length > 0 && (
-            <section className="home-section" aria-label="Pinned">
-              <h2>Pinned</h2>
-              <div className="home-pinned">
-                {page.pinned.map((entry) => (
+          {shownWaiting.length > 0 && (
+            <section className="home-section" aria-label="Waiting for You">
+              <h2>Waiting for You</h2>
+              <div className="home-grid is-wide">
+                {shownWaiting.map((remark) => (
                   <button
-                    key={entry.note.id}
+                    key={remark.threadId}
                     type="button"
-                    className="home-card home-pin press"
-                    onClick={() => onOpenNote(entry.note.id)}
+                    className="home-card home-wait press"
+                    onClick={() => onOpenThread(remark.noteId, remark.threadId)}
                   >
-                    <span className="home-pin-title">{entry.note.title || "Untitled"}</span>
-                    <span className="home-pin-preview">{derivedOf(entry.note).preview}</span>
-                    <span className="home-pin-date">
-                      {formatStamp(entry.note.updatedAt)}
-                      {faces(entry.note.id)}
+                    <span className="home-wait-head">
+                      <span className="home-wait-face">{remark.face}</span>
+                      <span className="home-wait-name">{remark.name}</span>
+                      <span className="home-card-date">{formatStamp(remark.at)}</span>
                     </span>
+                    <span className="home-wait-body">{remark.body}</span>
+                    <span className="home-card-where">{titleOf(page.byId.get(remark.noteId))}</span>
                   </button>
                 ))}
               </div>
             </section>
           )}
 
-          {page.folders.length > 0 && (
-            <section className="home-section" aria-label="Folders">
-              <h2>Folders</h2>
-              <div className="home-folders">
-                {page.folders.map(({ folder, inside }) => (
-                  <div
-                    key={folder.id}
-                    className="home-card home-folder"
-                    onContextMenu={(event) => {
-                      if ((event.target as HTMLElement).closest(".home-well-row")) return;
-                      event.preventDefault();
-                      folderMenu(event, folder, true);
-                    }}
+          {page.pinned.length > 0 && (
+            <section className="home-section" aria-label="Pinned">
+              <h2>Pinned</h2>
+              <div className="home-grid">
+                {page.pinned.map((entry) => (
+                  <NoteCard
+                    key={entry.note.id}
+                    entry={entry}
+                    className="home-pin"
+                    folder={folderOf(entry.note.id)}
+                    face={faces(entry.note.id)}
+                    onOpen={onOpenNote}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {page.recent.length > 0 && (
+            <section className="home-section" aria-label="Recent">
+              <h2>Recent</h2>
+              <div className="home-grid">
+                {page.recent.map((entry) => (
+                  <NoteCard
+                    key={entry.note.id}
+                    entry={entry}
+                    className="home-recent"
+                    folder={folderOf(entry.note.id)}
+                    face={faces(entry.note.id)}
+                    onOpen={onOpenNote}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {shownLately.length > 0 && (
+            <section className="home-section" aria-label="Lately">
+              <h2>Lately</h2>
+              <div className="home-card home-lately">
+                {shownLately.map((change) => (
+                  <button
+                    key={change.id}
+                    type="button"
+                    className="home-lately-row press"
+                    onClick={() => onOpenNote(change.noteId)}
                   >
-                    <div className="home-folder-head">
-                      <h3>
-                        <button
-                          type="button"
-                          className="home-folder-name"
-                          onClick={() => onOpenScope(folder.id)}
-                        >
-                          {folder.name}
-                        </button>
-                      </h3>
-                      <button
-                        type="button"
-                        aria-label={`${folder.name} actions`}
-                        aria-haspopup="menu"
-                        className="home-more press"
-                        onClick={(event) => folderMenu(event, folder)}
-                      >
-                        <MoreHorizontal size={20} />
-                      </button>
-                    </div>
-                    {inside.length > 0 && (
-                      <div className="home-well">
-                        {inside.slice(0, 3).map((entry) => (
-                          <button
-                            key={entry.note.id}
-                            type="button"
-                            className="home-well-row press"
-                            onClick={() => onOpenNote(entry.note.id)}
-                          >
-                            <span className="home-well-title">
-                              {entry.note.title || "Untitled"}
-                            </span>
-                            {faces(entry.note.id)}
-                            <span className="home-well-date">
-                              {formatStamp(entry.note.updatedAt)}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
+                    <span className="home-wait-face">{change.face}</span>
+                    <span className="home-lately-what">
+                      <span className="home-wait-name">{change.name}</span>
+                      <span className="home-lately-note">
+                        {titleOf(page.byId.get(change.noteId))}
+                      </span>
+                    </span>
+                    {(change.added || change.removed) && (
+                      <span className="home-lately-words">
+                        {change.added ? <span className="is-added">+{change.added}</span> : null}
+                        {change.removed ? (
+                          <span className="is-removed">−{change.removed}</span>
+                        ) : null}
+                      </span>
                     )}
-                    <div className="home-foot">
-                      <span className="home-where">{tally(inside.length)}</span>
-                      <button
-                        type="button"
-                        aria-label={`Show all of ${folder.name}`}
-                        className="home-show-all"
-                        onClick={() => onOpenScope(folder.id)}
-                      >
-                        Show All
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
-                  </div>
+                    <span className="home-card-date">{formatStamp(change.at)}</span>
+                  </button>
                 ))}
               </div>
             </section>
           )}
         </div>
       </div>
-      {menu && <PointMenu point={menu} items={menu.items} close={() => setMenu(null)} />}
     </section>
+  );
+}
+
+function NoteCard({
+  entry,
+  className,
+  folder,
+  face,
+  onOpen,
+}: {
+  entry: NoteEntry;
+  className: string;
+  folder: string | undefined;
+  face: ReactNode;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`home-card home-note ${className} press`}
+      onClick={() => onOpen(entry.note.id)}
+    >
+      <span className="home-note-title">{titleOf(entry)}</span>
+      <span className="home-note-preview">{derivedOf(entry.note).preview}</span>
+      <span className="home-note-foot">
+        <span className="home-card-where">{folder}</span>
+        {face}
+        <span className="home-card-date">{formatStamp(entry.note.updatedAt)}</span>
+      </span>
+    </button>
   );
 }

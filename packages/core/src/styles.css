@@ -14317,11 +14317,6 @@ button.sheet-chip:hover,
   margin-top: 18px;
 }
 
-.home-folder .home-foot {
-  margin-top: 12px;
-  padding-left: 4px;
-}
-
 .home-where {
   display: flex;
   min-width: 0;
@@ -14361,20 +14356,29 @@ button.sheet-chip:hover,
   font-weight: var(--weight-bold);
 }
 
-.home-pinned {
+/* Cards in a grid, as a window has room for: four across at the measure,
+   fewer as the column narrows. Waiting cards are wider — a remark is a
+   sentence, not a title. */
+.home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
 }
 
-.home-pin {
+.home-grid.is-wide {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.home-note,
+.home-wait {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   border-radius: 20px;
   padding: 16px 18px;
 }
 
-.home-pin-title {
+.home-note-title {
   overflow: hidden;
   font-size: 15px;
   font-weight: var(--weight-semibold);
@@ -14382,7 +14386,8 @@ button.sheet-chip:hover,
   white-space: nowrap;
 }
 
-.home-pin-preview {
+.home-note-preview,
+.home-wait-body {
   display: -webkit-box;
   min-height: 2.8em;
   margin-top: 4px;
@@ -14394,114 +14399,119 @@ button.sheet-chip:hover,
   -webkit-line-clamp: 2;
 }
 
-.home-pin-date {
+.home-wait-body {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.home-note-foot,
+.home-wait-head {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
+}
+
+.home-note-foot {
   margin-top: 10px;
+}
+
+.home-wait-head {
+  margin-bottom: 4px;
+}
+
+.home-card-where {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-wait > .home-card-where {
+  flex: none;
+  margin-top: 10px;
+}
+
+.home-card-date {
+  flex-shrink: 0;
+  margin-left: auto;
   color: var(--ink-4);
   font-size: 12px;
 }
 
-.home-folders {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 14px;
-}
-
-.home-folder {
-  padding: 18px;
-}
-
-.home-folder-head {
-  display: flex;
-  align-items: center;
-  padding: 0 4px;
-}
-
-.home-folder-head h3 {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-size: 20px;
-  font-weight: var(--weight-bold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* A folder's name is the way into it: a link, underlined only under the
-   pointer, as a heading in Finder's sidebar or Music's "See All" are. */
-.home-folder-name {
-  max-width: 100%;
-  overflow: hidden;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-folder-name:hover {
-  text-decoration: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-}
-
-.home-show-all {
+.home-wait-face {
   display: inline-flex;
   flex-shrink: 0;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  border-radius: 6px;
-  padding: 2px 4px;
-  color: var(--ink-2);
-  font-size: 13px;
-  font-weight: var(--weight-medium);
 }
 
-.home-show-all:hover {
-  color: var(--ink);
+.home-wait-face .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
 }
 
-.home-more {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  margin-left: auto;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--ink-2);
+.home-wait-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.home-well {
-  margin-top: 12px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+/* Lately is a list, not cards: a log of who did what, read down. */
+.home-lately {
+  border-radius: 20px;
   padding: 4px 0;
 }
 
-.home-well-row {
+.home-lately-row {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  font-size: 14px;
+  gap: 12px;
+  padding: 10px 18px;
   text-align: left;
 }
 
-.home-well-title {
+.home-lately-row + .home-lately-row {
+  box-shadow: inset 0 1px 0 var(--rule-soft);
+}
+
+.home-lately-what {
+  display: flex;
   min-width: 0;
   flex: 1;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.home-lately-note {
+  min-width: 0;
   overflow: hidden;
+  color: var(--ink-2);
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.home-well-date {
+.home-lately-words {
+  display: inline-flex;
   flex-shrink: 0;
-  color: var(--ink-3);
+  gap: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-lately-words .is-added {
+  color: var(--accent-strong);
+}
+
+.home-lately-words .is-removed {
+  color: var(--danger);
 }
 
 .home-faces {
@@ -14516,7 +14526,7 @@ button.sheet-chip:hover,
   font-size: 9px;
 }
 
-:is(.home-continue, .home-pin, .home-well-row, .home-folder-name, .home-show-all):focus-visible {
+:is(.home-continue, .home-note, .home-wait, .home-lately-row):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

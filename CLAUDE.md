@@ -1989,14 +1989,24 @@ printing.
   because in a shared book they are the point.
 - **Names.** Remarks is Comments and Trash is Recently Deleted, on screen only:
   `REMARKS`, `TRASH` and the code say what they always said.
-- **Home** (`HomePage.tsx`) is the phone's first tab as the desktop's front
-  page, and the window opens on it: Continue Writing, Pinned, every folder as a
-  card with its newest three. It is a window's page, not the phone's tab:
-  **Archive and Recently Deleted are not on it** — they stand at the foot of
-  the sidebar, as in Notes and Mail, and a second door in the content is a
-  second thing to keep agreeing with the first. Its strip names it and carries
-  a new note and search like every strip; a folder is opened by its name or
-  "Show All" and right-clicked for the same menu as in the sidebar.
+- **Home** (`HomePage.tsx`) is the desktop's front page, and the window opens
+  on it. **It carries no folders**: the sidebar is where places live, and
+  folder cards on Home with their newest three were the sidebar drawn twice.
+  Home earns its place by what the sidebar cannot say — time, people, what is
+  waiting — in this order: Continue Writing; **Waiting for You**, one card per
+  open thread with a remark somebody else wrote since this account last opened
+  the note (the badge's rule, `unreadRemarks`), pressed to open the note with
+  that thread up (`openComments(threadId)`); Pinned; **Recent**, the eight
+  newest notes across every folder, minus Continue Writing and whatever is
+  pinned; **Lately**, the others' latest stretches of writing in this notebook
+  from `note_versions` (`loadLately`: one bounded read each time Home opens,
+  named versions and the reader's own left out). Every section but Continue
+  Writing is omitted when empty; a face on a card is somebody in that note
+  now, never who wrote it. The partner's notebook gets the same page from
+  their scope. It is a window's page, not the phone's tab: **Archive and
+  Recently Deleted are not on it** — they stand at the foot of the sidebar, as
+  in Notes and Mail. Its strip names it and carries a new note and search
+  like every strip. Do not put the folder cards back.
 - **The note's tools** stand at its foot, as on the phone: one glass capsule
   (Aa, checklist, table, paperclip, pen) and Comments in a circle beside it.
   The strip keeps one ⋯, which holds Find (⌘F) and Outline. **Every menu
