@@ -2090,6 +2090,16 @@ printing.
   sheet is 24 round on the page's ground with its figures on cards; ⌘K and
   What's New are 20 round, and their chosen row is a neutral wash with the
   glyph in a quiet tile — the accent is never a whole row.
+- **What a note opens over it** speaks the same way. A picture is shown as
+  Photos shows one (`ImageViewer.tsx`): it flies out of its rectangle onto
+  black — not the palette, a photograph is judged on black — and Esc, the
+  round glass close or a click anywhere flies it home (`flyHome` in
+  `motion.ts`) as the ground lifts. The history panel's days and the sheets'
+  sections are the phone's `Grouped`: a quiet heading over a card of rows,
+  hairlines from the words' edge. The find bar and the drawing tools were
+  already glass and stay; on a phone's screen the find bar stands at the foot
+  in place of the tools. A cover's chips stay dark glass, because they stand
+  on a picture, and its primary one reads `--on-accent`.
 - **Menus the page draws** are the phone's glass popover at a desk's scale: 14
   round, rows of 30, each glyph in a quiet tile of its own, words in ink, a
   neutral hover, and the way back out of a section named after it. macOS keeps
