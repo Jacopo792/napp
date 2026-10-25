@@ -1,9 +1,10 @@
 /* Signing in stays deliberately small: the core owns the account flow; this
  * screen gives it a native, calm place to happen.
  *
- * The ground is a wall of notes drifting upward (NoteWall.tsx), the app's own
- * material; the form stands on it in a frosted card at the foot, Revolut's
- * onboarding.
+ * It is asked for only when it is needed: on a phone that has held a real
+ * account and is signed out, and from the app as a sheet (`app/sign-in.tsx`)
+ * to save an anonymous account's notes or to open another account. The
+ * form stands in a frosted card at the foot, Revolut's onboarding.
  *
  * Every movement on it has a cause (Movement with a cause, CLAUDE.md). The
  * wall settles in first, then the title, then the card rises with its
@@ -19,6 +20,9 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import {
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -61,11 +65,12 @@ import { DURATION, EASE } from "@/lib/motionTokens";
 import { useTextPrompt } from "./TextPrompt";
 import { usePalette, type Palette } from "./archive";
 import { Press } from "./Grouped";
-import { NoteWall } from "./NoteWall";
+import { PolicyLinks } from "./PolicyLinks";
+import { passwordRecoveryUrl } from "@/lib/passwordRecovery";
 import { SymbolView } from "./icons";
 import { glide, release } from "./theme";
 
-type Mode = "sign-in" | "sign-up";
+export type Mode = "sign-in" | "sign-up";
 
 /** Whatever theme the reader chose, this page is light ink on a dark wall. */
 function onWall(palette: Palette): Palette {
@@ -85,13 +90,19 @@ function onWall(palette: Palette): Palette {
 
 const glassy = Platform.OS === "ios" && isLiquidGlassAvailable();
 
-const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
+const BASE_COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": { title: "Welcome back.", lede: "Sign in to your notes.", action: "Sign In" },
   "sign-up": {
     title: "Start an archive.",
     lede: "Your notes, shared with whom you choose.",
     action: "Create Account",
   },
+};
+/** Creating from an anonymous account links an address to it: the notes stay. */
+const SAVE = {
+  title: "Save your notes.",
+  lede: "On every device, and shared.",
+  action: "Create Account",
 };
 
 const standard = Easing.bezier(
@@ -346,7 +357,7 @@ function ModeSwitch({
 const SWITCH = 40;
 
 /** Two lines of copy for the two modes, crossing in the direction the switch
- *  travels. The first is in the flow and holds the room. */
+ *  travels. */
 function Crossing({
   at,
   first,
@@ -369,7 +380,16 @@ function Crossing({
   }));
   return (
     <View>
-      <Animated.Text style={[style, out]} numberOfLines={1}>
+      {/* The longer line holds the room, so neither is cut short. */}
+      <Text
+        style={[style, { opacity: 0 }]}
+        numberOfLines={1}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {first.length >= second.length ? first : second}
+      </Text>
+      <Animated.Text style={[style, StyleSheet.absoluteFill, out]} numberOfLines={1}>
         {first}
       </Animated.Text>
       <Animated.Text
@@ -423,25 +443,64 @@ function Glass({ children }: { children: ReactNode }) {
   return <View style={[styles.glass, styles.glassFallback]}>{children}</View>;
 }
 
+/** Android keeps its native adjustResize handling. Reanimated's keyboard
+ * controller takes over the entire window there, leaving focused fields
+ * underneath the IME in this scrolling form. iOS keeps its frame animation. */
+function useAndroidKeyboard() {
+  const height = useSharedValue(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      height.value = event.endCoordinates.height;
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      height.value = 0;
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [height]);
+  return { height };
+}
+const useFormKeyboard = Platform.OS === "android" ? useAndroidKeyboard : useAnimatedKeyboard;
+
 export function SignIn({
   onSession,
   initialChoosing = null,
   initialEmail = "",
   onResume,
+  initialMode = "sign-in",
+  saving = false,
+  warning,
+  onSubmit,
+  onCancel,
+  onSkip,
 }: {
   onSession: (session: AppSession) => void;
   initialChoosing?: AuthenticationResult | null;
   /** The address of an account whose token was refused. */
   initialEmail?: string;
   onResume: (userId: string) => Promise<void>;
+  initialMode?: Mode;
+  /** Creating links an address to the anonymous account in front. */
+  saving?: boolean;
+  /** Said while signing in, above the button. */
+  warning?: string;
+  /** Replaces the page's own sign-in and registration (the app's sheet). */
+  onSubmit?: (mode: Mode, email: string, password: string) => Promise<void>;
+  /** From the app: closes the sheet. */
+  onCancel?: () => void;
+  /** On the signed-out page: the phone's own notes, without an account. */
+  onSkip?: () => Promise<void>;
 }) {
+  const COPY = saving ? { ...BASE_COPY, "sign-up": SAVE } : BASE_COPY;
   const prompt = useTextPrompt();
   const saved = otherAccounts("");
   const app = usePalette();
   const palette = useMemo(() => onWall(app), [app]);
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
-  const [mode, setMode] = useState<Mode>("sign-in");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
   const [email, setEmail] = useState(initialEmail);
@@ -457,9 +516,9 @@ export function SignIn({
 
   /* One driver for the change of mode: the switch's two edges, and `at`,
      the plate's centre, which the titles and the button's words read. */
-  const left = useSharedValue(0);
-  const right = useSharedValue(1);
-  const at = useSharedValue(0);
+  const left = useSharedValue(initialMode === "sign-up" ? 1 : 0);
+  const right = useSharedValue(initialMode === "sign-up" ? 2 : 1);
+  const at = useSharedValue(initialMode === "sign-up" ? 1 : 0);
   useEffect(() => {
     const to = signUp ? 1 : 0;
     if (reduce) {
@@ -485,7 +544,7 @@ export function SignIn({
       : withSpring(busy ? 1 : 0, busy ? glide : release);
   }, [busy, reduce, gather]);
 
-  const keyboardHeight = useAnimatedKeyboard().height;
+  const keyboardHeight = useFormKeyboard().height;
 
   function fail(message: string) {
     setError(message);
@@ -535,7 +594,15 @@ export function SignIn({
       if (signUp) {
         if (password.length < 8) throw new Error("Use at least 8 characters.");
         if (repeat !== password) throw new Error("The two passwords are different.");
-        const result = await registerAccount(email.trim(), password);
+      }
+      if (onSubmit) {
+        await onSubmit(mode, email.trim(), password);
+        haptic("success");
+        return;
+      }
+      if (signUp) {
+        // Creating accepts the terms: the line under the card says so.
+        const result = await registerAccount(email.trim(), password, true);
         setPassword("");
         setRepeat("");
         if (result.confirmationRequired) setNotice(`Check ${email.trim()} to finish.`);
@@ -581,21 +648,16 @@ export function SignIn({
     transform: [{ scale: reduce ? 1 : 0.6 + 0.4 * gather.value }],
   }));
 
-  const status = error || notice;
+  const status = error || notice || (signUp ? "" : (warning ?? ""));
   let order = 3;
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      enabled={Platform.OS === "android"}
+      behavior="height"
+    >
       <StatusBar style="light" />
-      <NoteWall
-        ink={{
-          ground: app.dark ? app.page : "#0f0e0c",
-          card: app.dark ? app.paper : "#1f1d1a",
-          ink: app.dark ? app.ink : "#efece6",
-          quiet: "rgba(255,255,255,0.16)",
-          edge: "rgba(255,255,255,0.08)",
-        }}
-      />
       <Animated.ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 10 }]}
         contentInsetAdjustmentBehavior="never"
@@ -612,6 +674,17 @@ export function SignIn({
               style={{ width: 44, height: 44 }}
             />
             <Text style={[styles.wordmark, { color: palette.ink }]}>napp</Text>
+            {onCancel ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={onCancel}
+                disabled={busy}
+                hitSlop={12}
+                style={{ marginLeft: "auto" }}
+              >
+                <Text style={{ color: palette.ink2, fontSize: 17 }}>Cancel</Text>
+              </Pressable>
+            ) : null}
           </Arrive>
           <View style={styles.air} />
 
@@ -738,7 +811,7 @@ export function SignIn({
               </Yield>
               <Arrive order={2} rise={40}>
                 <Glass>
-                  <Arrive order={3} style={{ marginBottom: 14 }}>
+                  <Arrive order={3} style={{ marginBottom: 12 }}>
                     <ModeSwitch
                       mode={mode}
                       left={left}
@@ -765,7 +838,7 @@ export function SignIn({
                           if (error) setError("");
                         }}
                       />
-                      <View style={{ height: 10 }} />
+                      <View style={{ height: 12 }} />
                       <Field
                         palette={palette}
                         inputRef={passwordInput}
@@ -795,8 +868,23 @@ export function SignIn({
                         }}
                         onSubmitEditing={() => (signUp ? repeatInput.current?.focus() : submit())}
                       />
+                      {signUp ? null : (
+                        <Pressable
+                          accessibilityRole="link"
+                          onPress={() =>
+                            void Linking.openURL(passwordRecoveryUrl()).catch(() =>
+                              fail("Could not open password recovery."),
+                            )
+                          }
+                          style={{ alignSelf: "flex-end", paddingTop: 12 }}
+                        >
+                          <Text style={{ color: palette.ink3, fontSize: 13 }}>
+                            Forgot password?
+                          </Text>
+                        </Pressable>
+                      )}
                       <Grow open={signUp}>
-                        <View style={{ paddingTop: 10 }}>
+                        <View style={{ paddingTop: 12 }}>
                           <Field
                             palette={palette}
                             inputRef={repeatInput}
@@ -890,12 +978,33 @@ export function SignIn({
                   ) : null}
                 </Glass>
               </Arrive>
+              <Arrive order={6} style={styles.foot}>
+                {onSkip ? (
+                  <Press
+                    feedback="scale"
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={() => void attempt(onSkip)}
+                    style={{ paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: palette.ink2, fontSize: 15, fontWeight: "500" }}>
+                      Not Now
+                    </Text>
+                  </Press>
+                ) : null}
+                {signUp ? (
+                  <Text style={[styles.consent, { color: palette.ink3 }]}>
+                    By creating an account you accept the Terms and Privacy Policy.
+                  </Text>
+                ) : null}
+                <PolicyLinks centred color={palette.ink3} />
+              </Arrive>
             </View>
           )}
           <KeyboardRoom height={keyboardHeight} bottom={insets.bottom} />
         </Animated.View>
       </Animated.ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -903,7 +1012,9 @@ export function SignIn({
  *  up, frame by frame with it — so the card rides up and the wall,
  *  drawn behind the scroller, stays where it is. */
 function KeyboardRoom({ height, bottom }: { height: SharedValue<number>; bottom: number }) {
-  const room = useAnimatedStyle(() => ({ height: Math.max(bottom, height.value) + 12 }));
+  const room = useAnimatedStyle(() => ({
+    height: (Platform.OS === "android" ? bottom : Math.max(bottom, height.value)) + 12,
+  }));
   return <Animated.View style={room} />;
 }
 
@@ -932,14 +1043,16 @@ function StatusLine({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#0f0e0c" },
-  scroll: { flexGrow: 1, paddingHorizontal: 12 },
+  scroll: { flexGrow: 1, paddingHorizontal: 16 },
   content: { width: "100%", maxWidth: 440, alignSelf: "center", flexGrow: 1 },
-  brand: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 12 },
   air: { flexGrow: 1, minHeight: 24 },
   wordmark: { fontSize: 30, fontWeight: "700", letterSpacing: -1.6 },
-  intro: { paddingHorizontal: 16, paddingBottom: 20 },
+  intro: { paddingBottom: 24 },
+  foot: { alignItems: "center", gap: 8, paddingTop: 16 },
+  consent: { fontSize: 12, lineHeight: 16, textAlign: "center" },
   title: { fontSize: 40, fontWeight: "700", letterSpacing: -1.6, lineHeight: 46 },
-  lede: { fontSize: 16, lineHeight: 23, marginTop: 5 },
+  lede: { fontSize: 16, lineHeight: 23, marginTop: 8 },
   thumb: {
     position: "absolute",
     top: 0,
@@ -985,7 +1098,7 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, fontWeight: "500" },
   reveal: { fontSize: 12, fontWeight: "600" },
   input: { fontSize: 17, minHeight: 27, padding: 0, marginTop: 4 },
-  submitRow: { marginTop: 20 },
+  submitRow: { marginTop: 12 },
   submit: {
     height: BUTTON,
     borderRadius: BUTTON / 2,
@@ -1010,7 +1123,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   ring: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.25 },
-  status: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 14 },
+  status: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingTop: 12 },
   statusText: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: "500" },
   choiceList: { gap: 10 },
   archiveButton: {

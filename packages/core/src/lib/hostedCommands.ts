@@ -22,6 +22,8 @@ export type HostedCommand =
   | { type: "previousMatch" }
   | { type: "closeSearch" }
   | { type: "putDownPen" }
+  /** A note just made: the caret in its title, the keyboard up. */
+  | { type: "focusTitle" }
   /** The picture the phone's viewer shows: drawn over its place (hide it),
    *  closed (put it back),
    *  or one of the two edits the viewer offers on it. Answered by the page. */

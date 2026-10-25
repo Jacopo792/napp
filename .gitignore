@@ -53,3 +53,12 @@ apps/*/release/
 apps/mobile/ios/
 apps/mobile/android/
 apps/mobile/.expo/
+
+# Android upload keys must be backed up privately, never committed.
+*.jks
+*.keystore
+
+# Local browser test reports and failure traces
+test-results/
+playwright-report/
+e2e/.hosted-editor/

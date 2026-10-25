@@ -12,6 +12,7 @@ import {
 
 const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   folder: "folder",
+  flag: "flag",
   "folder.fill": "folder",
   "camera.fill": "photo_camera",
   photo: "image",
@@ -70,6 +71,8 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   "circle.lefthalf.filled": "contrast",
   eye: "visibility",
   "chevron.right": "chevron_right",
+  "chevron.down": "expand_more",
+  "chevron.up": "expand_less",
   "arrow.right": "arrow_forward",
   "note.text": "description",
   "text.alignleft": "notes",
@@ -83,7 +86,9 @@ const names: Partial<Record<SFSymbol, AndroidSymbol>> = {
   "lock.fill": "lock",
   "lock.open": "lock_open",
   "xmark.circle.fill": "cancel",
+  xmark: "close",
   "arrow.up": "arrow_upward",
+  "arrow.up.forward": "north_east",
   "arrowshape.turn.up.left": "reply",
   "text.quote": "format_quote",
   "person.slash": "person_off",

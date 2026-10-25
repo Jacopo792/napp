@@ -16,3 +16,6 @@ vite.preview.config.ts
 apps/mobile/android
 apps/mobile/ios
 apps/mobile/.expo
+test-results
+playwright-report
+e2e/.hosted-editor

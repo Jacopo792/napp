@@ -18,6 +18,7 @@ const mobileCollabUrl = createRequire(import.meta.url)("../collab-url.cjs");
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 const MOCKED = [
+  "supabaseClient",
   "supabase",
   "session",
   "sync",

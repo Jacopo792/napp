@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import { restoreArchiveSession, SESSION_KEY } from "./sessionRestore.ts";
+import { accountContentRemovalKey } from "./accountContentShape.ts";
 
 const saved = { userId: "member-1", email: "member@example.invalid", archiveId: "archive-1" };
 const user = {
@@ -47,6 +48,18 @@ test("a connection failure preserves the archive and a retry opens it", async ()
     }),
   );
   assert.deepEqual(await restoreArchiveSession(disk, authResult(null)), saved);
+});
+test("a crash during device-content removal requires a fresh sign-in instead of restoring a blocked editor", async () => {
+  const disk = storage();
+  disk.setItem(accountContentRemovalKey(saved.userId), "removing");
+  assert.equal(
+    await restoreArchiveSession(disk, {
+      getUser: async () => assert.fail("must require fresh authentication"),
+    }),
+    null,
+  );
+  assert.equal(disk.getItem(SESSION_KEY), null);
+  assert.equal(disk.getItem(accountContentRemovalKey(saved.userId)), "removing");
 });
 
 test("expired, missing or mismatched identity cannot restore the archive", async () => {
@@ -134,4 +147,19 @@ test("Supabase restores across client restarts, rotates an expired JWT, and resp
   assert.equal(await restoreArchiveSession(disk, client().auth), null);
   assert.equal(disk.getItem(SESSION_KEY), null);
   assert.ok(requests.every((url) => !url.includes("grant_type=password")));
+});
+
+test("only a device that never held a real account may start an anonymous one", async () => {
+  const { mayStartAnonymous, SIGNED_IN_BEFORE_KEY } = await import("./sessionRestore.ts");
+  const read = (values: Record<string, string>) => ({
+    getItem: (key: string) => values[key] ?? null,
+  });
+  assert.equal(mayStartAnonymous(read({})), true);
+  assert.equal(mayStartAnonymous(read({ "napp:accounts": "[]" })), true);
+  // A saved session that may fail to restore is asked for again, never replaced.
+  assert.equal(mayStartAnonymous(read({ [SESSION_KEY]: JSON.stringify(saved) })), false);
+  // A refused token clears the saved session; the marker still remembers it.
+  assert.equal(mayStartAnonymous(read({ [SIGNED_IN_BEFORE_KEY]: "1" })), false);
+  assert.equal(mayStartAnonymous(read({ "napp:accounts": JSON.stringify([saved]) })), false);
+  assert.equal(mayStartAnonymous(read({ "napp:accounts": "{broken" })), false);
 });

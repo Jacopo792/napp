@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { Alert, Platform, View, type StyleProp, type ViewStyle } from "react-native";
 import { GestureDetector, useLongPressGesture } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { indexOf } from "@/lib/derived";
 import type { NoteEntry } from "@/lib/entries";
 import { fileNote, lockNote, pinNote, restoreNote, shelveNote, trashNote } from "@/lib/noteActs";
@@ -28,6 +28,9 @@ import { useChoice } from "./TextPrompt";
 export function useNoteActs(scope: string = ALL) {
   const { session, metaOf, act, refresh, facesOf } = useArchive();
   const choose = useChoice();
+  const router = useRouter();
+  const report = (id: string) =>
+    router.push({ pathname: "/settings/report", params: { noteId: id } });
   const ownerOf = (entry: NoteEntry) => entry.note.ownerId ?? session.userId;
   const rowOf = (entry: NoteEntry) => indexOf(metaOf(ownerOf(entry))).byNote.get(entry.note.id);
 
@@ -100,6 +103,9 @@ export function useNoteActs(scope: string = ALL) {
     const { left, right } = pair(entry);
     return (
       <Link.Menu>
+        {owner !== session.userId ? (
+          <Link.MenuAction title="Report Note" icon="flag" onPress={() => report(id)} />
+        ) : null}
         {!trash ? (
           <Link.MenuAction
             title={row?.pinned ? "Unpin" : "Pin"}
@@ -195,6 +201,7 @@ export function useNoteActs(scope: string = ALL) {
               },
             ]),
         { label: right.label, disabled: right.disabled, run: right.run },
+        ...(owner !== session.userId ? [{ label: "Report Note", run: () => report(id) }] : []),
         { label: left.label, disabled: left.disabled, destructive: true, run: left.run },
       ],
       <NotePreview note={entry.note} faces={facesOf(id)} />,

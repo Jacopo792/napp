@@ -19,6 +19,7 @@ import "@notes-app/core/styles.css";
 import type { AppSession } from "@/lib/session";
 import { HostedRequests, tokenUsable } from "@/lib/hostedRequests";
 import { wakeCollaboration } from "@/lib/collab";
+import { removeAccountContent, restoreAccountContent } from "@/lib/accountContent";
 import type { HostedCommand, HostedController } from "@/lib/hostedCommands";
 import { supabase } from "@/lib/supabaseClient";
 import type { Note as StoredNote } from "@/lib/types";
@@ -33,12 +34,13 @@ interface Opening {
   accessToken: string | null;
   preferences: AccountPreferences;
   headerHeight: number;
+  artwork?: Pick<StoredNote, "photo" | "cover">;
   previewSeed?: StoredNote;
 }
 
 type Note = Pick<
   Opening,
-  "noteId" | "canEdit" | "name" | "preferences" | "headerHeight" | "previewSeed"
+  "noteId" | "canEdit" | "name" | "preferences" | "headerHeight" | "previewSeed" | "artwork"
 >;
 
 declare global {
@@ -48,6 +50,7 @@ declare global {
     nappUpdate: (next: Note) => void;
     nappOpen: (next: Note | null) => void;
     nappToken: (accessToken: string) => void;
+    nappClearAccount: (id: string, userId: string) => void;
     nappWake: () => void;
     nappCommand: (id: string, command: HostedCommand) => void;
     nappFileResult: (id: string, error?: string) => void;
@@ -67,6 +70,7 @@ const post = (message: unknown) => window.ReactNativeWebView?.postMessage(JSON.s
    reader in the page (the collaboration socket, PostgREST, Storage, Realtime)
    asks `getSession`, so answering it here is the whole boundary. */
 let accessToken = window.napp.accessToken;
+restoreAccountContent(window.napp.session.userId);
 const waiting = new Set<() => void>();
 supabase.auth.stopAutoRefresh();
 window.nappToken = (next) => {
@@ -75,6 +79,17 @@ window.nappToken = (next) => {
   waiting.clear();
 };
 window.nappWake = () => wakeCollaboration();
+window.nappClearAccount = (id, userId) => {
+  void removeAccountContent(userId).then(
+    () => post({ kind: "account-content-cleared", id }),
+    () =>
+      post({
+        kind: "account-content-cleared",
+        id,
+        error: "Could not remove local editor notes. Try again.",
+      }),
+  );
+};
 async function currentToken(): Promise<string | null> {
   if (tokenUsable(accessToken, Date.now())) return accessToken;
   post({ kind: "token" });
@@ -269,6 +284,7 @@ function Page() {
       noteId={noteId}
       name={name}
       canEdit={canEdit}
+      artwork={opening.artwork}
       autocorrectOn={preferences.autocorrect}
       collaboratorsVisible={preferences.collaborators}
       onState={(state) => post({ ...state, noteId })}

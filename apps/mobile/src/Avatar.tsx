@@ -9,6 +9,8 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { avatarInitials } from "@/lib/avatarInitials";
 import { downloadAvatar } from "@/lib/supabase";
 import { usePalette } from "./archive";
+import { quiet } from "./Grouped";
+import { SymbolView } from "./icons";
 
 export const clearPictures = () => pictures.clear();
 
@@ -115,6 +117,10 @@ export function Avatar({
      disc takes more of the hue and the letters go deeper. */
   const disc = mix(palette.paper, hue, palette.dark ? 0.32 : 0.36);
   const letters = palette.dark ? mix(hue, "#ffffff", 0.25) : mix(hue, "#000000", 0.42);
+  /* Nobody named yet — an account with no nickname and no address — is a
+     silhouette, never a "?". */
+  const initials = avatarInitials(name, email);
+  const nameless = initials === "?";
   return (
     <View
       accessible
@@ -128,23 +134,27 @@ export function Avatar({
           borderRadius: size / 2,
           borderWidth: border,
           borderColor: ring,
-          backgroundColor: neutral ? palette.page : disc,
+          backgroundColor: nameless ? quiet(palette) : neutral ? palette.page : disc,
           alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
         }}
       >
-        <Text
-          style={{
-            color: neutral ? palette.ink2 : letters,
-            fontSize: size * 0.42,
-            fontWeight: "600",
-            letterSpacing: -0.2,
-          }}
-          allowFontScaling={false}
-        >
-          {avatarInitials(name, email)}
-        </Text>
+        {nameless ? (
+          <SymbolView name="person.fill" size={size / 2} tintColor={palette.ink3} />
+        ) : (
+          <Text
+            style={{
+              color: neutral ? palette.ink2 : letters,
+              fontSize: size * 0.42,
+              fontWeight: "600",
+              letterSpacing: -0.2,
+            }}
+            allowFontScaling={false}
+          >
+            {initials}
+          </Text>
+        )}
         {uri ? (
           <Animated.View
             entering={FadeIn.duration(180)}

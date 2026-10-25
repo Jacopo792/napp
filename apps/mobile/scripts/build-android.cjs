@@ -3,13 +3,24 @@
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
+const store = process.argv.includes("--store");
+if (store) {
+  for (const name of [
+    "NAPP_ANDROID_KEYSTORE",
+    "NAPP_ANDROID_KEY_ALIAS",
+    "NAPP_ANDROID_STORE_PASSWORD",
+    "NAPP_ANDROID_KEY_PASSWORD",
+  ])
+    if (!process.env[name]) throw new Error(`Missing ${name} for Google Play bundle`);
+}
+
 const mobile = path.resolve(__dirname, "..");
 const env = { ...process.env, NAPP_PREVIEW: "0", NODE_ENV: "production" };
 for (const [command, args, cwd] of [
   ["pnpm", ["editor"], mobile],
   [
     process.platform === "win32" ? "gradlew.bat" : "./gradlew",
-    ["assembleRelease"],
+    [store ? "bundleRelease" : "assembleRelease"],
     path.join(mobile, "android"),
   ],
 ]) {

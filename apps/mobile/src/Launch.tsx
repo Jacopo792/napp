@@ -60,6 +60,8 @@ const LIFT = (7 / 64) * MARK;
    light or dark by the phone's own setting, read before the app overrides it. */
 const NATIVE_GROUND = Appearance.getColorScheme() === "dark" ? "#0d0d0e" : "#f8f5ee";
 let first = true;
+import { startupTrace, traceStartup, startupLines, setStartupReducedMotion } from "./startupTrace";
+traceStartup("module");
 
 /* Metro's asset requires: an `import` of a png is typed a string here, by the
    web's declarations, and an Image wants Metro's asset number. */
@@ -79,10 +81,17 @@ function drift(search: (typeof SEARCH)[number], ms: number): number {
 export function Launch({ waiting }: { waiting: boolean }) {
   const palette = usePalette();
   const reduce = useReducedMotion();
+  setStartupReducedMotion(reduce);
   const [shown, setShown] = useState(waiting);
   const [from] = useState(() => (first ? NATIVE_GROUND : null));
   const [settled, setSettled] = useState(from === null);
   const [slow, setSlow] = useState(false);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!startupTrace || !shown) return;
+    const id = setInterval(() => setTick((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [shown]);
   /** 1 standing, 0 gone. */
   const presence = useSharedValue(1);
   /** The search's clock, in ms. */
@@ -126,11 +135,22 @@ export function Launch({ waiting }: { waiting: boolean }) {
     }
 
     const leave = () => {
+      traceStartup("launch hidden");
       setShown(false);
       setSlow(false);
     };
     const tick = () => void Haptics.selectionAsync().catch(() => {});
     const open = () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+    /* The overlay never waits on an animation to say it has finished: a
+       completion callback that is skipped or never fires (seen on a phone)
+       left the lock over a Home that was already open. Leaving twice is
+       harmless. */
+    traceStartup("launch exit");
+    const away = (ms: number) => {
+      const timer = setTimeout(leave, ms + 100);
+      return () => clearTimeout(timer);
+    };
 
     if (reduce) {
       arch.value = withTiming(1, { duration: 200 });
@@ -141,7 +161,7 @@ export function Launch({ waiting }: { waiting: boolean }) {
           if (done) scheduleOnRN(leave);
         }),
       );
-      return;
+      return away(200 + 240);
     }
 
     /* Each cylinder, in turn, falls from wherever its search has it into
@@ -177,6 +197,7 @@ export function Launch({ waiting }: { waiting: boolean }) {
         if (done) scheduleOnRN(leave);
       }),
     );
+    return away(aligned + 160 + 250);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the five cylinders are fixed refs
   }, [waiting, shown, reduce, presence, clock, arch]);
 
@@ -232,6 +253,20 @@ export function Launch({ waiting }: { waiting: boolean }) {
           Still opening your notes
         </Animated.Text>
       ) : null}
+      {startupTrace ? (
+        <Animated.Text
+          style={{
+            position: "absolute",
+            bottom: 80,
+            left: 16,
+            right: 16,
+            fontSize: 12,
+            color: palette.ink,
+          }}
+        >
+          {startupLines().join("\n")}
+        </Animated.Text>
+      ) : null}
     </Animated.View>
   );
 }
@@ -262,6 +297,11 @@ export function ArchiveOpened({ onOpened }: { onOpened: () => void }) {
   /* A phone that has opened this archive before already wears its own look
      (the appearance cache) and holds its notes: there is nothing to wait for. */
   const opened = Boolean((snapshot && (preferencesReady || warm)) || error);
+  useEffect(() => {
+    traceStartup(
+      `opened snap=${Boolean(snapshot)} prefs=${preferencesReady} warm=${warm} err=${error ? "y" : "n"}`,
+    );
+  }, [snapshot, preferencesReady, warm, error]);
   useEffect(() => {
     if (opened) onOpened();
   }, [opened, onOpened]);

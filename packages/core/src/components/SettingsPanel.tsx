@@ -52,6 +52,9 @@ import {
   Target,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
+import { AccountDeletionForm } from "@/components/AccountDeletionForm";
+import { PolicyLinks } from "@/components/PolicyLinks";
+import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
 import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
@@ -76,8 +79,11 @@ import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
-  APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE,
+  PHONE_PALETTES,
+  phonePaletteOf,
+  setPalette,
+  wornSide,
   currentAppearance,
   ICON_STYLES,
   SYSTEM_COLOURS,
@@ -319,6 +325,7 @@ export function SettingsPanel({
   kind = "notes",
   document,
   email,
+  onAccountDeleted,
   reading,
   autoLock,
   profile,
@@ -377,6 +384,7 @@ export function SettingsPanel({
   };
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
+  onAccountDeleted: () => void;
   /** Whose notes the window is currently pointed at. */
   reading: string;
   autoLock: AutoLockMinutes;
@@ -588,7 +596,7 @@ export function SettingsPanel({
   }
 
   const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
-    { id: "system", name: "System", icon: <Monitor size={20} /> },
+    { id: "system", name: "Automatic", icon: <Monitor size={20} /> },
     { id: "light", name: "Light", icon: <Sun size={20} /> },
     { id: "dark", name: "Dark", icon: <Moon size={20} /> },
   ];
@@ -836,6 +844,13 @@ export function SettingsPanel({
                       {leaveStatus}
                     </p>
                   )}
+                  <BlockedAccounts />
+                  <h3>Delete account</h3>
+                  <PolicyLinks />
+                  <details>
+                    <summary>Delete account permanently</summary>
+                    <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
+                  </details>
                 </section>
               )}
 
@@ -864,11 +879,10 @@ export function SettingsPanel({
 
                   <h3>Palette</h3>
                   <div className="palette-presets" role="group" aria-label="Colour palettes">
-                    {APPEARANCE_PRESETS.map((palette) => {
-                      const active =
-                        appearance.accent === palette.accent &&
-                        appearance.background === palette.background &&
-                        appearance.foreground === palette.foreground;
+                    {PHONE_PALETTES.map((palette) => {
+                      const active = wornSide(appearance, true)
+                        ? phonePaletteOf(appearance) === palette.id
+                        : false;
                       return (
                         <button
                           key={palette.id}
@@ -883,26 +897,32 @@ export function SettingsPanel({
                               await setWallpaper(await (await fetch(picture)).blob()).catch(
                                 () => undefined,
                               );
-                            setAppearance({
-                              ...currentAppearance(),
-                              theme: palette.theme,
-                              accent: palette.accent,
-                              background: palette.background,
-                              foreground: palette.foreground,
-                              ...(picture ? { glass: 30, wallpaperDim: 12, wallpaperBlur: 0 } : {}),
-                            });
+                            setPalette(palette.id);
+                            if (picture)
+                              setAppearance({
+                                ...currentAppearance(),
+                                glass: 30,
+                                wallpaperDim: 12,
+                                wallpaperBlur: 0,
+                              });
                           }}
                         >
-                          <span
-                            className="palette-chip"
-                            style={
-                              {
-                                "--palette-bg": palette.background,
-                                "--palette-fg": palette.foreground,
-                                "--palette-accent": palette.accent,
-                              } as React.CSSProperties
-                            }
-                          />
+                          <span className="palette-card" aria-hidden="true">
+                            {[palette.light, palette.dark].map((side) => (
+                              <span
+                                key={side.background}
+                                style={{ background: side.background, color: side.foreground }}
+                              >
+                                Aa
+                                <i
+                                  style={{
+                                    background:
+                                      palette.id === "graphite" ? side.foreground : side.accent,
+                                  }}
+                                />
+                              </span>
+                            ))}
+                          </span>
                           {palette.name}
                         </button>
                       );

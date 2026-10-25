@@ -8,6 +8,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Home,
   Info,
   Lock,
   Plus,
@@ -94,7 +95,15 @@ interface Props {
   /** The people this archive is shared between, as faces to switch between. */
   peopleShelf: React.ReactNode;
   scopeLabel: string;
+  /** The notebook's front page, above All notes, in a notes archive only. */
+  home?: { active: boolean; onSelect: () => void };
 }
+
+/** Asks the sidebar to start renaming a folder, or naming one inside it, in
+ *  its own tree — so a folder's menu elsewhere (Home) is the same two acts
+ *  rather than a second way of naming a folder. */
+export const FOLDER_ACT = "napp:folder-act";
+export type FolderAct = { id: string; act: "rename" | "subfolder" };
 
 const EXPANDED_KEY = "napp:folders-open";
 
@@ -466,6 +475,7 @@ export function Sidebar({
   spaceSwitch,
   peopleShelf,
   scopeLabel,
+  home,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
   /** Where a new folder is being typed: null for none, "" for the top level. */
@@ -508,6 +518,19 @@ export function Sidebar({
     setExpanded((current) => new Set(current).add(parentId));
     setAdding(parentId);
   }
+
+  useEffect(() => {
+    const act = (event: Event) => {
+      const { id, act } = (event as CustomEvent<FolderAct>).detail;
+      if (act === "rename") setRenaming(id);
+      else {
+        setExpanded((current) => new Set(current).add(id));
+        setAdding(id);
+      }
+    };
+    window.addEventListener(FOLDER_ACT, act);
+    return () => window.removeEventListener(FOLDER_ACT, act);
+  }, []);
 
   function renderNode(node: TreeNode, depth: number): React.ReactNode {
     const open = expanded.has(node.folder.id);
@@ -641,12 +664,21 @@ export function Sidebar({
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {spaceSwitch}
         {peopleShelf}
+        {home && (
+          <Row
+            scope={{ id: "__home", label: "Home", count: 0 }}
+            glyph={<Home size={16} />}
+            motion="home"
+            active={home.active}
+            onSelect={home.onSelect}
+          />
+        )}
         {all && (
           <Row
             scope={all}
             glyph={<NotebookText size={16} />}
             motion="notes"
-            active={selectedId === ALL}
+            active={selectedId === ALL && !home?.active}
             onSelect={() => onSelect(ALL)}
           />
         )}

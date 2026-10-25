@@ -184,7 +184,7 @@ export async function createNote(
 export async function updateNoteProperties(
   session: AppSession,
   noteId: string,
-  values: Pick<Note, "photo" | "cover">,
+  values: Partial<Pick<Note, "photo" | "cover">>,
 ): Promise<void> {
   await sleep(120);
   const entry = storeOf(session).notes.get(noteId);

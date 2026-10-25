@@ -1,3 +1,6 @@
+import type { Note as StoredNote } from "@/lib/types";
+import { useStoredImage } from "@/lib/media";
+import { coverBackground } from "@/lib/pageProperties";
 /* One note and nothing around it, for a host that draws its own chrome.
  *
  * The phone cannot draw the editor — ProseMirror is a DOM — so it hosts this
@@ -81,6 +84,7 @@ interface Props {
   /** The caret's own label. What other members see is stamped by the server. */
   name: string;
   canEdit: boolean;
+  artwork?: Pick<StoredNote, "photo" | "cover">;
   /** Where the note stands, for the host to say: a wait that is not named
    *  reads as a fault. */
   onState?: (state: HostedNoteState) => void;
@@ -101,6 +105,7 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     noteId,
     name,
     canEdit,
+    artwork,
     onState,
     autocorrectOn = true,
     collaboratorsVisible = true,
@@ -253,6 +258,8 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
           "nextMatch",
           "previousMatch",
           "closeSearch",
+          /* Asked as the note opens, a beat before the page hears it may write. */
+          "focusTitle",
         ];
         if (!writable.current && !readonly.includes(command.type))
           throw new Error("This note is read-only");
@@ -316,6 +323,9 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
           case "closeSearch":
             editor.closeSearch();
             break;
+          case "focusTitle":
+            titleRef.current?.focus();
+            break;
           case "edit": {
             const chain = instance?.chain().focus();
             if (!chain) break;
@@ -354,6 +364,10 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
     [session],
   );
 
+  const cover = artwork?.cover ?? null;
+  const coverImage = useStoredImage(cover?.kind === "upload" ? cover.objectId : null, resolveImage);
+  const photoImage = useStoredImage(artwork?.photo?.objectId ?? null, resolveImage);
+
   const collaboration =
     (note.ready || note.cached) && note.doc
       ? { document: note.doc, provider: collaboratorsVisible ? note.provider : null }
@@ -361,21 +375,48 @@ export const HostedNote = forwardRef<HostedController, Props>(function HostedNot
 
   return (
     <div ref={page} className="editor-scroll min-h-0 flex-1">
+      {cover ? (
+        <div
+          className="note-page-cover hosted-page-cover"
+          role="img"
+          aria-label="Note cover"
+          style={{
+            backgroundImage:
+              cover.kind === "preset"
+                ? (coverBackground(cover) ?? undefined)
+                : coverImage
+                  ? `url("${coverImage}")`
+                  : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: `center ${cover.position * 100}%`,
+          }}
+        />
+      ) : null}
       {/* The ink covers the body only; with the pen in hand the title is not a
           place to start typing, or a stray touch raises the keyboard over the
           tools. */}
       <header className="px-5 pt-5 pb-3" style={drawing ? { pointerEvents: "none" } : undefined}>
-        <div className="measure note-frontispiece-measure">
-          <TitleField
-            mobile
-            noteId={noteId}
-            canEdit={canEdit}
-            titleRef={titleRef}
-            onEdited={() => {}}
-            onDone={() => editorRef.current?.focus()}
-            yTitle={note.doc?.getText(TITLE_TEXT) ?? null}
-            synced={note.ready}
-          />
+        <div
+          className="measure note-frontispiece-measure"
+          style={{ display: "flex", alignItems: "center", gap: 12 }}
+        >
+          {artwork?.photo ? (
+            <div className="hosted-note-photo">
+              {photoImage ? <img src={photoImage} alt="Note picture" /> : null}
+            </div>
+          ) : null}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <TitleField
+              mobile
+              noteId={noteId}
+              canEdit={canEdit}
+              titleRef={titleRef}
+              onEdited={() => {}}
+              onDone={() => editorRef.current?.focus()}
+              yTitle={note.doc?.getText(TITLE_TEXT) ?? null}
+              synced={note.ready}
+            />
+          </div>
         </div>
       </header>
       {/* The same gutter NoteEditor gives the body on a phone. */}

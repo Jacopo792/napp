@@ -27,6 +27,7 @@ export {
   CalendarBlank as CalendarDays,
   BookmarkSimple as Bookmark,
   ClockCounterClockwise as History,
+  House as Home,
   Info,
   Camera,
   Crop,

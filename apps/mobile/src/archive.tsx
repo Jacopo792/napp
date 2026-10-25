@@ -1,3 +1,7 @@
+import { indexOf } from "@/lib/derived";
+import type { Note } from "@/lib/types";
+import { updateNoteProperties } from "@/lib/supabase";
+import { traceStartup } from "./startupTrace";
 /* The archive the phone is open on, held once for every screen: the session,
  * the snapshot Postgres returned, the Realtime channel that says it moved, and
  * the one way metadata changes. Every screen reads it; none of them loads it.
@@ -22,7 +26,7 @@ import {
   subscribeToAccountPreferences,
   type AccountPreferences,
 } from "@/lib/accountPreferences";
-import { APPEARANCE_PRESETS, currentAppearance, setAppearance } from "@/lib/appearance";
+import { currentAppearance, setAppearance } from "@/lib/appearance";
 import { phonePreferences as phoneView } from "@/lib/preferenceShape";
 import { currentAxes, setAxes } from "@/lib/axes";
 import { currentWritingPreferences, setWritingPreferences } from "@/lib/writingPreferences";
@@ -36,9 +40,11 @@ import {
 } from "@/lib/session";
 import { loadSpaces, type Space } from "@/lib/spaces";
 import { loadProfile, saveProfile, type Profile } from "@/lib/supabase";
-import { appearanceTokens, useAppearance } from "@/lib/appearance";
+import { appearanceTokens, phonePaletteOf, phoneSide, useAppearance } from "@/lib/appearance";
 import { honourLocks } from "@/lib/noteActs";
 import { clearSession, type AppSession } from "@/lib/session";
+import { removeAccountContent } from "@/lib/accountContent";
+import { signOutWithDeviceCleanup } from "@/lib/accountExit";
 import { loadArchive, persistMetaDiff, type ArchiveSnapshot } from "@/lib/supabase";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
 import {
@@ -60,6 +66,10 @@ interface Archive {
   metaOf: (owner: string) => Meta;
   signOut: () => Promise<void>;
   addAccount: () => Promise<void>;
+  /** Tears this account down and opens whatever `action` signs into. */
+  changeAccount: (action: () => Promise<AuthenticationResult | null>) => Promise<void>;
+  /** The same account under a new session record (an address just linked). */
+  adoptSession: (session: AppSession) => void;
   switchAccount: (userId: string) => Promise<void>;
   spaces: Space[];
   preferences: AccountPreferences;
@@ -69,6 +79,7 @@ interface Archive {
   profile: Profile | null;
   updateProfile: (next: Profile) => Promise<void>;
   refresh: () => void;
+  updateArtwork: (noteId: string, patch: Partial<Pick<Note, "photo" | "cover">>) => Promise<void>;
   present: Presence;
   setOpenNote: (id: string | null) => void;
   /** The other members who made a note or have written in it — never one who
@@ -89,13 +100,11 @@ export function useArchive(): Archive {
 
 export function ArchiveProvider({
   session,
-  onSignedOut,
   onSession,
   onAccountChange,
   children,
 }: {
   session: AppSession;
-  onSignedOut: () => void;
   onSession: (session: AppSession) => void;
   onAccountChange: (action: () => Promise<AuthenticationResult | null>) => Promise<void>;
   children: React.ReactNode;
@@ -117,6 +126,10 @@ export function ArchiveProvider({
     [session.userId],
   );
   const [openNote, setOpenNote] = useState<string | null>(null);
+  useEffect(() => {
+    traceStartup("provider mount");
+    return () => traceStartup("provider unmount");
+  }, []);
   const noteRef = useRef(openNote);
   noteRef.current = openNote;
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -131,7 +144,12 @@ export function ArchiveProvider({
      already had. Its notes also seed the core's note cache, so the first read
      asks only for the payloads that moved — the phone has no IndexedDB to
      keep them in as the web does. */
-  const [warm] = useState(() => warmUp(session));
+  const [warm] = useState(() => {
+    traceStartup("warmUp…");
+    const kept = warmUp(session);
+    traceStartup("warm " + Boolean(kept));
+    return kept;
+  });
   const [snapshot, setSnapshot] = useState<ArchiveSnapshot | null>(warm);
   const latest = useRef(snapshot);
   latest.current = snapshot;
@@ -160,8 +178,10 @@ export function ArchiveProvider({
   }, []);
 
   useEffect(() => {
+    traceStartup("prefs effect run");
     let live = true;
     const adopt = (row: AccountPreferences) => {
+      traceStartup("prefs adopt");
       if (!live) return;
       /* Every wake pulls the row again; the same row is not a new look, and a
          new appearance object is every screen redrawn and the page re-themed. */
@@ -179,10 +199,14 @@ export function ArchiveProvider({
         setWritingPreferences(next.writing);
       setPreferencesReady(true);
     };
-    void pullAccountPreferences(session).then(adopt, (reason) => live && setError(String(reason)));
+    void pullAccountPreferences(session).then(adopt, (reason) => {
+      traceStartup("prefs failed " + String(reason));
+      if (live) setError(String(reason));
+    });
     const channel = subscribeToAccountPreferences(session, adopt);
     void loadSpaces(session).then(
       (next) => {
+        traceStartup("spaces " + next.length);
         if (!live) return;
         /* A book is written at a desk: the phone lists only notes archives, and
          one that opens on a book goes to a notes archive or the empty chooser. */
@@ -221,7 +245,10 @@ export function ArchiveProvider({
       (reason) => live && setError(String(reason)),
     );
     void loadProfile(session).then(
-      (next) => live && setProfile(next),
+      (next) => {
+        traceStartup("profile");
+        if (live) setProfile(next);
+      },
       (reason) => live && setError(String(reason)),
     );
     return () => {
@@ -294,12 +321,16 @@ export function ArchiveProvider({
   useEffect(() => {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    traceStartup("load effect run");
     const read = async () => {
       const version = revision.current;
+      traceStartup("read: writes…");
       await writes.current;
+      traceStartup("read: loadArchive…");
       if (!live || version !== revision.current) return;
       try {
         const next = sameSnapshot(latest.current, await loadArchive(session));
+        traceStartup("loadArchive ok");
         if (live && version === revision.current) {
           /* Our own write coming back over Realtime reads an archive that has
              not changed: the same object, and nothing re-renders. */
@@ -311,6 +342,33 @@ export function ArchiveProvider({
           setError("");
         }
       } catch (reason) {
+        traceStartup("loadArchive failed " + String(reason));
+        if (!live) return;
+        // A deleted account or removed membership can make the archive's
+        // single-row query fail. Recheck identity before showing that error;
+        // a network failure must keep the cached archive available.
+        try {
+          const archives = await notesArchives(session);
+          if (!live) return;
+          if (!archives.some((archive) => archive.archiveId === session.archiveId)) {
+            forgetSnapshot(session);
+            await onAccountChange(async () => ({
+              account: session,
+              archives,
+              session: archives[0]
+                ? await chooseArchive(session, archives[0].archiveId, { notesOnly: true })
+                : null,
+            }));
+            return;
+          }
+        } catch (identityError) {
+          if (!live) return;
+          if (identityError instanceof SignInAgain) {
+            forgetSnapshot(session);
+            await onAccountChange(() => Promise.reject(identityError));
+            return;
+          }
+        }
         if (live) setError(reason instanceof Error ? reason.message : String(reason));
       }
     };
@@ -325,7 +383,7 @@ export function ArchiveProvider({
       clearTimeout(timer);
       void unsubscribeFromArchive(channel);
     };
-  }, [session, wake]);
+  }, [session, wake, onAccountChange]);
 
   /* A face on a note means that member is in it now — nothing else. A face
      for having written there read as being there, on notes nobody had open
@@ -337,7 +395,7 @@ export function ArchiveProvider({
         .filter((member) => !member.isSelf && present.get(member.userId) === noteId)
         .map((member) => ({
           userId: member.userId,
-          name: member.nickname || "Member",
+          name: member.nickname,
           avatarObject: member.avatarObject,
           online: true,
         }));
@@ -389,13 +447,68 @@ export function ArchiveProvider({
   );
   const signOut = useCallback(
     () =>
-      changeAccount(async () => {
-        forgetSnapshot(session);
-        await clearSession();
-        onSignedOut();
-        return null;
+      signOutWithDeviceCleanup({
+        writes: writes.current,
+        removeContent: () => removeAccountContent(session.userId),
+        leave: () =>
+          changeAccount(async () => {
+            await clearSession();
+            forgetSnapshot(session);
+            /* Signed out of a real account: the sign-in page, whose Not Now
+           is the only way to an anonymous one (`mayStartAnonymous`). */
+            return null;
+          }),
       }),
-    [changeAccount, onSignedOut, session],
+    [changeAccount, session],
+  );
+
+  const updateArtwork = useCallback(
+    (noteId: string, patch: Partial<Pick<Note, "photo" | "cover">>) => {
+      const write = writes.current.then(async () => {
+        const before = latest.current;
+        const entry = before?.entries.find((item) => item.note.id === noteId);
+        const member = before?.members.find((item) => item.isSelf);
+        const owner = entry?.note.ownerId ?? session.userId;
+        const row = indexOf(before?.metas[owner] ?? EMPTY_META).byNote.get(noteId);
+        if (
+          !before ||
+          !entry ||
+          member?.role !== "editor" ||
+          row?.trashedAt ||
+          (row?.lockedBy && row.lockedBy !== session.userId)
+        )
+          throw new Error("This note cannot be changed.");
+        const values = { photo: entry.note.photo, cover: entry.note.cover, ...patch };
+        const changed = { ...entry, note: { ...entry.note, ...values } };
+        const next = {
+          ...before,
+          entries: before.entries.map((item) => (item.note.id === noteId ? changed : item)),
+        };
+        revision.current += 1;
+        latest.current = next;
+        setSnapshot(next);
+        try {
+          await updateNoteProperties(session, noteId, patch);
+          keepSnapshot(session, latest.current ?? next);
+        } catch (reason) {
+          const current = latest.current;
+          if (current) {
+            const restored = {
+              ...current,
+              entries: current.entries.map((item) => (item === changed ? entry : item)),
+            };
+            latest.current = restored;
+            setSnapshot(restored);
+            revision.current += 1;
+          }
+          throw reason;
+        }
+      });
+      // Subsequent writes and account changes still wait after a refused edit.
+      writes.current = write.catch(() => {});
+      return write;
+    },
+    [session],
   );
 
   const value = useMemo(
@@ -407,6 +520,8 @@ export function ArchiveProvider({
       metaOf,
       signOut,
       addAccount,
+      changeAccount,
+      adoptSession: onSession,
       switchAccount,
       spaces,
       profile,
@@ -415,6 +530,7 @@ export function ArchiveProvider({
       updatePreferences,
       switchArchive,
       updateProfile,
+      updateArtwork,
       refresh,
       present,
       setOpenNote,
@@ -429,6 +545,8 @@ export function ArchiveProvider({
       metaOf,
       signOut,
       addAccount,
+      changeAccount,
+      onSession,
       switchAccount,
       spaces,
       profile,
@@ -437,6 +555,7 @@ export function ArchiveProvider({
       updatePreferences,
       switchArchive,
       updateProfile,
+      updateArtwork,
       refresh,
       present,
       setOpenNote,
@@ -449,8 +568,8 @@ export function ArchiveProvider({
 
 export interface Palette {
   dark: boolean;
-  /** The ground the cards stand on: the page, taken most of the way to black
-   *  in the dark, so a card reads as an object rather than a lighter grey. */
+  /** The ground the cards stand on, and `paper` the card: both the palette's
+   *  own, so a card reads as an object rather than a lighter grey. */
   page: string;
   /** The page as the editor paints it — the note's own ground. */
   canvas: string;
@@ -475,21 +594,15 @@ export function usePalette(): Palette {
   return useMemo(() => {
     const dark =
       appearance.theme === "dark" || (appearance.theme === "system" && system !== "light");
-    /* Automatic follows the phone's display, including the ink and ground;
-       a dark palette cannot supply white text to a light system surface. */
-    const automatic = APPEARANCE_PRESETS.find(
-      (preset) => preset.id === (dark ? "graphite" : "paper"),
-    )!;
-    const resolved =
-      appearance.theme === "system"
-        ? { ...appearance, background: automatic.background, foreground: automatic.foreground }
-        : appearance;
-    const t = appearanceTokens(resolved, dark);
+    /* One of the phone's five, on the side this light asks for: the stored
+       colours only say which five, so Automatic turns with the display. */
+    const side = phoneSide(phonePaletteOf(appearance), dark);
+    const t = appearanceTokens({ ...appearance, ...side }, dark);
     return {
       dark,
-      page: dark ? deepen(t["--page"], 0.55) : t["--page"],
-      canvas: t["--page"],
-      paper: dark ? deepen(t["--paper"], 0.2) : t["--paper"],
+      page: side.background,
+      canvas: side.background,
+      paper: side.card,
       surface: t["--surface"],
       ink: t["--ink"],
       ink2: t["--ink-2"],
@@ -502,20 +615,6 @@ export function usePalette(): Palette {
       folder: t["--folder-tint"] ?? t["--accent"],
     };
   }, [appearance, system]);
-}
-
-/** A colour taken `amount` of the way to black. */
-function deepen(hex: string, amount: number): string {
-  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-  if (!match) return hex;
-  return `#${match
-    .slice(1)
-    .map((part) =>
-      Math.round(parseInt(part, 16) * (1 - amount))
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
 }
 
 /* ── This phone's copy of the archive ─────────────────────────────────────

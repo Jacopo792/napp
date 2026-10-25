@@ -37,6 +37,7 @@ import { randomUUID } from "expo-crypto";
 import type { HostedNoteState } from "@notes-app/core/hosted";
 import { supabase } from "@/lib/supabaseClient";
 import { HostedRequests } from "@/lib/hostedRequests";
+import { registerAccountContentCleanup } from "@/lib/accountContent";
 import type { HostedCommand } from "@/lib/hostedCommands";
 import type { AccountPreferences } from "@/lib/accountPreferences";
 import type { Note as StoredNote } from "@/lib/types";
@@ -68,6 +69,7 @@ export interface NoteOpening {
   canEdit: boolean;
   preferences: AccountPreferences;
   headerHeight: number;
+  artwork?: Pick<StoredNote, "photo" | "cover">;
   /** Preview stores live in separate JS processes; production reads the server. */
   previewSeed?: StoredNote;
 }
@@ -129,11 +131,39 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
     setGeneration((value) => value + 1);
   }, []);
   const waiting = useRef(new HostedRequests());
+  const contentCleanup = useRef(new HostedRequests());
+  useEffect(() => {
+    const requests = contentCleanup.current;
+    const unregister = registerAccountContentCleanup(async (userId) => {
+      if (userId !== session.userId) return;
+      if (!web.current || !loaded.current)
+        throw new Error("The note editor is still loading. Try signing out again.");
+      const id = randomUUID();
+      await requests.request<void>(
+        id,
+        () => {
+          web.current!.injectJavaScript(
+            `window.nappClearAccount?.(${literal(id)}, ${literal(userId)});true;`,
+          );
+        },
+        15_000,
+      );
+    });
+    return () => {
+      unregister();
+      requests.reset("The editor was closed before local content removal finished");
+    };
+  }, [session.userId]);
   /* The first preferences, for the page's first paint; later ones travel with
      each opening. */
   const [firstPreferences] = useState(() => ({
     ...preferences,
-    appearance: { ...preferences.appearance, background: palette.canvas, foreground: palette.ink },
+    appearance: {
+      ...preferences.appearance,
+      background: palette.canvas,
+      foreground: palette.ink,
+      accent: palette.accent,
+    },
   }));
 
   useEffect(() => {
@@ -215,6 +245,9 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
       execute: <T,>(key: string, command: HostedCommand) => {
         if (borrower.current?.key !== key || !loaded.current)
           return Promise.reject(new Error("The note is still loading"));
+        /* The page can move its own focus, not the window's: the WebView has
+           to be the responder first, or the caret has no keyboard under it. */
+        if (command.type === "focusTitle") web.current?.requestFocus();
         const id = randomUUID();
         return waiting.current.request<T>(
           id,
@@ -235,6 +268,14 @@ export function HostedPageProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (!message || typeof message !== "object") return;
+    if (message.kind === "account-content-cleared" && typeof message.id === "string") {
+      contentCleanup.current.settle(
+        message.id,
+        undefined,
+        typeof message.error === "string" ? message.error : undefined,
+      );
+      return;
+    }
     if (message.kind === "token") {
       /* The page's token is about to lapse: this client is the one that may
          refresh, and getSession does so when it has to. */
@@ -356,9 +397,10 @@ export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
         ...opening.preferences.appearance,
         background: palette.canvas,
         foreground: palette.ink,
+        accent: palette.accent,
       },
     }),
-    [opening.preferences, palette.canvas, palette.ink],
+    [opening.preferences, palette.canvas, palette.ink, palette.accent],
   );
   const resolvedOpening = { ...opening, preferences: resolvedPreferences };
   const shared = useContext(Context);
@@ -387,10 +429,11 @@ export function useHostedNote(opening: NoteOpening, handlers: NoteHandlers) {
       });
     }, [borrow, key]),
   );
-  const { noteId, name, canEdit, preferences, headerHeight, previewSeed } = resolvedOpening;
+  const { noteId, name, canEdit, preferences, headerHeight, previewSeed, artwork } =
+    resolvedOpening;
   useEffect(() => {
-    update(key, { noteId, name, canEdit, preferences, headerHeight, previewSeed });
-  }, [update, key, noteId, name, canEdit, preferences, headerHeight, previewSeed]);
+    update(key, { noteId, name, canEdit, preferences, headerHeight, previewSeed, artwork });
+  }, [update, key, noteId, name, canEdit, preferences, headerHeight, previewSeed, artwork]);
 
   const run = shared.execute;
   const execute = useCallback(

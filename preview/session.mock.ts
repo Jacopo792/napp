@@ -30,7 +30,7 @@ export async function chooseArchive(account: { userId: string; email: string }, 
 }
 export async function registerAccount() { return { session: null, confirmationRequired: true }; }
 export async function restoreSession(): Promise<AppSession | null> { return current; }
-export async function clearSession(): Promise<void> {
+export async function clearSession(_options: { removeLocalContent?: boolean } = {}): Promise<void> {
   if (active) saved.delete(active.userId);
   current = active = null;
 }
@@ -69,3 +69,14 @@ export async function notesArchives(account: { userId: string }): Promise<Archiv
 export function forgetAccount(userId: string): void {
   saved.delete(userId);
 }
+export async function startAnonymous(selection: ArchiveSelection = {}): Promise<AuthenticationResult> {
+  active = { userId: PREVIEW_U1, email: "", archiveId: PREVIEW_ARCHIVE };
+  const archives = await loadArchiveOptions(PREVIEW_U1, selection);
+  current = { ...active, archiveId: archives[0]?.archiveId ?? PREVIEW_ARCHIVE };
+  return { session: current, account: active, archives };
+}
+export async function linkAccount(session: AppSession, email: string): Promise<AppSession> {
+  current = active = { ...session, email };
+  return current;
+}
+export async function checkCredentials(): Promise<void> {}

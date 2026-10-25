@@ -1,3 +1,4 @@
+import { NotePicture } from "./NotePicture";
 /* What a held row lifts: the note as it reads, drawn natively from the
  * projection the list already holds — the page Mail and Notes lift, without
  * starting a WebView, a Y.Doc and a socket for a glance. Pressing it opens the
@@ -225,6 +226,7 @@ export const NotePreview = memo(
           </Text>
           <Faces faces={faces} size={24} ring={palette.page} />
         </View>
+        <NotePicture note={note} size={40} />
         <Text
           style={{ color: palette.ink, fontSize: 26, lineHeight: 31, fontWeight: "700" }}
           numberOfLines={3}

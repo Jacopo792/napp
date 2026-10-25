@@ -1,3 +1,4 @@
+import { NoteCoverSheet, useNoteArtwork } from "../../NoteArtwork";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { useToolbarIcon } from "../../icons";
 /* One note, open. The words are the core's editor in a WebView — the page in
@@ -47,7 +48,7 @@ export default function Note() {
   const headerHeight = nativeHeaderHeight;
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<SearchStatus>({ current: 0, total: 0 });
-  const [panel, setPanel] = useState<"history" | "comments" | "people" | null>(null);
+  const [panel, setPanel] = useState<"history" | "comments" | "people" | "cover" | null>(null);
   const [anchor, setAnchor] = useState<{ threadId: string; quote: string } | null>(null);
   /* The thread whose passage was tapped in the note: the sheet opens on it. */
   const [thread, setThread] = useState<string | null>(null);
@@ -56,7 +57,11 @@ export default function Note() {
   const [shownImage, setShownImage] = useState<ShownImage | null>(null);
   const prompt = useTextPrompt();
   const choose = useChoice();
-  const { id, comments: openComments } = useLocalSearchParams<{ id: string; comments?: string }>();
+  const {
+    id,
+    comments: openComments,
+    fresh,
+  } = useLocalSearchParams<{ id: string; comments?: string; fresh?: string }>();
   /* Opened from Comments, the sheet waits for the push to land: two native
      transitions at once is the stutter that read as lag. The timer is for a
      push that had no animation to end. */
@@ -133,6 +138,16 @@ export default function Note() {
     !row?.trashedAt &&
     (!row?.lockedBy || row.lockedBy === session.userId);
 
+  const artwork = useMemo(
+    () => ({ photo: entry?.note.photo ?? null, cover: entry?.note.cover ?? null }),
+    [entry?.note.photo, entry?.note.cover],
+  );
+  const { busy: artworkBusy, choosePicture, removePicture } = useNoteArtwork(id, canEdit);
+  const openCover = () => {
+    Keyboard.dismiss();
+    setPanel("cover");
+  };
+
   const { execute, Host } = useHostedNote(
     {
       noteId: id,
@@ -140,6 +155,7 @@ export default function Note() {
       canEdit,
       preferences,
       headerHeight,
+      artwork,
       previewSeed: import.meta.env.NAPP_PREVIEW === "1" ? entry?.note : undefined,
     },
     {
@@ -156,6 +172,28 @@ export default function Note() {
       },
     },
   );
+
+  /* A note just made opens writing its title, as in Notes. Once, and only
+     after the push has landed: the page is carried into this screen during
+     it, and a focus given mid-flight is lost with the move. */
+  const titled = useRef(false);
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    if (fresh !== "1") return;
+    const land = () => setLanded(true);
+    const off = navigation.addListener("transitionEnd" as never, land);
+    const timer = setTimeout(land, 700);
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [fresh, navigation]);
+  const available = Boolean(state?.available);
+  useEffect(() => {
+    if (!landed || !canEdit || !available || titled.current) return;
+    titled.current = true;
+    void execute({ type: "focusTitle" }).catch(() => {});
+  }, [landed, canEdit, available, execute]);
 
   /* Leaving the note puts the pen down: coming back is coming back to read,
      and drawing again is asked for again. */
@@ -334,6 +372,31 @@ export default function Note() {
                 undefined,
                 [
                   { label: "Find in Note", icon: "magnifyingglass", run: () => setFinding(true) },
+                  {
+                    label: entry?.note.cover ? "Change Cover" : "Add Cover",
+                    icon: "paintpalette",
+                    disabled: !canEdit || busy || artworkBusy,
+                    run: openCover,
+                  },
+                  {
+                    label: "Note Picture",
+                    icon: "photo",
+                    disabled: !canEdit || busy || artworkBusy,
+                    submenu: [
+                      {
+                        label: entry?.note.photo ? "Change Photo" : "Choose Photo",
+                        icon: "photo",
+                        run: choosePicture,
+                      },
+                      {
+                        label: "Remove Photo",
+                        icon: "trash",
+                        destructive: true,
+                        disabled: !entry?.note.photo,
+                        run: removePicture,
+                      },
+                    ],
+                  },
                   { label: "History", icon: "clock", run: () => setPanel("history") },
                   { label: "People", icon: "person.2", run: () => setPanel("people") },
                   {
@@ -360,6 +423,26 @@ export default function Note() {
             >
               Find in Note
             </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon={icon("paintpalette")}
+              disabled={!canEdit || busy || artworkBusy}
+              onPress={openCover}
+            >
+              {entry?.note.cover ? "Change Cover" : "Add Cover"}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.Menu icon={icon("photo")} disabled={!canEdit || busy || artworkBusy}>
+              <Stack.Toolbar.Label>Note Picture</Stack.Toolbar.Label>
+              <Stack.Toolbar.MenuAction icon={icon("photo")} onPress={choosePicture}>
+                {entry?.note.photo ? "Change Photo" : "Choose Photo"}
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                icon={icon("trash")}
+                disabled={!entry?.note.photo}
+                onPress={removePicture}
+              >
+                Remove Photo
+              </Stack.Toolbar.MenuAction>
+            </Stack.Toolbar.Menu>
             <Stack.Toolbar.MenuAction icon={icon("clock")} onPress={() => setPanel("history")}>
               History
             </Stack.Toolbar.MenuAction>
@@ -389,6 +472,9 @@ export default function Note() {
         />
       </Stack.Toolbar>
 
+      {panel === "cover" ? (
+        <NoteCoverSheet noteId={id} canEdit={canEdit} onClose={() => setPanel(null)} />
+      ) : null}
       {panel === "history" ? (
         <NoteHistory
           noteId={id}

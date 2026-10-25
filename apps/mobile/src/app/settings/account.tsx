@@ -8,12 +8,10 @@ import { attempt, Line, Section, SettingsPage, ZoomLink } from "../../SettingsCo
 import { useTextPrompt } from "../../TextPrompt";
 
 export default function Account() {
-  const { profile, updateProfile, preferences: p } = useArchive();
+  const { profile, updateProfile } = useArchive();
   const prompt = useTextPrompt();
   const [busy, setBusy] = useState(false);
   const accounts = useAccountCards();
-  const go = (section: string) =>
-    ({ pathname: "/settings/[section]", params: { section } }) as const;
   const rename = () =>
     prompt(
       "Name",
@@ -40,16 +38,13 @@ export default function Account() {
           onPress={rename}
           opens
         />
-        <ZoomLink href={go("security")}>
-          <Line
-            icon="hand.raised"
-            label="Privacy"
-            note={p.presence ? "Online status shown" : "Online status hidden"}
-            opens
-          />
-        </ZoomLink>
       </Section>
       {accounts}
+      <Section>
+        <ZoomLink href="/settings/delete-account">
+          <Line icon="trash" label="Delete Account" tone="danger" opens />
+        </ZoomLink>
+      </Section>
     </SettingsPage>
   );
 }

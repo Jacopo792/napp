@@ -248,11 +248,120 @@ export const APPEARANCE_PRESETS = [
   },
 ] as const;
 
-const LIGHT_DEFAULTS = {
-  accent: "#1677c8",
-  background: "#fbfaf7",
-  foreground: "#242424",
+/* The phone's five, each a light side and a dark side; the Theme control
+   (Automatic, Light, Dark) says which is worn (Jacopo, 24 October 2026). The
+   computer keeps the eighteen above. What is stored is still the three
+   colours of the side being worn, so a row any client wrote keeps reading:
+   `phonePaletteOf` recognises either side of the five, and anything else by
+   the old preset it was — a colour nobody chose from a list is Graphite. */
+export interface PhoneSide {
+  background: string;
+  card: string;
+  foreground: string;
+  accent: string;
+}
+export const PHONE_PALETTES = [
+  {
+    id: "paper",
+    name: "Paper",
+    light: { background: "#f7f3ea", card: "#ffffff", foreground: "#28241e", accent: "#2f6fd6" },
+    dark: { background: "#16130f", card: "#24201b", foreground: "#efe7da", accent: "#c4643f" },
+  },
+  {
+    id: "graphite",
+    name: "Graphite",
+    light: { background: "#f2f2f7", card: "#ffffff", foreground: "#1c1c1e", accent: "#0a84ff" },
+    dark: { background: "#000000", card: "#1c1c1e", foreground: "#ececec", accent: "#0a84ff" },
+  },
+  {
+    id: "fjord",
+    name: "Fjord",
+    light: { background: "#eef1f5", card: "#ffffff", foreground: "#2e3440", accent: "#4c7a93" },
+    dark: { background: "#242933", card: "#2e3440", foreground: "#eceff4", accent: "#88c0d0" },
+  },
+  {
+    id: "rosewood",
+    name: "Rosewood",
+    light: { background: "#f8f0ef", card: "#ffffff", foreground: "#2e2124", accent: "#b8616e" },
+    dark: { background: "#1a1517", card: "#262022", foreground: "#f3e9ea", accent: "#e59aa4" },
+  },
+  {
+    id: "pine",
+    name: "Pine",
+    light: { background: "#eff3ec", card: "#ffffff", foreground: "#1f2a22", accent: "#3e7a52" },
+    dark: { background: "#0f1612", card: "#1a241e", foreground: "#e4ece5", accent: "#a9c8a0" },
+  },
+] as const satisfies readonly { id: string; name: string; light: PhoneSide; dark: PhoneSide }[];
+export type PhonePaletteId = (typeof PHONE_PALETTES)[number]["id"];
+
+/* Where each of the eighteen lands on the phone. */
+const PHONE_PALETTE_FOR: Record<string, PhonePaletteId> = {
+  paper: "paper",
+  vanilla: "paper",
+  lavender: "paper",
+  ink: "paper",
+  espresso: "paper",
+  ember: "paper",
+  graphite: "graphite",
+  night: "graphite",
+  midnight: "graphite",
+  cosmic: "graphite",
+  violet: "graphite",
+  aurora: "graphite",
+  fjord: "fjord",
+  abyss: "fjord",
+  rosewood: "rosewood",
+  plum: "rosewood",
+  moss: "pine",
+  pine: "pine",
 };
+
+/** Which of the five a stored appearance is wearing. */
+export function phonePaletteOf(
+  config: Pick<Appearance, "background" | "foreground">,
+): PhonePaletteId {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const worn = (side: PhoneSide) =>
+    same(side.background, config.background) && same(side.foreground, config.foreground);
+  const own = PHONE_PALETTES.find((palette) => worn(palette.light) || worn(palette.dark));
+  if (own) return own.id;
+  const old = APPEARANCE_PRESETS.find(
+    (preset) =>
+      same(preset.background, config.background) && same(preset.foreground, config.foreground),
+  );
+  return (old && PHONE_PALETTE_FOR[old.id]) || "graphite";
+}
+
+/** The side of one of the five that the phone wears in this light. */
+export function phoneSide(id: PhonePaletteId, dark: boolean): PhoneSide {
+  const palette = PHONE_PALETTES.find((candidate) => candidate.id === id) ?? PHONE_PALETTES[1];
+  return dark ? palette.dark : palette.light;
+}
+
+/** The side of the five this appearance wears in this light, when its stored
+ *  colours are one of the five's — so Automatic turns with the display on the
+ *  computer as it does on the phone. An accent the reader set by hand stays
+ *  theirs on either side. Null for the eighteen and for hand-mixed colours,
+ *  which are worn exactly as stored. */
+export function wornSide(
+  config: Pick<Appearance, "background" | "foreground" | "accent">,
+  dark: boolean,
+): PhoneSide | null {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  for (const palette of PHONE_PALETTES) {
+    const stored = [palette.light, palette.dark].find(
+      (side) =>
+        same(side.background, config.background) && same(side.foreground, config.foreground),
+    );
+    if (!stored) continue;
+    const side = dark ? palette.dark : palette.light;
+    if (same(stored.accent, config.accent)) return side;
+    /* An accent that is the ink — the computer's Graphite — stays the ink. */
+    if (same(stored.foreground, config.accent)) return { ...side, accent: side.foreground };
+    return { ...side, accent: config.accent };
+  }
+  return null;
+}
 
 const KEY = "napp:appearance:v1";
 const DB = "napp:appearance";
@@ -414,11 +523,16 @@ const SEMANTIC = {
 export function appearanceTokens(config: Appearance, dark: boolean): Record<string, string> {
   const tokens: Record<string, string> = {};
   const set = (name: string, value: string) => void (tokens[name] = value);
+  const side = wornSide(config, dark);
+  if (side) config = { ...config, ...side };
   const background = config.background;
   const foreground = config.foreground;
   const contrastShift = (config.contrast - 50) / 100;
 
   set("--page", background);
+  /* What a card inside a column is drawn in: the five name theirs; the
+     eighteen get one a step off their ground, lighter either way. */
+  set("--card", side?.card ?? mix(background, dark ? 0.08 : 0.7, "white"));
   set(
     "--paper",
     mix(background, dark ? 0.11 + contrastShift * 0.08 : 0.035, dark ? "white" : "black"),
@@ -523,8 +637,9 @@ export function applyAppearance(config = current): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const dark = darkMode(config);
-  const background = config.background;
-  const foreground = config.foreground;
+  const side = wornSide(config, dark);
+  const background = side?.background ?? config.background;
+  const foreground = side?.foreground ?? config.foreground;
 
   root.dataset.theme = dark ? "dark" : "light";
   root.style.colorScheme = dark ? "dark" : "light";
@@ -633,10 +748,27 @@ export function setAppearance(next: Appearance): void {
   scheduleAppearanceCommit();
 }
 
+/** Wear one of the five on the side `theme` asks for. The stored colours are
+ *  that side's, as the phone stores them; Automatic then turns with the
+ *  display through `wornSide`. */
+export function setPalette(id: PhonePaletteId, theme: ThemeMode = current.theme): void {
+  const dark = theme === "dark" || (theme === "system" && (media?.matches ?? true));
+  const { background, foreground, accent } = phoneSide(id, dark);
+  /* The computer wears Graphite monochrome, its accent the ink, as it always
+     had; the phone's own Graphite keeps the system blue. */
+  setAppearance({
+    ...current,
+    theme,
+    background,
+    foreground,
+    accent: id === "graphite" ? foreground : accent,
+  });
+}
+
+/* Changing the theme keeps the palette: one of the eighteen is carried to the
+   one of the five it lands on, which is the moment that reader leaves it. */
 export function setTheme(theme: ThemeMode): void {
-  const light = theme === "light" || (theme === "system" && media?.matches === false);
-  const defaults = light ? LIGHT_DEFAULTS : DEFAULT_APPEARANCE;
-  setAppearance({ ...current, theme, ...defaults });
+  setPalette(phonePaletteOf(current), theme);
 }
 
 /** A picture chosen here lands on this device first and is shared afterwards:

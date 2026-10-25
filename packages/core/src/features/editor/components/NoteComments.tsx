@@ -49,6 +49,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { SafetyActions } from "@/components/SafetyActions";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
@@ -572,6 +573,9 @@ export function NoteComments({
           <p className="note-comment-body">{words(comment)}</p>
         )}
         {reactionRow(comment)}
+        {!mine ? (
+          <SafetyActions noteId={noteId} userId={comment.authorId} commentId={comment.id} compact />
+        ) : null}
       </div>
     );
   }

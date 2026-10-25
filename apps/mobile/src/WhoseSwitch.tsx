@@ -1,90 +1,35 @@
-/* Whose notes Home is showing, as a segmented capsule: one segment a member —
- * the face and the first name, "You" for the reader — and a thumb that slides
- * to the one chosen on a spring with no overshoot, the others dimmed in step
- * with it. Two or three members share the width of the content; more scroll
- * sideways at a fixed width each, the same capsule. (Jacopo, 18 October 2026:
- * two faces overlapping in a pill under the bar read as an accident.) */
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+/* A notebook index on the page itself. Titles stay still and the selection
+ * line glides as one piece. The toolbar owns the profile photo. */
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from "react-native";
 import Animated, {
+  Easing,
   interpolateColor,
   useAnimatedStyle,
-  useDerivedValue,
+  useReducedMotion,
   useSharedValue,
-  withSpring,
-  type DerivedValue,
+  withTiming,
 } from "react-native-reanimated";
-import { scheduleOnUI } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
+import { scheduleOnUI } from "react-native-worklets";
 import { usePalette } from "./archive";
-import { Avatar, type Face } from "./Avatar";
-import { Card } from "./Grouped";
-/* One short glide. Reading a shared value on the JS thread can block on the
-   UI thread; the gesture's visual response stays on the UI thread instead. */
-const glide = { dampingRatio: 1, duration: 220 } as const;
+import type { Face } from "./Avatar";
 
 export interface Whose {
   face: Face;
   email?: string;
-  /** "You", or the member's first name. */
   label: string;
-  /** What the page shows when this one is chosen: "Your Notes". */
   title: string;
 }
-
-const PAD = 4;
-const HEIGHT = 40;
-/** A segment's width once the members no longer fit side by side. */
-const WIDE = 132;
-
-function Segment({
-  who,
-  at,
-  place,
-  width,
-  selected,
-  onPress,
-}: {
-  who: Whose;
-  at: number;
-  place: DerivedValue<number>;
-  width: number;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const palette = usePalette();
-  /* How much of the thumb is over this segment, 0 to 1: the face brightens
-     and the label's ink crosses from quiet to full as the plate arrives. */
-  const nearness = useDerivedValue(() => Math.max(0, 1 - Math.min(1, Math.abs(place.value - at))));
-  const dim = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * nearness.value }));
-  const ink = useAnimatedStyle(() => ({
-    color: interpolateColor(nearness.value, [0, 1], [palette.ink3, palette.ink]),
-  }));
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityLabel={who.title}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={{ width, height: HEIGHT }}
-    >
-      <Animated.View
-        style={[
-          { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-          dim,
-        ]}
-      >
-        <Avatar face={who.face} email={who.email} size={26} />
-        <Animated.Text
-          numberOfLines={1}
-          style={[{ fontSize: 15, fontWeight: "600", flexShrink: 1 }, ink]}
-        >
-          {who.label}
-        </Animated.Text>
-      </Animated.View>
-    </Pressable>
-  );
-}
+type Measure = { x: number; width: number };
+const turnMotion = { duration: 260, easing: Easing.bezier(0.25, 0.1, 0.25, 1) };
 
 export function WhoseSwitch({
   options,
@@ -96,100 +41,184 @@ export function WhoseSwitch({
   onChoose: (userId: string) => void;
 }) {
   const palette = usePalette();
-  const [width, setWidth] = useState(0);
-  const fits = options.length <= 3;
-  const segment = fits ? (width - PAD * 2) / Math.max(1, options.length) : WIDE;
-  const at = Math.max(
-    0,
-    options.findIndex((option) => option.face.userId === selected),
-  );
-  /* Where the thumb stands, in segments: set without motion on the first
-     frame and sprung to after, so the page opening does not slide it in. */
-  const left = useSharedValue(at);
-  const right = useSharedValue(at + 1);
-  const target = useSharedValue(at);
-  /* Sent from the press itself, before the page under it renders the new
-     member's notes: the plate leaves under the finger, not a render later. */
-  const slide = useCallback(
-    (to: number) => {
-      scheduleOnUI((next: number) => {
-        "worklet";
-        // The press and the selected prop can announce the same target.
-        // Do not restart a spring that is already going there.
-        if (target.value === next) return;
-        target.value = next;
-        right.value = withSpring(next + 1, glide);
-        left.value = withSpring(next, glide);
-      }, to);
-    },
-    [left, right, target],
-  );
-  useEffect(() => slide(at), [at, slide]);
-  /* The plate's centre, in segments: what the labels read. */
-  const place = useDerivedValue(() => (left.value + right.value - 1) / 2);
-  const thumb = useAnimatedStyle(() => ({
-    width: (right.value - left.value) * segment,
-    transform: [{ translateX: left.value * segment }],
-  }));
+  const reduce = useReducedMotion();
+  const { width } = useWindowDimensions();
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [measures, setMeasures] = useState<Record<string, Measure>>({});
+  const current = options.find((who) => who.face.userId === selected) ?? options[0];
+  const target = current ? measures[current.face.userId] : undefined;
+  const placed = useRef(false);
+  const left = useSharedValue(0);
+  const right = useSharedValue(0);
 
-  const row = (
-    <View style={{ flexDirection: "row" }}>
-      {width ? (
+  useEffect(() => {
+    if (!target) return;
+    const instant = !placed.current || reduce;
+    placed.current = true;
+    scheduleOnUI(
+      (x: number, end: number, still: boolean) => {
+        "worklet";
+        if (still) {
+          left.value = x;
+          right.value = end;
+          return;
+        }
+        left.value = withTiming(x, turnMotion);
+        right.value = withTiming(end, turnMotion);
+      },
+      target.x,
+      target.x + target.width,
+      instant,
+    );
+    scroll.current?.scrollTo({ x: Math.max(0, target.x - 16), animated: !reduce });
+  }, [target, reduce, left, right]);
+
+  const ink = useAnimatedStyle(() => ({
+    left: left.value,
+    width: Math.max(0, right.value - left.value),
+  }));
+  const measure = (userId: string, next: Measure) =>
+    setMeasures((before) =>
+      before[userId]?.x === next.x && before[userId]?.width === next.width
+        ? before
+        : { ...before, [userId]: next },
+    );
+  if (!current) return null;
+  return (
+    <ScrollView
+      ref={scroll}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+      contentContainerStyle={{ paddingRight: 2 }}
+    >
+      <View accessibilityRole="tablist" accessibilityLabel="Whose notes" style={styles.tabs}>
+        {options.map((who) => (
+          <NotebookTitle
+            key={who.face.userId}
+            title={who.title}
+            active={who.face.userId === current.face.userId}
+            maxWidth={width - 48}
+            onMeasure={(next) => measure(who.face.userId, next)}
+            onPress={() => {
+              if (who.face.userId === current.face.userId) return;
+              void Haptics.selectionAsync().catch(() => {});
+              onChoose(who.face.userId);
+            }}
+          />
+        ))}
         <Animated.View
           pointerEvents="none"
-          style={[
-            {
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: segment,
-              height: HEIGHT,
-              borderRadius: HEIGHT / 2,
-              borderCurve: "continuous",
-              backgroundColor: palette.dark ? "#ffffff2b" : "#ffffff",
-              shadowColor: "#000",
-              shadowOpacity: palette.dark ? 0 : 0.12,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 1 },
-            },
-            thumb,
-          ]}
+          style={[styles.ink, { backgroundColor: palette.accent, opacity: target ? 1 : 0 }, ink]}
         />
-      ) : null}
-      {width
-        ? options.map((who, index) => (
-            <Segment
-              key={who.face.userId}
-              who={who}
-              at={index}
-              place={place}
-              width={segment}
-              selected={index === at}
-              onPress={() => {
-                if (index === at) return;
-                slide(index);
-                void Haptics.selectionAsync().catch(() => {});
-                onChoose(who.face.userId);
-              }}
-            />
-          ))
-        : null}
-    </View>
-  );
-  return (
-    <View
-      accessibilityRole="tablist"
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-    >
-      <Card radius={HEIGHT / 2 + PAD} style={{ padding: PAD, minHeight: HEIGHT + PAD * 2 }}>
-        {fits ? (
-          row
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {row}
-          </ScrollView>
-        )}
-      </Card>
-    </View>
+      </View>
+    </ScrollView>
   );
 }
+
+function NotebookTitle({
+  title,
+  active,
+  maxWidth,
+  onMeasure,
+  onPress,
+}: {
+  title: string;
+  active: boolean;
+  maxWidth: number;
+  onMeasure: (measure: Measure) => void;
+  onPress: () => void;
+}) {
+  const palette = usePalette();
+  const reduce = useReducedMotion();
+  const weight = useSharedValue(active ? 1 : 0);
+  useEffect(() => {
+    weight.value = reduce
+      ? active
+        ? 1
+        : 0
+      : withTiming(active ? 1 : 0, { ...turnMotion, duration: 180 });
+  }, [active, reduce, weight]);
+  const ink = useAnimatedStyle(() => ({
+    color: interpolateColor(weight.value, [0, 1], [palette.ink3, palette.ink]),
+  }));
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityLabel={title}
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      onLayout={({ nativeEvent: { layout } }) => onMeasure({ x: layout.x, width: layout.width })}
+      style={({ pressed }) => [styles.title, { maxWidth, opacity: pressed ? 0.72 : 1 }]}
+    >
+      <Animated.Text numberOfLines={1} style={[styles.words, ink]}>
+        {title}
+      </Animated.Text>
+    </Pressable>
+  );
+}
+
+/** Both notebooks stay in place; a restrained dissolve changes whose
+ * notes are visible. Rapid reversals resume from the current opacity. */
+export function NotebookPage({
+  active,
+  onLayout,
+  children,
+}: {
+  active: boolean;
+  onLayout: (event: LayoutChangeEvent) => void;
+  children: ReactNode;
+}) {
+  const reduce = useReducedMotion();
+  const first = useRef(true);
+  const presence = useSharedValue(active ? 1 : 0);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    scheduleOnUI(
+      (chosen: boolean, still: boolean) => {
+        "worklet";
+        presence.value = still ? (chosen ? 1 : 0) : withTiming(chosen ? 1 : 0, turnMotion);
+      },
+      active,
+      reduce,
+    );
+  }, [active, reduce, presence]);
+  const turning = useAnimatedStyle(() => ({ opacity: presence.value }));
+  return (
+    <Animated.View
+      collapsable={false}
+      pointerEvents={active ? "auto" : "none"}
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
+      onLayout={onLayout}
+      style={[{ position: "absolute", top: 0, left: 0, right: 0, zIndex: active ? 1 : 0 }, turning]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/** A shorter notebook doesn't snap the rest of the scroll view upward. */
+export function NotebookPages({ height, children }: { height: number; children: ReactNode }) {
+  const reduce = useReducedMotion();
+  const room = useSharedValue(height);
+  const measured = useRef(height > 0);
+  useEffect(() => {
+    if (reduce || !measured.current) {
+      room.value = height;
+      if (height > 0) measured.current = true;
+    } else room.value = withTiming(height, turnMotion);
+  }, [height, reduce, room]);
+  const size = useAnimatedStyle(() => ({ height: room.value }));
+  return <Animated.View style={[{ overflow: "hidden" }, size]}>{children}</Animated.View>;
+}
+
+const styles = StyleSheet.create({
+  tabs: { flexDirection: "row", alignItems: "center", gap: 28, paddingBottom: 9 },
+  title: { minHeight: 44, justifyContent: "center" },
+  words: { fontSize: 22, fontWeight: "600", letterSpacing: -0.5 },
+  ink: { position: "absolute", bottom: 1, height: 2, borderRadius: 1 },
+});

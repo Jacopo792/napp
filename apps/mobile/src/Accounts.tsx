@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { router } from "expo-router";
 import { forgetAccount, otherAccounts } from "@/lib/session";
 import { useArchive, usePalette } from "./archive";
 import { Avatar } from "./Avatar";
@@ -33,7 +34,10 @@ export function Accounts() {
  *  saved on this phone is under it, one press away, and Add Account keeps the
  *  one in front among them. */
 export function useAccountCards() {
-  const { session, profile, addAccount, switchAccount, signOut } = useArchive();
+  const { session, profile, switchAccount, signOut } = useArchive();
+  const anonymous = !session.email;
+  const sheet = (mode: "save" | "sign-in") =>
+    router.push({ pathname: "/sign-in", params: { mode } });
   const palette = usePalette();
   const [, forgot] = useState(0);
   const saved = otherAccounts(session.userId);
@@ -94,8 +98,8 @@ export function useAccountCards() {
             size={32}
           />
         }
-        label={profile?.nickname || session.email}
-        note={profile?.nickname ? session.email : undefined}
+        label={profile?.nickname || session.email || "This Phone"}
+        note={anonymous ? "Not saved" : profile?.nickname ? session.email : undefined}
         accessibilityLabel={`${session.email}, current account`}
         trailing={
           <SymbolView name="checkmark" size={17} weight="semibold" tintColor={palette.ink} />
@@ -134,31 +138,41 @@ export function useAccountCards() {
           />
         );
       })}
+      {anonymous ? (
+        <Line
+          icon="person.badge.plus"
+          label="Save Your Notes"
+          disabled={busy}
+          onPress={() => sheet("save")}
+        />
+      ) : null}
       <Line
-        icon="person.badge.plus"
-        label="Add Account"
+        icon={anonymous ? "rectangle.portrait.and.arrow.right" : "person.badge.plus"}
+        label={anonymous ? "Sign In" : "Add Account"}
         disabled={busy}
-        onPress={() => void run(addAccount)}
+        onPress={() => sheet("sign-in")}
       />
     </Section>,
-    <Section key="out">
-      <Line
-        icon="rectangle.portrait.and.arrow.right"
-        label="Sign Out"
-        tone="danger"
-        disabled={busy}
-        onPress={() =>
-          choose("Sign out?", [
-            {
-              label: "Sign Out",
-              detail: session.email,
-              icon: "rectangle.portrait.and.arrow.right",
-              destructive: true,
-              run: () => void run(signOut),
-            },
-          ])
-        }
-      />
-    </Section>,
+    anonymous ? null : (
+      <Section key="out">
+        <Line
+          icon="rectangle.portrait.and.arrow.right"
+          label="Sign Out"
+          tone="danger"
+          disabled={busy}
+          onPress={() =>
+            choose("Remove local copies and sign out?", [
+              {
+                label: "Sign Out and Clear Local Copies",
+                detail: "Unsynced edits on this device will be deleted.",
+                icon: "rectangle.portrait.and.arrow.right",
+                destructive: true,
+                run: () => void run(signOut),
+              },
+            ])
+          }
+        />
+      </Section>
+    ),
   ];
 }

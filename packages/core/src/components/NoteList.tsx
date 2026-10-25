@@ -14,7 +14,10 @@ import { useDraggable } from "@dnd-kit/core";
 import {
   Archive,
   ArchiveRestore,
+  ArrowDownUp,
+  CalendarDays,
   ChevronRight,
+  Clock3,
   FileText,
   Folder as FolderGlyph,
   Image as ImageIcon,
@@ -30,6 +33,7 @@ import {
   SquarePen,
   Table2,
   Trash2,
+  Type,
   X,
 } from "@/components/icons";
 import type { Meta, NoteLock } from "@/lib/types";
@@ -49,7 +53,13 @@ import {
   isDrawingText,
 } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
-import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
+import {
+  readAdopting,
+  type ListPreferences,
+  type ListView,
+  type NoteGroup,
+  type SortCriterion,
+} from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import { playRows } from "@/lib/motion";
 import { useContextMenu } from "@/lib/contextMenu";
@@ -96,6 +106,8 @@ interface Props {
   groups?: NoteGroup[];
   view?: ListView;
   toolbarActions?: ReactNode;
+  /** The list's own order, drawn as the phone's chips under the search. */
+  sort?: { preferences: ListPreferences; onChange: (next: ListPreferences) => void };
   /** Before the title, at the strip's leading edge: the sidebar toggle. */
   leading?: ReactNode;
   /** The note's sheet, flown out of where the note is drawn in its row. */
@@ -220,6 +232,7 @@ const Row = memo(function Row({
   onContextMenu,
   onHold,
   resolveImage,
+  byCreated = false,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -246,7 +259,11 @@ const Row = memo(function Row({
   /** A still press — the note sheet. */
   onHold?: (entry: NoteEntry, origin: SheetOrigin) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
+  /** Sorted by creation, the row says when it was made, as the phone's does. */
+  byCreated?: boolean;
 }) {
+  const listRow = !mobile && !gallery;
+  const stamp = byCreated ? entry.note.createdAt : entry.note.updatedAt;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
     disabled: mobile || trashMode || archiveMode || !canWrite,
@@ -650,36 +667,40 @@ const Row = memo(function Row({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <p
-          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+        <div className={listRow ? "note-row-head" : undefined}>
+          <p
+            /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
-            entry.note.title ? "text-ink" : "text-ink-4 italic"
-          }`}
-          /* One line in the column, and that is the whole of why the list
+            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
+              entry.note.title ? "text-ink" : "text-ink-4 italic"
+            }`}
+            /* One line in the column, and that is the whole of why the list
              reads as a list. A title allowed three lines is three lines of one
              sentence, and the rows below it start wherever that sentence
              happened to end — so the column has no rhythm and you cannot see
              how many notes are under a heading without reading all of them.
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
-          style={{
-            fontWeight: gallery ? 520 : 650,
-            display: "-webkit-box",
-            WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
-          {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
-          {entry.note.title || "Untitled"}
-        </p>
+            style={{
+              fontWeight: gallery ? 520 : listRow ? 600 : 650,
+              display: "-webkit-box",
+              WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
+            {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
+            {entry.note.title || "Untitled"}
+          </p>
+          {/* The phone's anatomy: when, at the end of the title's line. */}
+          {listRow && <span className="note-row-stamp">{formatStamp(stamp)}</span>}
+        </div>
 
         <p className="note-row-summary mt-1 truncate">
-          <span>{formatStamp(entry.note.updatedAt)}</span>
+          {!listRow && <span>{formatStamp(stamp)}</span>}
           {/* What is left, where the list already says when. A checklist is
               the one kind of note whose state is the reason you open it. */}
           {checklist && (
@@ -888,6 +909,7 @@ export function NoteList({
   groups = [{ id: "notes", label: "Notes", entries }],
   view = "list",
   toolbarActions,
+  sort,
   leading,
   onInfo,
   topBar,
@@ -1234,6 +1256,7 @@ export function NoteList({
                 onContextMenu={openRowMenu}
                 onHold={holdEntry}
                 resolveImage={resolveImage}
+                byCreated={sort?.preferences.sortBy === "created"}
               />
             ))}
           </div>
@@ -1374,55 +1397,92 @@ export function NoteList({
             {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
           </p>
         </div>
-        {/* The compose control belongs beside the thing it adds to, not wedged
-            into the search field where it covered the text being typed. */}
         <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
           {toolbarActions}
-          {canWrite && !trashMode && (
-            <button
-              onClick={onNew}
-              disabled={busy || loading}
-              title="New note · N"
-              aria-label="New note"
-              className="toolbar-button press shrink-0"
-            >
-              <SquarePen size={18} />
-            </button>
-          )}
         </span>
       </header>
 
       {filterStrip}
 
-      {/* 32, the height of a Mac search field: a recess you type into, not a
-          slab the width of the column. */}
-      <div className="glass-search mx-3 mt-2 mb-1 flex h-8 shrink-0 items-center gap-2 px-2.5">
-        <Search size={14} className="shrink-0 text-ink-4" />
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              onQueryChange("");
-              e.currentTarget.blur();
-            }
-          }}
-          placeholder="Search"
-          aria-label="Search notes"
-          className="min-w-0 text-sm flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
-        />
-        {hasQuery && (
+      {/* The phone's bar under the strip: a search pill, and the one act that
+          adds to the list as a round button beside it. */}
+      <div className="list-search-row">
+        <div className="list-search-pill">
+          <Search size={16} className="shrink-0 text-ink-4" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                onQueryChange("");
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder="Search"
+            aria-label="Search notes"
+            className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
+          />
+          {hasQuery && (
+            <button
+              title="Clear search"
+              onClick={() => onQueryChange("")}
+              className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+        {canWrite && !trashMode && (
           <button
-            title="Clear search"
-            onClick={() => onQueryChange("")}
-            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+            onClick={onNew}
+            disabled={busy || loading}
+            title="New note · N"
+            aria-label="New note"
+            className="list-round-button press"
           >
-            <X size={12} />
+            <SquarePen size={18} />
           </button>
         )}
       </div>
+
+      {sort && (
+        <div className="list-sort-chips" role="group" aria-label="Sort notes">
+          {(
+            [
+              ["updated", "Edited", <Clock3 size={14} key="updated" />],
+              ["created", "Created", <CalendarDays size={14} key="created" />],
+              ["title", "Title", <Type size={14} key="title" />],
+            ] as [SortCriterion, string, ReactNode][]
+          ).map(([id, label, icon]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={sort.preferences.sortBy === id}
+              className="list-sort-chip press"
+              onClick={() => sort.onChange({ ...sort.preferences, sortBy: id })}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={sort.preferences.direction === "asc"}
+            className="list-sort-chip press"
+            onClick={() =>
+              sort.onChange({
+                ...sort.preferences,
+                direction: sort.preferences.direction === "asc" ? "desc" : "asc",
+              })
+            }
+          >
+            <ArrowDownUp size={14} />
+            Reverse
+          </button>
+        </div>
+      )}
 
       <div
         key={`${folderLabel}:${query.trim()}`}

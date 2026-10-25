@@ -76,7 +76,7 @@ export function useCreateNote(folderId: string | null = null, owner?: string) {
           { id, folderId },
         );
         refresh();
-        router.push({ pathname: "/note/[id]", params: { id: entry.note.id } });
+        router.push({ pathname: "/note/[id]", params: { id: entry.note.id, fresh: "1" } });
       }).finally(() => setCreating(false));
     },
   };

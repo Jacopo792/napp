@@ -17,6 +17,7 @@ if (PREVIEW && process.env.NODE_ENV === "production") {
 }
 assertEditorMode(readFileSync(path.join(__dirname, "editor/dist/index.html"), "utf8"), PREVIEW);
 const MOCKED = [
+  "supabaseClient",
   "supabase",
   "session",
   "sync",
@@ -34,6 +35,12 @@ config.watchFolders = [root];
    asset and is read as text by the note screen. */
 config.resolver.assetExts.push("html");
 config.resolver.resolveRequest = (context, name, platform) => {
+  if (PREVIEW && name === "./supabaseClient" && context.originModulePath.startsWith(core))
+    return context.resolveRequest(
+      context,
+      path.join(root, "preview/supabaseClient.mock.ts"),
+      platform,
+    );
   if (name.startsWith("@/")) {
     const inside = name.slice(2);
     const lib = inside.startsWith("lib/") && inside.slice(4);

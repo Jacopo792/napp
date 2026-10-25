@@ -3,10 +3,17 @@
    so importing it here put all of ProseMirror in the chunk the sign-in page
    loads before you can type a password. This module is the login screen's
    entire back end and must stay editor-free. */
-import { supabase } from "./supabaseClient";
+import { createEphemeralClient, supabase } from "./supabaseClient";
+import { acceptPolicies } from "./policyAcceptance";
 import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
-import { restoreArchiveSession, SESSION_KEY, type AppSession } from "./sessionRestore";
+import {
+  restoreArchiveSession,
+  SESSION_KEY,
+  SIGNED_IN_BEFORE_KEY,
+  type AppSession,
+} from "./sessionRestore";
+import { POLICY_VERSION } from "./storePolicies";
 export type { AppSession } from "./sessionRestore";
 
 /* The encrypted format is gone. Every note, folder, tag and archive setting is
@@ -63,6 +70,7 @@ async function ensureProfile(userId: string, email: string): Promise<void> {
 function storeSession(userId: string, email: string, archiveId: string): AppSession {
   const stored: StoredSession = { userId, email, archiveId };
   localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+  if (email) localStorage.setItem(SIGNED_IN_BEFORE_KEY, "1");
   resetArchiveCache();
   return stored;
 }
@@ -119,6 +127,8 @@ async function openAccount(
   }
 
   await ensureProfile(userId, email);
+  const { restoreAccountContent } = await import("./accountContent");
+  restoreAccountContent(userId);
   const archives = await loadArchiveOptions(userId, selection);
   if (archives.length === 0 && !selection.notesOnly) throw new Error("Could not open this account");
 
@@ -140,6 +150,9 @@ export async function authenticate(
   selection: ArchiveSelection = {},
 ): Promise<AuthenticationResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error?.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
+  if (error && (!error.status || error.status >= 500))
+    throw new Error("Could not reach the sign-in service. Check your connection and try again.");
   if (error || !data.user) throw new Error("Email or password is incorrect");
   try {
     return await openAccount(data.user.id, data.user.email ?? email, inviteToken, selection);
@@ -173,13 +186,63 @@ export async function chooseArchive(
   return storeSession(account.userId, account.email, archiveId);
 }
 
+/** The phone opens on the notes: with nobody signed in, it is given an
+ *  account with no address. The user id is the one it keeps for ever —
+ *  saving the notes later links an address to it (`linkAccount`). */
+export async function startAnonymous(
+  selection: ArchiveSelection = {},
+): Promise<AuthenticationResult> {
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error || !data.user) throw new Error("Couldn't reach the server. Try again");
+  return openAccount(data.user.id, "", undefined, selection);
+}
+
+/** Saving an anonymous account is a link, never a new account: the address
+ *  and password are given to the same user, so every row it owns stays put.
+ *  Email confirmation is off, so the address is the account's at once. */
+export async function linkAccount(
+  session: AppSession,
+  email: string,
+  password: string,
+  acceptedPolicies: boolean,
+): Promise<AppSession> {
+  if (!acceptedPolicies)
+    throw new Error("Accept the Terms of Use and read the Privacy Policy first");
+  const { data, error } = await supabase.auth.updateUser({ email, password });
+  if (error) throw new Error(error.message);
+  if (data.user?.id !== session.userId || !data.user.email)
+    throw new Error("Could not save this account");
+  await acceptPolicies(session.userId);
+  await supabase
+    .from("profiles")
+    .update({ nickname: defaultNickname(data.user.email) })
+    .eq("user_id", session.userId)
+    .eq("nickname", "");
+  const next = { ...session, email: data.user.email };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  localStorage.setItem(SIGNED_IN_BEFORE_KEY, "1");
+  return next;
+}
+
+/** Whether an address and password open an account, asked on a client of
+ *  its own: the account in front is left alone until they do. */
+export async function checkCredentials(email: string, password: string): Promise<void> {
+  const client = createEphemeralClient();
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw new Error("Email or password is incorrect");
+  await client.auth.signOut({ scope: "local" });
+}
+
 /** Registration deliberately gives the same completion message for a new or
  * existing address. With confirmations enabled Supabase also returns an
  * indistinguishable response, so the page does not become an account lookup. */
 export async function registerAccount(
   email: string,
   password: string,
+  acceptedPolicies = false,
 ): Promise<RegistrationResult> {
+  if (!acceptedPolicies)
+    throw new Error("Accept the Terms of Use and read the Privacy Policy first");
   const redirect = new URL(platform().webOrigin());
   const inviteToken = platform().inviteToken();
   if (inviteToken) redirect.searchParams.set("invite", inviteToken);
@@ -187,7 +250,14 @@ export async function registerAccount(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo },
+    options: {
+      emailRedirectTo,
+      data: {
+        napp_terms_version: POLICY_VERSION,
+        napp_privacy_version: POLICY_VERSION,
+        napp_policies_accepted_at: new Date().toISOString(),
+      },
+    },
   });
   if (error) throw new Error(error.message);
 
@@ -201,7 +271,10 @@ export async function registerAccount(
 }
 
 export async function restoreSession(): Promise<AppSession | null> {
-  return restoreArchiveSession(localStorage, supabase.auth);
+  const restored = await restoreArchiveSession(localStorage, supabase.auth);
+  // Accounts opened before the marker existed get it on their next launch.
+  if (restored?.email) localStorage.setItem(SIGNED_IN_BEFORE_KEY, "1");
+  return restored;
 }
 
 /* Other accounts on this device, kept so switching is a click instead of a
@@ -289,7 +362,7 @@ export async function notesArchives(account: {
   if (data.user?.id === account.userId)
     return loadArchiveOptions(account.userId, { notesOnly: true });
   if (error && !refusedToken(error)) throw new Error("Couldn't reach the server. Try again");
-  localStorage.removeItem(SESSION_KEY);
+  if (currentAppSession()?.userId === account.userId) localStorage.removeItem(SESSION_KEY);
   forgetAccount(account.userId);
   throw new SignInAgain(account.email);
 }
@@ -393,7 +466,7 @@ export async function resumeAccount(
  *  connection is not a verdict on the token, and forgetting the account over
  *  one made the next switch ask for a password it never needed. */
 function refusedToken(error: { status?: number }): boolean {
-  return typeof error.status === "number" && error.status >= 400 && error.status < 500;
+  return error.status === 400 || error.status === 401 || error.status === 403;
 }
 
 export async function switchAccount(userId: string): Promise<void> {
@@ -417,8 +490,12 @@ export async function switchAccount(userId: string): Promise<void> {
   window.location.reload();
 }
 
-export async function clearSession(): Promise<void> {
+export async function clearSession(options: { removeLocalContent?: boolean } = {}): Promise<void> {
   const leaving = currentAppSession();
+  if (options.removeLocalContent && leaving) {
+    const { removeAccountContent } = await import("./accountContent");
+    await removeAccountContent(leaving.userId);
+  }
   if (leaving) saveAccounts(savedAccounts().filter((a) => a.userId !== leaving.userId));
   localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();

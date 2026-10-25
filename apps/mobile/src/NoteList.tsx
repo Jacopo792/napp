@@ -1,3 +1,4 @@
+import { NotePicture } from "./NotePicture";
 import { randomUUID } from "expo-crypto";
 import { useToolbarIcon } from "./icons";
 /* One scope's notes, grouped by date — Pinned, Today, Previous 7 Days — each
@@ -349,6 +350,7 @@ export function NoteList({
                 >
                   <View style={styles.text}>
                     <View style={styles.titleLine}>
+                      <NotePicture note={item.note} size={22} />
                       <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
                         {item.note.title || "Untitled"}
                       </Text>

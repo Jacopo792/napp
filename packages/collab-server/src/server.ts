@@ -41,6 +41,8 @@ export interface CollaborationConfig {
   serviceRoleKey: string;
   allowedOrigins: string[];
   port: number;
+  /** The exact source revision running here; absent for ordinary local dev. */
+  revision?: string | null;
   /** How long a burst of keystrokes is gathered before it becomes one save. */
   debounce?: number;
   /** How long an authorisation answer is trusted before the archive is asked
@@ -368,6 +370,9 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        a database that is briefly away. */
     async onRequest({ request, response }) {
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (url.pathname === "/version") {
+        return respond(response, 200, { revision: config.revision ?? null });
+      }
       if (url.pathname === "/import-image") {
         const origin = request.headers.origin;
         if (!originAllowed(origin, config.allowedOrigins))

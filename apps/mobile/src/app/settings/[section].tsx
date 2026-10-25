@@ -1,9 +1,9 @@
 import { Accounts } from "../../Accounts";
 import { useTextPrompt } from "../../TextPrompt";
 import { useEffect, useState } from "react";
-import { Alert, Image, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Share, StyleSheet, Text, View } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import { APPEARANCE_PRESETS } from "@/lib/appearance";
+import { PHONE_PALETTES, phonePaletteOf, phoneSide, type PhonePaletteId } from "@/lib/appearance";
 import { createSpace, renameSpace } from "@/lib/spaces";
 import {
   createArchiveInvite,
@@ -89,43 +89,38 @@ export default function Section() {
       } as Record<string, string>
     )[section] ?? "Settings";
 
+  /* Sharing needs an address: an account with none is asked to save first. */
   const invite = () =>
-    prompt(
-      "Invite Someone",
-      "Email",
-      (email) => {
-        if (email?.trim())
-          void run(async () => {
-            const token = await createArchiveInvite(session, email.trim());
-            const link = new URL(platform().webOrigin());
-            link.searchParams.set("invite", token);
-            setInvites(await loadPendingInvites(session));
-            await Share.share({ message: link.toString() });
-          });
-      },
-      "plain-text",
-      "",
-      "email-address",
+    !session.email
+      ? router.push({ pathname: "/sign-in", params: { mode: "save" } })
+      : prompt(
+          "Invite Someone",
+          "Email",
+          (email) => {
+            if (email?.trim())
+              void run(async () => {
+                const token = await createArchiveInvite(session, email.trim());
+                const link = new URL(platform().webOrigin());
+                link.searchParams.set("invite", token);
+                setInvites(await loadPendingInvites(session));
+                await Share.share({ message: link.toString() });
+              });
+          },
+          "plain-text",
+          "",
+          "email-address",
+        );
+  /* The phone's five: the stored colours are the side being worn, so a
+     change of either the theme or the palette writes that side's three. */
+  const paletteId = phonePaletteOf(p.appearance);
+  const wear = (id: PhonePaletteId, theme: "system" | "dark" | "light") => {
+    const { background, foreground, accent } = phoneSide(
+      id,
+      theme === "dark" || (theme === "system" && palette.dark),
     );
-  const theme = (theme: "system" | "dark" | "light") => {
-    const base = APPEARANCE_PRESETS.find(
-      (preset) => preset.id === (theme === "light" ? "paper" : "graphite"),
-    )!;
-    update({
-      appearance: {
-        ...p.appearance,
-        accent: p.appearance.accent,
-        background: base.background,
-        foreground: base.foreground,
-        theme,
-      },
-    });
+    update({ appearance: { ...p.appearance, theme, background, foreground, accent } });
   };
-  const palettePreset = APPEARANCE_PRESETS.find(
-    (preset) =>
-      preset.background === p.appearance.background &&
-      preset.foreground === p.appearance.foreground,
-  );
+  const theme = (theme: "system" | "dark" | "light") => wear(paletteId, theme);
 
   /* The profile is the account page now; search still asks for it by name. */
   if (section === "profile") return <Account />;
@@ -234,7 +229,7 @@ export default function Section() {
                   <Avatar
                     face={{
                       userId: member.userId,
-                      name: member.nickname || "Member",
+                      name: member.nickname,
                       avatarObject: member.avatarObject,
                     }}
                     email={member.isSelf ? session.email : undefined}
@@ -299,18 +294,7 @@ export default function Section() {
                 />
               </Part>
               <Part title="Palette">
-                <PaletteChoices
-                  value={palettePreset?.id}
-                  onChange={(id) => {
-                    const preset = APPEARANCE_PRESETS.find((candidate) => candidate.id === id)!;
-                    setAppearance({
-                      theme: preset.theme,
-                      accent: preset.accent,
-                      background: preset.background,
-                      foreground: preset.foreground,
-                    });
-                  }}
-                />
+                <PaletteChoices value={paletteId} onChange={(id) => wear(id, p.appearance.theme)} />
               </Part>
               <Part>
                 <ZoomLink
@@ -491,25 +475,28 @@ function AppearancePreview() {
   );
 }
 
-function PaletteChoices({ value, onChange }: { value?: string; onChange: (id: string) => void }) {
+function PaletteChoices({
+  value,
+  onChange,
+}: {
+  value: PhonePaletteId;
+  onChange: (id: PhonePaletteId) => void;
+}) {
   const palette = usePalette();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 6, paddingHorizontal: 10, paddingVertical: 10 }}
-    >
-      {APPEARANCE_PRESETS.map((preset) => {
-        const selected = value === preset.id;
+    /* Five fit the card's width, so they stand in one row rather than scroll. */
+    <View style={{ flexDirection: "row", gap: 4, paddingHorizontal: 8, paddingVertical: 10 }}>
+      {PHONE_PALETTES.map((choice) => {
+        const selected = value === choice.id;
         return (
           <Press
-            key={preset.id}
+            key={choice.id}
             feedback="scale"
             accessibilityRole="radio"
-            accessibilityLabel={preset.name}
+            accessibilityLabel={choice.name}
             accessibilityState={{ checked: selected }}
-            onPress={() => onChange(preset.id)}
-            style={{ alignItems: "center", gap: 8, width: 84 }}
+            onPress={() => onChange(choice.id)}
+            style={{ flex: 1, alignItems: "center", gap: 8 }}
           >
             <View
               style={{
@@ -518,43 +505,56 @@ function PaletteChoices({ value, onChange }: { value?: string; onChange: (id: st
                 borderCurve: "continuous",
                 borderWidth: 2.5,
                 borderColor: selected ? palette.accent : "transparent",
+                alignSelf: "stretch",
               }}
             >
+              {/* Its light side over its dark side: the Theme above says which is worn. */}
               <View
                 style={{
-                  width: 70,
                   height: 82,
                   borderRadius: 14,
                   borderCurve: "continuous",
-                  backgroundColor: preset.background,
+                  overflow: "hidden",
                   borderWidth: 1,
                   borderColor: palette.dark ? "#ffffff1a" : "#00000014",
-                  padding: 10,
-                  justifyContent: "space-between",
                 }}
               >
-                <Text style={{ fontSize: 22, fontWeight: "700", color: preset.foreground }}>
-                  Aa
-                </Text>
-                <View
-                  style={{ height: 6, width: 30, borderRadius: 3, backgroundColor: preset.accent }}
-                />
+                {[choice.light, choice.dark].map((side, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      flex: 1,
+                      backgroundColor: side.background,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: side.foreground }}>
+                      Aa
+                    </Text>
+                    <View
+                      style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: side.accent }}
+                    />
+                  </View>
+                ))}
               </View>
             </View>
             <Text
               style={{
                 color: selected ? palette.ink : palette.ink3,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: selected ? "600" : "500",
               }}
               numberOfLines={1}
             >
-              {preset.name}
+              {choice.name}
             </Text>
           </Press>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 

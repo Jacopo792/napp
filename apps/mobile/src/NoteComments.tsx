@@ -47,6 +47,7 @@ import {
   type NoteComment,
   type Reaction,
 } from "@/lib/commentThreads";
+import { REPORT_REASONS, reportSafetyIssue } from "@/lib/storeSafety";
 import { fold, formatStamp } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
 import { subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
@@ -191,7 +192,13 @@ export function NoteComments({
   /** The thread to open on, when the reader came from its passage. */
   thread?: string | null;
 }) {
-  const { session, snapshot, preferences, updatePreferences } = useArchive();
+  const {
+    session,
+    snapshot,
+    preferences,
+    updatePreferences,
+    refresh: refreshArchive,
+  } = useArchive();
   const latestPreferences = useRef(preferences);
   latestPreferences.current = preferences;
   const palette = usePalette();
@@ -785,6 +792,29 @@ export function NoteComments({
               )
             }
             onDelete={() => removeOne(held.comment, held.thread)}
+            onReport={() =>
+              choose(
+                "Report comment",
+                REPORT_REASONS.map((reason) => ({
+                  label: reason.label,
+                  run: () =>
+                    void attempt(async () => {
+                      await reportSafetyIssue({
+                        reason: reason.value,
+                        noteId,
+                        commentId: held.comment.id,
+                      });
+                      known.delete(noteId);
+                      onClose();
+                      refreshArchive();
+                      Alert.alert(
+                        "Report submitted",
+                        "The developer can review the reported content. The note is hidden from you while the report is pending.",
+                      );
+                    }),
+                })),
+              )
+            }
           />
         ) : null}
       </View>
@@ -1008,6 +1038,7 @@ function HeldMenu({
   onReply,
   onEdit,
   onDelete,
+  onReport,
 }: {
   held: Held;
   mine: boolean;
@@ -1021,6 +1052,7 @@ function HeldMenu({
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onReport: () => void;
 }) {
   const inset = useSafeAreaInsets();
   const [frame, setFrame] = useState<{ height: number; stack: number } | null>(null);
@@ -1047,6 +1079,7 @@ function HeldMenu({
     run: () => void;
     danger?: boolean;
   }[] = [
+    ...(!mine ? [{ label: "Report comment", icon: "flag" as const, run: onReport }] : []),
     ...(canEdit && open
       ? [{ label: "Reply", icon: "arrowshape.turn.up.left" as const, run: onReply }]
       : []),

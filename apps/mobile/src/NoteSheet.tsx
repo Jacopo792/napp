@@ -16,11 +16,13 @@ export function NoteSheet({
   onClose,
   children,
   footer,
+  busy = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  busy?: boolean;
 }) {
   const palette = usePalette();
   const inset = useSafeAreaInsets();
@@ -29,7 +31,9 @@ export function NoteSheet({
       animationType="slide"
       presentationStyle="pageSheet"
       backdropColor={palette.page}
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        if (!busy) onClose();
+      }}
     >
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: palette.page }}
@@ -51,7 +55,13 @@ export function NoteSheet({
           >
             {title}
           </Text>
-          <Pressable accessibilityRole="button" hitSlop={12} onPress={onClose}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={onClose}
+            disabled={busy}
+            style={{ opacity: busy ? 0.4 : 1 }}
+          >
             <Text style={{ color: palette.accent, fontSize: 17 }}>Done</Text>
           </Pressable>
         </View>

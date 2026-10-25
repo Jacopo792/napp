@@ -1,3 +1,4 @@
+import { NotePicture } from "../../NotePicture";
 /* Home, as Jacopo set it out (18 October 2026): a notes app's front page in
  * the shapes of Revolut and Shop, never a bank's. Under the bar — the face,
  * the search, the + that makes things — whose notes these are, compact; then
@@ -9,8 +10,15 @@
  * A folder card swipes as a note row does, with its own pair: right to remove
  * the folder (its notes stay, unfiled), left to file everything in it away.
  * Its ⋯ and a long press offer the rest. */
-import { memo, useCallback, useRef, useState } from "react";
-import Animated from "react-native-reanimated";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link } from "expo-router";
@@ -24,13 +32,13 @@ import type { Folder } from "@/lib/types";
 import { useChoice, useTextPrompt } from "../../TextPrompt";
 import { useArchive, usePalette } from "../../archive";
 import { Faces } from "../../Avatar";
-import { Group, Row, quiet } from "../../Grouped";
+import { Group, Press, Row, quiet } from "../../Grouped";
 import { SwipeRow } from "../../SwipeRow";
 import { NoteLink } from "../../NoteLink";
 import { ZoomLink } from "../../SettingsControls";
 import { shelfGround, trashGround } from "../../theme";
 import { useCreateNote } from "../../useCreateNote";
-import { WhoseSwitch } from "../../WhoseSwitch";
+import { NotebookPage, NotebookPages, WhoseSwitch } from "../../WhoseSwitch";
 import { SymbolView } from "../../icons";
 import {
   BAR,
@@ -82,7 +90,9 @@ export default function Home() {
   const whose = members.map((member) => ({
     face: {
       userId: member.userId,
-      name: nameOf(member),
+      /* Your own face is the one the bar draws: your name's letter, or the
+         silhouette while you have none — never the "Y" of "You". */
+      name: member.isSelf ? member.nickname : nameOf(member),
       avatarObject: member.avatarObject,
       online: !member.isSelf && present.has(member.userId),
     },
@@ -91,7 +101,12 @@ export default function Home() {
     title: member.isSelf ? "Your Notes" : `${nameOf(member)}’s Notes`,
   }));
   const owner = shown?.userId ?? session.userId;
-  const pick = (userId: string) => setShowing(userId);
+  const pick = (userId: string) => {
+    const next = members.findIndex((member) => member.userId === userId);
+    const previous = members.findIndex((member) => member.userId === owner);
+    if (next < 0 || next === previous) return;
+    setShowing(userId);
+  };
   const { create, creating, importMarkdown } = useCreateNote(null, owner);
 
   const newFolder = (parentId: string | null = null) =>
@@ -152,30 +167,28 @@ export default function Home() {
           <SkeletonCard rows={3} />
         </>
       ) : (
-        <Animated.View entering={arrival} style={{ height: heights[owner] ?? 0 }}>
-          {members.map((member) => {
-            const visible = member.userId === owner;
-            return (
-              <View
-                key={member.userId}
-                collapsable={false}
-                pointerEvents={visible ? "auto" : "none"}
-                accessibilityElementsHidden={!visible}
-                importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
-                style={[styles.memberPage, { opacity: visible ? 1 : 0 }]}
-                onLayout={(event) => {
-                  const height = event.nativeEvent.layout.height;
-                  setHeights((previous) =>
-                    previous[member.userId] === height
-                      ? previous
-                      : { ...previous, [member.userId]: height },
-                  );
-                }}
-              >
-                <MemberContent owner={member.userId} />
-              </View>
-            );
-          })}
+        <Animated.View entering={arrival}>
+          <NotebookPages height={heights[owner] ?? 0}>
+            {members.map((member) => {
+              const visible = member.userId === owner;
+              return (
+                <NotebookPage
+                  key={member.userId}
+                  active={visible}
+                  onLayout={(event) => {
+                    const height = event.nativeEvent.layout.height;
+                    setHeights((previous) =>
+                      previous[member.userId] === height
+                        ? previous
+                        : { ...previous, [member.userId]: height },
+                    );
+                  }}
+                >
+                  <MemberContent owner={member.userId} />
+                </NotebookPage>
+              );
+            })}
+          </NotebookPages>
         </Animated.View>
       )}
     </TabPage>
@@ -193,6 +206,7 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
   const { session, snapshot, metaOf, act, facesOf } = useArchive();
   const palette = usePalette();
   const editor = snapshot?.members.find((member) => member.isSelf)?.role === "editor";
+  const { create } = useCreateNote(null, owner);
   /* One card open at a time across the whole screen. */
   const closers = useRef(new Map<string, () => void>());
   const register = useCallback((id: string, close: () => void) => {
@@ -248,6 +262,32 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
       .filter(Boolean)
       .join(" · ");
 
+  /* Nothing written yet: the first line, waiting. Your page only — a
+     partner's empty page is simply empty. */
+  if (!theirs.length)
+    return owner === session.userId && editor ? (
+      <View style={styles.continue}>
+        <Press
+          feedback="scale"
+          accessibilityRole="button"
+          accessibilityLabel="Write something"
+          onPress={create}
+        >
+          <Card style={[styles.continueCard, styles.emptyCard]}>
+            <Text style={[styles.label, { color: palette.ink3 }]}>Continue Writing</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={[styles.continueTitle, { color: palette.ink4 }]}>Write something</Text>
+              <Caret />
+            </View>
+            <View style={[styles.foot, { marginTop: "auto" }]}>
+              <View style={{ flex: 1 }} />
+              <Arrow accent />
+            </View>
+          </Card>
+        </Press>
+      </View>
+    ) : null;
+
   return (
     <View>
       {latest ? (
@@ -255,9 +295,15 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
           <NoteLink entry={latest} feedback="scale">
             <Card style={styles.continueCard}>
               <Text style={[styles.label, { color: palette.ink3 }]}>Continue Writing</Text>
-              <Text style={[styles.continueTitle, { color: palette.ink }]} numberOfLines={2}>
-                {latest.note.title || "Untitled"}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <NotePicture note={latest.note} size={40} />
+                <Text
+                  style={[styles.continueTitle, { color: palette.ink, flex: 1 }]}
+                  numberOfLines={2}
+                >
+                  {latest.note.title || "Untitled"}
+                </Text>
+              </View>
               <Text style={[styles.continueText, { color: palette.ink2 }]} numberOfLines={3}>
                 {derivedOf(latest.note).preview || "No additional text"}
               </Text>
@@ -283,12 +329,15 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
             {pinned.map((entry) => (
               <NoteLink key={entry.note.id} entry={entry} feedback="scale" style={{ width: 168 }}>
                 <Card radius={20} style={styles.pin}>
-                  <Text
-                    style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}
-                    numberOfLines={2}
-                  >
-                    {entry.note.title || "Untitled"}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <NotePicture note={entry.note} size={24} />
+                    <Text
+                      style={{ flex: 1, color: palette.ink, fontSize: 15, fontWeight: "600" }}
+                      numberOfLines={2}
+                    >
+                      {entry.note.title || "Untitled"}
+                    </Text>
+                  </View>
                   <Text
                     style={{ color: palette.ink3, fontSize: 13, lineHeight: 17 }}
                     numberOfLines={2}
@@ -421,6 +470,7 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
                     >
                       {inside.slice(0, 3).map((entry) => (
                         <NoteLink key={entry.note.id} entry={entry} style={styles.insideRow}>
+                          <NotePicture note={entry.note} size={24} />
                           <Text
                             style={{
                               flex: 1,
@@ -481,20 +531,53 @@ const MemberContent = memo(function MemberContent({ owner }: { owner: string }) 
 });
 
 /** Shop's round arrow at the foot of a card: this goes somewhere. */
-function Arrow() {
+function Arrow({ accent = false }: { accent?: boolean }) {
   const palette = usePalette();
   return (
-    <View style={[styles.arrow, { backgroundColor: quiet(palette) }]}>
-      <SymbolView name="arrow.right" size={15} weight="bold" tintColor={palette.ink} />
+    <View style={[styles.arrow, { backgroundColor: accent ? palette.accent : quiet(palette) }]}>
+      <SymbolView
+        name="arrow.right"
+        size={15}
+        weight="bold"
+        tintColor={accent ? palette.onAccent : palette.ink}
+      />
     </View>
   );
 }
 
+/** A text field's caret, blinking on the UI thread; still under reduced motion. */
+function Caret() {
+  const palette = usePalette();
+  const still = useReducedMotion();
+  const shown = useSharedValue(1);
+  useEffect(() => {
+    if (still) return;
+    shown.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 530 }),
+        withTiming(0, { duration: 0 }),
+        withTiming(0, { duration: 530 }),
+        withTiming(1, { duration: 0 }),
+      ),
+      -1,
+    );
+  }, [still, shown]);
+  const blink = useAnimatedStyle(() => ({ opacity: shown.value }));
+  return (
+    <Animated.View
+      style={[
+        { width: 2, height: 28, marginLeft: 2, borderRadius: 1, backgroundColor: palette.accent },
+        blink,
+      ]}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
-  memberPage: { position: "absolute", top: 0, left: 0, right: 0 },
-  whoseRow: { marginHorizontal: 16, marginTop: 2, marginBottom: 22 },
+  whoseRow: { marginHorizontal: 16, marginTop: 2, marginBottom: 14 },
   continue: { marginHorizontal: 16, marginBottom: 16 },
   continueCard: { padding: 18, gap: 6 },
+  emptyCard: { minHeight: 196 },
   label: { fontSize: 13, fontWeight: "600" },
   continueTitle: { fontSize: 24, fontWeight: "700", letterSpacing: -0.6, lineHeight: 29 },
   continueText: { fontSize: 15, lineHeight: 21 },

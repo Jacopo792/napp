@@ -49,6 +49,8 @@ async function pick(square: boolean): Promise<File | null> {
 
 /** A picture from the photo library, scaled to what a note needs. */
 export const pickPhoto = () => pick(false);
+/** A note’s identifying picture uses the same square crop as a profile. */
+export const pickSquarePhoto = () => pick(true);
 
 /** Three choices, asked the way each system asks. */
 function ask(title: string, options: { label: string; destructive?: boolean; run: () => void }[]) {
@@ -122,7 +124,7 @@ export function ProfileHero() {
         ])
       : choose();
 
-  const name = profile?.nickname || session.email.split("@")[0];
+  const name = profile?.nickname || session.email.split("@")[0] || "Notes on this phone";
   /* What only a notes app can say about you: how much you have written. */
   const mine = (snapshot?.entries ?? []).filter(
     (entry) => (entry.note.ownerId ?? session.userId) === session.userId,

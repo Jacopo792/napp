@@ -989,9 +989,8 @@ opacity, hit testing and accessibility visibility, while the outer scroll
 container takes the selected page's measured height. Do not use `Activity`
 here: it disconnects/reconnects effects on each switch; that version made
 switching worse on the physical iPhone. Do not use `display:none` or remount
-cards/replay staggered entrances when changing member. `WhoseSwitch` moves its plate on the UI thread in 220 ms;
-the press and the selected prop share one target, so neither restarts the
-other's spring. Do not synchronously read shared values on the JS thread in
+cards/replay staggered entrances when changing member. `WhoseSwitch`'s cross-fade is a
+layout animation, on the UI thread. Do not synchronously read shared values on the JS thread in
 this path. The preview has populated catalogues for both members, including
 long notes; an empty partner page cannot validate switching performance.
 
@@ -1027,8 +1026,8 @@ face's space so arrivals do not shift the preview. When the group already
 says the row's date ("Yesterday"), the row omits it; Created sorting reads the
 creation stamp, Edited reads the update stamp.
 
-**Depth is the reader's picture, never a wash.** The phone darkens the page
-most of the way to black and draws cards solid on it; a wallpaper chosen in
+**Depth is the reader's picture, never a wash.** The page is the palette's
+ground and the cards its card colour, both named in `PHONE_PALETTES`; a wallpaper chosen in
 Appearance is drawn sharp at the top of a tab page and fades into that
 ground, Revolut's way, and the cards there are the system's frosted glass
 (`expo-glass-effect`) scrolling over it. No picture, or a system without the
@@ -1095,25 +1094,36 @@ opens out of its row with the system zoom (`ZoomLink`), as the profile does.
 
 **Home is a notes app's front page, never a bank's** (Jacopo, 18 October
 2026: a big "10 notes" over a row of round labelled acts read as a balance).
-Under the bar, whose notes these are: a segmented capsule on the content's
-16-point grid, one segment a member — face and first name, "You" for the
-reader — with a thumb whose two edges ride two critically damped springs, the
-leading edge quicker, so it stretches toward where it is going and gathers
-as it lands, never overshooting; labels cross from quiet to full ink as it
-arrives (`WhoseSwitch`); past three members it scrolls sideways. Two faces
-overlapping in a pill read as an accident, and a stacked action sheet, a
-popover and a double press were all refused before it. The page under it is
-not remounted, and it does not wait for the old page to leave: the new one is
-drawn at once and comes in 24 pt from the side being gone to on the same
-spring, each block a beat behind the one above (`Turning`, one driver). The
-old page used to play out first, which was 150 ms of a blank column before the
-new one was even rendered, and read as lag. The thumb moves from the press
-itself, not from the render the press causes. Then **Continue
+Under the bar is an inline notebook index (`WhoseSwitch`, Jacopo, 24 October
+2026): “Your Notes” and the other members' notebook titles, in 22-point
+semibold on the content's 16-point grid. The toolbar holds the only profile
+photo. A 2-point accent line glides to the chosen notebook as one piece over
+260 ms, without stretching or springs. Titles stay at a fixed size and trade
+ink over 180 ms; touch feedback only changes opacity. The index scrolls
+horizontally for more members and brings the chosen title into view.
+`NotebookPage` keeps every member's page mounted and spatially still,
+dissolving between notebooks over 260 ms. Interrupted opacity is captured on
+the UI thread. `NotebookPages` adapts the scroll height on the same curve;
+inactive pages have no touches or accessibility focus. Reduce Motion changes
+the selection immediately. Jacopo explicitly rejected bouncing and scaling
+on this switch on 24 October 2026.
+Then **Continue
 Writing** — the latest note as one large card on the reader's picture — then
 **Pinned**, small cards scrolling sideways, then every folder as a Shop feed
 card (name, ⋯, its three latest notes, "N notes" and a round arrow), and the
 Archive and Recently Deleted in a small card at the foot. New Note, New
 Folder and Import Markdown are the bar's +; Archives is in Settings.
+**An empty page is the first line** (Jacopo, 24 October 2026). With no notes
+at all, your Home is the Continue Writing card alone, in its place and size:
+"Write something" in quiet ink, a caret blinking in the accent (still under
+reduced motion) and the round arrow in the accent. Pressed, it makes a note
+and opens it writing its title; nothing stands under it. A partner's empty
+page is empty. A note just made (`fresh` on the push) asks the page for
+`focusTitle` once the push has landed, and `HostedPage` makes the WebView the
+responder first — a focus the page gives itself raises no keyboard.
+**A face nobody has named is a silhouette**: `Avatar` draws `person.fill` in
+ink3 on the quiet fill wherever the letters would be "?", the anonymous
+Settings card included; a name set under Account gives it its letter and hue.
 **A book is not on the phone** — writing one is a desk's work. Archives of
 kind `document` are left out of the list, New Archive makes only notes, and a
 phone that opens on a book moves to the first notes archive.
@@ -1172,15 +1182,29 @@ defaults (17 pt, weight 400, leading 1.55). Reading, Icon Style and Folder Colou
 controls were removed at Jacopo's request on 17 October 2026; phone folders
 use the default colour and icons use one system-symbol style.
 
+**The phone has five themes, each light and dark** (Jacopo, 24 October
+2026): Paper, Graphite, Fjord, Rosewood, Pine — `PHONE_PALETTES` in
+`appearance.ts`, beside the computer's eighteen, which are untouched (Fjord
+and Rosewood there included). Theme (Automatic, Light, Dark) says which side
+is worn; `usePalette` resolves the side from the display, so Automatic turns
+with the phone. The stored shape did not change: the phone branch still holds
+the three colours of the side last worn, and `phonePaletteOf` reads either
+side of the five back to its palette and any older colours by the preset they
+were (`PHONE_PALETTE_FOR`) — a colour from no list is Graphite. There are no
+colour pickers on the phone.
+
 **Settings is in the order things are reached for** (Jacopo, 18 October
-2026, "you can't understand anything"): the profile card, then Archive
-(Archives, Members — "2 of 8"), This Phone (Appearance), Account (Accounts,
-Writing, Privacy). Accounts shows the current identity, saved accounts and Add
+2026, "you can't understand anything"): the profile card, This Phone
+(Appearance, Writing), then Archive in this exact order: Privacy, Members,
+Archives, Safety. Privacy uses the eye icon; Safety keeps the raised hand.
+Privacy opens from this main page rather than inside the account page
+(Jacopo, 24 October 2026). Accounts shows the current identity, saved accounts and Add
 Account, with Sign Out of This Account last and apart. Every index row leads with a tile
 and says what is set now; rows on the pages under it carry no tile. A page
 has one purpose and its destructive act last and apart. Appearance is the
-real rows in a live preview, then Theme, then Palette as named cards in one
-horizontal strip — choosing one is never a trip to another page — then
+real rows in a live preview, then Theme, then Palette as five named cards
+in one row, each its light side over its dark side — choosing one is never a
+trip to another page — then
 Wallpaper, a page that shows the picture itself; there is no blur choice.
 Privacy splits into what others can see and what I can see, every switch
 phrased so that on means shown. Revoking an invitation asks first.
@@ -1210,6 +1234,24 @@ account reads again, a refused token throws `SignInAgain` and the sign-in page
 opens on that address, a dropped connection is said. The profile's Accounts
 card lists the account in front, ticked, and every saved one with its last
 seen face; ⋯ or a long press removes one from the phone.
+
+**The phone opens on the notes, never on a form** (Jacopo, 24 October 2026).
+On a phone that has never held an account with an address — a first launch
+(`mayStartAnonymous` in `sessionRestore.ts`: no saved archive session, no saved
+account, nothing ever signed in) — `startAnonymous` signs in anonymously and the
+ordinary path follows: a personal archive, a profile,
+Home. RLS, the collaboration server and the archive code see an ordinary user
+id. An address is asked for only to share or to keep the notes past this
+phone, in the account sheet (`app/sign-in.tsx`). **Saving is a link, never a
+new account**: `linkAccount` is `updateUser({ email, password })` on the same
+user, immediate because confirmation is off, so no row moves. An anonymous
+session is `AppSession.email === ""`; `PolicyGate` lets it through, and the
+terms are accepted at the link. Signing into another account from it leaves
+its notes behind, and the sheet says so. Inviting asks for the address first.
+Signing out of a real account does **not** open an anonymous one: it opens
+the sign-in page, whose Not Now is the only way into an anonymous account, and
+a real session that fails to restore is asked for again, never replaced. Web and
+desktop are unchanged and still open on the sign-in page.
 
 The notes-only selection is enforced in `session.ts` for mobile authentication,
 archive choice, saved-account return and startup. It filters by `archives.kind`,
@@ -1899,6 +1941,17 @@ named — cut by `AvatarCropper` and shown wherever the note is named: in place 
 the document glyph in the list, and beside the title on the page. The **cover**
 is the band across the top of the page, set from the page, and either one of six
 curated gradients or an uploaded picture with a vertical focal point.
+
+On the phone, the note's ⋯ offers Add/Change Cover and Note Picture. Cover
+opens a native sheet with the same six presets, Photos and a continuous focal
+position control. The hosted page draws an inset 144-point band above its
+title, and a square note picture beside the title. Note pictures also appear
+in Home, pinned cards, folder rows, the note list and held-note previews.
+Photos uses the existing native square crop for note pictures. Both fields
+travel through the opening/update bridge, without remounting the editor or
+writing to its Y.Doc. `ArchiveProvider.updateArtwork` serializes optimistic
+patches, rolls back failures and waits before an account change. A photo-only
+write leaves a cover changed on another device intact, and vice versa.
 
 The photo lives in `notes.page_icon`, which held the retired emoji and symbol
 icons. The check in `20260831030000_note_photo.sql` was **widened** rather than

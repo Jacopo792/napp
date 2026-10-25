@@ -26,10 +26,14 @@ function accountFlow(
     emptyOnce?: boolean;
     /** The server no longer knows this session. */
     lost?: boolean;
+    authStatus?: number;
+    contentCleanupFails?: boolean;
+    signInError?: { status?: number; message: string };
   } = {},
 ) {
   const calls: { name: string; token?: string }[] = [];
   const storage = new Map<string, string>();
+  const signUpCalls: unknown[] = [];
   const archiveIds = options.archives?.map((archive) => archive.id) ?? ["personal"];
   let activeUser = user;
   let tokens = { access_token: "current-access", refresh_token: "current-refresh" };
@@ -38,12 +42,21 @@ function accountFlow(
   const authData = { data: { user, session: options.confirmation ? null : {} }, error: null };
   const supabase = {
     auth: {
-      signUp: async () => authData,
-      signInWithPassword: async () => authData,
+      signUp: async (input: unknown) => {
+        signUpCalls.push(input);
+        return authData;
+      },
+      signInWithPassword: async () =>
+        options.signInError
+          ? { data: { user: null, session: null }, error: options.signInError }
+          : authData,
       getSession: async () => ({ data: { session: { ...tokens, user: activeUser } } }),
       getUser: async () =>
-        options.lost
-          ? { data: { user: null }, error: { message: "Auth session missing!", status: 400 } }
+        options.lost || options.authStatus
+          ? {
+              data: { user: null },
+              error: { message: "Auth unavailable", status: options.authStatus ?? 400 },
+            }
           : { data: { user: activeUser }, error: null },
       onAuthStateChange: (callback: typeof listener) => {
         listener = callback;
@@ -124,12 +137,24 @@ function accountFlow(
             calls.push({ name: "clear-cache" });
           },
         };
-      if (name === "./sessionRestore") return { SESSION_KEY: "session" };
+      if (name === "./storePolicies") return { POLICY_VERSION: "2026-10-24" };
+      if (name === "./accountContent")
+        return {
+          restoreAccountContent: () => {},
+          removeAccountContent: async () => {
+            calls.push({ name: "remove-local-content" });
+            if (options.contentCleanupFails) throw new Error("Local removal blocked");
+          },
+        };
+      if (name === "./sessionRestore")
+        return { SESSION_KEY: "session", SIGNED_IN_BEFORE_KEY: "signed-in-before" };
+      if (name === "./policyAcceptance") return { acceptPolicies: async () => {} };
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
   return {
     api: exports,
+    signUpCalls,
     calls,
     storage,
     announce: (event: string, session: unknown) => listener(event, session),
@@ -138,7 +163,7 @@ function accountFlow(
 
 test("invited registration claims the invitation and returns both archives for selection", async () => {
   const flow = accountFlow({ invited: true });
-  const result = await flow.api.registerAccount(user.email, "test-password");
+  const result = await flow.api.registerAccount(user.email, "test-password", true);
   assert.equal(result.confirmationRequired, false);
   if (result.confirmationRequired) throw new Error("Unexpected confirmation");
   assert.equal(result.session, null);
@@ -154,17 +179,29 @@ test("invited registration claims the invitation and returns both archives for s
   assert.equal(flow.storage.size, 0);
 });
 
+test("registration cannot reach Auth without accepting policies", async () => {
+  const flow = accountFlow();
+  await assert.rejects(flow.api.registerAccount(user.email, "test-password"), /Accept the Terms/);
+  assert.equal(flow.signUpCalls.length, 0);
+  assert.equal(flow.storage.size, 0);
+});
+
 test("ordinary registration opens the personal archive without claiming an invitation", async () => {
   const flow = accountFlow();
-  const result = await flow.api.registerAccount(user.email, "test-password");
+  const result = await flow.api.registerAccount(user.email, "test-password", true);
   assert.equal(result.session?.archiveId, "personal");
+  const input = flow.signUpCalls[0] as { options: { data: Record<string, string> } };
+  assert.equal(input.options.data.napp_terms_version, "2026-10-24");
+  assert.equal(input.options.data.napp_privacy_version, "2026-10-24");
+  assert.ok(Number.isFinite(Date.parse(input.options.data.napp_policies_accepted_at)));
   assert.equal(flow.calls.length, 1);
-  assert.equal(flow.storage.size, 1);
+  // The archive session, and the mark that this phone has held a real account.
+  assert.deepEqual([...flow.storage.keys()].sort(), ["session", "signed-in-before"]);
 });
 
 test("registration awaiting email confirmation does not claim or open an archive", async () => {
   const flow = accountFlow({ invited: true, confirmation: true });
-  const result = await flow.api.registerAccount(user.email, "test-password");
+  const result = await flow.api.registerAccount(user.email, "test-password", true);
   assert.equal(result.confirmationRequired, true);
   assert.equal(result.session, null);
   assert.equal(flow.calls.length, 0);
@@ -173,7 +210,10 @@ test("registration awaiting email confirmation does not claim or open an archive
 
 test("a rejected invitation cannot silently open the personal archive after registration", async () => {
   const flow = accountFlow({ invited: true, claimError: "Invitation belongs to another account" });
-  await assert.rejects(flow.api.registerAccount(user.email, "test-password"), /another account/);
+  await assert.rejects(
+    flow.api.registerAccount(user.email, "test-password", true),
+    /another account/,
+  );
   assert.equal(flow.storage.size, 0);
 });
 
@@ -263,6 +303,48 @@ test("native switch validates membership, falls back from a Book, and keeps the 
   );
   assert.equal(flow.storage.has("session"), false);
 });
+test("automatic locking keeps offline documents while explicit removal completes before sign-out", async () => {
+  const locked = accountFlow();
+  await locked.api.authenticate(user.email, "test-password");
+  await locked.api.clearSession();
+  assert.ok(!locked.calls.some((call) => call.name === "remove-local-content"));
+  const removed = accountFlow();
+  await removed.api.authenticate(user.email, "test-password");
+  await removed.api.clearSession({ removeLocalContent: true });
+  assert.ok(
+    removed.calls.findIndex((call) => call.name === "remove-local-content") <
+      removed.calls.findIndex((call) => call.name === "sign-out"),
+  );
+});
+test("sign-in distinguishes an unavailable service and rate limiting from a refused password", async () => {
+  for (const status of [undefined, 0, 503, 504]) {
+    const flow = accountFlow({ signInError: { status, message: "Unavailable" } });
+    await assert.rejects(
+      flow.api.authenticate(user.email, "test-password"),
+      /Could not reach the sign-in service/,
+    );
+  }
+  const limited = accountFlow({ signInError: { status: 429, message: "Too many requests" } });
+  await assert.rejects(
+    limited.api.authenticate(user.email, "test-password"),
+    /Too many sign-in attempts/,
+  );
+  const refused = accountFlow({ signInError: { status: 400, message: "Invalid credentials" } });
+  await assert.rejects(
+    refused.api.authenticate(user.email, "test-password"),
+    /Email or password is incorrect/,
+  );
+});
+test("a failed local removal preserves the account so the person can retry", async () => {
+  const flow = accountFlow({ contentCleanupFails: true });
+  await flow.api.authenticate(user.email, "test-password");
+  await assert.rejects(
+    flow.api.clearSession({ removeLocalContent: true }),
+    /Local removal blocked/,
+  );
+  assert.ok(flow.storage.has("session"));
+  assert.ok(!flow.calls.some((call) => call.name === "sign-out"));
+});
 test("an expired saved token is removed while the current account remains recoverable", async () => {
   const flow = accountFlow({ expired: true });
   await flow.api.authenticate(user.email, "test-password");
@@ -342,6 +424,24 @@ test("a session the server no longer knows asks for that account's password", as
       reason.name === "SignInAgain" && reason.email === user.email,
   );
   assert.equal(flow.storage.has("session"), false);
+});
+test("a rate-limited identity check preserves the saved account and archive", async () => {
+  const flow = accountFlow({ emptyOnce: true, authStatus: 429 });
+  const saved = JSON.stringify({ userId: user.id, email: user.email, archiveId: "personal" });
+  flow.storage.set("session", saved);
+  await assert.rejects(flow.api.notesArchives({ userId: user.id, email: user.email }), /Try again/);
+  assert.equal(flow.storage.get("session"), saved);
+});
+test("a late refused identity check cannot remove another account's active archive", async () => {
+  const flow = accountFlow({ emptyOnce: true, lost: true });
+  const saved = JSON.stringify({
+    userId: "second",
+    email: "second@example.invalid",
+    archiveId: "other",
+  });
+  flow.storage.set("session", saved);
+  await assert.rejects(flow.api.notesArchives({ userId: user.id, email: user.email }), /Sign in/);
+  assert.equal(flow.storage.get("session"), saved);
 });
 test("adding an account from a dead session still reaches the sign-in page", async () => {
   const flow = accountFlow();

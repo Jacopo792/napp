@@ -1,6 +1,6 @@
 {
   "name": "@notes-app/mobile",
-  "version": "0.9.43",
+  "version": "0.9.46",
   "private": true,
   "license": "GPL-3.0-or-later",
   "main": "index.ts",
@@ -10,7 +10,8 @@
     "preview": "NAPP_PREVIEW=1 pnpm editor && NAPP_PREVIEW=1 expo start --dev-client --clear",
     "ios": "pnpm editor && expo run:ios",
     "android": "pnpm editor && expo run:android",
-    "build:android": "node scripts/build-android.cjs"
+    "build:android": "node scripts/build-android.cjs",
+    "build:android:store": "node scripts/build-android.cjs --store"
   },
   "dependencies": {
     "@expo/ui": "~58.0.0",
