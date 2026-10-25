@@ -1957,6 +1957,13 @@ printing.
   its accent is its ink, because Jacopo does not want the blue. Headings are
   ink; the accent is for small signals only — a dot, a 2px line, a ring.
   `--card` is the token a card in a column is drawn in.
+  **A reader who never chose opens on Graphite monochrome, Automatic**
+  (`DEFAULT_APPEARANCE`). `withDesktopDefault` moves the two looks nobody
+  picked — the old blue default and the light twin `setTheme` used to swap in
+  — there, from localStorage and from the account row alike; the old
+  default's "Dark" becomes Automatic, a Light somebody asked for stays Light,
+  and the eighteen are worn as stored. The eighteen's own Graphite had the old
+  default's colours, so it moves too, under the same name.
 - **Type.** A note is set in the system face, 17/400/1.55, as on the phone;
   Literata is the book's alone. So the reading face and its weight live under
   Settings → Document → Text, the one place they still do anything; leading
@@ -2007,6 +2014,14 @@ printing.
   in the rail — the travelling selection does that job in a column that is
   always open. The phone's Safety row is not here: its content is the store
   work, which is not on this branch.
+- **Profile** is the phone's Accounts page: a card for you (face, name,
+  address, the picture's acts as quiet words), the grouped rows, and Leave
+  Archive last, in a card of its own, in red words — no red box; the second
+  press confirms. Every settings group is a card of `--card`.
+- **Sheets, ⌘K and What's New** speak the same language at a desk's size: a
+  sheet is 24 round on the page's ground with its figures on cards; ⌘K and
+  What's New are 20 round, and their chosen row is a neutral wash with the
+  glyph in a quiet tile — the accent is never a whole row.
 - **Menus the page draws** are the phone's glass popover at a desk's scale: 14
   round, rows of 30, each glyph in a quiet tile of its own, words in ink, a
   neutral hover, and the way back out of a section named after it. macOS keeps

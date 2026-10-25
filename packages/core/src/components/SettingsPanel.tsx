@@ -748,40 +748,40 @@ export function SettingsPanel({
             <div className="settings-scroll">
               {section === "profile" && (
                 <section>
-                  <div className="profile-portrait">
+                  {/* The phone's profile card: your face, your name and the
+                      address you sign in with on one card, the picture's two
+                      acts as quiet words beside them. */}
+                  <div className="profile-card">
                     <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
-                    <b>{profile.nickname || email.split("@")[0]}</b>
-                    <small>{email}</small>
-                    <input
-                      ref={avatarRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) setCropping(file);
-                        event.target.value = "";
-                      }}
-                    />
-                    <div className="profile-portrait-actions">
-                      <button
-                        type="button"
-                        disabled={profileBusy}
-                        onClick={() => avatarRef.current?.click()}
-                      >
-                        {profile.avatarObject ? "Change picture" : "Add a picture"}
-                      </button>
-                      {profile.avatarObject && (
+                    <span className="profile-card-text">
+                      <b>{profile.nickname || email.split("@")[0]}</b>
+                      <small>{email}</small>
+                      <span className="profile-card-acts">
+                        <input
+                          ref={avatarRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) setCropping(file);
+                            event.target.value = "";
+                          }}
+                        />
                         <button
                           type="button"
-                          className="is-danger"
                           disabled={profileBusy}
-                          onClick={onAvatarRemove}
+                          onClick={() => avatarRef.current?.click()}
                         >
-                          Remove
+                          {profile.avatarObject ? "Change Picture" : "Add Picture"}
                         </button>
-                      )}
-                    </div>
+                        {profile.avatarObject && (
+                          <button type="button" disabled={profileBusy} onClick={onAvatarRemove}>
+                            Remove
+                          </button>
+                        )}
+                      </span>
+                    </span>
                   </div>
 
                   <div className="appearance-controls">
@@ -852,25 +852,34 @@ export function SettingsPanel({
                       {profileError}
                     </p>
                   )}
-                  <h3>Leave shared archive</h3>
-                  <div className="leave-archive-card">
-                    <RowLead
-                      icon={<LogOut size={16} />}
-                      label="Leave this archive"
-                      hint={
-                        members.length <= 1
-                          ? "Nobody to leave it to — you are the only member"
-                          : "Your access ends, but the notes stay for the other members"
-                      }
-                    />
+                  {/* The one act that cannot be taken back stands last and
+                      apart, in a card of its own, said in red words rather
+                      than drawn as a red box — as the phone's Delete Account
+                      row is. The second press is the confirmation. */}
+                  <div className="appearance-controls profile-leave">
                     <button
                       type="button"
-                      className={leaveConfirm ? "is-danger-confirm" : ""}
+                      className={`appearance-row profile-leave-row ${
+                        leaveConfirm ? "is-confirming" : ""
+                      }`}
                       disabled={leaveBusy || members.length <= 1}
                       onClick={() => void leaveArchive()}
                     >
-                      <LogOut size={16} />
-                      {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
+                      <RowLead
+                        icon={<LogOut size={16} />}
+                        label={
+                          leaveBusy
+                            ? "Leaving…"
+                            : leaveConfirm
+                              ? "Leave Archive — Confirm"
+                              : "Leave Archive"
+                        }
+                        hint={
+                          members.length <= 1
+                            ? "You are the only member"
+                            : "Your access ends; the notes stay for the others"
+                        }
+                      />
                     </button>
                   </div>
                   {leaveStatus && (

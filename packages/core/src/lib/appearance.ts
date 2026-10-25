@@ -56,14 +56,16 @@ export interface Appearance {
   frosted: boolean;
 }
 
-/* A new account opens on Graphite: the grey a Mac window is, and the system's
-   own blue for the one thing that can be acted on. Ink — near-black with a
-   grey accent — was the default once and is gone from the presets: a toggle
-   drawn grey on grey is a toggle nobody can read the state of. */
+/* A new account opens on Graphite as the desktop wears it — the phone's five
+   on the dark side, its accent the ink — and turns with the display. The
+   system blue that used to be the one thing to act with is gone from the
+   default: Jacopo does not want it, and in monochrome the accent is for small
+   signals that ink carries perfectly well. `withDesktopDefault` moves a
+   reader still on the old untouched values here. */
 export const DEFAULT_APPEARANCE: Appearance = {
-  theme: "dark",
-  accent: "#0a84ff",
-  background: "#1c1c1e",
+  theme: "system",
+  accent: "#ececec",
+  background: "#000000",
   foreground: "#ececec",
   contrast: 50,
   translucentSidebar: false,
@@ -363,6 +365,39 @@ export function wornSide(
   return null;
 }
 
+/* The two looks a reader got without choosing one: the old dark default, and
+   the light one `setTheme` used to swap in. Neither was picked from a list. */
+const UNCHOSEN = [
+  { accent: "#0a84ff", background: "#1c1c1e", foreground: "#ececec", theme: "dark" },
+  { accent: "#1677c8", background: "#fbfaf7", foreground: "#242424", theme: "light" },
+] as const;
+
+/** A reader still wearing a look nobody chose — the old blue default or its
+ *  light twin — is moved to Graphite monochrome; the old default's theme was
+ *  not chosen either, so it becomes Automatic, while a reader who asked for
+ *  Light keeps Light. Everything else, the eighteen and hand-mixed colours
+ *  included, is returned as it was. */
+export function withDesktopDefault(config: Appearance): Appearance {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const old = UNCHOSEN.find(
+    (look) =>
+      same(look.accent, config.accent) &&
+      same(look.background, config.background) &&
+      same(look.foreground, config.foreground),
+  );
+  if (!old) return config;
+  const theme = old.theme === "dark" && config.theme === "dark" ? "system" : config.theme;
+  const dark = theme === "dark" || (theme === "system" && (media?.matches ?? true));
+  const side = phoneSide("graphite", dark);
+  return {
+    ...config,
+    theme,
+    background: side.background,
+    foreground: side.foreground,
+    accent: side.foreground,
+  };
+}
+
 const KEY = "napp:appearance:v1";
 const DB = "napp:appearance";
 const STORE = "assets";
@@ -393,7 +428,7 @@ function read(): Appearance {
     const theme: ThemeMode = ["system", "dark", "light"].includes(parsed.theme ?? "")
       ? (parsed.theme as ThemeMode)
       : DEFAULT_APPEARANCE.theme;
-    return {
+    return withDesktopDefault({
       theme,
       accent: validHex(parsed.accent, DEFAULT_APPEARANCE.accent),
       background: validHex(parsed.background, DEFAULT_APPEARANCE.background),
@@ -413,7 +448,7 @@ function read(): Appearance {
       iconTint: autoOrHex(parsed.iconTint),
       folderColour: autoOrHex(parsed.folderColour),
       frosted: parsed.frosted === true,
-    };
+    });
   } catch {
     return DEFAULT_APPEARANCE;
   }

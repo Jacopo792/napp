@@ -39,6 +39,43 @@ test("one of the five turns with the light, and the eighteen are worn as stored"
   assert.equal(wornSide(mono, false)?.accent, graphite.light.foreground);
   /* A hand-set accent stays the reader's. */
   assert.equal(wornSide({ ...paper.light, accent: "#123456" }, true)?.accent, "#123456");
-  assert.equal(wornSide(DEFAULT_APPEARANCE, false), null);
+  /* The default is Graphite worn monochrome, so it turns with the light too. */
+  assert.deepEqual(wornSide(DEFAULT_APPEARANCE, false), {
+    ...graphite.light,
+    accent: graphite.light.foreground,
+  });
   assert.equal(appearanceTokens(DEFAULT_APPEARANCE, true)["--page"], DEFAULT_APPEARANCE.background);
+});
+
+test("a look nobody chose becomes Graphite monochrome; a chosen one stays", async () => {
+  const { withDesktopDefault, APPEARANCE_PRESETS } = await import("./appearance.ts");
+  const old = {
+    ...DEFAULT_APPEARANCE,
+    theme: "dark" as const,
+    accent: "#0a84ff",
+    background: "#1c1c1e",
+    foreground: "#ececec",
+  };
+  const moved = withDesktopDefault(old);
+  assert.equal(moved.theme, "system");
+  assert.equal(moved.accent, moved.foreground);
+  assert.equal(moved.background, "#000000");
+  /* Light asked for stays light, in Graphite's light side. */
+  const light = withDesktopDefault({
+    ...DEFAULT_APPEARANCE,
+    theme: "light" as const,
+    accent: "#1677c8",
+    background: "#fbfaf7",
+    foreground: "#242424",
+  });
+  assert.equal(light.theme, "light");
+  assert.equal(light.background, "#f2f2f7");
+  assert.equal(light.accent, light.foreground);
+  /* One of the eighteen is worn exactly as stored. (Their own Graphite was the
+     old default's colours, so it moves with it — the same name, either way.) */
+  const preset = APPEARANCE_PRESETS.find((one) => one.id === "midnight")!;
+  const chosen = { ...DEFAULT_APPEARANCE, ...preset, theme: preset.theme };
+  assert.deepEqual(withDesktopDefault(chosen), chosen);
+  /* The new default is itself one of the five, worn monochrome. */
+  assert.equal(withDesktopDefault(DEFAULT_APPEARANCE), DEFAULT_APPEARANCE);
 });
