@@ -3302,80 +3302,84 @@
    The width follows the travel rather than being fixed, so a row pushed past
    its resting place is not a panel with a strip of background beside it. It
    never goes below OPEN, because the label has to fit from the first frame. */
-/* A button, not a wall. Full-bleed to the row's own top and bottom it was a
-   rectangle of flat colour the height of the list, which is what a mail client
-   does with a row that is about to fly away — and nothing here flies away any
-   more, it waits to be pressed. So it is inset by three and carries the corner
-   every other pressable thing in the app carries, which says "press me" rather
-   than "let go and I happen".
-
-   The corner is on the outer edge only: the inner one is under the row until
-   the moment it is uncovered, and rounding it would show two corners meeting
-   at nothing while the row travels. */
+/* The phone's paper tab (`SwipeRow.tsx`, Jacopo, 21 October 2026): what the
+   row uncovers is not a slab of colour but one quiet tab standing on the
+   card's ground — the palette's paper, a hairline, 17 round, the glyph over
+   its name in ink. Only an act that destroys wears the danger ink; nothing is
+   a system red or purple, because the tab is Napp's own material and what an
+   act does is said by its name. The button is the whole uncovered width, so
+   the press lands anywhere in the gap; the tab is what is drawn in it. */
 .note-row-action {
   position: absolute;
   top: 0;
   bottom: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
   align-items: center;
   justify-content: center;
   border: 0;
+  background: transparent;
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  color: #fff;
   cursor: pointer;
 }
 
-/* What is in it arrives rather than being there. `--reveal` is how far open
-   the row is, written by the row itself, so the mark grows with the gesture
-   and lands at full size exactly as the panel finishes opening — the same
-   travel, two things doing it. */
-.note-row-action > * {
-  transform: scale(calc(0.55 + 0.45 * var(--reveal, 1)));
-  opacity: var(--reveal, 1);
+.note-row-tab {
+  display: flex;
+  width: 68px;
+  height: min(60px, calc(100% - 12px));
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 17px;
+  background: var(--paper);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+  text-align: center;
   transition:
-    transform var(--dur-base) var(--ease-spring),
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease-out),
     opacity var(--dur-fast) var(--ease);
 }
 
-.note-row-action:active {
-  filter: brightness(0.92);
+/* It arrives rather than being there: `--reveal` is how far open the row is,
+   and the tab slides the last ten pixels into its place and fades in on that
+   same travel — the phone's tab, which never scales. */
+.note-row-action.is-left .note-row-tab {
+  transform: translateX(calc(10px * (1 - var(--reveal, 1))));
 }
 
-/* Where a panel is parked is the direction it answers to; what colour it is
-   is what it does. The two are separate because every scope has the same pair
-   of directions and a different pair of acts — Trash restores where the list
-   archives, and both of them delete. */
-/* Tucked a corner's width under the row, so the row's own rounded corners
-   show the colour behind them: the row reads as a card lifted off a coloured
-   track, one object, rather than a card and a separate button side by side. */
+.note-row-action.is-right .note-row-tab {
+  transform: translateX(calc(-10px * (1 - var(--reveal, 1))));
+}
+
+.note-row-action .note-row-tab {
+  opacity: var(--reveal, 1);
+}
+
+.note-row-action:hover .note-row-tab,
+.note-row-action:active .note-row-tab {
+  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+}
+
+.note-row-action.is-trash {
+  color: var(--danger);
+}
+
 .note-row-action.is-left {
-  left: calc(100% - var(--radius-sm));
-  padding-left: var(--radius-sm);
-  border-start-end-radius: var(--radius-sm);
-  border-end-end-radius: var(--radius-sm);
+  left: 100%;
 }
 
 .note-row-action.is-right {
-  right: calc(100% - var(--radius-sm));
-  padding-right: var(--radius-sm);
-  border-start-start-radius: var(--radius-sm);
-  border-end-start-radius: var(--radius-sm);
+  right: 100%;
 }
 
-/* The system's own red and purple, as Mail paints these two acts. `--danger`
-   is a colour for words on a dark page — a pale pink that, as a fill, said
-   nothing about destroying anything. Fixed rather than themed: what an act
-   does is not a preference. */
-.note-row-action.is-trash {
-  background: #ff453a;
-}
-
-.note-row-action.is-archive {
-  background: #a970ff;
+@media (prefers-reduced-motion: reduce) {
+  .note-row-tab {
+    transition: none;
+  }
 }
 
 /* A travelling row has to be opaque, or the panel it is uncovering is read
@@ -14024,19 +14028,6 @@ button.sheet-chip:hover,
 
 .notebook-index-title.is-active::after {
   opacity: 1;
-}
-
-/* Inside a card the row is square, so a panel tucked a corner's width under
-   it would show as a coloured edge; parked exactly at the row's edge, the card
-   clips it until the row moves. */
-.note-row-list .note-row-action.is-left {
-  left: 100%;
-  padding-left: 0;
-}
-
-.note-row-list .note-row-action.is-right {
-  right: 100%;
-  padding-right: 0;
 }
 
 /* ── Home ────────────────────────────────────────────────────────────────────

@@ -791,8 +791,10 @@ const Row = memo(function Row({
                 act.run(entry);
               }}
             >
-              <act.Icon size={16} />
-              <span>{act.label}</span>
+              <span className="note-row-tab">
+                <act.Icon size={20} />
+                <span>{act.label}</span>
+              </span>
             </button>
           );
         })}

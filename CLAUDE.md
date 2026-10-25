@@ -209,19 +209,24 @@ is load-bearing**: a trackpad keeps sending decaying momentum after the fingers
 lift, so unclamped travel takes the row half the column. Clamped, a flick
 arrives at the give and springs back to open.
 
-The panel is a **button**, not a wall: inset by three from the row's own edges
-and carrying the corner on its outer side only — the inner one is under the row
-until the moment it is uncovered, and rounding it would show two corners
-meeting at nothing while the row travels. What is inside it arrives rather than
-being there: the row writes `--reveal`, how far open it is, and the mark grows
-on that same travel. The settle takes `--ease-bounce`, which is one step past
-`--ease-spring` and is only for a gesture the hand has already let go of — an
-overshoot under a finger reads as the list twitching.
+What is uncovered is the phone's **paper tab** (`SwipeRow.tsx`): one quiet
+tab 68 wide standing in the gap — the palette's `--paper`, a hairline, 17
+round, a 20px glyph over its name at 10/600 in ink. Only Delete wears
+`--danger`; nothing is the system's red or purple any more, because the tab is
+Napp's own material and the name says what it does. The button is still the
+whole uncovered width, so a press anywhere in the gap lands; the tab is what is
+drawn in it. It arrives rather than being there: the row writes `--reveal`,
+how far open it is, and on that travel the tab fades in and slides its last
+ten pixels into place — it never scales, as the phone's never does. The
+settle takes `--ease-bounce`, which is one step past `--ease-spring` and is
+only for a gesture the hand has already let go of — an overshoot under a
+finger reads as the list twitching.
 
 The panels are parked outside the row's own edges (`left: 100%`, `right: 100%`)
 rather than inside a wrapper, so the travelling row is the only thing that
 moves and the list's own `overflow-x: hidden` is what keeps a parked panel out
-of sight. A row that is open paints `--paper`, or the panel is read through it.
+of sight. A row that is open paints its card's `--card`, or the tab is read
+through it.
 One row is open at a time, announced on `napp:close-other-swipes` as the
 gesture starts rather than lifted into the list's state — a re-render of every
 row to move one row is the wrong shape for something a hand changes constantly.
