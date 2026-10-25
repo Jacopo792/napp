@@ -18,6 +18,7 @@ import {
   Target,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
+import { zoomNote } from "@/lib/motion";
 import { countWords } from "@/lib/format";
 import { loadThreadIds } from "@/lib/comments";
 import { PointMenu } from "@/components/ContextMenu";
@@ -1871,7 +1872,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           an `opacity: 0` on the one element carrying `background: var(--page)`,
           so the first frames of every note switch showed the reader's wallpaper
           through a hole where the page should be. */}
-      <div className="editor-body flex min-h-0 flex-1">
+      <div ref={zoomNote} className="editor-body flex min-h-0 flex-1">
         <div
           ref={setScroller}
           className={`editor-scroll page-in min-h-0 flex-1 ${inMargin ? "has-margin" : ""}`}

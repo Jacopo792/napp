@@ -645,7 +645,7 @@
      `transform-origin` at wherever the pointer went down, a right-click menu
      at the point itself, and this is only the fallback for a menu opened from
      the keyboard. Short enough never to be a wait. */
-  animation: menu-in 180ms var(--ease-out) backwards;
+  animation: menu-in var(--dur-base) var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -657,10 +657,12 @@
   transform-origin: top left;
 }
 
+/* The phone's popover grows from 0.94 on a spring with no overshoot; here
+   the same scale on `--ease-out`, which is that spring drawn as a curve. */
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.94);
   }
 }
 
@@ -5902,8 +5904,9 @@
    moves four pixels on one and ten on the other, and the wide one reads as the
    list flinching rather than the row answering. Wide targets get a ratio scaled
    to their size. */
+/* The phone's press gives 4% under the finger, never a bounce. */
 .press:active:not(:disabled) {
-  transform: scale(0.955);
+  transform: scale(0.96);
 }
 
 .sidebar-target.press:active,
@@ -5932,7 +5935,7 @@
 @keyframes menu-reveal {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.94);
   }
 }
 
@@ -6106,6 +6109,31 @@
   to {
     opacity: 0;
     transform: translateY(14px);
+  }
+}
+
+/* A note opened out of what was pressed (`zoomNote`): the page grows from
+   0.94 with its origin on the row or card, the phone's zoom on the desktop's
+   curve and the phone's 360ms of travel. While it does, the column's own
+   staggered entrance stands down — one movement, not two. */
+.editor-body[data-zoom] {
+  animation: note-zoom var(--dur-slow) var(--ease-out) backwards;
+}
+
+.editor-body[data-zoom] :is(.page-in > *, .rich-text-editor) {
+  animation: none;
+}
+
+@keyframes note-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-body[data-zoom] {
+    animation: none;
   }
 }
 
@@ -13745,13 +13773,14 @@ button.sheet-chip:hover,
 /* An exiting menu cannot intercept the click that dismissed it. */
 [data-menu-exiting] {
   pointer-events: none;
-  animation: menu-out 80ms var(--ease-out) forwards;
+  animation: menu-out 150ms var(--ease-out) forwards;
 }
-/* Back into where it came from, faster than it left. */
+/* Back into where it came from, faster than it left: the phone's 150ms
+   fade-and-shrink. */
 @keyframes menu-out {
   to {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.94);
   }
 }
 @media (prefers-reduced-motion: reduce) {

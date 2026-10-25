@@ -1871,11 +1871,19 @@ not a request for less motion. So:
   (`captureRows` before the change, `playRows` in `NoteList`'s layout effect).
 - Menus scale out of the last pointer-down (`MenuSurface`), a right-click menu
   out of its point; overlays `emerge` from the pressed point; a picture zooms
-  from its thumbnail. Opened from the keyboard, they only fade.
+  from its thumbnail. Opened from the keyboard, they only fade. The numbers
+  are the phone's popover: from 0.94 over `--dur-base` on `--ease-out` (its
+  spring with no overshoot, drawn as a curve), out in 150 ms back to 0.94. A
+  press gives 4% (`scale(0.96)`), the phone's `Press`, never a bounce.
 - **Sidebar glyphs never move on hover.** They move when something happens to
   their place: held over, given to, pressed. Do not put the hover wiggles back.
-- A note opened from the list arrives from the side of the list it was on
-  (`aimNote`); from anywhere else it fades.
+- **A note opens out of what was pressed**, as on the phone, where it zooms
+  out of its card: a row of the list or of Comments, or a card on Home
+  (`zoomNote` on the editor body). The page grows from 0.94 over `--dur-slow`
+  with its origin on that row or card, and the column's staggered entrance
+  stands down while it does. The page being left still goes the way of
+  `aimNote`. From a link, ⌘K or the keyboard there is nothing it came out of,
+  and it arrives as before. The book's chapters are left as they were.
 - A notched mouse wheel glides (trackpads untouched), columns fade under the
   chrome (not on Windows: a mask costs ClearType), and the title rises into the
   strip once it has scrolled away.

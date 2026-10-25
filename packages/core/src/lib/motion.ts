@@ -26,6 +26,8 @@ interface Press {
   y: number;
   rect: DOMRect;
   at: number;
+  /** What was pressed, so an opening can ask whether it was a note's row. */
+  target: Element;
 }
 let press: Press | null = null;
 
@@ -45,6 +47,7 @@ if (typeof document !== "undefined") {
             y: event.clientY,
             rect: target.getBoundingClientRect(),
             at: performance.now(),
+            target,
           }
         : null;
     },
@@ -68,6 +71,35 @@ export function originAtPress(el: HTMLElement) {
   const x = p.x - box.left;
   const y = p.y - box.top;
   el.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
+}
+
+/** A note opening out of what was pressed — its row, a card on Home, a row of
+ *  Comments — the way the phone's note zooms out of its card. The new page
+ *  scales up from 0.94 with its origin on the thing that was pressed, so it
+ *  travels a little from there as it grows. Pressed inside the page itself, or
+ *  opened from the keyboard, a link or ⌘K, there is nothing it came out of,
+ *  and the page arrives as it always did. Once per element. */
+const zoomed = new WeakSet<Element>();
+/* The things a note is opened out of: a row of the list, and Home's cards. */
+const NOTE_OPENERS = "[data-note-row], .home-continue, .home-pin, .home-well-row";
+
+export function zoomNote(el: HTMLElement | null) {
+  if (!el || zoomed.has(el) || reduced()) return;
+  zoomed.add(el);
+  const p = recentPress();
+  if (!p || !p.target.matches(NOTE_OPENERS)) return;
+  const box = el.getBoundingClientRect();
+  const cx = p.rect.left + p.rect.width / 2;
+  const cy = p.rect.top + p.rect.height / 2;
+  el.style.transformOrigin = `${Math.round(cx - box.left)}px ${Math.round(cy - box.top)}px`;
+  el.dataset.zoom = "";
+  /* Its own animation, not one bubbling up from inside the page. */
+  const done = (event: AnimationEvent) => {
+    if (event.target !== el) return;
+    delete el.dataset.zoom;
+    el.removeEventListener("animationend", done);
+  };
+  el.addEventListener("animationend", done);
 }
 
 /** An overlay arriving: out of the control that asked for it, or — opened from
