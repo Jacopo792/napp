@@ -32,6 +32,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^(?:@\/lib\/|\.\/)supabaseClient$/,
+        replacement: here("./preview/supabaseClient.mock.ts"),
+      },
+      {
         find: /^@\/components\/PolicyGate$/,
         replacement: here("./preview/PolicyGate.mock.tsx"),
       },
