@@ -13,6 +13,18 @@ API URL. Backend fixtures use disposable accounts and archives, with one-time
 sessions provisioned without sending mail. Interactive sign-in still uses real
 password authentication. Cleanup waits for document and history persistence.
 
+For server integration tests, also start a disposable Valkey instance. The port
+must be free; reuse your existing local test instance if one is already running.
+
+```sh
+docker run -d --rm --name napp-test-valkey -p 127.0.0.1:6380:6379 valkey/valkey:8-alpine
+REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server
+pnpm test:e2e:full
+# After testing, stop only the services you started for this run:
+docker stop napp-test-valkey
+supabase stop
+```
+
 The suite covers persistence after reload, unauthorized access and a tampered
 archive selection, invitations, offline convergence between browsers, locked
 notes, version restoration, account deletion preserving another member's work,

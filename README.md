@@ -1,7 +1,11 @@
+<img src="docs/branding/napp-logo.svg" width="88" height="88" alt="Napp logo" />
+
 # Napp
 
 A place for notes, shared writing and longer work – in your browser and on your
 desktop.
+
+**Coming soon to your phone.** [A first look at the native app ↓](#coming-soon-to-your-phone)
 
 ![Napp workspace](docs/app-preview.png)
 
@@ -49,8 +53,32 @@ file actions, keyboard shortcuts and an unread-comment badge. Installers are
 currently unsigned; [the desktop guide](DESKTOP.md) covers installation and
 troubleshooting.
 
-A separate mobile client is under development. Its source is not included on the
-`main` branch.
+## Coming soon to your phone
+
+Napp for iPhone and Android is on the way: the same shared notes and conversations,
+with a native interface built around touch. Pick up your writing, move between
+notebooks, discuss a passage and make the space your own.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/mobile/iphone-home.png" width="245" alt="Napp on iPhone: Home with shared notebooks, a recent note and folders" /></td>
+    <td align="center"><img src="docs/mobile/iphone-comments.png" width="245" alt="Napp on iPhone: a conversation attached to a passage in a note" /></td>
+    <td align="center"><img src="docs/mobile/iphone-appearance.png" width="245" alt="Napp on iPhone: light and dark themes, palettes and wallpaper settings" /></td>
+  </tr>
+  <tr>
+    <td align="center">Your notebooks</td>
+    <td align="center">Conversations in context</td>
+    <td align="center">Your own look</td>
+  </tr>
+</table>
+
+Screenshots captured on an iPhone 15 from the app in development. Mobile downloads
+are not available yet; release news will appear here and in
+[GitHub Releases](https://github.com/Jacopo792/napp/releases).
+
+The mobile client is developed separately. This repository's `main` branch
+contains the web and desktop clients, shared core and collaboration server;
+mobile source is not included.
 
 ## A workspace for longer writing
 
