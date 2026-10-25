@@ -61,14 +61,14 @@ notebooks, discuss a passage and make the space your own.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/mobile/iphone-home.png" width="245" alt="Napp on iPhone: Home with shared notebooks, a recent note and folders" /></td>
-    <td align="center"><img src="docs/mobile/iphone-comments.png" width="245" alt="Napp on iPhone: a conversation attached to a passage in a note" /></td>
-    <td align="center"><img src="docs/mobile/iphone-appearance.png" width="245" alt="Napp on iPhone: light and dark themes, palettes and wallpaper settings" /></td>
+    <td width="33%" align="center"><img src="docs/mobile/iphone-home.png" width="245" alt="Napp on iPhone: Home with shared notebooks, a recent note and folders" /></td>
+    <td width="33%" align="center"><img src="docs/mobile/iphone-comments.png" width="245" alt="Napp on iPhone: a conversation attached to a passage in a note" /></td>
+    <td width="33%" align="center"><img src="docs/mobile/iphone-appearance.png" width="245" alt="Napp on iPhone: light and dark themes, palettes and wallpaper settings" /></td>
   </tr>
   <tr>
-    <td align="center">Your notebooks</td>
-    <td align="center">Conversations in context</td>
-    <td align="center">Your own look</td>
+    <td width="33%" align="center">Your notebooks</td>
+    <td width="33%" align="center">Conversations in context</td>
+    <td width="33%" align="center">Your own look</td>
   </tr>
 </table>
 
