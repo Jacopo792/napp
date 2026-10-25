@@ -2119,12 +2119,20 @@ printing.
 
 ## Interface notes worth knowing
 
-- **The sign-in page does not scroll.** It carries no wordmark and no tagline —
-  the card says what it is — and the botanical plates are clipped to
-  `.login-garden` rather than to `.login-shell`: a stem hanging below the fold
-  made the door scrollable, and what was under it was the wallpaper of an app
-  nobody has signed into yet. The shell itself must stay unclipped vertically,
-  because on a short window the sign-up card is taller than the viewport.
+- **The sign-in page does not scroll.** It is the phone's door
+  (`SignIn.tsx`): a dark wall in every theme — nobody has chosen a palette yet,
+  so `.login-shell` names its own colours — with the plant of the day drawn on
+  it twice, the mark and "napp" in the corner, "Welcome back." over a frosted
+  card 32 round that holds the phone's switch (a plate between Sign In and
+  Create Account), fields as cards with their label inside, a 52 pill to go,
+  and "Saved on this computer": every account `otherAccounts` keeps, one press
+  back into each (`switchAccount`). The card is centred on a desk and stands
+  at the foot of a phone's screen. Glossa's pitch — the turning word, its
+  coloured field and its dots — went with it. The botanical plates are clipped
+  to `.login-garden` rather than to `.login-shell`: a stem hanging below the
+  fold made the door scrollable. The shell itself must stay unclipped
+  vertically, because on a short window the sign-up card is taller than the
+  viewport.
 - **The page is `translate="no"`, and that is not about language.** A
   browser's translator swaps React's text nodes for its own, and the next
   render throws `removeChild` on a node that is no longer a child. Every

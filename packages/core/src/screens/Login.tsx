@@ -1,23 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Image,
-  ListChecks,
-  MailCheck,
-  MessageSquare,
-  NotebookPen,
-  NotebookText,
-  Pencil,
-  Table2 as Table,
-} from "@/components/icons";
+import { useEffect, useState, type ReactNode } from "react";
+import { ArrowRight, MailCheck } from "@/components/icons";
 import {
   authenticate,
   chooseArchive,
+  otherAccounts,
   registerAccount,
   restoreSession,
+  switchAccount,
   type ArchiveOption,
 } from "@/lib/session";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
@@ -37,16 +27,17 @@ type Mode = "sign-in" | "sign-up";
    email confirmation turned off: whether it appears is decided by whether
    Supabase hands back a session, which is a server fact. Configure SMTP and
    turn confirmations back on and it is correct again. */
+/* The phone's words (`SignIn.tsx`), so the door says the same thing on both. */
 const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": {
-    title: "Sign in",
-    lede: "Welcome back.",
-    action: "Sign in",
+    title: "Welcome back.",
+    lede: "Sign in to your notes.",
+    action: "Sign In",
   },
   "sign-up": {
-    title: "Create account",
-    lede: "Your archive is made with it.",
-    action: "Create account",
+    title: "Start an archive.",
+    lede: "Your notes, shared with whom you choose.",
+    action: "Create Account",
   },
 };
 
@@ -69,6 +60,9 @@ export default function Login() {
   const [restoreError, setRestoreError] = useState("");
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const copy = COPY[mode];
+  /* Accounts this computer keeps signed in beside the one that left: one
+     press back into each, as the phone's "Saved on this phone". */
+  const [saved] = useState(() => otherAccounts(""));
 
   useEffect(() => {
     // Invitations must still go through the account flow that claims them.
@@ -143,29 +137,18 @@ export default function Login() {
 
   if (restoring) {
     return (
-      <LoginFrame>
-        <LoginMark />
-        <h1 className="login-title">Opening your notes</h1>
-        {restoreError ? (
-          <>
-            <p role="alert" className="login-lede">
-              {restoreError}
-            </p>
-            <button
-              type="button"
-              className="login-submit label"
-              onClick={() => {
-                setRestoreError("");
-                setRestoreAttempt((attempt) => attempt + 1);
-              }}
-            >
-              Try again <ArrowRight size={16} />
-            </button>
-          </>
-        ) : (
-          <p role="status" className="login-lede">
-            Restoring your session…
-          </p>
+      <LoginFrame title="Opening your notes." lede={restoreError || "Restoring your session…"}>
+        {restoreError && (
+          <button
+            type="button"
+            className="login-submit"
+            onClick={() => {
+              setRestoreError("");
+              setRestoreAttempt((attempt) => attempt + 1);
+            }}
+          >
+            Try Again <ArrowRight size={18} />
+          </button>
         )}
       </LoginFrame>
     );
@@ -173,51 +156,47 @@ export default function Login() {
 
   if (archiveChoice) {
     return (
-      <LoginFrame>
-        <LoginMark />
-        <h1 className="login-title">Choose an archive</h1>
-        <p className="login-lede">This account belongs to more than one archive.</p>
-        <div className="archive-choice-list mt-6">
+      <LoginFrame title="Your spaces." lede="Choose your archive">
+        <div className="login-choices">
           {archiveChoice.archives.map((archive) => (
             <button
               key={archive.archiveId}
               type="button"
+              className="login-choice press"
               disabled={loading}
               onClick={() => void handleArchiveChoice(archive.archiveId)}
             >
               <span>{archive.name}</span>
-              <small>
-                Joined{" "}
-                {new Date(archive.joinedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </small>
-              <ArrowRight size={16} />
+              <small>Open</small>
             </button>
           ))}
         </div>
         {error && (
-          <p role="alert" className="readout mt-3 text-danger">
+          <p role="alert" className="login-error">
             {error}
           </p>
         )}
+        <button
+          type="button"
+          className="login-quiet press"
+          disabled={loading}
+          onClick={() => {
+            setArchiveChoice(null);
+            setError("");
+          }}
+        >
+          Use another account
+        </button>
       </LoginFrame>
     );
   }
 
   if (confirmation) {
     return (
-      <LoginFrame>
-        <span className="login-mark is-quiet">
-          <MailCheck size={20} />
+      <LoginFrame title="Confirm your address." lede={confirmation}>
+        <span className="login-mark">
+          <MailCheck size={22} />
         </span>
-        <h1 className="login-title">Confirm your address</h1>
-        <p className="login-address">{confirmation}</p>
-        <p className="login-lede">
-          A message is on its way. Opening the link in it proves the address is yours and finishes
-          the account.
-        </p>
         <ol className="login-steps">
           <li>Open the message and follow its link — it brings you back here.</li>
           <li>Sign in with the same address and password.</li>
@@ -227,59 +206,48 @@ export default function Login() {
               : "Your own private archive is created the first time you sign in."}
           </li>
         </ol>
-        <p className="login-note">
-          Nothing arrived? Check the spam folder. The link works for 24 hours; after that, create
-          the account again with the same address.
-        </p>
         <button
           type="button"
-          className="login-submit label"
+          className="login-submit"
           onClick={() => {
             setConfirmation("");
             switchMode("sign-in");
           }}
         >
-          Back to sign in
+          Back to Sign In <ArrowRight size={18} />
         </button>
       </LoginFrame>
     );
   }
 
   return (
-    <LoginFrame>
-      {/* Which of the two you are doing is decided before anything is typed,
-          and the whole card answers to it — heading, explanation, button and
-          footnote — so creating an account is never the sign-in page wearing
-          a different word. */}
-      <div className="login-tabs" role="group" aria-label="Sign in or create an account">
+    <LoginFrame title={copy.title} lede={copy.lede}>
+      {/* Which of the two you are doing is decided before anything is typed:
+          the phone's switch, a plate that travels between two words, and the
+          whole card — title, button, the password's hint — answers to it. */}
+      <div className="login-switch" role="group" aria-label="Sign in or create an account">
+        <span className="login-switch-plate" data-mode={mode} aria-hidden="true" />
         <button
           type="button"
           aria-pressed={mode === "sign-in"}
-          className={mode === "sign-in" ? "is-active" : ""}
           onClick={() => switchMode("sign-in")}
         >
-          Sign in
+          Sign In
         </button>
         <button
           type="button"
           aria-pressed={mode === "sign-up"}
-          className={mode === "sign-up" ? "is-active" : ""}
           onClick={() => switchMode("sign-up")}
         >
-          Create account
+          Create Account
         </button>
-        <span className="login-tabs-marker" data-mode={mode} />
       </div>
-
-      <h1 className="login-title">{copy.title}</h1>
-      <p className="login-lede">{copy.lede}</p>
 
       {invited && (
         <p className="login-invite-note">
-          You followed an invitation.{" "}
           {mode === "sign-in"
             ? "Sign in with the invited address to join that archive."
-            : "Create the account with the invited address — the invitation is claimed as soon as it exists."}
+            : "Create the account with the invited address to join that archive."}
         </p>
       )}
 
@@ -290,70 +258,89 @@ export default function Login() {
           void handleSubmit();
         }}
       >
-        {/* Ruled fields, not boxes. Two outlined rectangles on a plane inside a
-            plane is three frames deep before a single character is typed. */}
-        <div className="login-field">
-          <label className="label" htmlFor="email">
-            Email
-          </label>
+        <label className="login-field" htmlFor="email">
+          <span className="login-field-label">Email</span>
           <input
             id="email"
             autoFocus
             type="email"
             autoComplete="email"
+            placeholder="you@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="login-input"
           />
-        </div>
+        </label>
 
-        <div className="login-field login-secret">
-          <label className="label" htmlFor="password">
+        <label className="login-field" htmlFor="password">
+          <span className="login-field-label">
             Password
-            {mode === "sign-up" && <span className="login-hint">8 characters or more</span>}
-          </label>
+            <button
+              type="button"
+              className="login-reveal"
+              aria-pressed={revealed}
+              onClick={(event) => {
+                event.preventDefault();
+                setRevealed((current) => !current);
+              }}
+            >
+              {revealed ? "Hide" : "Show"}
+            </button>
+          </span>
           <input
             id="password"
             type={revealed ? "text" : "password"}
             autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+            placeholder={mode === "sign-up" ? "At least 8 characters" : "Your password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="login-input"
           />
-          <button
-            type="button"
-            className="login-reveal"
-            aria-label={revealed ? "Hide password" : "Show password"}
-            aria-pressed={revealed}
-            onClick={() => setRevealed((current) => !current)}
-          >
-            {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </div>
+        </label>
 
         <button
           type="submit"
           disabled={loading || !email.trim() || !password}
-          className="login-submit label"
+          className="login-submit"
         >
           {loading ? (
-            mode === "sign-up" ? (
-              "Creating…"
-            ) : (
-              "Opening…"
-            )
+            <span className="login-ring" aria-label={mode === "sign-up" ? "Creating" : "Opening"} />
           ) : (
             <>
-              {copy.action} <ArrowRight size={16} />
+              {copy.action} <ArrowRight size={18} />
             </>
           )}
         </button>
       </form>
 
       {error && (
-        <p role="alert" className="readout login-error">
+        <p role="alert" className="login-error">
           {error}
         </p>
+      )}
+
+      {saved.length > 0 && mode === "sign-in" && (
+        <section className="login-saved" aria-label="Saved on this computer">
+          <h2>Saved on this computer</h2>
+          {saved.map((account) => (
+            <button
+              key={account.userId}
+              type="button"
+              className="login-choice press"
+              disabled={loading}
+              onClick={() => {
+                setLoading(true);
+                void switchAccount(account.userId).catch((reason: unknown) => {
+                  setError(reason instanceof Error ? reason.message : "Could not open it");
+                  setLoading(false);
+                });
+              }}
+            >
+              <span>{account.email}</span>
+              <ArrowRight size={18} />
+            </button>
+          ))}
+        </section>
       )}
     </LoginFrame>
   );
@@ -365,98 +352,41 @@ function plantOfTheDay(): ReturnType<typeof flowerFor> {
   return flowerFor(new Date().toDateString());
 }
 
-/* What goes in the archive, in the colour its tool takes in the toolbar — the
-   pill on the door and the glyph under the pointer are the same hue for the
-   same thing, so the colour means something before anybody has signed in. */
-const KINDS = [
-  { word: "notes", tone: "var(--tint-yellow)", Icon: NotebookText },
-  { word: "drawings", tone: "var(--tint-pink)", Icon: Pencil },
-  { word: "remarks", tone: "var(--tint-mint)", Icon: MessageSquare },
-  { word: "pictures", tone: "var(--tint-blue)", Icon: Image },
-  { word: "checklists", tone: "var(--tint-orange)", Icon: ListChecks },
-  { word: "tables", tone: "var(--tint-purple)", Icon: Table },
-] as const;
-
-/* Glossa's door, in this app's words: the pitch on the pastel of a word that
-   turns every few seconds, the field behind it following, and a dot per word
-   below that lights in turn. The word swaps with a blur rather than a slide,
-   and the pill it sits in measures what is coming and travels to that width,
-   so the line never jumps. */
-function Pitch() {
-  const [at, setAt] = useState(0);
-  const [width, setWidth] = useState<number>();
-  const word = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setAt((i) => (i + 1) % KINDS.length), 2400);
-    return () => window.clearInterval(timer);
-  }, []);
-  useLayoutEffect(() => {
-    const node = word.current;
-    if (!node) return;
-    // The headline is set in `vw`, so the word changes width with the window too.
-    const measure = new ResizeObserver(() => setWidth(node.offsetWidth));
-    measure.observe(node);
-    setWidth(node.offsetWidth);
-    return () => measure.disconnect();
-  }, [at]);
-  const { word: text, tone, Icon } = KINDS[at];
-
-  return (
-    <section className="login-pitch" style={{ "--tone": tone } as React.CSSProperties}>
-      <div className="login-garden" aria-hidden="true">
-        <BotanicalFlower flower={plantOfTheDay()} className="is-near" />
-      </div>
-      <span className="login-wordmark">
-        <img src={logoUrl} alt="" width={28} height={28} />
-        Napp
-      </span>
-      <p className="login-headline">
-        Two people.
-        <br />
-        One archive of
-        <br />
-        <span className="login-pill" style={{ width }}>
-          <span key={text} ref={word} className="login-pill-word">
-            <Icon size="0.62em" weight="bold" />
-            {text}
-          </span>
-        </span>
-      </p>
-      <div className="login-kinds">
-        <span className="login-dots">
-          {KINDS.map((kind, i) => (
-            <button
-              key={kind.word}
-              type="button"
-              aria-label={kind.word}
-              aria-pressed={i === at}
-              onClick={() => setAt(i)}
-              style={{ "--tone": kind.tone } as React.CSSProperties}
-            />
-          ))}
-        </span>
-        <span className="login-eyebrow">Shared notes, written by two</span>
-      </div>
-    </section>
-  );
-}
-
-function LoginFrame({ children }: { children: React.ReactNode }) {
+/* The phone's door: a dark wall with the plant of the day drawn on it twice,
+   the mark and the name in the corner, the title over a frosted card that
+   holds the form. Dark in every theme, as the phone's is: nobody has chosen a
+   palette yet, and the plate is drawn for a dark ground. */
+function LoginFrame({
+  title,
+  lede,
+  children,
+}: {
+  title: string;
+  lede: string;
+  children: ReactNode;
+}) {
+  const plant = plantOfTheDay();
   return (
     <div className="login-shell">
-      <Pitch />
+      <div className="login-garden" aria-hidden="true">
+        <BotanicalFlower flower={plant} className="is-near" />
+        <BotanicalFlower flower={plant} className="is-far" />
+      </div>
+      <span className="login-brand">
+        <img src={logoUrl} alt="" width={30} height={30} />
+        napp
+      </span>
       <main className="login-main">
-        <div className="login-card">{children}</div>
+        <div className="login-column">
+          <header className="login-intro">
+            <h1 key={title} className="login-title">
+              {title}
+            </h1>
+            <p className="login-lede">{lede}</p>
+          </header>
+          <div className="login-card">{children}</div>
+        </div>
       </main>
     </div>
-  );
-}
-
-function LoginMark() {
-  return (
-    <span className="login-mark">
-      <NotebookPen size={20} />
-    </span>
   );
 }
