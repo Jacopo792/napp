@@ -22,7 +22,7 @@ export function TrashSheet({
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   return (
-    <Sheet label="Trash" origin={origin}>
+    <Sheet label="Recently Deleted" origin={origin}>
       <div className="sheet-body">
         <header className="sheet-hero">
           <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>

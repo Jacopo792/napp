@@ -587,25 +587,30 @@
    the title gets the tight display cut and the body the open text cut from
    one file. A serif needs none of the negative tracking the sans display is
    set with; kept, it closes the counters up. `system` is one click away in
-   Settings → Reading, and puts every rule below out of play. */
-[data-reading-face="serif"] {
+   Settings → Reading, and puts every rule below out of play.
+
+   Literata is the book's now, and only the book's: a note is set in the
+   system face, as on the phone (`.rich-text-editor` below), so the note and
+   the phone read as one app. The book — the sheet, its corkboard and its
+   style menu — keeps the face exactly as it was. */
+[data-reading-face="serif"] :is(.manuscript-shell, .style-row-name) {
   --font-reading: "Literata Variable", "Iowan Old Style", Georgia, serif;
 }
 
-[data-reading-face="serif"] .note-title {
+[data-reading-face="serif"] :where(.manuscript-shell) .note-title {
   font-family: var(--font-reading);
   font-weight: 640;
   letter-spacing: -0.006em;
   line-height: 1.12;
 }
 
-[data-reading-face="serif"] .rich-text-content :is(h1, h2, h3) {
+[data-reading-face="serif"] :where(.manuscript-shell) .rich-text-content :is(h1, h2, h3) {
   font-family: var(--font-reading);
   font-weight: 640;
   letter-spacing: -0.004em;
 }
 
-[data-reading-face="serif"] .rich-text-content h3 {
+[data-reading-face="serif"] :where(.manuscript-shell) .rich-text-content h3 {
   letter-spacing: 0;
 }
 
@@ -4285,54 +4290,59 @@
   background: rgb(128 128 128 / 0.38);
 }
 
-/* Three across, and nine palettes: three full rows. Four across left the
-   ninth chip alone on a row of its own, which reads as one palette that did
-   not fit rather than as the last of the set. It also lines the grid up with
-   the three theme cards above it. */
+/* The phone's five, five across: each card its light side over its dark side,
+   so choosing one is never a guess about how it looks in the other light. */
 .palette-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 20px;
 }
 
 .palette-presets button {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  padding: 8px 8px;
+  padding: 0;
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
 
-.palette-presets button:hover,
 .palette-presets button.is-active {
-  border-color: var(--rule);
-  background: var(--accent-wash);
   color: var(--ink);
+  font-weight: 600;
 }
 
-.palette-presets button.is-active {
-  box-shadow: inset 0 0 0 1px var(--accent);
+.palette-card {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
 }
 
-.palette-chip {
-  position: relative;
-  display: block;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border: 1px solid rgb(128 128 128 / 0.28);
+.palette-presets button.is-active .palette-card {
+  box-shadow:
+    0 0 0 2px var(--page),
+    0 0 0 4px var(--accent);
+}
+
+.palette-card > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.palette-card i {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--palette-bg) 0 54%,
-    var(--palette-accent) 54% 76%,
-    var(--palette-fg) 76%
-  );
 }
 
 .theme-preview i {
@@ -4817,7 +4827,7 @@
   }
 
   .palette-presets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -7468,6 +7478,15 @@ body:has(.sidebar-row.is-over) .drag-chip {
   font-size: var(--read-size);
   font-weight: var(--read-weight);
   line-height: var(--read-leading);
+}
+
+/* A note reads as it does on the phone: the system face at its reading
+   weight and leading. The size stays the reader's (17px unless changed); the
+   book keeps every axis and its own letter. */
+.editor-shell:not(.manuscript-shell) .rich-text-editor {
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+  line-height: 1.55;
 }
 
 /* The run-out below the last line is the content's, not the scroll box's. As
@@ -13661,4 +13680,704 @@ button.sheet-chip:hover,
   border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   border-radius: inherit;
   background: color-mix(in srgb, var(--ink) 14%, var(--paper));
+}
+
+/* ── The list as the phone draws it ──────────────────────────────────────────
+   Under the strip, the phone's bar: a search pill, a round button for the one
+   act that adds, then the sort as chips. Below them each date group is a card
+   inside the column — its small grey heading inside it, no rules between its
+   rows, the chosen row an accent wash. The column stays a flush column on the
+   palette's ground; the cards are content in it, never panels.
+
+   The card clips, and that is load-bearing for the swipe: a row's panels are
+   parked at `left: 100%` and `right: 100%` of the row, and it is the card's
+   edge, not only the list's `overflow-x`, that keeps them out of sight. */
+:root:not(.has-wallpaper) .collection-column:not(.is-gallery) {
+  background: var(--page);
+}
+
+.list-search-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.list-search-pill {
+  display: flex;
+  height: 36px;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.list-search-pill:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.list-round-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.list-round-button:disabled {
+  opacity: 0.4;
+}
+
+.list-sort-chips {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 12px 2px;
+  scrollbar-width: none;
+}
+
+.list-sort-chip {
+  display: inline-flex;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  padding: 0 12px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+}
+
+.list-sort-chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--page);
+}
+
+.collection-column:not(.is-gallery) .note-group {
+  margin: 0 12px 12px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--card);
+}
+
+.collection-column:not(.is-gallery) .note-group-heading,
+:root:is(.has-wallpaper, .has-translucent-sidebar)
+  .collection-column:not(.is-gallery)
+  .note-group-heading {
+  position: static;
+  background: transparent;
+  padding: 14px 16px 4px;
+}
+
+.collection-column:not(.is-gallery) .note-group-heading h3 {
+  font-size: 13px;
+}
+
+.collection-column:not(.is-gallery) .note-group-body.is-open > * {
+  padding-bottom: 6px;
+}
+
+.note-row-list {
+  margin-inline: 0;
+  border-radius: 0;
+  padding: 10px 16px;
+}
+
+.note-row-list::after {
+  display: none;
+}
+
+.note-row-list.is-selected {
+  background: var(--accent-wash);
+}
+
+.note-row.note-row-list.is-swiped {
+  background: var(--card);
+}
+
+.note-row-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.note-row-head > p {
+  min-width: 0;
+  flex: 1;
+}
+
+.note-row-stamp {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-row-list .note-row-summary > .note-row-preview {
+  flex: 1 1 auto;
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
+}
+
+/* The phone's notebook index at the head of the notes sidebar: titles, not
+   faces; the chosen one in ink with a 2px accent line under it, the others
+   quiet. Nothing scales or bounces; the ink and the line fade. */
+.notebook-index {
+  display: flex;
+  gap: 18px;
+  margin: 2px 0 10px;
+  overflow-x: auto;
+  padding: 0 8px;
+  scrollbar-width: none;
+}
+
+.notebook-index-title {
+  position: relative;
+  flex-shrink: 0;
+  padding: 4px 0 8px;
+  color: var(--ink-4);
+  font-size: 17px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: color 180ms var(--ease);
+}
+
+.notebook-index-title::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: "";
+  opacity: 0;
+  transition: opacity 260ms var(--ease);
+}
+
+.notebook-index-title.is-active {
+  color: var(--ink);
+}
+
+.notebook-index-title.is-active::after {
+  opacity: 1;
+}
+
+/* Inside a card the row is square, so a panel tucked a corner's width under
+   it would show as a coloured edge; parked exactly at the row's edge, the card
+   clips it until the row moves. */
+.note-row-list .note-row-action.is-left {
+  left: 100%;
+  padding-left: 0;
+}
+
+.note-row-list .note-row-action.is-right {
+  right: 100%;
+  padding-right: 0;
+}
+
+/* ── Home ────────────────────────────────────────────────────────────────────
+   The phone's first tab as a column of its own, where the list and the note
+   stand otherwise: one 52px strip like theirs, then the notebook's front page
+   on the palette's ground at a measure of 920. Cards are `--card`, 24 and 20
+   round, rows inside them have no rules. It arrives by fading — nothing here
+   has a direction to come from — and nothing in it moves under the pointer. */
+:is(.sidebar-glyph, .settings-nav-tile)[data-tone="home"] {
+  --tone: #2f7cf6;
+}
+
+.home-page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--page);
+  animation: fade-in var(--dur-base) var(--ease) backwards;
+}
+
+.home-strip {
+  display: flex;
+  min-height: 52px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--paper);
+  box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+[data-shell] .home-strip {
+  -webkit-app-region: drag;
+}
+
+[data-shell] .home-strip > * {
+  -webkit-app-region: no-drag;
+}
+
+.home-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.home-measure {
+  display: flex;
+  max-width: 920px;
+  flex-direction: column;
+  gap: 26px;
+  margin: 0 auto;
+  padding: 28px 40px 48px;
+}
+
+.home-card {
+  display: block;
+  width: 100%;
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--rule-soft);
+  color: var(--ink);
+  text-align: left;
+}
+
+.home-continue {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 28px;
+}
+
+.home-label {
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+}
+
+.home-continue-title {
+  display: -webkit-box;
+  margin-top: 8px;
+  overflow: hidden;
+  font-size: 28px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.home-continue-preview {
+  display: -webkit-box;
+  max-width: 700px;
+  margin-top: 10px;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.home-continue-empty {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-4);
+  font-size: 28px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.015em;
+}
+
+.home-caret {
+  width: 2px;
+  height: 30px;
+  margin-left: 4px;
+  border-radius: 1px;
+  background: var(--accent);
+  animation: home-caret 1.06s steps(1) infinite;
+}
+
+@keyframes home-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page,
+  .home-caret {
+    animation: none;
+  }
+}
+
+.home-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.home-folder .home-foot {
+  margin-top: 12px;
+  padding-left: 4px;
+}
+
+.home-where {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
+.home-arrow {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  margin-left: auto;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+}
+
+.home-arrow.is-accent {
+  color: var(--accent);
+}
+
+.home-folder .home-arrow {
+  width: 32px;
+  height: 32px;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-section > h2 {
+  margin: 0;
+  padding-left: 4px;
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+}
+
+.home-pinned {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.home-pin {
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  padding: 16px 18px;
+}
+
+.home-pin-title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-pin-preview {
+  display: -webkit-box;
+  min-height: 2.8em;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.home-pin-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+
+.home-folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.home-folder {
+  padding: 18px;
+}
+
+.home-folder-head {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.home-folder-head h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-more {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+
+.home-well {
+  margin-top: 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 4px 0;
+}
+
+.home-well-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.home-well-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-well-date {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.home-places {
+  padding: 6px 0;
+}
+
+.home-place {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px;
+  font-size: 16px;
+  text-align: left;
+}
+
+.home-place-tile {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.home-place-tile[data-tone="archive"] {
+  color: #a970ff;
+}
+
+.home-place-tile[data-tone="trash"] {
+  color: #ff453a;
+}
+
+.home-place-count {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.home-faces {
+  display: inline-flex;
+  flex-shrink: 0;
+  --face-size: 20px;
+}
+
+.home-faces .avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+:is(.home-continue, .home-pin, .home-well-row, .home-place):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── The note's bars ─────────────────────────────────────────────────────────
+   The phone's two, at the foot of the pane and on the writing column: one
+   capsule of writing tools and Comments in a circle of the same height. They
+   are the last thing in the scroll box and sticky to its bottom, so they ride
+   16px above the foot while there is note below and come to rest under the
+   run-out after its last line. Glass from the palette's card colour on a layer
+   behind each — the capsule holds the menus it opens, and a filter on it would
+   make it the backdrop root of every one of them. */
+.note-bars-dock {
+  position: sticky;
+  z-index: 30;
+  bottom: 16px;
+  margin-top: 8px;
+  pointer-events: none;
+}
+
+.note-bars {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.note-bars > * {
+  pointer-events: auto;
+}
+
+.note-bars .editor-tool-cluster,
+.note-bars-comments {
+  position: relative;
+  height: 48px;
+  border: 0;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px var(--rule),
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 8px 24px -10px rgb(0 0 0 / 0.35);
+}
+
+.note-bars .editor-tool-cluster {
+  gap: 2px;
+  border-radius: 24px;
+  padding: 0 4px;
+}
+
+.note-bars .editor-tool-cluster::before,
+.note-bars-comments::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--card) 80%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  content: "";
+  pointer-events: none;
+}
+
+.note-bars .editor-tool-button {
+  width: 44px;
+  height: 40px;
+}
+
+.note-bars .editor-tool-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.note-bars .editor-tool-letters {
+  font-size: 16px;
+}
+
+.note-bars-comments {
+  display: grid;
+  width: 48px;
+  flex-shrink: 0;
+  margin-left: auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+}
+
+.note-bars-comments.is-active {
+  color: var(--accent);
+}
+
+/* The menus a foot capsule opens rise over the page; the list stays a list. */
+.note-bars .editor-tool-menu {
+  max-height: min(70vh, 34rem);
+  overflow-y: auto;
+}
+
+@media print {
+  .note-bars-dock {
+    display: none !important;
+  }
+}
+
+/* A short note still has its bars on the foot of the pane: the column is a
+   flex column and the dock takes the slack above it. */
+.editor-scroll:has(> .note-bars-dock) {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-scroll:has(> .note-bars-dock) > * {
+  flex-shrink: 0;
+}
+
+.editor-scroll > .note-bars-dock {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* Focus mode quiets the bars with the strip: same fade, same way back. */
+.workspace-shell.is-focus .note-bars {
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.workspace-shell.is-focus.is-quiet .note-bars:not(:hover, :focus-within) {
+  opacity: 0.12;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell.is-focus .note-bars {
+    transition: none;
+  }
+}
+
+/* A narrow pane — half of a split, a small window — closes the tools up
+   rather than pushing Comments past the column. */
+.note-bars-dock {
+  container-type: inline-size;
+}
+
+@container (width < 400px) {
+  .note-bars {
+    gap: 8px;
+  }
+
+  .note-bars .editor-tool-button {
+    width: 36px;
+  }
 }

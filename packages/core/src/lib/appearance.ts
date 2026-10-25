@@ -81,7 +81,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   frosted: false,
 };
 
-/* Seventeen starting points, each a ground, an ink and one colour to act with.
+/* Eighteen starting points, each a ground, an ink and one colour to act with.
    Every ground carries a little of its accent's hue — a palette whose ground
    is neutral grey reads as one colour dropped onto a grey app — and every
    accent is a colour somebody would choose on purpose, not a tint of the
@@ -117,6 +117,17 @@ export const APPEARANCE_PRESETS = [
     accent: "#2f6fd6",
     background: "#f8f5ee",
     foreground: "#28241e",
+  },
+  /* Ink: a warm black, cream to write in and one terracotta to act with —
+     a notebook at night. The phone darkens its ground further, so cards of
+     paper stand on it. */
+  {
+    id: "ink",
+    name: "Ink",
+    theme: "dark" as const,
+    accent: "#c4643f",
+    background: "#1f1c18",
+    foreground: "#efe7da",
   },
   {
     id: "midnight",
@@ -237,11 +248,120 @@ export const APPEARANCE_PRESETS = [
   },
 ] as const;
 
-const LIGHT_DEFAULTS = {
-  accent: "#1677c8",
-  background: "#fbfaf7",
-  foreground: "#242424",
+/* The phone's five, each a light side and a dark side; the Theme control
+   (Automatic, Light, Dark) says which is worn (Jacopo, 24 October 2026). The
+   computer keeps the eighteen above. What is stored is still the three
+   colours of the side being worn, so a row any client wrote keeps reading:
+   `phonePaletteOf` recognises either side of the five, and anything else by
+   the old preset it was — a colour nobody chose from a list is Graphite. */
+export interface PhoneSide {
+  background: string;
+  card: string;
+  foreground: string;
+  accent: string;
+}
+export const PHONE_PALETTES = [
+  {
+    id: "paper",
+    name: "Paper",
+    light: { background: "#f7f3ea", card: "#ffffff", foreground: "#28241e", accent: "#2f6fd6" },
+    dark: { background: "#16130f", card: "#24201b", foreground: "#efe7da", accent: "#c4643f" },
+  },
+  {
+    id: "graphite",
+    name: "Graphite",
+    light: { background: "#f2f2f7", card: "#ffffff", foreground: "#1c1c1e", accent: "#0a84ff" },
+    dark: { background: "#000000", card: "#1c1c1e", foreground: "#ececec", accent: "#0a84ff" },
+  },
+  {
+    id: "fjord",
+    name: "Fjord",
+    light: { background: "#eef1f5", card: "#ffffff", foreground: "#2e3440", accent: "#4c7a93" },
+    dark: { background: "#242933", card: "#2e3440", foreground: "#eceff4", accent: "#88c0d0" },
+  },
+  {
+    id: "rosewood",
+    name: "Rosewood",
+    light: { background: "#f8f0ef", card: "#ffffff", foreground: "#2e2124", accent: "#b8616e" },
+    dark: { background: "#1a1517", card: "#262022", foreground: "#f3e9ea", accent: "#e59aa4" },
+  },
+  {
+    id: "pine",
+    name: "Pine",
+    light: { background: "#eff3ec", card: "#ffffff", foreground: "#1f2a22", accent: "#3e7a52" },
+    dark: { background: "#0f1612", card: "#1a241e", foreground: "#e4ece5", accent: "#a9c8a0" },
+  },
+] as const satisfies readonly { id: string; name: string; light: PhoneSide; dark: PhoneSide }[];
+export type PhonePaletteId = (typeof PHONE_PALETTES)[number]["id"];
+
+/* Where each of the eighteen lands on the phone. */
+const PHONE_PALETTE_FOR: Record<string, PhonePaletteId> = {
+  paper: "paper",
+  vanilla: "paper",
+  lavender: "paper",
+  ink: "paper",
+  espresso: "paper",
+  ember: "paper",
+  graphite: "graphite",
+  night: "graphite",
+  midnight: "graphite",
+  cosmic: "graphite",
+  violet: "graphite",
+  aurora: "graphite",
+  fjord: "fjord",
+  abyss: "fjord",
+  rosewood: "rosewood",
+  plum: "rosewood",
+  moss: "pine",
+  pine: "pine",
 };
+
+/** Which of the five a stored appearance is wearing. */
+export function phonePaletteOf(
+  config: Pick<Appearance, "background" | "foreground">,
+): PhonePaletteId {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const worn = (side: PhoneSide) =>
+    same(side.background, config.background) && same(side.foreground, config.foreground);
+  const own = PHONE_PALETTES.find((palette) => worn(palette.light) || worn(palette.dark));
+  if (own) return own.id;
+  const old = APPEARANCE_PRESETS.find(
+    (preset) =>
+      same(preset.background, config.background) && same(preset.foreground, config.foreground),
+  );
+  return (old && PHONE_PALETTE_FOR[old.id]) || "graphite";
+}
+
+/** The side of one of the five that the phone wears in this light. */
+export function phoneSide(id: PhonePaletteId, dark: boolean): PhoneSide {
+  const palette = PHONE_PALETTES.find((candidate) => candidate.id === id) ?? PHONE_PALETTES[1];
+  return dark ? palette.dark : palette.light;
+}
+
+/** The side of the five this appearance wears in this light, when its stored
+ *  colours are one of the five's — so Automatic turns with the display on the
+ *  computer as it does on the phone. An accent the reader set by hand stays
+ *  theirs on either side. Null for the eighteen and for hand-mixed colours,
+ *  which are worn exactly as stored. */
+export function wornSide(
+  config: Pick<Appearance, "background" | "foreground" | "accent">,
+  dark: boolean,
+): PhoneSide | null {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  for (const palette of PHONE_PALETTES) {
+    const stored = [palette.light, palette.dark].find(
+      (side) =>
+        same(side.background, config.background) && same(side.foreground, config.foreground),
+    );
+    if (!stored) continue;
+    const side = dark ? palette.dark : palette.light;
+    if (same(stored.accent, config.accent)) return side;
+    /* An accent that is the ink — the computer's Graphite — stays the ink. */
+    if (same(stored.foreground, config.accent)) return { ...side, accent: side.foreground };
+    return { ...side, accent: config.accent };
+  }
+  return null;
+}
 
 const KEY = "napp:appearance:v1";
 const DB = "napp:appearance";
@@ -397,36 +517,32 @@ const SEMANTIC = {
   },
 } as const;
 
-export function applyAppearance(config = current): void {
-  const root = document.documentElement;
-  const dark = darkMode(config);
+/** Every colour the interface is drawn in, worked out from the reader's
+ *  appearance — as a map, so the web can write it onto the document and the
+ *  phone can read it into its own styles. One derivation, two surfaces. */
+export function appearanceTokens(config: Appearance, dark: boolean): Record<string, string> {
+  const tokens: Record<string, string> = {};
+  const set = (name: string, value: string) => void (tokens[name] = value);
+  const side = wornSide(config, dark);
+  if (side) config = { ...config, ...side };
   const background = config.background;
   const foreground = config.foreground;
   const contrastShift = (config.contrast - 50) / 100;
 
-  root.dataset.theme = dark ? "dark" : "light";
-  root.style.colorScheme = dark ? "dark" : "light";
-  root.style.setProperty("--page", background);
-  root.style.setProperty(
+  set("--page", background);
+  /* What a card inside a column is drawn in: the five name theirs; the
+     eighteen get one a step off their ground, lighter either way. */
+  set("--card", side?.card ?? mix(background, dark ? 0.08 : 0.7, "white"));
+  set(
     "--paper",
     mix(background, dark ? 0.11 + contrastShift * 0.08 : 0.035, dark ? "white" : "black"),
   );
-  root.style.setProperty(
+  set(
     "--surface",
     mix(background, dark ? 0.17 + contrastShift * 0.12 : 0.045, dark ? "black" : "white"),
   );
-  root.style.setProperty("--ink", foreground);
-  /* Windows owns the caption buttons, so the native strip follows the page
-     ground and ink whenever a reader changes palette. A wallpaper is content,
-     not something Windows can safely crop into window controls; its own base
-     palette remains the visual bridge between the two. */
-  const nativeFrame = (
-    window as unknown as {
-      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
-    }
-  ).napp;
-  nativeFrame?.setFrameTheme?.(background, foreground);
-  root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
+  set("--ink", foreground);
+  set("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
   /* The two muted inks are the whole legibility budget of the interface: every
      metadata line, every list marker and every idle glyph is one of them, and
      they were mixed far enough toward the ground to read as "disabled" on
@@ -442,9 +558,9 @@ export function applyAppearance(config = current): void {
      above 4.5:1 on that ground. It is held at 3.4:1 — over the 3:1 floor for
      an icon or a large label, which is all it is for. It is not a tier to set
      a sentence in. */
-  root.style.setProperty("--ink-3", mix(foreground, dark ? 0.24 : 0.26, dark ? "black" : "white"));
-  root.style.setProperty("--ink-4", mix(foreground, dark ? 0.34 : 0.36, dark ? "black" : "white"));
-  root.style.setProperty(
+  set("--ink-3", mix(foreground, dark ? 0.24 : 0.26, dark ? "black" : "white"));
+  set("--ink-4", mix(foreground, dark ? 0.34 : 0.36, dark ? "black" : "white"));
+  set(
     "--rule",
     mix(
       background,
@@ -452,7 +568,7 @@ export function applyAppearance(config = current): void {
       dark ? "white" : "black",
     ),
   );
-  root.style.setProperty(
+  set(
     "--rule-soft",
     mix(
       background,
@@ -473,39 +589,35 @@ export function applyAppearance(config = current): void {
   const accent = legibleOn(config.accent, paper, 3);
   const onAccent =
     contrastRatio(accent, "#f7f7f7") >= contrastRatio(accent, "#161616") ? "#f7f7f7" : "#161616";
-  root.style.setProperty("--accent", accent);
-  root.style.setProperty("--accent-strong", legibleOn(config.accent, paper, 4.5));
-  root.style.setProperty("--accent-wash", `${accent}24`);
+  set("--accent", accent);
+  set("--accent-strong", legibleOn(config.accent, paper, 4.5));
+  set("--accent-wash", `${accent}24`);
   /* Tinted icons take the accent unless the reader gave them a hue of their
      own, lifted to the same floors the accent is so a dark tint stays a
      visible glyph. */
   const tint = autoOrHex(config.iconTint);
-  root.style.setProperty("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
-  root.style.setProperty(
+  set("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
+  set(
     "--icon-tint-strong",
     tint === "auto" ? legibleOn(config.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
   );
-  root.style.setProperty("--on-accent", onAccent);
-  root.style.setProperty(
+  set("--on-accent", onAccent);
+  set(
     "--glass",
     config.translucentSidebar ? `${background}cc` : mix(background, 0.09, dark ? "white" : "black"),
   );
-  root.style.setProperty("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
-  root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
-  root.classList.toggle("has-frosted-glass", config.frosted);
+  set("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
   /* Liquid Glass: the share of the palette laid over a translucent surface.
      Two ranges, because the Mac's own material is already a tint and a CSS
      backdrop blur is not — the same "clear" is a lighter coat over vibrancy. */
   const glass = clamp(config.glass, 0, 100, DEFAULT_APPEARANCE.glass);
-  root.style.setProperty("--glass-tint", `${40 + glass / 2}%`);
-  root.style.setProperty("--glass-tint-native", `${20 + glass / 2}%`);
-  root.style.setProperty("--glass-tint-menu", `${70 + glass / 4}%`);
-  root.dataset.iconStyle = config.iconStyle;
+  set("--glass-tint", `${40 + glass / 2}%`);
+  set("--glass-tint-native", `${20 + glass / 2}%`);
+  set("--glass-tint-menu", `${70 + glass / 4}%`);
   const folder = autoOrHex(config.folderColour);
-  if (folder === "auto") root.style.removeProperty("--folder-tint");
-  else root.style.setProperty("--folder-tint", folder);
+  if (folder !== "auto") set("--folder-tint", folder);
   const highlight = autoOrHex(config.highlight);
-  root.style.setProperty(
+  set(
     "--selection",
     highlight !== "auto"
       ? `${highlight}59`
@@ -513,20 +625,45 @@ export function applyAppearance(config = current): void {
         ? "rgb(255 255 255 / 0.22)"
         : "rgb(0 0 0 / 0.14)",
   );
-  root.classList.toggle("has-wallpaper", config.wallpaper && Boolean(wallpaperUrl));
-  root.style.setProperty(
-    "--wallpaper",
-    wallpaperUrl ? `url(${JSON.stringify(wallpaperUrl)})` : "none",
-  );
-  root.style.setProperty("--wallpaper-dim", String(config.wallpaperDim / 100));
-  root.style.setProperty(
-    "--wallpaper-filter",
-    config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : "none",
-  );
-  root.style.setProperty("--wallpaper-fit", config.wallpaperFit);
   for (const [token, value] of Object.entries(SEMANTIC[dark ? "dark" : "light"])) {
-    root.style.setProperty(token, value);
+    set(token, value);
   }
+  return tokens;
+}
+
+export function applyAppearance(config = current): void {
+  /* A phone draws with its own views and reads `appearanceTokens` instead;
+     there is no document to write to. */
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const dark = darkMode(config);
+  const side = wornSide(config, dark);
+  const background = side?.background ?? config.background;
+  const foreground = side?.foreground ?? config.foreground;
+
+  root.dataset.theme = dark ? "dark" : "light";
+  root.style.colorScheme = dark ? "dark" : "light";
+  const set = (name: string, value: string) => root.style.setProperty(name, value);
+  root.style.removeProperty("--folder-tint");
+  for (const [token, value] of Object.entries(appearanceTokens(config, dark))) set(token, value);
+  /* Windows owns the caption buttons, so the native strip follows the page
+     ground and ink whenever a reader changes palette. A wallpaper is content,
+     not something Windows can safely crop into window controls; its own base
+     palette remains the visual bridge between the two. */
+  const nativeFrame = (
+    window as unknown as {
+      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
+    }
+  ).napp;
+  nativeFrame?.setFrameTheme?.(background, foreground);
+  root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
+  root.classList.toggle("has-frosted-glass", config.frosted);
+  root.dataset.iconStyle = config.iconStyle;
+  root.classList.toggle("has-wallpaper", config.wallpaper && Boolean(wallpaperUrl));
+  set("--wallpaper", wallpaperUrl ? `url(${JSON.stringify(wallpaperUrl)})` : "none");
+  set("--wallpaper-dim", String(config.wallpaperDim / 100));
+  set("--wallpaper-filter", config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : "none");
+  set("--wallpaper-fit", config.wallpaperFit);
   /* The browser paints its own chrome — address bar on the phone, the band
      behind a scrolled page — from this tag, and it was nailed to the graphite
      default in the markup. A reader on the Paper theme got a black strip above
@@ -591,8 +728,12 @@ function scheduleAppearanceCommit(): void {
 }
 
 export function initAppearance(): void {
-  media = window.matchMedia("(prefers-color-scheme: dark)");
-  media.addEventListener("change", () => current.theme === "system" && applyAppearance());
+  /* The phone has a window and no media queries; it asks its own platform
+     whether the system is dark and passes the answer to `appearanceTokens`. */
+  if (typeof window.matchMedia === "function") {
+    media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", () => current.theme === "system" && applyAppearance());
+  }
   current = read();
   applyAppearance();
   if (current.wallpaper)
@@ -607,10 +748,27 @@ export function setAppearance(next: Appearance): void {
   scheduleAppearanceCommit();
 }
 
+/** Wear one of the five on the side `theme` asks for. The stored colours are
+ *  that side's, as the phone stores them; Automatic then turns with the
+ *  display through `wornSide`. */
+export function setPalette(id: PhonePaletteId, theme: ThemeMode = current.theme): void {
+  const dark = theme === "dark" || (theme === "system" && (media?.matches ?? true));
+  const { background, foreground, accent } = phoneSide(id, dark);
+  /* The computer wears Graphite monochrome, its accent the ink, as it always
+     had; the phone's own Graphite keeps the system blue. */
+  setAppearance({
+    ...current,
+    theme,
+    background,
+    foreground,
+    accent: id === "graphite" ? foreground : accent,
+  });
+}
+
+/* Changing the theme keeps the palette: one of the eighteen is carried to the
+   one of the five it lands on, which is the moment that reader leaves it. */
 export function setTheme(theme: ThemeMode): void {
-  const light = theme === "light" || (theme === "system" && media?.matches === false);
-  const defaults = light ? LIGHT_DEFAULTS : DEFAULT_APPEARANCE;
-  setAppearance({ ...current, theme, ...defaults });
+  setPalette(phonePaletteOf(current), theme);
 }
 
 /** A picture chosen here lands on this device first and is shared afterwards:

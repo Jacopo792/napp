@@ -302,6 +302,8 @@ export interface NoteEditorHandle {
   /** With a version id, that version is opened in the list. */
   openHistory: (versionId?: string) => void;
   openComments: () => void;
+  /** The note's outline beside it, now asked for from the ⋯. */
+  toggleOutline: () => void;
   openLink: () => void;
   drawOnPage: () => void;
   /** Go to the first place these words occur — once they are there, which
@@ -448,6 +450,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [failure, setFailure] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(startWithComments);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  /* A note's tools stand at its foot, as on the phone: one capsule of writing
+     tools and Comments beside it. The phone's own page and the book keep the
+     strip they have. */
+  const bars = !mobile && !manuscript;
   /* The comments' column, not a second one beside it: one panel at a time. */
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyFocus, setHistoryFocus] = useState<string | null>(null);
@@ -669,6 +675,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       setQuotes(editorRef.current?.commentQuotes() ?? new Map());
       setCommentsOpen(true);
     },
+    toggleOutline() {
+      setOutlineOpen((open) => !open);
+    },
     openFind(query = "") {
       setFindOpen(true);
       if (query) {
@@ -840,7 +849,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   }
 
   const linkForm = (
-    <div className="popover editor-tool-menu absolute top-full left-0 z-40 mt-2 w-72 p-3">
+    <div
+      className={`popover editor-tool-menu absolute left-0 z-40 w-72 p-3 ${
+        bars ? "bottom-full mb-2" : "top-full mt-2"
+      }`}
+    >
       <p className="label mb-2 text-ink-2">Insert link</p>
       <label className="mb-2 block">
         <span className="label mb-1 block text-ink-4">Text</span>
@@ -902,6 +915,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       linkForm={linkForm}
       linkOpen={linkOpen}
       onCloseLink={closeLink}
+      rise={bars}
     />
   ) : null;
 
@@ -924,15 +938,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      beside the other groups, and only then a row of its own — never two rows
      of its own: the save state stays on the first row and gives up letters
      rather than taking a third. A note with no toolbar is one row always. */
-  const toolbarLayout: "centred" | "row" | "stacked" = !toolbar
-    ? "row"
-    : mobile
-      ? "stacked"
-      : shellWidth === null || shellWidth >= TOOLBAR_ROOM
-        ? "centred"
-        : shellWidth >= TOOLBAR_ROW_ROOM
-          ? "row"
-          : "stacked";
+  const toolbarLayout: "centred" | "row" | "stacked" =
+    !toolbar || bars
+      ? "row"
+      : mobile
+        ? "stacked"
+        : shellWidth === null || shellWidth >= TOOLBAR_ROOM
+          ? "centred"
+          : shellWidth >= TOOLBAR_ROW_ROOM
+            ? "row"
+            : "stacked";
 
   /* The writing group is centred on the words, not on the strip. The strip
      spans the whole column; the words are centred in what the scroll box
@@ -1705,6 +1720,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       </section>
     );
 
+  const commentsButton = session && commentAuthors && (
+    <button
+      type="button"
+      className={`note-bars-comments press ${commentsOpen ? "is-active" : ""}`}
+      aria-label="Comments"
+      aria-pressed={commentsOpen}
+      title="Comments"
+      onClick={() => {
+        if (commentsOpen) {
+          closeComments();
+          return;
+        }
+        setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+        setCommentsOpen(true);
+      }}
+    >
+      <MessageSquare size={20} />
+    </button>
+  );
+
   return (
     <section
       key={entry.note.id}
@@ -1731,7 +1766,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           {headerPresence}
           {/* Only where the strip keeps a column of its own on this side; in a
               narrow pane it would run under the buttons opposite. */}
-          {!mobile && toolbarLayout === "centred" && (
+          {!mobile && (toolbarLayout === "centred" || bars) && (
             <span className="editor-strip-title" data-shown={titleAway || undefined} aria-hidden>
               {entry.note.title || "Untitled"}
             </span>
@@ -1744,7 +1779,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             over a 632px editor the cluster ran fifteen pixels underneath the
             save readout, and no width of readout could have avoided it. */}
         {toolbarLayout !== "stacked" &&
-          (toolbar ? (
+          (toolbar && !bars ? (
             <div ref={centreRef} className="justify-self-center">
               {toolbar}
             </div>
@@ -1781,34 +1816,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               mobile ? "gap-1" : "editor-tool-group glass-toolbar"
             }`}
           >
-            <button
-              type="button"
-              className={`toolbar-button press ${outlineOpen ? "is-active" : ""}`}
-              aria-label="Outline"
-              aria-pressed={outlineOpen}
-              title="Outline"
-              onClick={() => setOutlineOpen((open) => !open)}
-            >
-              <ListTree size={16} />
-            </button>
-            {session && commentAuthors && (
-              <button
-                type="button"
-                className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
-                aria-label="Comments"
-                aria-pressed={commentsOpen}
-                title="Comments"
-                onClick={() => {
-                  if (commentsOpen) {
-                    closeComments();
-                    return;
-                  }
-                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-                  setCommentsOpen(true);
-                }}
-              >
-                <MessageSquare size={16} />
-              </button>
+            {!bars && (
+              <>
+                <button
+                  type="button"
+                  className={`toolbar-button press ${outlineOpen ? "is-active" : ""}`}
+                  aria-label="Outline"
+                  aria-pressed={outlineOpen}
+                  title="Outline"
+                  onClick={() => setOutlineOpen((open) => !open)}
+                >
+                  <ListTree size={16} />
+                </button>
+                {session && commentAuthors && (
+                  <button
+                    type="button"
+                    className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
+                    aria-label="Comments"
+                    aria-pressed={commentsOpen}
+                    title="Comments"
+                    onClick={() => {
+                      if (commentsOpen) {
+                        closeComments();
+                        return;
+                      }
+                      setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+                      setCommentsOpen(true);
+                    }}
+                  >
+                    <MessageSquare size={16} />
+                  </button>
+                )}
+              </>
             )}
             {headerActions}
           </span>
@@ -1986,6 +2025,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               </div>
             )}
           </div>
+
+          {/* The phone's bars, standing on the foot of the page. Sticky at the
+              end of the column, so they ride the bottom of the pane while
+              there is note below and come to rest after its last line — the
+              run-out is above them, never under them. */}
+          {bars && (toolbar || commentsButton) && (
+            <div className="note-bars-dock px-10">
+              <div className="measure note-bars">
+                {toolbar}
+                {commentsButton}
+              </div>
+            </div>
+          )}
         </div>
 
         {sidePanels}

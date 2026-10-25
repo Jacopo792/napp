@@ -66,6 +66,8 @@ interface Props {
   linkForm?: ReactNode;
   linkOpen?: boolean;
   onCloseLink?: () => void;
+  /** Standing at the foot of the note: the menus open upward. */
+  rise?: boolean;
 }
 
 const COLOR_LABEL: Record<TextColor, string> = {
@@ -117,6 +119,7 @@ export function EditorToolbar({
   linkForm,
   linkOpen = false,
   onCloseLink,
+  rise = false,
 }: Props) {
   const [open, setOpen] = useState<Tool | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -178,9 +181,9 @@ export function EditorToolbar({
         id={`${id}-${tool}`}
         role="menu"
         aria-label={label}
-        className={`popover menu-popover editor-tool-menu absolute top-full z-40 mt-2 p-1.5 ${
-          align === "left" ? "left-0" : "right-0"
-        }`}
+        className={`popover menu-popover editor-tool-menu absolute z-40 p-1.5 ${
+          rise ? "bottom-full mb-2" : "top-full mt-2"
+        } ${align === "left" ? "left-0" : "right-0"}`}
       >
         {children}
       </MenuSurface>
@@ -311,24 +314,6 @@ export function EditorToolbar({
         {linkOpen && linkForm}
       </div>
 
-      {/* ── Ink ── */}
-      <div className="relative">
-        {tab("draw", "Draw", <Pencil size={16} />)}
-        {menu(
-          "draw",
-          "Draw",
-          "left",
-          <>
-            <Row
-              icon={<Pencil size={16} />}
-              label="On the page"
-              onClick={() => run("drawing-page")}
-            />
-            <Row icon={<SquarePen size={16} />} label="On a board" onClick={() => run("drawing")} />
-          </>,
-        )}
-      </div>
-
       {/* ── Lists ── */}
       <div className="relative">
         {tab("lists", "Lists", <ListChecks size={16} />)}
@@ -452,6 +437,23 @@ export function EditorToolbar({
                 onChoosePhoto();
               }}
             />
+          </>,
+        )}
+      </div>
+      {/* ── Ink ── */}
+      <div className="relative">
+        {tab("draw", "Draw", <Pencil size={16} />)}
+        {menu(
+          "draw",
+          "Draw",
+          "left",
+          <>
+            <Row
+              icon={<Pencil size={16} />}
+              label="On the page"
+              onClick={() => run("drawing-page")}
+            />
+            <Row icon={<SquarePen size={16} />} label="On a board" onClick={() => run("drawing")} />
           </>,
         )}
       </div>

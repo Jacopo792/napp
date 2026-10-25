@@ -1,5 +1,6 @@
 import { MenuSurface } from "@/components/MenuSurface";
 import {
+  ListTree,
   Archive,
   ArchiveRestore,
   ClipboardCopy,
@@ -266,6 +267,7 @@ function noteMenuItems({
   recent,
   onTogglePin,
   onFind,
+  onOutline,
   onHistory,
   onToggleFocus,
   focusMode,
@@ -282,7 +284,25 @@ function noteMenuItems({
   return [
     pinItem(pinned, onTogglePin),
     ...lockItems(lock),
-    { kind: "item", id: "find", label: "Find in note", icon: <Search size={16} />, run: onFind },
+    {
+      kind: "item",
+      id: "find",
+      label: "Find in note",
+      icon: <Search size={16} />,
+      hint: keyName("⌘F"),
+      run: onFind,
+    },
+    ...(onOutline
+      ? [
+          {
+            kind: "item" as const,
+            id: "outline",
+            label: "Outline",
+            icon: <ListTree size={16} />,
+            run: onOutline,
+          },
+        ]
+      : []),
     { kind: "item", id: "history", label: "History", icon: <History size={16} />, run: onHistory },
     {
       kind: "item",
@@ -392,6 +412,8 @@ interface NoteMenuActions {
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
   onFind: () => void;
+  /** The note's headings beside it; absent where the page has none to show. */
+  onOutline?: () => void;
   onHistory: () => void;
   onToggleFocus: () => void;
   focusMode: boolean;
@@ -408,6 +430,11 @@ interface NoteMenuActions {
 }
 
 export function NoteMenu(props: NoteMenuActions) {
+  return <DotsMenu items={noteMenuItems(props)} />;
+}
+
+/** A ⋯ in a toolbar pill, holding whatever list it is given. */
+export function DotsMenu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const ref = useDismiss(open, close);
@@ -427,7 +454,7 @@ export function NoteMenu(props: NoteMenuActions) {
         role="menu"
         className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
       >
-        <MenuItems items={noteMenuItems(props)} close={close} />
+        <MenuItems items={items} close={close} />
       </MenuSurface>
     </div>
   );
