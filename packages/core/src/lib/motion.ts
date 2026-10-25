@@ -104,6 +104,37 @@ export function zoomNote(el: HTMLElement | null) {
   el.addEventListener("animationend", done);
 }
 
+/** The picture that was just pressed, if a picture was: where a picture
+ *  shown at full size has to fly home to when it is put down. */
+export function pressedPicture(): DOMRect | null {
+  const p = recentPress();
+  return p && p.target instanceof HTMLImageElement ? p.rect : null;
+}
+
+/** A picture going back into its thumbnail — `emerge`'s zoom, reversed, on
+ *  the same curve — while `ground` fades with it. Resolves when it has
+ *  landed, or at once when there is nowhere to land or motion is reduced. */
+export function flyHome(
+  el: HTMLElement | null,
+  home: DOMRect | null,
+  ground: HTMLElement | null,
+): Promise<void> {
+  if (!el || reduced()) return Promise.resolve();
+  const timing = { duration: 320, easing: EASE, fill: "forwards" as const };
+  ground?.animate([{ opacity: 1 }, { opacity: 0 }], timing);
+  if (!home) return el.animate([{ opacity: 1 }, { opacity: 0 }], timing).finished.then(() => {});
+  const box = el.getBoundingClientRect();
+  const dx = home.left + home.width / 2 - (box.left + box.width / 2);
+  const dy = home.top + home.height / 2 - (box.top + box.height / 2);
+  const s = home.width / box.width;
+  return el
+    .animate(
+      [{ transform: "none" }, { transform: `translate(${dx}px, ${dy}px) scale(${s})` }],
+      timing,
+    )
+    .finished.then(() => {});
+}
+
 /** An overlay arriving: out of the control that asked for it, or — opened from
  *  the keyboard — from its own centre, a little smaller than it will be.
  *  `zoom` is for a picture leaving its thumbnail: the same image, the same

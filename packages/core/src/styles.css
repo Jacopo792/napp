@@ -5589,8 +5589,10 @@
 }
 
 /* ── Full-size image ────────────────────────────────────────────────────────
-   The note is still there behind the scrim; the picture is simply lifted off
-   it for a moment. One entrance, eased out from an already-placed frame. ─── */
+   Photos' way: the picture flies out of its rectangle in the note onto black,
+   the ground arriving with the flight, and goes home the same way
+   (`ImageViewer.tsx`). No blur and no frame: the note behind is not what is
+   being looked at, and a rounded, shadowed picture is a card, not a photo. */
 .lightbox {
   position: fixed;
   inset: 0;
@@ -5598,53 +5600,53 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(1rem, 5vw, 3.5rem);
-  background: oklch(0.06 0 0 / 0.85);
-  backdrop-filter: blur(18px) saturate(0.9);
-  animation: lightbox-in var(--dur-base) var(--ease) backwards;
+  padding: clamp(1rem, 4vw, 3rem);
+  cursor: zoom-out;
+}
+
+.lightbox-ground {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: lightbox-in 420ms var(--ease) backwards;
 }
 
 .lightbox-figure {
-  margin: 0;
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
   max-width: 100%;
   max-height: 100%;
+  margin: 0;
 }
 
 .lightbox-figure img {
   display: block;
   min-height: 0;
   max-width: 100%;
-  max-height: 100%;
+  max-height: calc(100dvh - 2 * clamp(1rem, 4vw, 3rem));
   object-fit: contain;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-popover);
 }
 
 .lightbox-close {
   position: absolute;
-  top: clamp(0.75rem, 3vw, 1.5rem);
-  right: clamp(0.75rem, 3vw, 1.5rem);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: max(clamp(0.75rem, 3vw, 1.25rem), env(safe-area-inset-top));
+  right: clamp(0.75rem, 3vw, 1.25rem);
+  display: grid;
   width: 2.5rem;
   height: 2.5rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  color: var(--ink-2);
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
   cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  animation: lightbox-in 420ms var(--ease) backwards;
+  transition: background-color var(--dur-fast) var(--ease);
 }
 
 .lightbox-close:hover {
-  color: var(--ink);
-  border-color: var(--ink-4);
+  background: rgb(255 255 255 / 0.26);
 }
 
 @keyframes lightbox-in {
@@ -5654,8 +5656,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lightbox,
-  .lightbox-figure {
+  .lightbox-ground,
+  .lightbox-close {
     animation: none;
   }
 }
@@ -8055,7 +8057,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .note-cover-actions > span,
 .note-property-action {
   border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   background: rgb(20 20 22 / 0.76);
   box-shadow: var(--shadow-soft);
   color: #f5f2ed;
@@ -8079,7 +8081,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .note-property-action.is-primary {
   border-color: transparent;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .note-page-cover.is-editing:not(.is-placing) {
@@ -14893,5 +14895,116 @@ button.sheet-chip:hover,
     left: 50%;
     transform: translateX(-50%);
     font-size: 17px;
+  }
+}
+
+/* ── History and the sheets, grouped ─────────────────────────────────────────
+   The phone draws a list of facts as `Grouped`: a quiet heading over a card
+   of rows, a hairline between rows from the words' edge, the card 16 round.
+   The history panel's days and the sheets' sections are those cards here —
+   the markup is the same; only the ground under the rows changed. */
+.note-version-group {
+  gap: 0;
+  margin-bottom: 14px;
+}
+
+.note-version-day {
+  padding: 4px 12px 6px;
+}
+
+.note-version,
+.sheet-work > .sheet-row {
+  border-radius: 0;
+  background-color: var(--card);
+}
+
+.note-version + .note-version,
+.sheet-work > .sheet-row + .sheet-row {
+  background-image: linear-gradient(var(--rule-soft), var(--rule-soft));
+  background-position: right top;
+  background-repeat: no-repeat;
+  background-size: calc(100% - 12px) 1px;
+}
+
+.note-version-day + .note-version,
+.sheet-work > :not(.sheet-row) + .sheet-row {
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+.note-version:last-child,
+.sheet-work > .sheet-row:last-child,
+.sheet-work > .sheet-row:has(+ :not(.sheet-row)) {
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+}
+
+.note-version.is-open {
+  background-color: var(--card);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.note-version-head,
+.sheet-work > .sheet-row {
+  border-radius: inherit;
+  padding: 10px 12px;
+}
+
+.note-version:not(.is-open) .note-version-head:hover,
+.sheet-work > .sheet-row:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--ink) 5%, var(--card));
+}
+
+.note-version-faces > *,
+.note-version.is-open .note-version-faces > * {
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.sheet-work {
+  gap: 0;
+}
+
+.sheet-work h3 {
+  margin-top: 16px;
+  padding: 0 12px 6px;
+}
+
+.sheet-faces,
+.sheet-facts,
+.sheet-day {
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.sheet-faces {
+  padding: 8px;
+}
+
+.sheet-facts {
+  padding: 10px 12px;
+}
+
+.sheet-day {
+  margin-top: 6px;
+  padding: 6px 4px;
+}
+
+.sheet-day > p {
+  padding: 4px 8px 2px;
+}
+
+/* On a phone's screen the find bar stands where the tools stood — at the
+   foot, a glass field in reach of the thumb, as the phone's `NoteBars` find
+   does. A desk keeps it under the strip, where a Mac window's find bar is. */
+@media (max-width: 767px) {
+  .mobile-editor .find-bar {
+    position: absolute;
+    z-index: 30;
+    right: 16px;
+    bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
+    left: 16px;
+    width: auto;
+    margin: 0;
+    border-radius: 26px;
   }
 }

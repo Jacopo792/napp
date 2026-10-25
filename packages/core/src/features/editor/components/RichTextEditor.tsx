@@ -49,6 +49,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  X,
 } from "@/components/icons";
 import { createPortal } from "react-dom";
 import {
@@ -112,7 +113,7 @@ import { rememberSpelling, takeAutocorrection } from "@/features/editor/lib/auto
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import { platform } from "@/platform";
-import { emerge } from "@/lib/motion";
+import { emerge, flyHome, pressedPicture } from "@/lib/motion";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
 import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
@@ -2068,10 +2069,25 @@ const openOut = (img: HTMLImageElement | null) => {
   else img.addEventListener("load", () => emerge(img, "zoom"), { once: true });
 };
 
+/* Photos' way with a picture: it flies out of its own rectangle in the note
+   while the ground goes black with the flight, and put down — Esc, the close,
+   a click anywhere — it flies home to that rectangle as the ground lifts
+   (`ImageViewer.tsx` on the phone). Black, not the palette: a photograph is
+   judged on black, and a coloured ground tints it. */
 function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: () => void }) {
+  const [home] = useState(pressedPicture);
+  const ground = useRef<HTMLDivElement>(null);
+  const picture = useRef<HTMLImageElement | null>(null);
+  const leaving = useRef(false);
+  const close = useCallback(() => {
+    if (leaving.current) return;
+    leaving.current = true;
+    void flyHome(picture.current, home, ground.current).then(onClose);
+  }, [home, onClose]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close();
     };
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -2080,7 +2096,7 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, [close]);
 
   return createPortal(
     <div
@@ -2088,13 +2104,29 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
       aria-modal="true"
       aria-label={preview.alt}
       className="lightbox"
-      onClick={onClose}
+      onClick={close}
     >
-      <figure className="lightbox-figure" onClick={(event) => event.stopPropagation()}>
-        <img src={preview.src} alt={preview.alt} ref={openOut} />
+      <div ref={ground} className="lightbox-ground" aria-hidden="true" />
+      <figure className="lightbox-figure">
+        <img
+          src={preview.src}
+          alt={preview.alt}
+          ref={(img) => {
+            picture.current = img;
+            openOut(img);
+          }}
+        />
       </figure>
-      <button type="button" onClick={onClose} className="lightbox-close" aria-label="Close image">
-        ×
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          close();
+        }}
+        className="lightbox-close"
+        aria-label="Close image"
+      >
+        <X size={18} />
       </button>
     </div>,
     document.body,
