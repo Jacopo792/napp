@@ -2098,7 +2098,12 @@ printing.
 - **Sheets, ⌘K and What's New** speak the same language at a desk's size: a
   sheet is 24 round on the page's ground with its figures on cards; ⌘K and
   What's New are 20 round, and their chosen row is a neutral wash with the
-  glyph in a quiet tile — the accent is never a whole row.
+  glyph in a quiet tile — the accent is never a whole row. What's New's own
+  mark is that quiet tile too, not the orange badge it was. A chapter's status
+  dots and a met word goal read `--tint-yellow` and `--ok`, so they turn with
+  the palette. What may keep a literal colour is listed by what it stands
+  on: the door, a photograph's black, a scrim, a shadow, the sheet's paper and
+  print, the colour pickers and the theme previews.
 - **What a note opens over it** speaks the same way. A picture is shown as
   Photos shows one (`ImageViewer.tsx`): it flies out of its rectangle onto
   black — not the palette, a photograph is judged on black — and Esc, the

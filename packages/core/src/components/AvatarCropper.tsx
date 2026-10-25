@@ -109,7 +109,6 @@ export function AvatarCropper({
         className="cropper-panel glass-sheet"
       >
         <h2 id="cropper-title">Place your picture</h2>
-        <p>Drag the picture behind the circle, and use the slider to come closer.</p>
 
         <div
           className="cropper-stage"

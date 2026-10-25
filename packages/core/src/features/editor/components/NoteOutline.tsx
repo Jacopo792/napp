@@ -97,11 +97,7 @@ export function NoteOutline({
       </div>
 
       <div ref={list} className="note-outline-list">
-        {headings.length === 0 && (
-          <p className="note-outline-empty">
-            Headings appear here as you write them. Nothing in this note is a heading yet.
-          </p>
-        )}
+        {headings.length === 0 && <p className="note-outline-empty">No headings yet.</p>}
         {headings.map((heading) => (
           <button
             key={heading.id}

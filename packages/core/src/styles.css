@@ -5199,13 +5199,8 @@
   letter-spacing: -0.01em;
 }
 
-.cropper-panel > p {
-  margin-top: 4px;
+.cropper-panel > h2 {
   margin-bottom: 16px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  text-align: center;
 }
 
 .cropper-stage {
@@ -10939,11 +10934,11 @@ button.sheet-chip:hover,
 }
 
 .structure-status.is-revised {
-  background: #e0a43a;
+  background: var(--tint-yellow);
 }
 
 .structure-status.is-final {
-  background: #4caf7a;
+  background: var(--ok);
 }
 
 /* Two lines of what happens, under the name and in its column. */
@@ -10960,7 +10955,7 @@ button.sheet-chip:hover,
 }
 
 .structure-words.is-met {
-  color: #4caf7a;
+  color: var(--ok);
 }
 
 .structure-field {
@@ -11203,7 +11198,7 @@ button.sheet-chip:hover,
 }
 
 .board-card-words.is-met {
-  color: #4caf7a;
+  color: var(--ok);
 }
 
 .structure-notebook {
@@ -13180,8 +13175,10 @@ button.sheet-chip:hover,
   flex: none;
   place-items: center;
   border-radius: var(--radius-md);
-  background: linear-gradient(145deg, #ffb340, #ff7a1a);
-  color: #ffffff;
+  /* The phone's quiet tile, not a coloured badge: the glyph in ink on a
+     neutral step of the card. */
+  background: color-mix(in srgb, var(--ink) 8%, var(--card));
+  color: var(--ink);
 }
 
 .whats-new-heading {
