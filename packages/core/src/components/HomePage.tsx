@@ -67,6 +67,7 @@ export function HomePage({
   onOpenNote,
   onOpenThread,
   onNew,
+  foot,
 }: {
   /** What stands at the start of the strip: the columns' way back, when
    *  they are away. */
@@ -86,6 +87,9 @@ export function HomePage({
   onOpenNote: (id: string) => void;
   onOpenThread: (noteId: string, threadId: string) => void;
   onNew: () => void;
+  /** What closes the page on a phone's screen, where there is no sidebar:
+   *  the Archive and Recently Deleted, as the phone app ends its Home. */
+  foot?: ReactNode;
 }) {
   const index = indexOf(meta);
   const page = useMemo(() => {
@@ -134,6 +138,7 @@ export function HomePage({
                 </span>
               </button>
             )}
+            {foot}
           </div>
         </div>
       </section>
@@ -261,6 +266,7 @@ export function HomePage({
               </div>
             </section>
           )}
+          {foot}
         </div>
       </div>
     </section>

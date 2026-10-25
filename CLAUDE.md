@@ -2028,6 +2028,23 @@ printing.
   and Mail. Its strip is the note's strip with nothing open: the line across
   the window, and the columns' way back while they are away. Do not put the
   folder cards back.
+- **A phone's screen is the phone app.** Below 767px (`useIsCompact`) the
+  web app does not shrink the desk; it is the phone's three tabs — Home, Notes,
+  Comments — in a glass capsule at the foot (`.mobile-tabs`), with a note
+  pushed over them and Back returning to the tab it came from
+  (`mobileTabRef`). Home is the same `HomePage` as the empty pane, as the first
+  screen, and it ends with Archive and Recently Deleted because there is no
+  sidebar to hold them; the Notes tab is the same card list, search pill and
+  sort chips as the column (pressed again it opens the folders); whose notes is
+  the same `NotebookIndex`, under a bar of the reader's face (Settings) and,
+  on Home, search and +. **The note's tools stand at the foot there**: the
+  capsule at 52 with Comments in a circle beside it, as `NoteBars.tsx` has
+  them, every menu from it opening upward (`above`). That is the one place the
+  tools are not in the strip, and the reason is the hand, not the phone:
+  a screen held in it is reached from the bottom. **Settings** there is the
+  phone's index — your card, the groups as cards of rows with what is set
+  in each — and a section pushed over it with "‹ Settings"; the same markup as
+  the desk's rail (`data-stage`), never the strip of tabs it used to become.
 - **Esc closes the note.** Once to leave the text (the editor's own), again —
   with no menu, popover or dialog up — to close the note and bring Home back.
   ⌘W stays the window's: it is a system role in the macOS menu.

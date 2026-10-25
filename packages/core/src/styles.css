@@ -4884,77 +4884,6 @@
     text-align: right;
   }
 
-  /* The panel holds one height now, so the body has to say which of its two
-     rows absorbs it. Without this the nav strip stretches to half the sheet.
-
-     `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track is floored at the
-     min-content width of what is in it, so one wide row of cards pushed the
-     whole column past the edge of the panel and took the controls off the
-     right-hand side with it. */
-  .settings-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .settings-nav {
-    flex-direction: row;
-    border-right: 0;
-    border-bottom: 1px solid var(--rule-soft);
-    padding: 8px 12px;
-  }
-
-  /* Each section takes the width of its own name, and the strip scrolls. `flex:
-     1` shared the row out between them, which meant six names each too narrow
-     to read and Sign out — also a button in this nav — taking a third of the
-     strip for itself. */
-  .settings-nav-list button {
-    flex: 0 0 auto;
-    justify-content: center;
-    text-align: center;
-  }
-
-  .settings-nav-list button svg,
-  .settings-nav-group,
-  .settings-identity .avatar,
-  .settings-identity small,
-  .settings-nav-text small {
-    display: none;
-  }
-
-  /* A horizontal strip is not the column the marker measured itself against.
-     The active button paints its own background there. */
-  .settings-nav-marker {
-    display: none;
-  }
-
-  /* Six sections do not fit across a phone, so the strip scrolls rather than
-     dropping the ones that did not fit. */
-  .settings-nav-list {
-    flex-direction: row;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .settings-nav-list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings-nav button {
-    white-space: nowrap;
-  }
-
-  /* Sign out is not one of the sections and must not be sized like one: beside
-     a scrolling strip it takes the room it needs and no more. */
-  .settings-nav-signout {
-    flex: 0 0 auto;
-    margin-top: 0;
-    margin-left: 12px;
-    border-top: 0;
-    border-left: 1px solid var(--rule-soft);
-    padding-top: 8px;
-    padding-left: 12px;
-  }
-
   .settings-scroll {
     padding: 4px 16px 20px;
   }
@@ -14532,4 +14461,437 @@ button.sheet-chip:hover,
 
 .note-strip-round.is-active {
   color: var(--accent-strong);
+}
+
+/* ── A note's foot, on a phone's screen ──────────────────────────────────────
+   The phone app's bottom bar (`NoteBars.tsx`): a glass capsule of the writing
+   tools 52 tall, and Comments in a circle of the same height beside it — one
+   line for the eye to rest on, standing over the words at the thumb. On a
+   desk the tools are in the strip; on a screen held in a hand the foot is
+   where they belong. Menus from it open upward. */
+.mobile-editor {
+  position: relative;
+}
+
+.note-foot-bar {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
+  left: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.note-foot-bar > * {
+  pointer-events: auto;
+}
+
+.note-foot-tools .editor-tool-cluster.glass-toolbar,
+.note-foot-bar .note-strip-round {
+  border: 0;
+  background: color-mix(in srgb, var(--glass) 80%, transparent);
+  box-shadow:
+    0 0 0 1px var(--glass-border),
+    inset 0 1px 0 var(--glass-highlight),
+    var(--shadow-lift);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+.note-foot-tools .editor-tool-cluster {
+  height: 52px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: 26px;
+}
+
+.note-foot-tools .editor-tool-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+}
+
+.note-foot-tools .editor-tool-button svg,
+.note-foot-bar .note-strip-round svg {
+  width: 21px;
+  height: 21px;
+}
+
+.note-foot-bar .note-strip-round {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+}
+
+.note-foot-bar .note-strip-round.is-active {
+  color: var(--accent-strong);
+}
+
+.note-foot-tools .menu-popover.bottom-full {
+  transform-origin: bottom right;
+}
+
+.note-foot-tools .menu-popover.bottom-full.left-0 {
+  transform-origin: bottom left;
+}
+
+/* ── A phone's screen ────────────────────────────────────────────────────────
+   Below 767px the web app is the phone app in a browser: the palette's ground,
+   the same Home as an empty pane, the notes as dated cards under the search
+   pill and the sort chips, whose notes as the notebook index, and the three
+   tabs in a glass capsule at the foot (`(tabs)/_layout.tsx`). A note pushed
+   over them keeps its tools at the foot too. */
+.mobile-workspace .mobile-screen,
+.mobile-workspace .mobile-appbar,
+.mobile-note-list,
+.mobile-note-list .collection-toolbar {
+  background: var(--page);
+}
+
+.mobile-workspace .mobile-appbar {
+  border-bottom: 0;
+  padding: 0 16px 4px;
+}
+
+.mobile-appbar-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-appbar-index {
+  margin: 2px -4px 0;
+}
+
+.mobile-face {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.mobile-face .avatar {
+  width: 34px;
+  height: 34px;
+}
+
+.mobile-round {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--rule-soft);
+  color: var(--ink);
+}
+
+.mobile-home .home-strip {
+  display: none;
+}
+
+.mobile-home .home-measure {
+  padding: 8px 16px 112px;
+}
+
+.mobile-home .home-page {
+  background: var(--page);
+}
+
+.home-shelf {
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--card);
+}
+
+.home-shelf-row {
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  color: var(--ink);
+  font-size: 16px;
+  text-align: left;
+}
+
+.home-shelf-row > svg:first-child {
+  color: var(--ink-2);
+}
+
+.home-shelf-row + .home-shelf-row {
+  box-shadow: inset 0 1px 0 var(--rule-soft);
+}
+
+.home-shelf-chevron {
+  margin-left: auto;
+  color: var(--ink-4);
+}
+
+.mobile-note-list .collection-toolbar {
+  min-height: 0;
+  border: 0;
+  box-shadow: none;
+  padding: 4px 20px 6px;
+}
+
+.mobile-note-list .list-search-row {
+  padding-inline: 16px;
+}
+
+.mobile-note-list .list-sort-chips {
+  padding-inline: 16px;
+}
+
+.mobile-note-list .note-group {
+  margin: 0 16px 14px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--card);
+}
+
+.mobile-note-list .note-group-heading,
+:root:is(.has-wallpaper, .has-translucent-sidebar) .mobile-note-list .note-group-heading {
+  position: static;
+  background: transparent;
+  padding: 14px 16px 4px;
+}
+
+.mobile-note-list .note-row.mobile-note-row {
+  min-height: 0;
+  padding: 11px 16px;
+}
+
+/* A hairline between the rows of a card, from the words' edge to the card's. */
+.mobile-note-list .mobile-note-row + .mobile-note-row {
+  border-top: 0;
+  background-image: linear-gradient(var(--rule-soft), var(--rule-soft));
+  background-position: right top;
+  background-repeat: no-repeat;
+  background-size: calc(100% - 16px) 1px;
+}
+
+.mobile-note-list .mobile-note-row.is-swiped {
+  background-color: var(--card);
+}
+
+.mobile-note-list .mobile-note-row:active {
+  background: color-mix(in srgb, var(--ink) 6%, var(--card));
+}
+
+.mobile-tabs {
+  position: fixed;
+  z-index: 40;
+  bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
+  left: 50%;
+  display: flex;
+  height: 60px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--glass) 80%, transparent);
+  box-shadow:
+    0 0 0 1px var(--glass-border),
+    inset 0 1px 0 var(--glass-highlight),
+    var(--shadow-lift);
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+.mobile-tab {
+  position: relative;
+  display: flex;
+  width: 84px;
+  height: 50px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 25px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.mobile-tab[aria-current="page"] {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+
+.mobile-tab-dot {
+  position: absolute;
+  top: 7px;
+  right: 24px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--glass);
+}
+
+/* ── Settings on a phone's screen ────────────────────────────────────────────
+   The phone's Settings: an index first — your card, then the groups as cards
+   of rows, each saying what is set there now — and a section pushed over it
+   with the way back named "Settings". The desk's rail is the same list, so it
+   is the same markup in another arrangement; nothing scrolls sideways. */
+.settings-nav-head,
+.settings-back {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .settings-layer:has(.is-phone) {
+    padding: 0;
+  }
+
+  .settings-panel.is-phone {
+    width: 100%;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    background: var(--page);
+  }
+
+  .is-phone .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .is-phone[data-stage="index"] .settings-content,
+  .is-phone[data-stage="section"] .settings-nav {
+    display: none;
+  }
+
+  .is-phone .settings-nav {
+    overflow-y: auto;
+    border-right: 0;
+    padding: max(8px, env(safe-area-inset-top)) 16px 32px;
+    background: var(--page);
+  }
+
+  .is-phone .settings-nav-head {
+    display: flex;
+    min-height: 52px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .is-phone .settings-nav-head h2 {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+  }
+
+  .is-phone .settings-nav-marker {
+    display: none;
+  }
+
+  .is-phone .settings-nav-list {
+    gap: 0;
+  }
+
+  .is-phone .settings-nav .settings-identity,
+  .is-phone .settings-nav .settings-identity.is-active {
+    margin: 8px 0 22px;
+    border-radius: 20px;
+    padding: 14px 16px;
+    background: var(--card);
+    box-shadow: none;
+  }
+
+  .is-phone .settings-identity .avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .is-phone .settings-nav-group {
+    margin: 0;
+    padding: 0 16px 6px;
+  }
+
+  .is-phone .settings-nav-list > button:not(.settings-identity) {
+    min-height: 50px;
+    border-radius: 0;
+    padding: 0 16px;
+    background: var(--card);
+  }
+
+  .is-phone .settings-nav-list > button:not(.settings-identity):hover,
+  .is-phone .settings-nav-list > button.is-active:not(.settings-identity) {
+    background: var(--card);
+  }
+
+  .is-phone .settings-nav-group + button {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+  }
+
+  .is-phone .settings-nav-list > button:not(.settings-identity):has(+ .settings-nav-group),
+  .is-phone .settings-nav-list > button:not(.settings-identity):last-child {
+    margin-bottom: 22px;
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+  }
+
+  .is-phone .settings-nav-list > button:not(.settings-identity) + button {
+    background:
+      linear-gradient(var(--rule-soft), var(--rule-soft)) right top / calc(100% - 52px) 1px
+        no-repeat,
+      var(--card);
+  }
+
+  .is-phone .settings-nav-signout {
+    min-height: 50px;
+    margin-top: 0;
+    justify-content: center;
+    border: 0;
+    border-radius: 20px;
+    padding: 0 16px;
+    background: var(--card);
+  }
+
+  .is-phone .settings-content {
+    background: var(--page);
+  }
+
+  .is-phone .settings-header {
+    padding: max(0px, env(safe-area-inset-top)) 12px 0 8px;
+  }
+
+  .is-phone .settings-back {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 2px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: var(--weight-semibold);
+  }
+
+  .is-phone .settings-header h2 {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 17px;
+  }
 }

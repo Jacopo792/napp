@@ -44,6 +44,7 @@ import {
   MousePointer2,
   Users,
   X,
+  ChevronLeft,
   AlignCenter,
   Target,
 } from "@/components/icons";
@@ -60,6 +61,7 @@ import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
+import { useIsCompact } from "@/lib/media";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
 import { AXIS_SPECS, READING_FACES, setAxis, useAxes, type Axes } from "@/lib/axes";
@@ -440,6 +442,14 @@ export function SettingsPanel({
   const axes = useAxes();
   const appearance = useAppearance();
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
+  /* A phone's screen shows the index first and a section pushed over it, as
+     the phone's Settings does; a desk shows both, side by side. */
+  const phone = useIsCompact();
+  const [stage, setStage] = useState<"index" | "section">(initialSection ? "section" : "index");
+  const choose = (next: SettingsSection) => {
+    setSection(next);
+    setStage("section");
+  };
   const [closing, setClosing] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while
@@ -653,11 +663,23 @@ export function SettingsPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="settings-panel glass-sheet"
+        className={`settings-panel glass-sheet ${phone ? "is-phone" : ""}`}
+        data-stage={phone ? stage : undefined}
         ref={arrive}
       >
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
+            <header className="settings-nav-head">
+              <h2>Settings</h2>
+              <button
+                type="button"
+                aria-label="Close"
+                className="icon-button press h-9 w-9"
+                onClick={close}
+              >
+                <X size={20} />
+              </button>
+            </header>
             {/* Who this is, at the head of the rail rather than in a column of
                 its own on the far side. It was a standing summary opposite the
                 form, and everything it said the form said too — the one thing
@@ -679,7 +701,7 @@ export function SettingsPanel({
                 type="button"
                 aria-current={section === "profile" ? "page" : undefined}
                 className={`settings-identity ${section === "profile" ? "is-active" : ""}`}
-                onClick={() => setSection("profile")}
+                onClick={() => choose("profile")}
               >
                 <Avatar url={avatarUrl} name={profile.nickname} email={email} />
                 <span className="min-w-0">
@@ -700,7 +722,7 @@ export function SettingsPanel({
                         type="button"
                         aria-current={section === item.id ? "page" : undefined}
                         className={section === item.id ? "is-active" : ""}
-                        onClick={() => setSection(item.id)}
+                        onClick={() => choose(item.id)}
                       >
                         <span
                           className="settings-nav-tile"
@@ -735,6 +757,14 @@ export function SettingsPanel({
                 a big "Settings" over everything, with a sentence under it,
                 named the window rather than the page you were on. */}
             <header className="settings-header">
+              <button
+                type="button"
+                className="settings-back press"
+                onClick={() => setStage("index")}
+              >
+                <ChevronLeft size={20} />
+                Settings
+              </button>
               <h2 id="settings-title">{sectionName}</h2>
               <button
                 type="button"

@@ -21,6 +21,7 @@ import {
   Folder,
   FolderDown,
   FolderTree,
+  Home,
   Keyboard,
   Lock,
   Maximize2,
@@ -641,7 +642,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* The page left, read while the next one renders — so a chapter knows
      whether it was turned to forwards or back. */
   const lastOpened = useRef<string | null>(null);
-  const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
+  /* A phone's screen is the phone app's three tabs — Home, the notes, Comments
+     — with a note pushed over them; Back returns to the tab it was opened
+     from. */
+  const [mobileScreen, setMobileScreen] = useState<"home" | "collection" | "note">("home");
+  const mobileTabRef = useRef<"home" | "collection">("home");
+  useEffect(() => {
+    if (mobileScreen !== "note") mobileTabRef.current = mobileScreen;
+  }, [mobileScreen]);
   const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
   const autoLock = flags.autoLock;
@@ -1429,11 +1437,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      note is closed, and whenever the open note leaves the list. It is not a
      place of its own: the list stands beside it the whole time. */
   const homeShown = !selectedId && !docMode && !compact;
+  /* On a phone's screen Home is the first tab instead. */
+  const homeUp = homeShown || (compact && !docMode && mobileScreen === "home");
   /* Home's Lately: what the others wrote, read once each time Home comes
      up. A failure leaves the section out, never the page. */
   const [lately, setLately] = useState<FolderVersion[]>([]);
   useEffect(() => {
-    if (!homeShown || !session) return;
+    if (!homeUp || !session) return;
     let current = true;
     loadLately(session)
       .then((rows) => current && setLately(rows))
@@ -1441,7 +1451,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => {
       current = false;
     };
-  }, [homeShown, session]);
+  }, [homeUp, session]);
   const docFeatures = currentSpace?.features ?? DEFAULT_FEATURES;
   const manuscriptOwner =
     docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
@@ -3457,7 +3467,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   function handleMobileBack() {
     saveNow();
     setSelectedId(null);
-    setMobileScreen("collection");
+    setMobileScreen(mobileTabRef.current);
   }
 
   /* One writer for the profile, optimistic so the field does not snap back
@@ -4713,7 +4723,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Waiting for You: the badge's own remarks, the newest of each thread. */
   const homeWaiting: HomeRemark[] = [];
-  if (homeShown && selfId) {
+  if (homeUp && selfId) {
     const seenThreads = new Set<string>();
     const unread = unreadRemarks(archiveComments, selfId, remarksSeen).sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
@@ -6021,39 +6031,120 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
+  /* The phone app's bar over a tab: the reader's face (Settings, as the
+     phone's Accounts), the folders where there are folders to choose, and on
+     Home the search and the + that makes things; whose notes under it. */
+  const mobileBar = (tab: "home" | "collection") => (
+    <header
+      className="mobile-appbar shrink-0"
+      style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+    >
+      <div className="mobile-appbar-row">
+        <button
+          type="button"
+          aria-label="Settings"
+          className="mobile-face press"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Avatar
+            url={(selfId && avatarUrls[selfId]) || null}
+            name={profile.nickname || session.email}
+            email={session.email}
+            compact
+          />
+        </button>
+        {tab === "collection" && (
+          <button
+            type="button"
+            aria-label="Folders"
+            className="mobile-round press"
+            onClick={() => setFoldersOpen(true)}
+          >
+            <FolderTree size={19} />
+          </button>
+        )}
+        <span className="flex-1" />
+        {tab === "home" && (
+          <>
+            <button
+              type="button"
+              aria-label="Search notes"
+              className="mobile-round press"
+              onClick={() => {
+                setPaletteQuery("");
+                setPaletteOpen(true);
+              }}
+            >
+              <Search size={19} />
+            </button>
+            {canWriteArchive && (
+              <button
+                type="button"
+                aria-label="New note"
+                className="mobile-round press"
+                onClick={handleNew}
+              >
+                <Plus size={20} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {roster.length > 1 && <div className="mobile-appbar-index">{notebookIndex}</div>}
+    </header>
+  );
+
   if (compact) {
     return (
       <div className="mobile-workspace overflow-hidden" style={{ height: "100dvh" }}>
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
           <main className="h-full overflow-hidden">
+            {mobileScreen === "home" && (
+              <section className="mobile-screen mobile-home flex h-full flex-col">
+                {mobileBar("home")}
+                <HomePage
+                  entries={ownedEntries}
+                  meta={activeMeta}
+                  own={viewedMember?.isSelf ?? true}
+                  canWrite={canWriteArchive}
+                  faces={homeFaces}
+                  waiting={homeWaiting}
+                  lately={homeLately}
+                  onOpenNote={openFromHome}
+                  onOpenThread={(noteId, threadId) => {
+                    openFromHome(noteId);
+                    setOpenThen({ noteId, comments: threadId });
+                  }}
+                  onNew={handleNew}
+                  foot={
+                    <div className="home-shelf">
+                      <button
+                        type="button"
+                        className="home-shelf-row press"
+                        onClick={() => handleSelectFolder(ARCHIVE)}
+                      >
+                        <Archive size={18} />
+                        <span>Archive</span>
+                        <ChevronRight size={16} className="home-shelf-chevron" />
+                      </button>
+                      <button
+                        type="button"
+                        className="home-shelf-row press"
+                        onClick={() => handleSelectFolder(TRASH)}
+                      >
+                        <Trash2 size={18} />
+                        <span>Recently Deleted</span>
+                        <ChevronRight size={16} className="home-shelf-chevron" />
+                      </button>
+                    </div>
+                  }
+                />
+              </section>
+            )}
+
             {mobileScreen === "collection" && (
               <section className="mobile-screen flex h-full flex-col">
-                <header
-                  className="mobile-appbar shrink-0 px-4 pb-2"
-                  style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
-                >
-                  <div className="flex items-center gap-2">
-                    {/* Folders, Trash and the archive switch, one tap away in
-                        the same column the desktop keeps open. */}
-                    <button
-                      type="button"
-                      aria-label="Folders"
-                      className="toolbar-button press shrink-0"
-                      onClick={() => setFoldersOpen(true)}
-                    >
-                      <FolderTree size={20} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Settings"
-                      className="toolbar-button press shrink-0"
-                      onClick={() => setSettingsOpen(true)}
-                    >
-                      <Settings size={20} />
-                    </button>
-                    <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
-                  </div>
-                </header>
+                {mobileBar("collection")}
                 {/* Keyed on the scope, so changing whose notes these are re-runs
                     the list's own entrance instead of swapping the rows in
                     place. Nothing is lost by the remount: `handleViewChange`
@@ -6064,8 +6155,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   mobile
                   entries={visible}
                   groups={noteGroups}
-                  view="gallery"
+                  view="list"
                   toolbarActions={collectionActions}
+                  sort={
+                    selectedFolderId === REMARKS
+                      ? undefined
+                      : {
+                          preferences: activeListPreferences,
+                          onChange: handleListPreferencesChange,
+                        }
+                  }
                   filters={activeFilters}
                   meta={activeMeta}
                   showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
@@ -6168,6 +6267,44 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             )}
           </main>
         </DndContext>
+        {mobileScreen !== "note" && !docMode && !foldersOpen && (
+          <nav className="mobile-tabs" aria-label="Places">
+            {(
+              [
+                ["home", "Home", <Home size={22} key="home" />],
+                ["notes", "Notes", <NotebookText size={22} key="notes" />],
+                ["comments", "Comments", <MessageSquare size={22} key="comments" />],
+              ] as const
+            ).map(([id, label, icon]) => {
+              const current =
+                id === "home"
+                  ? mobileScreen === "home"
+                  : mobileScreen === "collection" &&
+                    (id === "comments") === (selectedFolderId === REMARKS);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="mobile-tab press"
+                  aria-current={current ? "page" : undefined}
+                  onClick={() => {
+                    if (id === "home") setMobileScreen("home");
+                    else if (id === "comments") handleSelectFolder(REMARKS);
+                    else if (mobileScreen === "collection" && selectedFolderId !== REMARKS)
+                      setFoldersOpen(true);
+                    else handleSelectFolder(selectedFolderId === REMARKS ? ALL : selectedFolderId);
+                  }}
+                >
+                  {icon}
+                  <span>{label}</span>
+                  {id === "comments" && unreadRemarkNotes.size > 0 && (
+                    <i className="mobile-tab-dot" aria-label="Unread comments" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        )}
         {foldersOpen && (
           <div className="mobile-nav-layer" role="presentation">
             <button

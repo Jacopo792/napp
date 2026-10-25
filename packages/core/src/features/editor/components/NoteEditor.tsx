@@ -469,6 +469,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      round buttons of the same height. The phone's own page and the book keep
      the strips they have. */
   const stripTools = !mobile && !manuscript;
+  /* On a phone's screen the tools stand where the phone app keeps them: a
+     glass capsule at the foot, with Comments in a circle beside it, in reach
+     of the thumb. The strip at the top keeps the way back and the ⋯. */
+  const footTools = mobile && !manuscript;
   /* The comments' column, not a second one beside it: one panel at a time. */
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyFocus, setHistoryFocus] = useState<string | null>(null);
@@ -866,9 +870,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   const linkForm = (
     <div
-      className={`popover editor-tool-menu absolute top-full z-40 mt-2 w-72 p-3 ${
-        stripTools ? "right-0" : "left-0"
-      }`}
+      className={`popover editor-tool-menu absolute z-40 w-72 p-3 ${
+        footTools ? "bottom-full mb-3" : "top-full mt-2"
+      } ${stripTools ? "right-0" : "left-0"}`}
     >
       <p className="label mb-2 text-ink-2">Insert link</p>
       <label className="mb-2 block">
@@ -932,6 +936,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       linkOpen={linkOpen}
       onCloseLink={closeLink}
       atEnd={stripTools}
+      above={footTools}
     />
   ) : null;
 
@@ -956,19 +961,21 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      rather than taking a third. A note with no toolbar is one row always.
      A desktop note's strip is its own shape: everything that acts stands on
      the right, and only a pane too narrow for that gives the capsule a row. */
-  const toolbarLayout: "centred" | "row" | "stacked" | "strip" = stripTools
-    ? toolbar && shellWidth !== null && shellWidth < STRIP_ROOM
-      ? "stacked"
-      : "strip"
-    : !toolbar
-      ? "row"
-      : mobile
+  const toolbarLayout: "centred" | "row" | "stacked" | "strip" = footTools
+    ? "strip"
+    : stripTools
+      ? toolbar && shellWidth !== null && shellWidth < STRIP_ROOM
         ? "stacked"
-        : shellWidth === null || shellWidth >= TOOLBAR_ROOM
-          ? "centred"
-          : shellWidth >= TOOLBAR_ROW_ROOM
-            ? "row"
-            : "stacked";
+        : "strip"
+      : !toolbar
+        ? "row"
+        : mobile
+          ? "stacked"
+          : shellWidth === null || shellWidth >= TOOLBAR_ROOM
+            ? "centred"
+            : shellWidth >= TOOLBAR_ROW_ROOM
+              ? "row"
+              : "stacked";
 
   /* The writing group is centred on the words, not on the strip. The strip
      spans the whole column; the words are centred in what the scroll box
@@ -1849,7 +1856,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   : "editor-tool-group glass-toolbar"
             }`}
           >
-            {!stripTools && (
+            {!stripTools && !footTools && (
               <>
                 <button
                   type="button"
@@ -1888,6 +1895,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       </div>
 
       {fileInputs}
+
+      {footTools && (toolbar || commentsButton) && !findOpen && (
+        <div className="note-foot-bar">
+          {toolbar && <div className="note-foot-tools">{toolbar}</div>}
+          {commentsButton}
+        </div>
+      )}
 
       {findBar}
       {passageMenuLayer}

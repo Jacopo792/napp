@@ -69,6 +69,8 @@ interface Props {
   /** Standing at the right of the strip: every menu hangs leftward from its
       button, or the last ones would run off the window's edge. */
   atEnd?: boolean;
+  /** Standing at the foot of a phone's screen: every menu opens upward. */
+  above?: boolean;
 }
 
 const COLOR_LABEL: Record<TextColor, string> = {
@@ -121,6 +123,7 @@ export function EditorToolbar({
   linkOpen = false,
   onCloseLink,
   atEnd = false,
+  above = false,
 }: Props) {
   const [open, setOpen] = useState<Tool | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -182,9 +185,9 @@ export function EditorToolbar({
         id={`${id}-${tool}`}
         role="menu"
         aria-label={label}
-        className={`popover menu-popover editor-tool-menu absolute top-full z-40 mt-2 p-1.5 ${
-          align === "left" && !atEnd ? "left-0" : "right-0"
-        }`}
+        className={`popover menu-popover editor-tool-menu absolute z-40 p-1.5 ${
+          above ? "bottom-full mb-3" : "top-full mt-2"
+        } ${align === "left" && !atEnd ? "left-0" : "right-0"}`}
       >
         {children}
       </MenuSurface>

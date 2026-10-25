@@ -287,7 +287,9 @@ const Row = memo(function Row({
   byCreated?: boolean;
   remark?: RowRemark;
 }) {
-  const listRow = !mobile && !gallery;
+  /* A phone's screen draws the same card rows as the desk's column: the
+     phone app's list, title and time on one line. */
+  const listRow = !gallery;
   const stamp = remark?.at ?? (byCreated ? entry.note.createdAt : entry.note.updatedAt);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -610,7 +612,7 @@ const Row = memo(function Row({
       }}
       className={`note-row group relative cursor-pointer ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
-          ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
+          ? "note-row-list mobile-note-row touch-pan-y"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
             : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-4"
@@ -715,7 +717,7 @@ const Row = memo(function Row({
             style={{
               fontWeight: gallery ? 520 : listRow ? 600 : 650,
               display: "-webkit-box",
-              WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
+              WebkitLineClamp: gallery ? 4 : 1,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
@@ -1332,6 +1334,89 @@ export function NoteList({
     </div>
   );
 
+  /* The phone's bar under the strip: a search pill, and the one act that
+     adds to the list as a round button beside it — on a desk and on a phone's
+     screen alike. */
+  const searchRow = (
+    <div className="list-search-row">
+      <div className="list-search-pill">
+        <Search size={16} className="shrink-0 text-ink-4" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              onQueryChange("");
+              e.currentTarget.blur();
+            }
+          }}
+          placeholder="Search"
+          aria-label="Search notes"
+          className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
+        />
+        {hasQuery && (
+          <button
+            title="Clear search"
+            onClick={() => onQueryChange("")}
+            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+      {canWrite && !trashMode && (
+        <button
+          onClick={onNew}
+          disabled={busy || loading}
+          title="New note · N"
+          aria-label="New note"
+          className="list-round-button press"
+        >
+          <SquarePen size={18} />
+        </button>
+      )}
+    </div>
+  );
+
+  const sortChips = sort && (
+    <div className="list-sort-chips" role="group" aria-label="Sort notes">
+      {(
+        [
+          ["updated", "Edited", <Clock3 size={14} key="updated" />],
+          ["created", "Created", <CalendarDays size={14} key="created" />],
+          ["title", "Title", <Type size={14} key="title" />],
+        ] as [SortCriterion, string, ReactNode][]
+      ).map(([id, label, icon]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={sort.preferences.sortBy === id}
+          className="list-sort-chip press"
+          onClick={() => sort.onChange({ ...sort.preferences, sortBy: id })}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
+      <button
+        type="button"
+        aria-pressed={sort.preferences.direction === "asc"}
+        className="list-sort-chip press"
+        onClick={() =>
+          sort.onChange({
+            ...sort.preferences,
+            direction: sort.preferences.direction === "asc" ? "desc" : "asc",
+          })
+        }
+      >
+        <ArrowDownUp size={14} />
+        Reverse
+      </button>
+    </div>
+  );
+
   if (mobile) {
     return (
       <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden">
@@ -1350,41 +1435,15 @@ export function NoteList({
 
         {filterStrip}
 
-        <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
-          <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
-            <Search size={16} className="shrink-0 text-ink-4" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.stopPropagation();
-                  onQueryChange("");
-                  event.currentTarget.blur();
-                }
-              }}
-              placeholder="Search notes"
-              aria-label="Search notes"
-              className="min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-4"
-            />
-            {hasQuery && (
-              <button
-                title="Clear search"
-                onClick={() => onQueryChange("")}
-                className="icon-button h-8 w-8 shrink-0 text-ink-4"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        </div>
+        {searchRow}
+
+        {sortChips}
 
         <div
           key={`${folderLabel}:${query.trim()}`}
           role="listbox"
           aria-label={`Notes in ${folderLabel}`}
-          className="list-in min-h-0 flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pb-24"
+          className="list-in min-h-0 flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-28"
         >
           <div>
             {loading ? (
@@ -1404,17 +1463,6 @@ export function NoteList({
           </div>
         </div>
 
-        {canWrite && !trashMode && (
-          <button
-            type="button"
-            onClick={onNew}
-            disabled={busy || loading}
-            aria-label="New note"
-            className="mobile-compose glass-toolbar absolute right-5 bottom-5 flex h-13 w-13 items-center justify-center text-accent disabled:opacity-40"
-          >
-            <SquarePen size={24} />
-          </button>
-        )}
         {rowMenuPanel}
         {photoPicker}
       </section>
@@ -1451,85 +1499,9 @@ export function NoteList({
 
       {filterStrip}
 
-      {/* The phone's bar under the strip: a search pill, and the one act that
-          adds to the list as a round button beside it. */}
-      <div className="list-search-row">
-        <div className="list-search-pill">
-          <Search size={16} className="shrink-0 text-ink-4" />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                onQueryChange("");
-                e.currentTarget.blur();
-              }
-            }}
-            placeholder="Search"
-            aria-label="Search notes"
-            className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
-          />
-          {hasQuery && (
-            <button
-              title="Clear search"
-              onClick={() => onQueryChange("")}
-              className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
-        {canWrite && !trashMode && (
-          <button
-            onClick={onNew}
-            disabled={busy || loading}
-            title="New note · N"
-            aria-label="New note"
-            className="list-round-button press"
-          >
-            <SquarePen size={18} />
-          </button>
-        )}
-      </div>
+      {searchRow}
 
-      {sort && (
-        <div className="list-sort-chips" role="group" aria-label="Sort notes">
-          {(
-            [
-              ["updated", "Edited", <Clock3 size={14} key="updated" />],
-              ["created", "Created", <CalendarDays size={14} key="created" />],
-              ["title", "Title", <Type size={14} key="title" />],
-            ] as [SortCriterion, string, ReactNode][]
-          ).map(([id, label, icon]) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={sort.preferences.sortBy === id}
-              className="list-sort-chip press"
-              onClick={() => sort.onChange({ ...sort.preferences, sortBy: id })}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            aria-pressed={sort.preferences.direction === "asc"}
-            className="list-sort-chip press"
-            onClick={() =>
-              sort.onChange({
-                ...sort.preferences,
-                direction: sort.preferences.direction === "asc" ? "desc" : "asc",
-              })
-            }
-          >
-            <ArrowDownUp size={14} />
-            Reverse
-          </button>
-        </div>
-      )}
+      {sortChips}
 
       <div
         key={`${folderLabel}:${query.trim()}`}
