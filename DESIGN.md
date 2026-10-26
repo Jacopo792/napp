@@ -235,6 +235,13 @@ application and a page that has been given a frame.
 
 - Preserve a 2 px accent (`:focus-visible`) outline with offset on interactive elements. Hover-only actions must also appear on keyboard focus.
 - Maintain AA text contrast, semantic labels for icon controls, pressed/expanded states, native range semantics, and alerts for unlock errors.
-- Motion is restrained. Opening a note uses the single authored entrance: a 420 ms fade with a 4 px upward settle. Ordinary state changes use short color transitions. The full-size image view fades its scrim in over 220 ms while the picture settles up from 4 px; the phone's maintenance sheet rises from the bottom edge over 320 ms.
+- Motion follows the action: a note opens from its list position, menus and overlays from the pressed control, and an image from its thumbnail. Without a meaningful origin, use a fade. Read current timings from the shared motion tokens rather than fixed values in this document.
 - Respect `prefers-reduced-motion`: remove page entrance and skeleton pulsing. Never make motion necessary to understand save, selection, or deletion state.
 - Animate `transform` and `opacity`, and nothing else that runs per frame. A scaled entrance on text re-rasterises every glyph, and `filter: blur(0)` still promotes a layer and still costs a pass — the wallpaper declares `filter: none` when there is no blur rather than a blur of zero.
+
+## Brand artwork
+
+Use `docs/branding/napp-logo.svg`: the supplied white arch and five rules on black.
+Favicons, sign-in artwork and desktop icons use the same geometry. The old
+botanical N is retired; botanical illustrations elsewhere are decoration, not
+a second logo. The mark does not imply encryption.

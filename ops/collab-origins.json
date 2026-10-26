@@ -1,0 +1,9 @@
+{
+  "production": [
+    "https://jacopo792.github.io",
+    "app://notes",
+    "https://notes",
+    "capacitor://notes"
+  ],
+  "development": ["http://localhost:5173", "http://localhost:5174", "http://localhost:5199"]
+}

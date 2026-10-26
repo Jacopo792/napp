@@ -14,10 +14,7 @@ import { useDraggable } from "@dnd-kit/core";
 import {
   Archive,
   ArchiveRestore,
-  ArrowDownUp,
-  CalendarDays,
   ChevronRight,
-  Clock3,
   FileText,
   Folder as FolderGlyph,
   Image as ImageIcon,
@@ -33,9 +30,7 @@ import {
   SquarePen,
   Table2,
   Trash2,
-  Type,
   X,
-  ListTree,
 } from "@/components/icons";
 import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
@@ -53,13 +48,7 @@ import {
   isDrawingText,
 } from "@/features/editor/lib/content";
 import type { NoteEntry } from "@/lib/entries";
-import {
-  readAdopting,
-  type ListPreferences,
-  type ListView,
-  type NoteGroup,
-  type SortCriterion,
-} from "@/lib/listPreferences";
+import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
 import { playRows } from "@/lib/motion";
 import { useContextMenu } from "@/lib/contextMenu";
@@ -116,8 +105,6 @@ interface Props {
   groups?: NoteGroup[];
   view?: ListView;
   toolbarActions?: ReactNode;
-  /** The list's own order, drawn as the phone's chips under the search. */
-  sort?: { preferences: ListPreferences; onChange: (next: ListPreferences) => void };
   /** Before the title, at the strip's leading edge: the sidebar toggle. */
   leading?: ReactNode;
   /** The note's sheet, flown out of where the note is drawn in its row. */
@@ -150,8 +137,6 @@ interface Props {
    *  is a number with nothing under it, and the honest answer to "I have read
    *  them all" is a note nobody could find. */
   unreadIds?: Set<string>;
-  /** In the Comments scope: the last word said in each note's open threads. */
-  remarks?: Map<string, RowRemark>;
   /** Notes the other member has open right now, and the colour she wears. */
   peerNoteIds?: Set<string>;
   peerTypingNoteIds?: Set<string>;
@@ -170,8 +155,6 @@ interface Props {
   onMoveToFolder: (noteId: string, folderId: string | null) => void;
   /** A picture for the note itself. A null file takes the current one off. */
   onSetPhoto: (noteId: string, file: File | null, crop?: AvatarCrop) => void;
-  /** The note opened with its outline beside it. */
-  onOutline?: (noteId: string) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
 }
 
@@ -223,15 +206,6 @@ function PeerDot({ here, typing, color }: { here: boolean; typing: boolean; colo
   );
 }
 
-/** What the Comments scope shows in a row instead of the note's own first
- *  line: the face of whoever spoke last, what they said, and when — the
- *  phone's Comments tab, row for row. */
-export interface RowRemark {
-  face: ReactNode;
-  body: string;
-  at: string;
-}
-
 const Row = memo(function Row({
   mobile,
   gallery,
@@ -255,8 +229,6 @@ const Row = memo(function Row({
   onContextMenu,
   onHold,
   resolveImage,
-  byCreated = false,
-  remark,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -283,14 +255,7 @@ const Row = memo(function Row({
   /** A still press — the note sheet. */
   onHold?: (entry: NoteEntry, origin: SheetOrigin) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
-  /** Sorted by creation, the row says when it was made, as the phone's does. */
-  byCreated?: boolean;
-  remark?: RowRemark;
 }) {
-  /* A phone's screen draws the same card rows as the desk's column: the
-     phone app's list, title and time on one line. */
-  const listRow = !gallery;
-  const stamp = remark?.at ?? (byCreated ? entry.note.createdAt : entry.note.updatedAt);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
     disabled: mobile || trashMode || archiveMode || !canWrite,
@@ -530,7 +495,7 @@ const Row = memo(function Row({
     if (from?.live) settle(slid);
   }
 
-  const preview = remark ? remark.body : derivedOf(entry.note).preview;
+  const { preview } = derivedOf(entry.note);
   const pinned = noteMeta?.pinned === true;
   const folderName = noteMeta?.folderId
     ? indexOf(meta).byFolder.get(noteMeta.folderId)?.name
@@ -612,7 +577,7 @@ const Row = memo(function Row({
       }}
       className={`note-row group relative cursor-pointer ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
         mobile && !gallery
-          ? "note-row-list mobile-note-row touch-pan-y"
+          ? "mobile-note-row min-h-[4.5rem] touch-pan-y px-4 py-3"
           : gallery
             ? "touch-pan-y border border-rule-soft p-4"
             : "note-row-list mx-2 touch-none py-2.5 pr-3 pl-4"
@@ -626,9 +591,7 @@ const Row = memo(function Row({
           because a card without one is a blank square. What is unread is a dot
           in the leading margin, where Mail keeps it. */}
       {!gallery && unread && <span className="note-row-dot" aria-label="Unread remarks" />}
-      {listRow && remark ? (
-        <span className="note-row-face">{remark.face}</span>
-      ) : entry.note.photo ? (
+      {entry.note.photo ? (
         <span
           className={`note-photo is-row ${gallery ? "is-gallery" : "is-thumb"} ${
             gallery && unread ? "has-unread" : ""
@@ -698,40 +661,36 @@ const Row = memo(function Row({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <div className={listRow ? "note-row-head" : undefined}>
-          <p
-            /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+        <p
+          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
-              entry.note.title ? "text-ink" : "text-ink-4 italic"
-            }`}
-            /* One line in the column, and that is the whole of why the list
+          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
+            entry.note.title ? "text-ink" : "text-ink-4 italic"
+          }`}
+          /* One line in the column, and that is the whole of why the list
              reads as a list. A title allowed three lines is three lines of one
              sentence, and the rows below it start wherever that sentence
              happened to end — so the column has no rhythm and you cannot see
              how many notes are under a heading without reading all of them.
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
-            style={{
-              fontWeight: gallery ? 520 : listRow ? 600 : 650,
-              display: "-webkit-box",
-              WebkitLineClamp: gallery ? 4 : 1,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
-            {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
-            {entry.note.title || "Untitled"}
-          </p>
-          {/* The phone's anatomy: when, at the end of the title's line. */}
-          {listRow && <span className="note-row-stamp">{formatStamp(stamp)}</span>}
-        </div>
+          style={{
+            fontWeight: gallery ? 520 : 650,
+            display: "-webkit-box",
+            WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
+          {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
+          {entry.note.title || "Untitled"}
+        </p>
 
         <p className="note-row-summary mt-1 truncate">
-          {!listRow && <span>{formatStamp(stamp)}</span>}
+          <span>{formatStamp(entry.note.updatedAt)}</span>
           {/* What is left, where the list already says when. A checklist is
               the one kind of note whose state is the reason you open it. */}
           {checklist && (
@@ -791,10 +750,8 @@ const Row = memo(function Row({
                 act.run(entry);
               }}
             >
-              <span className="note-row-tab">
-                <act.Icon size={20} />
-                <span>{act.label}</span>
-              </span>
+              <act.Icon size={16} />
+              <span>{act.label}</span>
             </button>
           );
         })}
@@ -942,7 +899,6 @@ export function NoteList({
   groups = [{ id: "notes", label: "Notes", entries }],
   view = "list",
   toolbarActions,
-  sort,
   leading,
   onInfo,
   topBar,
@@ -960,7 +916,6 @@ export function NoteList({
   trashMode,
   archiveMode,
   unreadIds,
-  remarks,
   peerNoteIds,
   peerTypingNoteIds,
   peerColor,
@@ -976,7 +931,6 @@ export function NoteList({
   lockOf,
   onMoveToFolder,
   onSetPhoto,
-  onOutline,
   resolveImage,
 }: Props) {
   const hasQuery = query.trim().length > 0;
@@ -1080,29 +1034,14 @@ export function NoteList({
   const rowMenuItems = ((): MenuItem[] => {
     if (!menuEntry) return [];
     const entry = menuEntry;
-    const opening: MenuItem[] = [
-      {
-        kind: "item",
-        id: "open",
-        label: "Open note",
-        icon: <FileText size={16} />,
-        run: () => onSelect(entry.note.id),
-      },
-      /* The page's ⋯ has the outline; the row's menu is the same note, so
-         it does too — opening the note with its headings beside it. */
-      ...(onOutline
-        ? [
-            {
-              kind: "item" as const,
-              id: "outline",
-              label: "Outline",
-              icon: <ListTree size={16} />,
-              run: () => onOutline(entry.note.id),
-            },
-          ]
-        : []),
-    ];
-    if (!canWrite) return [...opening, ...infoItem(entry)];
+    const open: MenuItem = {
+      kind: "item",
+      id: "open",
+      label: "Open note",
+      icon: <FileText size={16} />,
+      run: () => onSelect(entry.note.id),
+    };
+    if (!canWrite) return [open, ...infoItem(entry)];
     if (trashMode)
       return [
         ...infoItem(entry),
@@ -1134,7 +1073,7 @@ export function NoteList({
       ];
     if (archiveMode)
       return [
-        ...opening,
+        open,
         ...infoItem(entry),
         {
           kind: "item",
@@ -1154,7 +1093,7 @@ export function NoteList({
         },
       ];
     return [
-      ...opening,
+      open,
       ...infoItem(entry),
       pinItem(menuPinned, () => onTogglePin(entry.note.id)),
       ...lockItems(lockOf?.(entry.note.id)),
@@ -1306,8 +1245,6 @@ export function NoteList({
                 onContextMenu={openRowMenu}
                 onHold={holdEntry}
                 resolveImage={resolveImage}
-                byCreated={sort?.preferences.sortBy === "created"}
-                remark={remarks?.get(entry.note.id)}
               />
             ))}
           </div>
@@ -1336,89 +1273,6 @@ export function NoteList({
     </div>
   );
 
-  /* The phone's bar under the strip: a search pill, and the one act that
-     adds to the list as a round button beside it — on a desk and on a phone's
-     screen alike. */
-  const searchRow = (
-    <div className="list-search-row">
-      <div className="list-search-pill">
-        <Search size={16} className="shrink-0 text-ink-4" />
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              onQueryChange("");
-              e.currentTarget.blur();
-            }
-          }}
-          placeholder="Search"
-          aria-label="Search notes"
-          className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
-        />
-        {hasQuery && (
-          <button
-            title="Clear search"
-            onClick={() => onQueryChange("")}
-            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
-          >
-            <X size={12} />
-          </button>
-        )}
-      </div>
-      {canWrite && !trashMode && (
-        <button
-          onClick={onNew}
-          disabled={busy || loading}
-          title="New note · N"
-          aria-label="New note"
-          className="list-round-button press"
-        >
-          <SquarePen size={18} />
-        </button>
-      )}
-    </div>
-  );
-
-  const sortChips = sort && (
-    <div className="list-sort-chips" role="group" aria-label="Sort notes">
-      {(
-        [
-          ["updated", "Edited", <Clock3 size={14} key="updated" />],
-          ["created", "Created", <CalendarDays size={14} key="created" />],
-          ["title", "Title", <Type size={14} key="title" />],
-        ] as [SortCriterion, string, ReactNode][]
-      ).map(([id, label, icon]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={sort.preferences.sortBy === id}
-          className="list-sort-chip press"
-          onClick={() => sort.onChange({ ...sort.preferences, sortBy: id })}
-        >
-          {icon}
-          {label}
-        </button>
-      ))}
-      <button
-        type="button"
-        aria-pressed={sort.preferences.direction === "asc"}
-        className="list-sort-chip press"
-        onClick={() =>
-          sort.onChange({
-            ...sort.preferences,
-            direction: sort.preferences.direction === "asc" ? "desc" : "asc",
-          })
-        }
-      >
-        <ArrowDownUp size={14} />
-        Reverse
-      </button>
-    </div>
-  );
-
   if (mobile) {
     return (
       <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden">
@@ -1437,15 +1291,41 @@ export function NoteList({
 
         {filterStrip}
 
-        {searchRow}
-
-        {sortChips}
+        <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
+          <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
+            <Search size={16} className="shrink-0 text-ink-4" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  onQueryChange("");
+                  event.currentTarget.blur();
+                }
+              }}
+              placeholder="Search notes"
+              aria-label="Search notes"
+              className="min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-4"
+            />
+            {hasQuery && (
+              <button
+                title="Clear search"
+                onClick={() => onQueryChange("")}
+                className="icon-button h-8 w-8 shrink-0 text-ink-4"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
 
         <div
           key={`${folderLabel}:${query.trim()}`}
           role="listbox"
           aria-label={`Notes in ${folderLabel}`}
-          className="list-in min-h-0 flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pt-2 pb-28"
+          className="list-in min-h-0 flex-1 overflow-x-hidden overscroll-x-contain overflow-y-auto pb-24"
         >
           <div>
             {loading ? (
@@ -1465,6 +1345,17 @@ export function NoteList({
           </div>
         </div>
 
+        {canWrite && !trashMode && (
+          <button
+            type="button"
+            onClick={onNew}
+            disabled={busy || loading}
+            aria-label="New note"
+            className="mobile-compose glass-toolbar absolute right-5 bottom-5 flex h-13 w-13 items-center justify-center text-accent disabled:opacity-40"
+          >
+            <SquarePen size={24} />
+          </button>
+        )}
         {rowMenuPanel}
         {photoPicker}
       </section>
@@ -1494,16 +1385,55 @@ export function NoteList({
             {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
           </p>
         </div>
+        {/* The compose control belongs beside the thing it adds to, not wedged
+            into the search field where it covered the text being typed. */}
         <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
           {toolbarActions}
+          {canWrite && !trashMode && (
+            <button
+              onClick={onNew}
+              disabled={busy || loading}
+              title="New note · N"
+              aria-label="New note"
+              className="toolbar-button press shrink-0"
+            >
+              <SquarePen size={18} />
+            </button>
+          )}
         </span>
       </header>
 
       {filterStrip}
 
-      {searchRow}
-
-      {sortChips}
+      {/* 32, the height of a Mac search field: a recess you type into, not a
+          slab the width of the column. */}
+      <div className="glass-search mx-3 mt-2 mb-1 flex h-8 shrink-0 items-center gap-2 px-2.5">
+        <Search size={14} className="shrink-0 text-ink-4" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              onQueryChange("");
+              e.currentTarget.blur();
+            }
+          }}
+          placeholder="Search"
+          aria-label="Search notes"
+          className="min-w-0 text-sm flex-1 bg-transparent text-ink outline-none placeholder:text-ink-4"
+        />
+        {hasQuery && (
+          <button
+            title="Clear search"
+            onClick={() => onQueryChange("")}
+            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
 
       <div
         key={`${folderLabel}:${query.trim()}`}

@@ -57,6 +57,11 @@ export function useWindowWidth(): number {
    records that retention as debt to settle before production. ───────────── */
 const stored = new Map<string, Promise<string>>();
 
+window.addEventListener("napp:erase-account", () => {
+  for (const url of stored.values()) void url.then(URL.revokeObjectURL, () => undefined);
+  stored.clear();
+});
+
 const CACHE = "napp:image:v1";
 const keyFor = (objectId: string) => `https://napp.invalid/image/${objectId}`;
 

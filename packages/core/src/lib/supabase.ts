@@ -262,7 +262,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
      writing it down is for the next visit and must never hold up this one. */
   const rewritten = staleIds.map((id) => noteCache.get(id)).filter((entry) => entry !== undefined);
   if (rewritten.length > 0 || dropped.length > 0)
-    void writeCachedNotes(archiveId, rewritten, dropped);
+    void writeCachedNotes(session.userId, archiveId, rewritten, dropped);
 
   const foldersByOwner: Record<string, Folder[]> = {};
   const plainFolders = await Promise.all(
@@ -361,11 +361,16 @@ export async function createNote(
 export async function updateNoteProperties(
   session: AppSession,
   noteId: string,
-  values: Pick<Note, "photo" | "cover">,
+  values: Partial<Pick<Note, "photo" | "cover">>,
 ): Promise<void> {
+  const changes = {
+    ...("photo" in values ? { page_icon: values.photo } : {}),
+    ...("cover" in values ? { cover: values.cover } : {}),
+  };
+  if (!Object.keys(changes).length) return;
   const result = await supabase
     .from("notes")
-    .update({ page_icon: values.photo, cover: values.cover })
+    .update(changes)
     .eq("archive_id", session.archiveId)
     .eq("id", noteId);
   fail(result.error);

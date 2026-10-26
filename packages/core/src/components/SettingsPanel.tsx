@@ -26,55 +26,61 @@ import {
   NotebookText,
   ArrowDownUp,
   CalendarDays,
+  ChevronRight,
   Clock3,
   FolderInput,
   ImagePlus,
   Lock,
   LockOpen,
+  Monitor,
   MoreHorizontal,
+  Moon,
   Pin,
   Printer,
   Search,
   Settings,
   RotateCcw,
   SpellCheck,
+  Sun,
   Trash2,
   UserRound,
   Wand2,
   MousePointer2,
   Users,
   X,
-  ChevronLeft,
   AlignCenter,
   Target,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
+import { AccountDeletionForm } from "@/components/AccountDeletionForm";
+import { PolicyLinks } from "@/components/PolicyLinks";
+import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
-import {
-  PAGE_SIZES,
-  type ArchiveKind,
-  type DocumentFeatures,
-  type PageSetup,
-} from "@/lib/spaceShape";
+import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
 import { Invitations } from "@/components/Invitations";
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
-import { useIsCompact } from "@/lib/media";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
-import { AXIS_SPECS, READING_FACES, setAxis, useAxes, type Axes } from "@/lib/axes";
+import {
+  AXIS_SPECS,
+  PRESETS,
+  READING_FACES,
+  applyPreset,
+  matchingPreset,
+  setAxis,
+  useAxes,
+  type Axes,
+} from "@/lib/axes";
 import { AUTO_LOCK_CHOICES, AUTO_LOCK_LABELS, type AutoLockMinutes } from "@/lib/autoLock";
 import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import type { AvatarCrop } from "@/lib/image";
 import {
+  APPEARANCE_PRESETS,
   DEFAULT_APPEARANCE,
-  PHONE_PALETTES,
-  phonePaletteOf,
-  setPalette,
-  wornSide,
   currentAppearance,
   ICON_STYLES,
   SYSTEM_COLOURS,
@@ -118,20 +124,6 @@ import { emerge } from "@/lib/motion";
  * first load paid for the roster, the invitations, the appearance sliders and
  * the shortcut sheet before it could draw a list of notes. It lives here so
  * `notes.tsx` can ask for it only when somebody opens it. */
-
-const weightAxis = AXIS_SPECS.find((spec) => spec.key === "weight")!;
-const measureAxis = {
-  ...AXIS_SPECS.find((spec) => spec.key === "measure")!,
-  label: "Column width",
-};
-
-/** What the computer's half of Settings is called, after the shell it is in:
- *  the phone says "This Phone". Read off `data-shell`, which only the desktop
- *  shell writes. */
-function deviceGroupName(): string {
-  const shell = globalThis.document?.documentElement.dataset.shell;
-  return shell === "mac" ? "This Mac" : shell === "windows" ? "This PC" : "This Computer";
-}
 
 function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: Axes }) {
   const value = axes[spec.key];
@@ -330,6 +322,7 @@ export function SettingsPanel({
   kind = "notes",
   document,
   email,
+  onAccountDeleted,
   reading,
   autoLock,
   profile,
@@ -388,6 +381,7 @@ export function SettingsPanel({
   };
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
+  onAccountDeleted: () => void;
   /** Whose notes the window is currently pointed at. */
   reading: string;
   autoLock: AutoLockMinutes;
@@ -440,16 +434,10 @@ export function SettingsPanel({
   onLock: () => void;
 }) {
   const axes = useAxes();
+  const preset = matchingPreset(axes);
   const appearance = useAppearance();
+  const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
-  /* A phone's screen shows the index first and a section pushed over it, as
-     the phone's Settings does; a desk shows both, side by side. */
-  const phone = useIsCompact();
-  const [stage, setStage] = useState<"index" | "section">(initialSection ? "section" : "index");
-  const choose = (next: SettingsSection) => {
-    setSection(next);
-    setStage("section");
-  };
   const [closing, setClosing] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while
@@ -545,6 +533,7 @@ export function SettingsPanel({
   useEffect(() => {
     if (!open) {
       setClosing(false);
+      setTuning(false);
       setSection("profile");
       setLeaveConfirm(false);
       setLeaveBusy(false);
@@ -603,10 +592,10 @@ export function SettingsPanel({
     }
   }
 
-  const themeChoices: { id: ThemeMode; name: string }[] = [
-    { id: "system", name: "Automatic" },
-    { id: "light", name: "Light" },
-    { id: "dark", name: "Dark" },
+  const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
+    { id: "system", name: "System", icon: <Monitor size={20} /> },
+    { id: "light", name: "Light", icon: <Sun size={20} /> },
+    { id: "dark", name: "Dark", icon: <Moon size={20} /> },
   ];
 
   const sections = settingsSectionsFor(kind);
@@ -618,23 +607,6 @@ export function SettingsPanel({
     sections
       .flatMap((group): readonly { id: string; name: string }[] => group.items)
       .find((item) => item.id === section)?.name ?? "Settings";
-
-  /* The line under each row of the rail: what is set there now, as the
-     phone's index says it. A row with nothing worth saying says nothing. */
-  const worn = PHONE_PALETTES.find((one) => one.id === phonePaletteOf(appearance));
-  const summaries: Partial<Record<SettingsSection, string>> = {
-    appearance: `${wornSide(appearance, true) && worn ? worn.name : "Custom"}, ${
-      themeChoices.find((choice) => choice.id === appearance.theme)?.name ?? "Automatic"
-    }`,
-    writing: autocorrectEnabled ? "Autocorrection on" : "Autocorrection off",
-    shortcuts: `${shortcutsFor(kind).length} keys`,
-    security: presenceEnabled ? "Online status shown" : "Online status hidden",
-    members: `${members.length} of ${seatLimit} seats`,
-    spaces: spaces.find((space) => space.archiveId === currentArchiveId)?.name,
-    document: document
-      ? `${PAGE_SIZES[document.page.size].name}, ${document.page.fontSize} pt`
-      : undefined,
-  };
 
   /* The sheet leaves the way it came, rather than vanishing between two
      frames: a window that only ever animates in reads as one that was
@@ -663,28 +635,24 @@ export function SettingsPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className={`settings-panel glass-sheet ${phone ? "is-phone" : ""}`}
-        data-stage={phone ? stage : undefined}
+        className="settings-panel glass-sheet"
         ref={arrive}
       >
         <div className="settings-body">
           <nav className="settings-nav" aria-label="Settings sections">
-            <header className="settings-nav-head">
-              <h2>Settings</h2>
-              <button
-                type="button"
-                aria-label="Close"
-                className="icon-button press h-9 w-9"
-                onClick={close}
-              >
-                <X size={20} />
-              </button>
-            </header>
             {/* Who this is, at the head of the rail rather than in a column of
                 its own on the far side. It was a standing summary opposite the
                 form, and everything it said the form said too — the one thing
                 it added was the answer to "which account is this?", which
                 belongs beside the way out, not beside the controls. */}
+            <div className="settings-identity">
+              <Avatar url={avatarUrl} name={profile.nickname} email={email} />
+              <div className="min-w-0">
+                <b>{profile.nickname || email.split("@")[0]}</b>
+                <small>{email}</small>
+              </div>
+            </div>
+
             <div ref={navList} className="settings-nav-list">
               {marker && (
                 <span
@@ -693,52 +661,25 @@ export function SettingsPanel({
                   style={{ transform: `translateY(${marker.top}px)`, height: marker.height }}
                 />
               )}
-              {/* You, as the phone's Settings opens: a card with your face,
-                  your name and the address you sign in with. It is the way
-                  into Profile, so it is a row of the rail like the others —
-                  the marker travels to it. */}
-              <button
-                type="button"
-                aria-current={section === "profile" ? "page" : undefined}
-                className={`settings-identity ${section === "profile" ? "is-active" : ""}`}
-                onClick={() => choose("profile")}
-              >
-                <Avatar url={avatarUrl} name={profile.nickname} email={email} />
-                <span className="min-w-0">
-                  <b>{profile.nickname || email.split("@")[0]}</b>
-                  <small>{email}</small>
-                </span>
-              </button>
-              {sections
-                .filter((group) => group.group !== "Account")
-                .map((group) => (
-                  <Fragment key={group.group}>
-                    <p className="settings-nav-group">
-                      {group.group === "This Mac" ? deviceGroupName() : group.group}
-                    </p>
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        aria-current={section === item.id ? "page" : undefined}
-                        className={section === item.id ? "is-active" : ""}
-                        onClick={() => choose(item.id)}
-                      >
-                        <span
-                          className="settings-nav-tile"
-                          data-tone={item.tone}
-                          aria-hidden="true"
-                        >
-                          {item.icon}
-                        </span>
-                        <span className="settings-nav-text">
-                          {item.name}
-                          {summaries[item.id] && <small>{summaries[item.id]}</small>}
-                        </span>
-                      </button>
-                    ))}
-                  </Fragment>
-                ))}
+              {sections.map((group) => (
+                <Fragment key={group.group}>
+                  <p className="settings-nav-group">{group.group}</p>
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-current={section === item.id ? "page" : undefined}
+                      className={section === item.id ? "is-active" : ""}
+                      onClick={() => setSection(item.id)}
+                    >
+                      <span className="settings-nav-tile" data-tone={item.tone} aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      {item.name}
+                    </button>
+                  ))}
+                </Fragment>
+              ))}
             </div>
 
             {/* Leaving is not a section of Settings, so it does not sit in the
@@ -757,14 +698,6 @@ export function SettingsPanel({
                 a big "Settings" over everything, with a sentence under it,
                 named the window rather than the page you were on. */}
             <header className="settings-header">
-              <button
-                type="button"
-                className="settings-back press"
-                onClick={() => setStage("index")}
-              >
-                <ChevronLeft size={20} />
-                Settings
-              </button>
               <h2 id="settings-title">{sectionName}</h2>
               <button
                 type="button"
@@ -778,40 +711,40 @@ export function SettingsPanel({
             <div className="settings-scroll">
               {section === "profile" && (
                 <section>
-                  {/* The phone's profile card: your face, your name and the
-                      address you sign in with on one card, the picture's two
-                      acts as quiet words beside them. */}
-                  <div className="profile-card">
+                  <div className="profile-portrait">
                     <Avatar url={avatarUrl} name={profile.nickname} email={email} large />
-                    <span className="profile-card-text">
-                      <b>{profile.nickname || email.split("@")[0]}</b>
-                      <small>{email}</small>
-                      <span className="profile-card-acts">
-                        <input
-                          ref={avatarRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) setCropping(file);
-                            event.target.value = "";
-                          }}
-                        />
+                    <b>{profile.nickname || email.split("@")[0]}</b>
+                    <small>{email}</small>
+                    <input
+                      ref={avatarRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) setCropping(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <div className="profile-portrait-actions">
+                      <button
+                        type="button"
+                        disabled={profileBusy}
+                        onClick={() => avatarRef.current?.click()}
+                      >
+                        {profile.avatarObject ? "Change picture" : "Add a picture"}
+                      </button>
+                      {profile.avatarObject && (
                         <button
                           type="button"
+                          className="is-danger"
                           disabled={profileBusy}
-                          onClick={() => avatarRef.current?.click()}
+                          onClick={onAvatarRemove}
                         >
-                          {profile.avatarObject ? "Change Picture" : "Add Picture"}
+                          Remove
                         </button>
-                        {profile.avatarObject && (
-                          <button type="button" disabled={profileBusy} onClick={onAvatarRemove}>
-                            Remove
-                          </button>
-                        )}
-                      </span>
-                    </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="appearance-controls">
@@ -882,34 +815,25 @@ export function SettingsPanel({
                       {profileError}
                     </p>
                   )}
-                  {/* The one act that cannot be taken back stands last and
-                      apart, in a card of its own, said in red words rather
-                      than drawn as a red box — as the phone's Delete Account
-                      row is. The second press is the confirmation. */}
-                  <div className="appearance-controls profile-leave">
+                  <h3>Leave shared archive</h3>
+                  <div className="leave-archive-card">
+                    <RowLead
+                      icon={<LogOut size={16} />}
+                      label="Leave this archive"
+                      hint={
+                        members.length <= 1
+                          ? "Nobody to leave it to — you are the only member"
+                          : "Your access ends, but the notes stay for the other members"
+                      }
+                    />
                     <button
                       type="button"
-                      className={`appearance-row profile-leave-row ${
-                        leaveConfirm ? "is-confirming" : ""
-                      }`}
+                      className={leaveConfirm ? "is-danger-confirm" : ""}
                       disabled={leaveBusy || members.length <= 1}
                       onClick={() => void leaveArchive()}
                     >
-                      <RowLead
-                        icon={<LogOut size={16} />}
-                        label={
-                          leaveBusy
-                            ? "Leaving…"
-                            : leaveConfirm
-                              ? "Leave Archive — Confirm"
-                              : "Leave Archive"
-                        }
-                        hint={
-                          members.length <= 1
-                            ? "You are the only member"
-                            : "Your access ends; the notes stay for the others"
-                        }
-                      />
+                      <LogOut size={16} />
+                      {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
                     </button>
                   </div>
                   {leaveStatus && (
@@ -917,25 +841,46 @@ export function SettingsPanel({
                       {leaveStatus}
                     </p>
                   )}
+                  <BlockedAccounts />
+                  <h3>Delete account</h3>
+                  <PolicyLinks />
+                  <details>
+                    <summary>Delete account permanently</summary>
+                    <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
+                  </details>
                 </section>
               )}
 
               {section === "appearance" && (
                 <section>
                   <h3>Theme</h3>
-                  <Segmented
-                    label="Theme"
-                    value={appearance.theme}
-                    options={themeChoices}
-                    onChange={(id) => setTheme(id as ThemeMode)}
-                  />
+                  <div className="theme-picker" role="radiogroup" aria-label="Theme">
+                    {themeChoices.map((choice) => (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={appearance.theme === choice.id}
+                        className={appearance.theme === choice.id ? "is-active" : ""}
+                        onClick={() => setTheme(choice.id)}
+                      >
+                        <span className={`theme-preview is-${choice.id}`}>
+                          {choice.icon}
+                          <i />
+                          <b />
+                        </span>
+                        {choice.name}
+                      </button>
+                    ))}
+                  </div>
 
                   <h3>Palette</h3>
                   <div className="palette-presets" role="group" aria-label="Colour palettes">
-                    {PHONE_PALETTES.map((palette) => {
-                      const active = wornSide(appearance, true)
-                        ? phonePaletteOf(appearance) === palette.id
-                        : false;
+                    {APPEARANCE_PRESETS.map((palette) => {
+                      const active =
+                        appearance.accent === palette.accent &&
+                        appearance.background === palette.background &&
+                        appearance.foreground === palette.foreground;
                       return (
                         <button
                           key={palette.id}
@@ -950,32 +895,26 @@ export function SettingsPanel({
                               await setWallpaper(await (await fetch(picture)).blob()).catch(
                                 () => undefined,
                               );
-                            setPalette(palette.id);
-                            if (picture)
-                              setAppearance({
-                                ...currentAppearance(),
-                                glass: 30,
-                                wallpaperDim: 12,
-                                wallpaperBlur: 0,
-                              });
+                            setAppearance({
+                              ...currentAppearance(),
+                              theme: palette.theme,
+                              accent: palette.accent,
+                              background: palette.background,
+                              foreground: palette.foreground,
+                              ...(picture ? { glass: 30, wallpaperDim: 12, wallpaperBlur: 0 } : {}),
+                            });
                           }}
                         >
-                          <span className="palette-card" aria-hidden="true">
-                            {[palette.light, palette.dark].map((side) => (
-                              <span
-                                key={side.background}
-                                style={{ background: side.background, color: side.foreground }}
-                              >
-                                Aa
-                                <i
-                                  style={{
-                                    background:
-                                      palette.id === "graphite" ? side.foreground : side.accent,
-                                  }}
-                                />
-                              </span>
-                            ))}
-                          </span>
+                          <span
+                            className="palette-chip"
+                            style={
+                              {
+                                "--palette-bg": palette.background,
+                                "--palette-fg": palette.foreground,
+                                "--palette-accent": palette.accent,
+                              } as React.CSSProperties
+                            }
+                          />
                           {palette.name}
                         </button>
                       );
@@ -1133,12 +1072,20 @@ export function SettingsPanel({
                       </div>
                     </>
                   )}
+
+                  <button
+                    type="button"
+                    className="settings-reset"
+                    onClick={() =>
+                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
+                    }
+                  >
+                    Reset appearance
+                  </button>
                 </section>
               )}
 
-              {/* What was Style, under the palette: the phone has one
-                  Appearance, and so does this. */}
-              {section === "appearance" && (
+              {section === "style" && (
                 <section>
                   <h3>Icon style</h3>
                   <div className="icon-style-picker" role="radiogroup" aria-label="Icon style">
@@ -1234,15 +1181,52 @@ export function SettingsPanel({
                       />
                     )}
                   </div>
+                </section>
+              )}
+
+              {section === "reading" && (
+                <section>
+                  <div className="settings-specimen" aria-hidden="true">
+                    <p>
+                      Set the page for the way you read. Every note follows these choices instantly.
+                    </p>
+                  </div>
+                  <Segmented
+                    label="Reading face"
+                    value={axes.face}
+                    options={READING_FACES}
+                    onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
+                  />
+                  <Segmented
+                    label="Reading preset"
+                    value={preset?.id ?? null}
+                    options={PRESETS.map((item) => ({
+                      id: item.id,
+                      name: item.name,
+                      hint: item.role,
+                    }))}
+                    onChange={(id) => {
+                      const chosen = PRESETS.find((item) => item.id === id);
+                      if (chosen) applyPreset(chosen);
+                    }}
+                  />
                   <button
                     type="button"
-                    className="settings-reset"
-                    onClick={() =>
-                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
-                    }
+                    className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
+                    aria-expanded={tuning}
+                    onClick={() => setTuning((current) => !current)}
                   >
-                    Reset appearance
+                    <ChevronRight size={16} />
+                    <span>Fine-tune</span>
+                    <small>{preset ? preset.name : "Custom"}</small>
                   </button>
+                  {tuning && (
+                    <div className="settings-sliders">
+                      {AXIS_SPECS.map((spec) => (
+                        <AxisSlider key={spec.key} spec={spec} axes={axes} />
+                      ))}
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -1261,24 +1245,6 @@ export function SettingsPanel({
                       disabled={document.disabled}
                       onChange={document.onPage}
                     />
-                  </div>
-                  {/* The reading face and its weight reach the book alone now:
-                      a note is set in the system face at the phone's size.
-                      Size and leading are the page's (above); the measure is
-                      the sheet's width. */}
-                  <h3>Text</h3>
-                  <div className="appearance-controls">
-                    <div className="appearance-row is-stacked">
-                      <Segmented
-                        label="Face"
-                        value={axes.face}
-                        options={READING_FACES}
-                        onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
-                      />
-                    </div>
-                    <div className="appearance-row is-stacked">
-                      <AxisSlider spec={weightAxis} axes={axes} />
-                    </div>
                   </div>
                   <h3>References</h3>
                   <div className="appearance-controls settings-page-setup">
@@ -1356,19 +1322,6 @@ export function SettingsPanel({
                       />
                     </label>
                   </div>
-
-                  {/* How wide a note's column runs: the one reading axis a
-                      note still answers to. */}
-                  {!isDocument && (
-                    <>
-                      <h3>Page</h3>
-                      <div className="appearance-controls">
-                        <div className="appearance-row is-stacked">
-                          <AxisSlider spec={measureAxis} axes={axes} />
-                        </div>
-                      </div>
-                    </>
-                  )}
 
                   {isDocument && (
                     <>

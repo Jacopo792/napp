@@ -26,8 +26,6 @@ interface Press {
   y: number;
   rect: DOMRect;
   at: number;
-  /** What was pressed, so an opening can ask whether it was a note's row. */
-  target: Element;
 }
 let press: Press | null = null;
 
@@ -47,7 +45,6 @@ if (typeof document !== "undefined") {
             y: event.clientY,
             rect: target.getBoundingClientRect(),
             at: performance.now(),
-            target,
           }
         : null;
     },
@@ -71,68 +68,6 @@ export function originAtPress(el: HTMLElement) {
   const x = p.x - box.left;
   const y = p.y - box.top;
   el.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
-}
-
-/** A note opening out of what was pressed — its row, a card on Home, a row of
- *  Comments — the way the phone's note zooms out of its card. The new page
- *  scales up from 0.94 with its origin on the thing that was pressed, so it
- *  travels a little from there as it grows. Pressed inside the page itself, or
- *  opened from the keyboard, a link or ⌘K, there is nothing it came out of,
- *  and the page arrives as it always did. Once per element. */
-const zoomed = new WeakSet<Element>();
-/* The things a note is opened out of: Home's cards, which the note replaces.
-   A row of the list is not one — the note opens beside it, in a pane that
-   never moved, and a page growing out of the row read as the window bouncing. */
-const NOTE_OPENERS = ".home-continue, .home-note, .home-wait, .home-lately-row";
-
-export function zoomNote(el: HTMLElement | null) {
-  if (!el || zoomed.has(el) || reduced()) return;
-  zoomed.add(el);
-  const p = recentPress();
-  if (!p || !p.target.matches(NOTE_OPENERS)) return;
-  const box = el.getBoundingClientRect();
-  const cx = p.rect.left + p.rect.width / 2;
-  const cy = p.rect.top + p.rect.height / 2;
-  el.style.transformOrigin = `${Math.round(cx - box.left)}px ${Math.round(cy - box.top)}px`;
-  el.dataset.zoom = "";
-  /* Its own animation, not one bubbling up from inside the page. */
-  const done = (event: AnimationEvent) => {
-    if (event.target !== el) return;
-    delete el.dataset.zoom;
-    el.removeEventListener("animationend", done);
-  };
-  el.addEventListener("animationend", done);
-}
-
-/** The picture that was just pressed, if a picture was: where a picture
- *  shown at full size has to fly home to when it is put down. */
-export function pressedPicture(): DOMRect | null {
-  const p = recentPress();
-  return p && p.target instanceof HTMLImageElement ? p.rect : null;
-}
-
-/** A picture going back into its thumbnail — `emerge`'s zoom, reversed, on
- *  the same curve — while `ground` fades with it. Resolves when it has
- *  landed, or at once when there is nowhere to land or motion is reduced. */
-export function flyHome(
-  el: HTMLElement | null,
-  home: DOMRect | null,
-  ground: HTMLElement | null,
-): Promise<void> {
-  if (!el || reduced()) return Promise.resolve();
-  const timing = { duration: 320, easing: EASE, fill: "forwards" as const };
-  ground?.animate([{ opacity: 1 }, { opacity: 0 }], timing);
-  if (!home) return el.animate([{ opacity: 1 }, { opacity: 0 }], timing).finished.then(() => {});
-  const box = el.getBoundingClientRect();
-  const dx = home.left + home.width / 2 - (box.left + box.width / 2);
-  const dy = home.top + home.height / 2 - (box.top + box.height / 2);
-  const s = home.width / box.width;
-  return el
-    .animate(
-      [{ transform: "none" }, { transform: `translate(${dx}px, ${dy}px) scale(${s})` }],
-      timing,
-    )
-    .finished.then(() => {});
 }
 
 /** An overlay arriving: out of the control that asked for it, or — opened from
@@ -375,6 +310,27 @@ export function sendNotes(moves: { id: string; to: string | null; leaves: boolea
        only a row that is leaving it may be seen to go. */
     if (move.leaves) vanish(move.id, delay);
   });
+}
+
+/* ── Which way a note came from ─────────────────────────────────────────────
+   Opening the next note down the list is moving down a long page, so the new
+   note rises into place and the old one leaves upward; the note above comes
+   the other way. Set on the root, where the page's entrance and the view
+   transition's exit both read it. Opened from anything that is not a row —
+   a link, ⌘K, a reload — there is no direction and the note only fades. */
+export function aimNote(fromId: string | null, toId: string) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const row = (id: string | null) =>
+    id ? document.querySelector(`[data-note-row="${CSS.escape(id)}"]`) : null;
+  const from = row(fromId);
+  const to = row(toId);
+  if (!from || !to || from === to) {
+    delete root.dataset.noteDirection;
+    return;
+  }
+  root.dataset.noteDirection =
+    to.getBoundingClientRect().top > from.getBoundingClientRect().top ? "down" : "up";
 }
 
 /* ── A wheel that rolls ─────────────────────────────────────────────────────

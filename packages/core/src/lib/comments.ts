@@ -19,7 +19,7 @@ import {
   type NoteComment,
 } from "./commentThreads";
 
-export { lastOpenRemarks, notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
+export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
 export type {
   ArchiveComment,
   NoteComment,

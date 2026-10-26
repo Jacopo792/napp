@@ -29,24 +29,28 @@
  * on the way to opening a note — the panel is closed until somebody asks for
  * it, and the note is readable long before this has finished. */
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
   MessageSquare,
-  MoreHorizontal,
   Pencil,
-  Quote,
+  RotateCcw,
   Smile,
   Trash2,
   UserPlus,
   X,
 } from "@/components/icons";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
+import { SafetyActions } from "@/components/SafetyActions";
 import { Avatar } from "@/components/WorkspaceMenus";
-import { PointMenu } from "@/components/ContextMenu";
-import type { MenuItem } from "@/lib/menuShape";
-import type { MenuPoint } from "@/lib/contextMenu";
 import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
@@ -69,6 +73,7 @@ import {
   tally,
   type CommentThread,
 } from "@/lib/commentThreads";
+import { collaborationColor } from "@/features/editor/lib/ydoc";
 import { formatStamp } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
 
@@ -102,17 +107,6 @@ interface Props {
   /** Where the page has room beside its words: the cards are drawn in this
    *  element, inside the scrolling page, each beside its own passage. */
   margin?: HTMLElement | null;
-}
-
-/** How long ago, as the phone's annotations say it: "Now", "2m", "3h", then
- *  the list's own stamp — "Yesterday", a weekday, a date. */
-function ago(iso: string): string {
-  const then = new Date(iso);
-  const seconds = (Date.now() - then.getTime()) / 1000;
-  if (seconds < 60) return "Now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (then.toDateString() === new Date().toDateString()) return `${Math.floor(seconds / 3600)}h`;
-  return formatStamp(iso);
 }
 
 /** Air between the page's edge and the cards beside it. */
@@ -155,13 +149,14 @@ export function NoteComments({
   const [forYou, setForYou] = useState(false);
   /** The composer an @ is being typed in, and the name so far. */
   const [suggesting, setSuggesting] = useState<{ threadId: string; query: string } | null>(null);
-  /** Which remark's reactions are open. */
+  /** Which thread's Assign menu, or which remark's reactions, is open. */
+  const [assigning, setAssigning] = useState<string | null>(null);
   const [reacting, setReacting] = useState<string | null>(null);
-  /** A thread's ⋯, open under its button. */
-  const [threadMenu, setThreadMenu] = useState<(MenuPoint & { items: MenuItem[] }) | null>(null);
   const members = useMemo(() => [...authors.values()], [authors]);
   /* One of each is open at a time, so one ref each, on the one that is. */
+  const closeAssign = useCallback(() => setAssigning(null), []);
   const closeReact = useCallback(() => setReacting(null), []);
+  const assignRef = useDismiss<HTMLSpanElement>(assigning !== null, closeAssign);
   const reactRef = useDismiss<HTMLSpanElement>(reacting !== null, closeReact);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const threadRefs = useRef(new Map<string, HTMLElement>());
@@ -305,6 +300,7 @@ export function NoteComments({
   }
 
   async function assign(threadId: string, assigneeId: string | null) {
+    setAssigning(null);
     try {
       await assignThread(session, noteId, threadId, assigneeId);
       setComments((current) =>
@@ -477,29 +473,29 @@ export function NoteComments({
   /** One remark. `head` is the one that opened the thread — full weight, its
    *  own line for the name. A reply is quieter and sits under the rail, so the
    *  shape of the card says which is which before a word is read. */
-  function remark(comment: NoteComment, head: boolean, onlyOne: boolean) {
+  function remark(comment: NoteComment, head: boolean, onlyOne: boolean, extra?: ReactNode) {
     const author = authors.get(comment.authorId);
+    const name = author?.name || "Someone";
     const mine = comment.authorId === session.userId;
-    /* The phone's byline: a neutral face, the name — "You" for your own, as
-       Messages says it — and how long ago. The caret colours that once tinted
-       each name were a second colour system laid over a conversation that
-       reads perfectly well in ink; the face says who. */
-    const name = mine ? "You" : author?.name || "Someone";
+    /* The same colour this person's caret has in the text. Two people writing
+       to each other need to be told apart at a glance and one grey name above
+       another does not do it — but a second colour system would be worse than
+       none, so this is the one the note already uses. */
+    const colour = collaborationColor(comment.authorId);
     return (
       <div
         key={comment.id}
         className={`note-comment ${head ? "is-head" : "is-reply"} ${mine ? "is-mine" : ""}`}
+        style={{ "--author": colour } as React.CSSProperties}
       >
-        {/* Who and when on the left; the remark's own small acts on the right,
-            under the pointer only. What is done to the whole thread is at its
-            foot. */}
+        {/* Who and when on the left, what can be done on the right — Docs'
+            card. The tools were a row of words under the remark, which put
+            the most-used one (Resolve) the furthest from the eye. */}
         <div className="note-comment-head">
-          <Avatar url={author?.avatarUrl ?? null} name={author?.name || name} email="" compact />
+          <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
           <span className="note-comment-who">
             <span className="note-comment-name truncate">{name}</span>
-            <time className="note-comment-stamp" dateTime={comment.createdAt}>
-              {ago(comment.createdAt)}
-            </time>
+            <span className="readout note-comment-stamp">{formatStamp(comment.createdAt)}</span>
           </span>
           <span className="note-comment-tools" onClick={(event) => event.stopPropagation()}>
             {canEdit && reactTool(comment)}
@@ -528,6 +524,7 @@ export function NoteComments({
                 <Trash2 size={14} />
               </button>
             )}
+            {extra}
           </span>
         </div>
         {editing === comment.id ? (
@@ -576,6 +573,9 @@ export function NoteComments({
           <p className="note-comment-body">{words(comment)}</p>
         )}
         {reactionRow(comment)}
+        {!mine ? (
+          <SafetyActions noteId={noteId} userId={comment.authorId} commentId={comment.id} compact />
+        ) : null}
       </div>
     );
   }
@@ -648,83 +648,68 @@ export function NoteComments({
       .join(", ");
   }
 
-  /** A thread's ⋯: where it is in the note, who it is for, and taking it
-   *  back — the phone's three, in the page's own menu. Deleting is the
-   *  author's alone, so the whole thread is offered only to whoever wrote
-   *  every remark in it; it asks twice by being a section you step into. */
-  function openThreadMenu(event: React.MouseEvent<HTMLElement>, thread: CommentThread) {
-    event.stopPropagation();
-    const { left, bottom } = event.currentTarget.getBoundingClientRect();
-    const allMine = thread.comments.every((comment) => comment.authorId === session.userId);
-    const items: MenuItem[] = [
-      ...(quotes.has(thread.threadId)
-        ? [
-            {
-              kind: "item" as const,
-              id: "thread:show",
-              label: "Show in Note",
-              icon: <Quote size={16} />,
-              run: () => {
-                setActive(thread.threadId);
-                onReveal(thread.threadId);
-              },
-            },
-          ]
-        : []),
-      ...(canEdit && !thread.resolved
-        ? [
-            {
-              kind: "item" as const,
-              id: "thread:assign",
-              label: "Assign To",
-              icon: <UserPlus size={16} />,
-              submenu: [
-                ...members.map((member) => ({
-                  kind: "item" as const,
-                  id: `thread:assign:${member.userId}`,
-                  label: member.userId === session.userId ? "You" : member.name || "Someone",
-                  icon: thread.assigneeId === member.userId ? <Check size={16} /> : undefined,
-                  run: () => void assign(thread.threadId, member.userId),
-                })),
-                {
-                  kind: "item" as const,
-                  id: "thread:assign:nobody",
-                  label: "Nobody",
-                  icon: thread.assigneeId ? undefined : <Check size={16} />,
-                  run: () => void assign(thread.threadId, null),
-                },
-              ],
-            },
-          ]
-        : []),
-      ...(canEdit && allMine
-        ? [
-            { kind: "separator" as const },
-            {
-              kind: "item" as const,
-              id: "thread:delete",
-              label: "Delete Thread",
-              icon: <Trash2 size={16} />,
-              danger: true,
-              submenu: [
-                {
-                  kind: "item" as const,
-                  id: "thread:delete:confirm",
-                  label: "Delete Thread",
-                  danger: true,
-                  run: () => void removeThread(thread),
-                },
-              ],
-            },
-          ]
-        : []),
-    ];
-    setThreadMenu({ x: left, y: bottom + 4, items });
-  }
-
-  async function removeThread(thread: CommentThread) {
-    for (const [at, comment] of thread.comments.entries())
-      await remove(comment, at === thread.comments.length - 1);
+  /** Resolve, always in reach, and Assign beside it on hover. */
+  function threadTools(thread: CommentThread) {
+    return (
+      <>
+        {!thread.resolved && (
+          <span
+            className="note-comment-assign"
+            ref={assigning === thread.threadId ? assignRef : undefined}
+          >
+            <button
+              type="button"
+              className="note-comment-tool is-quiet press"
+              aria-label="Assign"
+              title="Assign"
+              aria-expanded={assigning === thread.threadId}
+              onClick={() =>
+                setAssigning((open) => (open === thread.threadId ? null : thread.threadId))
+              }
+            >
+              <UserPlus size={14} />
+            </button>
+            {assigning === thread.threadId && (
+              <span className="note-comment-assign-menu" role="menu">
+                {members.map((member) => (
+                  <button
+                    key={member.userId}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={thread.assigneeId === member.userId}
+                    className="note-comment-suggestion press"
+                    onClick={() => void assign(thread.threadId, member.userId)}
+                  >
+                    <Avatar url={member.avatarUrl} name={member.name} email="" compact />
+                    {member.userId === session.userId ? "Me" : member.name || "Someone"}
+                    {thread.assigneeId === member.userId && <Check size={12} />}
+                  </button>
+                ))}
+                {thread.assigneeId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="note-comment-suggestion press"
+                    onClick={() => void assign(thread.threadId, null)}
+                  >
+                    Nobody
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
+        )}
+        <button
+          type="button"
+          className="note-comment-tool is-resolve press"
+          aria-label={thread.resolved ? "Reopen" : "Resolve"}
+          title={thread.resolved ? "Reopen" : "Resolve"}
+          onClick={() => void toggleResolved(thread.threadId, !thread.resolved)}
+        >
+          {thread.resolved ? <RotateCcw size={14} /> : <Check size={15} weight="bold" />}
+        </button>
+      </>
+    );
   }
 
   function card(thread: CommentThread) {
@@ -757,14 +742,19 @@ export function NoteComments({
         {/* The passage, as the thread's title. It is how you know what is being
             discussed without hunting for the underline, and clicking the card
             lights that underline in the text. */}
-        {/* The passage, recessed into the card with a rule down its side, as
-            the phone draws it — pressed, it lights its words in the note. */}
         <p className={`note-comment-quote ${quotes.has(thread.threadId) ? "" : "is-orphan"}`}>
-          <span>{quotes.get(thread.threadId) || "The passage this was about is gone"}</span>
-          {quotes.has(thread.threadId) && <ArrowUpRight size={13} aria-hidden="true" />}
+          {quotes.get(thread.threadId) || "The passage this was about is gone"}
         </p>
+        {thread.assigneeId && (
+          <p className="note-comment-assignee">
+            <UserPlus size={12} />
+            {thread.assigneeId === session.userId
+              ? "Yours"
+              : authors.get(thread.assigneeId)?.name || "Someone"}
+          </p>
+        )}
 
-        {remark(head, true, thread.comments.length === 1)}
+        {remark(head, true, thread.comments.length === 1, canEdit && threadTools(thread))}
 
         {hiddenCount > 0 && (
           <button
@@ -781,61 +771,6 @@ export function NoteComments({
         )}
 
         {visibleReplies.map((reply) => remark(reply, false, false))}
-
-        {/* The thread's foot, in quiet words: who it is for, then Reply,
-            Resolve and ⋯ — the phone's, and the order a hand reaches for
-            them in. */}
-        <div className="note-comment-foot" onClick={(event) => event.stopPropagation()}>
-          {thread.assigneeId && (
-            <span className="note-comment-assignee">
-              <Avatar
-                url={authors.get(thread.assigneeId)?.avatarUrl ?? null}
-                name={authors.get(thread.assigneeId)?.name || ""}
-                email=""
-                compact
-              />
-              {thread.assigneeId === session.userId
-                ? "Assigned to you"
-                : `For ${authors.get(thread.assigneeId)?.name || "someone"}`}
-            </span>
-          )}
-          {canEdit && !thread.resolved && (
-            <button
-              type="button"
-              className="note-comment-word press"
-              onClick={() => {
-                setActive(thread.threadId);
-                window.requestAnimationFrame(() =>
-                  threadRefs.current
-                    .get(thread.threadId)
-                    ?.querySelector<HTMLTextAreaElement>(".note-comment-composer textarea")
-                    ?.focus(),
-                );
-              }}
-            >
-              Reply
-            </button>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              className="note-comment-word press"
-              onClick={() => void toggleResolved(thread.threadId, !thread.resolved)}
-            >
-              {thread.resolved ? "Reopen" : "Resolve"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="note-comment-tool is-quiet note-comment-more-acts press"
-            aria-label="More"
-            aria-haspopup="menu"
-            title="More"
-            onClick={(event) => openThreadMenu(event, thread)}
-          >
-            <MoreHorizontal size={16} />
-          </button>
-        </div>
 
         {/* The reply box belongs to the thread being read. One under every
             card was most of the column's weight — five threads, five empty
@@ -1004,9 +939,6 @@ export function NoteComments({
       )}
 
       <div className="note-comments-scroll">{body}</div>
-      {threadMenu && (
-        <PointMenu point={threadMenu} items={threadMenu.items} close={() => setThreadMenu(null)} />
-      )}
     </aside>
   );
   return margin ? createPortal(panel, margin) : panel;

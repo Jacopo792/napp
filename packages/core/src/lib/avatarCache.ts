@@ -10,6 +10,15 @@ interface CachedAvatar {
 
 const avatars = new Map<string, CachedAvatar>();
 
+window.addEventListener("napp:erase-account", (event) => {
+  const userId = (event as CustomEvent<string>).detail;
+  for (const [objectId, entry] of avatars)
+    if (entry.userId === userId) {
+      entry.stale = true;
+      dispose(objectId, entry);
+    }
+});
+
 function dispose(objectId: string, entry: CachedAvatar): void {
   if (entry.url) URL.revokeObjectURL(entry.url);
   avatars.delete(objectId);

@@ -96,12 +96,6 @@ interface Props {
   scopeLabel: string;
 }
 
-/** Asks the sidebar to start renaming a folder, or naming one inside it, in
- *  its own tree — so a folder's menu elsewhere is the same two acts
- *  rather than a second way of naming a folder. */
-export const FOLDER_ACT = "napp:folder-act";
-export type FolderAct = { id: string; act: "rename" | "subfolder" };
-
 const EXPANDED_KEY = "napp:folders-open";
 
 /* How long a press has to stay still to become a hold — the folder's sheet,
@@ -514,19 +508,6 @@ export function Sidebar({
     setExpanded((current) => new Set(current).add(parentId));
     setAdding(parentId);
   }
-
-  useEffect(() => {
-    const act = (event: Event) => {
-      const { id, act } = (event as CustomEvent<FolderAct>).detail;
-      if (act === "rename") setRenaming(id);
-      else {
-        setExpanded((current) => new Set(current).add(id));
-        setAdding(id);
-      }
-    };
-    window.addEventListener(FOLDER_ACT, act);
-    return () => window.removeEventListener(FOLDER_ACT, act);
-  }, []);
 
   function renderNode(node: TreeNode, depth: number): React.ReactNode {
     const open = expanded.has(node.folder.id);

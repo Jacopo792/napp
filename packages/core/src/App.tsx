@@ -24,6 +24,7 @@ import { initAxes } from "./lib/axes";
 import { initAppearance } from "./lib/appearance";
 import { initWritingPreferences } from "./lib/writingPreferences";
 import { keepCapture } from "./lib/capture";
+import { PolicyGate } from "@/components/PolicyGate";
 
 /* Before React, as they always have been: these write CSS custom properties on
    the document element, and a first paint that happens first is a flash of the
@@ -35,16 +36,36 @@ initWritingPreferences();
    before the router reads the address, and before a sign-in can lose it. */
 keepCapture();
 
+const LoginScreen = lazyRouteComponent(() => import("./screens/Login"));
+const DeletionScreen = lazyRouteComponent(() => import("./screens/AccountDeletion"));
+const RecoveryScreen = lazyRouteComponent(() => import("./screens/PasswordRecovery"));
+const PolicyScreen = lazyRouteComponent(() => import("./screens/Policy"));
+const NotesScreen = lazyRouteComponent(() => import("./screens/Notes"));
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: lazyRouteComponent(() => import("./screens/Login")),
+  component: () =>
+    ["privacy", "terms", "support"].includes(
+      new URLSearchParams(window.location.search).get("page") ?? "",
+    ) ? (
+      <PolicyScreen />
+    ) : new URLSearchParams(window.location.search).get("action") === "delete-account" ? (
+      <DeletionScreen />
+    ) : new URLSearchParams(window.location.search).get("action") === "reset-password" ? (
+      <RecoveryScreen />
+    ) : (
+      <LoginScreen />
+    ),
 });
 
 const notesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notes",
-  component: lazyRouteComponent(() => import("./screens/Notes")),
+  component: () => (
+    <PolicyGate>
+      <NotesScreen />
+    </PolicyGate>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([loginRoute, notesRoute]);

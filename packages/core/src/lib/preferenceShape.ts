@@ -6,7 +6,7 @@
  * a test — which is the half worth having one, because it decides what a
  * browser shows after a pull and it is reading JSON that has been sitting in a
  * column across however many versions of this client. */
-import { DEFAULT_APPEARANCE, withDesktopDefault, type Appearance } from "./appearance.ts";
+import { DEFAULT_APPEARANCE, type Appearance } from "./appearance.ts";
 import { AUTO_LOCK_CHOICES, type AutoLockMinutes } from "./autoLock.ts";
 import { DEFAULT_AXES, type Axes } from "./axes.ts";
 import { writingPreferencesFrom, type WritingPreferences } from "./writingPreferences.ts";
@@ -152,7 +152,7 @@ export function mergeAccountPreferences(
   const row = (stored ?? {}) as Partial<AccountPreferences>;
   const writing = row.writing as Partial<WritingPreferences> | undefined;
   return accountPreferences(
-    withDesktopDefault({ ...DEFAULT_APPEARANCE, ...local.appearance, ...(row.appearance ?? {}) }),
+    { ...DEFAULT_APPEARANCE, ...local.appearance, ...(row.appearance ?? {}) },
     { ...DEFAULT_AXES, ...local.axes, ...(row.axes ?? {}) },
     writingPreferencesFrom(writing, local.writing),
     {

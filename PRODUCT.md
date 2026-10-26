@@ -218,7 +218,7 @@ The interface uses the operating system's native sans-serif and monospace faces 
 sharpest platform rendering. Graphite remains the default; neutral borders, restrained
 radii and `--ease-premium` remain the visual foundation across custom themes.
 
-Custom accent and background colours are user-controlled. Tags, destructive states and
+Custom accent and background colours are user-controlled. Destructive states and
 success states retain their semantic meaning in every palette.
 
 ## Evidence on Hand
@@ -226,7 +226,8 @@ success states retain their semantic meaning in every palette.
 - Real note corpus readable via the Apple Notes connector — use it to size titles,
   previews, and reading measure honestly. Do not invent placeholder note content that
   is shorter or tidier than the real thing.
-- No logo, no wordmark, no brand imagery exists for this app. Do not fabricate one.
+- The supplied Napp logo is the white arch and five rules on black in
+  `docs/branding/napp-logo.svg`. Reuse it across clients and public material.
 - No users beyond the archive's own members. No testimonials, metrics, or adoption
   claims exist.
 

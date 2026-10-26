@@ -8,7 +8,7 @@ export function MenuSurface({
   ref,
   ...props
 }: ComponentProps<"div"> & { open: boolean; onExit?: () => void }) {
-  const present = usePresence(open, 150);
+  const present = usePresence(open, 80);
   useEffect(() => {
     if (!present) onExit?.();
   }, [present, onExit]);

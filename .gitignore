@@ -48,3 +48,11 @@ tmp/
 
 # Desktop build output
 apps/*/release/
+
+# The commercial mobile client remains outside the public source tree.
+apps/mobile/
+
+# Browser test artifacts
+test-results/
+playwright-report/
+e2e/.hosted-editor/

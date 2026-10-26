@@ -6,7 +6,6 @@ import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixtur
 import type { ArchiveComment, NoteComment, Reaction } from "@/lib/commentThreads";
 
 export {
-  lastOpenRemarks,
   notesWithOpenRemarks,
   threadsOf,
   unreadRemarks,

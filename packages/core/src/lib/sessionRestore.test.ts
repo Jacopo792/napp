@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import { restoreArchiveSession, SESSION_KEY } from "./sessionRestore.ts";
+import { accountContentRemovalKey } from "./accountContentShape.ts";
 
 const saved = { userId: "member-1", email: "member@example.invalid", archiveId: "archive-1" };
 const user = {
@@ -47,6 +48,18 @@ test("a connection failure preserves the archive and a retry opens it", async ()
     }),
   );
   assert.deepEqual(await restoreArchiveSession(disk, authResult(null)), saved);
+});
+test("a crash during device-content removal requires a fresh sign-in instead of restoring a blocked editor", async () => {
+  const disk = storage();
+  disk.setItem(accountContentRemovalKey(saved.userId), "removing");
+  assert.equal(
+    await restoreArchiveSession(disk, {
+      getUser: async () => assert.fail("must require fresh authentication"),
+    }),
+    null,
+  );
+  assert.equal(disk.getItem(SESSION_KEY), null);
+  assert.equal(disk.getItem(accountContentRemovalKey(saved.userId)), "removing");
 });
 
 test("expired, missing or mismatched identity cannot restore the archive", async () => {

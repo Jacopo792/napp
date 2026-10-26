@@ -39,7 +39,7 @@ services:
       # changing this line changes nothing on its own: the live value is set in
       # the Render dashboard.
       - key: ALLOWED_ORIGINS
-        value: https://jacopo792.github.io,app://notes,http://localhost:5173,http://localhost:5174,http://localhost:5199
+        value: https://jacopo792.github.io,app://notes,https://notes,capacitor://notes,http://localhost:5173,http://localhost:5174,http://localhost:5199
       # The bus below. One instance is the plan, but Render starts the new
       # instance before it stops the old one, so every deploy has a minute in
       # which two processes hold the same note — long enough to lose somebody's

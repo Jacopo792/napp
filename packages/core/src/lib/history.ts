@@ -140,26 +140,6 @@ export async function loadContributions(
   }));
 }
 
-/** Home's "Lately": the newest stretches of writing anybody but this reader
- *  had a hand in, across the archive — the caller keeps the notebook's own.
- *  One bounded read when Home opens; a stretch the reader wrote with somebody
- *  else is theirs to remember, and is left out with the rest of their own. */
-export async function loadLately(session: AppSession): Promise<FolderVersion[]> {
-  const result = await supabase
-    .from("note_versions")
-    .select(`note_id, ${LIST}`)
-    .eq("archive_id", session.archiveId)
-    .is("label", null)
-    .not("author_ids", "cs", `{${session.userId}}`)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  fail(result.error);
-  return ((result.data ?? []) as (VersionRow & { note_id: string })[]).map((row) => ({
-    ...toVersion(row),
-    noteId: row.note_id,
-  }));
-}
-
 export type FolderVersion = NoteVersion & { noteId: string };
 
 /** The latest versions across a set of notes — a folder and what is under it.

@@ -587,30 +587,25 @@
    the title gets the tight display cut and the body the open text cut from
    one file. A serif needs none of the negative tracking the sans display is
    set with; kept, it closes the counters up. `system` is one click away in
-   Settings → Reading, and puts every rule below out of play.
-
-   Literata is the book's now, and only the book's: a note is set in the
-   system face, as on the phone (`.rich-text-editor` below), so the note and
-   the phone read as one app. The book — the sheet, its corkboard and its
-   style menu — keeps the face exactly as it was. */
-[data-reading-face="serif"] :is(.manuscript-shell, .style-row-name) {
+   Settings → Reading, and puts every rule below out of play. */
+[data-reading-face="serif"] {
   --font-reading: "Literata Variable", "Iowan Old Style", Georgia, serif;
 }
 
-[data-reading-face="serif"] :where(.manuscript-shell) .note-title {
+[data-reading-face="serif"] .note-title {
   font-family: var(--font-reading);
   font-weight: 640;
   letter-spacing: -0.006em;
   line-height: 1.12;
 }
 
-[data-reading-face="serif"] :where(.manuscript-shell) .rich-text-content :is(h1, h2, h3) {
+[data-reading-face="serif"] .rich-text-content :is(h1, h2, h3) {
   font-family: var(--font-reading);
   font-weight: 640;
   letter-spacing: -0.004em;
 }
 
-[data-reading-face="serif"] :where(.manuscript-shell) .rich-text-content h3 {
+[data-reading-face="serif"] .rich-text-content h3 {
   letter-spacing: 0;
 }
 
@@ -645,7 +640,7 @@
      `transform-origin` at wherever the pointer went down, a right-click menu
      at the point itself, and this is only the fallback for a menu opened from
      the keyboard. Short enough never to be a wait. */
-  animation: menu-in var(--dur-base) var(--ease-out) backwards;
+  animation: menu-in 180ms var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -657,12 +652,10 @@
   transform-origin: top left;
 }
 
-/* The phone's popover grows from 0.94 on a spring with no overshoot; here
-   the same scale on `--ease-out`, which is that spring drawn as a curve. */
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.9);
   }
 }
 
@@ -703,350 +696,172 @@
 }
 
 /* ══ The door ════════════════════════════════════════════════════════════════
-   The phone's door (`SignIn.tsx`): a dark wall with the plant of the day drawn
-   on it, the mark and the name in the corner, "Welcome back." over a frosted
-   card that holds the form. Dark in every theme, as the phone's is — nobody
-   has chosen a palette yet — so the door names its own colours here rather
-   than wearing the reader's. It does not scroll: the garden is clipped, and
-   the shell may still grow past a short window when the card is taller. ─── */
+   The only screen in the app with nothing of the reader's on it yet, which is
+   the one place it may say what kind of place this is. It says it with a drawn
+   plate and a ruled form, not with a floating grey box. ────────────────────── */
+/* Glossa's shape: the pitch on the left on a field of colour, the form on
+   the right on the plain ground, with nothing framing it. Stacked on a narrow
+   window, the pitch first and shorter. */
 .login-shell {
-  --ink: #f4efe6;
-  --ink-2: rgb(244 239 230 / 0.74);
-  --ink-3: rgb(244 239 230 / 0.52);
-  --ink-4: rgb(244 239 230 / 0.36);
-  --danger: #ff9f95;
   position: relative;
   display: flex;
   min-height: 100vh;
   flex-direction: column;
+  /* Clipped sideways so the plate may bleed off both edges, but never
+     vertically: on a short laptop window the sign-up card is taller than the
+     viewport, and `overflow: hidden` would have cut its head and feet off with
+     no way to reach either. */
   overflow-x: clip;
-  background: #0f0e0c;
-  color: var(--ink);
-  color-scheme: dark;
+  background: var(--surface);
 }
 
-.login-brand {
+@media (min-width: 1024px) {
+  .login-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+
+/* The field takes the colour of the word in the pill, at a seventh of its
+   strength, and follows it when the word turns. */
+.login-pitch {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3rem;
+  overflow: clip;
+  background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  color: var(--ink);
+  transition: background-color 700ms var(--ease-in-out);
+}
+
+[data-shell="mac"]:not([data-fullscreen]) .login-pitch {
+  padding-top: calc(52px + 1rem);
+}
+
+.login-pitch .botanical-plate.is-near {
+  opacity: 0.09;
+}
+
+.login-pitch > :not(.login-garden) {
+  position: relative;
+}
+
+.login-wordmark {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 28px 32px 0;
-  font-size: 26px;
+  gap: 0.55rem;
+  align-self: flex-start;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
   font-weight: var(--weight-bold);
+  letter-spacing: -0.03em;
+}
+
+.login-wordmark img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.login-headline {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5.4vw, 5rem);
+  font-weight: var(--weight-bold);
+  line-height: 1.02;
   letter-spacing: -0.05em;
 }
 
-[data-shell="mac"]:not([data-fullscreen]) .login-brand {
-  padding-top: 64px;
-}
-
-.login-main {
-  position: relative;
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px 48px;
-}
-
-.login-column {
-  width: 100%;
-  max-width: 440px;
-}
-
-.login-intro {
-  padding: 0 4px 24px;
-}
-
-.login-title {
-  font-size: 40px;
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.04em;
-  line-height: 46px;
-  animation: login-cross var(--dur-base) var(--ease-out) backwards;
-}
-
-.login-lede {
-  margin-top: 8px;
-  color: var(--ink-2);
-  font-size: 16px;
-  line-height: 23px;
-}
-
-@keyframes login-cross {
-  from {
-    opacity: 0;
-  }
-}
-
-/* The frosted card: the phone's fallback glass, 32 round. */
-.login-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 32px;
-  padding: 16px;
-  background: rgb(24 21 18 / 0.78);
-  -webkit-backdrop-filter: blur(28px) saturate(1.4);
-  backdrop-filter: blur(28px) saturate(1.4);
-  animation: login-rise var(--dur-slow) var(--ease-out) backwards;
-}
-
-@keyframes login-rise {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-}
-
-/* Sign In / Create Account: a plate that travels between two words. */
-.login-switch {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-radius: 24px;
-  padding: 4px;
-  background: rgb(255 255 255 / 0.07);
-}
-
-.login-switch button {
-  position: relative;
-  height: 40px;
-  border-radius: 20px;
-  color: var(--ink-3);
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  transition: color var(--dur-fast) var(--ease);
-}
-
-.login-switch button[aria-pressed="true"] {
-  color: var(--ink);
-}
-
-.login-switch-plate {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  border-radius: 20px;
-  background: rgb(255 255 255 / 0.14);
-  box-shadow: 0 1px 6px rgb(0 0 0 / 0.3);
-  transition: transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-.login-switch-plate[data-mode="sign-up"] {
-  transform: translateX(100%);
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.login-field {
-  display: block;
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 18px;
-  padding: 12px 18px;
-  background: rgb(255 255 255 / 0.06);
-  cursor: text;
-  transition: border-color var(--dur-fast) var(--ease);
-}
-
-.login-field:focus-within {
-  border-color: rgb(255 255 255 / 0.32);
-}
-
-.login-field-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: var(--weight-medium);
-}
-
-.login-reveal {
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: var(--weight-semibold);
-}
-
-.login-reveal:hover {
-  color: var(--ink);
-}
-
-.login-input {
-  display: block;
-  width: 100%;
-  min-height: 27px;
-  margin-top: 4px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 17px;
-  outline: none;
-}
-
-.login-input::placeholder {
-  color: var(--ink-4);
-}
-
-.login-submit {
-  display: flex;
-  height: 52px;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2px;
-  border-radius: 26px;
-  padding: 0 24px;
+/* The one inverted surface on the door, as Glossa's white pill is: ink for a
+   ground, the page for letters, whatever the palette. Its width travels to the
+   word arriving rather than snapping to it. */
+.login-pill {
+  display: inline-flex;
+  box-sizing: content-box;
+  overflow: hidden;
+  margin-top: 0.08em;
+  border-radius: 0.2em;
   background: var(--ink);
-  color: #0f0e0c;
-  font-size: 17px;
-  font-weight: var(--weight-semibold);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease-press);
+  padding: 0.02em 0.3em 0.14em;
+  color: var(--surface);
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 8px 30px -12px rgb(0 0 0 / 0.45);
+  transition: width 300ms var(--ease-out);
 }
 
-.login-submit:active:not(:disabled) {
-  transform: scale(0.98);
+.login-pill-word {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.22em;
+  animation: login-word var(--dur-base) var(--ease-out) backwards;
 }
 
-.login-submit:disabled {
-  opacity: 0.4;
+.login-pill-word svg {
+  translate: 0 0.04em;
+  color: color-mix(in oklab, var(--tone) 70%, var(--surface));
 }
 
-.login-ring {
-  width: 22px;
-  height: 22px;
-  margin: 0 auto;
-  border: 2.25px solid rgb(15 14 12 / 0.25);
-  border-top-color: #0f0e0c;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+@keyframes login-word {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+    filter: blur(6px);
+  }
 }
 
-.login-error {
-  padding: 0 4px;
-  color: var(--danger);
-  font-size: 14px;
-  font-weight: var(--weight-medium);
-  line-height: 19px;
-}
-
-.login-invite-note,
-.login-steps {
-  padding: 0 4px;
-  color: var(--ink-2);
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.login-steps {
+.login-kinds {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-left: 22px;
-  list-style: decimal;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
 }
 
-.login-mark {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 0.08);
-}
-
-.login-choices,
-.login-saved {
+.login-dots {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.login-saved {
+  align-items: center;
   gap: 8px;
-  padding-top: 8px;
 }
 
-.login-saved h2 {
-  padding: 0 4px;
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.04em;
+.login-dots button {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tone);
+  opacity: 0.35;
+  filter: grayscale(1);
+  transition:
+    opacity var(--dur-base) var(--ease),
+    filter var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.login-dots button:hover {
+  opacity: 0.9;
+  filter: none;
+}
+
+.login-dots button[aria-pressed="true"] {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.3);
+}
+
+.login-eyebrow {
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.login-choice {
-  display: flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-radius: 16px;
-  padding: 0 18px;
-  background: rgb(255 255 255 / 0.07);
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: var(--weight-semibold);
-  text-align: left;
-}
-
-.login-choice span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.login-choice small,
-.login-choice svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-  font-size: 15px;
-  font-weight: var(--weight-medium);
-}
-
-.login-choice:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.11);
-}
-
-.login-quiet {
-  align-self: center;
-  padding: 8px;
-  color: var(--ink-2);
-  font-size: 15px;
-  font-weight: var(--weight-medium);
-}
-
-/* On a phone's screen the card stands at the foot, where the phone has it. */
-@media (max-width: 767px) {
-  .login-shell {
-    min-height: 100dvh;
+@media (max-width: 1023px) {
+  .login-headline {
+    font-size: clamp(2.1rem, 9vw, 3.4rem);
   }
-
-  .login-brand {
-    padding: max(20px, env(safe-area-inset-top)) 20px 0;
-  }
-
-  .login-main {
-    align-items: flex-end;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-}
-
-.login-shell .botanical-plate.is-near {
-  opacity: 0.22;
-}
-
-.login-shell .botanical-plate.is-far {
-  opacity: 0.1;
 }
 
 /* Clipped to the shell it decorates. The plates are drawn past their own box
@@ -1373,21 +1188,15 @@
    time. So: no border at rest, a ground that separates the card from the page,
    and the accent spent on exactly one card — the one being read or replied
    to. */
-/* ── A thread, in the phone's annotation language ──────────────────────────
-   One neutral card — `--card`, a hairline, 16 round — holding the passage it
-   is about, recessed into it with a rule down its side; then each remark as a
-   byline (a neutral face, the name, "You" for your own, how long ago) over
-   its words in ink; then the thread's foot in quiet words: Reply, Resolve, ⋯.
-   The open thread is said by its passage lighting in the note, and here by a
-   ring of ink rather than of accent — the accent stays for small signals. */
 .note-comment-thread {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--rule-soft);
-  border-radius: 16px;
-  padding: 14px 14px 4px;
-  background: var(--card);
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
   cursor: default;
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -1395,102 +1204,76 @@
 }
 
 .note-comment-thread:hover {
-  border-color: var(--rule);
+  border-color: var(--rule-soft);
 }
 
 .note-comment-thread.is-active {
-  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    var(--shadow-soft),
+    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* A thread nobody needs to act on any more steps back rather than disappearing:
    what was said stays readable, and stops asking to be read. */
 .note-comment-thread.is-resolved {
-  opacity: 0.62;
+  opacity: 0.58;
 }
 
 .note-comment-thread.is-pending {
-  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
-  padding-bottom: 14px;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
-/* The passage, recessed: a well of ink at 6% with a 2px rule of ink-3 down its
-   side, two lines at most, and the arrow that says pressing it goes there. */
+/* The quotation is the thread's title, so it is set like one — and clipped,
+   because a comment on three paragraphs must not push the remark off screen. */
 .note-comment-quote {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: 10px;
-  padding: 9px 12px 9px 16px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  color: var(--ink-2);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
-}
-
-.note-comment-quote::before {
-  position: absolute;
-  top: 9px;
-  bottom: 9px;
-  left: 8px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--ink-3);
-  content: "";
-}
-
-.note-comment-quote > span {
   display: -webkit-box;
-  min-width: 0;
-  flex: 1;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.note-comment-quote > svg {
-  flex-shrink: 0;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  padding-left: 8px;
   color: var(--ink-3);
+  font-family: var(--font-reading);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  text-align: left;
 }
 
-.note-comment-quote:hover {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
+.note-comment-quote.is-link:hover {
+  color: var(--ink);
 }
 
 /* A thread whose passage has been deleted has nothing to point at, so it stops
-   pretending to: no rule, and the sentence says what happened. */
+   pretending to: no accent rule, and the sentence says what happened. */
 .note-comment-quote.is-orphan {
+  border-left-color: var(--rule);
   color: var(--ink-4);
   font-style: italic;
-  cursor: default;
 }
 
-.note-comment-quote.is-orphan::before {
-  display: none;
-}
-
-/* A remark is its byline over its words; a reply is the same shape after a
-   hairline. */
+/* A remark is a line saying who and when, with what can be done at its right
+   end, and the words under it at the card's full width — Docs' card. The tools
+   used to be a row of words under the last remark, so Resolve, the act a
+   thread exists to end in, was the thing furthest from the eye; and a reply sat
+   on a rail of its own, which made a conversation of two lines look like an
+   outline. A reply is now the same shape after a hairline. */
 .note-comment {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .note-comment.is-reply {
   border-top: 1px solid var(--rule-soft);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .note-comment-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  min-height: 28px;
 }
 
 .note-comment-head > .avatar.is-compact {
@@ -1498,85 +1281,29 @@
   height: 24px;
   flex-shrink: 0;
   font-size: 9px;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--author, var(--rule)) 70%, transparent);
 }
 
 .note-comment-who {
   display: flex;
   min-width: 0;
   flex: 1;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  line-height: 1.25;
 }
 
+/* Who said it, in the colour this person's caret already has in the text —
+   a second colour system would be worse than none. */
 .note-comment-name {
-  color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
+  color: var(--author, var(--ink-2));
 }
 
 .note-comment-stamp {
-  flex-shrink: 0;
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-size: var(--text-2xs);
-}
-
-/* The thread's foot: who it is for, then quiet words, then ⋯ at the end. */
-.note-comment-foot {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 38px;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.note-comment-word {
-  color: var(--ink-2);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-}
-
-.note-comment-word:hover {
-  color: var(--ink);
-}
-
-.note-comment-foot .note-comment-more-acts {
-  margin-left: auto;
-  opacity: 1;
-  color: var(--ink-3);
-}
-
-.note-comment-foot .note-comment-assignee {
-  display: inline-flex;
-  min-width: 0;
-  flex-shrink: 1;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-
-.note-comment-foot .note-comment-assignee .avatar.is-compact {
-  width: 18px;
-  height: 18px;
-  font-size: 8px;
-}
-
-/* The face of whoever spoke last, in a Comments row: where the leading slot
-   says what you are about to open. */
-.note-row-face {
-  display: flex;
-  flex-shrink: 0;
-  align-self: center;
-  order: -1;
-}
-
-.note-row-face .avatar.is-compact {
-  width: 32px;
-  height: 32px;
-  font-size: 12px;
 }
 
 .note-comment-tools {
@@ -1963,12 +1690,310 @@
   }
 }
 
+.login-main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+
+/* No drop shadow. A 90px black blur over a near-black ground did not read as
+   lift, it read as a smudge ringing the card. The hairline and the paper step
+   already separate it; the inset highlight catches the top edge. */
+/* No frame: the form stands on the ground, as Glossa's does. The column is
+   the frame. */
+.login-card {
+  width: 100%;
+  max-width: 24rem;
+  animation: login-settle var(--dur-slow) var(--ease-out) backwards;
+}
+
+@keyframes login-settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Which of the two things you are doing is a choice, so it is a control at the
+   top of the card rather than a link under it. The rule under the pair carries
+   a marker that travels, so the two modes read as two pages of one card. */
+.login-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--rule);
+}
+
+.login-tabs button {
+  padding: 0 2px 12px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.login-tabs button:hover {
+  color: var(--ink-2);
+}
+
+.login-tabs button.is-active {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.login-tabs-marker {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 50%;
+  height: 1px;
+  background: var(--accent);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.login-tabs-marker[data-mode="sign-up"] {
+  transform: translateX(100%);
+}
+
+.login-title {
+  margin-top: 1.6rem;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
+.login-lede {
+  margin-top: 0.55rem;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* An address is data, not a heading. Setting it at display size ran
+   jacopovincenzoansalone@gmail.com straight off the edge of the card: an email
+   has no spaces to break at, so nothing was going to wrap it. It gets its own
+   line, at reading size, and is allowed to break anywhere it has to. */
+.login-address {
+  margin-top: 0.6rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: var(--weight-semibold);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.login-form {
+  margin-top: 1.75rem;
+  display: grid;
+  gap: 1rem;
+}
+
+/* Ruled, not boxed: a rule under a field is what a form on paper looks like,
+   and it stops the card being three nested frames deep before a character is
+   typed. The rule takes the accent and doubles under the caret. */
+.login-field {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.login-field .label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--ink-3);
+}
+
+/* Boxed now, as Glossa's are: with the card's frame gone, a ruled line was
+   a field with nothing round it. */
+.login-input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 0 0.85rem;
+  color: var(--ink);
+  font-size: 0.95rem;
+  outline: none;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.login-input:hover {
+  border-color: var(--ink-4);
+}
+
+.login-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.login-secret .login-input {
+  padding-right: 2.75rem;
+}
+
+.login-reveal {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.login-reveal:hover,
+.login-reveal[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.login-hint {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.login-submit {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  padding: 0.8rem 1rem;
+  color: var(--on-accent);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  text-transform: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
+}
+
+.login-submit:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.login-submit svg {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.login-submit:hover:not(:disabled) svg {
+  transform: translateX(2px);
+}
+
+.login-mark {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.login-mark.is-quiet {
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.login-steps {
+  display: grid;
+  gap: 12px;
+  margin-top: 1.25rem;
+  padding-left: 1.15rem;
+  list-style: decimal;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.login-steps::marker,
+.login-steps li::marker {
+  color: var(--ink-4);
+}
+
+.login-note {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.login-steps + .login-note {
+  margin-top: 1.25rem;
+}
+
+/* Said, and shaken once, as Glossa's is: the line arrives from the side it
+   would be refused from. */
+.login-error {
+  margin-top: 0.9rem;
+  color: var(--danger);
+  animation: login-refuse 400ms var(--ease-out);
+}
+
+@keyframes login-refuse {
+  0% {
+    transform: translateX(-6px);
+  }
+  33% {
+    transform: translateX(6px);
+  }
+  66% {
+    transform: translateX(-4px);
+  }
+  85% {
+    transform: translateX(2px);
+  }
+}
+
+.login-invite-note {
+  margin-top: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--accent-wash);
+  padding: 12px 12px;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .login-card,
-  .login-title,
-  .login-switch-plate {
+  .login-pill-word,
+  .login-error {
     animation: none;
-    transition: none;
   }
 
   .botanical-plate .stem,
@@ -1976,6 +2001,45 @@
     stroke-dashoffset: 0;
     animation: none;
   }
+}
+
+.archive-choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.archive-choice-list button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.archive-choice-list button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.archive-choice-list button span {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.archive-choice-list button small {
+  grid-column: 1;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.archive-choice-list button svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 /* A label on the left, its value hard against the right edge — the specimen's
@@ -2848,21 +2912,12 @@
   border-radius: var(--radius-lg);
 }
 
-/* The phone's popover, at a desk's scale: 14 round rather than 24, rows of
-   30 rather than 50, the glyph standing in a quiet tile of its own and the
-   words in ink. The tile is what makes a list of acts read as the phone's
-   menu and not a web dropdown; the measure is what keeps it a Mac menu. */
 .popover {
-  border-radius: 14px;
-}
-
-.menu-popover,
-.context-menu.popover {
-  padding: 5px;
+  border-radius: var(--radius-md);
 }
 
 .glass-sheet {
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
 }
 
 .menu-popover {
@@ -2889,11 +2944,11 @@
 .menu-row {
   display: flex;
   width: 100%;
-  min-height: 30px;
+  min-height: 28px;
   align-items: center;
-  gap: 9px;
-  border-radius: 8px;
-  padding: 3px 8px 3px 4px;
+  gap: 8px;
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
   text-align: left;
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
@@ -2904,23 +2959,8 @@
 
 .menu-row:hover,
 .menu-row:focus-visible {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--accent-wash);
   color: var(--ink);
-}
-
-.menu-row.is-danger:hover,
-.menu-row.is-danger:focus-visible {
-  color: var(--danger);
-}
-
-/* The glyph's tile: 22 square, 6 round, ink at 7% — the phone's 32/10. An
-   outer <svg> takes padding and a background like any replaced element. */
-.menu-row > svg:first-child {
-  box-sizing: content-box;
-  flex-shrink: 0;
-  padding: 3px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 
 .menu-separator {
@@ -3143,84 +3183,80 @@
    The width follows the travel rather than being fixed, so a row pushed past
    its resting place is not a panel with a strip of background beside it. It
    never goes below OPEN, because the label has to fit from the first frame. */
-/* The phone's paper tab (`SwipeRow.tsx`, Jacopo, 21 October 2026): what the
-   row uncovers is not a slab of colour but one quiet tab standing on the
-   card's ground — the palette's paper, a hairline, 17 round, the glyph over
-   its name in ink. Only an act that destroys wears the danger ink; nothing is
-   a system red or purple, because the tab is Napp's own material and what an
-   act does is said by its name. The button is the whole uncovered width, so
-   the press lands anywhere in the gap; the tab is what is drawn in it. */
+/* A button, not a wall. Full-bleed to the row's own top and bottom it was a
+   rectangle of flat colour the height of the list, which is what a mail client
+   does with a row that is about to fly away — and nothing here flies away any
+   more, it waits to be pressed. So it is inset by three and carries the corner
+   every other pressable thing in the app carries, which says "press me" rather
+   than "let go and I happen".
+
+   The corner is on the outer edge only: the inner one is under the row until
+   the moment it is uncovered, and rounding it would show two corners meeting
+   at nothing while the row travels. */
 .note-row-action {
   position: absolute;
   top: 0;
   bottom: 0;
   display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   align-items: center;
   justify-content: center;
   border: 0;
-  background: transparent;
-  color: var(--ink);
   font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  color: #fff;
   cursor: pointer;
 }
 
-.note-row-tab {
-  display: flex;
-  width: 68px;
-  height: min(60px, calc(100% - 12px));
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid var(--rule);
-  border-radius: 17px;
-  background: var(--paper);
-  font-size: 10px;
-  font-weight: var(--weight-semibold);
-  line-height: 1.1;
-  text-align: center;
+/* What is in it arrives rather than being there. `--reveal` is how far open
+   the row is, written by the row itself, so the mark grows with the gesture
+   and lands at full size exactly as the panel finishes opening — the same
+   travel, two things doing it. */
+.note-row-action > * {
+  transform: scale(calc(0.55 + 0.45 * var(--reveal, 1)));
+  opacity: var(--reveal, 1);
   transition:
-    background-color var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-spring),
     opacity var(--dur-fast) var(--ease);
 }
 
-/* It arrives rather than being there: `--reveal` is how far open the row is,
-   and the tab slides the last ten pixels into its place and fades in on that
-   same travel — the phone's tab, which never scales. */
-.note-row-action.is-left .note-row-tab {
-  transform: translateX(calc(10px * (1 - var(--reveal, 1))));
+.note-row-action:active {
+  filter: brightness(0.92);
 }
 
-.note-row-action.is-right .note-row-tab {
-  transform: translateX(calc(-10px * (1 - var(--reveal, 1))));
-}
-
-.note-row-action .note-row-tab {
-  opacity: var(--reveal, 1);
-}
-
-.note-row-action:hover .note-row-tab,
-.note-row-action:active .note-row-tab {
-  background: color-mix(in srgb, var(--ink) 7%, var(--paper));
-}
-
-.note-row-action.is-trash {
-  color: var(--danger);
-}
-
+/* Where a panel is parked is the direction it answers to; what colour it is
+   is what it does. The two are separate because every scope has the same pair
+   of directions and a different pair of acts — Trash restores where the list
+   archives, and both of them delete. */
+/* Tucked a corner's width under the row, so the row's own rounded corners
+   show the colour behind them: the row reads as a card lifted off a coloured
+   track, one object, rather than a card and a separate button side by side. */
 .note-row-action.is-left {
-  left: 100%;
+  left: calc(100% - var(--radius-sm));
+  padding-left: var(--radius-sm);
+  border-start-end-radius: var(--radius-sm);
+  border-end-end-radius: var(--radius-sm);
 }
 
 .note-row-action.is-right {
-  right: 100%;
+  right: calc(100% - var(--radius-sm));
+  padding-right: var(--radius-sm);
+  border-start-start-radius: var(--radius-sm);
+  border-end-start-radius: var(--radius-sm);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .note-row-tab {
-    transition: none;
-  }
+/* The system's own red and purple, as Mail paints these two acts. `--danger`
+   is a colour for words on a dark page — a pale pink that, as a fill, said
+   nothing about destroying anything. Fixed rather than themed: what an act
+   does is not a preference. */
+.note-row-action.is-trash {
+  background: #ff453a;
+}
+
+.note-row-action.is-archive {
+  background: #a970ff;
 }
 
 /* A travelling row has to be opaque, or the panel it is uncovering is read
@@ -3626,7 +3662,7 @@
 .settings-body {
   display: grid;
   flex: 1;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -3639,45 +3675,14 @@
   background: color-mix(in srgb, var(--ink) 3%, var(--paper));
 }
 
-/* The account, at the head of the rail: the phone's profile card, and the
-   way into Profile. A card of `--card` with the face at 40, because it is a
-   person and the rows under it are places. The marker still travels to it,
-   so its own ground steps aside while it is the chosen row. */
-.settings-nav .settings-identity {
+/* The account, at the head of the rail. */
+.settings-identity {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
-  border-radius: 12px;
-  padding: 10px;
-  background: var(--card);
-  box-shadow: 0 0 0 1px var(--rule-soft);
-}
-
-.settings-nav .settings-identity.is-active {
-  background: transparent;
-  box-shadow: none;
-}
-
-.settings-identity .avatar {
-  width: 40px;
-  height: 40px;
-}
-
-/* A row says what it is and, under it, what is set there now. */
-.settings-nav-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.settings-nav-text small {
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-regular);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  padding: 8px 8px 12px;
 }
 
 .settings-identity b {
@@ -3962,93 +3967,61 @@
    what left "Picture" starting 40px to the right of "Nickname". */
 /* Who this is, the way an account page opens: the face, the name and the
    address centred over everything that can be changed about them. */
-/* ── Profile, in the phone's Accounts language ──────────────────────────────
-   A card for you — face, name, address, the picture's acts as quiet words —
-   then the grouped rows, then the destructive act last, in a card of its
-   own, in red words. */
-.profile-card {
+.profile-portrait {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  border: 1px solid var(--rule-soft);
-  border-radius: 16px;
-  padding: 16px 18px;
-  background: var(--card);
-}
-
-.profile-card .avatar.is-large {
-  width: 64px;
-  height: 64px;
-  font-size: 26px;
-}
-
-.profile-card-text {
-  display: flex;
-  min-width: 0;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
+  margin-bottom: 20px;
+  padding: 8px 0 4px;
+  text-align: center;
 }
 
-.profile-card-text b {
-  overflow: hidden;
+.profile-portrait .avatar.is-large {
+  width: 76px;
+  height: 76px;
+  margin-bottom: 10px;
+  font-size: 32px;
+}
+
+.profile-portrait b {
   color: var(--ink);
-  font-size: var(--text-lg);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.profile-card-text small {
-  overflow: hidden;
-  color: var(--ink-3);
+.profile-portrait small {
+  color: var(--ink-4);
   font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.profile-card-acts {
+.profile-portrait-actions {
   display: flex;
-  gap: 14px;
-  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
-.profile-card-acts button {
-  color: var(--ink-2);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-}
-
-.profile-card-acts button:hover:not(:disabled) {
+.profile-portrait-actions button {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  padding: 5px 14px;
   color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  transition: color var(--dur-fast) var(--ease);
 }
 
-.profile-leave {
-  margin-top: 28px;
+.profile-portrait-actions button:hover {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
 }
 
-.profile-leave-row {
-  width: 100%;
-  text-align: left;
-}
-
-.profile-leave-row .settings-label b,
-.profile-leave-row .settings-lead {
+.profile-portrait-actions button.is-danger:hover {
   color: var(--danger);
-}
-
-.profile-leave-row:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 7%, transparent);
-}
-
-.profile-leave-row.is-confirming {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.profile-leave-row:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 /* Every value in this section ends at the same edge. Letting the label take
@@ -4312,59 +4285,54 @@
   background: rgb(128 128 128 / 0.38);
 }
 
-/* The phone's five, five across: each card its light side over its dark side,
-   so choosing one is never a guess about how it looks in the other light. */
+/* Three across, and nine palettes: three full rows. Four across left the
+   ninth chip alone on a row of its own, which reads as one palette that did
+   not fit rather than as the last of the set. It also lines the grid up with
+   the three theme cards above it. */
 .palette-presets {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin-bottom: 20px;
 }
 
 .palette-presets button {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 0;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-md);
+  padding: 8px 8px;
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
 
+.palette-presets button:hover,
 .palette-presets button.is-active {
+  border-color: var(--rule);
+  background: var(--accent-wash);
   color: var(--ink);
-  font-weight: 600;
 }
 
-.palette-card {
-  display: grid;
-  width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
+.palette-presets button.is-active {
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.palette-presets button.is-active .palette-card {
-  box-shadow:
-    0 0 0 2px var(--page),
-    0 0 0 4px var(--accent);
-}
-
-.palette-card > span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 34px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.palette-card i {
-  width: 8px;
-  height: 8px;
+.palette-chip {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 1px solid rgb(128 128 128 / 0.28);
   border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--palette-bg) 0 54%,
+    var(--palette-accent) 54% 76%,
+    var(--palette-fg) 76%
+  );
 }
 
 .theme-preview i {
@@ -4384,12 +4352,10 @@
 /* A group of rows is a recess a step off the pane, as System Settings draws
    one: a fill and a hairline, never a shadow — a settings card is not a thing
    floating over the page, it is part of it. */
-/* A group is the phone's grouped card: `--card` and a hairline, 12 round —
-   the same card a thread or a folder is drawn on, at a form's radius. */
 .appearance-controls {
-  border: 1px solid var(--rule-soft);
-  border-radius: 12px;
-  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
   overflow: hidden;
 }
 
@@ -4629,6 +4595,45 @@
   box-shadow: 0 0 0 2px var(--surface);
 }
 
+.leave-archive-card {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--rule-soft));
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.leave-archive-card button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--rule));
+  border-radius: var(--radius-sm);
+  padding: 8px 8px;
+  color: var(--danger);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.leave-archive-card button:hover:not(:disabled),
+.leave-archive-card button.is-danger-confirm {
+  border-color: var(--danger);
+  background: var(--danger-fill);
+  color: var(--on-danger);
+}
+
+.leave-archive-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 .compact-segment {
   display: flex;
   gap: 2px;
@@ -4729,6 +4734,75 @@
     text-align: right;
   }
 
+  /* The panel holds one height now, so the body has to say which of its two
+     rows absorbs it. Without this the nav strip stretches to half the sheet.
+
+     `minmax(0, 1fr)` and not `1fr`: a bare `1fr` track is floored at the
+     min-content width of what is in it, so one wide row of cards pushed the
+     whole column past the edge of the panel and took the controls off the
+     right-hand side with it. */
+  .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 8px 12px;
+  }
+
+  /* Each section takes the width of its own name, and the strip scrolls. `flex:
+     1` shared the row out between them, which meant six names each too narrow
+     to read and Sign out — also a button in this nav — taking a third of the
+     strip for itself. */
+  .settings-nav-list button {
+    flex: 0 0 auto;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .settings-nav-list button svg,
+  .settings-nav-group,
+  .settings-identity {
+    display: none;
+  }
+
+  /* A horizontal strip is not the column the marker measured itself against.
+     The active button paints its own background there. */
+  .settings-nav-marker {
+    display: none;
+  }
+
+  /* Six sections do not fit across a phone, so the strip scrolls rather than
+     dropping the ones that did not fit. */
+  .settings-nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav button {
+    white-space: nowrap;
+  }
+
+  /* Sign out is not one of the sections and must not be sized like one: beside
+     a scrolling strip it takes the room it needs and no more. */
+  .settings-nav-signout {
+    flex: 0 0 auto;
+    margin-top: 0;
+    margin-left: 12px;
+    border-top: 0;
+    border-left: 1px solid var(--rule-soft);
+    padding-top: 8px;
+    padding-left: 12px;
+  }
+
   .settings-scroll {
     padding: 4px 16px 20px;
   }
@@ -4743,7 +4817,7 @@
   }
 
   .palette-presets {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -5199,8 +5273,13 @@
   letter-spacing: -0.01em;
 }
 
-.cropper-panel > h2 {
+.cropper-panel > p {
+  margin-top: 4px;
   margin-bottom: 16px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  text-align: center;
 }
 
 .cropper-stage {
@@ -5429,10 +5508,8 @@
 }
 
 /* ── Full-size image ────────────────────────────────────────────────────────
-   Photos' way: the picture flies out of its rectangle in the note onto black,
-   the ground arriving with the flight, and goes home the same way
-   (`ImageViewer.tsx`). No blur and no frame: the note behind is not what is
-   being looked at, and a rounded, shadowed picture is a card, not a photo. */
+   The note is still there behind the scrim; the picture is simply lifted off
+   it for a moment. One entrance, eased out from an already-placed frame. ─── */
 .lightbox {
   position: fixed;
   inset: 0;
@@ -5440,53 +5517,53 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(1rem, 4vw, 3rem);
-  cursor: zoom-out;
-}
-
-.lightbox-ground {
-  position: absolute;
-  inset: 0;
-  background: #000;
-  animation: lightbox-in 420ms var(--ease) backwards;
+  padding: clamp(1rem, 5vw, 3.5rem);
+  background: oklch(0.06 0 0 / 0.85);
+  backdrop-filter: blur(18px) saturate(0.9);
+  animation: lightbox-in var(--dur-base) var(--ease) backwards;
 }
 
 .lightbox-figure {
-  position: relative;
+  margin: 0;
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   max-width: 100%;
   max-height: 100%;
-  margin: 0;
 }
 
 .lightbox-figure img {
   display: block;
   min-height: 0;
   max-width: 100%;
-  max-height: calc(100dvh - 2 * clamp(1rem, 4vw, 3rem));
+  max-height: 100%;
   object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
 }
 
 .lightbox-close {
   position: absolute;
-  top: max(clamp(0.75rem, 3vw, 1.25rem), env(safe-area-inset-top));
-  right: clamp(0.75rem, 3vw, 1.25rem);
-  display: grid;
+  top: clamp(0.75rem, 3vw, 1.5rem);
+  right: clamp(0.75rem, 3vw, 1.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  place-items: center;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.16);
-  color: #fff;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--ink-2);
   cursor: pointer;
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  animation: lightbox-in 420ms var(--ease) backwards;
-  transition: background-color var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 .lightbox-close:hover {
-  background: rgb(255 255 255 / 0.26);
+  color: var(--ink);
+  border-color: var(--ink-4);
 }
 
 @keyframes lightbox-in {
@@ -5496,8 +5573,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lightbox-ground,
-  .lightbox-close {
+  .lightbox,
+  .lightbox-figure {
     animation: none;
   }
 }
@@ -5675,9 +5752,8 @@
    moves four pixels on one and ten on the other, and the wide one reads as the
    list flinching rather than the row answering. Wide targets get a ratio scaled
    to their size. */
-/* The phone's press gives 4% under the finger, never a bounce. */
 .press:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.955);
 }
 
 .sidebar-target.press:active,
@@ -5706,7 +5782,7 @@
 @keyframes menu-reveal {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.9);
   }
 }
 
@@ -5804,6 +5880,33 @@
    was on: the next note down rises into place, the one above comes down, the
    way the page would move if the notes were one long scroll. Opened from
    anywhere else — a link, ⌘K, a reload — it has no direction and only fades. */
+@keyframes page-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@keyframes page-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* The old page is out of the way before the new one moves in: two texts
+   crossing each other in the same place read as a double exposure, not as a
+   page turning. */
+:root[data-note-direction="down"] .page-in > * {
+  animation-name: page-in-below;
+  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
+}
+
+:root[data-note-direction="up"] .page-in > * {
+  animation-name: page-in-above;
+  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
+}
+
 /* Opening another note, raised by `handleSelectNote`. The page being left is
    a picture that fades in 160ms over the new one, which arrives through its
    own `page-in` underneath — so the old words leave rather than being cut.
@@ -5829,28 +5932,30 @@
   mix-blend-mode: normal;
 }
 
-/* A note opened out of what was pressed (`zoomNote`): the page grows from
-   0.94 with its origin on the row or card, the phone's zoom on the desktop's
-   curve and the phone's 360ms of travel. While it does, the column's own
-   staggered entrance stands down — one movement, not two. */
-.editor-body[data-zoom] {
-  animation: note-zoom var(--dur-slow) var(--ease-out) backwards;
+/* The page being left goes the other way from the one arriving. */
+.is-opening-note[data-note-direction="down"]::view-transition-old(note-body) {
+  animation-name: page-out-above;
+  animation-duration: 110ms;
+  animation-timing-function: var(--ease-press);
 }
 
-.editor-body[data-zoom] :is(.page-in > *, .rich-text-editor) {
-  animation: none;
+.is-opening-note[data-note-direction="up"]::view-transition-old(note-body) {
+  animation-name: page-out-below;
+  animation-duration: 110ms;
+  animation-timing-function: var(--ease-press);
 }
 
-@keyframes note-zoom {
-  from {
+@keyframes page-out-above {
+  to {
     opacity: 0;
-    transform: scale(0.94);
+    transform: translateY(-14px);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .editor-body[data-zoom] {
-    animation: none;
+@keyframes page-out-below {
+  to {
+    opacity: 0;
+    transform: translateY(14px);
   }
 }
 
@@ -7365,15 +7470,6 @@ body:has(.sidebar-row.is-over) .drag-chip {
   line-height: var(--read-leading);
 }
 
-/* A note reads as it does on the phone: the system face at its reading
-   weight and leading. The size stays the reader's (17px unless changed); the
-   book keeps every axis and its own letter. */
-.editor-shell:not(.manuscript-shell) .rich-text-editor {
-  font-family: var(--font-sans);
-  font-weight: var(--weight-regular);
-  line-height: 1.55;
-}
-
 /* The run-out below the last line is the content's, not the scroll box's. As
    padding on the box it was counted inside `height: 100%` under
    `box-sizing: border-box`: once a cover left the editor shorter than 45vh the
@@ -7897,7 +7993,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .note-cover-actions > span,
 .note-property-action {
   border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: rgb(20 20 22 / 0.76);
   box-shadow: var(--shadow-soft);
   color: #f5f2ed;
@@ -7921,7 +8017,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .note-property-action.is-primary {
   border-color: transparent;
   background: var(--accent);
-  color: var(--on-accent);
+  color: #fff;
 }
 
 .note-page-cover.is-editing:not(.is-placing) {
@@ -8052,8 +8148,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   position: relative;
   display: flex;
   width: min(38rem, 100%);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--page) 94%, transparent);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
   backdrop-filter: blur(22px) saturate(1.06);
   max-height: min(30rem, calc(100dvh - 14vh));
   flex-direction: column;
@@ -8140,17 +8235,15 @@ body:has(.sidebar-row.is-over) .drag-chip {
   width: 100%;
   align-items: center;
   gap: 12px;
-  border-radius: 10px;
-  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
   color: var(--ink-2);
   text-align: left;
 }
 
-/* Chosen is a neutral wash and the words in ink, as in the page's menus: the
-   accent is for small signals, and a whole row is not small. */
 .palette-row.is-active {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  color: var(--ink);
+  background: var(--accent-wash);
+  color: var(--accent-strong);
 }
 
 .palette-row-icon {
@@ -8160,13 +8253,13 @@ body:has(.sidebar-row.is-over) .drag-chip {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  color: var(--ink-2);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  color: var(--ink-3);
 }
 
 .palette-row.is-active .palette-row-icon {
-  color: var(--ink);
+  color: var(--accent-strong);
 }
 
 .palette-row b {
@@ -9801,11 +9894,9 @@ text.ink-stroke {
   height: min(40rem, calc(100vh - 32px));
   flex-direction: column;
   overflow: hidden;
-  /* The phone's page sheet at a desk's size: 24 round, the palette's own
-     ground, and what it gathers drawn on cards of `--card` inside it. */
   border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  background: var(--page);
+  border-radius: 22px;
+  background: var(--glass);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     0 30px 80px rgb(0 0 0 / 0.45);
@@ -10048,15 +10139,14 @@ button.sheet-chip:hover,
   display: flex;
   flex-direction: column-reverse;
   gap: 2px;
-  border: 1px solid var(--rule-soft);
-  border-radius: 14px;
-  background: var(--card);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   padding: 10px 8px;
   text-align: center;
 }
 
 .sheet-stats > button:hover {
-  border-color: var(--rule);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
 }
 
 .sheet-stats dd,
@@ -10934,11 +11024,11 @@ button.sheet-chip:hover,
 }
 
 .structure-status.is-revised {
-  background: var(--tint-yellow);
+  background: #e0a43a;
 }
 
 .structure-status.is-final {
-  background: var(--ok);
+  background: #4caf7a;
 }
 
 /* Two lines of what happens, under the name and in its column. */
@@ -10955,7 +11045,7 @@ button.sheet-chip:hover,
 }
 
 .structure-words.is-met {
-  color: var(--ok);
+  color: #4caf7a;
 }
 
 .structure-field {
@@ -11026,7 +11116,7 @@ button.sheet-chip:hover,
 .board-desk {
   overflow: auto;
   padding: 32px 32px 96px;
-  background: var(--page);
+  background: color-mix(in srgb, var(--surface) 86%, #000);
 }
 
 .board-grid {
@@ -11060,7 +11150,7 @@ button.sheet-chip:hover,
   justify-content: center;
   margin: 0;
   border: 1px dashed var(--rule);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   padding: 16px;
   color: var(--ink-2);
   font-family: var(--font-reading);
@@ -11082,8 +11172,9 @@ button.sheet-chip:hover,
   min-height: 132px;
   flex-direction: column;
   border: 1px solid var(--rule-soft);
-  border-radius: 16px;
-  background: var(--card);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
   transition:
     opacity var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
@@ -11142,7 +11233,8 @@ button.sheet-chip:hover,
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 14px 14px 2px;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 10px 12px 8px;
   color: var(--ink);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -11168,10 +11260,10 @@ button.sheet-chip:hover,
   min-height: 3em;
   margin: 0;
   border: 0;
-  padding: 6px 14px 8px;
+  padding: 8px 12px;
   resize: none;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.45;
@@ -11180,15 +11272,15 @@ button.sheet-chip:hover,
 
 .board-card-synopsis:focus {
   outline: none;
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .board-card-foot {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 14px 12px;
-  color: var(--ink-3);
+  padding: 6px 12px 10px;
+  color: var(--ink-4);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -11198,7 +11290,7 @@ button.sheet-chip:hover,
 }
 
 .board-card-words.is-met {
-  color: var(--ok);
+  color: #4caf7a;
 }
 
 .structure-notebook {
@@ -11295,58 +11387,9 @@ button.sheet-chip:hover,
   margin-left: auto;
 }
 
-/* Whose manuscript, in the notebook index's words rather than a segmented
-   switch: the names side by side, the open one in ink with the 2px line
-   under it, the faces and the here/typing marks kept because in a shared
-   book they are the point. */
 .manuscript-titlebar-end .people-shelf {
-  width: auto;
+  width: 250px;
   margin: 0;
-  gap: 14px;
-  background: transparent;
-  padding: 0 4px;
-}
-
-.manuscript-titlebar-end .people-thumb {
-  display: none;
-}
-
-.manuscript-titlebar-end .people-face {
-  flex: 0 0 auto;
-  padding: 6px 0;
-  color: var(--ink-4);
-}
-
-.manuscript-titlebar-end .people-face.is-active {
-  color: var(--ink);
-}
-
-/* The notebook index's line, gliding between the names (`useIndexLine`). */
-.people-line {
-  display: none;
-}
-
-.manuscript-titlebar-end .people-line {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  display: block;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
-  pointer-events: none;
-}
-
-.manuscript-titlebar-end .people-line.is-gliding {
-  transition:
-    transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1),
-    width 260ms cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .manuscript-titlebar-end .people-line.is-gliding {
-    transition: none;
-  }
 }
 
 /* ── The writing bar ── */
@@ -11429,8 +11472,7 @@ button.sheet-chip:hover,
   padding: 0 3px;
 }
 
-.ribbon-word,
-.manuscript-bar-end .ribbon-tool > span {
+.ribbon-word {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
 }
@@ -11452,7 +11494,7 @@ button.sheet-chip:hover,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--ink-2);
   transition: background-color var(--dur-fast) var(--ease);
 }
@@ -11471,13 +11513,11 @@ button.sheet-chip:hover,
   opacity: 0.35;
 }
 
-/* The bar's fields are the family's controls: a card's ground, a hairline,
-   8 round — the search pill's material at a toolbar's height. */
 .ribbon-select {
   height: 28px;
-  border: 1px solid var(--rule-soft);
-  border-radius: 8px;
-  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   padding: 0 6px;
   color: var(--ink);
   font-size: var(--text-sm);
@@ -11492,8 +11532,8 @@ button.sheet-chip:hover,
 .ribbon-tool.is-style {
   width: 128px;
   justify-content: space-between;
-  border: 1px solid var(--rule-soft);
-  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   padding: 0 8px 0 10px;
   color: var(--ink);
   font-size: var(--text-sm);
@@ -13175,10 +13215,8 @@ button.sheet-chip:hover,
   flex: none;
   place-items: center;
   border-radius: var(--radius-md);
-  /* The phone's quiet tile, not a coloured badge: the glyph in ink on a
-     neutral step of the card. */
-  background: color-mix(in srgb, var(--ink) 8%, var(--card));
-  color: var(--ink);
+  background: linear-gradient(145deg, #ffb340, #ff7a1a);
+  color: #ffffff;
 }
 
 .whats-new-heading {
@@ -13233,7 +13271,7 @@ button.sheet-chip:hover,
   display: flex;
   align-items: center;
   gap: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 6px 8px;
   color: var(--ink-2);
   font-size: var(--text-sm);
@@ -13242,11 +13280,11 @@ button.sheet-chip:hover,
 }
 
 .whats-new-version:hover {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: var(--accent-wash);
 }
 
 .whats-new-version.is-current {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  background: var(--accent-wash);
   color: var(--ink);
   font-weight: var(--weight-semibold);
 }
@@ -13345,7 +13383,7 @@ button.sheet-chip:hover,
 
 .whats-new-done {
   min-width: 6.5rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   padding: 7px 16px;
   background: var(--accent);
   color: var(--on-accent);
@@ -13504,14 +13542,13 @@ button.sheet-chip:hover,
 /* An exiting menu cannot intercept the click that dismissed it. */
 [data-menu-exiting] {
   pointer-events: none;
-  animation: menu-out 150ms var(--ease-out) forwards;
+  animation: menu-out 80ms var(--ease-out) forwards;
 }
-/* Back into where it came from, faster than it left: the phone's 150ms
-   fade-and-shrink. */
+/* Back into where it came from, faster than it left. */
 @keyframes menu-out {
   to {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.96);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -13624,1240 +13661,4 @@ button.sheet-chip:hover,
   border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   border-radius: inherit;
   background: color-mix(in srgb, var(--ink) 14%, var(--paper));
-}
-
-/* ── The list as the phone draws it ──────────────────────────────────────────
-   Under the strip, the phone's bar: a search pill, a round button for the one
-   act that adds, then the sort as chips. Below them each date group is a card
-   inside the column — its small grey heading inside it, no rules between its
-   rows, the chosen row an accent wash. The column stays a flush column on the
-   palette's ground; the cards are content in it, never panels.
-
-   The card clips, and that is load-bearing for the swipe: a row's panels are
-   parked at `left: 100%` and `right: 100%` of the row, and it is the card's
-   edge, not only the list's `overflow-x`, that keeps them out of sight. */
-:root:not(.has-wallpaper) .collection-column:not(.is-gallery) {
-  background: var(--page);
-}
-
-.list-search-row {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px 0;
-}
-
-.list-search-pill {
-  display: flex;
-  height: 36px;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--card);
-  padding: 0 14px;
-  font-size: 14px;
-}
-
-.list-search-pill:focus-within {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.list-round-button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--card);
-  color: var(--ink);
-}
-
-.list-round-button:disabled {
-  opacity: 0.4;
-}
-
-.list-sort-chips {
-  display: flex;
-  flex-shrink: 0;
-  gap: 6px;
-  overflow-x: auto;
-  padding: 10px 12px 2px;
-  scrollbar-width: none;
-}
-
-.list-sort-chip {
-  display: inline-flex;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--card);
-  padding: 0 12px;
-  color: var(--ink-2);
-  font-size: 13px;
-  font-weight: var(--weight-semibold);
-}
-
-.list-sort-chip[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--page);
-}
-
-.collection-column:not(.is-gallery) .note-group {
-  margin: 0 12px 12px;
-  overflow: hidden;
-  border-radius: 20px;
-  background: var(--card);
-}
-
-.collection-column:not(.is-gallery) .note-group-heading,
-:root:is(.has-wallpaper, .has-translucent-sidebar)
-  .collection-column:not(.is-gallery)
-  .note-group-heading {
-  position: static;
-  background: transparent;
-  padding: 14px 16px 4px;
-}
-
-.collection-column:not(.is-gallery) .note-group-heading h3 {
-  font-size: 13px;
-}
-
-.collection-column:not(.is-gallery) .note-group-body.is-open > * {
-  padding-bottom: 6px;
-}
-
-.note-row-list {
-  margin-inline: 0;
-  border-radius: 0;
-  padding: 10px 16px;
-}
-
-.note-row-list::after {
-  display: none;
-}
-
-.note-row-list.is-selected {
-  background: var(--accent-wash);
-}
-
-.note-row.note-row-list.is-swiped {
-  background: var(--card);
-}
-
-.note-row-head {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.note-row-head > p {
-  min-width: 0;
-  flex: 1;
-}
-
-.note-row-stamp {
-  flex-shrink: 0;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.note-row-list .note-row-summary > .note-row-preview {
-  flex: 1 1 auto;
-  color: var(--ink-3);
-  font-weight: var(--weight-regular);
-}
-
-/* The phone's notebook index at the head of the notes sidebar: titles, not
-   faces; the chosen one in ink with a 2px accent line under it, the others
-   quiet. Nothing scales or bounces; the ink and the line fade. */
-/* The row scrolls; the frame fades the edge that has more behind it
-   (`NotebookIndex.tsx`). 15px, not the phone's 17: a sidebar is read at a
-   desk's distance, and at 17 two titles already overran its default width. */
-.notebook-index-frame {
-  position: relative;
-  margin: 2px 0 10px;
-}
-
-.notebook-index {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  padding: 0 8px;
-  scrollbar-width: none;
-}
-
-.notebook-index::-webkit-scrollbar {
-  display: none;
-}
-
-.notebook-index-frame[data-fade-start="true"] .notebook-index {
-  --fade-start: 28px;
-}
-
-.notebook-index-frame[data-fade-end="true"] .notebook-index {
-  --fade-end: 28px;
-}
-
-.notebook-index-frame:is([data-fade-start="true"], [data-fade-end="true"]) .notebook-index {
-  mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    #000 var(--fade-start, 0px),
-    #000 calc(100% - var(--fade-end, 0px)),
-    transparent 100%
-  );
-}
-
-/* Windows: no mask (ClearType), the sidebar's ground laid over the edge. */
-[data-shell="windows"] .notebook-index-frame .notebook-index {
-  mask-image: none;
-}
-
-[data-shell="windows"] .notebook-index-frame::before,
-[data-shell="windows"] .notebook-index-frame::after {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 28px;
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-}
-
-[data-shell="windows"] .notebook-index-frame::before {
-  left: 0;
-  background: linear-gradient(to right, var(--paper), transparent);
-}
-
-[data-shell="windows"] .notebook-index-frame::after {
-  right: 0;
-  background: linear-gradient(to left, var(--paper), transparent);
-}
-
-[data-shell="windows"] .notebook-index-frame[data-fade-start="true"]::before,
-[data-shell="windows"] .notebook-index-frame[data-fade-end="true"]::after {
-  opacity: 1;
-}
-
-.notebook-index-title {
-  position: relative;
-  flex-shrink: 0;
-  padding: 4px 0 8px;
-  color: var(--ink-4);
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  transition: color 180ms var(--ease);
-}
-
-.notebook-index-title.is-active {
-  color: var(--ink);
-}
-
-/* The open title's line. The titles trade ink over 180 ms while it travels
-   260 — the phone's two numbers. */
-.notebook-index {
-  position: relative;
-}
-
-.notebook-index-line {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
-  pointer-events: none;
-}
-
-.notebook-index-line.is-gliding {
-  transition:
-    transform 260ms cubic-bezier(0.25, 0.1, 0.25, 1),
-    width 260ms cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .notebook-index-title,
-  .notebook-index-line.is-gliding {
-    transition: none;
-  }
-}
-
-/* ── Home ────────────────────────────────────────────────────────────────────
-   The phone's first tab, standing in the note pane while no note is open: one
-   52px strip like the note's, then the notebook's front page on the palette's
-   ground at a measure of 720 — the note's own, near enough, so that a note
-   opened from it lands where Home stood. Cards are `--card`, 24 and 20 round,
-   rows inside them have no rules. It arrives by fading — nothing here has a
-   direction to come from — and nothing in it moves under the pointer. */
-.home-page {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  background: var(--page);
-  animation: fade-in var(--dur-base) var(--ease) backwards;
-}
-
-.home-strip {
-  display: flex;
-  min-height: 52px;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  background: var(--paper);
-  box-shadow: inset 0 -1px 0 var(--rule);
-}
-
-[data-shell] .home-strip {
-  -webkit-app-region: drag;
-}
-
-[data-shell] .home-strip > * {
-  -webkit-app-region: no-drag;
-}
-
-.home-scroll {
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  container-type: inline-size;
-}
-
-.home-measure {
-  display: flex;
-  max-width: 720px;
-  flex-direction: column;
-  gap: 26px;
-  margin: 0 auto;
-  padding: 28px 40px 48px;
-}
-
-.home-card {
-  display: block;
-  width: 100%;
-  border-radius: 24px;
-  background: var(--card);
-  box-shadow: 0 0 0 1px var(--rule-soft);
-  color: var(--ink);
-  text-align: left;
-}
-
-.home-continue {
-  display: flex;
-  flex-direction: column;
-  padding: 24px 28px;
-}
-
-.home-label {
-  color: var(--ink-3);
-  font-size: 13px;
-  font-weight: var(--weight-semibold);
-}
-
-.home-continue-title {
-  display: -webkit-box;
-  margin-top: 8px;
-  overflow: hidden;
-  font-size: 28px;
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.015em;
-  line-height: 1.15;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.home-continue-preview {
-  display: -webkit-box;
-  max-width: 700px;
-  margin-top: 10px;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: 16px;
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.home-continue-empty {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--ink-4);
-  font-size: 28px;
-  font-weight: var(--weight-bold);
-  letter-spacing: -0.015em;
-}
-
-.home-caret {
-  width: 2px;
-  height: 30px;
-  margin-left: 4px;
-  border-radius: 1px;
-  background: var(--accent);
-  animation: home-caret 1.06s steps(1) infinite;
-}
-
-@keyframes home-caret {
-  50% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home-page,
-  .home-caret {
-    animation: none;
-  }
-}
-
-.home-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.home-where {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-3);
-  font-size: 14px;
-}
-
-.home-arrow {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  margin-left: auto;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-}
-
-.home-arrow.is-accent {
-  color: var(--accent);
-}
-
-.home-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.home-section > h2 {
-  margin: 0;
-  padding-left: 4px;
-  font-size: 20px;
-  font-weight: var(--weight-bold);
-}
-
-/* Cards two across at the measure — the pane is a note's width, not a
-   window's — and one across once the pane is narrower than two cards can
-   read in. Waiting cards are a column of their own: a remark is a sentence,
-   not a title. */
-.home-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.home-grid.is-wide {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@container (width < 520px) {
-  .home-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .home-measure {
-    padding-inline: 20px;
-  }
-}
-
-.home-note,
-.home-wait {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  border-radius: 20px;
-  padding: 16px 18px;
-}
-
-.home-note-title {
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-note-preview,
-.home-wait-body {
-  display: -webkit-box;
-  min-height: 2.8em;
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: 13px;
-  line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.home-wait-body {
-  color: var(--ink-2);
-  font-size: 14px;
-}
-
-.home-note-foot,
-.home-wait-head {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.home-note-foot {
-  margin-top: 10px;
-}
-
-.home-wait-head {
-  margin-bottom: 4px;
-}
-
-.home-card-where {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-wait > .home-card-where {
-  flex: none;
-  margin-top: 10px;
-}
-
-.home-card-date {
-  flex-shrink: 0;
-  margin-left: auto;
-  color: var(--ink-4);
-  font-size: 12px;
-}
-
-.home-wait-face {
-  display: inline-flex;
-  flex-shrink: 0;
-}
-
-.home-wait-face .avatar {
-  width: 24px;
-  height: 24px;
-  font-size: 10px;
-}
-
-.home-wait-name {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: var(--weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Lately is a list, not cards: a log of who did what, read down. */
-.home-lately {
-  border-radius: 20px;
-  padding: 4px 0;
-}
-
-.home-lately-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  text-align: left;
-}
-
-.home-lately-row + .home-lately-row {
-  box-shadow: inset 0 1px 0 var(--rule-soft);
-}
-
-.home-lately-what {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.home-lately-note {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink-2);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-lately-words {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: 6px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.home-lately-words .is-added {
-  color: var(--accent-strong);
-}
-
-.home-lately-words .is-removed {
-  color: var(--danger);
-}
-
-.home-faces {
-  display: inline-flex;
-  flex-shrink: 0;
-  --face-size: 20px;
-}
-
-.home-faces .avatar {
-  width: 20px;
-  height: 20px;
-  font-size: 9px;
-}
-
-:is(.home-continue, .home-note, .home-wait, .home-lately-row):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* ── The note's strip ────────────────────────────────────────────────────────
-   A desktop note keeps its tools where a Mac window keeps them: at the right of
-   the strip over the page, in the order the phone gives them. One capsule of
-   writing tools 32px tall, then Comments and the ⋯ as round buttons of the
-   same height. The palette's card is the surface and a hairline its edge —
-   a toolbar in the window, not a pane floating over the page, so no shadow. */
-.note-strip-tools .editor-tool-cluster.glass-toolbar,
-.note-strip-round,
-.note-strip-actions .toolbar-button {
-  border: 0;
-  background: var(--card);
-  box-shadow: 0 0 0 1px var(--rule);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.note-strip-tools .editor-tool-cluster {
-  height: 32px;
-  align-items: center;
-  gap: 0;
-  padding: 0 2px;
-  border-radius: 16px;
-}
-
-.note-strip-tools .editor-tool-button {
-  width: 34px;
-  height: 28px;
-  border-radius: 14px;
-}
-
-.note-strip-tools .editor-tool-button svg,
-.note-strip-round svg,
-.note-strip-actions .toolbar-button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.note-strip-tools .editor-tool-letters {
-  font-size: 15px;
-}
-
-.note-strip-round,
-.note-strip-actions .toolbar-button {
-  display: grid;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--ink-2);
-}
-
-.note-strip-round:hover,
-.note-strip-actions .toolbar-button:hover {
-  background: color-mix(in srgb, var(--ink) 7%, var(--card));
-  color: var(--ink);
-}
-
-.note-strip-round.is-active {
-  color: var(--accent-strong);
-}
-
-/* ── A note's foot, on a phone's screen ──────────────────────────────────────
-   The phone app's bottom bar (`NoteBars.tsx`): a glass capsule of the writing
-   tools 52 tall, and Comments in a circle of the same height beside it — one
-   line for the eye to rest on, standing over the words at the thumb. On a
-   desk the tools are in the strip; on a screen held in a hand the foot is
-   where they belong. Menus from it open upward. */
-.mobile-editor {
-  position: relative;
-}
-
-.note-foot-bar {
-  position: absolute;
-  z-index: 30;
-  right: 0;
-  bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
-  left: 0;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 16px;
-  pointer-events: none;
-}
-
-.note-foot-bar > * {
-  pointer-events: auto;
-}
-
-.note-foot-tools .editor-tool-cluster.glass-toolbar,
-.note-foot-bar .note-strip-round {
-  border: 0;
-  background: color-mix(in srgb, var(--glass) 80%, transparent);
-  box-shadow:
-    0 0 0 1px var(--glass-border),
-    inset 0 1px 0 var(--glass-highlight),
-    var(--shadow-lift);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
-}
-
-.note-foot-tools .editor-tool-cluster {
-  height: 52px;
-  align-items: center;
-  gap: 2px;
-  padding: 0 6px;
-  border-radius: 26px;
-}
-
-.note-foot-tools .editor-tool-button {
-  width: 44px;
-  height: 44px;
-  border-radius: 22px;
-}
-
-.note-foot-tools .editor-tool-button svg,
-.note-foot-bar .note-strip-round svg {
-  width: 21px;
-  height: 21px;
-}
-
-.note-foot-bar .note-strip-round {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--ink);
-}
-
-.note-foot-bar .note-strip-round.is-active {
-  color: var(--accent-strong);
-}
-
-.note-foot-tools .menu-popover.bottom-full {
-  transform-origin: bottom right;
-}
-
-.note-foot-tools .menu-popover.bottom-full.left-0 {
-  transform-origin: bottom left;
-}
-
-/* ── A phone's screen ────────────────────────────────────────────────────────
-   Below 767px the web app is the phone app in a browser: the palette's ground,
-   the same Home as an empty pane, the notes as dated cards under the search
-   pill and the sort chips, whose notes as the notebook index, and the three
-   tabs in a glass capsule at the foot (`(tabs)/_layout.tsx`). A note pushed
-   over them keeps its tools at the foot too. */
-.mobile-workspace .mobile-screen,
-.mobile-workspace .mobile-appbar,
-.mobile-note-list,
-.mobile-note-list .collection-toolbar {
-  background: var(--page);
-}
-
-.mobile-workspace .mobile-appbar {
-  border-bottom: 0;
-  padding: 0 16px 4px;
-}
-
-.mobile-appbar-row {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  gap: 8px;
-}
-
-.mobile-appbar-index {
-  margin: 2px -4px 0;
-}
-
-.mobile-face {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-}
-
-.mobile-face .avatar {
-  width: 34px;
-  height: 34px;
-}
-
-.mobile-round {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--card);
-  box-shadow: 0 0 0 1px var(--rule-soft);
-  color: var(--ink);
-}
-
-.mobile-home .home-strip {
-  display: none;
-}
-
-.mobile-home .home-measure {
-  padding: 8px 16px 112px;
-}
-
-.mobile-home .home-page {
-  background: var(--page);
-}
-
-.home-shelf {
-  overflow: hidden;
-  border-radius: 20px;
-  background: var(--card);
-}
-
-.home-shelf-row {
-  display: flex;
-  width: 100%;
-  min-height: 50px;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  color: var(--ink);
-  font-size: 16px;
-  text-align: left;
-}
-
-.home-shelf-row > svg:first-child {
-  color: var(--ink-2);
-}
-
-.home-shelf-row + .home-shelf-row {
-  box-shadow: inset 0 1px 0 var(--rule-soft);
-}
-
-.home-shelf-chevron {
-  margin-left: auto;
-  color: var(--ink-4);
-}
-
-.mobile-note-list .collection-toolbar {
-  min-height: 0;
-  border: 0;
-  box-shadow: none;
-  padding: 4px 20px 6px;
-}
-
-.mobile-note-list .list-search-row {
-  padding-inline: 16px;
-}
-
-.mobile-note-list .list-sort-chips {
-  padding-inline: 16px;
-}
-
-.mobile-note-list .note-group {
-  margin: 0 16px 14px;
-  overflow: hidden;
-  border-radius: 20px;
-  background: var(--card);
-}
-
-.mobile-note-list .note-group-heading,
-:root:is(.has-wallpaper, .has-translucent-sidebar) .mobile-note-list .note-group-heading {
-  position: static;
-  background: transparent;
-  padding: 14px 16px 4px;
-}
-
-.mobile-note-list .note-row.mobile-note-row {
-  min-height: 0;
-  padding: 11px 16px;
-}
-
-/* A hairline between the rows of a card, from the words' edge to the card's. */
-.mobile-note-list .mobile-note-row + .mobile-note-row {
-  border-top: 0;
-  background-image: linear-gradient(var(--rule-soft), var(--rule-soft));
-  background-position: right top;
-  background-repeat: no-repeat;
-  background-size: calc(100% - 16px) 1px;
-}
-
-.mobile-note-list .mobile-note-row.is-swiped {
-  background-color: var(--card);
-}
-
-.mobile-note-list .mobile-note-row:active {
-  background: color-mix(in srgb, var(--ink) 6%, var(--card));
-}
-
-.mobile-tabs {
-  position: fixed;
-  z-index: 40;
-  bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
-  left: 50%;
-  display: flex;
-  height: 60px;
-  align-items: center;
-  gap: 2px;
-  padding: 0 6px;
-  border-radius: 30px;
-  background: color-mix(in srgb, var(--glass) 80%, transparent);
-  box-shadow:
-    0 0 0 1px var(--glass-border),
-    inset 0 1px 0 var(--glass-highlight),
-    var(--shadow-lift);
-  transform: translateX(-50%);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
-}
-
-.mobile-tab {
-  position: relative;
-  display: flex;
-  width: 84px;
-  height: 50px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  border-radius: 25px;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: var(--weight-semibold);
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.mobile-tab[aria-current="page"] {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-  font-weight: var(--weight-bold);
-}
-
-.mobile-tab-dot {
-  position: absolute;
-  top: 7px;
-  right: 24px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--glass);
-}
-
-/* ── Settings on a phone's screen ────────────────────────────────────────────
-   The phone's Settings: an index first — your card, then the groups as cards
-   of rows, each saying what is set there now — and a section pushed over it
-   with the way back named "Settings". The desk's rail is the same list, so it
-   is the same markup in another arrangement; nothing scrolls sideways. */
-.settings-nav-head,
-.settings-back {
-  display: none;
-}
-
-@media (max-width: 767px) {
-  .settings-layer:has(.is-phone) {
-    padding: 0;
-  }
-
-  .settings-panel.is-phone {
-    width: 100%;
-    height: 100dvh;
-    border: 0;
-    border-radius: 0;
-    background: var(--page);
-  }
-
-  .is-phone .settings-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .is-phone[data-stage="index"] .settings-content,
-  .is-phone[data-stage="section"] .settings-nav {
-    display: none;
-  }
-
-  .is-phone .settings-nav {
-    overflow-y: auto;
-    border-right: 0;
-    padding: max(8px, env(safe-area-inset-top)) 16px 32px;
-    background: var(--page);
-  }
-
-  .is-phone .settings-nav-head {
-    display: flex;
-    min-height: 52px;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .is-phone .settings-nav-head h2 {
-    font-family: var(--font-display);
-    font-size: 30px;
-    font-weight: var(--weight-bold);
-    letter-spacing: -0.02em;
-  }
-
-  .is-phone .settings-nav-marker {
-    display: none;
-  }
-
-  .is-phone .settings-nav-list {
-    gap: 0;
-  }
-
-  .is-phone .settings-nav .settings-identity,
-  .is-phone .settings-nav .settings-identity.is-active {
-    margin: 8px 0 22px;
-    border-radius: 20px;
-    padding: 14px 16px;
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .is-phone .settings-identity .avatar {
-    width: 52px;
-    height: 52px;
-  }
-
-  .is-phone .settings-nav-group {
-    margin: 0;
-    padding: 0 16px 6px;
-  }
-
-  .is-phone .settings-nav-list > button:not(.settings-identity) {
-    min-height: 50px;
-    border-radius: 0;
-    padding: 0 16px;
-    background: var(--card);
-  }
-
-  .is-phone .settings-nav-list > button:not(.settings-identity):hover,
-  .is-phone .settings-nav-list > button.is-active:not(.settings-identity) {
-    background: var(--card);
-  }
-
-  .is-phone .settings-nav-group + button {
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-  }
-
-  .is-phone .settings-nav-list > button:not(.settings-identity):has(+ .settings-nav-group),
-  .is-phone .settings-nav-list > button:not(.settings-identity):last-child {
-    margin-bottom: 22px;
-    border-bottom-left-radius: 20px;
-    border-bottom-right-radius: 20px;
-  }
-
-  .is-phone .settings-nav-list > button:not(.settings-identity) + button {
-    background:
-      linear-gradient(var(--rule-soft), var(--rule-soft)) right top / calc(100% - 52px) 1px
-        no-repeat,
-      var(--card);
-  }
-
-  .is-phone .settings-nav-signout {
-    min-height: 50px;
-    margin-top: 0;
-    justify-content: center;
-    border: 0;
-    border-radius: 20px;
-    padding: 0 16px;
-    background: var(--card);
-  }
-
-  .is-phone .settings-content {
-    background: var(--page);
-  }
-
-  .is-phone .settings-header {
-    padding: max(0px, env(safe-area-inset-top)) 12px 0 8px;
-  }
-
-  .is-phone .settings-back {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    gap: 2px;
-    color: var(--ink);
-    font-size: 16px;
-    font-weight: var(--weight-semibold);
-  }
-
-  .is-phone .settings-header h2 {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 17px;
-  }
-}
-
-/* ── History and the sheets, grouped ─────────────────────────────────────────
-   The phone draws a list of facts as `Grouped`: a quiet heading over a card
-   of rows, a hairline between rows from the words' edge, the card 16 round.
-   The history panel's days and the sheets' sections are those cards here —
-   the markup is the same; only the ground under the rows changed. */
-.note-version-group {
-  gap: 0;
-  margin-bottom: 14px;
-}
-
-.note-version-day {
-  padding: 4px 12px 6px;
-}
-
-.note-version,
-.sheet-work > .sheet-row {
-  border-radius: 0;
-  background-color: var(--card);
-}
-
-.note-version + .note-version,
-.sheet-work > .sheet-row + .sheet-row {
-  background-image: linear-gradient(var(--rule-soft), var(--rule-soft));
-  background-position: right top;
-  background-repeat: no-repeat;
-  background-size: calc(100% - 12px) 1px;
-}
-
-.note-version-day + .note-version,
-.sheet-work > :not(.sheet-row) + .sheet-row {
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-
-.note-version:last-child,
-.sheet-work > .sheet-row:last-child,
-.sheet-work > .sheet-row:has(+ :not(.sheet-row)) {
-  border-bottom-left-radius: 16px;
-  border-bottom-right-radius: 16px;
-}
-
-.note-version.is-open {
-  background-color: var(--card);
-  box-shadow: inset 0 0 0 1px var(--rule);
-}
-
-.note-version-head,
-.sheet-work > .sheet-row {
-  border-radius: inherit;
-  padding: 10px 12px;
-}
-
-.note-version:not(.is-open) .note-version-head:hover,
-.sheet-work > .sheet-row:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--ink) 5%, var(--card));
-}
-
-.note-version-faces > *,
-.note-version.is-open .note-version-faces > * {
-  box-shadow: 0 0 0 2px var(--card);
-}
-
-.sheet-work {
-  gap: 0;
-}
-
-.sheet-work h3 {
-  margin-top: 16px;
-  padding: 0 12px 6px;
-}
-
-.sheet-faces,
-.sheet-facts,
-.sheet-day {
-  border-radius: 16px;
-  background: var(--card);
-}
-
-.sheet-faces {
-  padding: 8px;
-}
-
-.sheet-facts {
-  padding: 10px 12px;
-}
-
-.sheet-day {
-  margin-top: 6px;
-  padding: 6px 4px;
-}
-
-.sheet-day > p {
-  padding: 4px 8px 2px;
-}
-
-/* On a phone's screen the find bar stands where the tools stood — at the
-   foot, a glass field in reach of the thumb, as the phone's `NoteBars` find
-   does. A desk keeps it under the strip, where a Mac window's find bar is. */
-@media (max-width: 767px) {
-  .mobile-editor .find-bar {
-    position: absolute;
-    z-index: 30;
-    right: 16px;
-    bottom: max(12px, calc(env(safe-area-inset-bottom) - 4px));
-    left: 16px;
-    width: auto;
-    margin: 0;
-    border-radius: 26px;
-  }
 }

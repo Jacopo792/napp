@@ -21,7 +21,6 @@ import {
   Folder,
   FolderDown,
   FolderTree,
-  Home,
   Keyboard,
   Lock,
   Maximize2,
@@ -39,7 +38,6 @@ import {
   Copy,
   FileDown,
   History,
-  ListTree,
   Printer,
   Structure,
   Chapters,
@@ -77,13 +75,7 @@ import {
   targetsOf,
   type ChapterTargets,
 } from "@/lib/references";
-import {
-  loadContributions,
-  loadLately,
-  loadNamedVersions,
-  type FolderVersion,
-  type NamedVersion,
-} from "@/lib/history";
+import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
 import {
   DndContext,
   DragEndEvent,
@@ -149,7 +141,6 @@ import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from 
 import {
   loadArchiveComments,
   notesWithOpenRemarks,
-  lastOpenRemarks,
   unreadRemarks,
   type RemarksSeen,
   type ArchiveComment,
@@ -210,12 +201,12 @@ import {
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
-import { captureRows, sendNotes, settleBack } from "@/lib/motion";
+import { aimNote, captureRows, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
-import { NoteList, type ActiveFilter, type RowRemark } from "@/components/NoteList";
+import { NoteList, type ActiveFilter } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import {
   announceTyping,
@@ -224,13 +215,7 @@ import {
   wakeCollaboration,
 } from "@/lib/collab";
 import { useAutoLock } from "@/lib/autoLock";
-import {
-  CollectionMenu,
-  Avatar,
-  DotsMenu,
-  NoteContextMenu,
-  NoteMenu,
-} from "@/components/WorkspaceMenus";
+import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
 /* Lazily, and only once it is opened. Settings is one panel behind one button
    that nobody presses on the way to a note, and it was riding in the same
    chunk as the archive. */
@@ -295,9 +280,6 @@ function faceOrigin(element: Element): SheetOrigin {
   return { x, y, width, height };
 }
 import { Sidebar, type Scope } from "@/components/Sidebar";
-import { HomePage, type HomeChange, type HomeRemark } from "@/components/HomePage";
-import { IndexLine, NotebookIndex } from "@/components/NotebookIndex";
-import { useIndexLine } from "@/lib/useIndexLine";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
 import { WhatsNewButton } from "@/components/WhatsNewButton";
@@ -604,8 +586,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [openThen, setOpenThen] = useState<{
     noteId: string;
     history?: string | true;
-    /** True for the conversation, or a thread id for that one. */
-    comments?: boolean | string;
+    comments?: boolean;
     /** Words to go to once the note is open — a heading or a line ⌘K found —
      *  or a footnote, a caption, a cited heading. */
     reveal?: Place;
@@ -617,14 +598,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      switch on its way out. */
   const holdRef = useRef<number | undefined>(undefined);
   const heldRef = useRef(false);
-  /* Whose manuscript, in the book's title strip: the notebook index's
-     gliding line under the open name. */
-  const peopleRef = useRef<HTMLDivElement>(null);
-  const [peopleLine, placePeopleLine] = useIndexLine(peopleRef, ".people-face.is-active");
-  /* Every render, because the shelf comes and goes with the book's strip
-     and its names change width as faces and typing marks arrive; placing is a
-     query and a comparison, and sets nothing when nothing moved. */
-  useLayoutEffect(() => placePeopleLine());
 
   function holdStart(event: React.PointerEvent, userId: string) {
     if (event.button !== 0 && event.pointerType === "mouse") return;
@@ -651,14 +624,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* The page left, read while the next one renders — so a chapter knows
      whether it was turned to forwards or back. */
   const lastOpened = useRef<string | null>(null);
-  /* A phone's screen is the phone app's three tabs — Home, the notes, Comments
-     — with a note pushed over them; Back returns to the tab it was opened
-     from. */
-  const [mobileScreen, setMobileScreen] = useState<"home" | "collection" | "note">("home");
-  const mobileTabRef = useRef<"home" | "collection">("home");
-  useEffect(() => {
-    if (mobileScreen !== "note") mobileTabRef.current = mobileScreen;
-  }, [mobileScreen]);
+  const [mobileScreen, setMobileScreen] = useState<"collection" | "note">("collection");
   const [listPreferences, setListPreferences] = useState<Record<string, ListPreferencesV1>>({});
   /** Minutes of inactivity before the archive locks itself; 0 is never. */
   const autoLock = flags.autoLock;
@@ -673,11 +639,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const splitTitleRef = useRef<HTMLTextAreaElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const noteEditorRef = useRef<NoteEditorHandle>(null);
-  /* The second note's editor, so its ⋯ can find in it and show its outline. */
-  const splitEditorRef = useRef<NoteEditorHandle>(null);
-  /** A note asked to open with its outline beside it, from a menu about a
-   *  note that was not the open one. */
-  const [outlineFor, setOutlineFor] = useState<string | null>(null);
   useEffect(() => {
     if (!openThen || selectedId !== openThen.noteId) return;
     /* The editor is a lazy chunk, so on the first note of a visit it is not
@@ -693,8 +654,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       }
       if (openThen.history)
         editor?.openHistory(openThen.history === true ? undefined : openThen.history);
-      else if (openThen.comments)
-        editor?.openComments(typeof openThen.comments === "string" ? openThen.comments : undefined);
+      else if (openThen.comments) editor?.openComments();
       else if (openThen.reveal) editor?.reveal(openThen.reveal);
       setOpenThen(null);
     };
@@ -1017,6 +977,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [readSnapshot]);
 
   useEffect(() => {
+    const safetyChanged = () => {
+      setSheets([]);
+      refreshRemote();
+    };
+    window.addEventListener("napp:safety-change", safetyChanged);
+    return () => window.removeEventListener("napp:safety-change", safetyChanged);
+  }, [refreshRemote]);
+
+  useEffect(() => {
     if (!session) return;
     let cancelled = false;
 
@@ -1283,22 +1252,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [session, refreshRemarks, awake]);
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
-  /* The Comments scope, row for row as the phone's tab: whoever spoke last in
-     a note's open threads, what they said, when. */
-  const lastRemarks = useMemo(() => lastOpenRemarks(archiveComments), [archiveComments]);
-  const remarkRows = useMemo(() => {
-    const rows = new Map<string, RowRemark>();
-    for (const [noteId, said] of lastRemarks) {
-      const member = members.find((one) => one.userId === said.authorId);
-      const name = member?.nickname || "Member";
-      rows.set(noteId, {
-        face: <Avatar url={avatarUrls[said.authorId] ?? null} name={name} email="" compact />,
-        body: said.authorId === selfId ? `You: ${said.body}` : said.body,
-        at: said.createdAt,
-      });
-    }
-    return rows;
-  }, [lastRemarks, members, avatarUrls, selfId]);
   const unreadRemarkNotes = useMemo(
     () =>
       new Set(
@@ -1411,26 +1364,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   ]);
 
   const noteGroups = useMemo(() => {
-    /* Comments is a conversation list, newest word first, in one card under
-       "Open" as the phone's tab has it — a date heading over it would date
-       the note, not what was said. */
-    if (selectedFolderId === REMARKS)
-      return [
-        {
-          id: "remarks",
-          label: "Open",
-          entries: [...visible].sort((a, b) =>
-            (lastRemarks.get(b.note.id)?.createdAt ?? "").localeCompare(
-              lastRemarks.get(a.note.id)?.createdAt ?? "",
-            ),
-          ),
-        },
-      ];
     const pinnedIds = new Set(
       activeMeta.notes.filter((note) => note.pinned).map((note) => note.id),
     );
     return groupEntries(visible, pinnedIds, activeListPreferences);
-  }, [visible, activeMeta.notes, activeListPreferences, selectedFolderId, lastRemarks]);
+  }, [visible, activeMeta.notes, activeListPreferences]);
   const orderedVisible = useMemo(() => noteGroups.flatMap((group) => group.entries), [noteGroups]);
 
   /* ── A document ──────────────────────────────────────────────────────────
@@ -1442,25 +1380,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      changes what a notes archive reads or writes. */
   const currentSpace = spaces.find((space) => space.archiveId === session?.archiveId);
   const docMode = currentSpace?.kind === "document";
-  /* Home is what the note pane shows with no note in it — at launch, after a
-     note is closed, and whenever the open note leaves the list. It is not a
-     place of its own: the list stands beside it the whole time. */
-  const homeShown = !selectedId && !docMode && !compact;
-  /* On a phone's screen Home is the first tab instead. */
-  const homeUp = homeShown || (compact && !docMode && mobileScreen === "home");
-  /* Home's Lately: what the others wrote, read once each time Home comes
-     up. A failure leaves the section out, never the page. */
-  const [lately, setLately] = useState<FolderVersion[]>([]);
-  useEffect(() => {
-    if (!homeUp || !session) return;
-    let current = true;
-    loadLately(session)
-      .then((rows) => current && setLately(rows))
-      .catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, [homeUp, session]);
   const docFeatures = currentSpace?.features ?? DEFAULT_FEATURES;
   const manuscriptOwner =
     docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
@@ -1705,9 +1624,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : selectedFolderId === UNFILED
         ? "Unfiled"
         : selectedFolderId === REMARKS
-          ? "Comments"
+          ? "Remarks"
           : selectedFolderId === TRASH
-            ? "Recently Deleted"
+            ? "Trash"
             : selectedFolderId === ARCHIVE
               ? "Archive"
               : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
@@ -2951,22 +2870,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       /* The bare keys below walk a note list, and a document has none. */
       if (docKeys.current.docMode) return;
 
-      /* Esc leaves the text; pressed again, with nothing else open to close,
-         it closes the note and the pane goes back to Home. ⌘W stays the
-         window's. */
-      if (
-        e.key === "Escape" &&
-        selectedId &&
-        !compact &&
-        !e.defaultPrevented &&
-        !document.querySelector(".popover, [role='dialog'], [role='menu']")
-      ) {
-        e.preventDefault();
-        saveNow();
-        setSelectedId(null);
-        return;
-      }
-
       if (e.key === "n") {
         e.preventDefault();
         void handleNew();
@@ -3373,10 +3276,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         !root.classList.contains("is-sliding-navigation")
       ) {
         root.classList.add("is-opening-note");
+        const from = selectedIdRef.current;
+        /* Aimed inside the callback: by then the old page is already a
+           picture, so the direction never restarts its entrance. */
         document
-          .startViewTransition(() => flushSync(() => setSelectedId(id)))
+          .startViewTransition(() =>
+            flushSync(() => {
+              aimNote(from, id);
+              setSelectedId(id);
+            }),
+          )
           .finished.finally(() => root.classList.remove("is-opening-note"));
       } else {
+        aimNote(selectedIdRef.current, id);
         setSelectedId(id);
       }
       /* Opening the note *is* having read what was said on it — a remark
@@ -3441,29 +3353,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [paletteOpen, session]);
 
-  /** A note's outline, asked for from a menu about the note (its row's, or
-   *  the editor's): the open note shows or hides it, another note opens
-   *  with it showing. */
-  function openWithOutline(id: string) {
-    if (id === selectedIdRef.current) {
-      noteEditorRef.current?.toggleOutline();
-      return;
-    }
-    setOutlineFor(id);
-    handleSelectNote(id);
-  }
-  useEffect(() => {
-    if (outlineFor && selectedId !== outlineFor) setOutlineFor(null);
-  }, [selectedId, outlineFor]);
-
-  /** A note opened from Home: in the list as it stands when the list holds
-   *  it, so opening something from the pane does not move the column beside
-   *  it; otherwise in every note, as a link does. */
-  function openFromHome(id: string) {
-    if (visible.some((entry) => entry.note.id === id)) handleSelectNote(id);
-    else handleOpenRecent(id);
-  }
-
   /** A link to a note, pressed. One made by Continue as note carries the
    *  words it was continued from, and those are what it goes back to. */
   function handleOpenRecent(id: string, passage?: string) {
@@ -3476,7 +3365,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   function handleMobileBack() {
     saveNow();
     setSelectedId(null);
-    setMobileScreen(mobileTabRef.current);
+    setMobileScreen("collection");
   }
 
   /* One writer for the profile, optimistic so the field does not snap back
@@ -3627,11 +3516,33 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [whatsNewUnseen, loading, openWhatsNew]);
   const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
 
-  function handleLock() {
+  async function handleLock(removeLocalContent = true) {
+    if (
+      removeLocalContent &&
+      !window.confirm(
+        "Sign out and remove this account’s local notes? Changes that have not reached the server will be deleted.",
+      )
+    )
+      return;
     saveNow();
-    clearDrafts();
-    void clearSession();
-    navigate({ to: "/" });
+    try {
+      if (!removeLocalContent) {
+        // An inactivity lock hides the archive immediately, even offline.
+        // Its recoverable Yjs stores are deliberately retained.
+        const signingOut = clearSession();
+        navigate({ to: "/" });
+        await signingOut;
+        return;
+      }
+      await drain();
+      await clearSession({ removeLocalContent });
+      clearDrafts();
+      navigate({ to: "/" });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Could not sign out. Try again.";
+      if (removeLocalContent) window.alert(message);
+      else setError(message);
+    }
   }
 
   function handleSwitchAccount(userId: string) {
@@ -3850,7 +3761,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
-  useAutoLock(autoLock, handleLock);
+  useAutoLock(autoLock, () => void handleLock(false));
 
   if (!session) return null;
 
@@ -3988,12 +3899,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       })),
       {
         id: REMARKS,
-        label: "Comments",
+        label: "Remarks",
         count: [...remarkedIds].filter((id) => !trashedIds.has(id)).length,
         unread: unreadRemarkCount,
       },
       { id: ARCHIVE, label: "Archive", count: archived },
-      { id: TRASH, label: "Recently Deleted", count: trash },
+      { id: TRASH, label: "Trash", count: trash },
     ];
   })();
   /* The notes in a folder named Templates or Modelli, in this scope. */
@@ -4148,26 +4059,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               run: () => setSelectedId(null),
             },
           ]
-        : [
-            ...scopes.map((scope) => ({
-              id: `scope:${scope.id}`,
-              group: "Go to",
-              name: scope.label,
-              icon:
-                scope.id === TRASH ? (
-                  <Trash2 size={16} />
-                ) : scope.id === REMARKS ? (
-                  <MessageSquare size={16} />
-                ) : scope.id === ARCHIVE ? (
-                  <Archive size={16} />
-                ) : scope.id === ALL ? (
-                  <NotebookText size={16} />
-                ) : (
-                  <Folder size={16} />
-                ),
-              run: () => handleSelectFolder(scope.id),
-            })),
-          ]),
+        : scopes.map((scope) => ({
+            id: `scope:${scope.id}`,
+            group: "Go to",
+            name: scope.label,
+            icon:
+              scope.id === TRASH ? (
+                <Trash2 size={16} />
+              ) : scope.id === REMARKS ? (
+                <MessageSquare size={16} />
+              ) : scope.id === ARCHIVE ? (
+                <Archive size={16} />
+              ) : scope.id === ALL ? (
+                <NotebookText size={16} />
+              ) : (
+                <Folder size={16} />
+              ),
+            run: () => handleSelectFolder(scope.id),
+          }))),
       /* The running text is found by the Text group below, with the line it
          is in; here a note is found by its name. */
       ...(docMode && manuscript
@@ -4230,7 +4139,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         return [
           {
             id: `remark:${remark.id}`,
-            group: "Comments",
+            group: "Remarks",
             name: remark.body,
             hint: title,
             keywords: `${remark.body} ${title}`.toLowerCase(),
@@ -4618,7 +4527,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }
   const peopleShelf = (
     <div
-      ref={peopleRef}
       role="group"
       aria-label="Whose notes"
       className="people-shelf"
@@ -4633,7 +4541,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       }
     >
       <span className="people-thumb" aria-hidden="true" />
-      <IndexLine line={peopleLine} className="people-line" />
       {roster.map((member) => {
         const active = viewAs === member.userId;
         const online =
@@ -4688,86 +4595,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       })}
     </div>
   );
-
-  /* The phone's notebook index, in the notes sidebar: whose notes, as titles
-     in the content's own voice, the chosen one underlined in the accent. The
-     book keeps the shelf above. Right-click a title for that person's sheet. */
-  const notebookIndex = (
-    <NotebookIndex
-      titles={roster.map((member) => ({
-        id: member.userId,
-        label: member.isSelf ? "Your Notes" : `${nameOf(member)}’s Notes`,
-      }))}
-      active={viewAs}
-      onSelect={handleViewChange}
-      onInfo={(userId, element) => openSheet({ ...faceOrigin(element), kind: "person", userId })}
-    />
-  );
-
-  /* Home's faces: somebody else in that note now, as the archive's presence
-     says it — never who wrote it. */
-  const homeFaces = (noteId: string) => {
-    if (!flags.collaborators) return null;
-    const here = roster.filter((member) => !member.isSelf && present.get(member.userId) === noteId);
-    return here.length ? (
-      <span className="home-faces">
-        {here.map((member) => (
-          <Avatar
-            key={member.userId}
-            url={avatarUrls[member.userId] ?? null}
-            name={nameOf(member)}
-            email=""
-          />
-        ))}
-      </span>
-    ) : null;
-  };
-
-  const homeFace = (userId: string) => {
-    const member = members.find((one) => one.userId === userId);
-    const name = member ? nameOf(member) : "Member";
-    return {
-      name,
-      face: <Avatar url={avatarUrls[userId] ?? null} name={name} email="" compact />,
-    };
-  };
-
-  /* Waiting for You: the badge's own remarks, the newest of each thread. */
-  const homeWaiting: HomeRemark[] = [];
-  if (homeUp && selfId) {
-    const seenThreads = new Set<string>();
-    const unread = unreadRemarks(archiveComments, selfId, remarksSeen).sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
-    for (const remark of unread) {
-      if (seenThreads.has(remark.threadId)) continue;
-      seenThreads.add(remark.threadId);
-      homeWaiting.push({
-        threadId: remark.threadId,
-        noteId: remark.noteId,
-        body: remark.body,
-        at: remark.createdAt,
-        ...homeFace(remark.authorId),
-      });
-    }
-  }
-
-  /* Lately, named by the first of the others who wrote it. */
-  const homeLately: HomeChange[] = lately.flatMap((version) => {
-    const author = version.authorIds.find((id) => id !== selfId);
-    return author
-      ? [
-          {
-            id: version.id,
-            noteId: version.noteId,
-            added: version.wordsAdded,
-            removed: version.wordsRemoved,
-            at: version.createdAt,
-            ...homeFace(author),
-          },
-        ]
-      : [];
-  });
 
   /* A door out of a sheet: the note, in whoever's scope it sits, and then
      its history or its conversation if that is what was pressed. */
@@ -5104,13 +4931,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         setFoldersOpen(false);
         setSettingsOpen(true);
       }}
-      onLock={handleLock}
+      onLock={() => void handleLock()}
       accountEmail={session?.email ?? ""}
       accounts={() => (session ? otherAccounts(session.userId) : [])}
       onSwitchAccount={handleSwitchAccount}
       onAddAccount={handleAddAccount}
       spaceSwitch={spaceSwitch}
-      peopleShelf={notebookIndex}
+      peopleShelf={peopleShelf}
       scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
     />
   );
@@ -5197,6 +5024,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             : undefined
         }
         email={session.email}
+        onAccountDeleted={() => {
+          clearDrafts();
+          setSession(null);
+          void navigate({ to: "/" });
+        }}
         reading={readingLabel}
         autoLock={autoLock}
         profile={profile}
@@ -5252,7 +5084,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsOpen(false);
           setSettingsSection(undefined);
         }}
-        onLock={handleLock}
+        onLock={() => void handleLock()}
       />
     </Suspense>
   );
@@ -5279,58 +5111,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }).catch(() => undefined)
       : undefined;
 
-  /* One ⋯ in the strip, as on the phone: Find and the outline are in it, and
-     the writing tools and Comments stand at the foot of the note. A reader
-     who may not write still finds and reads the outline from it. */
-  const paneNavigation = !listOpen ? (
-    <>
-      {/* With the columns away this strip is the only chrome in
-                        the window, so it carries what the columns did: getting
-                        them back, a new note, and finding one — the three acts
-                        nobody should have to reopen a column for. One capsule,
-                        like every group of toolbar items here. */}
-      <span className="editor-tool-group glass-toolbar flex items-center">
-        <button
-          type="button"
-          onClick={() => changeNavigation(true)}
-          aria-label="Show the sidebar"
-          title={"Show the sidebar · ⌘\\"}
-          className="toolbar-button press"
-        >
-          <PanelLeftOpen size={18} />
-        </button>
-        {canWriteArchive && (
-          <button
-            type="button"
-            onClick={handleNew}
-            aria-label="New note"
-            title="New note · ⌘N"
-            className="toolbar-button press"
-          >
-            <SquarePen size={18} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setPaletteQuery("");
-            setPaletteOpen(true);
-          }}
-          aria-label="Search notes"
-          title="Search · ⌘K"
-          className="toolbar-button press"
-        >
-          <Search size={18} />
-        </button>
-      </span>
-    </>
-  ) : null;
-
   const noteActions = selected ? (
     <>
-      {canWriteArchive ? (
+      <button
+        type="button"
+        aria-label="Find in note"
+        className="toolbar-button press"
+        onClick={() => noteEditorRef.current?.openFind()}
+      >
+        <Search size={16} />
+      </button>
+      {canWriteArchive && (
         <NoteMenu
-          onOutline={() => noteEditorRef.current?.toggleOutline()}
           lock={lockFor(selected.note.id)}
           pinned={pinned}
           folders={activeMeta.folders}
@@ -5352,26 +5144,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
           onRecent={handleOpenRecent}
           onDelete={() => handleMoveToTrash(selected)}
-        />
-      ) : (
-        <DotsMenu
-          items={[
-            {
-              kind: "item",
-              id: "find",
-              label: "Find in note",
-              icon: <Search size={16} />,
-              hint: keyName("⌘F"),
-              run: () => noteEditorRef.current?.openFind(),
-            },
-            {
-              kind: "item",
-              id: "outline",
-              label: "Outline",
-              icon: <ListTree size={16} />,
-              run: () => noteEditorRef.current?.toggleOutline(),
-            },
-          ]}
         />
       )}
     </>
@@ -5400,7 +5172,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onSavePdf={() => noteEditorRef.current?.savePdf()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
         onFind={() => noteEditorRef.current?.openFind()}
-        onOutline={() => noteEditorRef.current?.toggleOutline()}
         onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}
@@ -6042,120 +5813,39 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
-  /* The phone app's bar over a tab: the reader's face (Settings, as the
-     phone's Accounts), the folders where there are folders to choose, and on
-     Home the search and the + that makes things; whose notes under it. */
-  const mobileBar = (tab: "home" | "collection") => (
-    <header
-      className="mobile-appbar shrink-0"
-      style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
-    >
-      <div className="mobile-appbar-row">
-        <button
-          type="button"
-          aria-label="Settings"
-          className="mobile-face press"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Avatar
-            url={(selfId && avatarUrls[selfId]) || null}
-            name={profile.nickname || session.email}
-            email={session.email}
-            compact
-          />
-        </button>
-        {tab === "collection" && (
-          <button
-            type="button"
-            aria-label="Folders"
-            className="mobile-round press"
-            onClick={() => setFoldersOpen(true)}
-          >
-            <FolderTree size={19} />
-          </button>
-        )}
-        <span className="flex-1" />
-        {tab === "home" && (
-          <>
-            <button
-              type="button"
-              aria-label="Search notes"
-              className="mobile-round press"
-              onClick={() => {
-                setPaletteQuery("");
-                setPaletteOpen(true);
-              }}
-            >
-              <Search size={19} />
-            </button>
-            {canWriteArchive && (
-              <button
-                type="button"
-                aria-label="New note"
-                className="mobile-round press"
-                onClick={handleNew}
-              >
-                <Plus size={20} />
-              </button>
-            )}
-          </>
-        )}
-      </div>
-      {roster.length > 1 && <div className="mobile-appbar-index">{notebookIndex}</div>}
-    </header>
-  );
-
   if (compact) {
     return (
       <div className="mobile-workspace overflow-hidden" style={{ height: "100dvh" }}>
         <DndContext key="mobile-dnd" sensors={sensors} onDragEnd={handleDragEnd}>
           <main className="h-full overflow-hidden">
-            {mobileScreen === "home" && (
-              <section className="mobile-screen mobile-home flex h-full flex-col">
-                {mobileBar("home")}
-                <HomePage
-                  entries={ownedEntries}
-                  meta={activeMeta}
-                  own={viewedMember?.isSelf ?? true}
-                  canWrite={canWriteArchive}
-                  faces={homeFaces}
-                  waiting={homeWaiting}
-                  lately={homeLately}
-                  onOpenNote={openFromHome}
-                  onOpenThread={(noteId, threadId) => {
-                    openFromHome(noteId);
-                    setOpenThen({ noteId, comments: threadId });
-                  }}
-                  onNew={handleNew}
-                  foot={
-                    <div className="home-shelf">
-                      <button
-                        type="button"
-                        className="home-shelf-row press"
-                        onClick={() => handleSelectFolder(ARCHIVE)}
-                      >
-                        <Archive size={18} />
-                        <span>Archive</span>
-                        <ChevronRight size={16} className="home-shelf-chevron" />
-                      </button>
-                      <button
-                        type="button"
-                        className="home-shelf-row press"
-                        onClick={() => handleSelectFolder(TRASH)}
-                      >
-                        <Trash2 size={18} />
-                        <span>Recently Deleted</span>
-                        <ChevronRight size={16} className="home-shelf-chevron" />
-                      </button>
-                    </div>
-                  }
-                />
-              </section>
-            )}
-
             {mobileScreen === "collection" && (
               <section className="mobile-screen flex h-full flex-col">
-                {mobileBar("collection")}
+                <header
+                  className="mobile-appbar shrink-0 px-4 pb-2"
+                  style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Folders, Trash and the archive switch, one tap away in
+                        the same column the desktop keeps open. */}
+                    <button
+                      type="button"
+                      aria-label="Folders"
+                      className="toolbar-button press shrink-0"
+                      onClick={() => setFoldersOpen(true)}
+                    >
+                      <FolderTree size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Settings"
+                      className="toolbar-button press shrink-0"
+                      onClick={() => setSettingsOpen(true)}
+                    >
+                      <Settings size={20} />
+                    </button>
+                    <span className="ml-auto flex min-w-0">{archiveSwitch}</span>
+                  </div>
+                </header>
                 {/* Keyed on the scope, so changing whose notes these are re-runs
                     the list's own entrance instead of swapping the rows in
                     place. Nothing is lost by the remount: `handleViewChange`
@@ -6166,16 +5856,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   mobile
                   entries={visible}
                   groups={noteGroups}
-                  view="list"
+                  view="gallery"
                   toolbarActions={collectionActions}
-                  sort={
-                    selectedFolderId === REMARKS
-                      ? undefined
-                      : {
-                          preferences: activeListPreferences,
-                          onChange: handleListPreferencesChange,
-                        }
-                  }
                   filters={activeFilters}
                   meta={activeMeta}
                   showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
@@ -6188,7 +5870,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
-                  remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
                   peerNoteIds={peerNoteIds}
                   peerTypingNoteIds={peerTypingNoteIds}
                   peerColor={presenceColor}
@@ -6206,7 +5887,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
-                  onOutline={openWithOutline}
                   resolveImage={resolveImage}
                 />
               </section>
@@ -6227,7 +5907,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     canEdit={canEdit}
                     lock={selected ? lockFor(selected.note.id) : undefined}
                     startWithComments={selectedFolderId === REMARKS}
-                    startWithOutline={outlineFor === selected?.note.id}
                     proofreaderEnabled={proofreaderEnabled}
                     autocorrectEnabled={autocorrectEnabled}
                     viewingAsPartner={viewAs === "u2"}
@@ -6278,44 +5957,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             )}
           </main>
         </DndContext>
-        {mobileScreen !== "note" && !docMode && !foldersOpen && (
-          <nav className="mobile-tabs" aria-label="Places">
-            {(
-              [
-                ["home", "Home", <Home size={22} key="home" />],
-                ["notes", "Notes", <NotebookText size={22} key="notes" />],
-                ["comments", "Comments", <MessageSquare size={22} key="comments" />],
-              ] as const
-            ).map(([id, label, icon]) => {
-              const current =
-                id === "home"
-                  ? mobileScreen === "home"
-                  : mobileScreen === "collection" &&
-                    (id === "comments") === (selectedFolderId === REMARKS);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className="mobile-tab press"
-                  aria-current={current ? "page" : undefined}
-                  onClick={() => {
-                    if (id === "home") setMobileScreen("home");
-                    else if (id === "comments") handleSelectFolder(REMARKS);
-                    else if (mobileScreen === "collection" && selectedFolderId !== REMARKS)
-                      setFoldersOpen(true);
-                    else handleSelectFolder(selectedFolderId === REMARKS ? ALL : selectedFolderId);
-                  }}
-                >
-                  {icon}
-                  <span>{label}</span>
-                  {id === "comments" && unreadRemarkNotes.size > 0 && (
-                    <i className="mobile-tab-dot" aria-label="Unread comments" />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        )}
         {foldersOpen && (
           <div className="mobile-nav-layer" role="presentation">
             <button
@@ -6415,16 +6056,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   view="list"
                   leading={sidebarToggle}
                   toolbarActions={collectionActions}
-                  /* Comments is ordered by what was said last, so the
-                         sort chips would be buttons that do nothing there. */
-                  sort={
-                    selectedFolderId === REMARKS
-                      ? undefined
-                      : {
-                          preferences: activeListPreferences,
-                          onChange: handleListPreferencesChange,
-                        }
-                  }
                   filters={activeFilters}
                   meta={activeMeta}
                   showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
@@ -6437,7 +6068,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   scopeLabel={scopeTag}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
-                  remarks={selectedFolderId === REMARKS ? remarkRows : undefined}
                   peerNoteIds={peerNoteIds}
                   peerTypingNoteIds={peerTypingNoteIds}
                   peerColor={presenceColor}
@@ -6455,7 +6085,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
-                  onOutline={openWithOutline}
                   resolveImage={resolveImage}
                 />
               </div>
@@ -6470,107 +6099,121 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             </div>
           </div>
 
-          {homeShown ? (
-            <HomePage
-              leading={paneNavigation}
-              entries={ownedEntries}
-              meta={activeMeta}
-              own={viewedMember?.isSelf ?? true}
-              canWrite={canWriteArchive}
-              faces={homeFaces}
-              waiting={homeWaiting}
-              lately={homeLately}
-              onOpenNote={openFromHome}
-              onOpenThread={(noteId, threadId) => {
-                openFromHome(noteId);
-                setOpenThen({ noteId, comments: threadId });
-              }}
-              onNew={() => {
-                handleNew();
-                /* The editor is not mounted until Home gives way to it. */
-                let tries = 0;
-                const focus = () => {
-                  if (titleRef.current) titleRef.current.focus();
-                  else if (tries++ < 40) window.setTimeout(focus, 50);
-                };
-                window.setTimeout(focus, 50);
-              }}
-            />
-          ) : (
-            <Suspense
-              fallback={
-                <div className="soft-pane pane-page flex min-w-0 flex-1 flex-col gap-4 px-10 pt-10">
-                  <div className="measure">
-                    <div className="skeleton h-9 w-2/3" />
-                    <div className="skeleton mt-5 h-2.5 w-40" />
-                  </div>
+          <Suspense
+            fallback={
+              <div className="soft-pane pane-page flex min-w-0 flex-1 flex-col gap-4 px-10 pt-10">
+                <div className="measure">
+                  <div className="skeleton h-9 w-2/3" />
+                  <div className="skeleton mt-5 h-2.5 w-40" />
                 </div>
+              </div>
+            }
+          >
+            <NoteEditor
+              ref={noteEditorRef}
+              key={selected?.note.id ?? "empty"}
+              entry={selected}
+              syncRevision={syncRevision}
+              canEdit={canEdit}
+              lock={selected ? lockFor(selected.note.id) : undefined}
+              startWithComments={selectedFolderId === REMARKS}
+              proofreaderEnabled={proofreaderEnabled}
+              autocorrectEnabled={autocorrectEnabled}
+              viewingAsPartner={viewAs === "u2"}
+              partnerName={partnerName}
+              titleRef={titleRef}
+              onEdited={handleEdited}
+              onNew={handleNew}
+              onImportMarkdown={() => importRef.current?.click()}
+              onUploadImage={handleUploadImage}
+              onUploadFile={handleUploadFile}
+              resolveImage={resolveImage}
+              resolveFile={resolveFile}
+              onUpdatePageProperties={handleUpdatePageProperties}
+              onSetPhoto={handleNotePhoto}
+              collaboration={
+                (collaborative.ready || collaborative.cached) && collaborative.doc
+                  ? {
+                      document: collaborative.doc,
+                      provider: flags.collaborators ? collaborative.provider : null,
+                    }
+                  : null
               }
-            >
-              <NoteEditor
-                ref={noteEditorRef}
-                key={selected?.note.id ?? "empty"}
-                entry={selected}
-                syncRevision={syncRevision}
-                canEdit={canEdit}
-                lock={selected ? lockFor(selected.note.id) : undefined}
-                startWithComments={selectedFolderId === REMARKS}
-                startWithOutline={outlineFor === selected?.note.id}
-                proofreaderEnabled={proofreaderEnabled}
-                autocorrectEnabled={autocorrectEnabled}
-                viewingAsPartner={viewAs === "u2"}
-                partnerName={partnerName}
-                titleRef={titleRef}
-                onEdited={handleEdited}
-                onNew={handleNew}
-                onImportMarkdown={() => importRef.current?.click()}
-                onUploadImage={handleUploadImage}
-                onUploadFile={handleUploadFile}
-                resolveImage={resolveImage}
-                resolveFile={resolveFile}
-                onUpdatePageProperties={handleUpdatePageProperties}
-                onSetPhoto={handleNotePhoto}
-                collaboration={
-                  (collaborative.ready || collaborative.cached) && collaborative.doc
-                    ? {
-                        document: collaborative.doc,
-                        provider: flags.collaborators ? collaborative.provider : null,
-                      }
-                    : null
-                }
-                onContextMenu={
-                  canWriteArchive
-                    ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
-                    : undefined
-                }
-                navigationAction={paneNavigation}
-                headerStatus={noteStatus}
-                /* The faces on the sidebar's shelf say who is here and who is
+              onContextMenu={
+                canWriteArchive
+                  ? (event) => setEditorMenuPoint({ x: event.clientX, y: event.clientY })
+                  : undefined
+              }
+              navigationAction={
+                !listOpen ? (
+                  <>
+                    {/* With the columns away this strip is the only chrome in
+                        the window, so it carries what the columns did: getting
+                        them back, a new note, and finding one — the three acts
+                        nobody should have to reopen a column for. One capsule,
+                        like every group of toolbar items here. */}
+                    <span className="editor-tool-group glass-toolbar flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => changeNavigation(true)}
+                        aria-label="Show the sidebar"
+                        title={"Show the sidebar · ⌘\\"}
+                        className="toolbar-button press"
+                      >
+                        <PanelLeftOpen size={18} />
+                      </button>
+                      {canWriteArchive && (
+                        <button
+                          type="button"
+                          onClick={handleNew}
+                          aria-label="New note"
+                          title="New note · ⌘N"
+                          className="toolbar-button press"
+                        >
+                          <SquarePen size={18} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaletteQuery("");
+                          setPaletteOpen(true);
+                        }}
+                        aria-label="Search notes"
+                        title="Search · ⌘K"
+                        className="toolbar-button press"
+                      >
+                        <Search size={18} />
+                      </button>
+                    </span>
+                  </>
+                ) : null
+              }
+              headerStatus={noteStatus}
+              /* The faces on the sidebar's shelf say who is here and who is
                  writing; the header does not say it a second time. */
-                headerPresence={null}
-                headerActions={noteActions}
-                synced={collaborative.ready}
-                session={session}
-                commentAuthors={commentAuthors}
-                linkable={linkableNotes}
-                mentions={mentions}
-                onOpenNote={handleOpenRecent}
-                onRemarksChanged={refreshRemarks}
-                saidThreads={saidThreads}
-              />
-            </Suspense>
-          )}
+              headerPresence={null}
+              headerActions={noteActions}
+              synced={collaborative.ready}
+              session={session}
+              commentAuthors={commentAuthors}
+              linkable={linkableNotes}
+              mentions={mentions}
+              onOpenNote={handleOpenRecent}
+              onRemarksChanged={refreshRemarks}
+              saidThreads={saidThreads}
+            />
+          </Suspense>
 
           {/* The second note. It closes itself and does nothing else from its
               own header: one note is the one you are working in, and giving
               both a full set of page controls would mean two of everything
               claiming to be the note. */}
-          {splitEntry && !homeShown && (
+          {splitEntry && (
             <>
               <div className="split-seam" />
               <Suspense fallback={<div className="soft-pane pane-page min-w-0 flex-1" />}>
                 <NoteEditor
-                  ref={splitEditorRef}
                   key={`split:${splitEntry.note.id}`}
                   entry={splitEntry}
                   syncRevision={syncRevision}
@@ -6602,39 +6245,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
                   saidThreads={saidThreads}
-                  /* Its own ⋯ with what reading it needs — Find and the
-                         outline, which phase two moved off the strip and
-                         this pane then had no way back to — and its close. */
                   headerActions={
-                    <>
-                      <DotsMenu
-                        items={[
-                          {
-                            kind: "item",
-                            id: "find",
-                            label: "Find in note",
-                            icon: <Search size={16} />,
-                            run: () => splitEditorRef.current?.openFind(),
-                          },
-                          {
-                            kind: "item",
-                            id: "outline",
-                            label: "Outline",
-                            icon: <ListTree size={16} />,
-                            run: () => splitEditorRef.current?.toggleOutline(),
-                          },
-                        ]}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSplitId(null)}
-                        aria-label="Close the second note"
-                        title="Close the second note"
-                        className="toolbar-button press"
-                      >
-                        <X size={16} />
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => setSplitId(null)}
+                      aria-label="Close the second note"
+                      title="Close the second note"
+                      className="toolbar-button press"
+                    >
+                      <X size={16} />
+                    </button>
                   }
                 />
               </Suspense>

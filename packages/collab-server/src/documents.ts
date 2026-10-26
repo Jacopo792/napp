@@ -108,6 +108,10 @@ export async function storeDocument(
   document: Y.Doc,
 ): Promise<void> {
   const projected = projectDocument(document);
+  // Capture both representations before the first await. Another edit can
+  // arrive while the existing row is read; pairing that newer binary with
+  // the older projection would make the editor and archive disagree.
+  const state = Y.encodeStateAsUpdate(document);
   let content = withoutInvisibleDocumentEnding(projected.content);
   /* A difference that is only `null` or empty attributes, or an invisible
      ending, is not an edit: hand the row
@@ -117,7 +121,7 @@ export async function storeDocument(
     content = row.data.content;
   const saved = await service.rpc("save_note_document", {
     target_note_id: noteId,
-    document_state_base64: Buffer.from(Y.encodeStateAsUpdate(document)).toString("base64"),
+    document_state_base64: Buffer.from(state).toString("base64"),
     document_format_version: DOCUMENT_FORMAT_VERSION,
     projected_title: projected.title.trimEnd(),
     projected_body: richTextToPlainText(content),
