@@ -520,6 +520,7 @@ const Row = memo(function Row({
   }, [entry.note.content]);
   const checklist = useMemo(() => checklistProgress(entry.note.content), [entry.note.content]);
   const photoUrl = useStoredImage(entry.note.photo?.objectId ?? null, resolveImage);
+  const list = !mobile && !gallery;
   return (
     <div
       ref={(el) => {
@@ -661,36 +662,40 @@ const Row = memo(function Row({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <p
-          /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
+        {/* The phone's row: title and when on one line, how it begins under it. */}
+        <div className={list ? "note-row-head" : undefined}>
+          <p
+            /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-          className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
-            entry.note.title ? "text-ink" : "text-ink-4 italic"
-          }`}
-          /* One line in the column, and that is the whole of why the list
+            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
+              entry.note.title ? "text-ink" : "text-ink-4 italic"
+            }`}
+            /* One line in the column, and that is the whole of why the list
              reads as a list. A title allowed three lines is three lines of one
              sentence, and the rows below it start wherever that sentence
              happened to end — so the column has no rhythm and you cannot see
              how many notes are under a heading without reading all of them.
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
-          style={{
-            fontWeight: gallery ? 520 : 650,
-            display: "-webkit-box",
-            WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
-          {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
-          {entry.note.title || "Untitled"}
-        </p>
+            style={{
+              fontWeight: gallery ? 520 : 650,
+              display: "-webkit-box",
+              WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
+            {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
+            {entry.note.title || "Untitled"}
+          </p>
+          {list && <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>}
+        </div>
 
         <p className="note-row-summary mt-1 truncate">
-          <span>{formatStamp(entry.note.updatedAt)}</span>
+          {!list && <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>}
           {/* What is left, where the list already says when. A checklist is
               the one kind of note whose state is the reason you open it. */}
           {checklist && (

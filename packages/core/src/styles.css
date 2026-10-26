@@ -3142,7 +3142,7 @@
   line-height: 16px;
 }
 
-.note-row-summary > span:first-child {
+.note-row-summary > .note-row-when {
   flex: 0 0 auto;
   color: var(--ink-2);
   font-weight: var(--weight-medium);
@@ -3440,6 +3440,72 @@
 .note-row-list.is-swiped::after,
 .note-row-list:has(+ .note-row-list.is-swiped)::after {
   opacity: 0;
+}
+
+/* ── The phone's list, on a pointer ─────────────────────────────────────────
+   Each day is a card with its name small and grey inside it, as the phone's
+   groups are; a row is the title with when beside it, and how it begins under
+   it. Flush columns stay — the card is content inside the column. */
+.collection-column:not(.is-gallery) .note-group {
+  margin: 0 8px 10px;
+  padding-bottom: 4px;
+  border-radius: 12px;
+  background: var(--glass);
+}
+
+/* Light, the card is the lighter plane, as the phone's white cards on grey. */
+:root[data-theme="light"] .collection-column:not(.is-gallery) .note-group {
+  background: color-mix(in srgb, white 75%, var(--paper));
+  box-shadow: 0 0 0 1px var(--rule-soft);
+}
+
+.collection-column:not(.is-gallery) .note-group-heading,
+.collection-column:not(.is-gallery) .note-group-heading.is-first {
+  position: static;
+  padding: 12px 14px 4px;
+  background: transparent;
+}
+
+/* Folding stays, but as the phone shows it: no chevron until it is wanted. */
+.collection-column:not(.is-gallery) .note-group-twisty {
+  order: 3;
+  opacity: 0;
+}
+
+.collection-column:not(.is-gallery)
+  .note-group-heading:is(:hover, :focus-visible)
+  .note-group-twisty,
+.collection-column:not(.is-gallery) .note-group-twisty:not(.is-open) {
+  opacity: 1;
+}
+
+.note-group .note-row-list {
+  margin-inline: 4px;
+}
+
+.note-row-list .note-row-summary {
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.note-row-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.note-row-head > p {
+  min-width: 0;
+  flex: 1;
+}
+
+.note-row-head > .note-row-when {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 /* What is left of a checklist, in the line that already says when. */
