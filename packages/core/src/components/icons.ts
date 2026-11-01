@@ -85,6 +85,7 @@ export {
   CornersOut as Maximize2,
   ChatCircle as MessageSquare,
   ChatCircleDots as MessageSquarePlus,
+  ChatsCircle as MessagesSquare,
   CornersIn as Minimize2,
   Minus,
   Monitor,

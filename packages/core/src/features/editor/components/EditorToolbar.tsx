@@ -311,24 +311,6 @@ export function EditorToolbar({
         {linkOpen && linkForm}
       </div>
 
-      {/* ── Ink ── */}
-      <div className="relative">
-        {tab("draw", "Draw", <Pencil size={16} />)}
-        {menu(
-          "draw",
-          "Draw",
-          "left",
-          <>
-            <Row
-              icon={<Pencil size={16} />}
-              label="On the page"
-              onClick={() => run("drawing-page")}
-            />
-            <Row icon={<SquarePen size={16} />} label="On a board" onClick={() => run("drawing")} />
-          </>,
-        )}
-      </div>
-
       {/* ── Lists ── */}
       <div className="relative">
         {tab("lists", "Lists", <ListChecks size={16} />)}
@@ -452,6 +434,24 @@ export function EditorToolbar({
                 onChoosePhoto();
               }}
             />
+          </>,
+        )}
+      </div>
+
+      {/* ── Ink ── */}
+      <div className="relative">
+        {tab("draw", "Draw", <Pencil size={16} />)}
+        {menu(
+          "draw",
+          "Draw",
+          "left",
+          <>
+            <Row
+              icon={<Pencil size={16} />}
+              label="On the page"
+              onClick={() => run("drawing-page")}
+            />
+            <Row icon={<SquarePen size={16} />} label="On a board" onClick={() => run("drawing")} />
           </>,
         )}
       </div>

@@ -13912,6 +13912,15 @@ button.sheet-chip:hover,
   font-size: var(--text-xs);
 }
 
+/* Comments beside the note's tools, in a circle the height of their capsule,
+   as the phone's note bar draws it. */
+.editor-tool-group.is-circle {
+  aspect-ratio: 1;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  padding: 0;
+}
+
 /* ── The list, softened ──────────────────────────────────────────────────────
    The cards read as boxes stacked on boxes: a strong fill, a hairline under
    every row and a heavy selection inside it. A day is now a faint ground the

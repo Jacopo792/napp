@@ -10,6 +10,7 @@ import {
   ListTree,
   MessageSquare,
   MessageSquarePlus,
+  MessagesSquare,
   NotebookPen,
   Search,
   X,
@@ -1705,6 +1706,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       </section>
     );
 
+  /* The phone's note keeps Comments in a circle beside its tools; so does the
+     window's, the same height as the capsule it stands next to. */
+  const commentsButton = session && commentAuthors && (
+    <button
+      type="button"
+      className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
+      aria-label="Comments"
+      aria-pressed={commentsOpen}
+      title="Comments"
+      onClick={() => {
+        if (commentsOpen) {
+          closeComments();
+          return;
+        }
+        setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+        setCommentsOpen(true);
+      }}
+    >
+      {mobile ? <MessageSquare size={16} /> : <MessagesSquare size={17} />}
+    </button>
+  );
+  const commentsCircle = commentsButton && (
+    <span className="editor-tool-group glass-toolbar is-circle flex items-center">
+      {commentsButton}
+    </span>
+  );
+
   return (
     <section
       key={entry.note.id}
@@ -1745,8 +1773,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             save readout, and no width of readout could have avoided it. */}
         {toolbarLayout !== "stacked" &&
           (toolbar ? (
-            <div ref={centreRef} className="justify-self-center">
+            <div ref={centreRef} className="flex items-center gap-2 justify-self-center">
               {toolbar}
+              {!mobile && commentsCircle}
             </div>
           ) : (
             <span />
@@ -1755,7 +1784,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         {/* In a narrow pane the writing controls have a centred row of their
             own, leaving the status and page actions unobstructed. */}
         {toolbarLayout === "stacked" && (
-          <div className="editor-toolbar-compact-tools">{toolbar}</div>
+          <div className="editor-toolbar-compact-tools">
+            {toolbar}
+            {!mobile && commentsCircle}
+          </div>
         )}
 
         <span
@@ -1791,25 +1823,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             >
               <ListTree size={16} />
             </button>
-            {session && commentAuthors && (
-              <button
-                type="button"
-                className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
-                aria-label="Comments"
-                aria-pressed={commentsOpen}
-                title="Comments"
-                onClick={() => {
-                  if (commentsOpen) {
-                    closeComments();
-                    return;
-                  }
-                  setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-                  setCommentsOpen(true);
-                }}
-              >
-                <MessageSquare size={16} />
-              </button>
-            )}
+            {mobile && commentsButton}
             {headerActions}
           </span>
         </span>
