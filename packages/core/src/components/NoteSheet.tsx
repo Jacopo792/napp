@@ -211,7 +211,7 @@ export function NoteSheet({
 
         <div className="sheet-work">
           {people.length > 0 && (
-            <>
+            <section className="sheet-card">
               <h3>Written by</h3>
               <div className="sheet-faces">
                 {people.map((person) => (
@@ -226,73 +226,75 @@ export function NoteSheet({
                   </button>
                 ))}
               </div>
-            </>
+            </section>
           )}
 
-          <h3>
-            History
-            {versions && versions.length > RECENT && (
-              <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
-                All {versions.length}
-              </button>
+          <section className="sheet-card">
+            <h3>
+              History
+              {versions && versions.length > RECENT && (
+                <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
+                  All {versions.length}
+                </button>
+              )}
+            </h3>
+            {failure && (
+              <p role="alert" className="sheet-quiet is-failure">
+                {failure}
+              </p>
             )}
-          </h3>
-          {failure && (
-            <p role="alert" className="sheet-quiet is-failure">
-              {failure}
-            </p>
-          )}
-          {!versions && !failure && <p className="sheet-quiet">Loading…</p>}
-          {versions?.length === 0 && <p className="sheet-quiet">No versions yet.</p>}
-          {versions?.slice(0, RECENT).map((version) => {
-            const restore = version.label?.startsWith("Before restoring");
-            return (
+            {!versions && !failure && <p className="sheet-quiet">Loading…</p>}
+            {versions?.length === 0 && <p className="sheet-quiet">No versions yet.</p>}
+            {versions?.slice(0, RECENT).map((version) => {
+              const restore = version.label?.startsWith("Before restoring");
+              return (
+                <button
+                  key={version.id}
+                  type="button"
+                  className="sheet-row press"
+                  onClick={() => onOpenNote(note.id, { history: version.id })}
+                >
+                  <span className="sheet-row-title">
+                    {version.authorIds.map(nameOf).join(", ") || "Somebody"}
+                  </span>
+                  {version.label && (
+                    <span className="sheet-label">
+                      {restore ? <RotateCcw size={11} /> : <Bookmark size={11} />}
+                      {restore ? "Restored an earlier version" : version.label}
+                    </span>
+                  )}
+                  <span className="sheet-row-meta">
+                    {formatDateTime(version.createdAt)}
+                    {version.wordsAdded !== null && (
+                      <>
+                        {" · "}
+                        <span className="is-added">+{version.wordsAdded}</span>{" "}
+                        <span className="is-removed">−{version.wordsRemoved ?? 0}</span>
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+
+            {note.openRemarks > 0 && (
               <button
-                key={version.id}
                 type="button"
                 className="sheet-row press"
-                onClick={() => onOpenNote(note.id, { history: version.id })}
+                onClick={() => onOpenNote(note.id, { comments: true })}
               >
                 <span className="sheet-row-title">
-                  {version.authorIds.map(nameOf).join(", ") || "Somebody"}
-                </span>
-                {version.label && (
-                  <span className="sheet-label">
-                    {restore ? <RotateCcw size={11} /> : <Bookmark size={11} />}
-                    {restore ? "Restored an earlier version" : version.label}
-                  </span>
-                )}
-                <span className="sheet-row-meta">
-                  {formatDateTime(version.createdAt)}
-                  {version.wordsAdded !== null && (
-                    <>
-                      {" · "}
-                      <span className="is-added">+{version.wordsAdded}</span>{" "}
-                      <span className="is-removed">−{version.wordsRemoved ?? 0}</span>
-                    </>
-                  )}
+                  <MessageSquare size={13} />{" "}
+                  {note.openRemarks === 1
+                    ? "1 conversation waiting"
+                    : `${note.openRemarks} conversations waiting`}
                 </span>
               </button>
-            );
-          })}
-
-          {note.openRemarks > 0 && (
-            <button
-              type="button"
-              className="sheet-row press"
-              onClick={() => onOpenNote(note.id, { comments: true })}
-            >
-              <span className="sheet-row-title">
-                <MessageSquare size={13} />{" "}
-                {note.openRemarks === 1
-                  ? "1 conversation waiting"
-                  : `${note.openRemarks} conversations waiting`}
-              </span>
-            </button>
-          )}
+            )}
+          </section>
 
           {note.linkedFrom.length > 0 && (
-            <>
+            <section className="sheet-card">
               <h3>Linked from</h3>
               {note.linkedFrom.map((link) => (
                 <button
@@ -304,11 +306,11 @@ export function NoteSheet({
                   <span className="sheet-row-title">{link.title || "Untitled"}</span>
                 </button>
               ))}
-            </>
+            </section>
           )}
 
           {note.linksTo.length > 0 && (
-            <>
+            <section className="sheet-card">
               <h3>Links to</h3>
               {note.linksTo.map((link) => (
                 <button
@@ -320,16 +322,18 @@ export function NoteSheet({
                   <span className="sheet-row-title">{link.title || "Untitled"}</span>
                 </button>
               ))}
-            </>
+            </section>
           )}
 
-          <h3>Dates</h3>
-          <dl className="sheet-facts">
-            <dt>Created</dt>
-            <dd>{formatDateTime(note.createdAt)}</dd>
-            <dt>Last edited</dt>
-            <dd>{formatDateTime(note.updatedAt)}</dd>
-          </dl>
+          <section className="sheet-card">
+            <h3>Dates</h3>
+            <dl className="sheet-facts">
+              <dt>Created</dt>
+              <dd>{formatDateTime(note.createdAt)}</dd>
+              <dt>Last edited</dt>
+              <dd>{formatDateTime(note.updatedAt)}</dd>
+            </dl>
+          </section>
           {note.owner?.userId !== session.userId ? (
             <SafetyActions noteId={note.id} userId={note.owner?.userId} />
           ) : null}

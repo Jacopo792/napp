@@ -14224,3 +14224,131 @@ button.sheet-chip:hover,
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* ── Sheets in the phone's shape ──────────────────────────────────────────────
+   The note, person and folder sheets as the phone draws its People sheet: the
+   picture beside a large title, a round close, and every section a soft card
+   with its heading inside, in the same tokens as Settings and Home. */
+.sheet-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 14px;
+  padding: 22px 60px 16px 16px;
+  text-align: left;
+}
+
+.sheet-hero > .sheet-portrait {
+  grid-row: 1 / span 2;
+  margin: 0;
+}
+
+/* The ring stands 5px off a face; the face steps in by as much, so the ring
+   and not the face meets the edge the cards keep. */
+.sheet-hero > .sheet-portrait.is-round {
+  margin-left: 5px;
+}
+
+.sheet-hero > :not(.sheet-portrait) {
+  grid-column: 2;
+}
+
+.sheet-hero > :is(h2) {
+  align-self: end;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.sheet-hero > p {
+  align-self: start;
+}
+
+.sheet-hero > :is(.sheet-chips, .sheet-now) {
+  grid-column: 1 / -1;
+  justify-self: start;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.sheet-note-glyph {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+}
+
+.sheet-note-glyph svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sheet-portrait .avatar.is-large {
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+}
+
+.sheet-close {
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.sheet-stats > *,
+.sheet-card,
+.sheet-day,
+.sheet-work > .safety-actions {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+:root[data-theme="light"]
+  :is(.sheet-stats > *, .sheet-card, .sheet-day, .sheet-work > .safety-actions) {
+  background: color-mix(in srgb, white 70%, transparent);
+}
+
+.sheet-work:has(> .sheet-card, > .sheet-day) {
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.sheet-hero > .sheet-title-field {
+  align-self: end;
+  padding-left: 0;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  text-align: left;
+}
+
+.sheet-card,
+.sheet-day,
+.sheet-work > .safety-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 4px 6px 6px;
+}
+
+.sheet-card > h3,
+.sheet-day > p,
+.sheet-work > .safety-actions > h3 {
+  margin: 0;
+  padding: 8px 8px 4px;
+}
+
+/* A scroll bar standing in the sheet would pull the cards in from the edge
+   the numbers above them keep; a heading between cards starts where the
+   headings inside them do. */
+.sheet-work {
+  scrollbar-width: none;
+}
+
+.sheet-work > h3 {
+  padding: 0 14px;
+}

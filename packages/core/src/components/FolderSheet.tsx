@@ -156,7 +156,7 @@ export function FolderSheet({
 
         <div className="sheet-work">
           {people.length > 0 && (
-            <>
+            <section className="sheet-card">
               <h3>Written by</h3>
               <div className="sheet-faces">
                 {people.map((person) => (
@@ -171,11 +171,11 @@ export function FolderSheet({
                   </button>
                 ))}
               </div>
-            </>
+            </section>
           )}
 
           {folder.remarks.length > 0 && (
-            <>
+            <section className="sheet-card">
               <h3>Open remarks</h3>
               {folder.remarks.map((remark) => (
                 <button
@@ -194,62 +194,66 @@ export function FolderSheet({
                   </span>
                 </button>
               ))}
-            </>
+            </section>
           )}
 
-          <h3>Edited lately</h3>
-          {recent.length === 0 && <p className="sheet-quiet">No notes here yet.</p>}
-          {recent.map((note) => (
-            <button
-              key={note.id}
-              type="button"
-              className="sheet-row press"
-              onClick={() => onOpenNote(note.id)}
-            >
-              <span className="sheet-row-title">{note.title || "Untitled"}</span>
-              <span className="sheet-row-meta">{formatDateTime(note.updatedAt)}</span>
-            </button>
-          ))}
-
-          <h3>Latest versions</h3>
-          {failure && (
-            <p role="alert" className="sheet-quiet is-failure">
-              {failure}
-            </p>
-          )}
-          {!versions && !failure && <p className="sheet-quiet">Loading…</p>}
-          {versions?.length === 0 && <p className="sheet-quiet">No versions yet.</p>}
-          {versions?.slice(0, RECENT).map((version) => {
-            const restore = version.label?.startsWith("Before restoring");
-            return (
+          <section className="sheet-card">
+            <h3>Edited lately</h3>
+            {recent.length === 0 && <p className="sheet-quiet">No notes here yet.</p>}
+            {recent.map((note) => (
               <button
-                key={version.id}
+                key={note.id}
                 type="button"
-                className="sheet-row is-stacked press"
-                onClick={() => onOpenNote(version.noteId, { history: version.id })}
+                className="sheet-row press"
+                onClick={() => onOpenNote(note.id)}
               >
-                <span className="sheet-row-title">{titleOf(version.noteId)}</span>
-                {version.label && (
-                  <span className="sheet-label">
-                    {restore ? <RotateCcw size={11} /> : <Bookmark size={11} />}
-                    {restore ? "Restored an earlier version" : version.label}
-                  </span>
-                )}
-                <span className="sheet-row-meta">
-                  {version.authorIds.map(nameOf).join(", ") || "Somebody"}
-                  {" · "}
-                  {formatDateTime(version.createdAt)}
-                  {version.wordsAdded !== null && (
-                    <>
-                      {" · "}
-                      <span className="is-added">+{version.wordsAdded}</span>{" "}
-                      <span className="is-removed">−{version.wordsRemoved ?? 0}</span>
-                    </>
-                  )}
-                </span>
+                <span className="sheet-row-title">{note.title || "Untitled"}</span>
+                <span className="sheet-row-meta">{formatDateTime(note.updatedAt)}</span>
               </button>
-            );
-          })}
+            ))}
+          </section>
+
+          <section className="sheet-card">
+            <h3>Latest versions</h3>
+            {failure && (
+              <p role="alert" className="sheet-quiet is-failure">
+                {failure}
+              </p>
+            )}
+            {!versions && !failure && <p className="sheet-quiet">Loading…</p>}
+            {versions?.length === 0 && <p className="sheet-quiet">No versions yet.</p>}
+            {versions?.slice(0, RECENT).map((version) => {
+              const restore = version.label?.startsWith("Before restoring");
+              return (
+                <button
+                  key={version.id}
+                  type="button"
+                  className="sheet-row is-stacked press"
+                  onClick={() => onOpenNote(version.noteId, { history: version.id })}
+                >
+                  <span className="sheet-row-title">{titleOf(version.noteId)}</span>
+                  {version.label && (
+                    <span className="sheet-label">
+                      {restore ? <RotateCcw size={11} /> : <Bookmark size={11} />}
+                      {restore ? "Restored an earlier version" : version.label}
+                    </span>
+                  )}
+                  <span className="sheet-row-meta">
+                    {version.authorIds.map(nameOf).join(", ") || "Somebody"}
+                    {" · "}
+                    {formatDateTime(version.createdAt)}
+                    {version.wordsAdded !== null && (
+                      <>
+                        {" · "}
+                        <span className="is-added">+{version.wordsAdded}</span>{" "}
+                        <span className="is-removed">−{version.wordsRemoved ?? 0}</span>
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </section>
         </div>
       </div>
     </Sheet>
