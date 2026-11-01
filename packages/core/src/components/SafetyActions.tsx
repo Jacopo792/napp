@@ -45,9 +45,12 @@ export function SafetyActions({
     }
   };
   return (
-    <section>
+    <section className={`safety-actions ${compact ? "is-compact" : ""}`}>
+      {!compact && <h3>Safety</h3>}
       <details>
-        <summary>Report {commentId ? "comment" : noteId ? "note" : "user"}</summary>
+        <summary className="sheet-row press">
+          Report {commentId ? "comment" : noteId ? "note" : "user"}
+        </summary>
         <form className="account-deletion" onSubmit={(event) => void report(event)}>
           <label>
             Reason
@@ -84,6 +87,7 @@ export function SafetyActions({
       {userId && !compact ? (
         <button
           type="button"
+          className="sheet-row press is-danger"
           disabled={busy}
           onClick={() => {
             if (!window.confirm(BLOCK_CONSEQUENCES)) return;
@@ -104,9 +108,9 @@ export function SafetyActions({
       {status ? <p role="status">{status}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {!compact ? (
-        <p>
-          <a href={`mailto:${NAPP_SUPPORT_EMAIL}`}>Contact support</a>
-        </p>
+        <a className="sheet-row press" href={`mailto:${NAPP_SUPPORT_EMAIL}`}>
+          Contact support
+        </a>
       ) : null}
     </section>
   );

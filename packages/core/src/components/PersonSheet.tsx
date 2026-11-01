@@ -174,7 +174,6 @@ export function PersonSheet({
           )}
           {!work && !failure && <p className="sheet-quiet">Loading…</p>}
           {work?.length === 0 && <p className="sheet-quiet">Nothing written yet.</p>}
-          {!isSelf ? <SafetyActions userId={userId} /> : null}
           {days.map((day) => (
             <section key={day.label} className="sheet-day">
               <p>{day.label}</p>
@@ -208,6 +207,7 @@ export function PersonSheet({
               })}
             </section>
           ))}
+          {!isSelf ? <SafetyActions userId={userId} /> : null}
         </div>
       </div>
     </Sheet>

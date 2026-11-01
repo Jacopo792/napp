@@ -323,9 +323,6 @@ export function NoteSheet({
             </>
           )}
 
-          {note.owner?.userId !== session.userId ? (
-            <SafetyActions noteId={note.id} userId={note.owner?.userId} />
-          ) : null}
           <h3>Dates</h3>
           <dl className="sheet-facts">
             <dt>Created</dt>
@@ -333,6 +330,9 @@ export function NoteSheet({
             <dt>Last edited</dt>
             <dd>{formatDateTime(note.updatedAt)}</dd>
           </dl>
+          {note.owner?.userId !== session.userId ? (
+            <SafetyActions noteId={note.id} userId={note.owner?.userId} />
+          ) : null}
         </div>
       </div>
     </Sheet>

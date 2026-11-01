@@ -13821,3 +13821,96 @@ button.sheet-chip:hover,
   bottom: 0;
   box-shadow: none;
 }
+
+/* Report, Block and Contact support are rows of the sheet they stand in, at
+   its foot under their own heading — not browser defaults in the middle of
+   someone's recent work. */
+.safety-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 10px;
+}
+
+.safety-actions > h3 {
+  margin-bottom: 2px;
+}
+
+.safety-actions summary {
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+.safety-actions summary::-webkit-details-marker {
+  display: none;
+}
+
+.safety-actions .sheet-row {
+  width: 100%;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.safety-actions .sheet-row.is-danger {
+  color: var(--danger);
+}
+
+.safety-actions .account-deletion {
+  gap: 10px;
+  padding: 6px 8px 12px;
+  font-size: var(--text-sm);
+}
+
+.safety-actions .account-deletion label {
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.safety-actions .account-deletion :is(select, textarea) {
+  border-color: var(--rule);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.safety-actions .account-deletion textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.safety-actions .account-deletion p {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.safety-actions .account-deletion button {
+  justify-self: start;
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: var(--text-sm);
+}
+
+.safety-actions > [role="status"],
+.safety-actions > [role="alert"] {
+  padding: 4px 8px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.safety-actions > [role="alert"] {
+  color: var(--danger);
+}
+
+.safety-actions.is-compact {
+  margin-top: 0;
+}
+
+.safety-actions.is-compact summary {
+  padding: 2px 0;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
