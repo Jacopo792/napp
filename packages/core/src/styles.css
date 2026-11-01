@@ -13911,3 +13911,59 @@ button.sheet-chip:hover,
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
+
+/* ── The list, softened ──────────────────────────────────────────────────────
+   The cards read as boxes stacked on boxes: a strong fill, a hairline under
+   every row and a heavy selection inside it. A day is now a faint ground the
+   rows rest on, rows are parted by air rather than rules, titles sit a step
+   lighter and the selection is a quiet wash. */
+.collection-column:not(.is-gallery) .note-group {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--glass) 55%, transparent);
+  padding: 2px 0 6px;
+}
+
+:root[data-theme="light"] .collection-column:not(.is-gallery) .note-group {
+  background: color-mix(in srgb, white 55%, var(--paper));
+  box-shadow: none;
+}
+
+.note-group .note-row-list::after {
+  display: none;
+}
+
+.note-group .note-row-list {
+  margin-block: 1px;
+  border-radius: 10px;
+}
+
+.note-group .note-row-list.is-selected {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.collection-column:not(.is-gallery) .note-group-heading h3 {
+  color: var(--ink-4);
+  font-weight: var(--weight-medium);
+}
+
+.collection-column:not(.is-gallery) .note-group-heading span {
+  opacity: 0.7;
+}
+
+.note-group .note-row-folder {
+  opacity: 0.8;
+}
+
+/* The sidebar's cards take the same quieter ground, so the two columns are
+   still one material. */
+.sidebar-card,
+:root:root .sidebar-column .sidebar-footer {
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--glass) 55%, transparent);
+}
+
+:root[data-theme="light"] .sidebar-card,
+:root[data-theme="light"]:root .sidebar-column .sidebar-footer {
+  background: color-mix(in srgb, white 55%, var(--paper));
+  box-shadow: none;
+}

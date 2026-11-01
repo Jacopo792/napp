@@ -680,7 +680,7 @@ const Row = memo(function Row({
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
             style={{
-              fontWeight: gallery ? 520 : 650,
+              fontWeight: gallery ? 520 : mobile ? 650 : 600,
               display: "-webkit-box",
               WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
               WebkitBoxOrient: "vertical",
