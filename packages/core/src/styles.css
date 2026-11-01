@@ -13750,6 +13750,25 @@ button.sheet-chip:hover,
   margin-bottom: 0;
 }
 
+/* The account rows are one more card, on the same edge as the others: no
+   band of their own across the foot of the column. */
+:root:root .sidebar-column .sidebar-footer {
+  margin: 10px 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 0;
+  border-radius: 12px;
+  background: var(--glass);
+  padding: 4px;
+}
+
+:root[data-theme="light"]:root .sidebar-column .sidebar-footer {
+  background: color-mix(in srgb, white 75%, var(--paper));
+  box-shadow: 0 0 0 1px var(--rule-soft);
+}
+
+.sidebar-tail {
+  padding-bottom: 0;
+}
+
 .sidebar-card .sidebar-heading {
   margin-top: 0;
   padding-top: 6px;
@@ -13798,28 +13817,6 @@ button.sheet-chip:hover,
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.01em;
-}
-
-/* No faces: the toolbar owns the photo, as on the phone. The green dot that
-   says someone is here stays, beside the name. */
-.sidebar-scroll .people-face-portrait {
-  order: 2;
-  width: 8px;
-  height: 8px;
-}
-
-.sidebar-scroll .people-face-portrait .avatar {
-  display: none;
-}
-
-.sidebar-scroll .people-face-portrait:not(:has(.people-face-here)) {
-  display: none;
-}
-
-.sidebar-scroll .people-face-here {
-  right: 0;
-  bottom: 0;
-  box-shadow: none;
 }
 
 /* Report, Block and Contact support are rows of the sheet they stand in, at
