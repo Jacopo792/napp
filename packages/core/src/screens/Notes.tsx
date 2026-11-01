@@ -1296,11 +1296,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         })
         .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
         .slice(0, 8)
-        .map((entry) => ({
-          entry,
-          who:
-            members.find((member) => member.userId === entry.note.ownerId)?.nickname ?? "Somebody",
-        })),
+        .map((entry) => {
+          const owner = members.find((member) => member.userId === entry.note.ownerId);
+          return { entry, who: owner?.isSelf ? "you" : (owner?.nickname ?? "Somebody") };
+        }),
     [entries, viewAs, metas, members],
   );
 
