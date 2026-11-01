@@ -133,12 +133,6 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
-  /* One step past the spring, for the one gesture the hand is still holding
-     when the animation starts: a row let go of should arrive with some weight
-     in it, and overshoot far enough to be seen doing it. Nothing that tracks a
-     pointer may use this — an overshoot under the finger reads as the list
-     twitching. */
-  --ease-bounce: cubic-bezier(0.2, 1.7, 0.5, 1);
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
 
   --dur-press: 90ms;
@@ -3277,15 +3271,16 @@
 }
 
 /* Two motions on one row, on two properties with two curves. `transform` is
-   the swipe letting go, which wants the spring: a card thrown at the edge
-   comes back with some weight in it. The wash is the pointer, and it is
+   the swipe letting go, on the slide curve: the row arrives where it rests and
+   stops there. An overshooting curve made every release bounce past the
+   buttons and back, which read as the row refusing to stay put. The wash is the pointer, and it is
    uneven on purpose — it arrives at once and leaves slowly, as a list on the
    Mac does, so a pointer drawn down the column leaves a short fading trail
    instead of a row flicking on and off under it. */
 .note-row-list {
   --row-wash: 240ms;
   transition:
-    transform var(--dur-swipe) var(--ease-bounce),
+    transform var(--dur-swipe) var(--ease),
     background-color var(--row-wash) var(--ease);
 }
 

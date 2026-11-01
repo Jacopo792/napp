@@ -88,7 +88,7 @@ const OPEN = 92;
 const MAX = OPEN + 56;
 /* The clamp is not tidiness. A trackpad keeps sending decaying momentum
    after the fingers have lifted, so an unclamped flick travels half the
-   column; clamped it arrives at the give and springs back to open. */
+   column; clamped it arrives at the give and slides back to open. */
 const clamp = (value: number) => Math.max(-MAX, Math.min(MAX, value));
 
 export interface ActiveFilter {
@@ -569,11 +569,11 @@ const Row = memo(function Row({
         transform: slid === 0 ? "" : `translateX(${slid}px)`,
         /* A hand on the row takes the curves off, so it follows the finger
            frame for frame. A pointer list's own curves are in the stylesheet
-           (`.note-row-list`); the phone's rows keep the swipe's spring here. */
+           (`.note-row-list`); the phone's rows carry the same curve here. */
         transition: dragging
           ? "none"
           : mobile || gallery
-            ? "transform var(--dur-swipe) var(--ease-bounce), background-color var(--dur-fast) var(--ease)"
+            ? "transform var(--dur-swipe) var(--ease), background-color var(--dur-fast) var(--ease)"
             : undefined,
       }}
       className={`note-row group relative cursor-pointer ${slid !== 0 ? "is-swiped" : ""} ${gallery ? "note-gallery-item flex flex-col" : "flex gap-3"} ${
