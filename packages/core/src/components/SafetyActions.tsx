@@ -135,44 +135,48 @@ export function BlockedAccounts() {
     };
   }, [attempt]);
   return (
-    <section>
+    <>
       <h3>Blocked accounts</h3>
-      {error ? (
-        <p role="alert">
-          {error}{" "}
-          <button
-            onClick={() => {
-              setError("");
-              setAttempt((n) => n + 1);
-            }}
-          >
-            Try again
-          </button>
-        </p>
-      ) : !users.length ? (
-        <p>No blocked accounts.</p>
-      ) : null}
-      {users.map((user) => (
-        <div key={user.blocked_id} className="appearance-row">
-          <span>{user.blocked_name || "Member"}</span>
-          <button
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              setError("");
-              void unblockUser(user.blocked_id)
-                .then(() => {
-                  setAttempt((n) => n + 1);
-                  changed();
-                })
-                .catch((reason: Error) => setError(reason.message))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Unblock
-          </button>
-        </div>
-      ))}
-    </section>
+      <div className="appearance-controls">
+        {error ? (
+          <p role="alert" className="appearance-row">
+            <span className="flex-1">{error}</span>
+            <button
+              className="settings-row-button"
+              onClick={() => {
+                setError("");
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </button>
+          </p>
+        ) : !users.length ? (
+          <p className="appearance-row text-ink-4">No blocked accounts</p>
+        ) : null}
+        {users.map((user) => (
+          <div key={user.blocked_id} className="appearance-row">
+            <span className="flex-1">{user.blocked_name || "Member"}</span>
+            <button
+              className="settings-row-button"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setError("");
+                void unblockUser(user.blocked_id)
+                  .then(() => {
+                    setAttempt((n) => n + 1);
+                    changed();
+                  })
+                  .catch((reason: Error) => setError(reason.message))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Unblock
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

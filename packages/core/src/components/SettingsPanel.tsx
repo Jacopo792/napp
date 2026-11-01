@@ -843,11 +843,15 @@ export function SettingsPanel({
                   )}
                   <BlockedAccounts />
                   <h3>Delete account</h3>
-                  <PolicyLinks />
-                  <details>
-                    <summary>Delete account permanently</summary>
-                    <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
-                  </details>
+                  <div className="appearance-controls">
+                    <div className="appearance-row">
+                      <PolicyLinks />
+                    </div>
+                    <details className="settings-disclosure">
+                      <summary className="appearance-row">Delete account permanently</summary>
+                      <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
+                    </details>
+                  </div>
                 </section>
               )}
 

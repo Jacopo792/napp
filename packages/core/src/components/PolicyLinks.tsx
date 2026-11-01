@@ -2,10 +2,7 @@ import { policyUrl } from "@/lib/storePolicies";
 
 export function PolicyLinks() {
   return (
-    <nav
-      aria-label="Napp policies and support"
-      style={{ display: "flex", flexWrap: "wrap", gap: 16, fontSize: 13 }}
-    >
+    <nav aria-label="Napp policies and support" className="policy-links">
       <a href={policyUrl("privacy")} target="_blank" rel="noopener noreferrer">
         Privacy
       </a>
