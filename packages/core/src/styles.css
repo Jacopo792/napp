@@ -13728,3 +13728,96 @@ button.sheet-chip:hover,
   border-radius: inherit;
   background: color-mix(in srgb, var(--ink) 14%, var(--paper));
 }
+
+/* ── The phone's navigation, in the sidebar ─────────────────────────────────
+   Places sit in cards, as the phone's grouped pages do, with a heading small
+   and grey inside its card. Whose notes is the phone's notebook titles: names
+   that brighten when chosen, and one line gliding under the one you are in.
+   Scoped to the sidebar: the Book's title bar keeps its own switch. */
+.sidebar-card {
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: var(--glass);
+  padding: 4px;
+}
+
+:root[data-theme="light"] .sidebar-card {
+  background: color-mix(in srgb, white 75%, var(--paper));
+  box-shadow: 0 0 0 1px var(--rule-soft);
+}
+
+.sidebar-tail .sidebar-card {
+  margin-bottom: 0;
+}
+
+.sidebar-card .sidebar-heading {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+.sidebar-card > .sidebar-row + .sidebar-heading {
+  margin-top: 8px;
+}
+
+.sidebar-scroll .people-shelf {
+  margin-bottom: 12px;
+  border-radius: 0;
+  background: var(--paper);
+  padding: 0 0 2px;
+}
+
+:root:is(.has-wallpaper, .has-translucent-sidebar) .sidebar-scroll .people-shelf {
+  background: transparent;
+}
+
+.sidebar-scroll .people-thumb {
+  top: auto;
+  bottom: 0;
+  left: 14px;
+  width: calc(100% / var(--count, 2) - 28px);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: none;
+  transform: translateX(calc(var(--index, 0) * (100% + 28px)));
+}
+
+.sidebar-scroll .people-face {
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px 9px;
+  color: var(--ink-4);
+}
+
+.sidebar-scroll .people-face.is-active,
+.sidebar-scroll .people-face:hover {
+  color: var(--ink);
+}
+
+.sidebar-scroll .people-face-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* No faces: the toolbar owns the photo, as on the phone. The green dot that
+   says someone is here stays, beside the name. */
+.sidebar-scroll .people-face-portrait {
+  order: 2;
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar-scroll .people-face-portrait .avatar {
+  display: none;
+}
+
+.sidebar-scroll .people-face-portrait:not(:has(.people-face-here)) {
+  display: none;
+}
+
+.sidebar-scroll .people-face-here {
+  right: 0;
+  bottom: 0;
+  box-shadow: none;
+}
