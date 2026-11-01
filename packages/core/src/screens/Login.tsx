@@ -41,13 +41,13 @@ type Mode = "sign-in" | "sign-up";
    turn confirmations back on and it is correct again. */
 const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": {
-    title: "Sign in",
-    lede: "Welcome back.",
+    title: "Welcome back.",
+    lede: "Sign in to your notes.",
     action: "Sign in",
   },
   "sign-up": {
-    title: "Create account",
-    lede: "Your archive is made with it.",
+    title: "Start an archive.",
+    lede: "Your notes, shared with whom you choose.",
     action: "Create account",
   },
 };
@@ -250,30 +250,6 @@ export default function Login() {
 
   return (
     <LoginFrame>
-      {/* Which of the two you are doing is decided before anything is typed,
-          and the whole card answers to it — heading, explanation, button and
-          footnote — so creating an account is never the sign-in page wearing
-          a different word. */}
-      <div className="login-tabs" role="group" aria-label="Sign in or create an account">
-        <button
-          type="button"
-          aria-pressed={mode === "sign-in"}
-          className={mode === "sign-in" ? "is-active" : ""}
-          onClick={() => switchMode("sign-in")}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "sign-up"}
-          className={mode === "sign-up" ? "is-active" : ""}
-          onClick={() => switchMode("sign-up")}
-        >
-          Create account
-        </button>
-        <span className="login-tabs-marker" data-mode={mode} />
-      </div>
-
       <h1 className="login-title">{copy.title}</h1>
       <p className="login-lede">{copy.lede}</p>
 
@@ -286,99 +262,127 @@ export default function Login() {
         </p>
       )}
 
-      <form
-        className="login-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void handleSubmit();
-        }}
-      >
-        {/* Ruled fields, not boxes. Two outlined rectangles on a plane inside a
-            plane is three frames deep before a single character is typed. */}
-        <div className="login-field">
-          <label className="label" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            autoFocus
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="login-input"
-          />
-        </div>
-
-        <div className="login-field login-secret">
-          <label className="label" htmlFor="password">
-            Password
-            {mode === "sign-up" && <span className="login-hint">8 characters or more</span>}
-          </label>
-          <input
-            id="password"
-            type={revealed ? "text" : "password"}
-            autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="login-input"
-          />
+      {/* The phone's shape: the title stands on the ground, and the choice,
+          the fields and the button are one card under it. */}
+      <div className="login-panel">
+        {/* Which of the two you are doing is decided before anything is typed,
+          and the whole card answers to it — heading, explanation, button and
+          footnote — so creating an account is never the sign-in page wearing
+          a different word. */}
+        <div className="login-tabs" role="group" aria-label="Sign in or create an account">
           <button
             type="button"
-            className="login-reveal"
-            aria-label={revealed ? "Hide password" : "Show password"}
-            aria-pressed={revealed}
-            onClick={() => setRevealed((current) => !current)}
+            aria-pressed={mode === "sign-in"}
+            className={mode === "sign-in" ? "is-active" : ""}
+            onClick={() => switchMode("sign-in")}
           >
-            {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+            Sign in
           </button>
+          <button
+            type="button"
+            aria-pressed={mode === "sign-up"}
+            className={mode === "sign-up" ? "is-active" : ""}
+            onClick={() => switchMode("sign-up")}
+          >
+            Create account
+          </button>
+          <span className="login-tabs-marker" data-mode={mode} />
         </div>
 
-        {mode === "sign-up" ? (
-          <label
-            className="login-note"
-            style={{ display: "flex", gap: 10, alignItems: "flex-start" }}
-          >
-            <input
-              type="checkbox"
-              checked={policiesAccepted}
-              onChange={(event) => setPoliciesAccepted(event.target.checked)}
-              disabled={loading}
-            />
-            I agree to the Terms of Use and have read the Privacy Policy.
-          </label>
-        ) : null}
-        {mode === "sign-in" ? (
-          <a
-            href={passwordRecoveryUrl()}
-            className="login-note"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Forgot password?
-          </a>
-        ) : null}
-        <PolicyLinks />
-        <button
-          type="submit"
-          disabled={
-            loading || !email.trim() || !password || (mode === "sign-up" && !policiesAccepted)
-          }
-          className="login-submit label"
+        <form
+          className="login-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
         >
-          {loading ? (
-            mode === "sign-up" ? (
-              "Creating…"
+          {/* Ruled fields, not boxes. Two outlined rectangles on a plane inside a
+            plane is three frames deep before a single character is typed. */}
+          <div className="login-field">
+            <label className="label" htmlFor="email">
+              Email
+            </label>
+            <input
+              id="email"
+              autoFocus
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="login-input"
+            />
+          </div>
+
+          <div className="login-field login-secret">
+            <label className="label" htmlFor="password">
+              Password
+              {mode === "sign-up" && <span className="login-hint">8 characters or more</span>}
+            </label>
+            <input
+              id="password"
+              type={revealed ? "text" : "password"}
+              autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="login-input"
+            />
+            <button
+              type="button"
+              className="login-reveal"
+              aria-label={revealed ? "Hide password" : "Show password"}
+              aria-pressed={revealed}
+              onClick={() => setRevealed((current) => !current)}
+            >
+              {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {mode === "sign-up" ? (
+            <label
+              className="login-note"
+              style={{ display: "flex", gap: 10, alignItems: "flex-start" }}
+            >
+              <input
+                type="checkbox"
+                checked={policiesAccepted}
+                onChange={(event) => setPoliciesAccepted(event.target.checked)}
+                disabled={loading}
+              />
+              I agree to the Terms of Use and have read the Privacy Policy.
+            </label>
+          ) : null}
+          {mode === "sign-in" ? (
+            <a
+              href={passwordRecoveryUrl()}
+              className="login-note"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Forgot password?
+            </a>
+          ) : null}
+          <PolicyLinks />
+          <button
+            type="submit"
+            disabled={
+              loading || !email.trim() || !password || (mode === "sign-up" && !policiesAccepted)
+            }
+            className="login-submit label"
+          >
+            {loading ? (
+              mode === "sign-up" ? (
+                "Creating…"
+              ) : (
+                "Opening…"
+              )
             ) : (
-              "Opening…"
-            )
-          ) : (
-            <>
-              {copy.action} <ArrowRight size={16} />
-            </>
-          )}
-        </button>
-      </form>
+              <>
+                {copy.action} <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+      </div>
 
       {error && (
         <p role="alert" className="readout login-error">

@@ -1711,22 +1711,38 @@
   }
 }
 
+/* The phone's card: the choice, the fields and the button stand together on
+   the same soft ground as Settings' cards, with no outline. */
+.login-panel {
+  margin-top: 1.75rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 14px;
+}
+
+:root[data-theme="light"] .login-panel {
+  background: color-mix(in srgb, white 70%, transparent);
+}
+
 /* Which of the two things you are doing is a choice, so it is a control at the
-   top of the card rather than a link under it. The rule under the pair carries
-   a marker that travels, so the two modes read as two pages of one card. */
+   top of the card rather than a link under it: the phone's switch, a plate
+   that slides between the two words. */
 .login-tabs {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--rule);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 4px;
 }
 
 .login-tabs button {
-  padding: 0 2px 12px;
-  color: var(--ink-4);
+  position: relative;
+  z-index: 1;
+  height: 36px;
+  color: var(--ink-3);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  text-align: left;
   transition: color var(--dur-fast) var(--ease-out);
 }
 
@@ -1736,17 +1752,22 @@
 
 .login-tabs button.is-active {
   color: var(--ink);
-  font-weight: var(--weight-semibold);
 }
 
 .login-tabs-marker {
   position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 50%;
-  height: 1px;
-  background: var(--accent);
-  transition: transform var(--dur-base) var(--ease-out);
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+:root[data-theme="light"] .login-tabs-marker {
+  background: white;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.12);
 }
 
 .login-tabs-marker[data-mode="sign-up"] {
@@ -1754,20 +1775,23 @@
 }
 
 .login-title {
-  margin-top: 1.6rem;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: 2.5rem;
   font-weight: var(--weight-bold);
   line-height: 1.12;
   letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 
+.login-mark + .login-title {
+  margin-top: 1.6rem;
+}
+
 .login-lede {
   margin-top: 0.55rem;
   color: var(--ink-3);
-  font-size: 0.875rem;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
@@ -1785,7 +1809,7 @@
 }
 
 .login-form {
-  margin-top: 1.75rem;
+  margin-top: 1rem;
   display: grid;
   gap: 1rem;
 }
@@ -1811,9 +1835,9 @@
 .login-input {
   width: 100%;
   height: 44px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   padding: 0 0.85rem;
   color: var(--ink);
   font-size: 0.95rem;
@@ -1824,12 +1848,11 @@
 }
 
 .login-input:hover {
-  border-color: var(--ink-4);
+  border-color: var(--rule);
 }
 
 .login-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--ink-4);
 }
 
 .login-secret .login-input {
@@ -1870,23 +1893,21 @@
   justify-content: center;
   gap: 0.5rem;
   margin-top: 0.75rem;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  padding: 0.8rem 1rem;
-  color: var(--on-accent);
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  height: 48px;
+  color: var(--paper);
   font-size: var(--text-sm);
   letter-spacing: 0;
   text-transform: none;
   transition:
-    background-color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
     transform var(--dur-press) var(--ease-press);
 }
 
 .login-submit:hover:not(:disabled) {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
+  opacity: 0.88;
 }
 
 .login-submit:active:not(:disabled) {
