@@ -45,6 +45,43 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.47",
+    date: "2026-11-01",
+    headline: "The desktop in the phone's shape",
+    sections: [
+      {
+        heading: "One design across your devices",
+        items: [
+          {
+            title: "Lists, sidebar and settings as soft cards",
+            text: "The note list, the sidebar, Settings and the note, person and folder sheets take the phone's cards and large titles. Archive and Recently Deleted use the phone's words.",
+          },
+          {
+            title: "Home shows what is happening",
+            text: "With no note open, the window shows notes to continue, remarks to read and what the other person has written.",
+          },
+          {
+            title: "A calmer sign-in",
+            text: "Sign in and Create account are a single card with the phone's switch.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Swiped rows stay put",
+            text: "A row pushed sideways now settles on its buttons instead of bouncing past them.",
+          },
+          {
+            title: "Opening a note is not an edit",
+            text: "Opening a note no longer changes its modification time.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.46",
     date: "2026-10-25",
     headline: "Your notes, with clearer control",

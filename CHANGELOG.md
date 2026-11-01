@@ -3,6 +3,22 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.47 – 2026-11-01
+
+### Changed
+
+- Web and desktop take the phone's design: note list, sidebar, Settings, note/person/folder
+  sheets and the note bar use soft cards and large titles; Archive and Recently Deleted
+  use the phone's words.
+- Home in the empty pane shows notes to continue, remarks to read and the other member's
+  recent notes.
+- Sign-in: the phone's title, sliding switch and a single soft card; no blue accent.
+
+### Fixed
+
+- Swiped rows settle on their buttons instead of overshooting.
+- Opening a note no longer counts as an edit or changes its modification time.
+
 ## 0.9.46 – 2026-10-25
 
 ### Added
