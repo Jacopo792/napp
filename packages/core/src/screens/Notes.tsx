@@ -1663,7 +1663,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         : selectedFolderId === REMARKS
           ? "Remarks"
           : selectedFolderId === TRASH
-            ? "Trash"
+            ? "Recently Deleted"
             : selectedFolderId === ARCHIVE
               ? "Archive"
               : (activeMeta.folders.find((f) => f.id === selectedFolderId)?.name ?? "Folder");
@@ -3948,7 +3948,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         unread: unreadRemarkCount,
       },
       { id: ARCHIVE, label: "Archive", count: archived },
-      { id: TRASH, label: "Trash", count: trash },
+      { id: TRASH, label: "Recently Deleted", count: trash },
     ];
   })();
   /* The notes in a folder named Templates or Modelli, in this scope. */

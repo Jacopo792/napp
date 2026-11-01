@@ -805,8 +805,8 @@ const Row = memo(function Row({
           )}
           {archiveMode && (
             <button
-              aria-label={`Move ${entry.note.title || "Untitled"} out of Archive`}
-              title="Move out of Archive"
+              aria-label={`Put ${entry.note.title || "Untitled"} back`}
+              title="Put back"
               onClick={(event) => {
                 event.stopPropagation();
                 onArchiveChange(entry, false);
@@ -825,16 +825,16 @@ const Row = memo(function Row({
                   ? `Confirm permanent deletion of ${entry.note.title || "Untitled"}`
                   : trashMode
                     ? `Delete ${entry.note.title || "Untitled"} forever`
-                    : `Move ${entry.note.title || "Untitled"} to Trash`
+                    : `Delete ${entry.note.title || "Untitled"}`
               }
               title={
                 confirmDelete
                   ? trashMode
                     ? "Click again to permanently delete"
-                    : "Click again to move to Trash"
+                    : "Click again to delete"
                   : trashMode
                     ? `Delete "${entry.note.title || "Untitled"}" forever`
-                    : `Move "${entry.note.title || "Untitled"}" to Trash`
+                    : `Delete "${entry.note.title || "Untitled"}"`
               }
               onClick={(e) => {
                 e.stopPropagation();
@@ -851,7 +851,7 @@ const Row = memo(function Row({
               }`}
             >
               {confirmDelete ? (
-                <span className="label text-[10px]">{trashMode ? "Forever?" : "Trash?"}</span>
+                <span className="label text-[10px]">{trashMode ? "Forever?" : "Delete?"}</span>
               ) : (
                 <Trash2 size={16} />
               )}
@@ -878,7 +878,7 @@ const Row = memo(function Row({
  *  already at the top of it, so "deleted" need not be said twice. */
 function noteTally(count: number, trash = false): string {
   const notes = `${count} ${count === 1 ? "note" : "notes"}`;
-  return trash && count > 0 ? `${notes} · erased after 30 days` : notes;
+  return trash && count > 0 ? `${notes} · kept 30 days` : notes;
 }
 
 function Skeletons() {
@@ -1083,7 +1083,7 @@ export function NoteList({
         {
           kind: "item",
           id: "unarchive",
-          label: "Move out of Archive",
+          label: "Put back",
           icon: <ArchiveRestore size={16} />,
           run: () => onArchiveChange(entry, false),
         },
@@ -1091,7 +1091,7 @@ export function NoteList({
         {
           kind: "item",
           id: "trash",
-          label: "Move to Trash",
+          label: "Delete",
           icon: <Trash2 size={16} />,
           danger: true,
           run: () => onMoveToTrash(entry),
@@ -1152,7 +1152,7 @@ export function NoteList({
       {
         kind: "item",
         id: "trash",
-        label: "Move to Trash",
+        label: "Delete",
         icon: <Trash2 size={16} />,
         danger: true,
         run: () => onMoveToTrash(entry),
@@ -1338,7 +1338,7 @@ export function NoteList({
             ) : entries.length === 0 ? (
               <div className="empty-state">
                 <p>{hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}</p>
-                {(hasQuery || (!trashMode && canWrite)) && (
+                {(hasQuery || (!trashMode && !archiveMode && canWrite)) && (
                   <button onClick={() => (hasQuery ? onQueryChange("") : onNew())}>
                     {hasQuery ? "Clear search" : "Write the first note"}
                   </button>
@@ -1350,7 +1350,7 @@ export function NoteList({
           </div>
         </div>
 
-        {canWrite && !trashMode && (
+        {canWrite && !trashMode && !archiveMode && (
           <button
             type="button"
             onClick={onNew}
@@ -1394,7 +1394,7 @@ export function NoteList({
             into the search field where it covered the text being typed. */}
         <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
           {toolbarActions}
-          {canWrite && !trashMode && (
+          {canWrite && !trashMode && !archiveMode && (
             <button
               onClick={onNew}
               disabled={busy || loading}
@@ -1466,7 +1466,7 @@ export function NoteList({
              this app keeps for counts and states, not for talking. */
           <div className="empty-state">
             <p>{hasQuery ? `Nothing matches “${query.trim()}”` : `${folderLabel} is empty`}</p>
-            {(hasQuery || (!trashMode && canWrite)) && (
+            {(hasQuery || (!trashMode && !archiveMode && canWrite)) && (
               <button onClick={() => (hasQuery ? onQueryChange("") : onNew())}>
                 {hasQuery ? "Clear search" : "Write the first note"}
               </button>
