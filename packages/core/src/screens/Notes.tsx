@@ -1,3 +1,4 @@
+import { HomePage } from "@/components/HomePage";
 import { readableMedia } from "@/lib/mediaTextShape";
 import { loadMediaText, saveMediaText, subscribeMediaText } from "@/lib/mediaText";
 import type { JSONContent } from "@tiptap/core";
@@ -1264,6 +1265,43 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const unreadRemarkCount = useMemo(
     () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
     [archiveComments, selfId, remarksSeen],
+  );
+  /** The same remarks as Home lists them: newest first, named and titled. */
+  const homeRemarks = useMemo(() => {
+    if (!selfId) return [];
+    const titles = new Map(entries.map((entry) => [entry.note.id, entry.note.title]));
+    return unreadRemarks(archiveComments, selfId, remarksSeen)
+      .filter((remark) => titles.has(remark.noteId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((remark) => ({
+        id: remark.id,
+        noteId: remark.noteId,
+        noteTitle: titles.get(remark.noteId) ?? "",
+        author: members.find((member) => member.userId === remark.authorId)?.nickname ?? "Somebody",
+        body: remark.body,
+        createdAt: remark.createdAt,
+      }));
+  }, [archiveComments, selfId, remarksSeen, entries, members]);
+  /** The other members' latest notes, for Home: what the list beside it,
+   *  showing one person's notes, cannot. */
+  const othersLatest = useMemo(
+    () =>
+      entries
+        .filter((entry) => {
+          const owner = entry.note.ownerId;
+          if (!owner || owner === viewAs || !(entry.note.title || entry.note.body.trim()))
+            return false;
+          const note = metas[owner]?.notes.find((candidate) => candidate.id === entry.note.id);
+          return !note?.trashedAt && !note?.archivedAt;
+        })
+        .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
+        .slice(0, 8)
+        .map((entry) => ({
+          entry,
+          who:
+            members.find((member) => member.userId === entry.note.ownerId)?.nickname ?? "Somebody",
+        })),
+    [entries, viewAs, metas, members],
   );
 
   /* The number on the icon in the Dock, which is the whole of what an
@@ -3355,6 +3393,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /** A link to a note, pressed. One made by Continue as note carries the
    *  words it was continued from, and those are what it goes back to. */
+  /** Home opens a note in the scope it sits in, as ⌘K does. */
+  function handleOpenFromHome(id: string) {
+    const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId;
+    if (!docMode && owner && owner !== viewAs) setViewAs(owner);
+    handleOpenRecent(id);
+  }
+
   function handleOpenRecent(id: string, passage?: string) {
     setQuery("");
     setSelectedFolderId(ALL);
@@ -6113,6 +6158,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               ref={noteEditorRef}
               key={selected?.note.id ?? "empty"}
               entry={selected}
+              home={
+                <HomePage
+                  entries={ownedEntries.filter(
+                    (entry) => !trashedIds.has(entry.note.id) && !archivedIds.has(entry.note.id),
+                  )}
+                  meta={activeMeta}
+                  remarks={homeRemarks}
+                  others={othersLatest}
+                  onOpen={handleOpenFromHome}
+                />
+              }
               syncRevision={syncRevision}
               canEdit={canEdit}
               lock={selected ? lockFor(selected.note.id) : undefined}

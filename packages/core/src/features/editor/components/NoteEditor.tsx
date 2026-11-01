@@ -237,6 +237,8 @@ interface Props {
    *  local store while the socket is still on its way. */
   synced?: boolean;
   onNew: () => void;
+  /** What the empty pane shows instead of the drawing: the window's Home. */
+  home?: ReactNode;
   onImportMarkdown: () => void;
   onUploadImage: (file: File) => Promise<string>;
   onUploadFile: (file: File) => Promise<string>;
@@ -367,6 +369,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     session,
     synced = false,
     onNew,
+    home,
     onImportMarkdown,
     onUploadImage,
     onUploadFile,
@@ -1057,15 +1060,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
             The line is the command. A coloured button in the middle of an
             empty page reads as a form; a line reads as an invitation. */}
-        <div className="editor-empty flex flex-1 items-center justify-center px-8">
-          <BotanicalFlower
-            flower={flowerFor(new Date().toDateString())}
-            className="is-empty-page"
-          />
-          <button onClick={onNew} className="editor-empty-invite font-display">
-            Write a new one · N
-          </button>
-        </div>
+        {home && !mobile ? (
+          <div className="home-scroll min-h-0 flex-1 overflow-y-auto">{home}</div>
+        ) : (
+          <div className="editor-empty flex flex-1 items-center justify-center px-8">
+            <BotanicalFlower
+              flower={flowerFor(new Date().toDateString())}
+              className="is-empty-page"
+            />
+            <button onClick={onNew} className="editor-empty-invite font-display">
+              Write a new one · N
+            </button>
+          </div>
+        )}
       </section>
     );
   }
