@@ -45,6 +45,69 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.48",
+    date: "2026-11-02",
+    headline: "Search that finds the place, and a calmer window",
+    sections: [
+      {
+        heading: "Finding things",
+        items: [
+          {
+            title: "Search lights the words it found",
+            text: "Matches are highlighted in the list, the preview shows the words around them, and opening a result — or pressing Return — takes you to that passage and lights it.",
+          },
+          {
+            title: "Copy code in one press",
+            text: "A code block offers a Copy button while the pointer is on it.",
+          },
+          {
+            title: "See where a link goes",
+            text: "In the desktop app, a web link's address appears at the foot of the window while the pointer is on it.",
+          },
+        ],
+      },
+      {
+        heading: "Working together",
+        items: [
+          {
+            title: "You and Partner as one switch",
+            text: "The switch at the top of the sidebar is a single capsule again, with both names in full.",
+          },
+          {
+            title: "A face instead of a dot",
+            text: "A note somebody else has open shows their picture beside the time, and a small bubble while they write.",
+          },
+        ],
+      },
+      {
+        heading: "Details",
+        items: [
+          {
+            title: "Gentler motion",
+            text: "Settings, What's New and the info sheets settle in with a short rise instead of growing out of the button, and switching between light and dark fades.",
+          },
+          {
+            title: "Small touches",
+            text: "Checklist ticks are drawn and finished items step back, pinning drops a pin, links underline under the pointer, table rows follow the pointer, pictures fade in, and dragging text shows where it will land.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Save failed means a save failed",
+            text: "Other problems, such as a copy the system refused, now say what went wrong instead of reporting a failed save, and are shown even when no note is open.",
+          },
+          {
+            title: "The caret beside tables and pictures",
+            text: "The caret next to a table or a picture is visible on dark pages.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.47",
     date: "2026-11-01",
     headline: "The desktop in the phone's shape",

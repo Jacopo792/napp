@@ -419,7 +419,7 @@ export function SettingsPanel({
   spaceSwitchShown: boolean;
   onSpaceSwitchShownChange: (shown: boolean) => void;
   onSwitchArchive: (archiveId: string) => Promise<void>;
-  onNewArchive: (from: Element) => void;
+  onNewArchive: () => void;
   /** The account's first archive, which is never offered for deletion. */
   defaultArchiveId: string | undefined;
   onDeleteArchive: (archiveId: string) => Promise<void>;
@@ -1621,7 +1621,7 @@ export function SettingsPanel({
                     type="button"
                     className="space-list-new press"
                     disabled={spaceBusy}
-                    onClick={(event) => onNewArchive(event.currentTarget)}
+                    onClick={onNewArchive}
                   >
                     <Plus size={16} />
                     New archive…
@@ -1696,6 +1696,5 @@ export function SettingsPanel({
   );
 }
 
-/* Settings comes out of what opened it: the gear turning at the foot of the
-   sidebar, or the menu row that was pressed. Stable, so it runs once. */
+/* Settings settles in with a short rise and a fade. Stable, so it runs once. */
 const arrive = (el: HTMLElement | null) => emerge(el);

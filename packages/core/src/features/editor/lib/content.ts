@@ -1293,6 +1293,9 @@ export const BASE_EXTENSIONS = [
       defaultProtocol: "https",
       HTMLAttributes: { target: "_blank", rel: "noopener noreferrer nofollow" },
     },
+    /* Coloured by the stylesheet (`.drop-caret`), not inline, so it can be the
+       accent and glide between the places a drag could land. */
+    dropcursor: { color: false, width: 2, class: "drop-caret" },
   }),
   TextStyleKit,
   TableKit,

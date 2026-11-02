@@ -577,8 +577,23 @@ function replaceWallpaperUrl(blob: Blob | null): void {
    starts from the value the reader just chose. */
 function commitAppearance(): void {
   appearanceFrame = null;
-  applyAppearance(current);
-  listeners.forEach((listener) => listener());
+  const commit = () => {
+    applyAppearance(current);
+    listeners.forEach((listener) => listener());
+  };
+  /* Light to dark is the whole window changing at once, so it crossfades
+     rather than cutting. Only that change: the colour sliders commit every
+     frame, and each must not start a transition of its own. */
+  const flips =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.theme !== (darkMode(current) ? "dark" : "light");
+  if (
+    !flips ||
+    typeof document.startViewTransition !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    return commit();
+  document.startViewTransition(commit);
 }
 
 function scheduleAppearanceCommit(): void {

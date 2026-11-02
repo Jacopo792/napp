@@ -5,16 +5,14 @@
  * everywhere else. */
 import { useState } from "react";
 import { ArchiveRestore, Trash2 } from "@/components/icons";
-import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 
 export function TrashSheet({
-  origin,
   items,
   canWrite,
   onRestore,
   onDelete,
 }: {
-  origin: SheetOrigin;
   items: { id: string; title: string }[];
   canWrite: boolean;
   onRestore: (id: string) => void;
@@ -22,10 +20,10 @@ export function TrashSheet({
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   return (
-    <Sheet label="Trash" origin={origin}>
+    <Sheet label="Trash">
       <div className="sheet-body">
         <header className="sheet-hero">
-          <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>
+          <span className="sheet-portrait sheet-note-glyph">
             <Trash2 size={30} />
           </span>
           <h2>Trash</h2>

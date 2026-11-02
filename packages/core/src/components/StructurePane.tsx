@@ -322,7 +322,7 @@ export function StructurePane({
   onTrash: (id: string) => void;
   /** Every page under Notes, in one go. */
   onTrashAll: (ids: string[]) => void;
-  onInfo: (id: string, point: MenuPoint) => void;
+  onInfo: (id: string) => void;
   /** A chapter's status, synopsis or goal changed. */
   onChapter?: (id: string, info: ChapterInfo | undefined) => void;
   /** The open chapter's headings, under its row — the navigation pane of a

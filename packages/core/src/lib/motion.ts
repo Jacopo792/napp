@@ -70,8 +70,7 @@ export function originAtPress(el: HTMLElement) {
   el.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
 }
 
-/** An overlay arriving: out of the control that asked for it, or — opened from
- *  the keyboard — from its own centre, a little smaller than it will be.
+/** An overlay arriving: it rises a little into place and fades in.
  *  `zoom` is for a picture leaving its thumbnail: the same image, the same
  *  shape, so it travels and grows instead of appearing. */
 const emerged = new WeakSet<Element>();
@@ -99,16 +98,15 @@ export function emerge(el: HTMLElement | null, mode: "grow" | "zoom" = "grow") {
     });
     return;
   }
-  if (p) originAtPress(el);
+  /* A panel settles in where it will stay: a short rise and a fade. Growing
+     out of the button that opened it, from half its size, was rejected —
+     a whole window ballooning out of a sidebar row reads as a gimmick. */
   el.animate(
     [
-      { opacity: 0, transform: `scale(${p ? 0.5 : 0.96})` },
-      { opacity: 1, offset: 0.3 },
+      { opacity: 0, transform: "translateY(8px) scale(0.985)" },
       { opacity: 1, transform: "none" },
     ],
-    /* A cubic rather than the expo of a menu: the panel travels far enough
-       that the eye has to be given the journey, not only the arrival. */
-    { duration: p ? 440 : 240, easing: "cubic-bezier(0.33, 1, 0.68, 1)", fill: "backwards" },
+    { duration: 260, easing: EASE_OUT, fill: "backwards" },
   );
 }
 
@@ -165,6 +163,32 @@ export function playRows() {
       easing: EASE,
     });
   }
+}
+
+/* ── A pin set down ─────────────────────────────────────────────────────────
+   A pinned note's row is a new row in Pinned, so its glyph cannot tell it was
+   just pinned from having always been. The toggle names the note; the glyph
+   that mounts for it within the beat drops into the title, landing as the
+   row's rise ends. Opening a list full of pinned notes drops nothing. */
+let pinnedNow: { id: string; at: number } | null = null;
+
+export function markPinned(noteId: string) {
+  pinnedNow = { id: noteId, at: performance.now() };
+}
+
+export function dropPin(el: Element | null, noteId: string) {
+  if (!el || pinnedNow?.id !== noteId) return;
+  const fresh = performance.now() - pinnedNow.at < 800;
+  pinnedNow = null;
+  if (!fresh || reduced()) return;
+  el.animate(
+    [
+      { opacity: 0, transform: "translateY(-8px) rotate(-30deg) scale(0.6)" },
+      { opacity: 1, offset: 0.35 },
+      { opacity: 1, transform: "none" },
+    ],
+    { duration: 460, delay: 220, easing: "cubic-bezier(0.34, 1.42, 0.64, 1)", fill: "backwards" },
+  );
 }
 
 /* ── A note going somewhere ─────────────────────────────────────────────────

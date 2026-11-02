@@ -32,6 +32,7 @@ import {
   ArrowUpRight,
   Check,
   Circle,
+  Copy,
   Download,
   Eraser,
   ExternalLink,
@@ -941,7 +942,13 @@ function PrivateImageView({
             className="rich-media-image-open"
             onClick={() => options.open(src, alt || "Image")}
           >
-            <img src={src} alt={alt || "Image"} draggable={false} />
+            {/* Fades in once decoded rather than painting in as it arrives. */}
+            <img
+              src={src}
+              alt={alt || "Image"}
+              draggable={false}
+              onLoad={(event) => event.currentTarget.classList.add("is-arrived")}
+            />
           </button>
         ) : (
           <span className="rich-media-loading">
@@ -2770,7 +2777,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         editor.commands.setSearchTerm(text);
         const found = editor.storage.findAndReplace.results.length > 0;
         if (found) editor.commands.goToNextResult();
+        const { from, to } = editor.state.selection;
         editor.commands.clearSearch();
+        const { node } = editor.view.domAtPos(from);
+        const block = (node instanceof Element ? node : node.parentElement)?.closest(
+          "h1, h2, h3, h4, p, li",
+        );
+        /* Words inside a passage are lit where they stand, the way a remark's
+           passage is; a heading is a place, and only goes to the top. */
+        if (found && block && !/^H\d$/.test(block.tagName)) return lightPassage({ from, to });
         if (found) {
           /* The caret at the start, not the words selected: a heading left
              highlighted reads as something about to be replaced. */
@@ -2778,10 +2793,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
           editor.commands.focus(undefined, { scrollIntoView: false });
           /* To the top of the page, not just inside it: a heading pulled
              only as far as the bottom edge reads as nothing having moved. */
-          const { node } = editor.view.domAtPos(editor.state.selection.from);
-          (node instanceof Element ? node : node.parentElement)
-            ?.closest("h1, h2, h3, h4, p, li")
-            ?.scrollIntoView({ block: "start", behavior: "smooth" });
+          block?.scrollIntoView({ block: "start", behavior: "smooth" });
         }
         return found;
       },
@@ -2822,9 +2834,95 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, revision, collaboration]);
 
+  /* Where a web link goes, at the window's foot while the pointer is on it —
+     the browser's own status bubble, which a desktop window does not have. A
+     browser already shows it, so only the desktop shell gets this one. */
+  const [peek, setPeek] = useState<string | null>(null);
+  useEffect(() => {
+    if (!editor || !document.documentElement.dataset.shell) return;
+    const dom = editor.view.dom;
+    const over = (event: MouseEvent) => {
+      const link = (event.target as Element).closest?.("a[href]:not(.note-link)");
+      setPeek(link ? (link as HTMLAnchorElement).href : null);
+    };
+    const out = () => setPeek(null);
+    dom.addEventListener("mouseover", over);
+    dom.addEventListener("mouseleave", out);
+    return () => {
+      dom.removeEventListener("mouseover", over);
+      dom.removeEventListener("mouseleave", out);
+    };
+  }, [editor]);
+
+  /* A code block offers its text to copy from its top corner while the
+     pointer is on it: code is the one thing in a note taken out whole. The
+     button lives outside the document, so leaving the block for the button
+     does not take the button away. */
+  const [code, setCode] = useState<{ block: HTMLElement; top: number; right: number } | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const copyButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const over = (event: MouseEvent) => {
+      const block = (event.target as Element).closest?.("pre") as HTMLElement | null;
+      if (!block) return;
+      const box = block.getBoundingClientRect();
+      setCode((now) =>
+        now?.block === block ? now : { block, top: box.top, right: window.innerWidth - box.right },
+      );
+    };
+    const out = (event: MouseEvent) => {
+      const to = event.relatedTarget as Element | null;
+      if (to && (copyButton.current?.contains(to) || to.closest?.("pre"))) return;
+      setCode(null);
+      setCodeCopied(false);
+    };
+    const away = () => setCode(null);
+    dom.addEventListener("mouseover", over);
+    dom.addEventListener("mouseout", out);
+    window.addEventListener("scroll", away, true);
+    return () => {
+      dom.removeEventListener("mouseover", over);
+      dom.removeEventListener("mouseout", out);
+      window.removeEventListener("scroll", away, true);
+    };
+  }, [editor]);
+
   return (
     <>
       <EditorContent editor={editor} className="rich-text-editor" />
+      {code &&
+        createPortal(
+          <button
+            ref={copyButton}
+            type="button"
+            className="code-copy copy-swap press"
+            aria-label="Copy code"
+            data-copied={codeCopied || undefined}
+            style={{ top: code.top + 6, right: code.right + 6 }}
+            onMouseLeave={(event) => {
+              if (!(event.relatedTarget as Element | null)?.closest?.("pre")) setCode(null);
+            }}
+            onClick={() => {
+              void navigator.clipboard.writeText(code.block.textContent ?? "").then(() => {
+                setCodeCopied(true);
+                window.setTimeout(() => setCodeCopied(false), 1600);
+              });
+            }}
+          >
+            <Copy size={14} />
+            <Check size={14} weight="bold" />
+          </button>,
+          document.body,
+        )}
+      {peek &&
+        createPortal(
+          <div className="link-peek" translate="no" aria-hidden="true">
+            {peek}
+          </div>,
+          document.body,
+        )}
       {editor && !readOnly && (
         <>
           <BubbleMenu

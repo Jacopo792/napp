@@ -27,7 +27,7 @@ import {
   RotateCcw,
   Trash2,
 } from "@/components/icons";
-import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
 import type { AvatarCrop } from "@/lib/image";
@@ -64,13 +64,12 @@ export interface NoteSheetFacts {
 interface Props {
   session: AppSession;
   note: NoteSheetFacts;
-  origin: SheetOrigin;
   personOf: (userId: string) => SheetPerson | null;
   resolveImage: (objectId: string) => Promise<Blob>;
   onOpenNote: (noteId: string, then?: { history?: string | true; comments?: boolean }) => void;
   onOpenFolder: (folderId: string) => void;
   /** The face that was pressed, for the person sheet to fly out of. */
-  onOpenPerson: (userId: string, from: Element) => void;
+  onOpenPerson: (userId: string) => void;
   /** Absent where this reader cannot change the note. */
   onSetPhoto?: (file: File | null, crop?: AvatarCrop) => void;
 }
@@ -80,7 +79,6 @@ const RECENT = 8;
 export function NoteSheet({
   session,
   note,
-  origin,
   personOf,
   resolveImage,
   onOpenNote,
@@ -121,7 +119,7 @@ export function NoteSheet({
   const glyph = note.trashed ? <Trash2 size={30} /> : <FileText size={30} />;
 
   return (
-    <Sheet label={note.title || "Untitled"} origin={origin}>
+    <Sheet label={note.title || "Untitled"}>
       <div className="sheet-body">
         <header className="sheet-hero">
           <SheetPortrait
@@ -145,10 +143,7 @@ export function NoteSheet({
             {note.owner && (
               <>
                 {" · "}
-                <button
-                  type="button"
-                  onClick={(event) => onOpenPerson(note.owner!.userId, event.currentTarget)}
-                >
+                <button type="button" onClick={() => onOpenPerson(note.owner!.userId)}>
                   {note.owner.userId === session.userId ? "Yours" : `${note.owner.name}’s`}
                 </button>
               </>
@@ -219,7 +214,7 @@ export function NoteSheet({
                     key={person.userId}
                     type="button"
                     className="sheet-face press"
-                    onClick={(event) => onOpenPerson(person.userId, event.currentTarget)}
+                    onClick={() => onOpenPerson(person.userId)}
                   >
                     <Avatar url={person.avatarUrl} name={person.name} email="" compact />
                     {nameOf(person.userId)}

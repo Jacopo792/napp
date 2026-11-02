@@ -16,7 +16,7 @@
  * note itself. */
 import { useEffect, useMemo, useState } from "react";
 import { Bookmark, Folder, FolderOpen, MessageSquare, RotateCcw } from "@/components/icons";
-import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import type { SheetPerson } from "@/components/NoteSheet";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { loadFolderVersions, type FolderVersion } from "@/lib/history";
@@ -40,19 +40,17 @@ export interface FolderSheetFacts {
 interface Props {
   session: AppSession;
   folder: FolderSheetFacts;
-  origin: SheetOrigin;
   personOf: (userId: string) => SheetPerson | null;
   onShowFolder: (folderId: string) => void;
   /** Another folder's sheet, flying out of the name that was pressed. */
-  onOpenFolder: (folderId: string, from: Element) => void;
+  onOpenFolder: (folderId: string) => void;
   onOpenNote: (noteId: string, then?: { history?: string | true; comments?: boolean }) => void;
-  onOpenPerson: (userId: string, from: Element) => void;
+  onOpenPerson: (userId: string) => void;
 }
 
 export function FolderSheet({
   session,
   folder,
-  origin,
   personOf,
   onShowFolder,
   onOpenFolder,
@@ -100,10 +98,10 @@ export function FolderSheet({
   const words = folder.notes.reduce((sum, note) => sum + note.words, 0);
 
   return (
-    <Sheet label={folder.name} origin={origin}>
+    <Sheet label={folder.name}>
       <div className="sheet-body">
         <header className="sheet-hero">
-          <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>
+          <span className="sheet-portrait sheet-note-glyph">
             <FolderOpen size={30} />
           </span>
           <h2>{folder.name}</h2>
@@ -111,10 +109,7 @@ export function FolderSheet({
             {folder.parent ? (
               <>
                 In{" "}
-                <button
-                  type="button"
-                  onClick={(event) => onOpenFolder(folder.parent!.id, event.currentTarget)}
-                >
+                <button type="button" onClick={() => onOpenFolder(folder.parent!.id)}>
                   {folder.parent.name}
                 </button>
               </>
@@ -129,7 +124,7 @@ export function FolderSheet({
                   key={child.id}
                   type="button"
                   className="sheet-chip press"
-                  onClick={(event) => onOpenFolder(child.id, event.currentTarget)}
+                  onClick={() => onOpenFolder(child.id)}
                 >
                   <Folder size={12} />
                   {child.name}
@@ -164,7 +159,7 @@ export function FolderSheet({
                     key={person.userId}
                     type="button"
                     className="sheet-face press"
-                    onClick={(event) => onOpenPerson(person.userId, event.currentTarget)}
+                    onClick={() => onOpenPerson(person.userId)}
                   >
                     <Avatar url={person.avatarUrl} name={person.name} email="" compact />
                     {nameOf(person.userId)}

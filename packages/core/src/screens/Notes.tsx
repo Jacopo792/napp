@@ -202,12 +202,12 @@ import {
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
-import { aimNote, captureRows, sendNotes, settleBack } from "@/lib/motion";
+import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
-import { NoteList, type ActiveFilter } from "@/components/NoteList";
+import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import {
   announceTyping,
@@ -226,7 +226,7 @@ const SettingsPanel = lazy(() =>
 import type { MenuPoint } from "@/lib/contextMenu";
 import { ContextMenu } from "@/components/ContextMenu";
 import { PersonSheet } from "@/components/PersonSheet";
-import { SheetStack, type SheetOrigin } from "@/components/Sheet";
+import { SheetStack } from "@/components/Sheet";
 import { NoteSheet } from "@/components/NoteSheet";
 import { FolderSheet } from "@/components/FolderSheet";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
@@ -260,26 +260,14 @@ import { SpaceSwitch } from "@/components/SpaceSwitch";
 const BOOK_PRESET = ARCHIVE_PRESETS.find((preset) => preset.id === "book")!;
 const SWITCH_KEYS = ["numbering", "footnotes", "citations", "review"] as const;
 
-/** One sheet in the stack: what it is about, and where it grew out of. */
-type SheetEntry = SheetOrigin &
-  (
-    | { kind: "note"; noteId: string }
-    | { kind: "person"; userId: string }
-    | { kind: "folder"; folderId: string }
-    | { kind: "archive" }
-    | { kind: "new-archive" }
-    | { kind: "trash" }
-  );
-
-/** Where a held face is on screen — the portrait in it, when it has one, so
- *  the face that flies into a sheet starts exactly over the face that was
- *  held. */
-function faceOrigin(element: Element): SheetOrigin {
-  const { x, y, width, height } = (
-    element.querySelector(".avatar") ?? element
-  ).getBoundingClientRect();
-  return { x, y, width, height };
-}
+/** One sheet in the stack: what it is about. */
+type SheetEntry =
+  | { kind: "note"; noteId: string }
+  | { kind: "person"; userId: string }
+  | { kind: "folder"; folderId: string }
+  | { kind: "archive" }
+  | { kind: "new-archive" }
+  | { kind: "trash" };
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
@@ -473,6 +461,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
    *  new text is not its own and may be applied under the caret. */
   const [syncRevision, setSyncRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  /* A write that did not land, which the readout offers to retry, apart from
+     every other failure: those say what went wrong for a moment and go. One
+     slot for both read an import or a refused clipboard as "Save failed". */
+  const [saveError, setSaveError] = useState("");
   const [error, setError] = useState("");
   const [mediaTexts, setMediaTexts] = useState<Map<string, string>>(new Map());
   const [indexingMedia, setIndexingMedia] = useState(false);
@@ -602,12 +594,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   function holdStart(event: React.PointerEvent, userId: string) {
     if (event.button !== 0 && event.pointerType === "mouse") return;
-    const face = event.currentTarget;
     heldRef.current = false;
     window.clearTimeout(holdRef.current);
     holdRef.current = window.setTimeout(() => {
       heldRef.current = true;
-      openSheet({ ...faceOrigin(face), kind: "person", userId });
+      openSheet({ kind: "person", userId });
     }, HOLD_MS);
   }
 
@@ -1697,6 +1688,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => window.clearTimeout(timer);
   }, [statusFlash]);
 
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
   const storeEntry = useCallback((note: Note, version: number) => {
     const saved: NoteEntry = { note, version };
     entriesRef.current = entriesRef.current.map((current) =>
@@ -1889,11 +1886,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }
         }
       }
-      setError("");
+      setSaveError("");
       retryDelayRef.current = RETRY_MIN_MS;
     } catch (e) {
       failed = true;
-      setError(e instanceof Error ? e.message : "Save failed");
+      setSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
       inFlightRef.current = false;
       setSaving(false);
@@ -2223,6 +2220,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleTogglePin = useCallback(
     (noteId: string) => {
+      markPinned(noteId);
       handleMetaChange((prev) => {
         const existing = indexOf(prev).byNote.get(noteId);
         const notes: NoteMeta[] = existing
@@ -2380,7 +2378,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         await navigator.clipboard.writeText(markdownFor(entry));
         setStatusFlash("Copied");
       } catch {
-        setError("The browser would not give this page the clipboard");
+        setError("Could not copy");
       }
     },
     [markdownFor],
@@ -3340,6 +3338,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [compact, markRemarksSeen, viewAs],
   );
 
+  /* Chosen from a searched list: the note opens at the words that put it
+     there, lit for a moment, as Spotlight's text results already do. */
+  const handleSelectFromList = useCallback(
+    (id: string) => {
+      handleSelectNote(id);
+      const q = fold(query.trim());
+      const body = q ? entriesRef.current.find((entry) => entry.note.id === id)?.note.body : "";
+      const hit = body ? snippetOf(body, q) : null;
+      if (hit) setOpenThen({ noteId: id, reveal: hit.match });
+    },
+    [handleSelectNote, query],
+  );
+
   /* A line of the contents was pressed — on the title page or in a `[TOC]`
      block — so open its chapter and go to the heading. */
   useEffect(() => {
@@ -3814,36 +3825,48 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     ? activeMeta.folders.find((folder) => folder.id === dragId.slice(FOLDER_DRAG.length))
     : null;
 
-  /* The states have very different lengths, so the readout is given one slot of
+  /* Each state is keyed, so a new one is a new element and fades in
+     (`.note-status`) rather than swapping its words in place.
+
+     The states have very different lengths, so the readout is given one slot of
      a fixed width below and every state is measured against the widest of them.
      Left to size itself it slid back and forth by 55px on each debounce, which
      is the one thing in the toolbar that moves while you are looking at it. The
      write error is carried in the tooltip for the same reason. */
   const saveReadout = collaborative.refusal ? (
-    <span className="label text-danger" title={collaborative.refusal}>
+    <span key="refused" className="label text-danger" title={collaborative.refusal}>
       Unavailable
     </span>
-  ) : error ? (
+  ) : saveError ? (
     <button
+      key="failed"
       onClick={saveNow}
-      title={`${error}\nClick to retry the write now`}
+      title={`${saveError}\nClick to retry the write now`}
       className="flex items-center gap-2 text-left"
     >
       <span className="label text-danger underline-offset-2 hover:underline">Save failed</span>
     </button>
+  ) : error ? (
+    <span key={`error:${error}`} className="label text-danger" title={error}>
+      {error}
+    </span>
   ) : saving ? (
-    <span className="inline-flex items-center gap-2">
+    <span key="saving" className="inline-flex items-center gap-2">
       <span className="animate-spin inline-block h-2.5 w-2.5 rounded-full border border-accent border-t-transparent" />
       <span className="label text-accent">Saving</span>
     </span>
   ) : dirty ? (
-    <span className="label text-ink-2">Unsaved</span>
+    <span key="unsaved" className="label text-ink-2">
+      Unsaved
+    </span>
   ) : statusFlash ? (
-    <span className="label text-accent">{statusFlash}</span>
+    <span key={`flash:${statusFlash}`} className="label text-accent">
+      {statusFlash}
+    </span>
   ) : selectedId && collaborative.refusal ? (
     /* The door was answered and shut. Said rather than left as a wait, because
        a refusal that renders as "Connecting" is a wait nobody can end. */
-    <span className="label text-ink-2" title={collaborative.refusal}>
+    <span key="refusal" className="label text-ink-2" title={collaborative.refusal}>
       {collaborative.refusal}
     </span>
   ) : selectedId && !collaborative.ready ? (
@@ -3854,6 +3877,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
        meanwhile is kept and sent on arrival, which is the other half worth
        saying — so it goes in the tooltip rather than in a second line. */
     <span
+      key={collaborative.waking ? "waking" : "connecting"}
       className="label text-ink-4"
       title={
         collaborative.waking
@@ -3864,11 +3888,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       {collaborative.waking ? "Waking the server" : "Connecting"}
     </span>
   ) : selectedId && collaborative.connection === "offline" ? (
-    <span className="label text-ink-2" title="Changes stay on this device and sync on reconnect">
+    <span
+      key="offline"
+      className="label text-ink-2"
+      title="Changes stay on this device and sync on reconnect"
+    >
       Offline
     </span>
   ) : merge ? (
-    <span className="label text-accent" title={merge.detail}>
+    <span key={`merge:${merge.label}`} className="label text-accent" title={merge.detail}>
       {merge.label}
     </span>
   ) : null;
@@ -4079,12 +4107,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
     if (then) setOpenThen({ noteId: id, ...then });
   };
-  const middle = () => ({
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 3,
-    width: 1,
-    height: 1,
-  });
 
   const paletteCommands: Command[] = ((): Command[] => {
     if (!paletteOpen) return [];
@@ -4207,7 +4229,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         searchOnly: true,
         name: nameOf(member),
         icon: <UserRound size={16} />,
-        run: () => openSheet({ ...middle(), kind: "person", userId: member.userId }),
+        run: () => openSheet({ kind: "person", userId: member.userId }),
       })),
       ...namedVersions.flatMap((version) => {
         const entry = entries.find((candidate) => candidate.note.id === version.noteId);
@@ -4519,11 +4541,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           onContextMenu={(event) => {
             event.preventDefault();
             holdEnd();
-            openSheet({
-              ...faceOrigin(event.currentTarget),
-              kind: "person",
-              userId: member.userId,
-            });
+            openSheet({ kind: "person", userId: member.userId });
           }}
           aria-pressed={viewAs === member.userId}
           aria-label={notesOf(member)}
@@ -4558,15 +4576,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const presenceColor = presencePaletteFor(writingPreferences.presencePalette).color;
   const typingIds = new Set(notePeers.filter((peer) => peer.typing).map((peer) => peer.userId));
   const hereIds = new Set(notePeers.map((peer) => peer.userId));
-  /* The notes somebody else has open, for the dot on their rows. The note
+  /* The notes somebody else has open, for the face on their rows. The note
      open here is answered by awareness, which is certain; every other note by
      the presence channel, which is the only thing that can see it. */
-  const peerNoteIds = new Set<string>();
+  const peerNotes = new Map<string, PeerFace>();
   const peerTypingNoteIds = new Set<string>();
+  const peerFace = (userId: string): PeerFace => {
+    const member = roster.find((one) => one.userId === userId);
+    return { name: member ? nameOf(member) : "", avatarUrl: avatarUrls[userId] ?? null };
+  };
   if (flags.collaborators) {
     for (const [userId, noteId] of present)
-      if (noteId && userId !== session?.userId) peerNoteIds.add(noteId);
-    if (selectedId && hereIds.size > 0) peerNoteIds.add(selectedId);
+      if (noteId && userId !== session?.userId) peerNotes.set(noteId, peerFace(userId));
+    const [hereId] = hereIds;
+    if (selectedId && hereId) peerNotes.set(selectedId, peerFace(hereId));
     if (selectedId && typingIds.size > 0) peerTypingNoteIds.add(selectedId);
   }
   const peopleShelf = (
@@ -4606,11 +4629,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             onContextMenu={(event) => {
               event.preventDefault();
               holdEnd();
-              openSheet({
-                ...faceOrigin(event.currentTarget),
-                kind: "person",
-                userId: member.userId,
-              });
+              openSheet({ kind: "person", userId: member.userId });
             }}
             aria-pressed={active}
             aria-label={notesOf(member)}
@@ -4624,16 +4643,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           >
             <span className="people-face-portrait">
               <Avatar url={avatarUrls[member.userId] ?? null} name={nameOf(member)} email="" />
-              {online && <span className="people-face-here" aria-label="Here now" />}
+              {typing ? (
+                <span className="people-face-typing" aria-label="Writing">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : (
+                online && <span className="people-face-here" aria-label="Here now" />
+              )}
             </span>
             <span className="people-face-name">{member.isSelf ? "You" : nameOf(member)}</span>
-            {typing && (
-              <span className="people-face-typing" aria-label="Writing">
-                <i />
-                <i />
-                <i />
-              </span>
-            )}
           </button>
         );
       })}
@@ -4656,7 +4676,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return member ? { userId, name: nameOf(member), avatarUrl: avatarUrls[userId] ?? null } : null;
   };
 
-  function renderNoteSheet(sheet: SheetOrigin & { noteId: string }, key: string) {
+  function renderNoteSheet(sheet: { noteId: string }, key: string) {
     if (!session) return null;
     const entry = entries.find((one) => one.note.id === sheet.noteId);
     if (!entry) return null;
@@ -4674,7 +4694,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       <NoteSheet
         key={key}
         session={session}
-        origin={sheet}
         resolveImage={resolveImage}
         personOf={personOf}
         note={{
@@ -4712,7 +4731,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             handleViewChange(entry.note.ownerId);
           handleSelectFolder(folderId);
         }}
-        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+        onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
         onSetPhoto={
           canWriteArchive &&
           !trashedIds.has(entry.note.id) &&
@@ -4726,7 +4745,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* A folder and everything under it, counted the way the sidebar counts a
      closed one. */
-  function renderFolderSheet(sheet: SheetOrigin & { folderId: string }, key: string) {
+  function renderFolderSheet(sheet: { folderId: string }, key: string) {
     if (!session) return null;
     const folders = activeMeta.folders;
     const folder = folders.find((one) => one.id === sheet.folderId);
@@ -4750,13 +4769,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       if (!remark.resolvedAt && notes.some((entry) => entry.note.id === remark.noteId))
         threads.set(remark.noteId, (threads.get(remark.noteId) ?? new Set()).add(remark.threadId));
     const parent = folder.parentId ? folders.find((one) => one.id === folder.parentId) : undefined;
-    const pushFolder = (folderId: string, from: Element) =>
-      pushSheet({ ...faceOrigin(from), kind: "folder", folderId });
+    const pushFolder = (folderId: string) => pushSheet({ kind: "folder", folderId });
     return (
       <FolderSheet
         key={key}
         session={session}
-        origin={sheet}
         personOf={personOf}
         folder={{
           id: folder.id,
@@ -4783,7 +4800,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         }}
         onOpenFolder={pushFolder}
         onOpenNote={openFromSheet}
-        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+        onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
       />
     );
   }
@@ -4791,14 +4808,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* The archive on screen: its people, its seats, who is waiting to come in.
      The current archive's faces come from the live roster rather than the
      list the switch loaded, so somebody joining appears here at once. */
-  function renderArchiveSheet(sheet: SheetOrigin, key: string) {
+  function renderArchiveSheet(key: string) {
     const space = spacesView.find((one) => one.archiveId === session?.archiveId);
     if (!session || !space) return null;
     const live = entries.filter((entry) => !trashedIds.has(entry.note.id));
     return (
       <ArchiveSheet
         key={key}
-        origin={sheet}
         space={space}
         selfId={session.userId}
         avatarUrls={avatarUrls}
@@ -4819,17 +4835,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onOptions={saveDocumentOptions}
         onCreateInvite={inviteLink}
         onRevokeInvite={withdrawInvite}
-        onOpenPerson={(userId, from) => pushSheet({ ...faceOrigin(from), kind: "person", userId })}
+        onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
         onLeave={handleLeaveArchive}
         onDelete={() => handleDeleteArchive(space.archiveId)}
       />
     );
   }
 
-  /* Who that is, and what they have been doing. Grown out of the face the
-     hand held — see `.person-sheet` in the stylesheet — because a sheet that
-     answers a gesture should look like it came from it. */
-  function renderPersonSheet(sheet: SheetOrigin & { userId: string }, key: string) {
+  /* Who that is, and what they have been doing. */
+  function renderPersonSheet(sheet: { userId: string }, key: string) {
     if (!session) return null;
     const member = roster.find((one) => one.userId === sheet.userId);
     if (!member) return null;
@@ -4863,7 +4877,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               }
             : null
         }
-        origin={sheet}
         titleOf={(noteId) => entries.find((entry) => entry.note.id === noteId)?.note.title ?? null}
         onOpenNote={(noteId, withHistory) =>
           openFromSheet(noteId, withHistory ? { history: true } : undefined)
@@ -4884,12 +4897,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         const key = `${index}:${sheet.kind}`;
         if (sheet.kind === "note") return renderNoteSheet(sheet, `${key}:${sheet.noteId}`);
         if (sheet.kind === "folder") return renderFolderSheet(sheet, `${key}:${sheet.folderId}`);
-        if (sheet.kind === "archive") return renderArchiveSheet(sheet, key);
+        if (sheet.kind === "archive") return renderArchiveSheet(key);
         if (sheet.kind === "trash")
           return (
             <TrashSheet
               key={key}
-              origin={sheet}
               items={docTrash.map((entry) => ({ id: entry.note.id, title: entry.note.title }))}
               canWrite={canWriteArchive}
               onRestore={handleRestoreDocNote}
@@ -4903,7 +4915,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           return (
             <NewArchiveSheet
               key={key}
-              origin={sheet}
               onCreate={async (name, kind, features) => {
                 const archiveId = await createSpace(
                   name,
@@ -4931,13 +4942,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         currentId={session.archiveId}
         defaultId={defaultArchiveId}
         onSwitch={switchArchive}
-        onInfo={(origin) => openSheet({ ...origin, kind: "archive" })}
+        onInfo={() => openSheet({ kind: "archive" })}
         onSettings={() => {
           setFoldersOpen(false);
           setSettingsSection(docMode ? "document" : "spaces");
           setSettingsOpen(true);
         }}
-        onCreate={(origin) => openSheet({ ...origin, kind: "new-archive" })}
+        onCreate={() => openSheet({ kind: "new-archive" })}
         onDelete={(archiveId) =>
           void handleDeleteArchive(archiveId).catch((reason) =>
             setError(reason instanceof Error ? reason.message : "The archive could not be deleted"),
@@ -4968,7 +4979,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       onCreateFolder={handleCreateFolder}
       onRenameFolder={handleRenameFolder}
       onDeleteFolder={handleDeleteFolder}
-      onFolderInfo={(folderId, origin) => openSheet({ ...origin, kind: "folder", folderId })}
+      onFolderInfo={(folderId) => openSheet({ kind: "folder", folderId })}
       onClose={() => (compact ? setFoldersOpen(false) : changeNavigation(false))}
       closeInStrip={compact}
       onSettings={() => {
@@ -5101,12 +5112,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsOpen(false);
           await handleSwitchArchive(archiveId);
         }}
-        onNewArchive={(from) => {
+        onNewArchive={() => {
           /* Settings stands over the sheets; the new archive is the next
              thing in front of you, so Settings steps aside for it. */
-          const origin = faceOrigin(from);
           setSettingsOpen(false);
-          openSheet({ ...origin, kind: "new-archive" });
+          openSheet({ kind: "new-archive" });
         }}
         defaultArchiveId={defaultArchiveId}
         onDeleteArchive={handleDeleteArchive}
@@ -5137,12 +5147,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      whether the last write landed. Who else is reading starts the header,
      beside the window navigation. */
   const noteStatus = selected ? (
-    <span className="block min-w-0 truncate">
+    <span className="note-status block min-w-0 truncate">
       {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
     </span>
   ) : null;
 
   const notePresence = selected ? noteReaders : null;
+
+  /* With no note open there is no header to say what just happened, so the
+     list's tally says it instead, for as long as the header would have. */
+  const listNotice = selected ? null : error ? (
+    <span key={`error:${error}`} className="list-notice text-danger" title={error}>
+      {error}
+    </span>
+  ) : statusFlash ? (
+    <span key={`flash:${statusFlash}`} className="list-notice text-accent">
+      {statusFlash}
+    </span>
+  ) : null;
 
   /* Adding a cover is one of the acts the note's own menu carries. Offered
      only while there is not one: a cover carries its own Change and Remove. */
@@ -5412,8 +5434,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         id: "trash",
         label: docTrash.length ? `Show Trash (${docTrash.length})` : "Show Trash",
         icon: <Trash2 size={16} />,
-        run: () =>
-          openSheet({ x: window.innerWidth - 40, y: 26, width: 1, height: 1, kind: "trash" }),
+        run: () => openSheet({ kind: "trash" }),
       },
     ];
     const pageLabel = (item: ChapterItem) => item.title || item.preview || "Untitled";
@@ -5553,7 +5574,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 className="sidebar-footer-button press"
                 onClick={(event) => {
                   setFoldersOpen(false);
-                  openSheet({ ...faceOrigin(event.currentTarget), kind: "trash" });
+                  openSheet({ kind: "trash" });
                 }}
               >
                 <span className="sidebar-glyph" data-tone="trash">
@@ -5583,9 +5604,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onChapter={(id, chapter) => setNoteRow(manuscriptOwner, id, { chapter })}
         onTrash={handleTrashDocNote}
         onTrashAll={handleTrashDocNotes}
-        onInfo={(id, point) =>
-          openSheet({ x: point.x, y: point.y, width: 1, height: 1, kind: "note", noteId: id })
-        }
+        onInfo={(id) => openSheet({ kind: "note", noteId: id })}
         headings={contents.find((entry) => entry.id === selectedId)?.headings}
         stats={statsShown ? { today: wordsToday } : undefined}
         onHeading={(text) => selectedId && openPlace({ noteId: selectedId, text })}
@@ -5609,15 +5628,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             ? undefined
             : {
                 onOpen: openFromStructure,
-                onInfo: (id, point) =>
-                  openSheet({
-                    x: point.x,
-                    y: point.y,
-                    width: 1,
-                    height: 1,
-                    kind: "note",
-                    noteId: id,
-                  }),
+                onInfo: (id) => openSheet({ kind: "note", noteId: id }),
                 onMove: handleMoveChapter,
                 onNewPart: handleNewPart,
                 onNewChapter: handleNewChapter,
@@ -5912,15 +5923,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   scopeLabel={scopeTag}
+                  notice={listNotice}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
-                  peerNoteIds={peerNoteIds}
+                  peerNotes={peerNotes}
                   peerTypingNoteIds={peerTypingNoteIds}
-                  peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
-                  onSelect={handleSelectNote}
+                  onSelect={handleSelectFromList}
                   onNew={handleNew}
                   onMoveToTrash={handleMoveToTrash}
                   onRestore={handleRestore}
@@ -5928,7 +5939,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
-                  onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
+                  onInfo={(noteId) => openSheet({ kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -6110,15 +6121,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
                   scopeLabel={scopeTag}
+                  notice={listNotice}
                   trashMode={selectedFolderId === TRASH}
                   unreadIds={unreadRemarkNotes}
-                  peerNoteIds={peerNoteIds}
+                  peerNotes={peerNotes}
                   peerTypingNoteIds={peerTypingNoteIds}
-                  peerColor={presenceColor}
                   archiveMode={selectedFolderId === ARCHIVE}
                   searchRef={searchRef}
                   onQueryChange={setQuery}
-                  onSelect={handleSelectNote}
+                  onSelect={handleSelectFromList}
                   onNew={handleNew}
                   onMoveToTrash={handleMoveToTrash}
                   onRestore={handleRestore}
@@ -6126,7 +6137,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onDeleteForever={handleDeleteForever}
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
-                  onInfo={(noteId, origin) => openSheet({ ...origin, kind: "note", noteId })}
+                  onInfo={(noteId) => openSheet({ kind: "note", noteId })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}

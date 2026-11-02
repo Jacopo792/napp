@@ -12,7 +12,7 @@
  * two presses, because the way back in is somebody else's invitation. */
 import { useState } from "react";
 import { BookOpen, LogOut, Minus, NotebookText, Plus, Trash2 } from "@/components/icons";
-import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { Invitations } from "@/components/Invitations";
 import { FaceStack } from "@/components/SpaceSwitch";
 import { Avatar } from "@/components/WorkspaceMenus";
@@ -62,7 +62,6 @@ function KindPicker({
 }
 
 export function ArchiveSheet({
-  origin,
   space,
   selfId,
   isDefault,
@@ -80,7 +79,6 @@ export function ArchiveSheet({
   onLeave,
   onDelete,
 }: {
-  origin: SheetOrigin;
   space: Space;
   selfId: string;
   /** The archive an account starts with: always notes, never deleted. */
@@ -95,7 +93,7 @@ export function ArchiveSheet({
   onOptions: (features: DocumentFeatures) => Promise<void>;
   onCreateInvite: (email: string) => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
-  onOpenPerson: (userId: string, from: Element) => void;
+  onOpenPerson: (userId: string) => void;
   onLeave: () => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
@@ -130,10 +128,10 @@ export function ArchiveSheet({
   }
 
   return (
-    <Sheet label={space.name} origin={origin}>
+    <Sheet label={space.name}>
       <div className="sheet-body">
         <header className="sheet-hero">
-          <span className="sheet-portrait" data-sheet-flyer>
+          <span className="sheet-portrait">
             <FaceStack members={space.members} large />
           </span>
           <input
@@ -222,7 +220,7 @@ export function ArchiveSheet({
                 key={member.userId}
                 type="button"
                 className="sheet-face press"
-                onClick={(event) => onOpenPerson(member.userId, event.currentTarget)}
+                onClick={() => onOpenPerson(member.userId)}
               >
                 <Avatar
                   url={avatarUrls[member.userId] ?? null}
@@ -298,10 +296,8 @@ export function ArchiveSheet({
 /** A name and what it is for: notes, or a book. Members, seats and the
  *  book's tools are set from its own sheet once the window is open on it. */
 export function NewArchiveSheet({
-  origin,
   onCreate,
 }: {
-  origin: SheetOrigin;
   onCreate: (name: string, kind: ArchiveKind, features: DocumentFeatures) => Promise<void>;
 }) {
   const [name, setName] = useState("");
@@ -323,7 +319,7 @@ export function NewArchiveSheet({
   }
 
   return (
-    <Sheet label="New archive" origin={origin} className="is-short">
+    <Sheet label="New archive" className="is-short">
       <form
         className="sheet-body new-archive"
         onSubmit={(event) => {
@@ -332,7 +328,7 @@ export function NewArchiveSheet({
         }}
       >
         <header className="sheet-hero">
-          <span className="sheet-portrait sheet-note-glyph" data-sheet-flyer>
+          <span className="sheet-portrait sheet-note-glyph">
             <Plus size={30} />
           </span>
           <h2>New archive</h2>

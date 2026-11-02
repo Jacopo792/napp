@@ -30,7 +30,6 @@ import type { MenuItem } from "@/lib/menuShape";
 import { WhatsNewButton } from "./WhatsNewButton";
 import { UpdateNotice } from "./UpdateNotice";
 import { MenuButton } from "./MenuPrimitives";
-import type { SheetOrigin } from "./Sheet";
 
 /* ── The sidebar ─────────────────────────────────────────────────────────────
    Folders belong in the window, not in Settings.
@@ -73,8 +72,8 @@ interface Props {
   onCreateFolder: (name: string, parentId: string | null) => void;
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
-  /** The folder's sheet, growing out of its glyph. */
-  onFolderInfo: (id: string, origin: SheetOrigin) => void;
+  /** The folder's sheet. */
+  onFolderInfo: (id: string) => void;
   onClose: () => void;
   /** On the phone the column is a sheet and this is how it is put away; on
    *  the desktop hiding the columns lives in the list's own group. */
@@ -101,13 +100,6 @@ const EXPANDED_KEY = "napp:folders-open";
 /* How long a press has to stay still to become a hold — the folder's sheet,
    the way a note row's hold is the note's. */
 const HOLD_MS = 450;
-
-function glyphOrigin(row: Element): SheetOrigin {
-  const { x, y, width, height } = (
-    row.querySelector(".sidebar-glyph") ?? row
-  ).getBoundingClientRect();
-  return { x, y, width, height };
-}
 
 /* Whole pixels, both of them. 0.85rem is 13.6px, so every level of nesting used
    to push its glyph another 0.6px off the device grid — the icons at depth two
@@ -346,7 +338,7 @@ function Row({
   onSelect: () => void;
   onContextMenu?: (event: React.MouseEvent) => void;
   /** A mouse pressed and kept still; the click that ends it is not a select. */
-  onHold?: (row: Element) => void;
+  onHold?: () => void;
   /** A folder that can be dragged to another place among the folders. */
   movable?: boolean;
   /** Where a folder being dragged over this one would land beside it. */
@@ -379,7 +371,6 @@ function Row({
       className={`sidebar-row ${active ? "is-active" : ""} ${isOver && !folderOver ? "is-over" : ""} ${
         side ? `is-over-${side}` : ""
       } ${drag.isDragging ? "is-lifted" : ""}`}
-      data-folder-row={onHold ? scope.id : undefined}
       data-scope-row={scope.id}
       style={{ paddingLeft: `${depth * INDENT}px` }}
       onContextMenu={onContextMenu}
@@ -398,11 +389,10 @@ function Row({
           drag.listeners?.onPointerDown?.(event);
           if (!onHold || event.pointerType !== "mouse" || event.button !== 0) return;
           window.clearTimeout(hold.current?.timer);
-          const row = event.currentTarget;
           const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
           press.timer = window.setTimeout(() => {
             press.fired = true;
-            onHold(row);
+            onHold();
           }, HOLD_MS);
           hold.current = press;
         }}
@@ -575,7 +565,7 @@ export function Sidebar({
             draggedId === node.folder.id ? null : folderDropSide(folders, draggedId, node.folder.id)
           }
           onSelect={() => onSelect(node.folder.id)}
-          onHold={(row) => onFolderInfo(node.folder.id, glyphOrigin(row))}
+          onHold={() => onFolderInfo(node.folder.id)}
           onContextMenu={(event) => {
             setConfirmDelete(false);
             folderMenu.open(event, node.folder);
@@ -862,9 +852,7 @@ export function Sidebar({
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
           <MenuButton
             onClick={() => {
-              const id = folderMenu.target!.item.id;
-              const row = document.querySelector(`[data-folder-row="${CSS.escape(id)}"]`);
-              if (row) onFolderInfo(id, glyphOrigin(row));
+              onFolderInfo(folderMenu.target!.item.id);
               closeFolderMenu();
             }}
           >

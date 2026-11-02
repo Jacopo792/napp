@@ -1,4 +1,4 @@
-/* A sheet that comes out of the thing that was held.
+/* A sheet about one thing: a note, a folder, a person, an archive.
  *
  * Shared by the person sheet and the note sheet: the frame, the dismissal and
  * the motion are one decision, so they live once.
@@ -12,28 +12,20 @@
  * then a square long before it is a card. And the sheet changed height when
  * its rows arrived, in the middle of all that.
  *
- * Now nothing that big moves far. The sheet fades in at its own place from a
- * hair smaller, on a curve with no overshoot, and is a fixed height so what
- * loads later fills it rather than resizing it. The one thing that travels is
- * the `[data-sheet-flyer]` inside it — the face, or the note's glyph — which
- * starts exactly over the thing that was held and lands in the sheet. It is
- * already the shape it is, so there is no shape to morph; and it is small, so
- * the spring it lands with reads as landing. Transform and opacity only, both
- * composited: no frame of it asks for a paint.
- *
- * Closing runs the same two animations backwards, so the way out is the way
- * in. The Web Animations API rather than keyframes in the stylesheet, because
- * where the flyer starts is a measurement, not a constant.
+ * Then the sheet faded in about the held thing while its face or glyph flew
+ * out of the row into place. That too was rejected: a window coming out of a
+ * button reads as a gimmick. Now the sheet settles in where it stays — a short
+ * rise and a fade, the same as Settings — and is a fixed height so what loads
+ * later fills it rather than resizing it. Closing runs it backwards.
  *
  * ── The stack ───────────────────────────────────────────────────────────────
  * A name in one sheet opens another — a face in the note sheet opens the
  * person — and the way back is a Back arrow where Close is, on the other side.
  * So the sheets are a stack under one backdrop, and every sheet in it stays
- * mounted: the one underneath keeps what it loaded, and the face that was
- * pressed is still there for the flyer to go back into. Covered, a sheet only
- * fades out where it stands and is `inert`; the one on top comes out of the
- * face exactly as a first sheet comes out of a row. Back runs the top sheet's
- * own way out while the one underneath fades back in, at the same time — two
+ * mounted: the one underneath keeps what it loaded, and the way back finds it
+ * as it was. Covered, a sheet only fades out where it stands and is `inert`;
+ * the one on top arrives as a first sheet does. Back runs the top sheet's own
+ * way out while the one underneath fades back in, at the same time — two
  * motions that are one gesture. The backdrop fades once, for the whole stack. */
 import {
   Children,
@@ -49,16 +41,7 @@ import {
 } from "react";
 import { ChevronLeft, X } from "@/components/icons";
 
-export interface SheetOrigin {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-const OPEN = { duration: 220, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
-const FLY = { duration: 320, easing: "cubic-bezier(0.32, 1.25, 0.6, 1)" };
-const SHEET_FROM = 0.94;
+const OPEN = { duration: 260, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
 const CLOSE = { duration: 200, easing: "cubic-bezier(0.4, 0, 0.6, 1)" };
 
 const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -124,60 +107,35 @@ export function SheetStack({
 
 export function Sheet({
   label,
-  origin,
   className = "",
   children,
 }: {
   label: string;
-  origin: SheetOrigin;
   className?: string;
   children: ReactNode;
 }) {
   const place = useContext(Place)!;
   const { index, shown, backdrop } = place;
   const sheetRef = useRef<HTMLElement>(null);
-  const flight = useRef<{ sheet: Keyframe[]; flyer: Keyframe[] } | null>(null);
+  const flight = useRef<Keyframe[] | null>(null);
   const leaving = useRef(false);
   const covered = index < shown;
   const onTop = index === shown;
 
   /* Before the first paint, so there is no frame of the sheet sitting at its
-     destination before it has left. Whatever a previous run started is
-     cancelled on the way out: React runs this twice in development, and a
-     second run that measured the flyer mid-flight would compute a flight from
-     the held thing to the held thing and fight the first one. Cancelled, the
-     second run measures the flyer where it really lands. */
+     destination before it has arrived. It settles in where it will stay — a
+     short rise and a fade, like Settings. Coming out of the held row, with
+     its glyph flying into place, was rejected as a gimmick. */
   useLayoutEffect(() => {
     const sheet = sheetRef.current;
-    const flyer = sheet?.querySelector<HTMLElement>("[data-sheet-flyer]");
     if (!sheet || still()) return;
-    /* The sheet starts a hair small, scaled about the held thing itself —
-       so the point the flyer starts from stays exactly where the hand was,
-       and the flyer's own scale is divided by the sheet's to land on the
-       held thing's size. */
-    const held = { x: origin.x + origin.width / 2, y: origin.y + origin.height / 2 };
-    const frame = sheet.getBoundingClientRect();
-    sheet.style.transformOrigin = `${held.x - frame.x}px ${held.y - frame.y}px`;
-    const box = flyer?.getBoundingClientRect();
-    const start =
-      box && box.width > 0
-        ? `translate(${held.x - (box.x + box.width / 2)}px, ${
-            held.y - (box.y + box.height / 2)
-          }px) scale(${origin.width / box.width / SHEET_FROM})`
-        : "scale(0.6)";
-    flight.current = {
-      sheet: [
-        { opacity: 0, transform: `scale(${SHEET_FROM})` },
-        { opacity: 1, transform: "none" },
-      ],
-      flyer: [{ transform: start }, { transform: "none" }],
-    };
-    const running = [
-      sheet.animate(flight.current.sheet, OPEN),
-      flyer?.animate(flight.current.flyer, FLY),
+    flight.current = [
+      { opacity: 0, transform: "translateY(8px) scale(0.985)" },
+      { opacity: 1, transform: "none" },
     ];
-    return () => running.forEach((animation) => animation?.cancel());
-  }, [origin]);
+    const rise = sheet.animate(flight.current, OPEN);
+    return () => rise.cancel();
+  }, []);
 
   /* Covered, the sheet fades where it stands — it does not move, it is not
      what the eye is following — and fades back the same way. The first run is
@@ -205,13 +163,11 @@ export function Sheet({
       const done = whole ? place.close : place.back;
       if (!whole) place.leave();
       const sheet = sheetRef.current;
-      const flyer = sheet?.querySelector<HTMLElement>("[data-sheet-flyer]");
       if (!sheet || !flight.current || still()) return done();
       const options = { ...CLOSE, fill: "forwards" as const };
       const finished = [
         whole ? backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], options) : undefined,
-        sheet.animate([...flight.current.sheet].reverse(), options),
-        flyer?.animate([...flight.current.flyer].reverse(), options),
+        sheet.animate([...flight.current].reverse(), options),
       ].map((animation) => animation?.finished);
       /* A hidden window runs no animations and so finishes none; the sheet
          still has to go. */

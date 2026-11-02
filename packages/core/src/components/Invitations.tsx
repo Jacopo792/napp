@@ -5,7 +5,7 @@
  * copied by hand, and the message is composed and sent by the member's own
  * mail app. */
 import { useState } from "react";
-import { Copy, Mail, ShieldCheck, Undo2, UserPlus } from "@/components/icons";
+import { Check, Copy, Mail, ShieldCheck, Undo2, UserPlus } from "@/components/icons";
 
 /** Seven days is the invitation's whole life, so what is left of it is said in
  *  days rather than as a date nobody can subtract at a glance. */
@@ -54,6 +54,7 @@ export function Invitations({
   const [link, setLink] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function create() {
     const target = email.trim();
@@ -169,13 +170,18 @@ export function Invitations({
             <button
               type="button"
               aria-label="Copy invitation link"
+              className="copy-swap"
+              data-copied={copied || undefined}
               onClick={() => {
                 void navigator.clipboard.writeText(link).then(() => {
                   setStatus("Copied. The link expires in 7 days.");
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1600);
                 });
               }}
             >
               <Copy size={16} />
+              <Check size={16} weight="bold" />
             </button>
           </div>
           <a className="invite-mail" href={inviteMailto(email, link)}>

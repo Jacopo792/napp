@@ -34,10 +34,12 @@ import {
 } from "@/components/icons";
 import type { Meta, NoteLock } from "@/lib/types";
 import { AvatarCropper } from "./AvatarCropper";
+import { Avatar } from "./WorkspaceMenus";
 import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
 import { prefetchNote } from "@/lib/collab";
-import { formatStamp } from "@/lib/format";
+import { fold, formatStamp } from "@/lib/format";
+import { snippetOf } from "@/lib/spotlight";
 import { derivedOf, indexOf } from "@/lib/derived";
 import {
   DRAWING_TEXT_FONT,
@@ -50,28 +52,14 @@ import {
 import type { NoteEntry } from "@/lib/entries";
 import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
-import { playRows } from "@/lib/motion";
+import { dropPin, playRows } from "@/lib/motion";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuItems } from "./MenuPrimitives";
 import { pinItem, lockItems, moveItem } from "./menuNoteItems";
 import type { MenuItem } from "@/lib/menuShape";
-import type { SheetOrigin } from "./Sheet";
 
 /* How long a press has to stay still to become a hold — the note sheet. */
 const HOLD_MS = 450;
-
-/** Where a row's note is drawn: its photo or glyph when it has one, or a
- *  glyph-sized square at its leading edge — what the sheet's glyph flies out
- *  of and back into. */
-function rowOrigin(row: HTMLElement): SheetOrigin {
-  const lead = row.querySelector(".note-photo, .note-row-glyph");
-  if (lead) {
-    const { x, y, width, height } = lead.getBoundingClientRect();
-    return { x, y, width, height };
-  }
-  const box = row.getBoundingClientRect();
-  return { x: box.x + 12, y: box.y + box.height / 2 - 14, width: 28, height: 28 };
-}
 
 /** A row that has just been pushed open says so, and every other row closes.
  *  Announced rather than lifted into the list's state: this is a fact about a
@@ -108,7 +96,7 @@ interface Props {
   /** Before the title, at the strip's leading edge: the sidebar toggle. */
   leading?: ReactNode;
   /** The note's sheet, flown out of where the note is drawn in its row. */
-  onInfo?: (noteId: string, origin: SheetOrigin) => void;
+  onInfo?: (noteId: string) => void;
   /** Row above the collection header — the archive switch, the pane toggle. */
   topBar?: ReactNode;
   /** Row below the list — where Settings and the lock stand. */
@@ -130,6 +118,9 @@ interface Props {
    *  now and says no names, so the tally under the folder carries the member —
    *  a readout, which is what that line already is. */
   scopeLabel?: string;
+  /** Said in place of the tally for a moment — what just happened — when no
+   *  note is open whose header could say it. */
+  notice?: ReactNode;
   trashMode: boolean;
   archiveMode: boolean;
   /** Notes carrying a remark the reader has not seen. The badge in the sidebar
@@ -137,10 +128,9 @@ interface Props {
    *  is a number with nothing under it, and the honest answer to "I have read
    *  them all" is a note nobody could find. */
   unreadIds?: Set<string>;
-  /** Notes the other member has open right now, and the colour she wears. */
-  peerNoteIds?: Set<string>;
+  /** Notes another member has open right now, and whose face to show on them. */
+  peerNotes?: Map<string, PeerFace>;
   peerTypingNoteIds?: Set<string>;
-  peerColor?: string;
   searchRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
@@ -192,17 +182,63 @@ const GLYPHS = {
    pezzi giusti)", and a list that cuts that at 30 characters throws away the
    naming scheme its owner built. Three lines, then it stops. */
 
-function PeerDot({ here, typing, color }: { here: boolean; typing: boolean; color?: string }) {
+export interface PeerFace {
+  name: string;
+  avatarUrl: string | null;
+}
+
+/* Who has the note open: their face, small, beside when it changed — and the
+   same writing bubble the people switch wears while they type. It was a
+   coloured dot that pulsed, which said "something" without saying who. */
+function PeerBadge({
+  name,
+  avatarUrl,
+  typing,
+}: {
+  name: string | undefined;
+  avatarUrl: string | null;
+  typing: boolean;
+}) {
+  const here = name !== undefined;
   const present = usePresence(here, 120);
+  const last = useRef({ name: "", avatarUrl: null as string | null });
+  if (here) last.current = { name, avatarUrl };
   if (!present) return null;
+  const shown = last.current;
   return (
     <span
-      className={`note-row-peer ${here ? "" : "is-away"} ${here && typing ? "is-typing" : ""}`}
+      className={`note-row-peer ${here ? "" : "is-away"}`}
       role="img"
       aria-hidden={!here}
-      aria-label={typing ? "The other member is writing" : "Open by the other member now"}
-      style={{ "--face": color } as React.CSSProperties}
-    />
+      aria-label={
+        typing ? `${shown.name || "Member"} is writing` : `Open by ${shown.name || "a member"}`
+      }
+      title={shown.name || undefined}
+    >
+      <Avatar url={shown.avatarUrl} name={shown.name} email="" compact />
+      {here && typing && (
+        <span className="people-face-typing">
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* What was typed, found again in the row — folded the way the search folds,
+   so "perche" lights "Perché". `query` arrives already folded; null when the
+   text does not contain it. */
+function marked(text: string, query: string, radius = Infinity): ReactNode {
+  const hit = query ? snippetOf(text, query, radius) : null;
+  if (!hit) return null;
+  return (
+    <>
+      {hit.before}
+      <mark className="note-row-match">{hit.match}</mark>
+      {hit.after}
+    </>
   );
 }
 
@@ -213,9 +249,9 @@ const Row = memo(function Row({
   meta,
   selected,
   unread,
-  peerHere,
+  peerName,
+  peerAvatar,
   peerTyping,
-  peerColor,
   showFolder,
   onSelect,
   trashMode,
@@ -229,6 +265,7 @@ const Row = memo(function Row({
   onContextMenu,
   onHold,
   resolveImage,
+  query,
 }: {
   mobile: boolean;
   gallery: boolean;
@@ -236,9 +273,9 @@ const Row = memo(function Row({
   meta: Meta;
   selected: boolean;
   unread: boolean;
-  peerHere: boolean;
+  peerName: string | undefined;
+  peerAvatar: string | null;
   peerTyping: boolean;
-  peerColor?: string;
   showFolder: boolean;
   trashMode: boolean;
   archiveMode: boolean;
@@ -253,8 +290,9 @@ const Row = memo(function Row({
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
   /** A still press — the note sheet. */
-  onHold?: (entry: NoteEntry, origin: SheetOrigin) => void;
+  onHold?: (entry: NoteEntry) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
+  query: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: entry.note.id,
@@ -446,7 +484,7 @@ const Row = memo(function Row({
     const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
     press.timer = window.setTimeout(() => {
       press.fired = true;
-      if (rowRef.current) onHold(entry, rowOrigin(rowRef.current));
+      onHold(entry);
     }, HOLD_MS);
     hold.current = press;
   }
@@ -496,6 +534,11 @@ const Row = memo(function Row({
   }
 
   const { preview } = derivedOf(entry.note);
+  /* While searching, the preview is the words around the first match rather
+     than the note's opening line, so the reason it is listed is on screen.
+     ponytail: folds the whole body per row per keystroke; cache folded bodies
+     in `derivedOf` if long archives make typing lag. */
+  const around = query ? marked(entry.note.body, query, 32) : null;
   const pinned = noteMeta?.pinned === true;
   const folderName = noteMeta?.folderId
     ? indexOf(meta).byFolder.get(noteMeta.folderId)?.name
@@ -687,10 +730,17 @@ const Row = memo(function Row({
               overflow: "hidden",
             }}
           >
-            <PeerDot here={peerHere} typing={peerTyping} color={peerColor} />
-            {!gallery && pinned && <Pin size={12} className="note-row-pin" aria-label="Pinned" />}
-            {entry.note.title || "Untitled"}
+            {!gallery && pinned && (
+              <Pin
+                ref={(el) => dropPin(el, entry.note.id)}
+                size={12}
+                className="note-row-pin"
+                aria-label="Pinned"
+              />
+            )}
+            {entry.note.title ? (marked(entry.note.title, query) ?? entry.note.title) : "Untitled"}
           </p>
+          <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />
           {list && <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>}
         </div>
 
@@ -705,7 +755,7 @@ const Row = memo(function Row({
               {checklist.done}/{checklist.total}
             </span>
           )}
-          {preview && <span className="note-row-preview">{preview}</span>}
+          {(around ?? preview) && <span className="note-row-preview">{around ?? preview}</span>}
         </p>
 
         {!gallery && showFolder && folderName && (
@@ -918,12 +968,12 @@ export function NoteList({
   folderLabel,
   showFolder = false,
   scopeLabel,
+  notice,
   trashMode,
   archiveMode,
   unreadIds,
-  peerNoteIds,
+  peerNotes,
   peerTypingNoteIds,
-  peerColor,
   searchRef,
   onQueryChange,
   onSelect,
@@ -939,6 +989,7 @@ export function NoteList({
   resolveImage,
 }: Props) {
   const hasQuery = query.trim().length > 0;
+  const foldedQuery = fold(query.trim());
   /* The page speaks in note ids; the rows hand back the whole entry. One stable
      adapter per action beats one fresh closure per row per render. */
   const selectEntry = useCallback((entry: NoteEntry) => onSelect(entry.note.id), [onSelect]);
@@ -987,10 +1038,7 @@ export function NoteList({
      of the list rather than a new one whenever the page re-renders. */
   const onInfoRef = useRef(onInfo);
   onInfoRef.current = onInfo;
-  const holdEntry = useCallback(
-    (entry: NoteEntry, origin: SheetOrigin) => onInfoRef.current?.(entry.note.id, origin),
-    [],
-  );
+  const holdEntry = useCallback((entry: NoteEntry) => onInfoRef.current?.(entry.note.id), []);
   const infoItem = (entry: NoteEntry): MenuItem[] =>
     onInfo
       ? [
@@ -999,12 +1047,7 @@ export function NoteList({
             id: "info",
             label: "Note info",
             icon: <Info size={16} />,
-            run: () => {
-              const row = document.querySelector<HTMLElement>(
-                `[data-note-row="${CSS.escape(entry.note.id)}"]`,
-              );
-              if (row) onInfo(entry.note.id, rowOrigin(row));
-            },
+            run: () => onInfo(entry.note.id),
           },
         ]
       : [];
@@ -1229,14 +1272,15 @@ export function NoteList({
               <Row
                 mobile={mobile}
                 gallery={gallery}
+                query={foldedQuery}
                 key={entry.note.id}
                 entry={entry}
                 meta={meta}
                 selected={selectedId === entry.note.id}
                 unread={unreadIds?.has(entry.note.id) ?? false}
-                peerHere={peerNoteIds?.has(entry.note.id) ?? false}
+                peerName={peerNotes?.get(entry.note.id)?.name}
+                peerAvatar={peerNotes?.get(entry.note.id)?.avatarUrl ?? null}
                 peerTyping={peerTypingNoteIds?.has(entry.note.id) ?? false}
-                peerColor={peerColor}
                 showFolder={showFolder}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
@@ -1278,6 +1322,13 @@ export function NoteList({
     </div>
   );
 
+  /* Clearing keeps the caret in the field, as a Mac search field does: the
+     next word can be typed straight away. */
+  const clearSearch = () => {
+    onQueryChange("");
+    searchRef.current?.focus();
+  };
+
   if (mobile) {
     return (
       <section className="mobile-note-list relative flex h-full w-full flex-col overflow-hidden">
@@ -1287,8 +1338,8 @@ export function NoteList({
               {folderLabel}
             </h1>
             <p className="readout mt-1.5 text-ink-4">
-              {loading ? "Loading" : noteTally(entries.length, trashMode)}
-              {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
+              {notice ?? (loading ? "Loading" : noteTally(entries.length, trashMode))}
+              {scopeLabel && !loading && !notice && <span className="scope-tag">{scopeLabel}</span>}
             </p>
           </div>
           <span className="flex items-center gap-1">{toolbarActions}</span>
@@ -1317,8 +1368,8 @@ export function NoteList({
             {hasQuery && (
               <button
                 title="Clear search"
-                onClick={() => onQueryChange("")}
-                className="icon-button h-8 w-8 shrink-0 text-ink-4"
+                onClick={clearSearch}
+                className="search-clear icon-button h-8 w-8 shrink-0 text-ink-4"
               >
                 <X size={16} />
               </button>
@@ -1385,9 +1436,9 @@ export function NoteList({
             the thirty days the Trash is counting — is owed in full. */}
         <div className="collection-title min-w-0 flex-1">
           <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
-          <p className="readout shrink-0 text-ink-4">
-            {loading ? "Loading" : noteTally(entries.length, trashMode)}
-            {scopeLabel && !loading && <span className="scope-tag">{scopeLabel}</span>}
+          <p className={`readout text-ink-4 ${notice ? "min-w-0 truncate" : "shrink-0"}`}>
+            {notice ?? (loading ? "Loading" : noteTally(entries.length, trashMode))}
+            {scopeLabel && !loading && !notice && <span className="scope-tag">{scopeLabel}</span>}
           </p>
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged
@@ -1423,6 +1474,14 @@ export function NoteList({
               e.stopPropagation();
               onQueryChange("");
               e.currentTarget.blur();
+            } else if (e.key === "Enter" && hasQuery) {
+              /* Return opens the top result, at the words that found it —
+                 what a pointer would have done to the first row. */
+              const top = groups.find((group) => !collapsed.has(group.id))?.entries[0];
+              if (top) {
+                e.preventDefault();
+                onSelect(top.note.id);
+              }
             }
           }}
           placeholder="Search"
@@ -1432,8 +1491,8 @@ export function NoteList({
         {hasQuery && (
           <button
             title="Clear search"
-            onClick={() => onQueryChange("")}
-            className="icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
+            onClick={clearSearch}
+            className="search-clear icon-button shrink-0 p-1 text-ink-4 transition-colors hover:text-ink"
           >
             <X size={12} />
           </button>

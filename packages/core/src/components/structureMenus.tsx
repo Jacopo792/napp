@@ -23,7 +23,7 @@ export interface StructureActions {
   parts: Map<string, string>;
   canWrite: boolean;
   onOpen: (id: string) => void;
-  onInfo: (id: string, point: MenuPoint) => void;
+  onInfo: (id: string) => void;
   onMove: (id: string, target: StructureTarget) => void;
   onNewPart: (chapterId: string) => void;
   onNewChapter: (folderId: string | null) => void;
@@ -66,7 +66,7 @@ export function chapterMenuItems(
       id: "info",
       label: "Info",
       icon: <Info size={16} />,
-      run: () => onInfo(item.id, point),
+      run: () => onInfo(item.id),
     },
   ];
   if (canWrite && item.movable) {

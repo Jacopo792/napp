@@ -14,7 +14,6 @@ import { MenuSurface } from "@/components/MenuSurface";
  * and a note's row do; it grows out of the faces. */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronDown, Info, Plus, Settings, Trash2 } from "@/components/icons";
-import type { SheetOrigin } from "@/components/Sheet";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { MenuButton, MenuItems } from "@/components/MenuPrimitives";
 import { ContextMenu } from "@/components/ContextMenu";
@@ -71,13 +70,6 @@ export function FaceStack({ members, large = false }: { members: SpaceMember[]; 
   );
 }
 
-function spaceOrigin(element: Element): SheetOrigin {
-  const { x, y, width, height } = (
-    element.querySelector(".face-stack") ?? element
-  ).getBoundingClientRect();
-  return { x, y, width, height };
-}
-
 export function SpaceSwitch({
   spaces,
   currentId,
@@ -93,22 +85,20 @@ export function SpaceSwitch({
   /** The archive an account starts with, which is never deleted. */
   defaultId: string | undefined;
   onSwitch: (archiveId: string) => void;
-  onInfo: (origin: SheetOrigin) => void;
+  onInfo: () => void;
   onSettings: () => void;
-  onCreate: (origin: SheetOrigin) => void;
+  onCreate: () => void;
   onDelete: (archiveId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ point: MenuPoint; items: MenuItem[] } | null>(null);
   const close = () => setOpen(false);
   const ref = useDismiss(open, close);
-  const button = useRef<HTMLButtonElement>(null);
   const hold = useRef<{ timer: number; fired: boolean } | null>(null);
   useEffect(() => () => window.clearTimeout(hold.current?.timer), []);
 
   const current = spaces.find((space) => space.archiveId === currentId);
   if (!current) return null;
-  const origin = () => (button.current ? spaceOrigin(button.current) : spaceOrigin(document.body));
 
   /** What can be done to one archive: the right button on it, here or in
    *  the list. */
@@ -121,7 +111,7 @@ export function SpaceSwitch({
             id: "space-info",
             label: "Archive info",
             icon: <Info size={16} />,
-            run: () => onInfo(origin()),
+            run: onInfo,
           },
           {
             kind: "item",
@@ -165,7 +155,6 @@ export function SpaceSwitch({
   return (
     <div ref={ref} className="space-switch-wrap">
       <button
-        ref={button}
         type="button"
         className="space-switch press"
         aria-haspopup="menu"
@@ -181,7 +170,7 @@ export function SpaceSwitch({
           press.timer = window.setTimeout(() => {
             press.fired = true;
             setOpen(false);
-            onInfo(origin());
+            onInfo();
           }, HOLD_MS);
           hold.current = press;
         }}
@@ -237,7 +226,7 @@ export function SpaceSwitch({
               id: "space-new",
               label: "New archive…",
               icon: <Plus size={16} />,
-              run: () => onCreate(origin()),
+              run: onCreate,
             },
           ]}
         />

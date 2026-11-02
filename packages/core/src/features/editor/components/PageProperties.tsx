@@ -273,7 +273,6 @@ export function PageIdentity({
           label={onSetPhoto ? "Note photo" : "Show photo"}
           onPick={onSetPhoto}
           onRemove={onSetPhoto && (() => onSetPhoto(null))}
-          flyer={false}
         >
           {url && <img src={url} alt="" draggable={false} />}
         </SheetPortrait>

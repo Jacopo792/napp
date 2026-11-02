@@ -3,6 +3,32 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.48 – 2026-11-02
+
+### Added
+
+- Search highlights matches in note rows, shows the words around them, and opening a
+  result (or pressing Return in the search field) opens the note at that passage.
+- A Copy button on code blocks; the invitation link's copy button turns into a tick.
+- Desktop: a web link's address at the window's foot while the pointer is on it.
+- Without an open note, confirmations and errors replace the list's note count.
+
+### Changed
+
+- Settings, What's New and info sheets enter with a short rise and fade instead of
+  growing from the pressed control; the light/dark switch crossfades.
+- The You/Partner switch is a segmented capsule again; a note another member has open
+  shows their picture instead of a pulsing dot.
+- Motion and detail: drawn checklist ticks and dimmed finished items, a dropping pin,
+  a sweeping loading placeholder, softer link underlines, table row hover, fading-in
+  pictures, an accent drop cursor and a focus ring that settles onto its control.
+
+### Fixed
+
+- Failures other than a save (for example a refused clipboard) were reported as
+  "Save failed" until the next save; they now show their own message briefly.
+- The gap cursor beside tables and pictures was invisible on dark pages.
+
 ## 0.9.47 – 2026-11-01
 
 ### Changed

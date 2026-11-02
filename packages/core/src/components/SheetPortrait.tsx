@@ -7,9 +7,6 @@
  * are told apart by time, so a hold that lands never also opens the menu.
  * Where the picture is not the reader's to change, a press shows it.
  *
- * Used on a sheet and on the page, so nothing in it is sheet-only:
- * `data-sheet-flyer` is read only inside a sheet.
- *
  * The cropper and the enlarged picture are portalled to the body: the sheet
  * carries a transform, and a `position: fixed` inside a transform is fixed to
  * the sheet, not the window. The menu is the page's own, never the system's:
@@ -33,7 +30,6 @@ export function SheetPortrait({
   label,
   onPick,
   onRemove,
-  flyer = true,
   children,
 }: {
   className: string;
@@ -43,8 +39,6 @@ export function SheetPortrait({
   /** Absent where the picture is not the reader's to change. */
   onPick?: (file: File, crop: AvatarCrop) => void;
   onRemove?: () => void;
-  /** Whether this is the face a sheet flies out of. */
-  flyer?: boolean;
   children: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -108,7 +102,6 @@ export function SheetPortrait({
     <>
       <span
         className={`${className} ${interactive ? "is-pressable" : ""}`}
-        data-sheet-flyer={flyer || undefined}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         aria-label={interactive ? label : undefined}

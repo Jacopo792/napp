@@ -17,7 +17,7 @@
  * reads, so the "+120" here and the "+120" there are one number. */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Bookmark } from "@/components/icons";
-import { Sheet, type SheetOrigin } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
 import type { AvatarCrop } from "@/lib/image";
@@ -47,8 +47,6 @@ interface Props {
   noteCount: number;
   /** Where they are, when presence says so. */
   now: PersonNow | null;
-  /** Where the face was: it flies from there into the sheet, and back. */
-  origin: SheetOrigin;
   titleOf: (noteId: string) => string | null;
   onOpenNote: (noteId: string, withHistory: boolean) => void;
   /** Only on your own sheet: a face is its owner's to change. */
@@ -73,7 +71,6 @@ export function PersonSheet({
   color,
   noteCount,
   now,
-  origin,
   titleOf,
   onOpenNote,
   onSetAvatar,
@@ -117,7 +114,7 @@ export function PersonSheet({
   }, [work]);
 
   return (
-    <Sheet label={name} origin={origin}>
+    <Sheet label={name}>
       <div className="sheet-body" style={{ "--person": color } as CSSProperties}>
         <header className="sheet-hero">
           <SheetPortrait

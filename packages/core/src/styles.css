@@ -293,6 +293,23 @@
   :focus-visible {
     outline: 2px solid var(--ink-2);
     outline-offset: 2px;
+    /* It lands on the control, as a Mac focus ring does: drawn a little wide
+       and closing in, so the eye is taken to where focus went. In the base
+       layer, so any element with an animation of its own keeps it. */
+    animation: focus-ring-in var(--dur-fast) var(--ease-out);
+  }
+
+  @keyframes focus-ring-in {
+    from {
+      outline-color: transparent;
+      outline-offset: 6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :focus-visible {
+      animation: none;
+    }
   }
 
   input,
@@ -655,38 +672,6 @@
 
 .context-menu {
   animation: menu-in 140ms var(--ease-out) backwards;
-}
-
-/* A card that answers a hold should look like it came out of the finger that
-   held. So it grows from the corner nearest the point it was asked from —
-   which is the top-left corner, because that is the corner the panel is placed
-   by — and it does it on the spring, which is what separates a thing arriving
-   from a thing appearing. Larger than `menu-in` on purpose: this is one card
-   about one person, not a list of things to do, and it can afford the travel a
-   menu cannot. */
-.context-menu.member-card-panel {
-  padding: 16px;
-  animation: member-card-in var(--dur-base) var(--ease-spring) backwards;
-  transform-origin: top left;
-}
-
-@keyframes member-card-in {
-  from {
-    opacity: 0;
-    transform: scale(0.72);
-  }
-}
-
-/* The card is laid out as the note header's is — it is the same card. */
-.context-menu.member-card-panel > .member-presence-heading,
-.context-menu.member-card-panel > .member-presence-facts {
-  display: flex;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .context-menu.member-card-panel {
-    animation: none;
-  }
 }
 
 /* ══ The door ════════════════════════════════════════════════════════════════
@@ -2078,19 +2063,29 @@
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes skeleton-pulse {
-  0%,
-  100% {
-    opacity: 1;
+/* One light passing over every placeholder at once: the band is fixed to the
+   window, so the bars of a row and the rows below it are lit by the same
+   sweep instead of each flickering on its own. */
+@keyframes skeleton-sweep {
+  from {
+    background-position: -40vw 0;
   }
-  50% {
-    opacity: 0.45;
+  to {
+    background-position: 140vw 0;
   }
 }
 .skeleton {
-  background: var(--rule-soft);
+  background: var(--rule-soft)
+    linear-gradient(
+      100deg,
+      transparent 0,
+      color-mix(in srgb, var(--ink) 9%, transparent) 50%,
+      transparent 100%
+    )
+    no-repeat fixed;
+  background-size: 40vw 100%;
   border-radius: var(--radius-pill);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
+  animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2566,6 +2561,15 @@
   padding: 16px;
   color: var(--ink);
   text-align: left;
+  /* A card about one person, not a menu: it settles in where it stays, the
+     way Settings and the sheets do, instead of growing out of the face. */
+  animation: settings-reveal var(--dur-base) var(--ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .member-presence-popover {
+    animation: none;
+  }
 }
 
 .member-presence-heading {
@@ -2879,6 +2883,112 @@
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   transition: background var(--dur-fast) var(--ease);
+}
+
+/* The caret beside a table or a picture, where there is no text to stand in.
+   The editor's own is a black hairline — invisible on this page — so it takes
+   the text caret's accent and weight. */
+.ProseMirror .ProseMirror-gapcursor::after {
+  border-top: 2px solid var(--accent);
+  border-radius: 1px;
+}
+
+/* The copy button over a code block's top corner. */
+.code-copy {
+  position: fixed;
+  z-index: 60;
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-3);
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+.code-copy:hover {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .code-copy {
+    animation: none;
+  }
+}
+
+/* A web link's address at the window's foot while the pointer is on it. */
+.link-peek {
+  position: fixed;
+  z-index: 120;
+  bottom: 8px;
+  left: 8px;
+  max-width: min(36rem, calc(100vw - 16px));
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-peek {
+    animation: none;
+  }
+}
+
+/* Where a dragged passage will land: the accent, rounded, gliding from one
+   gap to the next instead of jumping. */
+.drop-caret {
+  border-radius: 1px;
+  background: var(--accent);
+  transition:
+    left 90ms var(--ease-out),
+    top 90ms var(--ease-out),
+    width 90ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-caret {
+    transition: none;
+  }
+}
+
+/* The note's status, and the list's tally standing in for it: each new word fades in rather than replacing the last
+   in place. */
+.note-status > *,
+.list-notice {
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-status > *,
+  .list-notice {
+    animation: none;
+  }
+}
+
+/* The clear button arrives with the first letter instead of blinking on:
+   small, so it can afford the spring. */
+.search-clear {
+  animation: search-clear-in var(--dur-fast) var(--ease-spring) backwards;
+}
+
+@keyframes search-clear-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-clear {
+    animation: none;
+  }
 }
 
 .glass-search:focus-within {
@@ -3399,6 +3509,14 @@
   color: var(--ink-3);
 }
 
+/* The searched words, lit where they sit: a wash under the letters, never a
+   change of colour or weight that would make the line jump. */
+.note-row-match {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+}
+
 .note-row-folder {
   display: flex;
   min-width: 0;
@@ -3480,6 +3598,13 @@
   position: static;
   padding: 12px 14px 4px;
   background: transparent;
+}
+
+/* The heading is the top of a rounded card, so its focus ring is drawn inside
+   the card and follows its corners; a square ring stood out past them. */
+.collection-column:not(.is-gallery) .note-group-heading:focus-visible {
+  border-radius: 14px 14px 8px 8px;
+  outline-offset: -2px;
 }
 
 /* Folding stays, but as the phone shows it: no chevron until it is wanted. */
@@ -4597,12 +4722,14 @@
   display: block;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   /* The knob is white in every palette, on and off, as a Mac's is: it is a
      physical thing sitting on a track, not a colour of the theme. */
   background: #fff;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-  transition: transform var(--dur-base) var(--ease-spring);
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    width var(--dur-fast) var(--ease-press);
 }
 
 .appearance-row input[role="switch"]:checked {
@@ -4611,6 +4738,15 @@
 
 .appearance-row input[role="switch"]:checked::before {
   transform: translateX(14px);
+}
+
+/* Held down, the knob stretches toward where it is about to go, as a finger
+   on a real switch leans before it flips. */
+.appearance-row input[role="switch"]:active::before {
+  width: 21px;
+}
+.appearance-row input[role="switch"]:checked:active::before {
+  transform: translateX(9px);
 }
 
 .appearance-row.is-slider input[type="range"] {
@@ -5251,6 +5387,33 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* Copy turns into a tick where the finger is, then back: the confirmation
+   arrives at the control that was pressed, not only in the status line. */
+.invite-link-row button.copy-swap {
+  display: inline-grid;
+}
+.copy-swap > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 260ms var(--ease-spring);
+}
+.copy-swap > svg:last-child,
+.copy-swap[data-copied] > svg:first-child {
+  opacity: 0;
+  transform: scale(0.5);
+}
+.copy-swap[data-copied] > svg:last-child {
+  opacity: 1;
+  transform: none;
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .copy-swap > svg {
+    transition: none;
+  }
 }
 
 .invite-link-row input {
@@ -5920,12 +6083,11 @@
   }
 }
 
-/* And goes back towards it: the origin the entrance set is still on the
-   element. */
+/* And leaves the way it came: sinking back the few pixels it rose. */
 @keyframes settings-leave {
   to {
     opacity: 0;
-    transform: scale(0.82);
+    transform: translateY(8px) scale(0.985);
   }
 }
 
@@ -7641,11 +7803,19 @@ body:has(.sidebar-row.is-over) .drag-chip {
   padding: 0;
 }
 
+/* The underline is quiet while reading and fills in under the pointer, so a
+   paragraph full of links is not a paragraph full of rules. */
 .rich-text-content a {
   color: var(--accent);
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 2px;
+  transition: text-decoration-color var(--dur-fast) var(--ease-press);
+}
+
+.rich-text-content a:hover {
+  text-decoration-color: currentColor;
 }
 
 .rich-text-content blockquote {
@@ -7681,14 +7851,64 @@ body:has(.sidebar-row.is-over) .drag-chip {
   gap: 0.55em;
 }
 .rich-text-content ul[data-type="taskList"] li > label {
-  padding-top: 0.22em;
+  /* Centres the box on the first line of the item's paragraph. */
+  padding-top: 0.58em;
 }
 .rich-text-content ul[data-type="taskList"] li > div {
   min-width: 0;
   flex: 1;
 }
 .rich-text-content ul[data-type="taskList"] input {
-  accent-color: var(--accent);
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0;
+  border: 1.5px solid var(--ink-4);
+  border-radius: 0.3em;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+.rich-text-content ul[data-type="taskList"] input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+/* The tick is drawn left to right, the way a pen makes it, rather than
+   appearing whole: a wipe across the stroke, not a fade. */
+.rich-text-content ul[data-type="taskList"] input::after {
+  content: "";
+  width: 86%;
+  height: 86%;
+  background: var(--ink);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.2 5 8.6 9.5 3.6' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 220ms var(--ease-out) 60ms;
+}
+.rich-text-content ul[data-type="taskList"] input:checked::after {
+  clip-path: inset(0 0 0 0);
+}
+/* A done item steps back so what is left to do reads first. Only its own
+   lines: a list nested under it keeps its own state. */
+.rich-text-content ul[data-type="taskList"] li > div > :not(ul) {
+  transition: color 220ms var(--ease-out) 60ms;
+}
+.rich-text-content ul[data-type="taskList"] li[data-checked="true"] > div > :not(ul) {
+  color: var(--ink-3);
+}
+.rich-text-content ul[data-type="taskList"] input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rich-text-content ul[data-type="taskList"] input,
+  .rich-text-content ul[data-type="taskList"] input::after,
+  .rich-text-content ul[data-type="taskList"] li > div > :not(ul) {
+    transition: none;
+  }
 }
 
 .rich-text-content .tableWrapper {
@@ -7713,6 +7933,14 @@ body:has(.sidebar-row.is-over) .drag-chip {
   background: var(--surface);
   font-family: var(--font-sans);
   font-weight: var(--weight-semibold);
+}
+/* The row under the pointer lifts a shade, so a wide table can be read
+   across without losing the line. */
+.rich-text-content td {
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.rich-text-content tr:hover > td {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
 .rich-text-content .selectedCell::after {
   position: absolute;
@@ -7757,6 +7985,14 @@ body:has(.sidebar-row.is-over) .drag-chip {
   width: 100%;
   max-height: 34rem;
   object-fit: contain;
+}
+.rich-media-image-open img.is-arrived {
+  animation: fade-in var(--dur-base) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rich-media-image-open img.is-arrived {
+    animation: none;
+  }
 }
 /* The picture and the ink over it, and nothing else: the caption below is not
    part of the picture and must not be drawn on. */
@@ -9500,16 +9736,32 @@ text.ink-stroke {
 /* Reading stays still. Awareness from this note alone can say writing. */
 .note-row-peer {
   position: relative;
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: var(--face, var(--ok));
-  vertical-align: 0.08em;
+  display: inline-grid;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  align-self: center;
+  margin-right: 6px;
   opacity: 1;
   animation: peer-in 120ms var(--ease-out) backwards;
   transition: opacity 120ms var(--ease-out);
+}
+
+.note-row-peer .avatar {
+  width: 100%;
+  height: 100%;
+  font-size: 8px;
+}
+
+.note-row-peer .people-face-typing {
+  right: -7px;
+  bottom: -4px;
+  padding: 2px 2.5px;
+}
+
+.note-row-peer .people-face-typing i {
+  width: 2.5px;
+  height: 2.5px;
 }
 
 .note-row-peer.is-away {
@@ -9532,35 +9784,6 @@ text.ink-stroke {
   }
   .note-row-peer {
     transition: none;
-  }
-}
-
-.note-row-peer.is-typing::after {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  box-shadow: 0 0 0 1.5px var(--face, var(--ok));
-  content: "";
-  animation: peer-wave 2s var(--ease-out) infinite;
-}
-
-@keyframes peer-wave {
-  from {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-
-  70%,
-  to {
-    opacity: 0;
-    transform: scale(2.4);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-row-peer.is-typing::after {
-    animation: none;
-    opacity: 0;
   }
 }
 
@@ -9602,21 +9825,25 @@ text.ink-stroke {
 }
 
 /* Writing, in this note, now — the bubble a phone shows when somebody is
-   typing to you, because it is the one everybody already reads that way. */
+   typing to you, because it is the one everybody already reads that way. It
+   sits on the portrait's corner in place of the green dot, so the name beside
+   it keeps its whole width. */
 .people-face-typing {
+  position: absolute;
+  right: -8px;
+  bottom: -4px;
   display: flex;
-  flex-shrink: 0;
-  gap: 2.5px;
-  margin-left: auto;
+  gap: 1.5px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  padding: 4px 5px;
+  background: color-mix(in srgb, var(--ink) 18%, var(--paper));
+  box-shadow: 0 0 0 2px var(--paper);
+  padding: 2.5px 3px;
   animation: people-here-in var(--dur-base) var(--ease-spring) backwards;
 }
 
 .people-face-typing i {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: var(--ink-2);
   animation: people-typing 1.2s var(--ease-in-out) infinite;
@@ -9953,10 +10180,10 @@ text.ink-stroke {
   opacity: 0.5;
 }
 
-/* ── A sheet, out of the thing that was held ─────────────────────────────────
-   The frame both sheets wear. The motion is in `Sheet.tsx`, written with the
-   Web Animations API because where the flyer starts is measured; nothing here
-   animates a corner, a size or a shadow, so no frame of it repaints. Fixed
+/* ── A sheet ──────────────────────────────────────────────────────────────────
+   The frame every sheet wears. The motion is in `Sheet.tsx`, written with the
+   Web Animations API so closing can run it backwards; nothing here animates a
+   corner, a size or a shadow, so no frame of it repaints. Fixed
    height: rows that arrive after the sheet has opened fill it rather than
    resizing it under the eye. */
 .sheet-backdrop {
@@ -10010,7 +10237,7 @@ text.ink-stroke {
 }
 
 /* The bands after the hero arrive a beat apart, in reading order. The hero
-   itself does not fade: the flyer is in it, and is already arriving. */
+   arrives with the sheet itself. */
 .sheet-body > :not(.sheet-hero) {
   animation: sheet-band-in var(--dur-slow) var(--ease-out) backwards;
 }
@@ -13794,45 +14021,29 @@ button.sheet-chip:hover,
   margin-top: 8px;
 }
 
+/* In the sidebar the switch is one capsule the width of the column, the
+   thumb a filled half that slides under the chosen person — the segmented
+   control of the Mac and the phone. Tabs with a rule under them were tried
+   and cut "Partner" to "Part…" at the sidebar's width. */
 .sidebar-scroll .people-shelf {
   margin-bottom: 12px;
-  border-radius: 0;
-  background: var(--paper);
-  padding: 0 0 2px;
+  border-radius: var(--radius-pill);
 }
 
-:root:is(.has-wallpaper, .has-translucent-sidebar) .sidebar-scroll .people-shelf {
-  background: transparent;
+.sidebar-scroll .people-thumb,
+.sidebar-scroll .people-face {
+  border-radius: var(--radius-pill);
 }
 
-.sidebar-scroll .people-thumb {
-  top: auto;
-  bottom: 0;
-  left: 14px;
-  width: calc(100% / var(--count, 2) - 28px);
-  height: 2px;
-  border-radius: 1px;
-  background: var(--accent);
-  box-shadow: none;
-  transform: translateX(calc(var(--index, 0) * (100% + 28px)));
+/* Dark, the chosen half is the lighter plane, as a selected row is; the page
+   colour the switch uses elsewhere read as a hole in the capsule. */
+:root[data-theme="dark"] .sidebar-scroll .people-thumb {
+  background: color-mix(in srgb, var(--ink) 14%, var(--paper));
 }
 
 .sidebar-scroll .people-face {
   justify-content: center;
-  gap: 6px;
-  padding: 6px 4px 9px;
-  color: var(--ink-4);
-}
-
-.sidebar-scroll .people-face.is-active,
-.sidebar-scroll .people-face:hover {
-  color: var(--ink);
-}
-
-.sidebar-scroll .people-face-name {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  padding: 5px 10px 5px 6px;
 }
 
 /* Report, Block and Contact support are rows of the sheet they stand in, at
