@@ -235,6 +235,34 @@ function createWindow() {
      becomes the archive a moment later. */
   window.once("ready-to-show", () => window.show());
 
+  /* A 27" monitor at "looks like 2560" draws the same points as a laptop,
+     further from the eye, so the whole interface read small. The zoom follows
+     the display the window is on: 1 up to 2048pt wide, up to 1.25 at 2560,
+     and always 1 on a laptop's own screen, however much space it is set to.
+     It is set only when the window lands on another display, so Cmd +/- still
+     holds until the window moves. The traffic lights are native and do not
+     zoom; they are moved to stay centred in the 52px strip, which does. */
+  let fittedDisplay = null;
+  const fitZoom = () => {
+    const display = screen.getDisplayMatching(window.getBounds());
+    if (display.id === fittedDisplay) return;
+    fittedDisplay = display.id;
+    const zoom = display.internal ? 1 : Math.min(1.25, Math.max(1, display.workArea.width / 2048));
+    window.webContents.setZoomFactor(zoom);
+    if (isMac) window.setWindowButtonPosition({ x: 19, y: Math.round(26 * zoom - 6) });
+  };
+  window.webContents.on("did-finish-load", () => {
+    fittedDisplay = null;
+    fitZoom();
+  });
+  window.on("moved", fitZoom);
+  const refit = () => {
+    fittedDisplay = null;
+    fitZoom();
+  };
+  screen.on("display-metrics-changed", refit);
+  window.on("closed", () => screen.off("display-metrics-changed", refit));
+
   /* macOS takes the traffic lights away in full screen, so the gutter held for
      them has to go with them. It is stated here rather than read from CSS: the
      window is the only thing that knows, and `--titlebar-inset` and

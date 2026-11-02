@@ -3,6 +3,14 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.49 – 2026-11-02
+
+### Changed
+
+- Desktop: the interface zooms with the display the window is on — 1× on a
+  laptop's built-in screen and on displays up to 2048 points wide, rising to
+  1.25× at 2560, so a large monitor no longer shows small text.
+
 ## 0.9.48 – 2026-11-02
 
 ### Added

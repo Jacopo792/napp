@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.49",
+    date: "2026-11-02",
+    headline: "Readable on a large monitor",
+    sections: [
+      {
+        heading: "Desktop",
+        items: [
+          {
+            title: "Sized for the screen it is on",
+            text: "On a large external monitor the desktop app grows by up to a quarter, so text no longer reads small. A laptop's own screen keeps the usual size, and moving the window between screens adjusts it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.48",
     date: "2026-11-02",
     headline: "Search that finds the place, and a calmer window",
