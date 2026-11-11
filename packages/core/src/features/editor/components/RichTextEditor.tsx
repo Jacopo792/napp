@@ -50,6 +50,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  X,
 } from "@/components/icons";
 import { createPortal } from "react-dom";
 import {
@@ -113,7 +114,7 @@ import { rememberSpelling, takeAutocorrection } from "@/features/editor/lib/auto
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import { platform } from "@/platform";
-import { emerge } from "@/lib/motion";
+import { emerge, leave } from "@/lib/motion";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
 import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
@@ -2076,9 +2077,11 @@ const openOut = (img: HTMLImageElement | null) => {
 };
 
 function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: () => void }) {
+  const layer = useRef<HTMLDivElement>(null);
+  const close = () => leave(layer.current, onClose);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") leave(layer.current, onClose);
     };
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -2095,13 +2098,19 @@ function ImageLightbox({ preview, onClose }: { preview: ImagePreview; onClose: (
       aria-modal="true"
       aria-label={preview.alt}
       className="lightbox"
-      onClick={onClose}
+      ref={layer}
+      onClick={close}
     >
       <figure className="lightbox-figure" onClick={(event) => event.stopPropagation()}>
         <img src={preview.src} alt={preview.alt} ref={openOut} />
       </figure>
-      <button type="button" onClick={onClose} className="lightbox-close" aria-label="Close image">
-        ×
+      <button
+        type="button"
+        onClick={close}
+        className="round-close lightbox-close press"
+        aria-label="Close image"
+      >
+        <X size={18} />
       </button>
     </div>,
     document.body,

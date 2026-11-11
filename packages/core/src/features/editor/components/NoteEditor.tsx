@@ -16,7 +16,7 @@ import {
   X,
   BookOpen,
   Keyboard,
-  Target,
+  Maximize2,
 } from "@/components/icons";
 import { keyName } from "@/lib/shortcuts";
 import { countWords } from "@/lib/format";
@@ -1417,10 +1417,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             <span className="manuscript-bar-quiet">{pages ? "Pages" : headerStatus}</span>
           )}
           {/* Finding, remarks and versions at the right: the formatting row
-              is for the words. Nothing that reads as a status stands here —
-              the bar is tools, and a line of text in it pushed the ribbon
-              onto a second row. Headings are in the structure, and the whole
-              inspector is still ⌥⌘I. */}
+              is for the words. Each tool carries its name — six bare glyphs
+              were read as "goal", "?" and "pen" — and the names fold away
+              when the bar is narrow. Headings are in the inspector, ⌥⌘I. */}
           <span className="manuscript-bar-end">
             <button
               type="button"
@@ -1446,7 +1445,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 title="Focus mode · Esc to leave"
                 onClick={manuscript.onToggleFocus}
               >
-                <Target size={16} />
+                <Maximize2 size={16} />
+                <span className="ribbon-word">Focus</span>
               </button>
             )}
             {manuscript.onToggleTypewriter && (
@@ -1459,6 +1459,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onClick={manuscript.onToggleTypewriter}
               >
                 <Keyboard size={16} />
+                <span className="ribbon-word">Typewriter</span>
               </button>
             )}
             <button
@@ -1472,6 +1473,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               }}
             >
               <Search size={16} />
+              <span className="ribbon-word">Find</span>
             </button>
             {session && commentAuthors && (
               <button
@@ -1483,6 +1485,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onClick={() => showTab(inspectorTab === "comments" ? null : "comments")}
               >
                 <MessageSquare size={16} />
+                <span className="ribbon-word">Comments</span>
               </button>
             )}
             {session && (
@@ -1495,6 +1498,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onClick={() => showTab(inspectorTab === "versions" ? null : "versions")}
               >
                 <History size={16} />
+                <span className="ribbon-word">Versions</span>
               </button>
             )}
             {headerActions}

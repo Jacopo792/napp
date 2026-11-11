@@ -30,6 +30,7 @@ import {
   NotebookText,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Search,
   Settings,
   SquarePen,
@@ -1907,6 +1908,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
   }, [refreshRemote, resolveConflict, storeEntry]);
 
+  /* `drain` steps aside while a save is already on its way, which is right for
+     a timer and wrong for leaving: the archive switch read that as "still
+     saving" and refused. Leaving waits for the save in flight, then flushes
+     what is left. Bounded, so a request that never answers cannot hold the
+     window; what is still waiting after that is refused as before. */
+  const settleWrites = useCallback(async () => {
+    const deadline = Date.now() + 8000;
+    while (inFlightRef.current && Date.now() < deadline)
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    await drain();
+  }, [drain]);
+
   const schedule = useCallback(() => {
     if (!hasPending()) {
       window.clearTimeout(timerRef.current);
@@ -3619,7 +3632,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     async (current: AppSession, act: () => Promise<void>) => {
       /* Membership removal revokes the right to finish a write, so flush first
          and fail closed if any note or metadata is still waiting locally. */
-      await drain();
+      await settleWrites();
       if (hasPending() || pendingMetaRef.current.size > 0) {
         throw new Error("Your latest changes could not be saved. Try again before leaving.");
       }
@@ -3641,7 +3654,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       setSession(null);
       navigate({ to: "/" });
     },
-    [drain, navigate, onReopen],
+    [settleWrites, navigate, onReopen],
   );
 
   const handleLeaveArchive = useCallback(async () => {
@@ -3673,7 +3686,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     async (archiveId: string) => {
       const current = sessionRef.current;
       if (!current || current.archiveId === archiveId) return;
-      await drain();
+      await settleWrites();
       if (hasPending() || pendingMetaRef.current.size > 0)
         throw new Error("Your latest changes are still saving. Try again in a moment.");
       await chooseArchive(current, archiveId);
@@ -3682,7 +3695,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       document.documentElement.dataset.arriving = "";
       onReopen();
     },
-    [drain, onReopen],
+    [settleWrites, onReopen],
   );
 
   /* Arrived: everything the archive needs is here. Each entrance is finished
@@ -5480,31 +5493,54 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         : []),
     ];
     const titlebar = compact ? null : (
-      <div className="manuscript-titlebar">
-        <button
-          type="button"
-          onClick={toggleBoard}
-          aria-label="Organize the book"
-          aria-pressed={boardOpen}
-          title={"Organize the book · ⌘\\"}
-          className={`ribbon-tool press ${boardOpen ? "is-active" : ""}`}
-        >
-          <Board size={16} />
-        </button>
+      <div className={`manuscript-titlebar ${boardOpen ? "is-board" : ""}`}>
+        {/* The two views by name. This was one unlabelled grid icon, which said
+            neither that there was a second view nor how to come back from it. */}
+        <span className="book-view-switch" role="radiogroup" aria-label="View">
+          {(["Write", "Board"] as const).map((view) => {
+            const chosen = (view === "Board") === boardOpen;
+            return (
+              <button
+                key={view}
+                type="button"
+                role="radio"
+                aria-checked={chosen}
+                title={`${view} · ⌘\\`}
+                className={`press ${chosen ? "is-active" : ""}`}
+                onClick={() => !chosen && toggleBoard()}
+              >
+                {view === "Board" ? <Board size={14} /> : <Pencil size={14} />}
+                {view}
+              </button>
+            );
+          })}
+        </span>
         {spaceSwitch || <span className="manuscript-titlebar-book">{currentSpace?.name}</span>}
-        <WritingMenuButton
-          label="Chapters"
-          icon={null}
-          className="manuscript-titlebar-chapter press"
-          items={chapterMenu}
-        >
-          <span>
-            {chapterAt >= 0 ? `${chapterAt + 1} · ` : ""}
-            {chapter ? pageLabel(chapter) : selected?.note.title || "Contents"}
-          </span>
-          <ChevronDown size={12} />
-        </WritingMenuButton>
+        {/* On the board no chapter is open, so none is named. */}
+        {!boardOpen && (
+          <WritingMenuButton
+            label="Chapters"
+            icon={null}
+            className="manuscript-titlebar-chapter press"
+            items={chapterMenu}
+          >
+            <span>
+              {chapterAt >= 0 ? `${chapterAt + 1} · ` : ""}
+              {chapter ? pageLabel(chapter) : selected?.note.title || "Contents"}
+            </span>
+            <ChevronDown size={12} />
+          </WritingMenuButton>
+        )}
         <span className="manuscript-titlebar-end">
+          {error || saveError ? (
+            <span className="label text-danger" title={error || saveError} role="status">
+              {error || "Save failed"}
+            </span>
+          ) : statusFlash ? (
+            <span className="label text-accent" role="status">
+              {statusFlash}
+            </span>
+          ) : null}
           <UpdateNotice />
           {roster.length > 1 && peopleShelf}
           <WritingMenuButton
@@ -5647,18 +5683,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             >
               <Structure size={18} />
             </button>
-          ) : (
-            !navigationOpen && (
-              <button
-                type="button"
-                onClick={() => changeNavigation(true)}
-                aria-label="Show the structure"
-                className="ribbon-tool press"
-              >
-                <PanelLeftOpen size={16} />
-              </button>
-            )
-          )
+          ) : undefined
         }
         rows={manuscript.rows}
         parts={manuscript.parts}

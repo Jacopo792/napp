@@ -2,11 +2,11 @@ import { useSyncExternalStore } from "react";
 
 export type ThemeMode = "system" | "dark" | "light";
 
-/** How the sidebar's glyphs are drawn, after the Mac's own Icon & widget
- *  style: a coloured tile, a dark tile with a coloured glyph, the bare glyph,
- *  or one tile tinted with the accent. */
-export type IconStyle = "default" | "dark" | "clear" | "tinted";
-export const ICON_STYLES: readonly IconStyle[] = ["default", "dark", "clear", "tinted"];
+/** How the app's glyphs are drawn: bare, in the ink, or each on a tile washed
+ *  with one hue. The coloured and dark tiles that stood beside these were
+ *  removed; a value saved under either name reads as `clear`. */
+export type IconStyle = "clear" | "tinted";
+export const ICON_STYLES: readonly IconStyle[] = ["clear", "tinted"];
 
 /** The system's own hues, offered wherever a colour is a choice rather than a
  *  palette: the text highlight and the folders. */
@@ -485,6 +485,13 @@ export function applyAppearance(config = current): void {
     "--icon-tint-strong",
     tint === "auto" ? legibleOn(config.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
   );
+  /* The tile of the place you are in is filled, and its glyph is whichever
+     of the two inks reads on that fill. */
+  const fill = tint === "auto" ? accent : legibleOn(tint, paper, 3);
+  root.style.setProperty(
+    "--on-icon-tint",
+    contrastRatio(fill, "#f7f7f7") >= contrastRatio(fill, "#161616") ? "#f7f7f7" : "#161616",
+  );
   root.style.setProperty("--on-accent", onAccent);
   root.style.setProperty(
     "--glass",
@@ -500,7 +507,9 @@ export function applyAppearance(config = current): void {
   root.style.setProperty("--glass-tint", `${40 + glass / 2}%`);
   root.style.setProperty("--glass-tint-native", `${20 + glass / 2}%`);
   root.style.setProperty("--glass-tint-menu", `${70 + glass / 4}%`);
-  root.dataset.iconStyle = config.iconStyle;
+  /* Checked here, where every source ends up: the account's row is merged in
+     unvalidated, and may still carry a style that no longer exists. */
+  root.dataset.iconStyle = ICON_STYLES.includes(config.iconStyle) ? config.iconStyle : "clear";
   const folder = autoOrHex(config.folderColour);
   if (folder === "auto") root.style.removeProperty("--folder-tint");
   else root.style.setProperty("--folder-tint", folder);

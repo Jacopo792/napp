@@ -135,6 +135,10 @@
   --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* What stands between an open window and the app behind it. One value:
+     sheets, Settings, the palette and a held portrait each had their own. */
+  --scrim: rgb(0 0 0 / 0.5);
+
   --dur-press: 90ms;
   --dur-fast: 160ms;
   --dur-base: 240ms;
@@ -3820,7 +3824,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  background: rgb(0 0 0 / 0.58);
+  background: var(--scrim);
 }
 
 /* One size for every section. The dialog is a window, not a wrapper: resizing
@@ -3981,52 +3985,31 @@
   gap: 10px;
 }
 
-/* Each section wears its own colour, as System Settings' do: a glyph alone in
-   a column of seven is read; a tile of colour is found. The tiles are the
-   only saturated thing in the panel, so the colour means "this is a place"
-   and nothing else. Fixed hues, not the reader's accent, because they name
-   sections rather than state. */
+/* The rail's glyphs are drawn the way the sidebar's are, at the same size, so
+   one Icon style is one look in both columns. Each section used to wear a
+   fixed colour of its own here, whatever the style said. */
 .settings-nav-tile {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  background: var(--tile, #8e8e93);
-  color: #fff;
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
+  color: var(--ink-3);
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .settings-nav-tile svg {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 
-.settings-nav-tile[data-tone="blue"] {
-  --tile: #2f7cf6;
+.settings-nav button:hover .settings-nav-tile {
+  color: var(--ink-2);
 }
-.settings-nav-tile[data-tone="green"] {
-  --tile: #34a853;
-}
-.settings-nav-tile[data-tone="slate"] {
-  --tile: #5e6b7d;
-}
-.settings-nav-tile[data-tone="violet"] {
-  --tile: #8b5cf6;
-}
-.settings-nav-tile[data-tone="orange"] {
-  --tile: #f08a24;
-}
-.settings-nav-tile[data-tone="pink"] {
-  --tile: #ff375f;
-}
-.settings-nav-tile[data-tone="teal"] {
-  --tile: #14a3a3;
-}
-.settings-nav-tile[data-tone="gray"] {
-  --tile: #7d7d84;
+
+.settings-nav button.is-active .settings-nav-tile {
+  color: var(--accent-strong);
 }
 
 .settings-nav button {
@@ -4332,13 +4315,12 @@
   color: var(--ink);
 }
 
-/* Icon style: four tiles of the same three places, each drawn the way that
-   style draws them — the choice is shown, not described. The previews carry
-   their own rules rather than reading the root's, or every tile would show
-   whichever style is chosen now. */
+/* Icon style: the same three places drawn each way — the choice is shown,
+   not described. The previews carry their own rules rather than reading the
+   root's, or both would show whichever style is chosen now. */
 .icon-style-picker {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -4359,8 +4341,8 @@
   display: flex;
   width: 100%;
   justify-content: center;
-  gap: 6px;
-  padding: 14px 0;
+  gap: 10px;
+  padding: 16px 0;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--paper);
@@ -4375,49 +4357,33 @@
 }
 
 .icon-style-preview > span {
-  --tone: #8e8e93;
   display: inline-flex;
   width: 24px;
   height: 24px;
   align-items: center;
   justify-content: center;
   border-radius: 6.5px;
-}
-
-.icon-style-preview > [data-tone="notes"] {
-  --tone: #f5b80f;
-}
-.icon-style-preview > [data-tone="folder"] {
-  --tone: var(--folder-tint, #2f7cf6);
-}
-.icon-style-preview > [data-tone="trash"] {
-  --tone: #ff453a;
-}
-
-.icon-style-preview[data-preview="default"] > span {
-  background: var(--tone);
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
-  color: #fff;
-}
-
-.icon-style-preview[data-preview="dark"] > span {
-  background: color-mix(in srgb, var(--ink) 10%, var(--surface));
-  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent);
-  color: var(--tone);
-}
-
-.icon-style-preview[data-preview="clear"] > span {
   color: var(--ink-3);
 }
 
-.icon-style-preview[data-preview="clear"] > [data-tone="folder"] {
-  color: var(--folder-tint, var(--ink-3));
+.icon-style-preview svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* The first place is the one you are in, so the preview shows the state too. */
+.icon-style-preview[data-preview="clear"] > span:first-child {
+  color: var(--accent-strong);
 }
 
 .icon-style-preview[data-preview="tinted"] > span {
-  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 22%, transparent);
-  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--icon-tint, var(--accent)) 30%, transparent);
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 20%, transparent);
   color: var(--icon-tint-strong, var(--accent-strong));
+}
+
+.icon-style-preview[data-preview="tinted"] > span:first-child {
+  background: var(--icon-tint, var(--accent));
+  color: var(--on-icon-tint, var(--on-accent));
 }
 
 /* Automatic, then the system's hues: a dot each, the chosen one ringed in
@@ -5791,24 +5757,6 @@
   position: absolute;
   top: clamp(0.75rem, 3vw, 1.5rem);
   right: clamp(0.75rem, 3vw, 1.5rem);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  color: var(--ink-2);
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.lightbox-close:hover {
-  color: var(--ink);
-  border-color: var(--ink-4);
 }
 
 @keyframes lightbox-in {
@@ -5819,7 +5767,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lightbox,
-  .lightbox-figure {
+  .lightbox-figure,
+  .portrait-zoom,
+  .portrait-zoom img {
     animation: none;
   }
 }
@@ -6069,12 +6019,39 @@
 
 /* The exit is shorter than the entrance and has no travel to speak of: a
    sheet going away is not something to watch. */
-.settings-layer.is-closing .settings-scrim {
-  animation: fade-out 160ms var(--ease-press) forwards;
+.is-closing > .settings-scrim,
+:is(.lightbox, .portrait-zoom).is-closing {
+  animation: fade-out var(--dur-fast) var(--ease-in-out) forwards;
 }
 
-.settings-layer.is-closing .settings-panel {
-  animation: settings-leave 200ms var(--ease-in-out) forwards;
+.is-closing > :is(.settings-panel, .palette) {
+  animation: settings-leave var(--dur-fast) var(--ease-in-out) forwards;
+}
+
+/* A window on its way out is not there to be pressed. */
+:is(.settings-layer, .palette-layer, .lightbox, .portrait-zoom).is-closing {
+  pointer-events: none;
+}
+
+/* The one close button: round, 32px, a wash of the ink — the sheets' own.
+   Settings, What's New and the lightbox each drew a different square. */
+.round-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.round-close:hover {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink);
 }
 
 @keyframes fade-out {
@@ -6841,53 +6818,17 @@
 }
 
 /* ── Icon style ──────────────────────────────────────────────────────────────
-   Settings → Appearance → Icon style, after the Mac's Icon & widget style.
-   `clear` is the bare glyph above and stays the default; the other three put
-   each destination on a tile, the way the Settings rail already does. Every
-   place has a hue of its own — yellow for the notes, as the platform's own
-   notebook is, and the swipe's red and purple for the bin and the shelf, so
-   an act and its place wear one colour. A folder takes `--folder-tint` when
-   the reader has chosen one.
+   Settings → Style. Two ways to draw every glyph in the app, and the sidebar,
+   the Settings rail, the toolbars and the menus all answer to the one choice.
 
-   Tiles are 20px on a 16px slot's centre, held by a negative margin so the
-   names do not move when the style changes. The glyph inside drops to 13px:
-   a 16px glyph in a 20px tile has no room to be a picture on a ground. */
-.sidebar-glyph[data-tone],
-.settings-nav-tile {
-  --tone: #8e8e93;
-}
+   `clear` is the bare glyph above: ink at rest, the accent on the place you
+   are in. `tinted` stands each glyph on a tile washed with one hue — the
+   accent, or the colour chosen under it — and the place you are in is the one
+   tile that is filled. One hue, so the fill is what tells the places apart;
+   a hue per place was the two styles that were removed.
 
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="notes"] {
-  --tone: #f5b80f;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="folder"] {
-  --tone: var(--folder-tint, #2f7cf6);
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="pin"] {
-  --tone: #f08a24;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="remarks"] {
-  --tone: #34a853;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="archive"] {
-  --tone: #a970ff;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="trash"] {
-  --tone: #ff453a;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="lock"] {
-  --tone: #5e6b7d;
-}
-:is(.sidebar-glyph, .settings-nav-tile)[data-tone="whats-new"] {
-  --tone: #ff9f0a;
-}
-
-/* The Settings rail's tiles answer to the same choice, with their own hues. */
-.settings-nav-tile {
-  --tone: var(--tile, #8e8e93);
-}
-
-/* Bare glyphs keep the ink — except a folder somebody gave a colour. */
+   A tile is 24px on the 18px slot's centre, held by a negative margin so the
+   names do not move when the style changes, with a 16px glyph inside. */
 :root[data-icon-style="clear"] .sidebar-glyph[data-tone="folder"] {
   color: var(--folder-tint, var(--ink-3));
 }
@@ -6896,121 +6837,43 @@
   color: var(--folder-tint, var(--accent-strong));
 }
 
-:root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
-  .sidebar-glyph[data-tone] {
+:root[data-icon-style="tinted"] :is(.sidebar-glyph[data-tone], .settings-nav-tile) {
   width: 24px;
   height: 24px;
   margin: -3px;
   border-radius: 6.5px;
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 20%, transparent);
+  color: var(--icon-tint-strong, var(--accent-strong));
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
 }
 
-:root:is([data-icon-style="default"], [data-icon-style="dark"], [data-icon-style="tinted"])
-  .sidebar-glyph[data-tone]
-  svg {
+:root[data-icon-style="tinted"] :is(.sidebar-glyph[data-tone], .settings-nav-tile) svg {
   width: 16px;
   height: 16px;
   color: inherit;
 }
 
-:root[data-icon-style="default"] .sidebar-glyph[data-tone] {
-  background: var(--tone);
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18);
-  color: #fff;
+:root[data-icon-style="tinted"]
+  :is(.sidebar-row:hover .sidebar-glyph[data-tone], .settings-nav button:hover .settings-nav-tile) {
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 32%, transparent);
 }
 
-/* A dark tile is the ground lifted one step, and the hue moves to the glyph. */
-:root[data-icon-style="dark"] .sidebar-glyph[data-tone],
-:root[data-icon-style="dark"] .settings-nav-tile {
-  background: color-mix(in srgb, var(--ink) 10%, var(--surface));
-  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 14%, transparent);
-  color: var(--tone);
-}
-
-/* Tinted is one hue for every place: the accent, washed into the tile. */
-:root[data-icon-style="tinted"] .sidebar-glyph[data-tone],
-:root[data-icon-style="tinted"] .settings-nav-tile {
-  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 22%, transparent);
-  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--icon-tint, var(--accent)) 30%, transparent);
-  color: var(--icon-tint-strong, var(--accent-strong));
-}
-
-:root[data-icon-style="clear"] .settings-nav-tile {
-  background: transparent;
-  box-shadow: none;
-  color: var(--tone);
-}
-
-/* ── Icon style, past the sidebar ────────────────────────────────────────────
-   The choice is the whole app's, not the rail's. A toolbar keeps its glyphs
-   bare — a tile in a 32px button is a button inside a button — so there the
-   styles differ by colour alone: Default and Dark give every act a hue of its
-   own, Tinted gives them all the accent, Clear leaves them in the ink.
-
-   The hue is a state, not a livery. Nine saturated system colours standing in
-   a row at rest read as a messaging app's tray, and said nothing — every
-   button was equally loud, so none of them was. At rest a tool is ink, as in
-   Glossa; it takes its own colour when the pointer is on it and while it is
-   open, so the one coloured glyph in the bar is the one you are using. And the
-   colour is the palette's own `--tint-*`, matched in lightness to the page,
-   never a system blue at full saturation over a dark ground. The hue
-   is read off the button's own label, which is also what a screen reader
-   reads, so the two cannot name different buttons. Menus and the Settings
-   rows follow Tinted only: a menu is a list of words, and a column of eight
-   colours down its left edge would be the loudest thing on the screen. */
-:is(.toolbar-button, .editor-tool-button)[aria-label="New note"] {
-  --tone: var(--tint-yellow);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Text formatting"] {
-  --tone: var(--tint-blue);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Draw"] {
-  --tone: var(--tint-pink);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Lists"] {
-  --tone: var(--tint-orange);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Tables"] {
-  --tone: var(--tint-mint);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Attachments"] {
-  --tone: var(--tint-purple);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Outline"] {
-  --tone: var(--tint-blue);
-}
-:is(.toolbar-button, .editor-tool-button)[aria-label="Comments"] {
-  --tone: var(--tint-mint);
-}
-:is(.toolbar-button, .editor-tool-button):is(
-  [aria-label="Find in note"],
-  [aria-label="Search"],
-  [aria-label="Find a note"]
-) {
-  --tone: var(--tint-purple);
-}
-
-:root:is([data-icon-style="default"], [data-icon-style="dark"])
-  :is(.toolbar-button, .editor-tool-button):is(
-    :hover,
-    :focus-visible,
-    .is-active,
-    [aria-expanded="true"]
+:root[data-icon-style="tinted"]
+  :is(
+    .sidebar-row.is-active .sidebar-glyph[data-tone],
+    .settings-nav button.is-active .settings-nav-tile
   ) {
-  color: var(--tone, var(--ink));
+  background: var(--icon-tint, var(--accent));
+  color: var(--on-icon-tint, var(--on-accent));
 }
 
-:root[data-icon-style="default"] .note-row-glyph:not(:has(img)),
-:root[data-icon-style="dark"] .note-row-glyph:not(:has(img)) {
-  color: var(--tint-yellow);
-}
-
-:root[data-icon-style="tinted"] :is(.toolbar-button, .editor-tool-button),
+/* Past the two columns a glyph has no tile to stand on — a tile in a 32px
+   button is a button inside a button — so there Tinted is the hue alone. */
+:root[data-icon-style="tinted"] :is(.toolbar-button, .editor-tool-button, .ribbon-tool),
 :root[data-icon-style="tinted"] .note-row-glyph,
-:root[data-icon-style="tinted"] .menu-row > svg:first-child,
-:root[data-icon-style="tinted"] .settings-lead {
+:root[data-icon-style="tinted"] .menu-row > svg:first-child {
   color: var(--icon-tint-strong, var(--accent-strong));
 }
 
@@ -8474,10 +8337,12 @@ body:has(.sidebar-row.is-over) .drag-chip {
   animation: palette-in var(--dur-base) var(--ease-out) backwards;
 }
 
+/* It rises the few pixels every other window rises. It used to drop from
+   above, the one surface in the app that arrived from the other side. */
 @keyframes palette-in {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.985);
+    transform: translateY(8px) scale(0.985);
   }
 }
 
@@ -10193,7 +10058,7 @@ text.ink-stroke {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgb(0 0 0 / 0.38);
+  background: var(--scrim);
 }
 
 .sheet {
@@ -10301,7 +10166,7 @@ text.ink-stroke {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(0 0 0 / 0.6);
+  background: var(--scrim);
   cursor: zoom-out;
   animation: portrait-zoom-fade var(--dur-base) var(--ease-out) backwards;
 }
@@ -10312,7 +10177,7 @@ text.ink-stroke {
   object-fit: cover;
   border-radius: 28px;
   box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
-  animation: portrait-zoom-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: portrait-zoom-in var(--dur-base) var(--ease-out) backwards;
 }
 
 .portrait-zoom.is-round img {
@@ -10988,10 +10853,6 @@ button.sheet-chip:hover,
   color: var(--ink);
 }
 
-.settings-nav-tile[data-tone="indigo"] {
-  --tile: #5b5bd6;
-}
-
 /* Between two archives: the new screen is mounted and not yet shown. See
    `NotesPage` for why the way across is a single fade. */
 [data-arriving] .workspace-shell,
@@ -11551,6 +11412,57 @@ button.sheet-chip:hover,
   touch-action: none;
 }
 
+/* The card's menu, at the end of its head. Quiet until the card is under the
+   pointer or it has the focus; always there where there is no pointer. */
+.board-card-more {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.board-card:hover .board-card-more,
+.board-card-more:focus-visible {
+  opacity: 1;
+}
+
+.board-card-more:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+
+@media (hover: none) {
+  .board-card-more {
+    width: 44px;
+    height: 44px;
+    top: 0;
+    right: 0;
+    opacity: 1;
+  }
+}
+
+.board-card:has(.board-card-more) .board-card-head {
+  padding-right: 38px;
+}
+
+.board-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding-top: 18vh;
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+
 .board-card-number {
   color: var(--ink-4);
   font-size: var(--text-xs);
@@ -11636,6 +11548,48 @@ button.sheet-chip:hover,
   padding: 0 10px;
   background: var(--paper);
   box-shadow: inset 0 -1px 0 var(--rule);
+}
+
+/* Write | Board: the book's two views, named, the chosen one raised the way
+   the segmented controls in Settings raise theirs. */
+.book-view-switch {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  margin-right: 6px;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.book-view-switch button {
+  display: flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 0 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  transition:
+    background-color var(--dur-fast) var(--ease-press),
+    color var(--dur-fast) var(--ease-press);
+}
+
+.book-view-switch button:hover {
+  color: var(--ink);
+}
+
+.book-view-switch button.is-active {
+  background: color-mix(in srgb, var(--ink) 15%, transparent);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+}
+
+/* On the board nothing follows the book's name, so nothing is promised. */
+.manuscript-titlebar.is-board > :is(.manuscript-titlebar-book, .space-switch-wrap)::after {
+  content: none;
 }
 
 .manuscript-titlebar-book {
@@ -11957,6 +11911,25 @@ button.sheet-chip:hover,
   height: 3px;
   margin-top: 2px;
   border-radius: var(--radius-pill);
+}
+
+/* Pages is the one name at the end of the bar that stays when it narrows, so
+   it is set like the others. */
+.manuscript-bar-end > button > span {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* The names at the end of the bar go first: with them the two halves need
+   about 1100px, and under that they ran into the formatting tools. */
+@container manuscript-bar (max-width: 1160px) {
+  .manuscript-bar-end .ribbon-word {
+    display: none;
+  }
+
+  .manuscript-bar-end .ribbon-tool:has(.ribbon-word) {
+    padding: 0;
+  }
 }
 
 @container manuscript-bar (max-width: 900px) {
@@ -13546,20 +13519,6 @@ button.sheet-chip:hover,
   font-size: var(--text-sm);
 }
 
-.whats-new-close {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  color: var(--ink-3);
-}
-
-.whats-new-close:hover {
-  background: var(--accent-wash);
-  color: var(--ink);
-}
-
 .whats-new-body {
   display: grid;
   min-height: 0;
@@ -13911,12 +13870,6 @@ button.sheet-chip:hover,
   border-radius: var(--radius-md);
   background: var(--paper);
   box-shadow: var(--shadow-popover);
-}
-
-/* What's New comes out of the row at the foot of the sidebar that opened it
-   (`emerge` in `lib/motion.ts`), so the palette's own drop is not wanted. */
-.palette.whats-new {
-  animation: none;
 }
 
 /* Content going under the chrome rather than being cut by it — the column

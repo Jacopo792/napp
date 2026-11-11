@@ -279,8 +279,6 @@ function GlassSlider({ value, onChange }: { value: number; onChange: (value: num
 }
 
 const ICON_STYLE_NAMES: Record<IconStyle, string> = {
-  default: "Default",
-  dark: "Dark",
   clear: "Clear",
   tinted: "Tinted",
 };
@@ -436,6 +434,11 @@ export function SettingsPanel({
   const axes = useAxes();
   const preset = matchingPreset(axes);
   const appearance = useAppearance();
+  /* An account row may still name a style that was removed; it draws as Clear,
+     so that is the one shown as chosen. */
+  const iconStyle: IconStyle = ICON_STYLES.includes(appearance.iconStyle)
+    ? appearance.iconStyle
+    : "clear";
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
   const [closing, setClosing] = useState(false);
@@ -702,7 +705,7 @@ export function SettingsPanel({
               <button
                 type="button"
                 aria-label="Close"
-                className="icon-button press ml-auto h-8 w-8"
+                className="round-close press ml-auto"
                 onClick={close}
               >
                 <X size={18} />
@@ -1098,8 +1101,8 @@ export function SettingsPanel({
                         key={style}
                         type="button"
                         role="radio"
-                        aria-checked={appearance.iconStyle === style}
-                        className={appearance.iconStyle === style ? "is-active" : ""}
+                        aria-checked={iconStyle === style}
+                        className={iconStyle === style ? "is-active" : ""}
                         onClick={() => setAppearance({ ...appearance, iconStyle: style })}
                       >
                         <span className="icon-style-preview" data-preview={style}>
@@ -1120,7 +1123,7 @@ export function SettingsPanel({
 
                   <h3>Colour</h3>
                   <div className="appearance-controls">
-                    {appearance.iconStyle === "tinted" && (
+                    {iconStyle === "tinted" && (
                       <SwatchRow
                         icon={<Palette size={16} />}
                         label="Tint colour"
@@ -1147,11 +1150,7 @@ export function SettingsPanel({
                   <h3>Material</h3>
                   <div className="appearance-controls">
                     <label className="appearance-row">
-                      <RowLead
-                        icon={<Layers size={16} />}
-                        label="Translucency"
-                        hint="Rails, bars and menus let what is behind them through"
-                      />
+                      <RowLead icon={<Layers size={16} />} label="Translucency" />
                       <input
                         type="checkbox"
                         role="switch"
@@ -1163,11 +1162,7 @@ export function SettingsPanel({
                     </label>
 
                     <label className="appearance-row">
-                      <RowLead
-                        icon={<Image size={16} />}
-                        label="Frosted glass"
-                        hint="A wallpaper blurred into light, and palettes with a picture of their own"
-                      />
+                      <RowLead icon={<Image size={16} />} label="Frosted glass" />
                       <input
                         type="checkbox"
                         role="switch"
@@ -1178,7 +1173,7 @@ export function SettingsPanel({
                       />
                     </label>
 
-                    {appearance.translucentSidebar && (
+                    {(appearance.translucentSidebar || appearance.frosted) && (
                       <GlassSlider
                         value={appearance.glass}
                         onChange={(glass) => setAppearance({ ...appearance, glass })}

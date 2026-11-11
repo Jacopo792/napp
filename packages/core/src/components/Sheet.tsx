@@ -40,9 +40,10 @@ import {
   type RefObject,
 } from "react";
 import { ChevronLeft, X } from "@/components/icons";
+import { OVERLAY_IN, OVERLAY_OUT } from "@/lib/motion";
 
-const OPEN = { duration: 260, easing: "cubic-bezier(0.16, 1, 0.3, 1)" };
-const CLOSE = { duration: 200, easing: "cubic-bezier(0.4, 0, 0.6, 1)" };
+const OPEN = OVERLAY_IN;
+const CLOSE = OVERLAY_OUT;
 
 const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

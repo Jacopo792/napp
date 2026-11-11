@@ -29,7 +29,7 @@ import type { ChapterInfo } from "@/lib/types";
 import type { MenuItem } from "@/lib/menuShape";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { PointMenu } from "@/components/ContextMenu";
-import { Plus } from "@/components/icons";
+import { MoreHorizontal, Plus } from "@/components/icons";
 import { ChapterField, type ChapterItem } from "./StructurePane";
 import { chapterMenuItems, partMenuItems, type StructureActions } from "./structureMenus";
 
@@ -96,11 +96,25 @@ function Card({
         {number !== undefined && <span className="board-card-number">{number}</span>}
         <span className="board-card-title">{item.title || item.preview || "Untitled"}</span>
       </button>
+      {/* Everything a card can do was behind a right-click nothing pointed to. */}
+      {onMenu && (
+        <button
+          type="button"
+          className="board-card-more press"
+          aria-label={`Actions for ${item.title || "Untitled"}`}
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            onMenu({ x: box.left, y: box.bottom + 4 });
+          }}
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      )}
       {canWrite && onChapter ? (
         <textarea
           className="board-card-synopsis"
           aria-label={`Synopsis of ${item.title || "Untitled"}`}
-          placeholder="What happens here"
+          placeholder="Synopsis"
           maxLength={SYNOPSIS_LIMIT}
           value={draft ?? info?.synopsis ?? ""}
           onChange={(event) => setDraft(event.target.value)}
@@ -115,7 +129,7 @@ function Card({
           }}
         />
       ) : (
-        <p className="board-card-synopsis">{info?.synopsis}</p>
+        <p className="board-card-synopsis">{info?.synopsis ?? item.preview}</p>
       )}
       {goal && onChapter && onGoalDone && (
         <ChapterField field="goal" info={info} onSave={onChapter} onDone={onGoalDone} />
@@ -132,6 +146,7 @@ function Card({
         >
           {item.words.toLocaleString()}
           {info?.goal ? ` / ${info.goal.toLocaleString()}` : ""}
+          {item.words === 1 && !info?.goal ? " word" : " words"}
         </span>
       </footer>
     </article>
@@ -197,8 +212,8 @@ export function ChapterBoard({
   actions,
   onRenamePart,
 }: {
-  /** What stands at the start of the strip: the button that brings the
-   *  structure back when it is hidden. */
+  /** What stands at the start of the strip: on a phone, the way to the
+   *  structure. */
   lead?: ReactNode;
   /** The window's strip over a book, when the board stands in a window. */
   titlebar?: ReactNode;
@@ -253,7 +268,6 @@ export function ChapterBoard({
       {titlebar}
       <div className="manuscript-bar shrink-0">
         {lead}
-        <span className="manuscript-bar-quiet">Board</span>
         {canWrite && actions && (
           <span className="manuscript-bar-end">
             <button
@@ -288,6 +302,21 @@ export function ChapterBoard({
         }}
       >
         <div className="board-desk min-h-0 flex-1">
+          {rows.length === 0 && notebook.length === 0 && (
+            <div className="board-empty">
+              <p>No chapters yet</p>
+              {canWrite && actions && (
+                <button
+                  type="button"
+                  className="space-list-button press"
+                  onClick={() => actions.onNewChapter(null)}
+                >
+                  <Plus size={14} />
+                  New chapter
+                </button>
+              )}
+            </div>
+          )}
           <div className="board-grid">
             {rows.map((row) =>
               row.kind === "part" ? (

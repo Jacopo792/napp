@@ -6,10 +6,10 @@
  *
  * Closing it, any way at all, is having read it: a sheet that has to be
  * dismissed twice is a sheet people learn to dismiss without reading. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Sparkle, X } from "@/components/icons";
 import { DOWNLOADS, RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
-import { emerge } from "@/lib/motion";
+import { leave } from "@/lib/motion";
 
 /* The pictures go into the bundle by name, so a release's entry needs no
    import of its own and a missing file is an empty slot, not a failed build. */
@@ -48,10 +48,12 @@ export function WhatsNewSheet({
     }
   }
 
+  const layer = useRef<HTMLDivElement>(null);
+  const close = () => leave(layer.current, onClose);
   useEffect(() => {
     if (!open) return;
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") leave(layer.current, onClose);
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
@@ -61,14 +63,13 @@ export function WhatsNewSheet({
   const release = RELEASES.find((one) => one.version === shown) ?? RELEASES[0];
 
   return (
-    <div className="palette-layer is-whats-new" role="presentation">
-      <button type="button" aria-label="Close" className="settings-scrim" onClick={onClose} />
+    <div ref={layer} className="palette-layer is-whats-new" role="presentation">
+      <button type="button" aria-label="Close" className="settings-scrim" onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="whats-new-title"
         className="palette whats-new glass-sheet"
-        ref={arrive}
       >
         <header className="whats-new-head">
           <span className="whats-new-mark" aria-hidden="true">
@@ -82,9 +83,9 @@ export function WhatsNewSheet({
           </div>
           <button
             type="button"
-            className="whats-new-close press"
+            className="round-close press"
             aria-label="Close What's New"
-            onClick={onClose}
+            onClick={close}
           >
             <X size={16} />
           </button>
@@ -168,8 +169,3 @@ export function WhatsNewSheet({
     </div>
   );
 }
-
-/* Out of the row that opened it — or, opened by itself after an update, from
-   its own middle. Module-level so the ref is the same function every render
-   and runs once, on the way in. */
-const arrive = (el: HTMLElement | null) => emerge(el);

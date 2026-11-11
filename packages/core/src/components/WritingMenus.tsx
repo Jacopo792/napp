@@ -266,6 +266,7 @@ export function PageSetupButton({
         onClick={() => setOpen((now) => !now)}
       >
         <Ruler size={16} />
+        <span className="ribbon-word">Page</span>
       </button>
       {open && (
         <div role="dialog" aria-label="Page setup" className="popover page-setup">

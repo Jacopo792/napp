@@ -17,6 +17,22 @@ const reduced = () =>
 const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 
+/** One entrance and one exit for every window that opens over the app, in
+ *  script what `--dur-base`/`--ease-out` and `--dur-fast`/`--ease-in-out` are
+ *  in the stylesheet. Sheets, Settings, the palette and What's New had four
+ *  durations and three curves between them. */
+export const OVERLAY_IN = { duration: 240, easing: EASE_OUT };
+export const OVERLAY_OUT = { duration: 160, easing: "cubic-bezier(0.65, 0, 0.35, 1)" };
+
+/** Lets a layer play its exit (`.is-closing` in the stylesheet) before it is
+ *  closed, so a window that came in does not vanish between two frames. */
+export function leave(layer: Element | null, done: () => void): void {
+  if (!layer || reduced()) return done();
+  if (layer.classList.contains("is-closing")) return;
+  layer.classList.add("is-closing");
+  window.setTimeout(done, OVERLAY_OUT.duration);
+}
+
 /* ── Where the hand last was ────────────────────────────────────────────────
    Read by whatever opens next, so an overlay can come out of the button that
    asked for it without every caller passing a rectangle down. A key is not a
@@ -106,7 +122,7 @@ export function emerge(el: HTMLElement | null, mode: "grow" | "zoom" = "grow") {
       { opacity: 0, transform: "translateY(8px) scale(0.985)" },
       { opacity: 1, transform: "none" },
     ],
-    { duration: 260, easing: EASE_OUT, fill: "backwards" },
+    { ...OVERLAY_IN, fill: "backwards" },
   );
 }
 

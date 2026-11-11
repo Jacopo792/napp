@@ -13,6 +13,7 @@
  * Change opens a file dialog, which a browser grants to a click and not to a
  * message coming back over an IPC bridge. */
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { leave } from "@/lib/motion";
 import { createPortal } from "react-dom";
 import { AvatarCropper } from "@/components/AvatarCropper";
 import { ContextMenu } from "@/components/ContextMenu";
@@ -192,11 +193,13 @@ export function ImageZoom({
   wide?: boolean;
   onClose: () => void;
 }) {
+  const layer = useRef<HTMLDivElement>(null);
+  const close = () => leave(layer.current, onClose);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        leave(layer.current, onClose);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -206,9 +209,10 @@ export function ImageZoom({
   return createPortal(
     <div
       className={`portrait-zoom ${round ? "is-round" : ""} ${wide ? "is-wide" : ""}`}
+      ref={layer}
       role="dialog"
       aria-label={label}
-      onClick={onClose}
+      onClick={close}
     >
       <img src={image} alt="" draggable={false} />
     </div>,

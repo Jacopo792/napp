@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Search } from "@/components/icons";
+import { leave } from "@/lib/motion";
 import { fold } from "@/lib/format";
 import { fuzzyMatch, type Snippet } from "@/lib/spotlight";
 import { shortcutsFor, shortcutGroups, keyName } from "@/lib/shortcuts";
@@ -158,6 +159,9 @@ export function CommandPalette({
     list.current?.querySelector<HTMLElement>(".is-active")?.scrollIntoView({ block: "nearest" });
   }, [cursor]);
 
+  const layer = useRef<HTMLDivElement>(null);
+  const close = () => leave(layer.current, onClose);
+
   if (!open) return null;
 
   function choose(command: Command | undefined) {
@@ -167,8 +171,8 @@ export function CommandPalette({
   }
 
   return (
-    <div className="palette-layer" role="presentation">
-      <button type="button" aria-label="Close" className="settings-scrim" onClick={onClose} />
+    <div ref={layer} className="palette-layer" role="presentation">
+      <button type="button" aria-label="Close" className="settings-scrim" onClick={close} />
       <div role="dialog" aria-modal="true" aria-label="Commands" className="palette glass-sheet">
         <div className="palette-search">
           <Search size={16} />
@@ -180,7 +184,7 @@ export function CommandPalette({
             aria-label="Search everything"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") return onClose();
+              if (event.key === "Escape") return close();
               if (event.key === "Enter") {
                 event.preventDefault();
                 return choose(active);
@@ -248,10 +252,12 @@ export function ShortcutSheet({
   kind?: "notes" | "document";
   onClose: () => void;
 }) {
+  const layer = useRef<HTMLDivElement>(null);
+  const close = () => leave(layer.current, onClose);
   useEffect(() => {
     if (!open) return;
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") leave(layer.current, onClose);
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
@@ -261,8 +267,8 @@ export function ShortcutSheet({
 
   const groups = shortcutGroups(kind);
   return (
-    <div className="palette-layer is-shortcuts" role="presentation">
-      <button type="button" aria-label="Close" className="settings-scrim" onClick={onClose} />
+    <div ref={layer} className="palette-layer is-shortcuts" role="presentation">
+      <button type="button" aria-label="Close" className="settings-scrim" onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
