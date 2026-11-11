@@ -12906,6 +12906,30 @@ button.sheet-chip:hover,
   background: color-mix(in srgb, var(--surface) 72%, var(--paper));
 }
 
+/* A docked column arrives from the edge it is docked to. These were the only
+   surfaces in the app that appeared between two frames. Inside the inspector
+   a tab replaces a tab in place, so only the column itself travels. */
+.manuscript-inspector,
+:is(.note-comments:not(.is-margin), .note-outline, .note-history):not(.manuscript-inspector *) {
+  animation: panel-in var(--dur-base) var(--ease-out) backwards;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manuscript-inspector,
+  .note-comments,
+  .note-outline,
+  .note-history {
+    animation: none;
+  }
+}
+
 @container editor (max-width: 700px) {
   .manuscript-inspector {
     position: absolute;

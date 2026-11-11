@@ -151,9 +151,9 @@ function AxisSlider({ spec, axes }: { spec: (typeof AXIS_SPECS)[number]; axes: A
 }
 
 /** The anatomy every settings row shares, and the one the profile page will
- *  reuse: a leading glyph, the name of the thing with a line saying what it
- *  does, and the control itself flush right. Naming the row is what lets the
- *  control stop explaining itself. */
+ *  reuse: a leading glyph, the name of the thing, and the control itself flush
+ *  right. The line under the name is for a state — a count, why a control is
+ *  off — never for a sentence explaining the row: the name does that. */
 function RowLead({ icon, label, hint }: { icon: ReactNode; label: string; hint?: string }) {
   return (
     <>
@@ -174,7 +174,6 @@ function RowLead({ icon, label, hint }: { icon: ReactNode; label: string; hint?:
 function AppearanceSlider({
   icon,
   label,
-  hint,
   min,
   max,
   value,
@@ -183,7 +182,6 @@ function AppearanceSlider({
 }: {
   icon: ReactNode;
   label: string;
-  hint?: string;
   min: number;
   max: number;
   value: number;
@@ -193,7 +191,7 @@ function AppearanceSlider({
   const fill = ((value - min) / (max - min)) * 100;
   return (
     <label className="appearance-row is-slider">
-      <RowLead icon={icon} label={label} hint={hint} />
+      <RowLead icon={icon} label={label} />
       <input
         type="range"
         className="axis-range"
@@ -752,11 +750,7 @@ export function SettingsPanel({
 
                   <div className="appearance-controls">
                     <div className="appearance-row profile-row">
-                      <RowLead
-                        icon={<UserRound size={16} />}
-                        label="Nickname"
-                        hint="What others in this archive call you"
-                      />
+                      <RowLead icon={<UserRound size={16} />} label="Nickname" />
                       <input
                         className="profile-field"
                         value={nickname}
@@ -774,11 +768,7 @@ export function SettingsPanel({
                     </div>
 
                     <div className="appearance-row profile-row">
-                      <RowLead
-                        icon={<Users size={16} />}
-                        label="Archive"
-                        hint="Everybody here reads and writes every note"
-                      />
+                      <RowLead icon={<Users size={16} />} label="Archive" />
                       <span className="profile-static">
                         {memberCount} {memberCount === 1 ? "member" : "members"}
                       </span>
@@ -788,21 +778,13 @@ export function SettingsPanel({
                       did. They are facts about this account, so this is where
                       they were always going to end up. */}
                     <div className="appearance-row profile-row">
-                      <RowLead
-                        icon={<Layers size={16} />}
-                        label="Reading"
-                        hint="Whose notes the window is pointed at"
-                      />
+                      <RowLead icon={<Layers size={16} />} label="Reading" />
                       <span className="profile-static">{reading}</span>
                     </div>
 
                     {joinedAt && (
                       <div className="appearance-row profile-row">
-                        <RowLead
-                          icon={<CalendarDays size={16} />}
-                          label="Member since"
-                          hint="When this account joined the archive"
-                        />
+                        <RowLead icon={<CalendarDays size={16} />} label="Member since" />
                         <span className="profile-static">
                           {new Date(joinedAt).toLocaleDateString(undefined, {
                             month: "long",
@@ -823,11 +805,7 @@ export function SettingsPanel({
                     <RowLead
                       icon={<LogOut size={16} />}
                       label="Leave this archive"
-                      hint={
-                        members.length <= 1
-                          ? "Nobody to leave it to — you are the only member"
-                          : "Your access ends, but the notes stay for the other members"
-                      }
+                      hint={members.length <= 1 ? "You are the only member" : undefined}
                     />
                     <button
                       type="button"
@@ -931,23 +909,13 @@ export function SettingsPanel({
                   <div className="appearance-controls">
                     {(
                       [
-                        [
-                          "Accent",
-                          "accent",
-                          "Selection, focus and every active state",
-                          <Palette size={16} />,
-                        ],
-                        [
-                          "Background",
-                          "background",
-                          "The colour every surface is mixed from",
-                          <Type size={16} />,
-                        ],
-                        ["Foreground", "foreground", "Text colour", <Type size={16} />],
+                        ["Accent", "accent", <Palette size={16} />],
+                        ["Background", "background", <Type size={16} />],
+                        ["Foreground", "foreground", <Type size={16} />],
                       ] as const
-                    ).map(([label, key, hint, icon]) => (
+                    ).map(([label, key, icon]) => (
                       <label key={key} className="appearance-row">
-                        <RowLead icon={icon} label={label} hint={hint} />
+                        <RowLead icon={icon} label={label} />
                         <span className="color-control">
                           <input
                             type="color"
@@ -964,7 +932,6 @@ export function SettingsPanel({
                     <AppearanceSlider
                       icon={<Contrast size={16} />}
                       label="Contrast"
-                      hint="Distance between the stacked surfaces"
                       min={20}
                       max={80}
                       value={appearance.contrast}
@@ -973,11 +940,7 @@ export function SettingsPanel({
                     />
 
                     <div className="appearance-row wallpaper-row">
-                      <RowLead
-                        icon={<Image size={16} />}
-                        label="Background image"
-                        hint="Kept with your account, so every browser opens to it"
-                      />
+                      <RowLead icon={<Image size={16} />} label="Background image" />
                       <input
                         ref={wallpaperRef}
                         type="file"
@@ -1063,11 +1026,7 @@ export function SettingsPanel({
                         </div>
                         {writingPreferences.sheetTone !== "paper" && (
                           <label className="appearance-row">
-                            <RowLead
-                              icon={<Contrast size={16} />}
-                              label="Adapt text colours"
-                              hint="On a dark sheet, as Word does"
-                            />
+                            <RowLead icon={<Contrast size={16} />} label="Adapt text colours" />
                             <input
                               type="checkbox"
                               role="switch"
@@ -1272,10 +1231,8 @@ export function SettingsPanel({
                         label="Correct as I type"
                         hint={
                           learned === 0
-                            ? "Accents and apostrophes, finished when a word is. Undo one to keep your spelling"
-                            : `Accents and apostrophes, finished when a word is. ${learned} ${
-                                learned === 1 ? "spelling is" : "spellings are"
-                              } yours and left alone`
+                            ? undefined
+                            : `${learned} ${learned === 1 ? "spelling" : "spellings"} kept as yours`
                         }
                       />
                       <input
@@ -1290,11 +1247,7 @@ export function SettingsPanel({
                       switch above, because it is a thing you press. */}
                     {learned > 0 && (
                       <div className="appearance-row">
-                        <RowLead
-                          icon={<RotateCcw size={16} />}
-                          label="Words you kept"
-                          hint="Offer these corrections again"
-                        />
+                        <RowLead icon={<RotateCcw size={16} />} label="Words you kept" />
                         <button
                           type="button"
                           className="settings-row-action press"
@@ -1308,11 +1261,7 @@ export function SettingsPanel({
                       </div>
                     )}
                     <label className="appearance-row">
-                      <RowLead
-                        icon={<SpellCheck size={16} />}
-                        label="Proofreading"
-                        hint="Offer spelling and grammar corrections on this device"
-                      />
+                      <RowLead icon={<SpellCheck size={16} />} label="Proofreading" />
                       <input
                         type="checkbox"
                         role="switch"
@@ -1327,11 +1276,7 @@ export function SettingsPanel({
                       <h3>While writing</h3>
                       <div className="appearance-controls">
                         <div className="appearance-row">
-                          <RowLead
-                            icon={<Target size={16} />}
-                            label="Focus"
-                            hint="What stays lit in focus mode"
-                          />
+                          <RowLead icon={<Target size={16} />} label="Focus" />
                         </div>
                         <div className="appearance-row is-stacked">
                           <Segmented
@@ -1346,11 +1291,7 @@ export function SettingsPanel({
                           />
                         </div>
                         <label className="appearance-row">
-                          <RowLead
-                            icon={<AlignCenter size={16} />}
-                            label="Typewriter scrolling"
-                            hint="The line you write stays mid-window"
-                          />
+                          <RowLead icon={<AlignCenter size={16} />} label="Typewriter scrolling" />
                           <input
                             type="checkbox"
                             role="switch"
@@ -1359,11 +1300,7 @@ export function SettingsPanel({
                           />
                         </label>
                         <label className="appearance-row">
-                          <RowLead
-                            icon={<Clock3 size={16} />}
-                            label="Words today"
-                            hint="Today and this session, under the goal"
-                          />
+                          <RowLead icon={<Clock3 size={16} />} label="Words today" />
                           <input
                             type="checkbox"
                             role="switch"
@@ -1455,11 +1392,7 @@ export function SettingsPanel({
                   <h3>Signing out</h3>
                   <div className="appearance-controls">
                     <div className="appearance-row">
-                      <RowLead
-                        icon={<Timer size={16} />}
-                        label="Sign out when idle"
-                        hint="Require the account password again after a period of inactivity"
-                      />
+                      <RowLead icon={<Timer size={16} />} label="Sign out when idle" />
                     </div>
                     <div className="appearance-row is-stacked">
                       <Segmented
@@ -1481,11 +1414,7 @@ export function SettingsPanel({
                       that says somebody is here at all. It is mutual, because
                       the channel is joined only while publishing. */}
                     <label className="appearance-row">
-                      <RowLead
-                        icon={<Users size={16} />}
-                        label="Show me in the roster"
-                        hint="Others see you are here, and you see who else is"
-                      />
+                      <RowLead icon={<Users size={16} />} label="Show me in the roster" />
                       <input
                         type="checkbox"
                         role="switch"
@@ -1504,11 +1433,6 @@ export function SettingsPanel({
                         label={
                           isDocument ? "Collaborators in the document" : "Collaborators in notes"
                         }
-                        hint={
-                          isDocument
-                            ? "Show who else is in this chapter, and their cursor"
-                            : "Show who else has this note open, and their cursor"
-                        }
                       />
                       <input
                         type="checkbox"
@@ -1524,11 +1448,7 @@ export function SettingsPanel({
                       hiding them after they arrive. */}
                     {!isDocument && (
                       <label className="appearance-row">
-                        <RowLead
-                          icon={<Archive size={16} />}
-                          label="Keep archived notes private"
-                          hint="Archived notes stay visible only to you"
-                        />
+                        <RowLead icon={<Archive size={16} />} label="Keep archived notes private" />
                         <input
                           type="checkbox"
                           role="switch"
@@ -1545,11 +1465,7 @@ export function SettingsPanel({
                 <section>
                   <div className="appearance-controls">
                     <label className="appearance-row">
-                      <RowLead
-                        icon={<Layers size={16} />}
-                        label="Archive switch"
-                        hint="At the top of the sidebar"
-                      />
+                      <RowLead icon={<Layers size={16} />} label="Archive switch" />
                       <input
                         type="checkbox"
                         role="switch"
@@ -1653,7 +1569,6 @@ export function SettingsPanel({
                       <div key={member.userId}>
                         <span>
                           <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
-                          <small>Can read and write every note</small>
                         </span>
                       </div>
                     ))}
