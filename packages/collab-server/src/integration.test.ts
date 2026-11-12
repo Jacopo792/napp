@@ -603,11 +603,13 @@ describe("the collaboration server", { skip }, () => {
     append(theirs.doc, " [before]");
     await until(() => mine.doc.getText(TITLE).toString().includes("[before]"));
 
-    const demoted = await editor.client.rpc("set_archive_member_role", {
-      archive_id: archiveId,
-      user_id: mate.userId,
-      role: "viewer",
-    });
+    // Members can no longer change roles themselves, so the demotion comes
+    // from the trusted side, as an administrator's would.
+    const demoted = await asService(local)
+      .from("archive_members")
+      .update({ role: "viewer" })
+      .eq("archive_id", archiveId)
+      .eq("user_id", mate.userId);
     assert.equal(demoted.error, null, demoted.error?.message);
     await sleep(400); // past the authorisation window
 
@@ -622,11 +624,11 @@ describe("the collaboration server", { skip }, () => {
     assert.ok(!(await titleOf(noteId)).includes("[after]"), "the demoted write was persisted");
 
     // Put the seat back for the tests that follow.
-    await editor.client.rpc("set_archive_member_role", {
-      archive_id: archiveId,
-      user_id: mate.userId,
-      role: "editor",
-    });
+    await asService(local)
+      .from("archive_members")
+      .update({ role: "editor" })
+      .eq("archive_id", archiveId)
+      .eq("user_id", mate.userId);
     mine.provider.destroy();
     theirs.provider.destroy();
   });
