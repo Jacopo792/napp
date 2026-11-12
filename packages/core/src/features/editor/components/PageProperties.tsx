@@ -1,6 +1,7 @@
 import { Image as ImageIcon, Upload } from "@/components/icons";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { HOLD_MS, ImageZoom, SheetPortrait } from "@/components/SheetPortrait";
+import { MenuSurface } from "@/components/MenuSurface";
 import { useDismiss } from "@/components/useDismiss";
 import type { AvatarCrop } from "@/lib/image";
 import { useStoredImage } from "@/lib/media";
@@ -194,38 +195,39 @@ export function PageCover({
                 >
                   Change cover
                 </button>
-                {pickerOpen && (
-                  <div className="popover note-cover-picker absolute top-full right-0 z-50 mt-2 p-2">
-                    <p className="menu-label">Gallery</p>
-                    <div className="note-cover-grid">
-                      {COVER_PRESETS.map((preset) => (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          aria-label={preset.name}
-                          aria-pressed={cover.kind === "preset" && cover.id === preset.id}
-                          style={{ background: preset.background }}
-                          onClick={() => {
-                            onChange({
-                              photo,
-                              cover: { kind: "preset", id: preset.id, position: 0.5 },
-                            });
-                            setPickerOpen(false);
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="menu-row mt-1"
-                      disabled={busy}
-                      onClick={openFilePicker}
-                    >
-                      <Upload size={16} />
-                      {busy ? "Uploading…" : "Upload a picture"}
-                    </button>
+                <MenuSurface
+                  open={pickerOpen}
+                  className="popover note-cover-picker absolute top-full right-0 z-50 mt-2 p-2"
+                >
+                  <p className="menu-label">Gallery</p>
+                  <div className="note-cover-grid">
+                    {COVER_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        aria-label={preset.name}
+                        aria-pressed={cover.kind === "preset" && cover.id === preset.id}
+                        style={{ background: preset.background }}
+                        onClick={() => {
+                          onChange({
+                            photo,
+                            cover: { kind: "preset", id: preset.id, position: 0.5 },
+                          });
+                          setPickerOpen(false);
+                        }}
+                      />
+                    ))}
                   </div>
-                )}
+                  <button
+                    type="button"
+                    className="menu-row mt-1"
+                    disabled={busy}
+                    onClick={openFilePicker}
+                  >
+                    <Upload size={16} />
+                    {busy ? "Uploading…" : "Upload a picture"}
+                  </button>
+                </MenuSurface>
               </div>
               <button
                 type="button"

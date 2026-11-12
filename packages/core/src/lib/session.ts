@@ -118,16 +118,34 @@ async function openAccount(
   };
 }
 
+/** What a refused sign-in is called. Being rate limited or offline is not a
+ *  wrong password, and saying so sends people to reset one that was right. */
+export function signInFailure(error: { status?: number }): Error {
+  if (error.status === 429) return new Error("Too many sign-in attempts. Try again shortly.");
+  if (!error.status || error.status >= 500)
+    return new Error("Could not reach the sign-in service. Check your connection and try again.");
+  return new Error("Email or password is incorrect");
+}
+
+/** Registration and linking say the same thing for a taken address as for any
+ *  other refusal the person can do nothing about: the page is not an account
+ *  lookup. A weak password is theirs to fix, so that one is named. */
+function registrationFailure(error: { status?: number; code?: string; message: string }): Error {
+  if (error.status === 429) return new Error("Too many attempts. Try again shortly.");
+  if (!error.status || error.status >= 500)
+    return new Error("Could not reach the sign-in service. Check your connection and try again.");
+  if (error.code === "weak_password") return new Error(error.message);
+  return new Error("Could not create this account. Sign in instead, or use another address");
+}
+
 export async function authenticate(
   email: string,
   password: string,
   inviteToken?: string,
 ): Promise<AuthenticationResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error?.status === 429) throw new Error("Too many sign-in attempts. Try again shortly.");
-  if (error && (!error.status || error.status >= 500))
-    throw new Error("Could not reach the sign-in service. Check your connection and try again.");
-  if (error || !data.user) throw new Error("Email or password is incorrect");
+  if (error) throw signInFailure(error);
+  if (!data.user) throw new Error("Email or password is incorrect");
   try {
     return await openAccount(data.user.id, data.user.email ?? email, inviteToken);
   } catch (reason) {
@@ -181,7 +199,7 @@ export async function registerAccount(
       },
     },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw registrationFailure(error);
 
   if (data.session && data.user) {
     const result = await openAccount(data.user.id, data.user.email ?? email, inviteToken);
@@ -254,12 +272,15 @@ export function otherAccounts(userId: string): { userId: string; email: string }
     .map(({ userId, email }) => ({ userId, email }));
 }
 
-/** Leaves this account signed in for later and opens the sign-in page. */
+/** Leaves this account signed in for later and opens the sign-in page. No
+ *  `signOut` here: it revokes the refresh token on the server, and the account
+ *  just saved would then need its password the first time it was returned to.
+ *  The next sign-in replaces the client's session without revoking this one. */
 export async function addAccount(): Promise<void> {
   await stashCurrent();
   localStorage.removeItem(SESSION_KEY);
   resetArchiveCache();
-  await supabase.auth.signOut({ scope: "local" });
+  await clearNoteStore();
 }
 
 /** Swaps to a saved account and reloads, so every channel, provider and cache
@@ -279,6 +300,7 @@ export async function switchAccount(userId: string): Promise<void> {
     saveAccounts(savedAccounts().filter((a) => a.userId !== userId));
     throw new Error(`Sign in to ${target.email} again`);
   }
+  await clearNoteStore();
   localStorage.setItem(
     SESSION_KEY,
     JSON.stringify({ userId, email: target.email, archiveId: target.archiveId }),

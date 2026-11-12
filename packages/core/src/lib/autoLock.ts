@@ -26,6 +26,7 @@ export const AUTO_LOCK_LABELS: Record<AutoLockMinutes, string> = {
 };
 
 const KEY = "napp:auto-lock";
+const DEADLINE_KEY = "napp:auto-lock-deadline";
 
 function isChoice(value: number): value is AutoLockMinutes {
   return (AUTO_LOCK_CHOICES as readonly number[]).includes(value);
@@ -65,17 +66,47 @@ export function useAutoLock(minutes: AutoLockMinutes, onLock: () => void): void 
   useEffect(() => {
     if (minutes === 0) return;
 
+    /* The deadline is a time, kept where every tab and the next launch can
+       read it. A timer alone restarts from zero whenever it is re-armed, and
+       does not run at all while the laptop is asleep or the app is closed. */
+    const due = () => Number(localStorage.getItem(DEADLINE_KEY)) || 0;
+    const expire = () => {
+      localStorage.removeItem(DEADLINE_KEY);
+      lock.current();
+    };
+
     let timer = 0;
+    let written = 0;
     const arm = () => {
+      const now = Date.now();
+      // Typing calls this on every key; the stored copy need not be that fresh.
+      if (now - written > 10_000) {
+        localStorage.setItem(DEADLINE_KEY, String(now + minutes * 60_000));
+        written = now;
+      }
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => lock.current(), minutes * 60_000);
+      timer = window.setTimeout(() => {
+        // Another tab may have been busy since this timer was set.
+        if (Date.now() >= due()) expire();
+        else arm();
+      }, minutes * 60_000);
     };
 
     /* Coming back to a tab that was hidden past its deadline locks at once
        rather than granting a fresh window for having been away. */
     const onVisibility = () => {
-      if (document.visibilityState === "visible") arm();
+      if (document.visibilityState !== "visible") return;
+      const deadline = due();
+      if (deadline && Date.now() >= deadline) expire();
+      else arm();
     };
+
+    // A launch after the deadline passed while the app was closed.
+    const left = due();
+    if (left && Date.now() >= left) {
+      expire();
+      return;
+    }
 
     for (const event of ACTIVITY) window.addEventListener(event, arm, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
@@ -83,6 +114,8 @@ export function useAutoLock(minutes: AutoLockMinutes, onLock: () => void): void 
 
     return () => {
       window.clearTimeout(timer);
+      // Signed out or switched off: the next sign-in starts its own window.
+      localStorage.removeItem(DEADLINE_KEY);
       for (const event of ACTIVITY) window.removeEventListener(event, arm);
       document.removeEventListener("visibilitychange", onVisibility);
     };

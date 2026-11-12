@@ -268,11 +268,9 @@ export function PageSetupButton({
         <Ruler size={16} />
         <span className="ribbon-word">Page</span>
       </button>
-      {open && (
-        <div role="dialog" aria-label="Page setup" className="popover page-setup">
-          <PageSetupFields page={page} disabled={disabled} onChange={onChange} />
-        </div>
-      )}
+      <MenuSurface open={open} role="dialog" aria-label="Page setup" className="popover page-setup">
+        <PageSetupFields page={page} disabled={disabled} onChange={onChange} />
+      </MenuSurface>
     </div>
   );
 }

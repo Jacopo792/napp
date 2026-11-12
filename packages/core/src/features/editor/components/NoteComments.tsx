@@ -847,7 +847,10 @@ export function NoteComments({
     if (column) {
       const box = column.getBoundingClientRect();
       const origin = scope.getBoundingClientRect();
-      margin.style.left = `${Math.round(box.right - origin.left + scope.scrollLeft + MARGIN_ASIDE)}px`;
+      const end = Math.round(box.right - origin.left + scope.scrollLeft);
+      margin.style.left = `${end + MARGIN_ASIDE}px`;
+      /* The cover ends where the column does, never under the cards. */
+      scope.style.setProperty("--column-end", `${end}px`);
       /* As tall as the page, so the column has the length of the page to
          stay pinned along. */
       const bottom = box.bottom - origin.top + scope.scrollTop;

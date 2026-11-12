@@ -1107,6 +1107,10 @@
   margin-left: max(0px, calc(50% - (var(--sheet-width) + 344px) / 2));
 }
 
+.has-margin .note-page-cover {
+  width: var(--column-end, 100%);
+}
+
 .comment-margin {
   position: absolute;
   top: 24px;
@@ -2127,6 +2131,13 @@
   background: var(--surface);
 }
 
+/* `hidden` still scrolls: focusing or revealing something wider than the
+   window (a toolbar, a caret) slid the whole shell sideways and clipped the
+   sidebar's left edge. `clip` has no scroll position to leave behind. */
+.workspace-shell {
+  overflow: clip;
+}
+
 .pane-frame {
   min-width: 0;
   min-height: 0;
@@ -2265,7 +2276,7 @@
    menu is wider than the column it hangs in, and a permanent clip would cut
    it. */
 .pane-slide.is-collapsed {
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* Opaque all the way: the columns tried fading as they slid, and a column
@@ -3581,26 +3592,17 @@
 }
 
 /* ── The phone's list, on a pointer ─────────────────────────────────────────
-   Each day is a card with its name small and grey inside it, as the phone's
-   groups are; a row is the title with when beside it, and how it begins under
-   it. Flush columns stay — the card is content inside the column. */
+   Each day is a small grey heading and its rows rest directly on the pane;
+   a row is the title with when beside it, and how it begins under it. One
+   level only: the selected row is the one rounded shape. */
 .collection-column:not(.is-gallery) .note-group {
-  margin: 0 8px 10px;
-  padding-bottom: 4px;
-  border-radius: 12px;
-  background: var(--glass);
-}
-
-/* Light, the card is the lighter plane, as the phone's white cards on grey. */
-:root[data-theme="light"] .collection-column:not(.is-gallery) .note-group {
-  background: color-mix(in srgb, white 75%, var(--paper));
-  box-shadow: 0 0 0 1px var(--rule-soft);
+  margin: 0 0 6px;
 }
 
 .collection-column:not(.is-gallery) .note-group-heading,
 .collection-column:not(.is-gallery) .note-group-heading.is-first {
   position: static;
-  padding: 12px 14px 4px;
+  padding: 12px 20px 4px;
   background: transparent;
 }
 
@@ -3617,9 +3619,6 @@
   opacity: 0;
 }
 
-.collection-column:not(.is-gallery)
-  .note-group-heading:is(:hover, :focus-visible)
-  .note-group-twisty,
 .collection-column:not(.is-gallery) .note-group-twisty:not(.is-open) {
   opacity: 1;
 }
@@ -4645,31 +4644,6 @@
   color: var(--ink-4);
   font-size: var(--text-xs);
   line-height: 1.4;
-}
-
-.color-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  padding: 4px 8px 4px 6px;
-}
-
-.color-control input[type="color"] {
-  width: 25px;
-  height: 25px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-}
-
-.color-control code {
-  color: var(--ink-2);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
 }
 
 .appearance-row input[role="switch"] {
@@ -12921,6 +12895,21 @@ button.sheet-chip:hover,
   }
 }
 
+/* Back to the edge, faster than it came (OVERLAY_OUT). */
+.exits {
+  display: contents;
+}
+.exits[data-exiting] > :is(.manuscript-inspector, .note-comments, .note-outline, .note-history) {
+  pointer-events: none;
+  animation: panel-out var(--dur-fast) var(--ease-in-out) forwards;
+}
+@keyframes panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .manuscript-inspector,
   .note-comments,
@@ -14130,17 +14119,6 @@ button.sheet-chip:hover,
    every row and a heavy selection inside it. A day is now a faint ground the
    rows rest on, rows are parted by air rather than rules, titles sit a step
    lighter and the selection is a quiet wash. */
-.collection-column:not(.is-gallery) .note-group {
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--glass) 55%, transparent);
-  padding: 2px 0 6px;
-}
-
-:root[data-theme="light"] .collection-column:not(.is-gallery) .note-group {
-  background: color-mix(in srgb, white 55%, var(--paper));
-  box-shadow: none;
-}
-
 .note-group .note-row-list::after {
   display: none;
 }
@@ -14280,155 +14258,6 @@ button.sheet-chip:hover,
   color: var(--ink);
 }
 
-/* ── Home ─────────────────────────────────────────────────────────────────────
-   The window's empty pane, in the same soft cards as the list: the note to
-   carry on with large, then the unread remarks and the recent notes, each a
-   card of rows. Places stay in the sidebar. */
-.home-page {
-  display: flex;
-  max-width: 680px;
-  flex-direction: column;
-  gap: 28px;
-  margin: 0 auto;
-  padding: 48px 32px 64px;
-}
-
-.home-continue,
-.home-card {
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-}
-
-:root[data-theme="light"] :is(.home-continue, .home-card) {
-  background: color-mix(in srgb, white 70%, transparent);
-}
-
-.home-continue {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 22px 24px 18px;
-  text-align: left;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.home-continue:hover,
-.home-row:hover {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-}
-
-.home-kicker,
-.home-section h3 {
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
-.home-continue-title {
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.home-continue-preview {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-md);
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.home-continue-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-}
-
-.home-arrow {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  color: var(--ink-2);
-}
-
-.home-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.home-section h3 {
-  padding-left: 4px;
-}
-
-.home-card {
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-}
-
-.home-row {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-  border-radius: 12px;
-  padding: 9px 12px;
-  text-align: left;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.home-row-line {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.home-row-title {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-row-place,
-.home-row time {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-}
-
-.home-row time {
-  font-variant-numeric: tabular-nums;
-}
-
-.home-row-body {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 /* ── Sheets in the phone's shape ──────────────────────────────────────────────
    The note, person and folder sheets as the phone draws its People sheet: the
    picture beside a large title, a round close, and every section a soft card
@@ -14459,8 +14288,12 @@ button.sheet-chip:hover,
 
 .sheet-hero > :is(h2) {
   align-self: end;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-family: var(--font-sans);
-  font-size: 22px;
+  font-size: 20px;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
@@ -14555,4 +14388,320 @@ button.sheet-chip:hover,
 
 .sheet-work > h3 {
   padding: 0 14px;
+}
+
+/* ── Marking up a picture ────────────────────────────────────────────────────
+   One panel grown from the picture's place in the note, over a scrim; one row
+   of tools; options as small menus under the tool that owns them. */
+:root {
+  --markup-margin: 32px;
+}
+
+.markup-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: var(--scrim);
+}
+
+.markup-panel {
+  position: fixed;
+  z-index: 810;
+  transform-origin: 0 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.markup-bar {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-3);
+}
+
+.markup-tool-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.markup-tool {
+  display: inline-flex;
+  min-width: 30px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: var(--radius-xs);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.markup-tool:hover:not(:disabled) {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.markup-tool.is-active {
+  color: var(--accent);
+}
+
+.markup-tool:disabled {
+  opacity: 0.35;
+}
+
+.markup-rule {
+  width: 1px;
+  height: 14px;
+  margin: 0 6px;
+  background: var(--rule);
+}
+
+.markup-spacer {
+  flex: 1;
+}
+
+.markup-text-button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.markup-text-button:hover {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.markup-text-button.is-done {
+  font-weight: var(--weight-semibold, 600);
+  color: var(--accent);
+}
+
+.markup-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 2;
+  min-width: 11rem;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  transform-origin: top left;
+  animation: fade-in var(--dur-fast) var(--ease-out) backwards;
+}
+
+.markup-menu .menu-row {
+  justify-content: flex-start;
+}
+
+.markup-check {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+.markup-nib {
+  display: block;
+  width: 5rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink-2);
+}
+
+.markup-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1.1rem);
+  gap: 8px;
+  padding: 6px;
+}
+
+/* The picture, centred at its own proportions. The sides are the same picture
+   enlarged, blurred and darkened rather than a flat colour. */
+.markup-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.markup-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.2);
+  filter: blur(28px) brightness(0.5);
+}
+
+.markup-image {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  transition:
+    width var(--dur-slow) var(--ease-out),
+    height var(--dur-slow) var(--ease-out);
+}
+
+/* The whole picture, laid out against its view box and moved, turned and scaled
+   so that the crop fills it. The ink is inside it, so the two cannot part. */
+.media-plane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.media-plane > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  user-select: none;
+}
+
+/* A cropped or turned picture in the note: a box of the view's own proportions. */
+.rich-media-image-view {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.markup-crop {
+  position: absolute;
+  inset: 0;
+}
+
+.markup-dim {
+  position: absolute;
+  background: rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.markup-crop-rect {
+  position: absolute;
+  border: 1px solid rgb(255 255 255 / 0.9);
+  cursor: move;
+  touch-action: none;
+}
+
+/* Corner brackets, drawn by ::before inside a larger invisible target (28px,
+   44px for a finger); the edges are strips along each side. */
+.markup-handle {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  .markup-handle {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.markup-handle::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 0 solid #fff;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.6));
+}
+
+.markup-handle.is-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.markup-handle.is-nw::before {
+  top: 4px;
+  left: 4px;
+  border-width: 4px 0 0 4px;
+}
+.markup-handle.is-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.markup-handle.is-ne::before {
+  top: 4px;
+  right: 4px;
+  border-width: 4px 4px 0 0;
+}
+.markup-handle.is-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+.markup-handle.is-sw::before {
+  bottom: 4px;
+  left: 4px;
+  border-width: 0 0 4px 4px;
+}
+.markup-handle.is-se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+.markup-handle.is-se::before {
+  right: 4px;
+  bottom: 4px;
+  border-width: 0 4px 4px 0;
+}
+.markup-handle.is-n,
+.markup-handle.is-s {
+  left: 18px;
+  right: 18px;
+  width: auto;
+  height: 16px;
+  cursor: ns-resize;
+}
+.markup-handle.is-n {
+  top: 0;
+}
+.markup-handle.is-s {
+  bottom: 0;
+}
+.markup-handle.is-e,
+.markup-handle.is-w {
+  top: 18px;
+  bottom: 18px;
+  width: 16px;
+  height: auto;
+  cursor: ew-resize;
+}
+.markup-handle.is-e {
+  right: 0;
+}
+.markup-handle.is-w {
+  left: 0;
+}
+.markup-handle.is-n::before,
+.markup-handle.is-s::before,
+.markup-handle.is-e::before,
+.markup-handle.is-w::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markup-menu {
+    animation: none;
+  }
+  .markup-image,
+  .media-plane {
+    transition: none;
+  }
 }

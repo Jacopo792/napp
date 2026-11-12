@@ -1431,12 +1431,11 @@ export function NoteList({
             is what made a 52px strip that runs the width of the window read as
             a heading pasted beside a toolbar. Side by side they are one
             readout, separated by the middot this line already uses for the
-            scope. The name is what truncates: a folder you cannot read the end
-            of is named again in the column beside this one, and a count — or
-            the thirty days the Trash is counting — is owed in full. */}
+            scope. The name keeps its place: when the strip is
+            too narrow the readout after it truncates, then drops, first. */}
         <div className="collection-title min-w-0 flex-1">
           <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
-          <p className={`readout text-ink-4 ${notice ? "min-w-0 truncate" : "shrink-0"}`}>
+          <p className="readout min-w-0 shrink-[100] truncate whitespace-nowrap text-ink-4">
             {notice ?? (loading ? "Loading" : noteTally(entries.length, trashMode))}
             {scopeLabel && !loading && !notice && <span className="scope-tag">{scopeLabel}</span>}
           </p>

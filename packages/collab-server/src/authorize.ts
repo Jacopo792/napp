@@ -90,7 +90,8 @@ export function createAuthorizer(
       /* The archive could not be asked. Refusing is the safe answer, and it is
          deliberately not cached: a database hiccup should not lock somebody out
          for the whole TTL. */
-      return { allowed: false, reason: error instanceof Error ? error.message : "Try again" };
+      console.warn("authorisation lookup failed:", error instanceof Error ? error.message : error);
+      return { allowed: false, reason: "Try again" };
     }
 
     if (answers.size > SWEEP_ABOVE) {

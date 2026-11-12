@@ -22,6 +22,7 @@ import { keyName } from "@/lib/shortcuts";
 import { countWords } from "@/lib/format";
 import { loadThreadIds } from "@/lib/comments";
 import { PointMenu } from "@/components/ContextMenu";
+import { Exits } from "@/components/Exits";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
 import type { WritingFocusSettings } from "../lib/writingFocus";
@@ -237,14 +238,14 @@ interface Props {
    *  local store while the socket is still on its way. */
   synced?: boolean;
   onNew: () => void;
-  /** What the empty pane shows instead of the drawing: the window's Home. */
-  home?: ReactNode;
   onImportMarkdown: () => void;
   onUploadImage: (file: File) => Promise<string>;
   onUploadFile: (file: File) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
+  /** A column is docked beside the note: the window may need to make room. */
+  onDockedPanel?: (open: boolean) => void;
   /** What the header says about the note — the save readout. It stands beside
    *  the controls rather than inside them: a dock magnifies what a pointer can
    *  press, and this is not a button. */
@@ -369,7 +370,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     session,
     synced = false,
     onNew,
-    home,
+    onDockedPanel,
     onImportMarkdown,
     onUploadImage,
     onUploadFile,
@@ -458,6 +459,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   useEffect(() => {
     if (commentsOpen) setHistoryOpen(false);
   }, [commentsOpen]);
+  const dockedOpen = commentsOpen || outlineOpen || historyOpen;
+  useEffect(() => {
+    onDockedPanel?.(dockedOpen);
+    return () => onDockedPanel?.(false);
+  }, [dockedOpen, onDockedPanel]);
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -1060,19 +1066,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
             The line is the command. A coloured button in the middle of an
             empty page reads as a form; a line reads as an invitation. */}
-        {home && !mobile ? (
-          <div className="home-scroll min-h-0 flex-1 overflow-y-auto">{home}</div>
-        ) : (
-          <div className="editor-empty flex flex-1 items-center justify-center px-8">
-            <BotanicalFlower
-              flower={flowerFor(new Date().toDateString())}
-              className="is-empty-page"
-            />
-            <button onClick={onNew} className="editor-empty-invite font-display">
-              Write a new one · N
-            </button>
-          </div>
-        )}
+        <div className="editor-empty flex flex-1 items-center justify-center px-8">
+          <BotanicalFlower
+            flower={flowerFor(new Date().toDateString())}
+            className="is-empty-page"
+          />
+          <button onClick={onNew} className="editor-empty-invite font-display">
+            Write a new one · N
+          </button>
+        </div>
       </section>
     );
   }
@@ -1337,9 +1339,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     );
   const sidePanels = (
     <>
-      {outlinePanel}
-      {historyPanel}
-      {commentsPanel}
+      <Exits open={Boolean(outlinePanel)}>{outlinePanel}</Exits>
+      <Exits open={Boolean(historyPanel)}>{historyPanel}</Exits>
+      <Exits open={Boolean(commentsPanel)}>{commentsPanel}</Exits>
     </>
   );
 
@@ -1667,43 +1669,45 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </article>
             {manuscript.footer}
           </div>
-          {inspectorTab && !(inMargin && inspectorTab === "comments") && (
-            <aside className="manuscript-inspector" aria-label="Inspector">
-              <div className="inspector-tabs" role="tablist">
-                {inspectorTabs
-                  .filter((tab) => tab.shown)
-                  .map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={inspectorTab === tab.id}
-                      className={`press ${inspectorTab === tab.id ? "is-active" : ""}`}
-                      onClick={() => showTab(tab.id)}
-                    >
-                      {tab.name}
-                    </button>
-                  ))}
-                <button
-                  type="button"
-                  className="inspector-close press"
-                  aria-label="Close the inspector"
-                  onClick={() => showTab(null)}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="inspector-pane" hidden={inspectorTab !== "headings"}>
-                {outlinePanel}
-              </div>
-              <div className="inspector-pane" hidden={inspectorTab !== "comments"}>
-                {!inMargin && commentsPanel}
-              </div>
-              <div className="inspector-pane" hidden={inspectorTab !== "versions"}>
-                {historyPanel}
-              </div>
-            </aside>
-          )}
+          <Exits open={Boolean(inspectorTab && !(inMargin && inspectorTab === "comments"))}>
+            {inspectorTab && !(inMargin && inspectorTab === "comments") && (
+              <aside className="manuscript-inspector" aria-label="Inspector">
+                <div className="inspector-tabs" role="tablist">
+                  {inspectorTabs
+                    .filter((tab) => tab.shown)
+                    .map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={inspectorTab === tab.id}
+                        className={`press ${inspectorTab === tab.id ? "is-active" : ""}`}
+                        onClick={() => showTab(tab.id)}
+                      >
+                        {tab.name}
+                      </button>
+                    ))}
+                  <button
+                    type="button"
+                    className="inspector-close press"
+                    aria-label="Close the inspector"
+                    onClick={() => showTab(null)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="inspector-pane" hidden={inspectorTab !== "headings"}>
+                  {outlinePanel}
+                </div>
+                <div className="inspector-pane" hidden={inspectorTab !== "comments"}>
+                  {!inMargin && commentsPanel}
+                </div>
+                <div className="inspector-pane" hidden={inspectorTab !== "versions"}>
+                  {historyPanel}
+                </div>
+              </aside>
+            )}
+          </Exits>
         </div>
         {!pages && !mobile && (
           <SheetStatus

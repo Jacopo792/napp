@@ -121,6 +121,15 @@ export interface Context {
  * socket goes, without anybody having to. */
 const guards = new WeakMap<object, Guard | null>();
 
+/* When each connection last proved it may still be here. Asking for a token is
+   only a request: a client that never answers would otherwise keep receiving a
+   note it has been removed from. */
+const proved = new WeakMap<object, number>();
+
+/* A Supabase access token is about a kilobyte. Anything far past that is not
+   one, and is not worth three round trips or a slot in the answer cache. */
+const MAX_TOKEN = 4096;
+
 function redisExtension(config: CollaborationConfig): Extension[] {
   if (!config.redisUrl) return [];
   return [
@@ -192,6 +201,13 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
   });
   const tokenRefresh = config.tokenRefresh ?? 60_000;
   let readinessState: string | null = null;
+  /* Readiness costs a database query and a Redis connection, and anybody can
+     ask. One answer serves everybody who asks within five seconds. */
+  let readiness: {
+    at: number;
+    probe: Promise<[Awaited<ReturnType<typeof probeSupabase>>, boolean | null]>;
+  } | null = null;
+  let importing = 0;
 
   return new Server<Context>({
     port: config.port,
@@ -214,6 +230,9 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     maxDebounce: 10000,
     // Handled by the caller, so the flush can be awaited and logged.
     stopOnSignals: false,
+    /* ws allows 100 MiB a frame by default. Pictures live in Storage, so a
+       note's whole state is far below this. */
+    websocketOptions: { maxPayload: 16 * 1024 * 1024 },
     extensions: redisExtension(config),
 
     /* Refused before the WebSocket exists at all. `onConnect` below is the
@@ -237,6 +256,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     async onAuthenticate({ documentName, token, connectionConfig }) {
       const noteId = noteIdOf(documentName);
       if (!noteId) throw new Error("That is not a note");
+      if (token.length > MAX_TOKEN) throw new Error("Sign in again");
 
       const answer = await authorize(token, noteId, { fresh: true });
       if (!answer.allowed) throw new Error(answer.reason);
@@ -265,7 +285,14 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        authorisation — that is how a revoked member stops being connected
        without anybody having to reload. */
     async connected({ connection }) {
-      const timer = setInterval(() => connection.requestToken(), tokenRefresh);
+      proved.set(connection, Date.now());
+      const timer = setInterval(() => {
+        if (Date.now() - (proved.get(connection) ?? 0) > 2 * tokenRefresh) {
+          connection.close();
+          return;
+        }
+        connection.requestToken();
+      }, tokenRefresh);
       connection.onClose(() => clearInterval(timer));
     },
 
@@ -273,11 +300,14 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       const noteId = noteIdOf(documentName);
       if (!noteId) return;
 
-      const answer = await authorize(token, noteId, { fresh: true });
-      if (!answer.allowed) {
+      const answer =
+        token.length > MAX_TOKEN ? null : await authorize(token, noteId, { fresh: true });
+      /* A different account's token is not a renewal of this connection. */
+      if (!answer?.allowed || answer.identity.userId !== connection.context.userId) {
         connection.close();
         return;
       }
+      proved.set(connection, Date.now());
       connection.context.token = token;
       connection.readOnly = answer.readOnly;
       connectionConfig.readOnly = answer.readOnly;
@@ -350,9 +380,18 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       versions.touched(noteIdOf(documentName)!, context.archiveId, context.userId);
     },
 
-    async onStoreDocument({ documentName, document }) {
+    async onStoreDocument(payload) {
+      const { documentName, document, instance } = payload;
       const noteId = noteIdOf(documentName)!;
-      await storeDocument(service, noteId, document);
+      try {
+        await storeDocument(service, noteId, document);
+      } catch (error) {
+        /* Hocuspocus logs a failed save and never tries again; if the writer
+           then stops typing, the edit lives only in this process. Queue the
+           save again so it lands once the database is back. */
+        instance.storeDocumentHooks(document, payload);
+        throw error;
+      }
       await versions.settle(noteId, document);
     },
 
@@ -369,7 +408,10 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        out of rotation and leaves it running, which is the correct response to
        a database that is briefly away. */
     async onRequest({ request, response }) {
-      const url = new URL(request.url ?? "/", "http://localhost");
+      /* `//` and friends do not parse, and a throw here is an unhandled
+         rejection that takes the whole process down. */
+      const url = URL.parse(request.url ?? "/", "http://localhost");
+      if (!url) return respond(response, 400, { error: "Bad request" });
       if (url.pathname === "/version") {
         return respond(response, 200, { revision: config.revision ?? null });
       }
@@ -389,10 +431,14 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         if (request.method !== "GET") return respond(response, 405, { error: "Method refused" });
         const noteId = noteIdOf(url.searchParams.get("note") ?? "");
         const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
-        if (!noteId || !token) return respond(response, 401, { error: "Sign in to import images" });
+        if (!noteId || !token || token.length > MAX_TOKEN)
+          return respond(response, 401, { error: "Sign in to import images" });
         const access = await authorize(token, noteId, { fresh: true });
         if (!access.allowed || access.readOnly)
           return respond(response, 403, { error: "This note cannot be edited" });
+        /* Each import buffers up to 20 MB. */
+        if (importing >= 3) return respond(response, 429, { error: "Try again in a moment" });
+        importing++;
         try {
           const image = await importImage(url.searchParams.get("url") ?? "");
           response.writeHead(200, {
@@ -405,6 +451,8 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
           return respond(response, 422, {
             error: "Could not copy this image. Download it from the source and attach it.",
           });
+        } finally {
+          importing--;
         }
         throw null;
       }
@@ -412,7 +460,12 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         return respond(response, 200, { status: "ok" });
       }
       if (request.url === "/readyz") {
-        const [supabaseProbe, redisOk] = await Promise.all([probeSupabase(service), probeRedis()]);
+        if (!readiness || Date.now() - readiness.at > 5000)
+          readiness = {
+            at: Date.now(),
+            probe: Promise.all([probeSupabase(service), probeRedis()]),
+          };
+        const [supabaseProbe, redisOk] = await readiness.probe;
         const checks = { supabase: supabaseProbe.ok, redis: redisOk };
         const ready = checks.supabase && checks.redis !== false;
         const state = ready ? "ready" : `unavailable: ${JSON.stringify(checks)}`;

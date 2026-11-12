@@ -45,6 +45,65 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.50",
+    date: "2026-11-12",
+    headline: "Marking up pictures, and a calmer app",
+    sections: [
+      {
+        heading: "Pictures",
+        items: [
+          {
+            title: "Mark up in one panel",
+            text: "A picture opens into one panel with a single row of tools: pen, highlighter, eraser, shapes, text, move, thickness, colour, fill and undo. Cancel or Done closes it, and your ink is saved when you press Done.",
+          },
+          {
+            title: "Crop and rotate",
+            text: "Pictures can be cropped and rotated. The original file is never changed.",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Opens on your latest note",
+            text: "The Continue writing page is gone. The app opens the note you wrote in most recently.",
+          },
+          {
+            title: "A flatter list",
+            text: "The note list uses plain date headers and flat rows. A note's cover no longer covers margin comments, and long sheet titles stop at two lines.",
+          },
+          {
+            title: "Room for the note",
+            text: "With a side panel open in a narrow window, the sidebar and then the list step aside so the note stays readable. Panels and popovers now close with the same motion they open with.",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "Fewer words, fewer controls",
+            text: "Explanatory sentences are gone. Accent, Background and Foreground colours come from the themes and palettes only, Translucency and Frosted glass are one Material control, and Reset appearance leaves Style alone. Members and Leave archive are in the archive sheet.",
+          },
+          {
+            title: "Two icon styles",
+            text: "Icons are Clear or Tinted. The Book names its Write and Board views and reads more easily.",
+          },
+        ],
+      },
+      {
+        heading: "Security",
+        items: [
+          {
+            title: "Safer sessions and attachments",
+            text: "Adding an account no longer signs out the saved one, and auto-lock holds through sleep and restarts. Other tabs close when you sign out or lock. A busy or offline sign-in service is no longer reported as a wrong password. On desktop, only attachments that open in a viewer open directly; others are shown in their folder.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.49",
     date: "2026-11-02",
     headline: "Readable on a large monitor",

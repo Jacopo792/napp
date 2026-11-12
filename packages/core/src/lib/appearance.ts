@@ -397,11 +397,27 @@ const SEMANTIC = {
   },
 } as const;
 
+/* Colours are chosen from the palettes only. A free colour saved by an older
+   version stays in the stored preferences, unread: it draws as the theme's own
+   ground instead of a stranger's colours, and nothing is rewritten. */
+const KNOWN_COLOURS = new Set(
+  [...APPEARANCE_PRESETS, LIGHT_DEFAULTS, DEFAULT_APPEARANCE].map((p) =>
+    `${p.accent}${p.background}${p.foreground}`.toLowerCase(),
+  ),
+);
+
+function coloursOf(config: Appearance) {
+  const { accent, background, foreground } = config;
+  if (KNOWN_COLOURS.has(`${accent}${background}${foreground}`.toLowerCase())) return config;
+  return darkMode(config) ? DEFAULT_APPEARANCE : LIGHT_DEFAULTS;
+}
+
 export function applyAppearance(config = current): void {
   const root = document.documentElement;
   const dark = darkMode(config);
-  const background = config.background;
-  const foreground = config.foreground;
+  const colours = coloursOf(config);
+  const background = colours.background;
+  const foreground = colours.foreground;
   const contrastShift = (config.contrast - 50) / 100;
 
   root.dataset.theme = dark ? "dark" : "light";
@@ -470,11 +486,11 @@ export function applyAppearance(config = current): void {
     dark ? 0.11 + contrastShift * 0.08 : 0.035,
     dark ? "white" : "black",
   );
-  const accent = legibleOn(config.accent, paper, 3);
+  const accent = legibleOn(colours.accent, paper, 3);
   const onAccent =
     contrastRatio(accent, "#f7f7f7") >= contrastRatio(accent, "#161616") ? "#f7f7f7" : "#161616";
   root.style.setProperty("--accent", accent);
-  root.style.setProperty("--accent-strong", legibleOn(config.accent, paper, 4.5));
+  root.style.setProperty("--accent-strong", legibleOn(colours.accent, paper, 4.5));
   root.style.setProperty("--accent-wash", `${accent}24`);
   /* Tinted icons take the accent unless the reader gave them a hue of their
      own, lifted to the same floors the accent is so a dark tint stays a
@@ -483,7 +499,7 @@ export function applyAppearance(config = current): void {
   root.style.setProperty("--icon-tint", tint === "auto" ? accent : legibleOn(tint, paper, 3));
   root.style.setProperty(
     "--icon-tint-strong",
-    tint === "auto" ? legibleOn(config.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
+    tint === "auto" ? legibleOn(colours.accent, paper, 4.5) : legibleOn(tint, paper, 4.5),
   );
   /* The tile of the place you are in is filled, and its glyph is whichever
      of the two inks reads on that fill. */

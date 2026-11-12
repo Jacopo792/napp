@@ -339,6 +339,12 @@ function createWindow() {
     return { action: "deny" };
   });
 
+  /* The window holds the bridge to the file system and the clipboard. It shows
+     the application and nothing else, whatever a page asks it to load. */
+  window.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith(isDev ? DEV_URL : `${APP_ORIGIN}/`)) event.preventDefault();
+  });
+
   void window.loadURL(isDev ? DEV_URL : `${APP_ORIGIN}/index.html`);
   return window;
 }
@@ -382,9 +388,27 @@ ipcMain.handle("napp:save", (event, files, fallbackName) =>
 
 /* Shown, not saved: written where the operating system keeps things it is
    allowed to throw away, then handed to whatever opens that kind of file. */
+/* An attachment's name is chosen by whoever attached it, and `openPath` runs
+   whatever the system does for that kind of file. Only kinds that open in a
+   viewer are opened; anything else is shown in its folder, where launching it
+   is the reader's own decision and not a click inside a note. */
+const OPENS_IN_A_VIEWER = new Set(
+  (
+    "pdf txt md csv rtf png jpg jpeg gif webp heic svg bmp tiff " +
+    "mp3 m4a wav mp4 mov m4v webm doc docx xls xlsx ppt pptx odt ods odp pages numbers key epub"
+  ).split(" "),
+);
+
 ipcMain.handle("napp:open", async (_event, name, data) => {
-  const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "napp-")), path.basename(name));
+  const file = path.join(
+    await fs.mkdtemp(path.join(os.tmpdir(), "napp-")),
+    path.basename(String(name)),
+  );
   await fs.writeFile(file, Buffer.from(data));
+  if (!OPENS_IN_A_VIEWER.has(path.extname(file).slice(1).toLowerCase())) {
+    shell.showItemInFolder(file);
+    return null;
+  }
   const failure = await shell.openPath(file);
   return failure || null;
 });

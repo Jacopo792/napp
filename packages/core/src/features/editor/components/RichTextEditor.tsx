@@ -29,10 +29,13 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import {
+  AlignJustify,
   ArrowUpRight,
   Check,
+  ChevronDown,
   Circle,
   Copy,
+  Crop as CropIcon,
   Download,
   Eraser,
   ExternalLink,
@@ -45,7 +48,9 @@ import {
   Minus,
   Move,
   PaintBucket,
+  Palette,
   Pencil,
+  RotateCw,
   Square,
   Trash2,
   Type,
@@ -109,7 +114,19 @@ import {
 import { attachmentType, attachmentExtension } from "@/features/editor/lib/attachments";
 import { mediaPaste } from "@/features/editor/lib/paste";
 import { inlinePastedStyles, reflowPasted } from "@/features/editor/lib/reflow";
-import { splitMediaStroke } from "@/features/editor/lib/mediaInk";
+import {
+  WHOLE_CROP,
+  isWholeView,
+  planeFit,
+  readView,
+  turnRect,
+  unturnRect,
+  viewAspect,
+  writeCrop,
+  type Crop,
+  type ImageView,
+  splitMediaStroke,
+} from "@/features/editor/lib/mediaInk";
 import { rememberSpelling, takeAutocorrection } from "@/features/editor/lib/autocorrect";
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
@@ -881,16 +898,25 @@ function PrivateImageView({
      takes — same hand, same box, measured against the picture's width. It is
      put down until it is picked up, so the picture still opens when clicked. */
   const strokes = useMemo(() => drawingMarks(node.attrs.strokes as string), [node.attrs.strokes]);
-  const writeInk = useCallback(
-    (next: DrawingMark[]) => updateAttributes({ strokes: JSON.stringify(next) }),
-    [updateAttributes],
+  /* The picture's own size, learned when it decodes: a crop and a turn are
+     laid out against it. */
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const view = useMemo(
+    () => readView(node.attrs.crop, node.attrs.turns),
+    [node.attrs.crop, node.attrs.turns],
   );
-  const [pen, setPen] = useState(false);
+  const shaped = !isWholeView(view) && natural !== null && !video;
+  const plane = shaped ? planeCss(view, natural, view.turns) : null;
+  /* Marking up happens in a panel of its own, on a draft of the strokes: the
+     note's document is written once, on Done, and not at all on Cancel. */
+  const [markup, setMarkup] = useState(false);
+  const frame = useRef<HTMLSpanElement>(null);
   const ink = useInk({
     strokes,
-    write: writeInk,
+    write: () => {},
     fit: "width",
-    editable: editor.isEditable,
+    editable: false,
+    turned: shaped,
   });
 
   useEffect(() => {
@@ -922,6 +948,34 @@ function PrivateImageView({
     };
   }, [objectId, resolveImage, attempt, video, alt]);
 
+  /* Fades in once decoded rather than painting in as it arrives. */
+  const pic = (
+    <img
+      src={src}
+      alt={alt || "Image"}
+      draggable={false}
+      onLoad={(event) => {
+        event.currentTarget.classList.add("is-arrived");
+        setNatural({ w: event.currentTarget.naturalWidth, h: event.currentTarget.naturalHeight });
+      }}
+    />
+  );
+  /* Always mounted, even with nothing on it: the layer measures itself to
+     know how tall it is in stroke units, and a layer that appears only once
+     the pen is out has nothing to measure until too late. */
+  const layer = (
+    <svg
+      ref={ink.surface}
+      className="rich-media-image-ink"
+      viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
+      /* See the page layer below: a surface measured against its width must
+         never let its height stretch the ink. */
+      preserveAspectRatio="xMinYMin meet"
+    >
+      {ink.inked}
+    </svg>
+  );
+
   return (
     <NodeViewWrapper className={`rich-media-image ${error ? "is-error" : ""}`}>
       {/* The frame is what the ink lies over, and it holds the picture alone:
@@ -929,7 +983,7 @@ function PrivateImageView({
           caption is not part of the picture. There is no caption under it
           any more: the alt was a file name or an object id, and a pasted
           picture arrived with a uuid printed beneath it. */}
-      <span className="rich-media-image-frame" contentEditable={false}>
+      <span ref={frame} className="rich-media-image-frame" contentEditable={false}>
         {src && video ? (
           <video
             src={src}
@@ -941,15 +995,27 @@ function PrivateImageView({
           <button
             type="button"
             className="rich-media-image-open"
+            /* A cropped or turned picture is a box of its own proportions,
+               as wide as an uncropped picture of that shape would be. */
+            style={plane ? { width: `min(100%, ${34 * plane.aspect}rem)` } : undefined}
             onClick={() => options.open(src, alt || "Image")}
           >
-            {/* Fades in once decoded rather than painting in as it arrives. */}
-            <img
-              src={src}
-              alt={alt || "Image"}
-              draggable={false}
-              onLoad={(event) => event.currentTarget.classList.add("is-arrived")}
-            />
+            {plane ? (
+              <div
+                className="rich-media-image-view"
+                data-crop={node.attrs.crop}
+                data-turns={view.turns}
+                data-strokes={node.attrs.strokes}
+                style={{ aspectRatio: plane.aspect }}
+              >
+                <div className="media-plane" style={plane.style}>
+                  {pic}
+                  {layer}
+                </div>
+              </div>
+            ) : (
+              pic
+            )}
           </button>
         ) : (
           <span className="rich-media-loading">
@@ -965,36 +1031,23 @@ function PrivateImageView({
             )}
           </span>
         )}
-        {/* Always mounted, even with nothing on it: the layer measures itself
-            to know how tall it is in stroke units, and a layer that appears
-            only once the pen is out has nothing to measure until too late. */}
-        <svg
-          ref={ink.surface}
-          className={`rich-media-image-ink ${
-            pen && !ink.erasing && !ink.arranging ? "is-drawing" : ""
-          } ${pen && ink.erasing ? "is-erasing" : ""} ${
-            pen && ink.arranging ? "is-arranging" : ""
-          }`}
-          viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
-          /* See the page layer below: a surface measured against its width
-             must never let its height stretch the ink. */
-          preserveAspectRatio="xMinYMin meet"
-          onPointerDown={ink.start}
-        >
-          {ink.inked}
-        </svg>
+        {!plane && layer}
       </span>
-      {editor.isEditable && (
+      {editor.isEditable && src && !video && (
         <button
           type="button"
-          className={`rich-media-remove is-ink ${pen ? "is-active" : ""}`}
-          aria-label={pen ? "Put the pen down" : "Draw on this picture"}
-          title={pen ? "Put the pen down" : "Draw on this picture"}
-          aria-pressed={pen}
-          onClick={() => setPen((on) => !on)}
+          className="rich-media-remove is-ink"
+          aria-label="Mark up this picture"
+          title="Mark up this picture"
+          onClick={() => {
+            (
+              frame.current?.querySelector(".rich-media-image-open") ?? frame.current
+            )?.scrollIntoView({ block: "center", behavior: "instant" });
+            setMarkup(true);
+          }}
           contentEditable={false}
         >
-          {pen ? <Check size={16} /> : <Pencil size={16} />}
+          <Pencil size={16} />
         </button>
       )}
       {editor.isEditable && (
@@ -1009,13 +1062,528 @@ function PrivateImageView({
           <Trash2 size={16} />
         </button>
       )}
-      {editor.isEditable && pen && (
-        <span className="rich-media-drawing-tools" contentEditable={false}>
-          {ink.tools}
-        </span>
+      {markup && frame.current && natural && (
+        <ImageMarkup
+          src={src}
+          alt={alt}
+          initial={strokes}
+          initialView={view}
+          natural={natural}
+          anchor={
+            frame.current.querySelector<HTMLElement>(".rich-media-image-open") ?? frame.current
+          }
+          onClose={(next) => {
+            setMarkup(false);
+            if (next)
+              updateAttributes({
+                strokes: JSON.stringify(next.strokes),
+                crop: writeCrop(next.view.crop),
+                turns: next.view.turns,
+              });
+          }}
+        />
       )}
-      {ink.menu}
     </NodeViewWrapper>
+  );
+}
+
+/* ── Marking up a picture ────────────────────────────────────────────────────
+   The picture grows out of its place in the note into one panel above the
+   window, and the rest of the window waits behind a scrim. Everything is in a
+   single row of tools; options open from the tool they belong to. The strokes
+   are a draft held here: Done writes them to the note once, Cancel and Escape
+   leave the document exactly as it was. */
+const MARKUP_BAR = 44;
+
+/** A motion token as the stylesheet defines it, so the panel moves on the same
+ *  curve as the rest of the app and not on a copy of it. */
+function motionToken(name: string, fallback: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+/** The style of a view's plane, in container units: the plane is the whole
+ *  original laid out against the view box (`container-type: inline-size`, so
+ *  `cqw` is the box's width) and moved, turned and scaled so that the crop is
+ *  what the box shows. `spin` is the unwrapped turn count, so that turning
+ *  again animates on through 360 instead of back round. */
+function planeCss(
+  view: ImageView,
+  natural: { w: number; h: number },
+  spin: number,
+): { aspect: number; style: React.CSSProperties } {
+  const fit = planeFit(view, natural.w, natural.h);
+  const c = (n: number) => `${(n * 100).toFixed(4)}cqw`;
+  return {
+    aspect: fit.aspect,
+    style: {
+      width: c(fit.width),
+      aspectRatio: `${natural.w} / ${natural.h}`,
+      transform: `translate(${c(fit.centre.x)}, ${c(fit.centre.y)}) rotate(${spin * 90}deg) translate(${c(-fit.offset.x)}, ${c(-fit.offset.y)})`,
+    },
+  };
+}
+
+const MIN_CROP_SIZE = 0.06;
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+function ImageMarkup({
+  src,
+  alt,
+  initial,
+  initialView,
+  natural,
+  anchor,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  initial: DrawingMark[];
+  initialView: ImageView;
+  natural: { w: number; h: number };
+  anchor: HTMLElement;
+  onClose: (next: { strokes: DrawingMark[]; view: ImageView } | null) => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const ink = useInk({
+    strokes: draft,
+    write: setDraft,
+    fit: "width",
+    editable: true,
+    turned: true,
+  });
+  const [crop, setCrop] = useState(initialView.crop);
+  const [spin, setSpin] = useState(initialView.turns);
+  const [cropping, setCropping] = useState(false);
+  /* The rectangle being sized, on the whole picture as it is turned now. */
+  const [rect, setRect] = useState<Crop>(WHOLE_CROP);
+  const imageBox = useRef<HTMLDivElement>(null);
+  const turns = ((spin % 4) + 4) % 4;
+  const hand = ink.hand;
+  const MARKUP_SHAPES = DRAWING_TOOLS.slice(0, 4);
+  const [menu, setMenu] = useState<"shape" | "nib" | "colour" | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+
+  /* Where the picture sits now. The panel is laid out once, against it: centred
+     on the picture and wider than it, a margin from every edge of the window. */
+  const layout = useMemo(() => {
+    const from = anchor.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = Number.parseFloat(motionToken("--markup-margin", "32")) || 32;
+    const width = Math.min(vw - 2 * margin, Math.max(from.width + 160, 520));
+    const height = Math.min(Math.max(from.height, 220), vh - 2 * margin - MARKUP_BAR);
+    const centre = from.top + from.height / 2;
+    return {
+      from,
+      width,
+      height,
+      left: clamp(from.left + from.width / 2 - width / 2, margin, vw - margin - width),
+      top: clamp(centre - height / 2 - MARKUP_BAR, margin, vh - margin - height - MARKUP_BAR),
+    };
+    // The anchor is read once, on entry: the panel does not follow the note.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Grows from the picture's own place, and goes back to it. */
+  const fly = useCallback(
+    (entering: boolean) => {
+      const element = panel.current;
+      if (!element) return Promise.resolve();
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const options: KeyframeAnimationOptions = {
+        duration: reduced ? 0 : Number.parseFloat(motionToken("--dur-slow", "360")) || 360,
+        easing: motionToken("--ease-out", "ease-out"),
+        fill: "both",
+      };
+      const { from, left, top, width } = layout;
+      const small = `translate(${from.left - left}px, ${from.top - top}px) scale(${from.width / width})`;
+      const frames = [
+        { transform: small, opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ];
+      if (!entering) frames.reverse();
+      scrim.current?.animate(
+        [{ opacity: entering ? 0 : 1 }, { opacity: entering ? 1 : 0 }],
+        options,
+      );
+      return element.animate(frames, options).finished.then(() => undefined);
+    },
+    [layout],
+  );
+  useEffect(() => {
+    void fly(true);
+  }, [fly]);
+
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const settled = useRef({ crop, rect, turns, cropping });
+  settled.current = { crop, rect, turns, cropping };
+  const finish = useCallback(
+    (commit: boolean) => {
+      if (leaving) return;
+      setLeaving(true);
+      setMenu(null);
+      const now = settled.current;
+      /* Done while sizing a crop takes the rectangle as it stands. */
+      const final = now.cropping ? unturnRect(now.turns, now.rect) : now.crop;
+      void fly(false).then(() =>
+        onClose(
+          commit ? { strokes: draftRef.current, view: { crop: final, turns: now.turns } } : null,
+        ),
+      );
+    },
+    [fly, leaving, onClose],
+  );
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const menuRef = useRef(menu);
+  menuRef.current = menu;
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (menuRef.current) setMenu(null);
+      else if (settled.current.cropping) setCropping(false);
+      else finishRef.current(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: PointerEvent) => {
+      if (!(event.target as Element).closest?.(".markup-tool-wrap")) setMenu(null);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [menu]);
+
+  const shown: ImageView = { crop: cropping ? WHOLE_CROP : crop, turns };
+  const plane = planeCss(shown, natural, spin);
+  const boxWidth = Math.min(layout.width, layout.height * plane.aspect);
+  const boxHeight = boxWidth / plane.aspect;
+  const startCrop = () => {
+    setMenu(null);
+    if (cropping) return setCropping(false);
+    setRect(turnRect(turns, crop));
+    setCropping(true);
+  };
+  const applyCrop = () => {
+    setCrop(unturnRect(turns, rect));
+    setCropping(false);
+  };
+  /* A corner, or the inside of the rectangle, followed with `window` listeners
+     for the reason the ink is. */
+  const grab =
+    (kind: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w" | "move") =>
+    (event: React.PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const box = imageBox.current!.getBoundingClientRect();
+      const start = rect;
+      const move = (next: PointerEvent) => {
+        const dx = (next.clientX - event.clientX) / box.width;
+        const dy = (next.clientY - event.clientY) / box.height;
+        if (kind === "move") {
+          setRect({
+            ...start,
+            x: clamp(start.x + dx, 0, 1 - start.w),
+            y: clamp(start.y + dy, 0, 1 - start.h),
+          });
+          return;
+        }
+        let [x0, y0, x1, y1] = [start.x, start.y, start.x + start.w, start.y + start.h];
+        if (kind.includes("w")) x0 = clamp(x0 + dx, 0, x1 - MIN_CROP_SIZE);
+        if (kind.includes("e")) x1 = clamp(x1 + dx, x0 + MIN_CROP_SIZE, 1);
+        if (kind.includes("n")) y0 = clamp(y0 + dy, 0, y1 - MIN_CROP_SIZE);
+        if (kind.includes("s")) y1 = clamp(y1 + dy, y0 + MIN_CROP_SIZE, 1);
+        setRect({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    };
+  const penActive = !hand.erasing && !hand.marker && hand.shape === null;
+  const shapeGlyph = MARKUP_SHAPES.find((each) => each.tool === hand.shape) ?? MARKUP_SHAPES[0];
+  const ShapeGlyph =
+    hand.shape === null || hand.shape === "text" || hand.shape === "move"
+      ? Square
+      : shapeGlyph.Glyph;
+  const tool = (
+    label: string,
+    Glyph: typeof Pencil,
+    active: boolean,
+    onClick: () => void,
+    disabled = false,
+    whileCropping = false,
+  ) => (
+    <button
+      type="button"
+      className={`markup-tool ${active ? "is-active" : ""}`}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      disabled={disabled || (cropping && !whileCropping)}
+      onClick={() => {
+        setMenu(null);
+        onClick();
+      }}
+    >
+      <Glyph size={16} />
+    </button>
+  );
+  const dropdown = (
+    name: "shape" | "nib" | "colour",
+    label: string,
+    Glyph: typeof Pencil,
+    active: boolean,
+    body: React.ReactNode,
+  ) => (
+    <span className="markup-tool-wrap">
+      <button
+        type="button"
+        className={`markup-tool is-menu ${active ? "is-active" : ""}`}
+        aria-label={label}
+        title={label}
+        aria-haspopup="menu"
+        disabled={cropping}
+        aria-expanded={menu === name}
+        onClick={() => setMenu((open) => (open === name ? null : name))}
+      >
+        <Glyph size={16} />
+        <ChevronDown size={10} />
+      </button>
+      {menu === name && (
+        <div role="menu" className="markup-menu">
+          {body}
+        </div>
+      )}
+    </span>
+  );
+  const custom = !DRAWING_INKS.includes(hand.ink as (typeof DRAWING_INKS)[number]);
+
+  return createPortal(
+    <>
+      <div ref={scrim} className="markup-scrim" />
+      <div
+        ref={panel}
+        className="markup-panel"
+        role="dialog"
+        aria-label="Mark up picture"
+        style={{ left: layout.left, top: layout.top, width: layout.width }}
+      >
+        <div className="markup-bar">
+          {tool("Pen", Pencil, penActive, hand.pen)}
+          {tool("Highlighter", Highlighter, !hand.erasing && hand.marker, hand.toggleMarker)}
+          {tool("Eraser", Eraser, hand.erasing, hand.toggleErase)}
+          {dropdown(
+            "shape",
+            "Shapes",
+            ShapeGlyph,
+            !hand.erasing && MARKUP_SHAPES.some((each) => each.tool === hand.shape),
+            MARKUP_SHAPES.map(({ tool: shape, label, Glyph }) => (
+              <button
+                key={shape}
+                type="button"
+                role="menuitemradio"
+                aria-checked={hand.shape === shape}
+                className="menu-row"
+                onClick={() => {
+                  if (hand.shape !== shape) hand.toggleShape(shape);
+                  setMenu(null);
+                }}
+              >
+                <Glyph size={16} />
+                {label}
+                {hand.shape === shape && <Check size={14} className="markup-check" />}
+              </button>
+            )),
+          )}
+          {tool("Text box", Type, !hand.erasing && hand.shape === "text", () =>
+            hand.toggleShape("text"),
+          )}
+          {tool("Move a mark", Move, !hand.erasing && hand.shape === "move", () =>
+            hand.toggleShape("move"),
+          )}
+          <span className="markup-rule" />
+          {dropdown(
+            "nib",
+            "Stroke thickness",
+            AlignJustify,
+            false,
+            DRAWING_NIBS.map((size) => (
+              <button
+                key={size}
+                type="button"
+                role="menuitemradio"
+                aria-checked={!hand.marker && hand.nib === size}
+                aria-label={`Thickness ${size}`}
+                className="menu-row"
+                onClick={() => {
+                  hand.chooseNib(size);
+                  setMenu(null);
+                }}
+              >
+                <span className="markup-nib" style={{ height: Math.max(2, size / 2) }} />
+                {!hand.marker && hand.nib === size && <Check size={14} className="markup-check" />}
+              </button>
+            )),
+          )}
+          {dropdown(
+            "colour",
+            "Stroke colour",
+            Palette,
+            false,
+            <div className="markup-swatches">
+              {DRAWING_INKS.map((colour) => (
+                <button
+                  key={colour}
+                  type="button"
+                  role="menuitemradio"
+                  className={`drawing-ink ${colour === hand.ink ? "is-chosen" : ""}`}
+                  style={{ background: colour }}
+                  aria-label={`Draw in ${colour}`}
+                  aria-checked={colour === hand.ink}
+                  onClick={() => {
+                    hand.choose(colour);
+                    setMenu(null);
+                  }}
+                />
+              ))}
+              <label
+                className={`drawing-ink is-any ${custom ? "is-chosen" : ""}`}
+                style={custom ? { background: hand.ink } : undefined}
+                title="Any colour"
+              >
+                <input
+                  type="color"
+                  value={hand.ink}
+                  aria-label="Draw in any colour"
+                  onChange={(event) => hand.choose(event.target.value)}
+                />
+              </label>
+            </div>,
+          )}
+          {tool(
+            "Fill the shape",
+            PaintBucket,
+            hand.closed && hand.filling,
+            hand.toggleFill,
+            !hand.closed,
+          )}
+          {tool(
+            "Undo the last mark",
+            Undo2,
+            false,
+            () => setDraft((now) => now.slice(0, -1)),
+            draft.length === 0,
+          )}
+          <span className="markup-rule" />
+          {tool("Rotate", RotateCw, false, () => setSpin((n) => n + 1))}
+          {tool("Crop", CropIcon, cropping, startCrop, false, true)}
+          <span className="markup-spacer" />
+          {cropping && (
+            <button type="button" className="markup-text-button is-done" onClick={applyCrop}>
+              Crop
+            </button>
+          )}
+          <button type="button" className="markup-text-button" onClick={() => finish(false)}>
+            Cancel
+          </button>
+          <button type="button" className="markup-text-button is-done" onClick={() => finish(true)}>
+            Done
+          </button>
+        </div>
+        <div className="markup-stage" style={{ height: layout.height }}>
+          {/* The empty sides are the picture again, blurred and darkened. */}
+          <img className="markup-backdrop" src={src} alt="" draggable={false} />
+          <div
+            ref={imageBox}
+            className="markup-image"
+            style={{ width: boxWidth, height: boxHeight }}
+          >
+            <div className="media-plane" style={plane.style}>
+              <img src={src} alt={alt || "Image"} draggable={false} />
+              <svg
+                ref={ink.surface}
+                className={`rich-media-image-ink ${
+                  cropping
+                    ? ""
+                    : hand.erasing
+                      ? "is-erasing"
+                      : hand.shape === "move"
+                        ? "is-arranging"
+                        : "is-drawing"
+                }`}
+                viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
+                preserveAspectRatio="xMinYMin meet"
+                onPointerDown={ink.start}
+              >
+                {ink.inked}
+              </svg>
+            </div>
+            {cropping && (
+              <div className="markup-crop">
+                <span
+                  className="markup-dim"
+                  style={{ left: 0, top: 0, right: 0, height: `${rect.y * 100}%` }}
+                />
+                <span
+                  className="markup-dim"
+                  style={{ left: 0, bottom: 0, right: 0, top: `${(rect.y + rect.h) * 100}%` }}
+                />
+                <span
+                  className="markup-dim"
+                  style={{
+                    left: 0,
+                    top: `${rect.y * 100}%`,
+                    width: `${rect.x * 100}%`,
+                    height: `${rect.h * 100}%`,
+                  }}
+                />
+                <span
+                  className="markup-dim"
+                  style={{
+                    right: 0,
+                    top: `${rect.y * 100}%`,
+                    left: `${(rect.x + rect.w) * 100}%`,
+                    height: `${rect.h * 100}%`,
+                  }}
+                />
+                <div
+                  className="markup-crop-rect"
+                  style={{
+                    left: `${rect.x * 100}%`,
+                    top: `${rect.y * 100}%`,
+                    width: `${rect.w * 100}%`,
+                    height: `${rect.h * 100}%`,
+                  }}
+                  onPointerDown={grab("move")}
+                >
+                  {(["n", "e", "s", "w", "nw", "ne", "sw", "se"] as const).map((corner) => (
+                    <span
+                      key={corner}
+                      className={`markup-handle is-${corner}`}
+                      data-corner={corner}
+                      onPointerDown={grab(corner)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {ink.menu}
+    </>,
+    document.body,
   );
 }
 
@@ -1215,11 +1783,16 @@ function useInk({
   write,
   fit,
   editable,
+  turned = false,
 }: {
   strokes: DrawingMark[];
   write: (next: DrawingMark[]) => void;
   fit: "board" | "width";
   editable: boolean;
+  /** The surface sits under a CSS transform (a turned or cropped picture):
+   *  it is measured by layout size and read through its screen matrix, since
+   *  its bounding box is no longer its shape. */
+  turned?: boolean;
 }) {
   const [ink, setInk] = useState<string>(lastInk);
   const [nib, setNib] = useState<number>(lastNib);
@@ -1302,14 +1875,16 @@ function useInk({
     const element = surface.current?.parentElement;
     if (fit === "board" || !element) return;
     const measure = () => {
-      const box = element.getBoundingClientRect();
+      const box = turned
+        ? { width: element.offsetWidth, height: element.offsetHeight }
+        : element.getBoundingClientRect();
       if (box.width > 0) setAspect(box.height / box.width);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [fit]);
+  }, [fit, turned]);
   const box =
     fit === "board"
       ? DRAWING_BOX
@@ -1323,6 +1898,15 @@ function useInk({
 
   const at = useCallback(
     (event: { clientX: number; clientY: number }) => {
+      if (turned) {
+        const svg = surface.current;
+        const matrix = svg?.getScreenCTM();
+        if (!svg || !matrix) return null;
+        const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+        const x = Math.round(point.x);
+        const y = Math.round(point.y);
+        return { x, y, at: `${x},${y}` };
+      }
       const rect = surface.current?.getBoundingClientRect();
       if (!rect || rect.width === 0) return null;
       const scale = DRAWING_BOX.width / rect.width;
@@ -1334,7 +1918,7 @@ function useInk({
       );
       return { x, y, at: `${x},${y}` };
     },
-    [fit],
+    [fit, turned],
   );
 
   /** The eraser takes whole strokes, not pixels of them. Half a line left
@@ -1800,12 +2384,60 @@ function useInk({
           document.body,
         )
       : null;
+  /* The same state and the same setters the palette above uses, for a surface
+     that lays its own controls out (the picture's markup panel). */
+  const hand = {
+    ink,
+    nib,
+    marker,
+    shape,
+    filling,
+    erasing,
+    closed,
+    choose,
+    chooseNib(size: number) {
+      lastNib = size;
+      lastMarker = false;
+      setNib(size);
+      setMarker(false);
+      setErasing(false);
+    },
+    toggleMarker() {
+      lastMarker = !marker;
+      setMarker((on) => !on);
+      setErasing(false);
+    },
+    toggleShape(tool: InkTool) {
+      const next = shape === tool ? null : tool;
+      lastShape = next;
+      setShape(next);
+      setErasing(false);
+      setComposing(null);
+    },
+    toggleFill() {
+      lastFilling = !filling;
+      setFilling((on) => !on);
+    },
+    toggleErase() {
+      setErasing((on) => !on);
+    },
+    /** The plain pen: no shape, no highlighter, no eraser. */
+    pen() {
+      lastShape = null;
+      lastMarker = false;
+      setShape(null);
+      setMarker(false);
+      setErasing(false);
+      setComposing(null);
+    },
+  };
   return {
     surface,
     box,
     start,
     inked,
     tools,
+    hand,
     erasing,
     arranging: shape === "move",
     menu: (

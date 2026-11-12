@@ -1,5 +1,5 @@
 import { ocrAssets } from "./scripts/ocrAssets";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -23,12 +23,22 @@ const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 const desktop = process.env.NAPP_SHELL === "desktop";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: here(desktop ? "./apps/desktop" : "./apps/web"),
   envDir: here("."),
   /* The desktop port is not a preference: it is the one the Electron window
      loads in development, so it has to be that port or nothing. */
   server: desktop ? { port: 5174, strictPort: true } : { port: Number(process.env.PORT) || 5199 },
+  /* Only the preview: the desktop renderer requires the published web origin
+     (invitation and policy links), and the released build keeps requiring it.
+     The fixture gets a placeholder unless one is set in the environment. */
+  define: {
+    "import.meta.env.VITE_WEB_ORIGIN": JSON.stringify(
+      process.env.VITE_WEB_ORIGIN ||
+        loadEnv(mode, here("."), "VITE_").VITE_WEB_ORIGIN ||
+        "https://preview.example/",
+    ),
+  },
   resolve: {
     alias: [
       {
@@ -55,4 +65,4 @@ export default defineConfig({
     ],
   },
   plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root: here(".") })],
-});
+}));

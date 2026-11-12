@@ -91,3 +91,7 @@ export async function addAccount(): Promise<void> {
 export async function switchAccount(): Promise<void> {
   window.location.reload();
 }
+
+export function signInFailure(): Error {
+  return new Error("Email or password is incorrect");
+}

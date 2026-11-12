@@ -1,4 +1,5 @@
 import { createEphemeralClient, supabase } from "./supabaseClient";
+import { signInFailure } from "./session";
 
 export const ACCOUNT_DELETION_CONSEQUENCES =
   "Your account, profile, comments and notes will be permanently deleted, including your shared notes, their attachments and version history. Documents created by other people will stay, including your edits and any files needed by those documents. This cannot be undone.";
@@ -62,7 +63,7 @@ export async function eraseAccountWithPassword(email: string, password: string, 
   if (error || !data.user) {
     const status = await accountErasureStatus(token).catch(() => "unknown" as const);
     if (status !== "unknown") return { status, requestToken: token };
-    throw new Error("Email or password is incorrect");
+    throw error ? signInFailure(error) : new Error("Email or password is incorrect");
   }
   try {
     const result = await eraseAccount(data.user.id, password, token, client);

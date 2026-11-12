@@ -75,3 +75,7 @@ test("only the deployed site and a developer's own machine may connect", () => {
   assert.equal(originAllowed(undefined, allowed), false);
   assert.equal(originAllowed("null", allowed), false);
 });
+
+test("one note has one document name: an upper-case spelling is refused", () => {
+  assert.equal(noteIdOf("AAAAAAAA-2222-3333-4444-555555555555"), null);
+});

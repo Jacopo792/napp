@@ -9,6 +9,7 @@ import {
   type DrawingMark,
 } from "./content";
 import { exportFileName } from "./exchange";
+import { isWholeView, readView, type ImageView } from "./mediaInk";
 import { platform } from "@/platform";
 import { referenceSnapshot } from "@/lib/documentContents";
 import { bibliography, citationText } from "@/lib/citations";
@@ -17,44 +18,65 @@ type Resolve = (id: string) => Promise<Blob>;
 function png(canvas: HTMLCanvasElement): Uint8Array {
   return Uint8Array.from(atob(canvas.toDataURL("image/png").split(",")[1]), (c) => c.charCodeAt(0));
 }
-async function picture(blob: Blob, marks: DrawingMark[] = []): Promise<HTMLCanvasElement> {
+async function picture(
+  blob: Blob,
+  marks: DrawingMark[] = [],
+  view: ImageView = readView(undefined, undefined),
+): Promise<HTMLCanvasElement> {
   const src = URL.createObjectURL(blob);
   try {
     const image = new Image();
     image.src = src;
     await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(image, 0, 0);
-    const scale = canvas.width / 1000;
-    ctx.scale(scale, scale);
-    for (const mark of marks) {
-      if (isDrawingText(mark)) {
-        ctx.fillStyle = mark.color;
-        ctx.font = `${mark.size}px ${DRAWING_TEXT_FONT}`;
-        ctx.textBaseline = "alphabetic";
-        ctx.fillText(mark.text, mark.x, mark.y);
-        continue;
-      }
-      const path = new Path2D(mark.d);
-      /* Under the outline, never over it: a closed shape is its edge, and a
-         fill painted afterwards eats half the line that draws it. */
-      if (mark.fill) {
-        ctx.fillStyle = mark.fill;
-        ctx.fill(path);
-      }
-      ctx.strokeStyle = mark.color;
-      ctx.lineWidth = mark.width;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke(path);
-    }
-    return canvas;
+    return paintPicture(image, marks, view);
   } finally {
     URL.revokeObjectURL(src);
   }
+}
+
+/** The picture with its ink on it at the original's size, then cropped and
+ *  turned as the note shows it. The file itself is never touched. */
+function paintPicture(image: HTMLImageElement, marks: DrawingMark[], view: ImageView) {
+  const full = document.createElement("canvas");
+  full.width = image.naturalWidth;
+  full.height = image.naturalHeight;
+  const ctx = full.getContext("2d")!;
+  ctx.drawImage(image, 0, 0);
+  const scale = full.width / 1000;
+  ctx.scale(scale, scale);
+  for (const mark of marks) {
+    if (isDrawingText(mark)) {
+      ctx.fillStyle = mark.color;
+      ctx.font = `${mark.size}px ${DRAWING_TEXT_FONT}`;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(mark.text, mark.x, mark.y);
+      continue;
+    }
+    const path = new Path2D(mark.d);
+    /* Under the outline, never over it: a closed shape is its edge, and a
+       fill painted afterwards eats half the line that draws it. */
+    if (mark.fill) {
+      ctx.fillStyle = mark.fill;
+      ctx.fill(path);
+    }
+    ctx.strokeStyle = mark.color;
+    ctx.lineWidth = mark.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke(path);
+  }
+  if (isWholeView(view)) return full;
+  const { crop, turns } = view;
+  const sw = crop.w * full.width;
+  const sh = crop.h * full.height;
+  const out = document.createElement("canvas");
+  out.width = Math.round(turns % 2 ? sh : sw);
+  out.height = Math.round(turns % 2 ? sw : sh);
+  const o = out.getContext("2d")!;
+  o.translate(out.width / 2, out.height / 2);
+  o.rotate((turns * Math.PI) / 2);
+  o.drawImage(full, crop.x * full.width, crop.y * full.height, sw, sh, -sw / 2, -sh / 2, sw, sh);
+  return out;
 }
 
 export async function exportDocx(
@@ -151,7 +173,11 @@ export async function exportDocx(
           node.type === "privateImage"
             ? await resolve(String(node.attrs?.objectId))
             : await (await fetch(String(node.attrs?.src))).blob();
-        canvas = await picture(blob, drawingMarks(node.attrs?.strokes));
+        canvas = await picture(
+          blob,
+          drawingMarks(node.attrs?.strokes),
+          readView(node.attrs?.crop, node.attrs?.turns),
+        );
       }
       const scale = Math.min(1, 600 / canvas.width, 800 / canvas.height);
       return [
@@ -359,6 +385,23 @@ export async function exportPdf(title: string, source: HTMLElement): Promise<Blo
       label.textContent = "Video attachment";
       label.style.cssText = `height:${original.clientHeight}px;display:flex;align-items:center;justify-content:center;background:#eee;color:#222`;
       copy.replaceWith(label);
+    }
+    /* A cropped or turned picture is a plane under a CSS transform, which the
+       copy does not carry: it leaves as the picture already composed. */
+    if (original.matches(".rich-media-image-view")) {
+      const source = original.querySelector("img");
+      if (source && source.complete) {
+        const view = readView(
+          original.getAttribute("data-crop"),
+          original.getAttribute("data-turns"),
+        );
+        const img = document.createElement("img");
+        img.style.cssText = `display:block;width:${original.clientWidth}px;height:${original.clientHeight}px`;
+        const marks = drawingMarks(original.getAttribute("data-strokes"));
+        img.src = paintPicture(source, marks, view).toDataURL("image/png");
+        copy.replaceWith(img);
+        return;
+      }
     }
     if (
       original instanceof SVGSVGElement &&
@@ -582,7 +625,15 @@ export async function exportEpub(
             ? await resolve(node.getAttribute("objectid") || "")
             : await (await fetch(node.getAttribute("src") || "")).blob();
         blob = new Blob(
-          [png(await picture(original, drawingMarks(node.getAttribute("strokes")))) as BlobPart],
+          [
+            png(
+              await picture(
+                original,
+                drawingMarks(node.getAttribute("strokes")),
+                readView(node.getAttribute("crop"), node.getAttribute("turns")),
+              ),
+            ) as BlobPart,
+          ],
           { type: "image/png" },
         );
         ext = "png";

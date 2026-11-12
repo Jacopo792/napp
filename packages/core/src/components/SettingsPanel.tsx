@@ -57,7 +57,6 @@ import { PolicyLinks } from "@/components/PolicyLinks";
 import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
 import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
-import { Invitations } from "@/components/Invitations";
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
@@ -325,10 +324,6 @@ export function SettingsPanel({
   avatarUrl,
   joinedAt,
   memberCount,
-  members,
-  seatLimit,
-  invites,
-  canManageMembers,
   presenceEnabled,
   collaboratorsVisible,
   proofreaderEnabled,
@@ -339,15 +334,13 @@ export function SettingsPanel({
   onNicknameSave,
   onAvatarPick,
   onAvatarRemove,
-  onCreateInvite,
-  onRevokeInvite,
-  onLeaveArchive,
   spaces,
   currentArchiveId,
   spaceSwitchShown,
   onSpaceSwitchShownChange,
   onSwitchArchive,
   onNewArchive,
+  onOpenArchive,
   defaultArchiveId,
   onDeleteArchive,
   onPresenceEnabledChange,
@@ -386,16 +379,6 @@ export function SettingsPanel({
   avatarUrl: string | null;
   joinedAt?: string;
   memberCount: number;
-  members: {
-    userId: string;
-    nickname: string;
-    isSelf: boolean;
-  }[];
-  /** How many members the archive holds room for. Two, by design. */
-  seatLimit: number;
-  /** Invitations nobody has claimed yet; each one is holding a seat. */
-  invites: { id: string; email: string; expiresAt: string }[];
-  canManageMembers: boolean;
   presenceEnabled: boolean;
   collaboratorsVisible: boolean;
   proofreaderEnabled: boolean;
@@ -406,9 +389,6 @@ export function SettingsPanel({
   onNicknameSave: (nickname: string) => void;
   onAvatarPick: (file: File, crop: AvatarCrop) => void;
   onAvatarRemove: () => void;
-  onCreateInvite: (email: string) => Promise<string>;
-  onRevokeInvite: (inviteId: string) => Promise<void>;
-  onLeaveArchive: () => Promise<void>;
   /** Every archive this account is in; the window is open on one of them. */
   spaces: Space[];
   currentArchiveId: string;
@@ -416,6 +396,8 @@ export function SettingsPanel({
   onSpaceSwitchShownChange: (shown: boolean) => void;
   onSwitchArchive: (archiveId: string) => Promise<void>;
   onNewArchive: () => void;
+  /** Members, invitations and leaving live in the archive's own sheet. */
+  onOpenArchive: () => void;
   /** The account's first archive, which is never offered for deletion. */
   defaultArchiveId: string | undefined;
   onDeleteArchive: (archiveId: string) => Promise<void>;
@@ -451,12 +433,9 @@ export function SettingsPanel({
   /** The file waits here while its square is chosen; nothing is uploaded until
    *  the cropper is confirmed. */
   const [cropping, setCropping] = useState<File | null>(null);
-  const [leaveConfirm, setLeaveConfirm] = useState(false);
   const [spaceStatus, setSpaceStatus] = useState("");
   const [spaceBusy, setSpaceBusy] = useState(false);
   const [deletingSpace, setDeletingSpace] = useState<string | null>(null);
-  const [leaveBusy, setLeaveBusy] = useState(false);
-  const [leaveStatus, setLeaveStatus] = useState("");
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
   const navList = useRef<HTMLDivElement>(null);
@@ -536,9 +515,6 @@ export function SettingsPanel({
       setClosing(false);
       setTuning(false);
       setSection("profile");
-      setLeaveConfirm(false);
-      setLeaveBusy(false);
-      setLeaveStatus("");
       setCropping(null);
     }
   }, [open]);
@@ -555,12 +531,6 @@ export function SettingsPanel({
     onNicknameSave(trimmed);
   }
 
-  /* A seat is held by a member or by an invitation waiting to be claimed. The
-     same arithmetic the database enforces, so the form is closed before the
-     write is refused rather than after. */
-  const seatsTaken = members.length + invites.length;
-  const seatsFull = seatsTaken >= seatLimit;
-
   async function spaceAct(work: () => Promise<void>) {
     setSpaceBusy(true);
     setSpaceStatus("");
@@ -570,26 +540,6 @@ export function SettingsPanel({
       setSpaceStatus(reason instanceof Error ? reason.message : "That did not work");
     } finally {
       setSpaceBusy(false);
-    }
-  }
-
-  async function leaveArchive() {
-    if (!leaveConfirm) {
-      setLeaveConfirm(true);
-      setLeaveStatus(
-        "Confirm to leave. Your access ends immediately; notes stay with the archive.",
-      );
-      return;
-    }
-    setLeaveBusy(true);
-    setLeaveStatus("");
-    try {
-      await onLeaveArchive();
-    } catch (reason) {
-      setLeaveConfirm(false);
-      setLeaveStatus(reason instanceof Error ? reason.message : "Could not leave this archive");
-    } finally {
-      setLeaveBusy(false);
     }
   }
 
@@ -769,9 +719,13 @@ export function SettingsPanel({
 
                     <div className="appearance-row profile-row">
                       <RowLead icon={<Users size={16} />} label="Archive" />
-                      <span className="profile-static">
+                      <button
+                        type="button"
+                        className="space-list-button press"
+                        onClick={onOpenArchive}
+                      >
                         {memberCount} {memberCount === 1 ? "member" : "members"}
-                      </span>
+                      </button>
                     </div>
 
                     {/* The two facts the summary column carried and no section
@@ -798,28 +752,6 @@ export function SettingsPanel({
                   {profileError && (
                     <p className="profile-note text-danger" role="alert">
                       {profileError}
-                    </p>
-                  )}
-                  <h3>Leave shared archive</h3>
-                  <div className="leave-archive-card">
-                    <RowLead
-                      icon={<LogOut size={16} />}
-                      label="Leave this archive"
-                      hint={members.length <= 1 ? "You are the only member" : undefined}
-                    />
-                    <button
-                      type="button"
-                      className={leaveConfirm ? "is-danger-confirm" : ""}
-                      disabled={leaveBusy || members.length <= 1}
-                      onClick={() => void leaveArchive()}
-                    >
-                      <LogOut size={16} />
-                      {leaveBusy ? "Leaving…" : leaveConfirm ? "Confirm leave" : "Leave archive"}
-                    </button>
-                  </div>
-                  {leaveStatus && (
-                    <p className="profile-note" role="status">
-                      {leaveStatus}
                     </p>
                   )}
                   <BlockedAccounts />
@@ -907,28 +839,6 @@ export function SettingsPanel({
                   </div>
 
                   <div className="appearance-controls">
-                    {(
-                      [
-                        ["Accent", "accent", <Palette size={16} />],
-                        ["Background", "background", <Type size={16} />],
-                        ["Foreground", "foreground", <Type size={16} />],
-                      ] as const
-                    ).map(([label, key, icon]) => (
-                      <label key={key} className="appearance-row">
-                        <RowLead icon={icon} label={label} />
-                        <span className="color-control">
-                          <input
-                            type="color"
-                            value={appearance[key]}
-                            onChange={(event) =>
-                              setAppearance({ ...appearance, [key]: event.target.value })
-                            }
-                          />
-                          <code>{appearance[key].toUpperCase()}</code>
-                        </span>
-                      </label>
-                    ))}
-
                     <AppearanceSlider
                       icon={<Contrast size={16} />}
                       label="Contrast"
@@ -1043,7 +953,23 @@ export function SettingsPanel({
                     type="button"
                     className="settings-reset"
                     onClick={() =>
-                      void setWallpaper(null).then(() => setAppearance(DEFAULT_APPEARANCE))
+                      void setWallpaper(null).then(() => {
+                        /* Appearance only: Style's icons, highlight and material stay. */
+                        const { theme, accent, background, foreground, contrast } =
+                          DEFAULT_APPEARANCE;
+                        const { wallpaperDim, wallpaperBlur, wallpaperFit } = DEFAULT_APPEARANCE;
+                        setAppearance({
+                          ...currentAppearance(),
+                          theme,
+                          accent,
+                          background,
+                          foreground,
+                          contrast,
+                          wallpaperDim,
+                          wallpaperBlur,
+                          wallpaperFit,
+                        });
+                      })
                     }
                   >
                     Reset appearance
@@ -1108,29 +1034,30 @@ export function SettingsPanel({
 
                   <h3>Material</h3>
                   <div className="appearance-controls">
-                    <label className="appearance-row">
-                      <RowLead icon={<Layers size={16} />} label="Translucency" />
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        checked={appearance.translucentSidebar}
-                        onChange={(event) =>
-                          setAppearance({ ...appearance, translucentSidebar: event.target.checked })
+                    <div className="appearance-row is-stacked">
+                      <Segmented
+                        label="Material"
+                        value={
+                          appearance.frosted
+                            ? "frosted"
+                            : appearance.translucentSidebar
+                              ? "translucent"
+                              : "solid"
+                        }
+                        options={[
+                          { id: "solid", name: "Solid" },
+                          { id: "translucent", name: "Translucent" },
+                          { id: "frosted", name: "Frosted" },
+                        ]}
+                        onChange={(id) =>
+                          setAppearance({
+                            ...appearance,
+                            translucentSidebar: id !== "solid",
+                            frosted: id === "frosted",
+                          })
                         }
                       />
-                    </label>
-
-                    <label className="appearance-row">
-                      <RowLead icon={<Image size={16} />} label="Frosted glass" />
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        checked={appearance.frosted}
-                        onChange={(event) =>
-                          setAppearance({ ...appearance, frosted: event.target.checked })
-                        }
-                      />
-                    </label>
+                    </div>
 
                     {(appearance.translucentSidebar || appearance.frosted) && (
                       <GlassSlider
@@ -1542,48 +1469,6 @@ export function SettingsPanel({
                       {spaceStatus}
                     </p>
                   )}
-                </section>
-              )}
-
-              {section === "members" && (
-                <section>
-                  <h3>Seats</h3>
-                  <dl className="settings-facts">
-                    <div>
-                      <span className="settings-lead" aria-hidden="true">
-                        <Users size={16} />
-                      </span>
-                      <span className="settings-label">
-                        <dt>Occupied</dt>
-                        <dd>
-                          {seatsTaken} of {seatLimit}
-                          {invites.length > 0 && ` · ${invites.length} waiting to be claimed`}
-                        </dd>
-                      </span>
-                    </div>
-                  </dl>
-
-                  <h3>Members</h3>
-                  <div className="member-role-list">
-                    {members.map((member) => (
-                      <div key={member.userId}>
-                        <span>
-                          <b>{member.isSelf ? "You" : member.nickname || "Member"}</b>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Sharing the archive is the decision; there is no reader
-                    role to pick afterwards. What one member takes back from
-                    another is a note or a passage, from the note itself. */}
-
-                  <Invitations
-                    invites={invites}
-                    seatsFull={seatsFull}
-                    canManage={canManageMembers}
-                    onCreate={onCreateInvite}
-                    onRevoke={onRevokeInvite}
-                  />
                 </section>
               )}
             </div>

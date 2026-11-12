@@ -88,6 +88,17 @@ export const PrivateImage = Node.create({
          an export: a picture leaves as `napp-image:`, which carries no bytes
          of its own, so there is nothing for the strokes to be drawn on. */
       strokes: { default: "[]" },
+      /* How the picture is shown, never a new bitmap: a crop rectangle
+         normalised to the original ("x,y,w,h", empty = all of it) and clockwise
+         quarter turns applied after it. The strokes stay in original-image
+         units, so a view is one transform over picture and ink together. See
+         `mediaInk.ts`. Absent on older notes and older clients, which show the
+         whole picture. */
+      crop: { default: "" },
+      turns: {
+        default: 0,
+        parseHTML: (element) => Number(element.getAttribute("turns")) || 0,
+      },
     };
   },
   parseHTML: () => [{ tag: "napp-private-image" }],

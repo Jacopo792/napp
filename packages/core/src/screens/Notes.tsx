@@ -1,4 +1,3 @@
-import { HomePage } from "@/components/HomePage";
 import { readableMedia } from "@/lib/mediaTextShape";
 import { loadMediaText, saveMediaText, subscribeMediaText } from "@/lib/mediaText";
 import type { JSONContent } from "@tiptap/core";
@@ -98,6 +97,7 @@ import {
   switchAccount,
   type AppSession,
 } from "@/lib/session";
+import { SESSION_KEY } from "@/lib/sessionRestore";
 import {
   createSpace,
   setDocumentFeatures,
@@ -520,6 +520,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      to run without the rail and the list, so this is that state plus a way in
      that is not a small button in a corner, plus a class the stylesheet reads. */
   const [focusMode, setFocusMode] = useState(false);
+  /* A docked column (comments, history, outline, inspector) is open, and which
+     panes it asked to be put away to keep the note readable. */
+  const [dockedPanel, setDockedPanel] = useState(false);
+  const [listAutoHidden, setListAutoHidden] = useState(false);
+  const autoHidden = useRef({ sidebar: false, handled: false });
   /* The second note, read beside the first. A note id and nothing else: the
      editor is already a component that takes an entry, and the collaboration
      hook is already a hook that takes a note id — two of each is the whole
@@ -858,6 +863,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => {
       active = false;
     };
+  }, [navigate]);
+
+  /* Signing out, locking or switching account in another tab removes the
+     saved session. `storage` only fires in the tabs that did not do it, and
+     those are the ones still showing an archive that has just been closed. */
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SESSION_KEY || event.newValue) return;
+      setSession(null);
+      void navigate({ to: "/", replace: true });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [navigate]);
 
   /**
@@ -1258,43 +1276,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
     [archiveComments, selfId, remarksSeen],
   );
-  /** The same remarks as Home lists them: newest first, named and titled. */
-  const homeRemarks = useMemo(() => {
-    if (!selfId) return [];
-    const titles = new Map(entries.map((entry) => [entry.note.id, entry.note.title]));
-    return unreadRemarks(archiveComments, selfId, remarksSeen)
-      .filter((remark) => titles.has(remark.noteId))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((remark) => ({
-        id: remark.id,
-        noteId: remark.noteId,
-        noteTitle: titles.get(remark.noteId) ?? "",
-        author: members.find((member) => member.userId === remark.authorId)?.nickname ?? "Somebody",
-        body: remark.body,
-        createdAt: remark.createdAt,
-      }));
-  }, [archiveComments, selfId, remarksSeen, entries, members]);
-  /** The other members' latest notes, for Home: what the list beside it,
-   *  showing one person's notes, cannot. */
-  const othersLatest = useMemo(
-    () =>
-      entries
-        .filter((entry) => {
-          const owner = entry.note.ownerId;
-          if (!owner || owner === viewAs || !(entry.note.title || entry.note.body.trim()))
-            return false;
-          const note = metas[owner]?.notes.find((candidate) => candidate.id === entry.note.id);
-          return !note?.trashedAt && !note?.archivedAt;
-        })
-        .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))
-        .slice(0, 8)
-        .map((entry) => {
-          const owner = members.find((member) => member.userId === entry.note.ownerId);
-          return { entry, who: owner?.isSelf ? "you" : (owner?.nickname ?? "Somebody") };
-        }),
-    [entries, viewAs, metas, members],
-  );
-
   /* The number on the icon in the Dock, which is the whole of what an
      application can say to somebody who is not looking at it.
      `navigator.setAppBadge` and not a bridge to `app.dock.setBadge`: it is a
@@ -1606,6 +1587,30 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const last = [...manuscript.chapters].sort((a, b) => updated(b.id) - updated(a.id))[0];
     if (last && last.id !== selectedId) setSelectedId(last.id);
   }, [docMode, manuscript, docSelected, loading, entries, selectedId]);
+
+  /* A list opens on a note, as Apple Notes does: the one last opened in it, or
+     else the most recently edited. Choosing it only selects — it is not an
+     edit, and it marks nothing read. The Trash and a search stay as they are,
+     and a phone shows the list first. */
+  useEffect(() => {
+    if (docMode || compact || loading || selectedId || query || selectedFolderId === TRASH) return;
+    const remembered = listPreferences[viewAs]?.recentNoteIds.find((id) =>
+      visible.some((entry) => entry.note.id === id),
+    );
+    const latest = [...visible].sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt))[0];
+    const id = remembered ?? latest?.note.id;
+    if (id) setSelectedId(id);
+  }, [
+    docMode,
+    compact,
+    loading,
+    selectedId,
+    query,
+    selectedFolderId,
+    listPreferences,
+    viewAs,
+    visible,
+  ]);
 
   /* The window is named after what is open in it. A Mac window's title is not
      decoration — it is what Mission Control, the Window menu and ⌘Tab's preview
@@ -2506,6 +2511,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         updatedAt: new Date().toISOString(),
       };
 
+      /* Take the selection now, not when the insert lands: until then the old
+         note is neither open nor focused, so a keystroke can reach nobody
+         else's text and the list's auto-open has nothing to fill. */
+      (document.activeElement as HTMLElement | null)?.blur();
+      setSelectedId(note.id);
       setSaving(true);
       setError("");
       try {
@@ -2564,8 +2574,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           { title: note.title, body: note.body, content: structuredClone(content) },
           note.updatedAt,
         );
-        if (!seed) window.setTimeout(() => titleRef.current?.focus(), 0);
+        /* The editor mounts on the next commit; focus it as soon as it is there. */
+        if (!seed) {
+          let frames = 0;
+          const focusTitle = () => {
+            if (titleRef.current) titleRef.current.focus();
+            else if (frames++ < 30) requestAnimationFrame(focusTitle);
+          };
+          requestAnimationFrame(focusTitle);
+        }
       } catch (e) {
+        setSelectedId((current) => (current === note.id ? null : current));
         setError(e instanceof Error ? e.message : "Failed to create note");
       } finally {
         setSaving(false);
@@ -3416,13 +3435,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /** A link to a note, pressed. One made by Continue as note carries the
    *  words it was continued from, and those are what it goes back to. */
-  /** Home opens a note in the scope it sits in, as ⌘K does. */
-  function handleOpenFromHome(id: string) {
-    const owner = entries.find((entry) => entry.note.id === id)?.note.ownerId;
-    if (!docMode && owner && owner !== viewAs) setViewAs(owner);
-    handleOpenRecent(id);
-  }
-
   function handleOpenRecent(id: string, passage?: string) {
     setQuery("");
     setSelectedFolderId(ALL);
@@ -3821,6 +3833,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      they were put. The list gives ground first, because it is a preview column
      and the folders are a fixed vocabulary that either fits or does not. */
   const editorReserve = 380;
+  /** The docked columns are 320–340px; the note beside one keeps this much. */
+  const DOCKED_PANEL_WIDTH = 340;
+  const NOTE_COLUMN_MIN = 420;
   const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 2);
   const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
   const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
@@ -3830,6 +3845,52 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, () => void handleLock(false));
+
+  const listOpen = (navigationOpen || !focusMode) && !listAutoHidden;
+
+  /* The note keeps a readable column beside a docked panel. Opening one that
+     would squeeze it puts the folders away, then the list, with the same slide
+     as the toggles; closing it brings back only what it put away. Looked at
+     once per opening, so a pane the reader shows or hides meanwhile is theirs. */
+  useEffect(() => {
+    const auto = autoHidden.current;
+    if (!dockedPanel) {
+      if (!auto.handled) return;
+      auto.handled = false;
+      if (auto.sidebar && !navigationOpen) changeNavigation(true);
+      auto.sidebar = false;
+      setListAutoHidden(false);
+      return;
+    }
+    if (compact || focusMode || auto.handled) return;
+    auto.handled = true;
+    const room = (open: boolean, width: number) => (open ? width + 1 : 0);
+    const note = (sidebar: boolean, list: boolean) =>
+      windowWidth - room(sidebar, sidebarShown) - room(list, listShown) - DOCKED_PANEL_WIDTH;
+    if (note(navigationOpen, listOpen) >= NOTE_COLUMN_MIN) return;
+    if (navigationOpen) {
+      auto.sidebar = true;
+      changeNavigation(false);
+    }
+    if (note(false, listOpen) < NOTE_COLUMN_MIN) setListAutoHidden(true);
+  }, [
+    dockedPanel,
+    compact,
+    focusMode,
+    navigationOpen,
+    listOpen,
+    windowWidth,
+    sidebarShown,
+    listShown,
+    changeNavigation,
+  ]);
+  /* Showing the folders by hand is the reader's say: it is not undone. */
+  useEffect(() => {
+    if (navigationOpen) {
+      autoHidden.current.sidebar = false;
+      setListAutoHidden(false);
+    }
+  }, [navigationOpen]);
 
   if (!session) return null;
 
@@ -4018,7 +4079,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      they are. Compose goes to the trailing edge. */
   /* The list stays when the folders go, so the one control for them stays
      where it was too, at the list's leading edge, and says which way it goes. */
-  const listOpen = navigationOpen || !focusMode;
   const sidebarToggle = !compact && (
     <button
       type="button"
@@ -5103,10 +5163,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         avatarUrl={avatarUrls[session.userId] ?? null}
         joinedAt={members.find((member) => member.isSelf)?.joinedAt}
         memberCount={members.length}
-        members={members}
-        seatLimit={seatLimit}
-        invites={invites}
-        canManageMembers={canWriteArchive}
         presenceEnabled={flags.presence}
         collaboratorsVisible={flags.collaborators}
         profileBusy={profileBusy}
@@ -5114,11 +5170,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
         onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
         onAvatarRemove={() => void handleAvatarRemove()}
-        onCreateInvite={async (email) => {
-          return inviteLink(email);
+        onOpenArchive={() => {
+          setSettingsOpen(false);
+          openSheet({ kind: "archive" });
         }}
-        onRevokeInvite={withdrawInvite}
-        onLeaveArchive={handleLeaveArchive}
         spaces={spacesView}
         currentArchiveId={session.archiveId}
         onSwitchArchive={async (archiveId) => {
@@ -6193,17 +6248,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               ref={noteEditorRef}
               key={selected?.note.id ?? "empty"}
               entry={selected}
-              home={
-                <HomePage
-                  entries={ownedEntries.filter(
-                    (entry) => !trashedIds.has(entry.note.id) && !archivedIds.has(entry.note.id),
-                  )}
-                  meta={activeMeta}
-                  remarks={homeRemarks}
-                  others={othersLatest}
-                  onOpen={handleOpenFromHome}
-                />
-              }
+              onDockedPanel={setDockedPanel}
               syncRevision={syncRevision}
               canEdit={canEdit}
               lock={selected ? lockFor(selected.note.id) : undefined}

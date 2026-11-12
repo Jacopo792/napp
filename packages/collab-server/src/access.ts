@@ -43,11 +43,13 @@ export function decideAccess(note: NoteRow | null, role: string | null, userId: 
   };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** A document name is a note id and nothing else. */
+/** A document name is a note id and nothing else. Lower case only: Hocuspocus
+ *  keys documents by the raw name, so a second spelling of one id would be a
+ *  second document saving over the first. */
 export function noteIdOf(documentName: string): string | null {
-  return UUID.test(documentName) ? documentName.toLowerCase() : null;
+  return UUID.test(documentName) ? documentName : null;
 }
 
 /** Only the deployed site and a developer's own machine may connect. A browser

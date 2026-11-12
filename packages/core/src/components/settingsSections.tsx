@@ -27,21 +27,15 @@ export const SETTINGS_SECTIONS = [
         tone: "blue",
         name: "Profile",
         icon: <UserRound size={16} />,
-        keywords: "nickname name avatar picture photo leave archive",
-      },
-      {
-        id: "members",
-        tone: "green",
-        name: "Members",
-        icon: <Users size={16} />,
-        keywords: "seats invite invitation people partner",
+        keywords: "nickname name avatar picture photo",
       },
       {
         id: "spaces",
         tone: "indigo",
         name: "Archives",
         icon: <Layers size={16} />,
-        keywords: "spaces archive switch new archive open",
+        keywords:
+          "spaces archive switch new archive open members seats invite invitation people partner leave",
       },
       {
         id: "security",

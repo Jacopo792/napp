@@ -21,6 +21,24 @@ test("the workspace opens a note and keeps edits when navigating between notes",
   await expect(title).toHaveValue("E2E navigation preserves this title");
 });
 
+test("pressing New and typing writes the new note and leaves the open one alone", async ({
+  page,
+}) => {
+  const title = page.getByRole("textbox", { name: "Note title", exact: true });
+  await expect(title).toBeEditable();
+  const before = await title.inputValue();
+  const bodyBefore = await page.locator(".tiptap[contenteditable=true]").innerText();
+  await page.getByRole("button", { name: "New note", exact: true }).first().click();
+  await expect(title).toBeFocused();
+  await page.keyboard.type("Typed straight away");
+  await expect(title).toHaveValue("Typed straight away");
+  await page.locator("[data-note-row]").nth(1).click();
+  await expect(title).toHaveValue(before);
+  await expect
+    .poll(() => page.locator(".tiptap[contenteditable=true]").innerText())
+    .toBe(bodyBefore);
+});
+
 test("a new note can be written and found through search", async ({ page }) => {
   await page.getByRole("button", { name: "New note", exact: true }).first().click();
   await page.getByRole("textbox", { name: "Note title", exact: true }).fill("E2E searchable note");

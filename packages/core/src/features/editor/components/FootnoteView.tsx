@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
+import { MenuSurface } from "@/components/MenuSurface";
 import { Trash2 } from "@/components/icons";
 import { OPEN_FOOTNOTE, takeFootnoteWanted } from "@/features/editor/lib/referenceMarks";
 
@@ -117,10 +118,10 @@ export function FootnoteView({
         setOpen(true);
       }}
     >
-      {open &&
-        place &&
+      {place &&
         createPortal(
-          <div
+          <MenuSurface
+            open={open}
             ref={panel}
             className="popover footnote-panel"
             role="dialog"
@@ -162,7 +163,7 @@ export function FootnoteView({
                 </button>
               </div>
             )}
-          </div>,
+          </MenuSurface>,
           document.body,
         )}
     </NodeViewWrapper>

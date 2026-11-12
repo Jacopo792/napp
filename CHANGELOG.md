@@ -3,6 +3,51 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.50 – 2026-11-12
+
+### Added
+
+- Pictures open into one markup panel with a single row of tools (pen, highlighter,
+  eraser, shapes, text, move, thickness, colour, fill, undo), Cancel and Done. Ink
+  is written when Done is pressed.
+- Pictures can be cropped and rotated without changing the original file.
+
+### Changed
+
+- The centre "Continue writing" home is gone; the app opens the most recent note.
+- The note list uses plain date headers and flat rows. Sheet titles clamp to two
+  lines, and a note's cover no longer draws over margin comments.
+- With a side panel open in a narrow window, the sidebar and then the list step aside.
+- Comments, History, Outline, the Book inspector and the footnote, page-setup and
+  cover popovers animate out as well as in; docked panels arrive from their edge.
+- Settings: explanatory sentences removed. The free Accent, Background and Foreground
+  pickers are removed; previously saved custom colours are no longer applied.
+  Translucency and Frosted glass are one Material control. Reset appearance no longer
+  resets Style. Members and Leave archive live only in the archive sheet.
+- Two icon styles (Clear and Tinted); the Book names its Write and Board views and
+  is easier to read. Windows open and close in one way.
+
+### Fixed
+
+- Switching or leaving an archive waits for a save in flight instead of refusing.
+- Network and rate-limit errors at sign-in are no longer reported as a wrong password.
+- Adding an account no longer signs the saved one out.
+- Auto-lock survives sleep and restart.
+- Other tabs close when you sign out or lock.
+
+### Security
+
+- The collaboration server answers a malformed unauthenticated request with 400
+  instead of crashing.
+- A removed member's connection is closed when it stops answering token refresh.
+- Note ids are case-checked; failed saves are retried.
+- Limits on message size, token length, parallel image imports and readiness checks.
+- Sign-up no longer reveals whether an address is registered.
+- Desktop: only viewer-type attachments open directly, others are revealed in the
+  folder; the window cannot navigate outside the app.
+- A database hardening migration (`20261111010000_security_hardening.sql`) is
+  included in the repository.
+
 ## 0.9.49 – 2026-11-02
 
 ### Changed

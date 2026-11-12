@@ -77,6 +77,7 @@ export {
   ListDashes as ListTree,
   CircleNotch as Loader2,
   ArrowCounterClockwise as RotateCcw,
+  ArrowClockwise as RotateCw,
   LockSimple as Lock,
   LockSimpleOpen as LockOpen,
   SignOut as LogOut,
