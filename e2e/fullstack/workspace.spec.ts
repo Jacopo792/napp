@@ -9,6 +9,47 @@ import {
   showMemberNotes,
 } from "./fixture.ts";
 
+test("a slow new-note insert is committed before collaboration opens it", async ({
+  page,
+  accounts,
+}) => {
+  const account = await accounts.create("slow-create");
+  await seedNote(account, "Keep the existing note unchanged");
+  let pendingId = "";
+  let committed = false;
+  const prematureFrames: string[] = [];
+  page.on("websocket", (socket) => {
+    socket.on("framesent", ({ payload }) => {
+      if (pendingId && !committed && Buffer.from(payload).includes(Buffer.from(pendingId)))
+        prematureFrames.push(pendingId);
+    });
+  });
+  await login(page, account);
+  await page.route("**/rest/v1/notes*", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    pendingId = (route.request().postDataJSON() as { id: string }).id;
+    // A slow insert must not turn an optimistic selection into an auth refusal.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await route.fetch();
+    committed = response.ok();
+    await route.fulfill({ response });
+  });
+  await page.getByRole("button", { name: "New note", exact: true }).first().click();
+  const editor = page.locator(".tiptap[contenteditable=true]");
+  await expect(editor).toBeVisible();
+  expect(pendingId).not.toBe("");
+  expect(committed).toBe(true);
+  expect(prematureFrames).toEqual([]);
+  await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(0);
+  await editor.fill("A slow insert still opens a writable document.");
+  await expect
+    .poll(
+      async () =>
+        (await account.client.from("notes").select("body").eq("id", pendingId).single()).data?.body,
+    )
+    .toContain("A slow insert still opens a writable document.");
+});
+
 test("typing survives a reload and is persisted by the collaboration server", async ({
   page,
   accounts,

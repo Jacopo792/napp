@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.51",
+    date: "2026-11-13",
+    headline: "New notes open reliably",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Ready to write",
+            text: "New notes wait for their creation to finish before connecting to collaboration, avoiding an incorrect permission error on slower connections.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.50",
     date: "2026-11-12",
     headline: "Marking up pictures, and a calmer app",

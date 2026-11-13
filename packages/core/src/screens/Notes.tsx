@@ -671,7 +671,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         : null,
     [session, profile.nickname],
   );
-  const collaborative = useCollaborativeNote(selectedId, collaborationIdentity);
+  /* New takes the selection before its INSERT finishes, so typing cannot
+     reach the previous note. Only join collaboration once the catalogue has
+     the saved row: the server correctly refuses an id that does not exist yet,
+     and that refusal otherwise stays cached in the held provider. */
+  const collaborativeId = useMemo(
+    () => (entries.some((entry) => entry.note.id === selectedId) ? selectedId : null),
+    [entries, selectedId],
+  );
+  const collaborative = useCollaborativeNote(collaborativeId, collaborationIdentity);
   /* Awareness is per document, so the second note announces you on the second
      note and nowhere else. It used to be told not to announce at all, back when
      presence was one archive-wide channel carrying a single `noteId` that two

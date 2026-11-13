@@ -10,12 +10,10 @@ services:
   - type: web
     name: notes-collab
     runtime: docker
-    # Free, by decision on 2026-08-31. A free web service sleeps after fifteen
-    # idle minutes and takes about fifty seconds to wake, and an editor does
-    # not open before the server has authorised and synced — so the first note
-    # opened after a quiet spell waits. `starter` is the upgrade when that
-    # wait stops being acceptable.
-    plan: free
+    # Upgraded in the dashboard on 2026-11-13: $7/month, 0.5 CPU, 512 MB RAM.
+    # Always on; no keep-awake workflow is needed. Keep one instance until
+    # measured concurrent editing load justifies additional paid capacity.
+    plan: 0.5c-512mb
     region: frankfurt
     # This path matches the live service's Docker settings as of 2026-09-27.
     dockerfilePath: ./packages/collab-server/Dockerfile
