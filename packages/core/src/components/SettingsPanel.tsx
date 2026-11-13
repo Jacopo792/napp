@@ -290,7 +290,7 @@ function Segmented({
   onChange,
 }: {
   label: string;
-  options: { id: string; name: string; hint?: string }[];
+  options: { id: string; name: string }[];
   value: string | null;
   onChange: (id: string) => void;
 }) {
@@ -304,8 +304,7 @@ function Segmented({
           className={`press ${value === option.id ? "is-active" : ""}`}
           onClick={() => onChange(option.id)}
         >
-          <span>{option.name}</span>
-          {option.hint && <small>{option.hint}</small>}
+          {option.name}
         </button>
       ))}
     </div>
@@ -549,10 +548,10 @@ export function SettingsPanel({
     }
   }
 
-  const themeChoices: { id: ThemeMode; name: string; icon: ReactNode }[] = [
-    { id: "system", name: "System", icon: <Monitor size={20} /> },
-    { id: "light", name: "Light", icon: <Sun size={20} /> },
-    { id: "dark", name: "Dark", icon: <Moon size={20} /> },
+  const themeChoices: { id: ThemeMode; name: string }[] = [
+    { id: "system", name: "System" },
+    { id: "light", name: "Light" },
+    { id: "dark", name: "Dark" },
   ];
 
   const sections = settingsSectionsFor(kind);
@@ -783,25 +782,16 @@ export function SettingsPanel({
 
               {section === "appearance" && (
                 <section>
-                  <h3>Theme</h3>
-                  <div className="theme-picker" role="radiogroup" aria-label="Theme">
-                    {themeChoices.map((choice) => (
-                      <button
-                        key={choice.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={appearance.theme === choice.id}
-                        className={appearance.theme === choice.id ? "is-active" : ""}
-                        onClick={() => setTheme(choice.id)}
-                      >
-                        <span className={`theme-preview is-${choice.id}`}>
-                          {choice.icon}
-                          <i />
-                          <b />
-                        </span>
-                        {choice.name}
-                      </button>
-                    ))}
+                  <div className="appearance-controls">
+                    <div className="appearance-row">
+                      <RowLead icon={<Monitor size={16} />} label="Theme" />
+                      <Segmented
+                        label="Theme"
+                        value={appearance.theme}
+                        options={themeChoices.map(({ id, name }) => ({ id, name }))}
+                        onChange={(id) => setTheme(id as ThemeMode)}
+                      />
+                    </div>
                   </div>
 
                   <h3>Palette</h3>
@@ -889,21 +879,22 @@ export function SettingsPanel({
 
                     {appearance.wallpaper && (
                       <>
-                        <div className="appearance-row wallpaper-fit-row">
-                          <span>Image fit</span>
-                          <span className="compact-segment" role="group" aria-label="Image fit">
-                            {(["cover", "contain"] as const).map((fit) => (
-                              <button
-                                key={fit}
-                                type="button"
-                                aria-pressed={appearance.wallpaperFit === fit}
-                                className={appearance.wallpaperFit === fit ? "is-active" : ""}
-                                onClick={() => setAppearance({ ...appearance, wallpaperFit: fit })}
-                              >
-                                {fit === "cover" ? "Fill" : "Fit"}
-                              </button>
-                            ))}
-                          </span>
+                        <div className="appearance-row">
+                          <RowLead icon={<Image size={16} />} label="Image fit" />
+                          <Segmented
+                            label="Image fit"
+                            value={appearance.wallpaperFit}
+                            options={[
+                              { id: "cover", name: "Fill" },
+                              { id: "contain", name: "Fit" },
+                            ]}
+                            onChange={(id) =>
+                              setAppearance({
+                                ...appearance,
+                                wallpaperFit: id as "cover" | "contain",
+                              })
+                            }
+                          />
                         </div>
                         <AppearanceSlider
                           icon={<Contrast size={16} />}
@@ -935,7 +926,8 @@ export function SettingsPanel({
                     <>
                       <h3>Sheet</h3>
                       <div className="appearance-controls">
-                        <div className="appearance-row is-stacked">
+                        <div className="appearance-row">
+                          <RowLead icon={<Contrast size={16} />} label="Sheet" />
                           <Segmented
                             label="Sheet"
                             value={writingPreferences.sheetTone}
@@ -992,31 +984,22 @@ export function SettingsPanel({
 
               {section === "style" && (
                 <section>
-                  <h3>Icon style</h3>
-                  <div className="icon-style-picker" role="radiogroup" aria-label="Icon style">
-                    {ICON_STYLES.map((style) => (
-                      <button
-                        key={style}
-                        type="button"
-                        role="radio"
-                        aria-checked={iconStyle === style}
-                        className={iconStyle === style ? "is-active" : ""}
-                        onClick={() => setAppearance({ ...appearance, iconStyle: style })}
-                      >
-                        <span className="icon-style-preview" data-preview={style}>
-                          <span data-tone="notes">
-                            <NotebookText size={14} />
-                          </span>
-                          <span data-tone="folder">
-                            <FolderGlyph size={14} />
-                          </span>
-                          <span data-tone="trash">
-                            <Trash2 size={14} />
-                          </span>
-                        </span>
-                        {ICON_STYLE_NAMES[style]}
-                      </button>
-                    ))}
+                  <h3>Icons</h3>
+                  <div className="appearance-controls">
+                    <div className="appearance-row">
+                      <RowLead icon={<NotebookText size={16} />} label="Icon style" />
+                      <Segmented
+                        label="Icon style"
+                        value={iconStyle}
+                        options={ICON_STYLES.map((style) => ({
+                          id: style,
+                          name: ICON_STYLE_NAMES[style],
+                        }))}
+                        onChange={(id) =>
+                          setAppearance({ ...appearance, iconStyle: id as IconStyle })
+                        }
+                      />
+                    </div>
                   </div>
 
                   <h3>Colour</h3>
@@ -1047,7 +1030,8 @@ export function SettingsPanel({
 
                   <h3>Material</h3>
                   <div className="appearance-controls">
-                    <div className="appearance-row is-stacked">
+                    <div className="appearance-row">
+                      <RowLead icon={<Layers size={16} />} label="Sidebar" />
                       <Segmented
                         label="Material"
                         value={
@@ -1086,28 +1070,33 @@ export function SettingsPanel({
                 <section>
                   <div className="settings-specimen" aria-hidden="true">
                     <p>
-                      Set the page for the way you read. Every note follows these choices instantly.
+                      The point is not their size. It is the structure underneath, and what it
+                      allows one family to hold.
                     </p>
                   </div>
-                  <Segmented
-                    label="Reading face"
-                    value={axes.face}
-                    options={READING_FACES}
-                    onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
-                  />
-                  <Segmented
-                    label="Reading preset"
-                    value={preset?.id ?? null}
-                    options={PRESETS.map((item) => ({
-                      id: item.id,
-                      name: item.name,
-                      hint: item.role,
-                    }))}
-                    onChange={(id) => {
-                      const chosen = PRESETS.find((item) => item.id === id);
-                      if (chosen) applyPreset(chosen);
-                    }}
-                  />
+                  <div className="appearance-controls">
+                    <div className="appearance-row">
+                      <RowLead icon={<Type size={16} />} label="Typeface" />
+                      <Segmented
+                        label="Reading face"
+                        value={axes.face}
+                        options={READING_FACES.map(({ id, name }) => ({ id, name }))}
+                        onChange={(id) => setAxis("face", id === "system" ? "system" : "serif")}
+                      />
+                    </div>
+                    <div className="appearance-row">
+                      <RowLead icon={<BookOpen size={16} />} label="Layout" />
+                      <Segmented
+                        label="Reading preset"
+                        value={preset?.id ?? null}
+                        options={PRESETS.map((item) => ({ id: item.id, name: item.name }))}
+                        onChange={(id) => {
+                          const chosen = PRESETS.find((item) => item.id === id);
+                          if (chosen) applyPreset(chosen);
+                        }}
+                      />
+                    </div>
+                  </div>
                   <button
                     type="button"
                     className={`settings-disclosure press ${tuning ? "is-open" : ""}`}
@@ -1217,8 +1206,6 @@ export function SettingsPanel({
                       <div className="appearance-controls">
                         <div className="appearance-row">
                           <RowLead icon={<Target size={16} />} label="Focus" />
-                        </div>
-                        <div className="appearance-row is-stacked">
                           <Segmented
                             label="Focus"
                             value={writingPreferences.focusScope}
@@ -1333,8 +1320,6 @@ export function SettingsPanel({
                   <div className="appearance-controls">
                     <div className="appearance-row">
                       <RowLead icon={<Timer size={16} />} label="Sign out when idle" />
-                    </div>
-                    <div className="appearance-row is-stacked">
                       <Segmented
                         label="Sign out when idle"
                         value={String(autoLock)}

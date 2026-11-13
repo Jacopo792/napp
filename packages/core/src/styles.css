@@ -4295,96 +4295,6 @@
    moving labels at once. The active marker is enough acknowledgement without
    delaying the page somebody asked for. */
 
-.theme-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.theme-picker > button {
-  display: grid;
-  gap: 8px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  text-align: left;
-}
-
-.theme-picker > button.is-active {
-  color: var(--ink);
-}
-
-/* Icon style: the same three places drawn each way — the choice is shown,
-   not described. The previews carry their own rules rather than reading the
-   root's, or both would show whichever style is chosen now. */
-.icon-style-picker {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.icon-style-picker > button {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-
-.icon-style-picker > button.is-active {
-  color: var(--ink);
-}
-
-.icon-style-preview {
-  display: flex;
-  width: 100%;
-  justify-content: center;
-  gap: 10px;
-  padding: 16px 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-
-.icon-style-picker > button.is-active .icon-style-preview {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.icon-style-preview > span {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6.5px;
-  color: var(--ink-3);
-}
-
-.icon-style-preview svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* The first place is the one you are in, so the preview shows the state too. */
-.icon-style-preview[data-preview="clear"] > span:first-child {
-  color: var(--accent-strong);
-}
-
-.icon-style-preview[data-preview="tinted"] > span {
-  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 20%, transparent);
-  color: var(--icon-tint-strong, var(--accent-strong));
-}
-
-.icon-style-preview[data-preview="tinted"] > span:first-child {
-  background: var(--icon-tint, var(--accent));
-  color: var(--on-icon-tint, var(--on-accent));
-}
-
 /* Automatic, then the system's hues: a dot each, the chosen one ringed in
    its own colour with a gap of ground between, as the Mac rings it. */
 .swatch-choices {
@@ -4413,48 +4323,6 @@
   box-shadow:
     0 0 0 2px var(--paper),
     0 0 0 3.5px var(--swatch);
-}
-
-.theme-preview {
-  position: relative;
-  display: block;
-  height: 88px;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: #1c1c1c;
-  color: #9a9a9a;
-  box-shadow: inset 0 0 0 1px transparent;
-}
-
-.theme-picker button.is-active .theme-preview {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.theme-preview.is-light {
-  background: #f3f2ee;
-  color: #555;
-}
-
-.theme-preview.is-system {
-  background: linear-gradient(90deg, #f3f2ee 0 50%, #1c1c1c 50%);
-}
-
-.theme-preview svg {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-}
-
-.theme-preview i,
-.theme-preview b {
-  position: absolute;
-  right: 9px;
-  left: 28%;
-  display: block;
-  border-radius: var(--radius-xs);
-  background: rgb(128 128 128 / 0.38);
 }
 
 /* Three across, and nine palettes: three full rows. Four across left the
@@ -4507,28 +4375,11 @@
   );
 }
 
-.theme-preview i {
-  top: 32px;
-  height: 11px;
-}
-
-.theme-preview b {
-  top: 50px;
-  height: 28px;
-}
-
-/* The card. With the form on its own it is the thing that says "these rows
-   belong together", so it stands on the page rather than being outlined on it:
-   a face a shade off the surface, a hairline, and the contact shadow the rest
-   of the app uses. */
-/* A group of rows is a recess a step off the pane, as System Settings draws
-   one: a fill and a hairline, never a shadow — a settings card is not a thing
-   floating over the page, it is part of it. */
+/* A group of rows is no box at all: rows standing on the page, a hairline
+   under each, the section label above them. A card around every group made
+   the dialog a stack of panels and every control looked oversized in it. */
 .appearance-controls {
-  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 /* Two groups in a row are two groups, with the air System Settings leaves
@@ -4548,19 +4399,19 @@
 .appearance-row {
   position: relative;
   display: flex;
-  min-height: 44px;
+  min-height: 40px;
   align-items: center;
   gap: 16px;
-  padding: 8px 14px;
+  padding: 6px 2px;
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
 
 .appearance-row::after {
   position: absolute;
-  right: 14px;
+  right: 0;
   bottom: 0;
-  left: 14px;
+  left: 0;
   height: 1px;
   background: color-mix(in srgb, var(--ink) 8%, transparent);
   content: "";
@@ -4570,7 +4421,6 @@
   left: 0;
 }
 
-.appearance-row:last-child::after,
 .appearance-row:has(+ .appearance-row.is-stacked)::after,
 .appearance-row.is-stacked::after {
   display: none;
@@ -4792,47 +4642,29 @@
   opacity: 0.46;
 }
 
-.compact-segment {
-  display: flex;
-  gap: 2px;
-  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  padding: 2px;
-}
-
-.compact-segment button {
-  border-radius: var(--radius-xs);
-  padding: 4px 8px;
-  color: var(--ink-3);
-  font-size: var(--text-2xs);
-}
-
-.compact-segment button.is-active {
-  background: var(--accent-wash);
-  color: var(--accent-strong);
-}
-
 .wallpaper-actions {
   display: flex;
   gap: 6px;
 }
 
+/* Buttons in a row are the segmented control's size and ground: a small
+   wash, no outline, so a row's buttons and its choices read as one family. */
 .wallpaper-actions button,
 .settings-reset {
   display: inline-flex;
+  min-height: 24px;
   align-items: center;
-  gap: 6px;
-  border: 1px solid var(--rule);
+  gap: 5px;
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 2px 10px;
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
 
 .wallpaper-actions button:hover,
 .settings-reset:hover {
-  background: var(--accent-wash);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
   color: var(--ink);
 }
 
@@ -4847,21 +4679,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 24px;
   flex-shrink: 0;
-  border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
-  padding: 5px 9px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 2px 10px;
   color: var(--ink-2);
   font-size: var(--text-sm);
   transition:
     background-color var(--dur-fast) var(--ease-press),
-    color var(--dur-fast) var(--ease-press),
-    border-color var(--dur-fast) var(--ease-press);
+    color var(--dur-fast) var(--ease-press);
 }
 
 .settings-row-action:hover {
-  border-color: var(--accent);
-  background: var(--accent-wash);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
   color: var(--ink);
 }
 
@@ -4970,10 +4801,6 @@
     background: var(--accent-wash);
   }
 
-  .theme-preview {
-    height: 68px;
-  }
-
   .palette-presets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5026,29 +4853,28 @@
 }
 
 /* ── Segmented choices ───────────────────────────────────────────────────── */
+/* Sized to its words and standing at the right of the row that names it, as a
+   Mac's does — never a bar across the whole page. */
 .settings-segment {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 4px;
-  border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  padding: 4px;
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 2px;
 }
 
 .settings-segment button {
   display: flex;
-  min-height: 40px;
-  flex-direction: column;
+  min-height: 24px;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  border-radius: var(--radius-sm);
-  padding: 4px 6px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 2px 10px;
   color: var(--ink-3);
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
@@ -5068,50 +4894,27 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
 }
 
-.settings-segment small {
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  line-height: 1.2;
-}
-
-.settings-segment button.is-active small {
-  color: var(--ink-3);
-}
-
-/* On a phone the four names alone fill the track; the roles underneath wrap to
-   two lines each and turn a segmented control into a paragraph. */
-@media (max-width: 460px) {
-  .settings-segment small {
-    display: none;
-  }
-
-  .settings-segment button {
-    min-height: 34px;
-  }
-}
-
 /* ── Fine-tune ───────────────────────────────────────────────────────────── */
+/* A row like the ones above it: same height, same edge, same hairline. */
 .settings-disclosure {
   display: flex;
   width: 100%;
+  min-height: 40px;
   align-items: center;
-  gap: var(--rail-gap);
-  margin-top: 12px;
-  border-radius: var(--radius-sm);
-  padding: 8px 12px 8px 6px;
-  color: var(--ink-2);
-  font-size: var(--text-md);
-  font-weight: var(--weight-medium);
+  gap: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 6px 2px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
   transition:
     background-color var(--dur-fast) var(--ease-press),
     color var(--dur-fast) var(--ease-press),
     transform var(--dur-press) var(--ease-press);
 }
 
-.settings-disclosure:hover {
-  background: var(--accent-wash);
-  color: var(--ink);
+.settings-disclosure:hover svg {
+  color: var(--ink-2);
 }
 
 .settings-disclosure svg {
@@ -5178,21 +4981,27 @@
    None of it is a control; all of it is the thing you open Settings to check,
    and it had nowhere else in the interface to live. */
 .settings-facts {
-  display: grid;
-  gap: 1px;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  background: var(--rule-soft);
-  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 .settings-facts > div {
   display: flex;
-  min-height: 62px;
+  min-height: 40px;
   align-items: center;
   gap: 16px;
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  padding: 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 6px 2px;
+}
+
+.settings-facts .settings-label {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.settings-facts dd {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
 }
 
 .settings-facts .settings-lead {
@@ -14325,23 +14134,22 @@ button.sheet-event:hover {
 }
 
 /* ── Settings, in the phone's material ──────────────────────────────────────
-   Cards are the same faint ground as the list's and the sidebar's, with no
-   outline; the page names itself in a large title, as the phone's settings
-   pages do. The leave card is a card like the rest — its button carries the
-   danger, not a red frame around the whole row. */
-.settings-panel .appearance-controls,
+   Groups of rows stand on the page (see `.appearance-controls`); the leave
+   card is the one card left, its button carrying the danger rather than a red
+   frame around the whole row. The page names itself in a large title, as the
+   phone's settings pages do. */
 .settings-panel .leave-archive-card {
   border: 0;
   border-radius: 14px;
   background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
-:root[data-theme="light"] .settings-panel :is(.appearance-controls, .leave-archive-card) {
+:root[data-theme="light"] .settings-panel .leave-archive-card {
   background: color-mix(in srgb, white 70%, transparent);
 }
 
 .settings-panel .appearance-row::after {
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 .settings-header h2 {
@@ -14401,26 +14209,33 @@ button.sheet-event:hover {
   font-size: var(--text-sm);
 }
 
-/* Palettes are soft tiles on the same ground as the cards, the chosen one
-   ringed in the accent — the phone's palette tiles, not outlined buttons. */
-.settings-panel .palette-presets button {
-  border: 0;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+/* Palettes are rows of the list like any other choice: a chip and a name on
+   the page, the chosen one on a wash — not a wall of tiles. */
+.settings-panel .palette-presets {
+  gap: 2px 8px;
 }
 
-:root[data-theme="light"] .settings-panel .palette-presets button {
-  background: color-mix(in srgb, white 70%, transparent);
+.settings-panel .palette-presets button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  padding: 5px 6px;
 }
 
 .settings-panel .palette-presets button:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 .settings-panel .palette-presets button.is-active {
   background: color-mix(in srgb, var(--ink) 10%, transparent);
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: none;
   color: var(--ink);
+}
+
+.settings-panel .palette-chip {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
 }
 
 /* ── Sheets in the phone's shape ──────────────────────────────────────────────
