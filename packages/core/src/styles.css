@@ -9343,7 +9343,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
   background: transparent;
 }
 
-[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper) .sidebar-column {
+[data-shell="mac"].has-translucent-sidebar:not(.has-wallpaper)
+  :is(.sidebar-column, .collection-column) {
   /* A tint, not a colour. The material supplies the depth; this only carries
      the palette across it, so it is much lighter than the opaque ground it
      replaces — paint it at full strength and the vibrancy is behind a wall.
@@ -14795,4 +14796,22 @@ button.sheet-chip:hover,
 
 .sidebar-scroll > .sidebar-card:first-child {
   margin-top: 6px;
+}
+
+/* ── Sidebar and list, one tone above the note ──────────────────────────────
+   The two navigation columns are one block, the note a sheet beside it. Their
+   ground is the note's own colour lifted a step toward the ink, so it keeps
+   the note's hue instead of each palette's separate grey; everything inside
+   the columns that painted `--paper` to match them follows. */
+:root {
+  --column: color-mix(in srgb, var(--ink) 5%, var(--page));
+}
+
+:root[data-theme="light"] {
+  --column: color-mix(in srgb, var(--ink) 4%, var(--page));
+}
+
+.sidebar-column,
+.collection-column {
+  --paper: var(--column);
 }
