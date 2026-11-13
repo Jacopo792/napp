@@ -273,7 +273,6 @@ type SheetEntry =
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
-import { FolderPeek, NotePeek } from "@/components/NotePeek";
 import {
   CURRENT_RELEASE,
   compareVersions,
@@ -516,25 +515,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [namedVersions, setNamedVersions] = useState<NamedVersion[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  /* The note shown while its row is held, and where the press landed. */
-  const [peek, setPeek] = useState<{
-    kind: "note" | "folder";
-    id: string;
-    x: number;
-    y: number;
-  } | null>(null);
-  useEffect(() => {
-    if (!peek) return;
-    const end = () => setPeek(null);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    window.addEventListener("blur", end);
-    return () => {
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-      window.removeEventListener("blur", end);
-    };
-  }, [peek]);
   /* Focus is the two panes put away and the page's own controls stepping back
      while you write. It is not a third layout: the workspace already knows how
      to run without the rail and the list, so this is that state plus a way in
@@ -4840,30 +4820,25 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* A folder and everything under it, counted the way the sidebar counts a
      closed one. */
-  /** The live notes in a folder and every folder under it. */
-  function notesInFolder(folderId: string) {
-    const within = new Set([folderId]);
+  function renderFolderSheet(sheet: { folderId: string }, key: string) {
+    if (!session) return null;
+    const folders = activeMeta.folders;
+    const folder = folders.find((one) => one.id === sheet.folderId);
+    if (!folder) return null;
+    const within = new Set([folder.id]);
     for (let grew = true; grew; ) {
       grew = false;
-      for (const one of activeMeta.folders)
+      for (const one of folders)
         if (one.parentId && within.has(one.parentId) && !within.has(one.id)) {
           within.add(one.id);
           grew = true;
         }
     }
     const index = indexOf(activeMeta);
-    return ownedEntries.filter((entry) => {
+    const notes = ownedEntries.filter((entry) => {
       const meta = index.byNote.get(entry.note.id);
       return !!meta?.folderId && within.has(meta.folderId) && !meta.trashedAt && !meta.archivedAt;
     });
-  }
-
-  function renderFolderSheet(sheet: { folderId: string }, key: string) {
-    if (!session) return null;
-    const folders = activeMeta.folders;
-    const folder = folders.find((one) => one.id === sheet.folderId);
-    if (!folder) return null;
-    const notes = notesInFolder(folder.id);
     const threads = new Map<string, Set<string>>();
     for (const remark of archiveComments)
       if (!remark.resolvedAt && notes.some((entry) => entry.note.id === remark.noteId))
@@ -5074,7 +5049,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       onCreateFolder={handleCreateFolder}
       onRenameFolder={handleRenameFolder}
       onDeleteFolder={handleDeleteFolder}
-      onFolderPeek={(id, point) => setPeek({ kind: "folder", id, ...point })}
+      onFolderInfo={(folderId) => openSheet({ kind: "folder", folderId })}
       onClose={() => (compact ? setFoldersOpen(false) : changeNavigation(false))}
       closeInStrip={compact}
       onSettings={() => {
@@ -5177,46 +5152,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onClose={() => setShortcutsOpen(false)}
       />
       <WhatsNewSheet open={whatsNewOpen} seen={whatsNewFrom} onClose={closeWhatsNew} />
-      {peek?.kind === "note" &&
-        (() => {
-          const entry = entries.find((one) => one.note.id === peek.id);
-          if (!entry) return null;
-          const owner = entry.note.ownerId ? personOf(entry.note.ownerId) : null;
-          return (
-            <NotePeek
-              point={peek}
-              resolveImage={resolveImage}
-              note={{
-                title: entry.note.title,
-                body: entry.note.body,
-                photoObjectId: entry.note.photo?.objectId ?? null,
-                byline: owner ? (owner.userId === session?.userId ? "You" : owner.name) : "",
-                words: derivedOf(entry.note).words,
-                updatedAt: entry.note.updatedAt,
-              }}
-            />
-          );
-        })()}
-      {peek?.kind === "folder" &&
-        (() => {
-          const folder = activeMeta.folders.find((one) => one.id === peek.id);
-          if (!folder) return null;
-          const notes = notesInFolder(folder.id);
-          return (
-            <FolderPeek
-              point={peek}
-              folder={{
-                name: folder.name,
-                notes: notes.map((entry) => ({
-                  id: entry.note.id,
-                  title: entry.note.title,
-                  updatedAt: entry.note.updatedAt,
-                })),
-                words: notes.reduce((sum, entry) => sum + derivedOf(entry.note).words, 0),
-              }}
-            />
-          );
-        })()}
     </>
   );
 
@@ -6109,7 +6044,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
                   onInfo={(noteId) => openSheet({ kind: "note", noteId })}
-                  onPeek={(id, point) => setPeek({ kind: "note", id, ...point })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}
@@ -6308,7 +6242,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onTogglePin={handleTogglePin}
                   lockOf={lockFor}
                   onInfo={(noteId) => openSheet({ kind: "note", noteId })}
-                  onPeek={(id, point) => setPeek({ kind: "note", id, ...point })}
                   onMoveToFolder={handleMoveNote}
                   onSetPhoto={handleNotePhoto}
                   resolveImage={resolveImage}

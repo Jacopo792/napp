@@ -101,8 +101,6 @@ interface Props {
   leading?: ReactNode;
   /** The note's sheet, flown out of where the note is drawn in its row. */
   onInfo?: (noteId: string) => void;
-  /** A row held still: the note shown while the press lasts. */
-  onPeek?: (noteId: string, point: { x: number; y: number }) => void;
   /** Row above the collection header — the archive switch, the pane toggle. */
   topBar?: ReactNode;
   /** Row below the list — where Settings and the lock stand. */
@@ -296,7 +294,7 @@ const Row = memo(function Row({
   onTogglePin: (entry: NoteEntry) => void;
   onContextMenu: (event: ReactMouseEvent, entry: NoteEntry) => void;
   /** A still press — the note sheet. */
-  onHold?: (entry: NoteEntry, point: { x: number; y: number }) => void;
+  onHold?: (entry: NoteEntry) => void;
   resolveImage: (objectId: string) => Promise<Blob>;
   query: string;
 }) {
@@ -490,7 +488,7 @@ const Row = memo(function Row({
     const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
     press.timer = window.setTimeout(() => {
       press.fired = true;
-      onHold(entry, { x: press.x, y: press.y });
+      onHold(entry);
     }, HOLD_MS);
     hold.current = press;
   }
@@ -963,7 +961,6 @@ export function NoteList({
   titleMenu,
   leading,
   onInfo,
-  onPeek,
   topBar,
   footer,
   filters = [],
@@ -1046,15 +1043,9 @@ export function NoteList({
      of the list rather than a new one whenever the page re-renders. */
   const onInfoRef = useRef(onInfo);
   onInfoRef.current = onInfo;
-  const onPeekRef = useRef(onPeek);
-  onPeekRef.current = onPeek;
-  const holdEntry = useCallback((entry: NoteEntry, point: { x: number; y: number }) => {
-    if (onPeekRef.current) onPeekRef.current(entry.note.id, point);
-    else onInfoRef.current?.(entry.note.id);
-  }, []);
-  /* Where a hold shows the note, its menu needs no "Note info". */
+  const holdEntry = useCallback((entry: NoteEntry) => onInfoRef.current?.(entry.note.id), []);
   const infoItem = (entry: NoteEntry): MenuItem[] =>
-    onInfo && !onPeek
+    onInfo
       ? [
           {
             kind: "item",

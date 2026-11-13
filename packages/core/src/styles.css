@@ -10492,6 +10492,175 @@ button.sheet-chip:hover,
   }
 }
 
+/* A note's or a folder's sheet: one heading read left to right, its counts as
+   one line of doors, then what happened on a single line through the faces.
+   No tiles and no card per section. */
+.sheet-body.is-timeline .sheet-hero {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 64px 0 22px;
+  text-align: left;
+}
+
+/* Everything arrives with the sheet in one movement: bands landing a beat
+   apart read as the sheet stuttering open. */
+.sheet-body.is-timeline > * {
+  animation: none;
+}
+
+.sheet-body.is-timeline .sheet-hero > div {
+  min-width: 0;
+}
+
+.sheet-body.is-timeline .sheet-portrait {
+  margin: 0;
+}
+
+.sheet-body.is-timeline .sheet-note-glyph {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 11px;
+}
+
+.sheet-body.is-timeline .sheet-hero h2 {
+  overflow: hidden;
+  font-size: var(--text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-body.is-timeline .sheet-hero p {
+  margin-top: 1px;
+}
+
+.sheet-counts,
+.sheet-links {
+  padding: 14px 22px 0;
+  color: var(--ink-4);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.sheet-counts button,
+.sheet-links button {
+  color: var(--ink-2);
+}
+
+.sheet-counts button:hover,
+.sheet-links button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.sheet-links {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rule);
+  margin: 6px 10px 0;
+  padding: 10px 12px 0;
+}
+
+.sheet-body.is-timeline .sheet-work {
+  padding: 16px 10px 14px;
+}
+
+.sheet-timeline {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The line runs between the marks, never under them: the sheet is glass, and
+   a mark painted over the line would show it through. */
+.sheet-timeline li:not(:last-child)::after {
+  position: absolute;
+  top: 32px;
+  bottom: -2px;
+  left: 23px;
+  width: 1px;
+  background: var(--rule);
+  content: "";
+}
+
+.sheet-timeline li {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.sheet-event-mark {
+  position: relative;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  place-items: center;
+  margin: 6px 6px 0 13px;
+  border-radius: 50%;
+  color: var(--ink-3);
+}
+
+.sheet-event-mark:empty::after {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  content: "";
+}
+
+.sheet-event-mark .avatar.is-compact {
+  width: 22px;
+  height: 22px;
+  font-size: 8px;
+}
+
+.sheet-event-mark.is-face:hover {
+  box-shadow: 0 0 0 2px var(--ink-4);
+}
+
+.sheet-event {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+button.sheet-event:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.sheet-event-text {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-event-meta {
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-event-meta .is-added {
+  color: var(--accent-strong);
+}
+
+.sheet-event-meta .is-removed {
+  color: var(--danger);
+}
+
 /* The note's own glyph, or its photograph: a square with the row's corner,
    because it is the row's glyph that flew here. */
 .sheet-note-glyph {
@@ -14877,103 +15046,4 @@ button.sheet-chip:hover,
 .collection-toolbar.is-titled .collection-title-button {
   margin-left: -6px;
   padding: 2px 6px;
-}
-
-/* ── A note, seen while its row is held ─────────────────────────────────────
-   The page itself, small: its picture, its title and opening lines in the
-   reading face, one grey line of facts. It grows out of the press and has
-   nothing to press. */
-.note-peek {
-  position: fixed;
-  z-index: 96;
-  width: 340px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--page);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent),
-    0 24px 60px rgb(0 0 0 / 0.42);
-  pointer-events: none;
-  animation: peek-in 220ms var(--ease-out) backwards;
-}
-
-@keyframes peek-in {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-peek {
-    animation: none;
-  }
-}
-
-.note-peek-photo {
-  display: block;
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-}
-
-.note-peek-page {
-  padding: 16px 18px 4px;
-}
-
-.note-peek-page h2 {
-  margin-bottom: 8px;
-  color: var(--ink);
-  font-family: var(--font-reading, var(--font-serif, Georgia, serif));
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.note-peek-page p {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--ink-2);
-  font-family: var(--font-reading, var(--font-serif, Georgia, serif));
-  font-size: 13.5px;
-  line-height: 1.6;
-  white-space: pre-line;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 8;
-}
-
-.note-peek-facts {
-  padding: 10px 18px 14px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-}
-
-.note-peek-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding-bottom: 6px;
-  list-style: none;
-}
-
-.note-peek-list li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--text-sm);
-}
-
-.note-peek-list span {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.note-peek-list time {
-  flex: none;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
 }

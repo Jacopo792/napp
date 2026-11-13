@@ -61,3 +61,7 @@ export function memberSince(value: string): string {
     year: "numeric",
   });
 }
+
+/** "1 word", "2 words": a count and its noun. */
+export const plural = (count: number, one: string) =>
+  `${count.toLocaleString()} ${one}${count === 1 ? "" : "s"}`;

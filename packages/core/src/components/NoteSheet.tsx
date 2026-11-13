@@ -16,23 +16,14 @@
  * version opens the note with that version in its history, a remark count
  * opens the conversation, a link opens the note at the other end. The sheet is
  * a map with doors, not a page to read and close. */
-import { useEffect, useMemo, useState } from "react";
-import {
-  Archive,
-  Bookmark,
-  FileText,
-  Lock,
-  MessageSquare,
-  Pin,
-  RotateCcw,
-  Trash2,
-} from "@/components/icons";
+import { useEffect, useState, type ReactNode } from "react";
+import { FileText, MessageSquare, Trash2 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
 import type { AvatarCrop } from "@/lib/image";
 import { loadVersions, type NoteVersion } from "@/lib/history";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, plural } from "@/lib/format";
 import { useStoredImage } from "@/lib/media";
 import type { AppSession } from "@/lib/session";
 import { SafetyActions } from "./SafetyActions";
@@ -102,25 +93,86 @@ export function NoteSheet({
 
   /* Everyone with a hand in it, the most active first; the owner leads even
      with no version yet, because the note is in their scope. */
-  const people = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const version of versions ?? [])
-      for (const userId of version.authorIds) counts.set(userId, (counts.get(userId) ?? 0) + 1);
-    if (note.owner && !counts.has(note.owner.userId)) counts.set(note.owner.userId, 0);
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([userId]) => personOf(userId))
-      .filter((person): person is SheetPerson => person !== null);
-  }, [versions, note.owner, personOf]);
+  const counts = new Map<string, number>();
+  for (const version of versions ?? [])
+    for (const userId of version.authorIds) counts.set(userId, (counts.get(userId) ?? 0) + 1);
+  if (note.owner && !counts.has(note.owner.userId)) counts.set(note.owner.userId, 0);
+  const people = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([userId]) => userId);
 
   const nameOf = (userId: string) =>
     userId === session.userId ? "You" : (personOf(userId)?.name ?? "A former member");
 
-  const glyph = note.trashed ? <Trash2 size={30} /> : <FileText size={30} />;
+  const glyph = note.trashed ? <Trash2 size={22} /> : <FileText size={22} />;
+  const face = (userId: string | undefined) => {
+    const person = userId ? personOf(userId) : null;
+    return person ? <Avatar url={person.avatarUrl} name={person.name} email="" compact /> : null;
+  };
+  const states = [
+    note.trashed && "In the Trash",
+    note.archived && !note.trashed && "Archived",
+    note.pinned && "Pinned",
+    note.lockedBy &&
+      (note.lockedBy === session.userId
+        ? "Only you may write it"
+        : `Locked by ${nameOf(note.lockedBy)}`),
+  ].filter(Boolean);
+
+  /* One line of what happened, newest first: the last edit, every version
+     with its people, and the day it began. */
+  const events: SheetEvent[] = [];
+  if (note.openRemarks > 0)
+    events.push({
+      key: "remarks",
+      mark: <MessageSquare size={13} />,
+      text:
+        note.openRemarks === 1
+          ? "1 conversation waiting"
+          : `${note.openRemarks} conversations waiting`,
+      onOpen: () => onOpenNote(note.id, { comments: true }),
+    });
+  const newest = versions?.[0]?.createdAt;
+  if (!newest || Date.parse(note.updatedAt) - Date.parse(newest) > 60_000)
+    events.push({
+      key: "edited",
+      text: "Last edited",
+      meta: formatDateTime(note.updatedAt),
+      onOpen: () => onOpenNote(note.id),
+    });
+  for (const version of versions?.slice(0, RECENT) ?? []) {
+    const restore = version.label?.startsWith("Before restoring");
+    const who = version.authorIds.map(nameOf).join(" and ") || "Somebody";
+    events.push({
+      key: version.id,
+      person: version.authorIds[0],
+      mark: face(version.authorIds[0]),
+      text: restore
+        ? `${who} restored an earlier version`
+        : version.label
+          ? `${who} · “${version.label}”`
+          : `${who} edited`,
+      meta: formatDateTime(version.createdAt),
+      added: version.wordsAdded,
+      removed: version.wordsRemoved,
+      onOpen: () => onOpenNote(note.id, { history: version.id }),
+    });
+  }
+  if (versions && versions.length > RECENT)
+    events.push({
+      key: "all",
+      text: `All ${versions.length} versions`,
+      onOpen: () => onOpenNote(note.id, { history: true }),
+    });
+  events.push({
+    key: "created",
+    person: note.owner?.userId,
+    mark: face(note.owner?.userId),
+    text: note.owner ? `${nameOf(note.owner.userId)} created it` : "Created",
+    meta: formatDateTime(note.createdAt),
+  });
 
   return (
     <Sheet label={note.title || "Untitled"}>
-      <div className="sheet-body">
+      <div className="sheet-body is-timeline">
         <header className="sheet-hero">
           <SheetPortrait
             className="sheet-portrait sheet-note-glyph"
@@ -131,209 +183,163 @@ export function NoteSheet({
           >
             {photoUrl ? <img src={photoUrl} alt="" draggable={false} /> : glyph}
           </SheetPortrait>
-          <h2>{note.title || "Untitled"}</h2>
-          <p>
-            {note.folder ? (
-              <button type="button" onClick={() => onOpenFolder(note.folder!.id)}>
-                {note.folder.name}
-              </button>
-            ) : (
-              "No folder"
-            )}
-            {note.owner && (
-              <>
-                {" · "}
-                <button type="button" onClick={() => onOpenPerson(note.owner!.userId)}>
-                  {note.owner.userId === session.userId ? "Yours" : `${note.owner.name}’s`}
+          <div>
+            <h2>{note.title || "Untitled"}</h2>
+            <p>
+              {note.folder ? (
+                <button type="button" onClick={() => onOpenFolder(note.folder!.id)}>
+                  {note.folder.name}
                 </button>
-              </>
-            )}
-          </p>
-          {(note.pinned || note.archived || note.trashed || note.lockedBy) && (
-            <span className="sheet-chips">
-              {note.trashed && (
-                <span className="sheet-chip">
-                  <Trash2 size={12} />
-                  In the Trash
-                </span>
+              ) : (
+                "No folder"
               )}
-              {note.archived && !note.trashed && (
-                <span className="sheet-chip">
-                  <Archive size={12} />
-                  Archived
-                </span>
+              {note.owner && (
+                <>
+                  {" · "}
+                  <button type="button" onClick={() => onOpenPerson(note.owner!.userId)}>
+                    {note.owner.userId === session.userId ? "Yours" : `${note.owner.name}’s`}
+                  </button>
+                </>
               )}
-              {note.pinned && (
-                <span className="sheet-chip">
-                  <Pin size={12} />
-                  Pinned
-                </span>
-              )}
-              {note.lockedBy && (
-                <span className="sheet-chip">
-                  <Lock size={12} />
-                  {note.lockedBy === session.userId
-                    ? "Only you may write it"
-                    : `Locked by ${nameOf(note.lockedBy)}`}
-                </span>
-              )}
-            </span>
-          )}
+              {states.map((state) => ` · ${state}`)}
+            </p>
+          </div>
         </header>
 
-        <div className="sheet-stats">
-          <button type="button" className="press" onClick={() => onOpenNote(note.id)}>
-            <small>Words</small>
-            <strong>{note.words.toLocaleString()}</strong>
+        <p className="sheet-counts">
+          <button type="button" onClick={() => onOpenNote(note.id)}>
+            {plural(note.words, "word")}
           </button>
-          <button
-            type="button"
-            className="press"
-            onClick={() => onOpenNote(note.id, { history: true })}
-          >
-            <small>Versions</small>
-            <strong>{versions ? versions.length : "–"}</strong>
+          {" · "}
+          <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
+            {versions ? plural(versions.length, "version") : "Versions"}
           </button>
-          <button
-            type="button"
-            className="press"
-            onClick={() => onOpenNote(note.id, { comments: true })}
-          >
-            <small>Open remarks</small>
-            <strong>{note.openRemarks}</strong>
+          {" · "}
+          <button type="button" onClick={() => onOpenNote(note.id, { comments: true })}>
+            {plural(note.openRemarks, "open remark")}
           </button>
-        </div>
+          {people.length > 0 && " · by "}
+          {people.map((userId, index) => (
+            <span key={userId}>
+              {index > 0 && (index === people.length - 1 ? " and " : ", ")}
+              <button type="button" onClick={() => onOpenPerson(userId)}>
+                {nameOf(userId)}
+              </button>
+            </span>
+          ))}
+        </p>
 
         <div className="sheet-work">
-          {people.length > 0 && (
-            <section className="sheet-card">
-              <h3>Written by</h3>
-              <div className="sheet-faces">
-                {people.map((person) => (
-                  <button
-                    key={person.userId}
-                    type="button"
-                    className="sheet-face press"
-                    onClick={() => onOpenPerson(person.userId)}
-                  >
-                    <Avatar url={person.avatarUrl} name={person.name} email="" compact />
-                    {nameOf(person.userId)}
-                  </button>
-                ))}
-              </div>
-            </section>
+          {failure && (
+            <p role="alert" className="sheet-quiet is-failure">
+              {failure}
+            </p>
           )}
-
-          <section className="sheet-card">
-            <h3>
-              History
-              {versions && versions.length > RECENT && (
-                <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
-                  All {versions.length}
-                </button>
-              )}
-            </h3>
-            {failure && (
-              <p role="alert" className="sheet-quiet is-failure">
-                {failure}
-              </p>
-            )}
-            {!versions && !failure && <p className="sheet-quiet">Loading…</p>}
-            {versions?.length === 0 && <p className="sheet-quiet">No versions yet.</p>}
-            {versions?.slice(0, RECENT).map((version) => {
-              const restore = version.label?.startsWith("Before restoring");
-              return (
-                <button
-                  key={version.id}
-                  type="button"
-                  className="sheet-row press"
-                  onClick={() => onOpenNote(note.id, { history: version.id })}
-                >
-                  <span className="sheet-row-title">
-                    {version.authorIds.map(nameOf).join(", ") || "Somebody"}
-                  </span>
-                  {version.label && (
-                    <span className="sheet-label">
-                      {restore ? <RotateCcw size={11} /> : <Bookmark size={11} />}
-                      {restore ? "Restored an earlier version" : version.label}
-                    </span>
-                  )}
-                  <span className="sheet-row-meta">
-                    {formatDateTime(version.createdAt)}
-                    {version.wordsAdded !== null && (
-                      <>
-                        {" · "}
-                        <span className="is-added">+{version.wordsAdded}</span>{" "}
-                        <span className="is-removed">−{version.wordsRemoved ?? 0}</span>
-                      </>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-
-            {note.openRemarks > 0 && (
-              <button
-                type="button"
-                className="sheet-row press"
-                onClick={() => onOpenNote(note.id, { comments: true })}
-              >
-                <span className="sheet-row-title">
-                  <MessageSquare size={13} />{" "}
-                  {note.openRemarks === 1
-                    ? "1 conversation waiting"
-                    : `${note.openRemarks} conversations waiting`}
+          <SheetTimeline events={events} onOpenPerson={onOpenPerson} />
+          {(note.linkedFrom.length > 0 || note.linksTo.length > 0) && (
+            <p className="sheet-links">
+              {note.linkedFrom.length > 0 && (
+                <span>
+                  Linked from <LinkList links={note.linkedFrom} onOpen={onOpenNote} />
                 </span>
-              </button>
-            )}
-          </section>
-
-          {note.linkedFrom.length > 0 && (
-            <section className="sheet-card">
-              <h3>Linked from</h3>
-              {note.linkedFrom.map((link) => (
-                <button
-                  key={link.id}
-                  type="button"
-                  className="sheet-row press"
-                  onClick={() => onOpenNote(link.id)}
-                >
-                  <span className="sheet-row-title">{link.title || "Untitled"}</span>
-                </button>
-              ))}
-            </section>
+              )}
+              {note.linksTo.length > 0 && (
+                <span>
+                  Links to <LinkList links={note.linksTo} onOpen={onOpenNote} />
+                </span>
+              )}
+            </p>
           )}
-
-          {note.linksTo.length > 0 && (
-            <section className="sheet-card">
-              <h3>Links to</h3>
-              {note.linksTo.map((link) => (
-                <button
-                  key={link.id}
-                  type="button"
-                  className="sheet-row press"
-                  onClick={() => onOpenNote(link.id)}
-                >
-                  <span className="sheet-row-title">{link.title || "Untitled"}</span>
-                </button>
-              ))}
-            </section>
-          )}
-
-          <section className="sheet-card">
-            <h3>Dates</h3>
-            <dl className="sheet-facts">
-              <dt>Created</dt>
-              <dd>{formatDateTime(note.createdAt)}</dd>
-              <dt>Last edited</dt>
-              <dd>{formatDateTime(note.updatedAt)}</dd>
-            </dl>
-          </section>
           {note.owner?.userId !== session.userId ? (
             <SafetyActions noteId={note.id} userId={note.owner?.userId} />
           ) : null}
         </div>
       </div>
     </Sheet>
+  );
+}
+
+function LinkList({
+  links,
+  onOpen,
+}: {
+  links: { id: string; title: string }[];
+  onOpen: (noteId: string) => void;
+}) {
+  return links.map((link, index) => (
+    <span key={link.id}>
+      {index > 0 && ", "}
+      <button type="button" onClick={() => onOpen(link.id)}>
+        {link.title || "Untitled"}
+      </button>
+    </span>
+  ));
+}
+
+export interface SheetEvent {
+  key: string;
+  /** Whose face marks it; pressing the face opens them. */
+  person?: string;
+  mark?: ReactNode;
+  text: string;
+  meta?: string;
+  added?: number | null;
+  removed?: number | null;
+  onOpen?: () => void;
+}
+
+/** What happened, newest first, on one line drawn through the faces. */
+export function SheetTimeline({
+  events,
+  onOpenPerson,
+}: {
+  events: SheetEvent[];
+  onOpenPerson: (userId: string) => void;
+}) {
+  return (
+    <ol className="sheet-timeline">
+      {events.map((event) => {
+        const body = (
+          <>
+            <span className="sheet-event-text">{event.text}</span>
+            {(event.meta || event.added != null) && (
+              <span className="sheet-event-meta">
+                {event.meta}
+                {event.added != null && (
+                  <>
+                    {" · "}
+                    <span className="is-added">+{event.added}</span>{" "}
+                    <span className="is-removed">−{event.removed ?? 0}</span>
+                  </>
+                )}
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li key={event.key}>
+            {event.person && event.mark ? (
+              <button
+                type="button"
+                className="sheet-event-mark is-face"
+                aria-label="Open person"
+                onClick={() => onOpenPerson(event.person!)}
+              >
+                {event.mark}
+              </button>
+            ) : (
+              <span className="sheet-event-mark">{event.mark}</span>
+            )}
+            {event.onOpen ? (
+              <button type="button" className="sheet-event" onClick={event.onOpen}>
+                {body}
+              </button>
+            ) : (
+              <div className="sheet-event">{body}</div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
