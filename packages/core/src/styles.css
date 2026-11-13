@@ -14978,3 +14978,14 @@ button.sheet-event:hover {
 .collection-column:not(.is-gallery) .note-group-heading h3 {
   font-weight: var(--weight-semibold);
 }
+
+/* The note's band at the list's and the sidebar's 40px, so one line crosses
+   the window. The pills shrink to 34 to keep 3px of band above and below. */
+.editor-toolbar.h-13 {
+  height: 40px;
+}
+
+.editor-toolbar :is(.editor-tool-group, .editor-tool-cluster) {
+  height: 34px;
+  padding-block: 0;
+}
