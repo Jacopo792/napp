@@ -114,6 +114,9 @@ interface Props {
   busy: boolean;
   canWrite: boolean;
   folderLabel: string;
+  /** Every note is in view: the title counts them ("All 10 notes") and the
+   *  tally beside it goes. */
+  allNotes?: boolean;
   /** Whose notes these are, when they are not yours. The switch is portraits
    *  now and says no names, so the tally under the folder carries the member —
    *  a readout, which is what that line already is. */
@@ -627,9 +630,7 @@ const Row = memo(function Row({
       {/* A list row is Notes' shape: no kind-of-document glyph — the title says
           what it is — and the note's own picture or drawing, when it has one,
           as a thumbnail at the trailing edge. A gallery card keeps its glyph,
-          because a card without one is a blank square. What is unread is a dot
-          in the leading margin, where Mail keeps it. */}
-      {!gallery && unread && <span className="note-row-dot" aria-label="Unread remarks" />}
+          because a card without one is a blank square. */}
       {entry.note.photo ? (
         <span
           className={`note-photo is-row ${gallery ? "is-gallery" : "is-thumb"} ${
@@ -700,21 +701,15 @@ const Row = memo(function Row({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        {/* When, small, above the title; who is in it at the same line's end.
-            The title then has the row's whole width and two lines. */}
-        {list && (
-          <div className="note-row-head">
-            <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>
-            <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />
-          </div>
-        )}
-        <div>
+        {/* The title, two lines, and at its first line's end the face of
+            whoever is in the note; when closes the line under it. */}
+        <div className={list ? "note-row-title" : undefined}>
           <p
             /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
              its 1px rule was painted across two device rows at half strength —
              the blur down the list that looked like bad icon rendering. */
-            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[14px] leading-[19px]"} ${
+            className={`${gallery ? "text-[15px] leading-[20px]" : mobile ? "text-[16px] leading-[22px]" : "text-[13px] leading-[18px]"} ${
               entry.note.title ? "text-ink" : "text-ink-4 italic"
             }`}
             /* One line in the column, and that is the whole of why the list
@@ -725,13 +720,15 @@ const Row = memo(function Row({
              A card in the gallery has room for four; a phone keeps three,
              where a thumb is scrolling and the rows are further apart. */
             style={{
-              fontWeight: gallery ? 520 : mobile ? 650 : 600,
+              fontWeight: gallery ? 520 : mobile ? 650 : 560,
               display: "-webkit-box",
               WebkitLineClamp: gallery ? 4 : mobile ? 3 : 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
           >
+            {/* Floated, so only the title's first line steps aside for it. */}
+            {list && <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />}
             {!gallery && pinned && (
               <Pin
                 ref={(el) => dropPin(el, entry.note.id)}
@@ -756,7 +753,14 @@ const Row = memo(function Row({
               {checklist.done}/{checklist.total}
             </span>
           )}
-          {(around ?? preview) && <span className="note-row-preview">{around ?? preview}</span>}
+          {around || preview ? (
+            <span className="note-row-preview">{around ?? preview}</span>
+          ) : (
+            list && <span className="note-row-preview">No additional text</span>
+          )}
+          {list && (
+            <span className="note-row-when is-end">{formatStamp(entry.note.updatedAt)}</span>
+          )}
         </p>
       </div>
 
@@ -961,6 +965,7 @@ export function NoteList({
   busy,
   canWrite,
   folderLabel,
+  allNotes = false,
   scopeLabel,
   notice,
   trashMode,
@@ -992,6 +997,10 @@ export function NoteList({
     [onTogglePin],
   );
   const gallery = view === "gallery";
+  const countInTitle = allNotes && !loading && !hasQuery;
+  const heading = countInTitle
+    ? `All ${entries.length} ${entries.length === 1 ? "note" : "notes"}`
+    : folderLabel;
 
   /* Right-click on the note it is about. Every item here already exists behind
      a button somewhere; what was missing was reaching them from the row. */
@@ -1432,21 +1441,23 @@ export function NoteList({
             too narrow the readout after it truncates, then drops, first. */}
         <div className="collection-title min-w-0 flex-1">
           {titleMenu ? (
-            <h2 className="min-w-0 text-sm font-semibold text-ink">{titleMenu(folderLabel)}</h2>
+            <h2 className="min-w-0 text-sm font-semibold text-ink">{titleMenu(heading)}</h2>
           ) : (
-            <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
+            <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{heading}</h2>
           )}
-          <p className="readout min-w-0 shrink-[100] truncate whitespace-nowrap text-ink-4">
-            {notice ??
-              (loading
-                ? "Loading"
-                : titleMenu
-                  ? entries.length
-                  : noteTally(entries.length, trashMode))}
-            {scopeLabel && !titleMenu && !loading && !notice && (
-              <span className="scope-tag">{scopeLabel}</span>
-            )}
-          </p>
+          {(notice || loading || trashMode || (scopeLabel && !titleMenu)) && (
+            <p className="readout min-w-0 shrink-[100] truncate whitespace-nowrap text-ink-4">
+              {notice ??
+                (loading
+                  ? "Loading"
+                  : titleMenu
+                    ? entries.length
+                    : noteTally(entries.length, trashMode))}
+              {scopeLabel && !titleMenu && !loading && !notice && (
+                <span className="scope-tag">{scopeLabel}</span>
+              )}
+            </p>
+          )}
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged
             into the search field where it covered the text being typed. */}

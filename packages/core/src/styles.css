@@ -3506,17 +3506,6 @@
   padding: 4px;
 }
 
-/* Mail's unread dot, in the margin the row keeps for it. */
-.note-row-dot {
-  position: absolute;
-  top: calc(0.625rem + 6px);
-  left: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-strong);
-}
-
 .note-row-pin {
   display: inline-block;
   margin-right: 4px;
@@ -3614,31 +3603,51 @@
 .note-group .note-row-list {
   margin-inline: 4px;
   align-items: center;
-  padding-block: 10px;
+  padding-block: 12px;
 }
 
 .note-row-list .note-row-summary {
-  font-size: 13px;
-  line-height: 17px;
-}
-
-/* When, small, on its own line above the title; whoever is in the note at
-   that line's far end. */
-.note-row-head {
-  display: flex;
-  min-width: 0;
-  height: 16px;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
-.note-row-head > .note-row-when {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
+/* The face of whoever is in the note, at the end of the title's first line
+   and on the edge the counts and the times end on. Floated, so the second
+   line runs under it to the full width. */
+.note-row-title .note-row-peer {
+  display: flex;
+  width: auto;
+  height: 18px;
+  float: right;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 0 10px;
+}
+
+.note-row-title .note-row-peer .avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+/* Writing: three dots in line before the face, on its centre line — no
+   lozenge hanging off its corner. */
+.note-row-title .note-row-peer .people-face-typing {
+  position: static;
+  gap: 3px;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* When, at the far end of the preview's line. */
+.note-row-summary > .note-row-when.is-end {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
 }
 
@@ -13924,8 +13933,9 @@ button.sheet-event:hover {
   gap: 6px;
 }
 
+/* 14px: the ring round the face you are in takes 3.5 of it. */
 .sidebar-rail-faces {
-  gap: 10px;
+  gap: 14px;
 }
 
 .sidebar-rail-places {
@@ -14142,13 +14152,18 @@ button.sheet-event:hover {
    every row and a heavy selection inside it. A day is now a faint ground the
    rows rest on, rows are parted by air rather than rules, titles sit a step
    lighter and the selection is a quiet wash. */
+/* A hairline between two rows, exactly as wide as the text above it: from
+   the title's first letter to the time's last digit. */
 .note-group .note-row-list::after {
-  display: none;
+  right: 12px;
+  left: 16px;
+  border-bottom-color: var(--rule-soft);
 }
 
+/* 5px: a selected row is a row, not a card. */
 .note-group .note-row-list {
   margin-block: 1px;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 
 .note-group .note-row-list.is-selected {
@@ -14867,9 +14882,11 @@ button.sheet-event:hover {
    The list column has no strip: its name is the first thing in it, large, with
    the count beside it in grey and the pen at the end of the same line. The name
    opens the list's options on a press or the right button. */
+/* 10px on the right: the pen's glyph then ends on the edge the counts and
+   the times end on. */
 .collection-toolbar.is-titled {
-  min-height: 52px;
-  padding: 0 14px 0 20px;
+  min-height: 40px;
+  padding: 0 10px 0 20px;
   background: transparent;
   box-shadow: none;
 }
@@ -14880,9 +14897,8 @@ button.sheet-event:hover {
 }
 
 .collection-toolbar.is-titled h2 {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
 .collection-toolbar.is-titled .readout {
@@ -14892,4 +14908,73 @@ button.sheet-event:hover {
 .collection-toolbar.is-titled .collection-title-button {
   margin-left: -6px;
   padding: 2px 6px;
+}
+
+/* In the list the picture takes the face's slot: a small square at the end
+   of the title's first line, so the time below keeps the edge every other
+   time ends on. The title's first line steps aside for it the way it does
+   for the face. */
+.note-group .note-row-list .is-thumb {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+
+.note-group .note-row-list .note-row-glyph.is-sketch.is-thumb {
+  padding: 2px;
+}
+
+.note-group .note-row-list:has(.is-thumb) .note-row-title > p::before {
+  width: 30px;
+  height: 18px;
+  float: right;
+  content: "";
+}
+
+.note-row-title .note-row-peer .people-face-typing i {
+  width: 4px;
+  height: 4px;
+  animation-name: people-typing-fade;
+}
+
+@keyframes people-typing-fade {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* ── The list on the sidebar's scale ─────────────────────────────────────────
+   Every line in the list column stands level with its neighbour across the
+   divider, in the same size: the title with the archive's name (40px band,
+   14px), the search with All notes (34px from 46), the first day with
+   Folders (its words at 96), a title at a folder's 13px. */
+.collection-toolbar.is-titled {
+  height: 40px;
+}
+
+.collection-column .glass-search {
+  height: 34px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.collection-column:not(.is-gallery) [role="listbox"] {
+  padding-top: 6px;
+}
+
+.collection-column:not(.is-gallery) .note-group-heading,
+.collection-column:not(.is-gallery) .note-group-heading.is-first {
+  padding-top: 6px;
+}
+
+.collection-column:not(.is-gallery) .note-group-heading h3 {
+  font-weight: var(--weight-semibold);
 }

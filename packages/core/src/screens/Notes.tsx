@@ -6025,6 +6025,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   busy={saving}
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
+                  allNotes={selectedFolderId === ALL}
                   scopeLabel={scopeTag}
                   notice={listNotice}
                   trashMode={selectedFolderId === TRASH}
@@ -6222,6 +6223,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   busy={saving}
                   canWrite={canWriteArchive}
                   folderLabel={folderLabel}
+                  allNotes={selectedFolderId === ALL}
                   scopeLabel={scopeTag}
                   notice={listNotice}
                   trashMode={selectedFolderId === TRASH}
