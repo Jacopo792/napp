@@ -129,7 +129,7 @@ export function ArchiveSheet({
 
   return (
     <Sheet label={space.name}>
-      <div className="sheet-body">
+      <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <span className="sheet-portrait">
             <FaceStack members={space.members} large />

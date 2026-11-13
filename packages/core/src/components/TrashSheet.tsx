@@ -22,7 +22,7 @@ export function TrashSheet({
   const [confirming, setConfirming] = useState<string | null>(null);
   return (
     <Sheet label="Trash">
-      <div className="sheet-body">
+      <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <span className="sheet-portrait sheet-note-glyph">
             <Trash2 size={30} />
