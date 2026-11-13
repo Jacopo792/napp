@@ -157,7 +157,11 @@ export async function openNote(page: Page, id: string) {
 }
 
 export async function showMemberNotes(page: Page, account: Account) {
-  await page.getByRole("button", { name: `${account.nickname}'s notes`, exact: true }).click();
+  /* The member's face in the sidebar's rail, named after them. */
+  await page
+    .locator(".sidebar-rail-faces")
+    .getByRole("button", { name: account.nickname, exact: true })
+    .click();
 }
 
 export async function invite(owner: Account, member: Account) {
