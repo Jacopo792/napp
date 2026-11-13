@@ -23,6 +23,7 @@ import {
   ListChecks,
   Paperclip,
   Pin,
+  PinFilled,
   RotateCcw,
   Camera,
   Crop,
@@ -840,7 +841,7 @@ const Row = memo(function Row({
                 pinned ? "text-accent opacity-100" : "text-ink-3 hover:text-accent"
               }`}
             >
-              <Pin size={16} weight={pinned ? "fill" : "regular"} />
+              {pinned ? <PinFilled size={16} /> : <Pin size={16} />}
             </button>
           )}
           {trashMode && (

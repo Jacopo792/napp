@@ -73,7 +73,7 @@ export function WhatsNewSheet({
       >
         <header className="whats-new-head">
           <span className="whats-new-mark" aria-hidden="true">
-            <Sparkle size={18} weight="fill" />
+            <Sparkle size={18} />
           </span>
           <div className="whats-new-heading">
             <h2 id="whats-new-title">What&rsquo;s New</h2>

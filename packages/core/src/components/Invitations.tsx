@@ -181,7 +181,7 @@ export function Invitations({
               }}
             >
               <Copy size={16} />
-              <Check size={16} weight="bold" />
+              <Check size={16} stroke={2.5} />
             </button>
           </div>
           <a className="invite-mail" href={inviteMailto(email, link)}>

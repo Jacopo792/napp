@@ -452,7 +452,7 @@ function Pitch() {
         <br />
         <span className="login-pill" style={{ width }}>
           <span key={text} ref={word} className="login-pill-word">
-            <Icon size="0.62em" weight="bold" />
+            <Icon size="0.62em" stroke={2.5} />
             {text}
           </span>
         </span>

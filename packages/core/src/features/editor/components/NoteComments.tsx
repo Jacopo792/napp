@@ -706,7 +706,7 @@ export function NoteComments({
           title={thread.resolved ? "Reopen" : "Resolve"}
           onClick={() => void toggleResolved(thread.threadId, !thread.resolved)}
         >
-          {thread.resolved ? <RotateCcw size={14} /> : <Check size={15} weight="bold" />}
+          {thread.resolved ? <RotateCcw size={14} /> : <Check size={15} stroke={2.5} />}
         </button>
       </>
     );

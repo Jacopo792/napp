@@ -270,7 +270,7 @@ function GlassSlider({ value, onChange }: { value: number; onChange: (value: num
           <i style={{ left: "calc(15px + (100% - 30px) / 3)" }} />
           <i style={{ left: "calc(15px + (100% - 30px) * 2 / 3)" }} />
         </span>
-        <Copy size={18} weight="fill" aria-hidden="true" />
+        <Copy size={18} aria-hidden="true" />
       </span>
     </div>
   );

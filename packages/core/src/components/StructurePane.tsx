@@ -417,7 +417,7 @@ export function StructurePane({
                 title="Board"
                 onClick={board.toggle}
               >
-                <Board size={13} weight={board.open ? "fill" : "bold"} />
+                <Board size={13} stroke={board.open ? 2.75 : 2.25} />
               </button>
             )}
             {canWrite && (
@@ -428,7 +428,7 @@ export function StructurePane({
                 title={`New chapter · ${keyName("⌘N")}`}
                 onClick={() => onNewChapter(null)}
               >
-                <Plus size={13} weight="bold" />
+                <Plus size={13} stroke={2.5} />
               </button>
             )}
           </div>

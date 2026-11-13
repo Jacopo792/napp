@@ -3553,7 +3553,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
             }}
           >
             <Copy size={14} />
-            <Check size={14} weight="bold" />
+            <Check size={14} stroke={2.5} />
           </button>,
           document.body,
         )}
