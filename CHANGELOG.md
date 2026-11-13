@@ -14,7 +14,7 @@ changes. The commit history remains the detailed engineering record.
 - In a framed Mac window the traffic lights sit centred in the top band and the
   sidebar no longer steps down, so the three columns stay level.
 - Person, note, folder and archive sheets and a book's Trash use one flat layout:
-  evenly spaced numbers and History grouped by day.
+  three number tiles and History grouped by day.
 - Comments are a full-height column of the window with flat thread rows; the
   floating margin mode is removed.
 - What's New is a page of Settings instead of a modal; after an update Settings

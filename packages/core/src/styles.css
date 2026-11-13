@@ -14842,35 +14842,33 @@ button.sheet-chip:hover,
   color: var(--ink);
 }
 
-/* The numbers: from the face's edge to the counts' edge, the same space
-   between each. */
+/* The numbers: three equal tiles from the face's edge to the counts' edge,
+   each a quiet ground with its number large and its name under it. Without
+   them the sheet read as too bare. */
 .sheet-body.is-plain .sheet-stats {
-  display: flex;
-  justify-content: space-between;
-  gap: 0;
-  margin: 28px var(--sheet-inset) 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 24px var(--sheet-inset) 0;
 }
 
 .sheet-body.is-plain .sheet-stats > * {
+  align-items: center;
   gap: 2px;
-  border-radius: 0;
-  background: none;
-  padding: 0;
-  text-align: left;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 12px 8px;
+  text-align: center;
 }
 
 .sheet-body.is-plain .sheet-stats > button:hover {
-  background: none;
-}
-
-.sheet-body.is-plain .sheet-stats > button:hover small {
-  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
 }
 
 .sheet-body.is-plain .sheet-stats :is(dd, strong) {
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
 }
 
 .sheet-body.is-plain .sheet-stats :is(dt, small) {
@@ -15075,7 +15073,7 @@ button.sheet-chip:hover,
 }
 
 .sheet-body.is-plain .sheet-stepper > span {
-  justify-content: flex-start;
+  justify-content: center;
   gap: 8px;
 }
 

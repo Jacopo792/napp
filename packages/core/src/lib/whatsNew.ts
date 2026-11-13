@@ -72,7 +72,7 @@ export const RELEASES: Release[] = [
         items: [
           {
             title: "Plain information sheets",
-            text: "Holding a note, a folder or a person opens a calmer sheet: three numbers spaced evenly, then what happened grouped by day, each row with a face, the time and the words changed. The archive's sheet and a book's Trash are drawn the same way.",
+            text: "Holding a note, a folder or a person opens a calmer sheet: three numbers in tiles, then what happened grouped by day, each row with a face, the time and the words changed. The archive's sheet and a book's Trash are drawn the same way.",
             image: "0.9.53-sheets.jpg",
           },
         ],
