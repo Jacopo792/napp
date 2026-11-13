@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.52",
+    date: "2026-11-13",
+    headline: "Titles save through the live document",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "A reliable first title",
+            text: "A note's title becomes editable with its live document, so typing as soon as a note opens cannot trigger an obsolete save or a misleading Save failed message.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.51",
     date: "2026-11-13",
     headline: "New notes open reliably",

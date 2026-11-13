@@ -18,10 +18,25 @@ test("a slow new-note insert is committed before collaboration opens it", async 
   let pendingId = "";
   let committed = false;
   const prematureFrames: string[] = [];
-  page.on("websocket", (socket) => {
-    socket.on("framesent", ({ payload }) => {
+  const legacyWrites: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PATCH" && new URL(request.url()).pathname === "/rest/v1/notes") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      if (["title", "body", "content"].some((field) => field in body))
+        legacyWrites.push(request.url());
+    }
+  });
+  await page.routeWebSocket("ws://127.0.0.1:1235", (socket) => {
+    const server = socket.connectToServer();
+    socket.onMessage((payload) => {
       if (pendingId && !committed && Buffer.from(payload).includes(Buffer.from(pendingId)))
         prematureFrames.push(pendingId);
+      server.send(payload);
+    });
+    server.onMessage(async (payload) => {
+      // Keep the title visible before its live document arrives, deterministically.
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      socket.send(payload);
     });
   });
   await login(page, account);
@@ -35,6 +50,9 @@ test("a slow new-note insert is committed before collaboration opens it", async 
     await route.fulfill({ response });
   });
   await page.getByRole("button", { name: "New note", exact: true }).first().click();
+  // Filling as soon as the title appears must wait for its live Y.Text,
+  // rather than enqueue a legacy REST write while the document is connecting.
+  await page.getByRole("textbox", { name: "Note title", exact: true }).fill("Slow-created title");
   const editor = page.locator(".tiptap[contenteditable=true]");
   await expect(editor).toBeVisible();
   expect(pendingId).not.toBe("");
@@ -45,9 +63,19 @@ test("a slow new-note insert is committed before collaboration opens it", async 
   await expect
     .poll(
       async () =>
-        (await account.client.from("notes").select("body").eq("id", pendingId).single()).data?.body,
+        (await account.client.from("notes").select("title,body").eq("id", pendingId).single()).data,
     )
-    .toContain("A slow insert still opens a writable document.");
+    .toMatchObject({
+      title: "Slow-created title",
+      body: "A slow insert still opens a writable document.",
+    });
+  expect(legacyWrites).toEqual([]);
+  await page.reload();
+  await openNote(page, pendingId);
+  await expect(page.getByRole("textbox", { name: "Note title", exact: true })).toHaveValue(
+    "Slow-created title",
+  );
+  await expect(page.getByRole("button", { name: "Save failed", exact: true })).toHaveCount(0);
 });
 
 test("typing survives a reload and is persisted by the collaboration server", async ({
