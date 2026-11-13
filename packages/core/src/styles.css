@@ -13692,6 +13692,38 @@ button.sheet-chip:hover,
   font-size: 11px;
 }
 
+/* Somebody here now: a dot at the face's lower right, in the presence colour
+   chosen in Writing, the face cut away around it rather than ringed. The dot
+   stays lit on a dimmed face, so the dimming moves to the picture. */
+.sidebar-rail .sidebar-face:has(.is-online) {
+  position: relative;
+  opacity: 1;
+}
+
+.sidebar-rail .sidebar-face:has(.is-online):not(.is-active) > * {
+  opacity: 0.45;
+}
+
+.sidebar-rail .sidebar-face:has(.is-online):not(.is-active):hover > * {
+  opacity: 0.8;
+}
+
+.sidebar-rail .sidebar-face-pic .avatar.is-online {
+  -webkit-mask: radial-gradient(circle 6px at 24px 24px, transparent 5.5px, #000 6px);
+  mask: radial-gradient(circle 6px at 24px 24px, transparent 5.5px, #000 6px);
+}
+
+.sidebar-rail .sidebar-face:has(.is-online)::after {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--presence, var(--accent-strong));
+  content: "";
+}
+
 .sidebar-rail-button {
   position: relative;
   display: grid;
