@@ -4324,54 +4324,87 @@
     0 0 0 3.5px var(--swatch);
 }
 
-/* Three across, and nine palettes: three full rows. Four across left the
-   ninth chip alone on a row of its own, which reads as one palette that did
-   not fit rather than as the last of the set. It also lines the grid up with
-   the three theme cards above it. */
+/* Each palette as a window in small — a sidebar a step darker, three lines
+   of text and its accent — with its name under it. Six across: the six dark
+   ones fill a row and the light ones sit on the same columns below. */
 .palette-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px 10px;
+  margin-bottom: 24px;
+  /* On the rows' edges, 2px in from the rules. */
+  padding-inline: 2px;
 }
 
 .palette-presets button {
   display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  padding: 8px 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   color: var(--ink-3);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .palette-presets button:hover,
 .palette-presets button.is-active {
-  border-color: var(--rule);
-  background: var(--accent-wash);
   color: var(--ink);
 }
 
-.palette-presets button.is-active {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.palette-chip {
+.palette-tile {
   position: relative;
   display: block;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border: 1px solid rgb(128 128 128 / 0.28);
-  border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--palette-bg) 0 54%,
-    var(--palette-accent) 54% 76%,
-    var(--palette-fg) 76%
-  );
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--palette-bg);
+  box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.25);
+}
+
+.palette-presets button:hover .palette-tile {
+  box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.5);
+}
+
+.palette-presets button.is-active .palette-tile {
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.palette-tile i {
+  position: absolute;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--palette-fg);
+}
+
+/* The sidebar, a step darker than the ground. */
+.palette-tile i:nth-child(1) {
+  inset: 0 auto 0 0;
+  width: 28%;
+  height: auto;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--palette-bg) 86%, black);
+}
+
+.palette-tile i:nth-child(2) {
+  top: 22%;
+  left: 38%;
+  width: 46%;
+}
+
+.palette-tile i:nth-child(3) {
+  top: 40%;
+  left: 38%;
+  width: 52%;
+  opacity: 0.4;
+}
+
+.palette-tile i:nth-child(4) {
+  top: 62%;
+  left: 38%;
+  width: 18%;
+  height: 5px;
+  background: var(--palette-accent);
 }
 
 /* A group of rows is no box at all: rows standing on the page, a hairline
@@ -4801,7 +4834,7 @@
   }
 
   .palette-presets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -13992,35 +14025,6 @@ button.sheet-chip:hover,
   gap: 12px;
   padding: 4px 14px 14px;
   font-size: var(--text-sm);
-}
-
-/* Palettes are rows of the list like any other choice: a chip and a name on
-   the page, the chosen one on a wash — not a wall of tiles. */
-.settings-panel .palette-presets {
-  gap: 2px 8px;
-}
-
-.settings-panel .palette-presets button {
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  padding: 5px 6px;
-}
-
-.settings-panel .palette-presets button:hover {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-}
-
-.settings-panel .palette-presets button.is-active {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  box-shadow: none;
-  color: var(--ink);
-}
-
-.settings-panel .palette-chip {
-  width: 18px;
-  height: 18px;
-  flex-basis: 18px;
 }
 
 /* ── Sheets in the phone's shape ──────────────────────────────────────────────

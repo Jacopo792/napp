@@ -62,9 +62,10 @@ export interface Appearance {
    drawn grey on grey is a toggle nobody can read the state of. */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "dark",
-  accent: "#0a84ff",
-  background: "#1c1c1e",
-  foreground: "#ececec",
+  /* Fjord: the palette a first opening and Reset appearance land on. */
+  accent: "#88c0d0",
+  background: "#2e3440",
+  foreground: "#eceff4",
   contrast: 50,
   translucentSidebar: false,
   wallpaper: false,
@@ -81,35 +82,17 @@ export const DEFAULT_APPEARANCE: Appearance = {
   frosted: false,
 };
 
-/* Seventeen starting points, each a ground, an ink and one colour to act with.
-   Every ground carries a little of its accent's hue — a palette whose ground
-   is neutral grey reads as one colour dropped onto a grey app — and every
-   accent is a colour somebody would choose on purpose, not a tint of the
-   ground. Fjord and Rosewood are the reader's own favourites and are kept
-   exactly as they were. They are starting points only: what is stored is the
+/* Ten starting points, each a ground, an ink and one colour to act with. Four
+   the reader kept out of seventeen (2026-11-13) — Fjord and Rosewood, their
+   own favourites, exactly as they were — and six made in the same manner:
+   a ground carrying a little of its accent's hue, and an accent muted enough
+   to read beside text rather than shout over it. Mist and Blush are Fjord's
+   and Rosewood's light sides. They are starting points only: what is stored is the
    three colours, so a reader who chose one keeps it when this list changes. */
 export const APPEARANCE_PRESETS = [
-  /* A Mac window's grey and the system blue. */
-  {
-    id: "graphite",
-    name: "Graphite",
-    theme: "dark" as const,
-    accent: "#0a84ff",
-    background: "#1c1c1e",
-    foreground: "#ececec",
-  },
-  /* Near-black and the yellow every notebook app on the platform is lit by. */
-  {
-    id: "night",
-    name: "Night",
-    theme: "dark" as const,
-    accent: "#ffd60a",
-    background: "#121214",
-    foreground: "#ececea",
-  },
   /* Warm paper and an ink-blue. A light preset sets its own theme when it is
      pressed; touching the THEME segment afterwards still resets the three
-     colours, for this one and for Vanilla and Lavender alike. */
+     colours. */
   {
     id: "paper",
     name: "Paper",
@@ -117,14 +100,6 @@ export const APPEARANCE_PRESETS = [
     accent: "#2f6fd6",
     background: "#f8f5ee",
     foreground: "#28241e",
-  },
-  {
-    id: "midnight",
-    name: "Midnight",
-    theme: "dark" as const,
-    accent: "#64d2ff",
-    background: "#0f1724",
-    foreground: "#e6eef7",
   },
   {
     id: "fjord",
@@ -135,30 +110,6 @@ export const APPEARANCE_PRESETS = [
     foreground: "#eceff4",
   },
   {
-    id: "plum",
-    name: "Plum",
-    theme: "dark" as const,
-    accent: "#d6a4ff",
-    background: "#1d1622",
-    foreground: "#f2eaf6",
-  },
-  {
-    id: "espresso",
-    name: "Espresso",
-    theme: "dark" as const,
-    accent: "#ff9f43",
-    background: "#1c1612",
-    foreground: "#f3e9de",
-  },
-  {
-    id: "moss",
-    name: "Moss",
-    theme: "dark" as const,
-    accent: "#5fd88a",
-    background: "#131a15",
-    foreground: "#e5eee7",
-  },
-  {
     id: "rosewood",
     name: "Rosewood",
     theme: "dark" as const,
@@ -166,76 +117,82 @@ export const APPEARANCE_PRESETS = [
     background: "#221c1e",
     foreground: "#f3e9ea",
   },
-  /* Four from one series (dyslove.design): Cosmic #23212C, Violet #36255C,
-     Lavender #D2C3F6 and Vanilla #F1FEC8, each the ground of its own preset
-     and lending the others an ink or an accent. */
+  /* Near-black and the yellow every notebook app on the platform is lit by. */
   {
-    id: "cosmic",
-    name: "Cosmic",
+    id: "night",
+    name: "Night",
     theme: "dark" as const,
-    accent: "#d2c3f6",
-    background: "#23212c",
-    foreground: "#f1fec8",
+    accent: "#ffd60a",
+    background: "#121214",
+    foreground: "#ececea",
   },
   {
-    id: "violet",
-    name: "Violet",
+    id: "sage",
+    name: "Sage",
     theme: "dark" as const,
-    accent: "#f1fec8",
-    background: "#36255c",
-    foreground: "#efe9fc",
+    accent: "#a3be8c",
+    background: "#252a27",
+    foreground: "#e7ece5",
   },
   {
-    id: "lavender",
-    name: "Lavender",
+    id: "dune",
+    name: "Dune",
+    theme: "dark" as const,
+    accent: "#d9a76a",
+    background: "#29241f",
+    foreground: "#f1e8dc",
+  },
+  {
+    id: "dusk",
+    name: "Dusk",
+    theme: "dark" as const,
+    accent: "#b48ead",
+    background: "#25222e",
+    foreground: "#ece8f3",
+  },
+  {
+    id: "mist",
+    name: "Mist",
     theme: "light" as const,
-    accent: "#36255c",
-    background: "#d2c3f6",
-    foreground: "#1b1530",
+    accent: "#5e81ac",
+    background: "#eceff4",
+    foreground: "#2e3440",
   },
   {
-    id: "vanilla",
-    name: "Vanilla",
+    id: "blush",
+    name: "Blush",
     theme: "light" as const,
-    accent: "#36255c",
-    background: "#f1fec8",
-    foreground: "#1d1f12",
-  },
-  /* Four darker ones in the same manner, each a photograph whose light sits
-     on the left, behind the glass, and fades to the ground under the page. */
-  {
-    id: "abyss",
-    name: "Abyss",
-    theme: "dark" as const,
-    accent: "#5fd4c4",
-    background: "#0e2226",
-    foreground: "#e3f2f1",
+    accent: "#b4606d",
+    background: "#f6eeee",
+    foreground: "#2c2325",
   },
   {
-    id: "ember",
-    name: "Ember",
-    theme: "dark" as const,
-    accent: "#ff8a4c",
-    background: "#1e1210",
-    foreground: "#f6e7dc",
-  },
-  {
-    id: "pine",
-    name: "Pine",
-    theme: "dark" as const,
-    accent: "#a9c8a0",
-    background: "#121c17",
-    foreground: "#e4ece5",
-  },
-  {
-    id: "aurora",
-    name: "Aurora",
-    theme: "dark" as const,
-    accent: "#7fe3d6",
-    background: "#10142a",
-    foreground: "#e8ecfb",
+    id: "linen",
+    name: "Linen",
+    theme: "light" as const,
+    accent: "#8a6a45",
+    background: "#f2efe8",
+    foreground: "#2a2824",
   },
 ] as const;
+
+/* The palettes offered before 2026-11-13, by their colours only: a reader who
+   chose one keeps it, though it is no longer offered. */
+const RETIRED_COLOURS = [
+  ["#0a84ff", "#1c1c1e", "#ececec"], // graphite, the default until then
+  ["#64d2ff", "#0f1724", "#e6eef7"], // midnight
+  ["#d6a4ff", "#1d1622", "#f2eaf6"], // plum
+  ["#ff9f43", "#1c1612", "#f3e9de"], // espresso
+  ["#5fd88a", "#131a15", "#e5eee7"], // moss
+  ["#d2c3f6", "#23212c", "#f1fec8"], // cosmic
+  ["#f1fec8", "#36255c", "#efe9fc"], // violet
+  ["#36255c", "#d2c3f6", "#1b1530"], // lavender
+  ["#36255c", "#f1fec8", "#1d1f12"], // vanilla
+  ["#5fd4c4", "#0e2226", "#e3f2f1"], // abyss
+  ["#ff8a4c", "#1e1210", "#f6e7dc"], // ember
+  ["#a9c8a0", "#121c17", "#e4ece5"], // pine
+  ["#7fe3d6", "#10142a", "#e8ecfb"], // aurora
+];
 
 const LIGHT_DEFAULTS = {
   accent: "#1677c8",
@@ -400,11 +357,12 @@ const SEMANTIC = {
 /* Colours are chosen from the palettes only. A free colour saved by an older
    version stays in the stored preferences, unread: it draws as the theme's own
    ground instead of a stranger's colours, and nothing is rewritten. */
-const KNOWN_COLOURS = new Set(
-  [...APPEARANCE_PRESETS, LIGHT_DEFAULTS, DEFAULT_APPEARANCE].map((p) =>
+const KNOWN_COLOURS = new Set([
+  ...[...APPEARANCE_PRESETS, LIGHT_DEFAULTS, DEFAULT_APPEARANCE].map((p) =>
     `${p.accent}${p.background}${p.foreground}`.toLowerCase(),
   ),
-);
+  ...RETIRED_COLOURS.map((colours) => colours.join("").toLowerCase()),
+]);
 
 function coloursOf(config: Appearance) {
   const { accent, background, foreground } = config;
