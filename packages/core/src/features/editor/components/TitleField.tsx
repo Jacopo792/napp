@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import type * as Y from "yjs";
-import { editTitle, useDraftTitle } from "@/features/editor/lib/draft";
+import { useDraftTitle } from "@/features/editor/lib/draft";
 
 interface Props {
   mobile: boolean;
@@ -106,27 +106,18 @@ export function TitleField({
       rows={1}
       value={title}
       onChange={(event) => {
-        if (!canEdit) return;
+        if (!canEdit || !yTitle) return;
         const el = event.target;
         const raw = el.value;
         const next = capitalizeSentences(raw);
         const start = el.selectionStart;
         const end = el.selectionEnd;
-        if (yTitle) {
-          yTitle.doc?.transact(() => {
-            yTitle.delete(0, yTitle.length);
-            yTitle.insert(0, next);
-          });
-          /* Yjs has the words; this says a person is putting them there. It
-             used to sit only in the branch below, so with collaboration on —
-             which is always — renaming a note announced nothing. `schedule()`
-             on the other side of it is a no-op here: the draft store stays
-             empty in this mode, so no legacy write is woken by saying so. */
-          onEdited();
-        } else {
-          editTitle(noteId, next);
-          onEdited();
-        }
+        yTitle.doc?.transact(() => {
+          yTitle.delete(0, yTitle.length);
+          yTitle.insert(0, next);
+        });
+        // Titles use the same live document as the body, never the legacy queue.
+        onEdited();
         if (next !== raw && start !== null && end !== null) {
           window.requestAnimationFrame(() => {
             if (document.activeElement === el) el.setSelectionRange(start, end);
@@ -144,7 +135,7 @@ export function TitleField({
         }
       }}
       placeholder="Untitled"
-      readOnly={!canEdit}
+      readOnly={!canEdit || !yTitle}
       lang="it"
       aria-label="Note title"
       autoCapitalize="sentences"

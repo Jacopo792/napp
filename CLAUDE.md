@@ -128,13 +128,13 @@ inspect the rendered result as well as the source.
 - `main` pushes run `.github/workflows/ci.yml`. Checks gate the deploy job; the
   configured Render hook requests the backend deployment. The workflow verifies
   the requested revision, readiness and allowed origins before publishing Pages.
-  A missing hook is reported as a skipped backend deployment, not proof of rollout.
+  A missing hook fails the production deploy; it must never silently skip Render.
 - `render.yaml` documents service settings; it does not update the existing live
   service by itself. `ops/collab-origins.json` records expected origins. Verify
   the running SHA and WebSocket behavior; a healthy old instance is not a deploy.
 - `/healthz` is liveness, `/readyz` checks dependencies and `/version` identifies
-  the running revision. Keep-alive timing belongs to its workflow; GitHub cron
-  is best-effort and is not an uptime guarantee.
+  the running revision. The paid collaboration instance stays awake without
+  scheduled pings. See `docs/backend-operations.md` for capacity and operations.
 - Before an application release, align web/desktop versions, the English
   user-facing What's New entry and `CHANGELOG.md`. Push the reviewed public
   commit, verify CI, then tag `v<version>` to build the desktop installers.

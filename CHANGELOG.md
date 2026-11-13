@@ -3,6 +3,29 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.52 – 2026-11-13
+
+### Fixed
+
+- Titles wait for their collaborative Y.Text before accepting input, matching the
+  note body. Typing during the first connection cannot enter the legacy REST save
+  queue or produce a misleading Save failed after the live document arrives.
+
+## 0.9.51 – 2026-11-13
+
+### Fixed
+
+- New notes join collaboration only after their database row is saved. Selecting
+  the pending note still moves focus away from the previous note, without caching
+  a permission refusal for a document that does not exist yet.
+- Production deployment fails if the Render deploy hook is missing and always
+  verifies the running backend revision before publishing the web client.
+
+### Changed
+
+- The collaboration server uses the always-on USD 7/month Render instance.
+  Removed the obsolete scheduled keep-awake workflow.
+
 ## 0.9.50 – 2026-11-12
 
 ### Added

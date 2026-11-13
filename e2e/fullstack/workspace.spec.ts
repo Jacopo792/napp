@@ -9,6 +9,75 @@ import {
   showMemberNotes,
 } from "./fixture.ts";
 
+test("a slow new-note insert is committed before collaboration opens it", async ({
+  page,
+  accounts,
+}) => {
+  const account = await accounts.create("slow-create");
+  await seedNote(account, "Keep the existing note unchanged");
+  let pendingId = "";
+  let committed = false;
+  const prematureFrames: string[] = [];
+  const legacyWrites: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PATCH" && new URL(request.url()).pathname === "/rest/v1/notes") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      if (["title", "body", "content"].some((field) => field in body))
+        legacyWrites.push(request.url());
+    }
+  });
+  await page.routeWebSocket("ws://127.0.0.1:1235", (socket) => {
+    const server = socket.connectToServer();
+    socket.onMessage((payload) => {
+      if (pendingId && !committed && Buffer.from(payload).includes(Buffer.from(pendingId)))
+        prematureFrames.push(pendingId);
+      server.send(payload);
+    });
+    server.onMessage(async (payload) => {
+      // Keep the title visible before its live document arrives, deterministically.
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      socket.send(payload);
+    });
+  });
+  await login(page, account);
+  await page.route("**/rest/v1/notes*", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    pendingId = (route.request().postDataJSON() as { id: string }).id;
+    // A slow insert must not turn an optimistic selection into an auth refusal.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const response = await route.fetch();
+    committed = response.ok();
+    await route.fulfill({ response });
+  });
+  await page.getByRole("button", { name: "New note", exact: true }).first().click();
+  // Filling as soon as the title appears must wait for its live Y.Text,
+  // rather than enqueue a legacy REST write while the document is connecting.
+  await page.getByRole("textbox", { name: "Note title", exact: true }).fill("Slow-created title");
+  const editor = page.locator(".tiptap[contenteditable=true]");
+  await expect(editor).toBeVisible();
+  expect(pendingId).not.toBe("");
+  expect(committed).toBe(true);
+  expect(prematureFrames).toEqual([]);
+  await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(0);
+  await editor.fill("A slow insert still opens a writable document.");
+  await expect
+    .poll(
+      async () =>
+        (await account.client.from("notes").select("title,body").eq("id", pendingId).single()).data,
+    )
+    .toMatchObject({
+      title: "Slow-created title",
+      body: "A slow insert still opens a writable document.",
+    });
+  expect(legacyWrites).toEqual([]);
+  await page.reload();
+  await openNote(page, pendingId);
+  await expect(page.getByRole("textbox", { name: "Note title", exact: true })).toHaveValue(
+    "Slow-created title",
+  );
+  await expect(page.getByRole("button", { name: "Save failed", exact: true })).toHaveCount(0);
+});
+
 test("typing survives a reload and is persisted by the collaboration server", async ({
   page,
   accounts,

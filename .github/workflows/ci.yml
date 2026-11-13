@@ -310,16 +310,16 @@ jobs:
       # a red commit as happily as a green one.
       #
       # The hook is a URL carrying its own key, so it is a secret and never a
-      # variable. Absent, this step says so and passes: a fork cannot read it,
-      # and neither can a clone nobody has given it to.
+      # variable. This production-only job must fail if it is absent; otherwise
+      # Pages could publish a client while silently leaving the backend behind.
       - name: Deploy the collaboration server
         id: collab
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK is not set — the collaboration server was not deployed."
-            exit 0
+            echo "::error::RENDER_DEPLOY_HOOK is required for a production deployment."
+            exit 1
           fi
           echo "asked Render for a deploy, HTTP $(curl --fail --silent \
             --max-time 60 --request POST --output /dev/null \
@@ -327,7 +327,6 @@ jobs:
           echo "requested=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify the deployed revision and native origins
-        if: steps.collab.outputs.requested == 'true'
         env:
           EXPECTED_REVISION: ${{ github.sha }}
           DEPLOY_WAIT_MS: "600000"
