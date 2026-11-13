@@ -27,7 +27,6 @@ import type { Folder as FolderType } from "@/lib/types";
 import { ContextMenu, PointMenu } from "./ContextMenu";
 import { useContextMenu, type MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
-import { WhatsNewButton } from "./WhatsNewButton";
 import { UpdateNotice } from "./UpdateNotice";
 import { MenuButton } from "./MenuPrimitives";
 
@@ -84,15 +83,22 @@ interface Props {
   accounts: () => { userId: string; email: string }[];
   onSwitchAccount: (userId: string) => void;
   onAddAccount: () => void;
-  /** What changed in Napp, and whether there is a release not read yet. */
-  onWhatsNew: () => void;
-  whatsNewUnseen: boolean;
-  /** The archive switch, which belongs above the destinations it re-points. */
   /** Which archive, above whose notes inside it. */
   spaceSwitch: React.ReactNode;
-  /** The people this archive is shared between, as faces to switch between. */
-  peopleShelf: React.ReactNode;
+  /** The people this archive is shared between. Each face is that person's
+   *  whole notebook, which is what "All notes" used to be. */
+  people: SidebarPerson[];
+  viewAs: string;
+  onPerson: (userId: string) => void;
+  onPersonInfo: (userId: string) => void;
+  /** The archive's name, where there is no switch to carry it. */
   scopeLabel: string;
+}
+
+export interface SidebarPerson {
+  userId: string;
+  label: string;
+  face: React.ReactNode;
 }
 
 const EXPANDED_KEY = "napp:folders-open";
@@ -451,10 +457,11 @@ export function Sidebar({
   accounts,
   onSwitchAccount,
   onAddAccount,
-  onWhatsNew,
-  whatsNewUnseen,
   spaceSwitch,
-  peopleShelf,
+  people,
+  viewAs,
+  onPerson,
+  onPersonInfo,
   scopeLabel,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
@@ -564,7 +571,8 @@ export function Sidebar({
           dropSide={(draggedId) =>
             draggedId === node.folder.id ? null : folderDropSide(folders, draggedId, node.folder.id)
           }
-          onSelect={() => onSelect(node.folder.id)}
+          /* The open folder pressed again closes it, back to every note. */
+          onSelect={() => onSelect(active ? ALL : node.folder.id)}
           onHold={() => onFolderInfo(node.folder.id)}
           onContextMenu={(event) => {
             setConfirmDelete(false);
@@ -629,10 +637,40 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {spaceSwitch}
-        {peopleShelf}
+        {/* Which archive, and whose notes in it: the name on the left, the
+            faces on the right as the switch. A face is that person's whole
+            notebook, so pressing the one you are in goes back to all of it. */}
+        <div className="sidebar-head">
+          <div className="sidebar-head-name">
+            {spaceSwitch || <span className="sidebar-head-title">{scopeLabel}</span>}
+          </div>
+          {people.length > 0 && (
+            <div className="sidebar-faces" role="group" aria-label="Whose notes">
+              {people.map((person) => (
+                <button
+                  key={person.userId}
+                  type="button"
+                  className={`sidebar-face press ${person.userId === viewAs ? "is-active" : ""}`}
+                  aria-pressed={person.userId === viewAs}
+                  aria-label={person.label}
+                  title={person.label}
+                  onClick={() =>
+                    person.userId === viewAs ? onSelect(ALL) : onPerson(person.userId)
+                  }
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    onPersonInfo(person.userId);
+                  }}
+                >
+                  {person.face}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="sidebar-card">
-          {all && (
+          {people.length === 0 && all && (
             <Row
               scope={all}
               glyph={<NotebookText size={16} />}
@@ -782,7 +820,6 @@ export function Sidebar({
           only the lock came back. */}
       <div className="sidebar-footer">
         <UpdateNotice />
-        <WhatsNewButton unseen={whatsNewUnseen} onOpen={onWhatsNew} />
         <button
           type="button"
           className="sidebar-footer-button press"

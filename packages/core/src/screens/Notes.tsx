@@ -3,6 +3,7 @@ import { loadMediaText, saveMediaText, subscribeMediaText } from "@/lib/mediaTex
 import type { JSONContent } from "@tiptap/core";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  cloneElement,
   lazy,
   Suspense,
   useCallback,
@@ -272,7 +273,6 @@ type SheetEntry =
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
 import { WhatsNewSheet } from "@/components/WhatsNewSheet";
-import { WhatsNewButton } from "@/components/WhatsNewButton";
 import {
   CURRENT_RELEASE,
   compareVersions,
@@ -5033,11 +5033,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
     <Sidebar
-      onWhatsNew={() => {
-        setFoldersOpen(false);
-        openWhatsNew();
-      }}
-      whatsNewUnseen={whatsNewUnseen}
       scopes={scopes}
       folders={activeMeta.folders}
       selectedId={selectedFolderId}
@@ -5064,9 +5059,37 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       accounts={() => (session ? otherAccounts(session.userId) : [])}
       onSwitchAccount={handleSwitchAccount}
       onAddAccount={handleAddAccount}
-      spaceSwitch={spaceSwitch}
-      peopleShelf={peopleShelf}
-      scopeLabel={viewedMember ? nameOf(viewedMember) : "My notes"}
+      spaceSwitch={spaceSwitch ? cloneElement(spaceSwitch, { bare: true }) : null}
+      people={
+        roster.length > 1
+          ? roster.map((member) => ({
+              userId: member.userId,
+              label: member.isSelf ? "You" : nameOf(member),
+              face: (
+                <span className="sidebar-face-pic">
+                  <Avatar
+                    url={avatarUrls[member.userId] ?? null}
+                    name={nameOf(member)}
+                    email=""
+                    compact
+                    online={
+                      !member.isSelf &&
+                      ((flags.presence && onlineMemberIds.has(member.userId)) ||
+                        hereIds.has(member.userId))
+                    }
+                  />
+                </span>
+              ),
+            }))
+          : []
+      }
+      viewAs={viewAs}
+      onPerson={(userId) => {
+        handleViewChange(userId);
+        setFoldersOpen(false);
+      }}
+      onPersonInfo={(userId) => openSheet({ kind: "person", userId })}
+      scopeLabel={currentSpace?.name ?? "My notes"}
     />
   );
 
@@ -5207,6 +5230,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsSection(undefined);
         }}
         onLock={() => void handleLock()}
+        onWhatsNew={() => {
+          setSettingsOpen(false);
+          openWhatsNew();
+        }}
+        whatsNewUnseen={whatsNewUnseen}
       />
     </Suspense>
   );
@@ -5640,13 +5668,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           compact && (
             <div className="sidebar-footer">
               <UpdateNotice />
-              <WhatsNewButton
-                unseen={whatsNewUnseen}
-                onOpen={() => {
-                  setFoldersOpen(false);
-                  openWhatsNew();
-                }}
-              />
               <button
                 type="button"
                 className="sidebar-footer-button press"

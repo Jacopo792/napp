@@ -31,6 +31,7 @@ import {
   FolderInput,
   ImagePlus,
   Lock,
+  Sparkle,
   LockOpen,
   Monitor,
   MoreHorizontal,
@@ -352,6 +353,8 @@ export function SettingsPanel({
   onAutoLockChange,
   onClose,
   onLock,
+  onWhatsNew,
+  whatsNewUnseen = false,
 }: {
   open: boolean;
   /** The section to open on; Settings otherwise opens on the profile. */
@@ -410,6 +413,9 @@ export function SettingsPanel({
   onAutoLockChange: (minutes: AutoLockMinutes) => void;
   onClose: () => void;
   onLock: () => void;
+  /** Release notes live here, beside the version they describe. */
+  onWhatsNew?: () => void;
+  whatsNewUnseen?: boolean;
 }) {
   const axes = useAxes();
   const preset = matchingPreset(axes);
@@ -638,6 +644,13 @@ export function SettingsPanel({
                 column, which is where an application has put "sign out" for
                 thirty years. The summary opposite keeps the sentence about
                 what leaving costs; this is the door. */}
+            {onWhatsNew && (
+              <button type="button" className="settings-nav-signout press" onClick={onWhatsNew}>
+                <Sparkle size={16} />
+                What’s New
+                {whatsNewUnseen && <span className="settings-nav-dot" aria-label="Unread" />}
+              </button>
+            )}
             <button type="button" className="settings-nav-signout press" onClick={onLock}>
               <Lock size={16} />
               Sign out

@@ -79,7 +79,10 @@ export function SpaceSwitch({
   onSettings,
   onCreate,
   onDelete,
+  bare = false,
 }: {
+  /** Name and chevron only, where the faces stand beside it already. */
+  bare?: boolean;
   spaces: Space[];
   currentId: string;
   /** The archive an account starts with, which is never deleted. */
@@ -184,7 +187,7 @@ export function SpaceSwitch({
           setMenu({ point: { x: event.clientX, y: event.clientY }, items: spaceItems(current) });
         }}
       >
-        <FaceStack members={current.members} />
+        {!bare && <FaceStack members={current.members} />}
         <span className="space-switch-name">{current.name}</span>
         <ChevronDown size={14} className="space-switch-chevron" />
       </button>

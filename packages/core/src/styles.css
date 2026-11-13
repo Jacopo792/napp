@@ -13707,11 +13707,6 @@ button.sheet-chip:hover,
   font-weight: var(--weight-regular, 400);
 }
 
-/* The row at the foot of the sidebar says when there is something to read. */
-.sidebar-footer-button.is-whats-new {
-  color: var(--ink);
-}
-
 /* On a phone the versions are a row across the top. */
 @media (max-width: 640px) {
   .palette-layer.is-whats-new {
@@ -14704,4 +14699,100 @@ button.sheet-chip:hover,
   .media-plane {
     transition: none;
   }
+}
+
+/* ── Archive and people, one line at the head of the sidebar ───────────────
+   The archive's name on the left, the faces on the right. The face you are
+   reading wears a ring of ink; the others wait at half strength. */
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin: 4px 0 8px;
+  padding: 0 4px 0 0;
+}
+
+.sidebar-head-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-head .space-switch-wrap {
+  margin: 0;
+}
+
+.sidebar-head .space-switch {
+  width: auto;
+  max-width: 100%;
+  padding: 5px 8px;
+}
+
+.sidebar-head-title {
+  display: block;
+  overflow: hidden;
+  padding: 5px 8px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-faces {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.sidebar-face {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  opacity: 0.45;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    box-shadow var(--dur-base) var(--ease);
+}
+
+.sidebar-face:hover {
+  opacity: 0.8;
+}
+
+.sidebar-face.is-active {
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px var(--sidebar-ground, var(--paper)),
+    0 0 0 3.5px color-mix(in srgb, var(--ink) 80%, transparent);
+}
+
+.sidebar-face-pic,
+.sidebar-face-pic .avatar {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+/* Presence is a dot on the face, not a coloured ring around it. */
+.sidebar-face-pic .avatar.is-online {
+  box-shadow: none;
+}
+
+.sidebar-card:empty {
+  display: none;
+}
+
+.settings-nav-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.sidebar-scroll > .sidebar-card:first-child {
+  margin-top: 6px;
 }
