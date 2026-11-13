@@ -31,7 +31,6 @@
 import {
   Check,
   ChevronDown,
-  MessageSquare,
   Pencil,
   RotateCcw,
   Smile,
@@ -39,16 +38,7 @@ import {
   UserPlus,
   X,
 } from "@/components/icons";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SafetyActions } from "@/components/SafetyActions";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
@@ -104,13 +94,7 @@ interface Props {
   /** Something was said, resolved or taken back — so lists outside this
    *  panel can read again now rather than when Realtime gets round to it. */
   onChanged?: () => void;
-  /** Where the page has room beside its words: the cards are drawn in this
-   *  element, inside the scrolling page, each beside its own passage. */
-  margin?: HTMLElement | null;
 }
-
-/** Air between the page's edge and the cards beside it. */
-const MARGIN_ASIDE = 28;
 
 /** A thread longer than this is folded in the middle. Somebody arriving at a
  *  conversation wants how it opened and how it stands, not the middle of it. */
@@ -131,7 +115,6 @@ export function NoteComments({
   onRemoveAnchor,
   onResolveAnchor,
   onChanged,
-  margin,
 }: Props) {
   const [comments, setComments] = useState<NoteComment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -825,85 +808,15 @@ export function NoteComments({
      put in a stylesheet. */
   const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
 
-  /* ── The margin ──────────────────────────────────────────────────────────
-     Beside the page, inside its scroller, and held at the top of it while the
-     page moves. The cards were level with their passages, which left the
-     header alone at the top of the margin and the first remark half a page
-     below it; they now stand under the header in the order their passages
-     come in the text — the open one lights its words, and a click on the
-     words opens its card, so the eye-line is stated rather than implied.
-     Written onto the elements directly: it follows every reflow of the
-     note, which is not a reason to render the conversation again. */
-  const placeRef = useRef<() => void>(() => {});
-  placeRef.current = () => {
-    if (!margin) return;
-    const scope = margin.parentElement;
-    if (!scope) return;
-    /* Beside the words, not against the far wall: the page is centred in
-       what the window leaves it, so a margin pinned to the right edge stood
-       further from the sheet the wider the window was. */
-    const column =
-      scope.querySelector(".manuscript-sheet") ?? scope.querySelector(".rich-text-content");
-    if (column) {
-      const box = column.getBoundingClientRect();
-      const origin = scope.getBoundingClientRect();
-      const end = Math.round(box.right - origin.left + scope.scrollLeft);
-      margin.style.left = `${end + MARGIN_ASIDE}px`;
-      /* The cover ends where the column does, never under the cards. */
-      scope.style.setProperty("--column-end", `${end}px`);
-      /* As tall as the page, so the column has the length of the page to
-         stay pinned along. */
-      const bottom = box.bottom - origin.top + scope.scrollTop;
-      margin.style.height = `${Math.max(0, Math.round(bottom - margin.offsetTop))}px`;
-    }
-    margin.style.setProperty("--margin-room", `${scope.clientHeight - 48}px`);
-    const anchorTop = (id: string) => {
-      const anchor = /^[a-zA-Z0-9-]+$/.test(id)
-        ? scope.querySelector(`.rich-text-content span[data-comment-thread="${id}"]`)
-        : null;
-      return anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY;
-    };
-    [...threadRefs.current.entries()]
-      .filter(([, node]) => node.isConnected)
-      .map(([id, node]) => ({ node, at: anchorTop(id) }))
-      .sort((a, b) => a.at - b.at)
-      .forEach(({ node }, index) => {
-        node.style.order = String(index);
-      });
-  };
-
-  useLayoutEffect(() => placeRef.current());
-
-  useEffect(() => {
-    if (!margin?.parentElement) return;
-    let frame = 0;
-    const later = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => placeRef.current());
-    };
-    const sizes = new ResizeObserver(later);
-    const content = margin.parentElement.querySelector(".rich-text-content");
-    if (content) sizes.observe(content);
-    sizes.observe(margin.parentElement);
-    return () => {
-      cancelAnimationFrame(frame);
-      sizes.disconnect();
-    };
-  }, [margin, comments, pendingThread, showResolved, forYou, expanded]);
-
   const panel = (
-    <aside
-      className={`note-comments ${margin ? "is-margin" : ""}`}
-      aria-label="Comments on this note"
-    >
+    <aside className="note-comments" aria-label="Comments on this note">
       {lit && (
         <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
       )}
       <header className="note-comments-header">
-        <MessageSquare size={16} />
         <span className="note-comments-title">
           Comments
-          {threads.length > 0 && <b className="note-comments-count">{threads.length}</b>}
+          {threads.length > 0 && <span className="note-comments-count">{threads.length}</span>}
         </span>
         {forYouCount > 0 && (
           <button
@@ -913,7 +826,7 @@ export function NoteComments({
             onClick={() => setForYou((on) => !on)}
           >
             For you
-            <b className="note-comments-count">{forYouCount}</b>
+            <span className="note-comments-count">{forYouCount}</span>
           </button>
         )}
         {resolvedCount > 0 && (
@@ -944,5 +857,5 @@ export function NoteComments({
       <div className="note-comments-scroll">{body}</div>
     </aside>
   );
-  return margin ? createPortal(panel, margin) : panel;
+  return panel;
 }

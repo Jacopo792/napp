@@ -1039,7 +1039,20 @@
   flex-shrink: 0;
   min-height: 0;
   border-left: 1px solid var(--rule-soft);
-  background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+  background: var(--column);
+}
+
+/* A column of the window, like the sidebar and the list: full height, its
+   name in the 40px band the toolbar stops short of. The panel is pulled up
+   over the band's last 320px rather than the toolbar being rebuilt around it. */
+@container editor (min-width: 701px) {
+  .editor-shell:has(> .editor-body > .exits > .note-comments) > .editor-toolbar {
+    margin-right: 320px;
+  }
+
+  .editor-body > .exits > .note-comments {
+    margin-top: -40px;
+  }
 }
 
 /* A column beside the page needs a page left to stand beside. Below this the
@@ -1063,101 +1076,39 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  padding: 12px 12px 12px;
-  border-bottom: 1px solid var(--rule-soft);
+  height: 40px;
+  padding: 0 12px 0 20px;
   color: var(--ink-3);
 }
 
 .note-comments-count {
   margin-left: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--paper-2);
-  padding: 1px 6px;
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-family: var(--font-sans);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
 }
 
 .note-comments-title {
   flex: 1;
   font-family: var(--font-sans);
-  font-size: var(--text-xs);
+  font-size: 14px;
   font-weight: var(--weight-semibold);
-  color: var(--ink-2);
-}
-
-/* ── Comments in the margin ──
-   Inside the page's own scroller (see `NoteComments`): the page moves over to
-   make room, and each card stands level with its passage. */
-.has-margin {
-  position: relative;
-  padding-right: 360px;
-}
-
-/* On the desk the sheet and the cards beside it are centred as one, the way
-   Pages moves the page over when its comments open — rather than the sheet
-   centred alone and the cards against the far wall, a hand's width away from
-   the words they are about. `NoteComments` puts the margin at the sheet's edge. */
-.manuscript-desk.has-margin {
-  padding-right: 24px;
-}
-
-.manuscript-desk.has-margin > .manuscript-sheet {
-  margin-left: max(0px, calc(50% - (var(--sheet-width) + 344px) / 2));
-}
-
-.has-margin .note-page-cover {
-  width: var(--column-end, 100%);
-}
-
-.comment-margin {
-  position: absolute;
-  top: 24px;
-  left: 0;
-  width: 316px;
-}
-
-.manuscript-desk > .comment-margin {
-  top: 40px;
-}
-
-.note-comments.is-margin {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  width: auto;
-  max-height: var(--margin-room, 70vh);
-  border: 0;
-  background: transparent;
-}
-
-/* In the margin the header is a line of type, not a card: a floating capsule
-   over the column read as one more comment, and the first one. */
-.note-comments.is-margin .note-comments-header {
-  border: 0;
-  padding: 0 0 0 2px;
-  min-height: 28px;
-  background: none;
-}
-
-.note-comments.is-margin .note-comments-scroll {
-  gap: 10px;
-  padding: 8px 0 12px;
+  color: var(--ink);
 }
 
 .note-comments-scroll {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
   flex: 1;
-  overflow-y: auto;
-  padding: 12px;
+  overflow: hidden auto;
+  padding: 0 20px 12px;
 }
 
 .note-comments-empty,
 .note-comments-failure {
+  padding-top: 12px;
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
@@ -1165,7 +1116,7 @@
 }
 
 .note-comments-failure {
-  padding: 0 12px;
+  padding: 0 20px;
   color: var(--danger);
 }
 
@@ -1178,37 +1129,26 @@
 .note-comment-thread {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: var(--paper);
-  box-shadow: var(--shadow-soft);
+  gap: 8px;
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 12px 0;
   cursor: default;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
 }
 
-.note-comment-thread:hover {
-  border-color: var(--rule-soft);
-}
-
+/* Ruled rows, like the sheets: the thread being read is told apart by the
+   list's own selection ground, not by a ring of accent around a card. */
 .note-comment-thread.is-active {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow:
-    var(--shadow-soft),
-    0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+  margin: 0 -8px;
+  border-radius: 5px;
+  border-bottom-color: transparent;
+  padding: 12px 8px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 /* A thread nobody needs to act on any more steps back rather than disappearing:
    what was said stays readable, and stops asking to be read. */
 .note-comment-thread.is-resolved {
   opacity: 0.58;
-}
-
-.note-comment-thread.is-pending {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 /* The quotation is the thread's title, so it is set like one — and clipped,
@@ -1218,12 +1158,10 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  padding-left: 8px;
   color: var(--ink-3);
-  font-family: var(--font-reading);
+  font-family: var(--font-sans);
   font-size: var(--text-xs);
-  line-height: 1.45;
+  line-height: 1.4;
   text-align: left;
 }
 
@@ -1234,9 +1172,7 @@
 /* A thread whose passage has been deleted has nothing to point at, so it stops
    pretending to: no accent rule, and the sentence says what happened. */
 .note-comment-quote.is-orphan {
-  border-left-color: var(--rule);
   color: var(--ink-4);
-  font-style: italic;
 }
 
 /* A remark is a line saying who and when, with what can be done at its right
@@ -1248,63 +1184,101 @@
 .note-comment {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .note-comment.is-reply {
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 10px;
+  padding-top: 4px;
 }
 
+/* Face, name, and the time at the row's end — the sheets' history row. What
+   follows the name is indented to it, so the faces make one edge. */
 .note-comment-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
+  min-height: 24px;
 }
 
 .note-comment-head > .avatar.is-compact {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   font-size: 9px;
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--author, var(--rule)) 70%, transparent);
+  box-shadow: none;
 }
 
 .note-comment-who {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  line-height: 1.25;
+  align-items: baseline;
+  gap: 8px;
 }
 
-/* Who said it, in the colour this person's caret already has in the text —
-   a second colour system would be worse than none. */
 .note-comment-name {
+  min-width: 0;
   font-family: var(--font-sans);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  color: var(--author, var(--ink-2));
+  color: var(--ink);
 }
 
 .note-comment-stamp {
+  margin-left: auto;
+  flex-shrink: 0;
   color: var(--ink-4);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
+}
+
+.note-comment > :not(.note-comment-head) {
+  margin-left: 28px;
+}
+
+/* The time keeps the row's end, the edge every sheet ends its rows on; what
+   can be done with a remark takes that place under the pointer. A touch
+   screen has no pointer to wait for, so there the tools stay in the row. */
+@media (hover: hover) {
+  .note-comment-head {
+    position: relative;
+  }
+
+  .note-comment-head > .note-comment-tools {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 24px;
+    margin: 0 -5px 0 0;
+    opacity: 0;
+  }
+
+  .note-comment-head .note-comment-tool.is-quiet {
+    opacity: 1;
+  }
+
+  .note-comment:is(:hover, :focus-within) > .note-comment-head > .note-comment-tools,
+  .note-comment-tools:has([aria-expanded="true"]) {
+    opacity: 1;
+  }
+
+  .note-comment:is(:hover, :focus-within) .note-comment-stamp,
+  .note-comment:has(.note-comment-tools [aria-expanded="true"]) .note-comment-stamp {
+    visibility: hidden;
+  }
 }
 
 .note-comment-tools {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 1px;
-  margin-right: -4px;
+  gap: 0;
+  margin-right: -5px;
 }
 
 .note-comment-tool {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
@@ -1349,9 +1323,7 @@
   align-items: center;
   gap: 6px;
   align-self: flex-start;
-  border-top: 1px solid var(--rule-soft);
-  width: 100%;
-  padding: 8px 0 0;
+  padding: 0 0 0 28px;
   color: var(--ink-4);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
@@ -1366,7 +1338,7 @@
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1430,32 +1402,27 @@
   gap: 6px;
   color: var(--ink-3);
   font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
 }
 
 .note-comment-reactions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
 }
 
 .note-comment-reaction {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--rule-soft);
-  border-radius: 999px;
-  padding: 1px 8px;
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
 }
 
 .note-comment-reaction.is-mine {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--ink);
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
 }
 
 .note-comment-react,
@@ -1549,17 +1516,19 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: -4px;
 }
 
 .note-comment-composer textarea {
   width: 100%;
-  min-height: 2.6em;
+  min-height: 1.45em;
   field-sizing: content;
   max-height: 12em;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  padding: 7px 9px;
-  background: var(--surface);
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  border-radius: 0;
+  padding: 8px 0 0;
+  background: none;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
@@ -1571,7 +1540,6 @@
 .note-comment-composer textarea:focus,
 .note-comment-editor textarea:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 .note-comment-composer textarea::placeholder {
@@ -1579,17 +1547,14 @@
 }
 
 .note-comment-send {
-  border-radius: var(--radius-md);
-  padding: 5px 12px;
-  background: var(--accent);
-  color: var(--on-accent);
+  padding: 4px 0 4px 8px;
+  color: var(--accent);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
 }
 
 .note-comment-send:disabled {
-  background: var(--paper-2);
   color: var(--ink-4);
 }
 
@@ -12774,7 +12739,7 @@ button.sheet-chip:hover,
    surfaces in the app that appeared between two frames. Inside the inspector
    a tab replaces a tab in place, so only the column itself travels. */
 .manuscript-inspector,
-:is(.note-comments:not(.is-margin), .note-outline, .note-history):not(.manuscript-inspector *) {
+:is(.note-comments, .note-outline, .note-history):not(.manuscript-inspector *) {
   animation: panel-in var(--dur-base) var(--ease-out) backwards;
 }
 

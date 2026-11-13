@@ -112,11 +112,6 @@ export interface ManuscriptFrame {
    it is a fact about the writer, not about the chapter or the document. */
 let suggestingWanted = false;
 
-/** What the comments' margin takes beside the page: its cards and air. */
-const MARGIN_ROOM = 384;
-/** The narrowest a note's column may become to make room for the margin. */
-const NOTE_MEASURE_MIN = 520;
-
 /** Word's status bar: where you are in the chapter and how much of it there
  *  is, under the desk rather than in the structure, where the eye is not.
  *  The page is the desk's own measure — the sheet's height in page heights.
@@ -467,29 +462,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   /* The scrolling column, handed to the outline so it can ask both questions
      it has — what the headings say, and where they are — of one element. */
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  /* Comments stand in the page's margin when the page has one wide enough;
-     otherwise they are the panel they always were. Measured on the whole
-     body of the editor — the panel, while open, is part of what the margin
-     would have — and against the sheet's own width, read while it has no
-     margin, because a margin is what narrows it. A note's column may give
-     up a little of its measure for the margin; a printed page may not. */
-  const [marginHost, setMarginHost] = useState<HTMLDivElement | null>(null);
-  const [roomy, setRoomy] = useState(false);
-  useEffect(() => {
-    const body = scroller?.parentElement;
-    if (!scroller || !body || mobile) return;
-    let sheetWidth = 0;
-    const measure = () => {
-      const sheet = scroller.querySelector<HTMLElement>(".manuscript-sheet");
-      if (sheet && !scroller.classList.contains("has-margin")) sheetWidth = sheet.offsetWidth;
-      const need = sheet ? sheetWidth + MARGIN_ROOM + 48 : NOTE_MEASURE_MIN + MARGIN_ROOM + 80;
-      setRoomy(body.clientWidth >= need);
-    };
-    measure();
-    const sizes = new ResizeObserver(measure);
-    sizes.observe(body);
-    return () => sizes.disconnect();
-  }, [scroller, mobile]);
   /* Scrolled past, the title does not leave: it rises into the strip above
      the page, the way a large title becomes the bar's. Asked of the title
      itself, so a cover of any height above it changes nothing. */
@@ -1306,37 +1278,32 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       onClose={() => setHistoryOpen(false)}
     />
   );
-  const inMargin = commentsOpen && roomy && !mobile && !pages;
-  const commentsPanel = (commentsOpen || keepPanels) &&
-    session &&
-    commentAuthors &&
-    !(inMargin && !marginHost) && (
-      <NoteComments
-        key={entry.note.id}
-        session={session}
-        noteId={entry.note.id}
-        canEdit={canEdit}
-        authors={commentAuthors}
-        quotes={quotes}
-        pendingThread={pendingThread}
-        onPendingHandled={() => {
-          /* Said now: it stays drawn while the archive's set catches up. */
-          if (pendingThread) setNoteThreads((ids) => ids && new Set(ids).add(pendingThread));
-          setPendingThread(null);
-        }}
-        focusThread={focusThread}
-        onFocusHandled={() => setFocusThread(null)}
-        onClose={closeComments}
-        onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
-        onRemoveAnchor={(threadId) => {
-          editorRef.current?.removeComment(threadId);
-          setQuotes(editorRef.current?.commentQuotes() ?? new Map());
-        }}
-        onResolveAnchor={syncCommentResolution}
-        onChanged={onRemarksChanged}
-        margin={inMargin ? marginHost : null}
-      />
-    );
+  const commentsPanel = (commentsOpen || keepPanels) && session && commentAuthors && (
+    <NoteComments
+      key={entry.note.id}
+      session={session}
+      noteId={entry.note.id}
+      canEdit={canEdit}
+      authors={commentAuthors}
+      quotes={quotes}
+      pendingThread={pendingThread}
+      onPendingHandled={() => {
+        /* Said now: it stays drawn while the archive's set catches up. */
+        if (pendingThread) setNoteThreads((ids) => ids && new Set(ids).add(pendingThread));
+        setPendingThread(null);
+      }}
+      focusThread={focusThread}
+      onFocusHandled={() => setFocusThread(null)}
+      onClose={closeComments}
+      onReveal={(threadId) => editorRef.current?.revealComment(threadId)}
+      onRemoveAnchor={(threadId) => {
+        editorRef.current?.removeComment(threadId);
+        setQuotes(editorRef.current?.commentQuotes() ?? new Map());
+      }}
+      onResolveAnchor={syncCommentResolution}
+      onChanged={onRemarksChanged}
+    />
+  );
   const sidePanels = (
     <>
       <Exits open={Boolean(outlinePanel)}>{outlinePanel}</Exits>
@@ -1528,14 +1495,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               what is written here is what prints. */}
           <div
             ref={setScroller}
-            className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""} ${
-              inMargin ? "has-margin" : ""
-            }`}
-            /* The sheet's width on the desk too, so the sheet and the
-               comments beside it can be centred as one. */
-            style={
-              { "--sheet-width": pageStyle(manuscript.page)["--sheet-width"] } as CSSProperties
-            }
+            className={`manuscript-desk min-h-0 flex-1 ${pages ? "is-paged" : ""}`}
             onContextMenu={onPassageMenu}
             onKeyDown={(event) => {
               if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1543,8 +1503,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 setQuiet(true);
             }}
           >
-            {inMargin && <div ref={setMarginHost} className="comment-margin" />}
-            {inMargin && commentsPanel}
             <article
               ref={sheetRef}
               className={`manuscript-sheet ${manuscript.numbered ? "is-numbered" : ""}`}
@@ -1669,8 +1627,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             </article>
             {manuscript.footer}
           </div>
-          <Exits open={Boolean(inspectorTab && !(inMargin && inspectorTab === "comments"))}>
-            {inspectorTab && !(inMargin && inspectorTab === "comments") && (
+          <Exits open={Boolean(inspectorTab)}>
+            {inspectorTab && (
               <aside className="manuscript-inspector" aria-label="Inspector">
                 <div className="inspector-tabs" role="tablist">
                   {inspectorTabs
@@ -1700,7 +1658,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   {outlinePanel}
                 </div>
                 <div className="inspector-pane" hidden={inspectorTab !== "comments"}>
-                  {!inMargin && commentsPanel}
+                  {commentsPanel}
                 </div>
                 <div className="inspector-pane" hidden={inspectorTab !== "versions"}>
                   {historyPanel}
@@ -1860,10 +1818,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       <div className="editor-body flex min-h-0 flex-1">
         <div
           ref={setScroller}
-          className={`editor-scroll page-in min-h-0 flex-1 ${inMargin ? "has-margin" : ""}`}
+          className="editor-scroll page-in min-h-0 flex-1"
           onContextMenu={onPassageMenu}
         >
-          {inMargin && <div ref={setMarginHost} className="comment-margin" />}
           <PageCover
             cover={entry.note.cover}
             photo={entry.note.photo}
