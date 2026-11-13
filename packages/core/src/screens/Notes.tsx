@@ -6019,7 +6019,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   titleMenu={collectionMenu}
                   filters={activeFilters}
                   meta={activeMeta}
-                  showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
                   selectedId={selectedId}
                   query={query}
                   loading={loading}
@@ -6217,7 +6216,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   titleMenu={collectionMenu}
                   filters={activeFilters}
                   meta={activeMeta}
-                  showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
                   selectedId={selectedId}
                   query={query}
                   loading={loading}

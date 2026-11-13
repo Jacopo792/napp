@@ -636,16 +636,13 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {/* Which archive, and whose notes in it: the name on the left, the
-            faces on the right as the switch. A face is that person's whole
-            notebook, so pressing the one you are in goes back to all of it. */}
-        <div className="sidebar-head">
-          <div className="sidebar-head-name">
-            {spaceSwitch || <span className="sidebar-head-title">{scopeLabel}</span>}
-          </div>
+      <div className="sidebar-body flex min-h-0 flex-1">
+        {/* The rail: whose notes, the places a note goes to rather than lives
+            in, and the application's own controls at the foot. The column
+            beside it is left to the archive's name and its folders. */}
+        <div className="sidebar-rail">
           {people.length > 0 && (
-            <div className="sidebar-faces" role="group" aria-label="Whose notes">
+            <div className="sidebar-rail-faces" role="group" aria-label="Whose notes">
               {people.map((person) => (
                 <button
                   key={person.userId}
@@ -667,214 +664,197 @@ export function Sidebar({
               ))}
             </div>
           )}
-        </div>
 
-        <div className="sidebar-card">
-          {people.length === 0 && all && (
-            <Row
-              scope={all}
-              glyph={<NotebookText size={16} />}
-              motion="notes"
-              active={selectedId === ALL}
-              onSelect={() => onSelect(ALL)}
-            />
+          {(remarks || archive || trash) && (
+            <div className="sidebar-rail-places" role="group" aria-label="Places">
+              {(
+                [
+                  [remarks, REMARKS, <MessageSquare key="r" size={18} />],
+                  [archive, ARCHIVE, <Archive key="a" size={18} />],
+                  [trash, TRASH, <Trash2 key="t" size={18} />],
+                ] as const
+              ).map(([scope, id, glyph]) =>
+                scope ? (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`sidebar-rail-button press ${selectedId === id ? "is-active" : ""}`}
+                    aria-pressed={selectedId === id}
+                    aria-label={
+                      scope.unread ? `${scope.label}, ${scope.unread} unread` : scope.label
+                    }
+                    title={scope.label}
+                    onClick={() => onSelect(id)}
+                  >
+                    {glyph}
+                    {scope.unread ? (
+                      <span className="sidebar-place-badge">{scope.unread}</span>
+                    ) : null}
+                  </button>
+                ) : null,
+              )}
+            </div>
           )}
 
-          {/* Pinned notes, above the folders and below All notes. A pin already
-            floats a note to the top of its list; up here it is reachable from
-            whichever list you are in, which is the thing pinning was for. The
-            block simply is not there when nothing is pinned — an empty
-            "Pinned" heading teaches the reader to ignore that part of the
-            column. */}
-          {pinned.length > 0 && (
-            <>
-              <p className="sidebar-heading">
-                Pinned
-                <span>{pinned.length}</span>
-              </p>
-              {pinned.map((note) => (
-                <div
-                  key={note.id}
-                  className={`sidebar-row ${selectedNoteId === note.id ? "is-active" : ""}`}
-                >
+          <div className="sidebar-rail-foot">
+            <button
+              type="button"
+              className="sidebar-rail-button press"
+              data-motion="settings"
+              aria-label="Settings"
+              title="Settings"
+              onClick={onSettings}
+            >
+              <Settings size={18} />
+            </button>
+            <button
+              type="button"
+              className="sidebar-rail-button press"
+              data-motion="lock"
+              aria-label="Switch account"
+              title="Switch account"
+              onClick={(event) => {
+                const box = event.currentTarget.getBoundingClientRect();
+                setAccountMenu({
+                  x: box.left,
+                  /* Opens upward: the button is the last thing in the column. */
+                  y: box.top - 4 - 36 * (accounts().length + 3),
+                  items: [
+                    { kind: "label", label: accountEmail },
+                    ...accounts().map(
+                      (a): MenuItem => ({
+                        kind: "item",
+                        id: `account:${a.userId}`,
+                        label: a.email,
+                        run: () => onSwitchAccount(a.userId),
+                      }),
+                    ),
+                    { kind: "separator" },
+                    {
+                      kind: "item",
+                      id: "account-add",
+                      label: "Add account",
+                      icon: <Plus size={16} />,
+                      run: onAddAccount,
+                    },
+                    {
+                      kind: "item",
+                      id: "account-lock",
+                      label: "Lock & sign out",
+                      icon: <Lock size={16} />,
+                      run: onLock,
+                    },
+                  ],
+                });
+              }}
+            >
+              <Users size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+            <div className="sidebar-head">
+              <div className="sidebar-head-name">
+                {spaceSwitch || <span className="sidebar-head-title">{scopeLabel}</span>}
+              </div>
+            </div>
+
+            <div className="sidebar-card">
+              {all && (
+                <Row
+                  scope={all}
+                  glyph={<NotebookText size={16} />}
+                  motion="notes"
+                  active={selectedId === ALL}
+                  onSelect={() => onSelect(ALL)}
+                />
+              )}
+
+              {/* Pinned notes, above the folders and below All notes. A pin already
+                floats a note to the top of its list; up here it is reachable from
+                whichever list you are in, which is the thing pinning was for. The
+                block simply is not there when nothing is pinned — an empty
+                "Pinned" heading teaches the reader to ignore that part of the
+                column. */}
+              {pinned.length > 0 && (
+                <>
+                  <p className="sidebar-heading">
+                    Pinned
+                    <span>{pinned.length}</span>
+                  </p>
+                  {pinned.map((note) => (
+                    <div
+                      key={note.id}
+                      className={`sidebar-row ${selectedNoteId === note.id ? "is-active" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        aria-current={selectedNoteId === note.id ? "true" : undefined}
+                        className="sidebar-target press"
+                        onClick={() => onSelectNote(note.id)}
+                      >
+                        <span className="sidebar-glyph" data-motion="pin" data-tone="pin">
+                          <Pin size={16} />
+                        </span>
+                        <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* A heading and a tally, like every other heading in this column.
+                The act that makes one lives in the strip above, where the window
+                keeps the acts that are about the column rather than about a row
+                in it. */}
+            {/* New folder stands on the heading of the folders it adds to. It
+                was in the window strip, beside the button that hides the column —
+                two unrelated acts side by side above the people, and the one that
+                makes a folder nowhere near the folders. */}
+            <div className="sidebar-card">
+              <div className="sidebar-heading">
+                Folders
+                {canWrite ? (
                   <button
                     type="button"
-                    aria-current={selectedNoteId === note.id ? "true" : undefined}
-                    className="sidebar-target press"
-                    onClick={() => onSelectNote(note.id)}
+                    onClick={() => setAdding("")}
+                    aria-label="New folder"
+                    title="New folder"
+                    className="sidebar-heading-add press"
                   >
-                    <span className="sidebar-glyph" data-motion="pin" data-tone="pin">
-                      <Pin size={16} />
-                    </span>
-                    <span className="sidebar-name truncate">{note.title || "Untitled"}</span>
+                    <FolderPlus size={16} />
                   </button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
+                ) : (
+                  <span>{folders.length || ""}</span>
+                )}
+              </div>
 
-        {/* A heading and a tally, like every other heading in this column.
-            The act that makes one lives in the strip above, where the window
-            keeps the acts that are about the column rather than about a row
-            in it. */}
-        {/* New folder stands on the heading of the folders it adds to. It
-            was in the window strip, beside the button that hides the column —
-            two unrelated acts side by side above the people, and the one that
-            makes a folder nowhere near the folders. */}
-        <div className="sidebar-card">
-          <div className="sidebar-heading">
-            Folders
-            {canWrite ? (
-              <button
-                type="button"
-                onClick={() => setAdding("")}
-                aria-label="New folder"
-                title="New folder"
-                className="sidebar-heading-add press"
-              >
-                <FolderPlus size={16} />
-              </button>
-            ) : (
-              <span>{folders.length || ""}</span>
-            )}
+              {tree.length === 0 && adding === null && (
+                <p className="sidebar-empty">No folders yet.</p>
+              )}
+
+              {tree.map((node) => renderNode(node, 0))}
+
+              {canWrite && adding === "" && (
+                <NameField
+                  value=""
+                  depth={0}
+                  placeholder="Folder name"
+                  onCommit={(name) => {
+                    setAdding(null);
+                    const trimmed = name.trim();
+                    if (trimmed) onCreateFolder(trimmed, null);
+                  }}
+                  onCancel={() => setAdding(null)}
+                />
+              )}
+            </div>
           </div>
-
-          {tree.length === 0 && adding === null && <p className="sidebar-empty">No folders yet.</p>}
-
-          {tree.map((node) => renderNode(node, 0))}
-
-          {canWrite && adding === "" && (
-            <NameField
-              value=""
-              depth={0}
-              placeholder="Folder name"
-              onCommit={(name) => {
-                setAdding(null);
-                const trimmed = name.trim();
-                if (trimmed) onCreateFolder(trimmed, null);
-              }}
-              onCancel={() => setAdding(null)}
-            />
-          )}
+          <UpdateNotice />
         </div>
-      </div>
-
-      {/* Trash sits at the foot of the column rather than trailing the folder
-          list. Left inline it floated at the top of a tall empty space with the
-          account controls stranded far below it; down here the column reads as
-          three settled blocks — where notes are, where deleted notes go, and
-          what this session is.
-
-          Archive shares that block, above Trash: both are places a note leaves
-          the folders for, and the one you can come back from belongs first. */}
-      {(remarks || archive || trash) && (
-        <div className="sidebar-tail">
-          <div className="sidebar-card">
-            {/* What has been said, above what has been filed and what has been
-              thrown away. It is the one row here you can arrive at with
-              something waiting in it, so it is the one row that can carry a
-              dot, and the dot is all it carries. */}
-            {remarks && (remarks.count > 0 || (remarks.unread ?? 0) > 0) && (
-              <Row
-                /* The row carries the dot and nothing else. A tally of notes
-                 being talked about sits in the same slot the dot does and
-                 clears only when the last thread is resolved — so once the dot
-                 goes the number that replaces it reads as an unread count
-                 stuck at one, which is the one thing a badge must never do. */
-                scope={{ ...remarks, count: 0 }}
-                glyph={<MessageSquare size={16} />}
-                motion="remarks"
-                active={selectedId === REMARKS}
-                droppable={false}
-                onSelect={() => onSelect(REMARKS)}
-              />
-            )}
-            {archive && (
-              <Row
-                scope={archive}
-                glyph={<Archive size={16} />}
-                motion="archive"
-                active={selectedId === ARCHIVE}
-                droppable={false}
-                onSelect={() => onSelect(ARCHIVE)}
-              />
-            )}
-            {trash && (
-              <Row
-                scope={trash}
-                glyph={<Trash2 size={16} />}
-                motion="trash"
-                active={selectedId === TRASH}
-                droppable={false}
-                onSelect={() => onSelect(TRASH)}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Where an application's account controls stand, which is what this
-          block was built for and what the stylesheet still says it holds. The
-          two of them left together when the top of the column grew a face;
-          only the lock came back. */}
-      <div className="sidebar-footer">
-        <UpdateNotice />
-        <button
-          type="button"
-          className="sidebar-footer-button press"
-          data-motion="settings"
-          onClick={onSettings}
-        >
-          <span className="sidebar-glyph" data-tone="settings">
-            <Settings size={16} />
-          </span>
-          <span>Settings</span>
-        </button>
-        <button
-          type="button"
-          className="sidebar-footer-button press"
-          data-motion="lock"
-          onClick={(event) => {
-            const box = event.currentTarget.getBoundingClientRect();
-            setAccountMenu({
-              x: box.left,
-              /* Opens upward: the button is the last thing in the column. */
-              y: box.top - 4 - 36 * (accounts().length + 3),
-              items: [
-                { kind: "label", label: accountEmail },
-                ...accounts().map(
-                  (a): MenuItem => ({
-                    kind: "item",
-                    id: `account:${a.userId}`,
-                    label: a.email,
-                    run: () => onSwitchAccount(a.userId),
-                  }),
-                ),
-                { kind: "separator" },
-                {
-                  kind: "item",
-                  id: "account-add",
-                  label: "Add account",
-                  icon: <Plus size={16} />,
-                  run: onAddAccount,
-                },
-                {
-                  kind: "item",
-                  id: "account-lock",
-                  label: "Lock & sign out",
-                  icon: <Lock size={16} />,
-                  run: onLock,
-                },
-              ],
-            });
-          }}
-        >
-          <span className="sidebar-glyph" data-tone="lock">
-            <Users size={16} />
-          </span>
-          <span>Switch account</span>
-        </button>
       </div>
 
       {accountMenu && (

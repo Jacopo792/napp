@@ -16,7 +16,6 @@ import {
   ArchiveRestore,
   ChevronRight,
   FileText,
-  Folder as FolderGlyph,
   Image as ImageIcon,
   ImageOff,
   Info,
@@ -115,10 +114,6 @@ interface Props {
   busy: boolean;
   canWrite: boolean;
   folderLabel: string;
-  /** Whether a row names its folder: yes wherever the list spans folders —
-   *  All notes, Remarks, Archive, Trash — and no inside one, where every row
-   *  would name the folder the header already names. */
-  showFolder?: boolean;
   /** Whose notes these are, when they are not yours. The switch is portraits
    *  now and says no names, so the tally under the folder carries the member —
    *  a readout, which is what that line already is. */
@@ -257,7 +252,6 @@ const Row = memo(function Row({
   peerName,
   peerAvatar,
   peerTyping,
-  showFolder,
   onSelect,
   trashMode,
   archiveMode,
@@ -281,7 +275,6 @@ const Row = memo(function Row({
   peerName: string | undefined;
   peerAvatar: string | null;
   peerTyping: boolean;
-  showFolder: boolean;
   trashMode: boolean;
   archiveMode: boolean;
   canWrite: boolean;
@@ -545,9 +538,6 @@ const Row = memo(function Row({
      in `derivedOf` if long archives make typing lag. */
   const around = query ? marked(entry.note.body, query, 32) : null;
   const pinned = noteMeta?.pinned === true;
-  const folderName = noteMeta?.folderId
-    ? indexOf(meta).byFolder.get(noteMeta.folderId)?.name
-    : undefined;
   const glyph = GLYPHS[documentGlyph(entry.note.content)];
   const Glyph = glyph.icon;
   /* A note with a sketch in it shows the sketch where the glyph goes — the
@@ -710,8 +700,15 @@ const Row = memo(function Row({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        {/* The phone's row: title and when on one line, how it begins under it. */}
-        <div className={list ? "note-row-head" : undefined}>
+        {/* When, small, above the title; who is in it at the same line's end.
+            The title then has the row's whole width and two lines. */}
+        {list && (
+          <div className="note-row-head">
+            <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>
+            <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />
+          </div>
+        )}
+        <div>
           <p
             /* Whole-pixel leading. A ratio of 1.35 puts a line box at 18.225px,
              so every row below the first started on a fraction of a pixel and
@@ -730,7 +727,7 @@ const Row = memo(function Row({
             style={{
               fontWeight: gallery ? 520 : mobile ? 650 : 600,
               display: "-webkit-box",
-              WebkitLineClamp: gallery ? 4 : mobile ? 3 : 1,
+              WebkitLineClamp: gallery ? 4 : mobile ? 3 : 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
@@ -745,8 +742,7 @@ const Row = memo(function Row({
             )}
             {entry.note.title ? (marked(entry.note.title, query) ?? entry.note.title) : "Untitled"}
           </p>
-          <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />
-          {list && <span className="note-row-when">{formatStamp(entry.note.updatedAt)}</span>}
+          {!list && <PeerBadge name={peerName} avatarUrl={peerAvatar} typing={peerTyping} />}
         </div>
 
         <p className="note-row-summary mt-1 truncate">
@@ -762,13 +758,6 @@ const Row = memo(function Row({
           )}
           {(around ?? preview) && <span className="note-row-preview">{around ?? preview}</span>}
         </p>
-
-        {!gallery && showFolder && folderName && (
-          <p className="note-row-folder">
-            <FolderGlyph size={12} aria-hidden="true" />
-            <span>{folderName}</span>
-          </p>
-        )}
       </div>
 
       {/* What is under the row. Each panel is parked just outside the edge it
@@ -972,7 +961,6 @@ export function NoteList({
   busy,
   canWrite,
   folderLabel,
-  showFolder = false,
   scopeLabel,
   notice,
   trashMode,
@@ -1287,7 +1275,6 @@ export function NoteList({
                 peerName={peerNotes?.get(entry.note.id)?.name}
                 peerAvatar={peerNotes?.get(entry.note.id)?.avatarUrl ?? null}
                 peerTyping={peerTypingNoteIds?.has(entry.note.id) ?? false}
-                showFolder={showFolder}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
                 canWrite={canWrite}
