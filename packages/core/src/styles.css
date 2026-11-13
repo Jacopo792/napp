@@ -14709,8 +14709,10 @@ button.sheet-chip:hover,
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  margin: 4px 0 8px;
+  /* The band's own 52px, so the archive's name, the list's title and the
+     note's tools share one centre line across the window. */
+  height: 52px;
+  margin: 0 0 8px;
   padding: 0 4px 0 0;
 }
 
@@ -14794,10 +14796,6 @@ button.sheet-chip:hover,
   background: var(--accent);
 }
 
-.sidebar-scroll > .sidebar-card:first-child {
-  margin-top: 6px;
-}
-
 /* ── Sidebar and list, one tone above the note ──────────────────────────────
    The two navigation columns are one block, the note a sheet beside it. Their
    ground is the note's own colour lifted a step toward the ink, so it keeps
@@ -14814,4 +14812,69 @@ button.sheet-chip:hover,
 .sidebar-column,
 .collection-column {
   --paper: var(--column);
+}
+
+/* ── The list's name opens its options ───────────────────────────────────────
+   No capsule and no ⋯: the name is the menu, the count sits after it in grey,
+   and the pen stands alone at the end. */
+.collection-title-menu {
+  display: flex;
+  max-width: 100%;
+}
+
+.collection-title-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin-left: -7px;
+  border-radius: 7px;
+  padding: 4px 7px;
+  color: inherit;
+  font: inherit;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.collection-title-button:hover,
+.collection-title-button[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.collection-title:has(.collection-title-menu) .readout::before {
+  content: none;
+}
+
+.collection-title:has(.collection-title-menu) {
+  gap: 2px;
+}
+
+/* ── The list names itself, without a band ──────────────────────────────────
+   The list column has no strip: its name is the first thing in it, large, with
+   the count beside it in grey and the pen at the end of the same line. The name
+   opens the list's options on a press or the right button. */
+.collection-toolbar.is-titled {
+  min-height: 52px;
+  padding: 0 14px 0 20px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.collection-toolbar.is-titled .collection-title {
+  align-items: baseline;
+  gap: 8px;
+}
+
+.collection-toolbar.is-titled h2 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.collection-toolbar.is-titled .readout {
+  font-size: var(--text-sm);
+}
+
+.collection-toolbar.is-titled .collection-title-button {
+  margin-left: -6px;
+  padding: 2px 6px;
 }

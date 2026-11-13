@@ -109,7 +109,10 @@ export function CollectionMenu({
   onOpenPalette,
   onOpenShortcuts,
   bulk,
+  title,
 }: {
+  /** The list's name, when the name itself is what opens the menu. */
+  title?: ReactNode;
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
   onExportAll: () => void;
@@ -132,21 +135,40 @@ export function CollectionMenu({
   const ref = useDismiss(open, close);
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        aria-label="List options"
-        title="Sort and view"
-        aria-expanded={open}
-        className="toolbar-button press"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={20} />
-      </button>
+    <div ref={ref} className={title ? "collection-title-menu relative min-w-0" : "relative"}>
+      {title ? (
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title="Sort and view"
+          className="collection-title-button"
+          onClick={() => setOpen((current) => !current)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setOpen(true);
+          }}
+        >
+          <span className="min-w-0 truncate">{title}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label="List options"
+          title="Sort and view"
+          aria-expanded={open}
+          className="toolbar-button press"
+          onClick={() => setOpen((current) => !current)}
+        >
+          <MoreHorizontal size={20} />
+        </button>
+      )}
       <MenuSurface
         open={open}
         role="menu"
-        className="popover menu-popover absolute top-full right-0 z-50 mt-2 w-60 p-1.5"
+        className={`popover menu-popover absolute top-full z-50 mt-2 w-60 p-1.5 ${
+          title ? "left-0" : "right-0"
+        }`}
       >
         <MenuButton
           onClick={() => {

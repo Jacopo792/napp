@@ -4092,9 +4092,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     </button>
   );
 
-  const collectionActions = (
+  const collectionMenu = (title?: React.ReactNode) => (
     <>
       <CollectionMenu
+        title={title}
         preferences={activeListPreferences}
         onChange={handleListPreferencesChange}
         onIndexMedia={canWriteArchive ? () => void indexMedia() : undefined}
@@ -4129,6 +4130,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       />
     </>
   );
+  const collectionActions = collectionMenu();
 
   /* One roster, ordered with yourself first, and it is local on purpose:
      `members` arrives in the order people joined and stays that way for the
@@ -6014,6 +6016,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   groups={noteGroups}
                   view="gallery"
                   toolbarActions={collectionActions}
+                  titleMenu={collectionMenu}
                   filters={activeFilters}
                   meta={activeMeta}
                   showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
@@ -6210,8 +6213,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   entries={visible}
                   groups={noteGroups}
                   view="list"
-                  leading={sidebarToggle}
                   toolbarActions={collectionActions}
+                  titleMenu={collectionMenu}
                   filters={activeFilters}
                   meta={activeMeta}
                   showFolder={!activeMeta.folders.some((folder) => folder.id === selectedFolderId)}
@@ -6302,7 +6305,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   : undefined
               }
               navigationAction={
-                !listOpen ? (
+                listOpen ? (
+                  sidebarToggle
+                ) : (
                   <>
                     {/* With the columns away this strip is the only chrome in
                         the window, so it carries what the columns did: getting
@@ -6344,7 +6349,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                       </button>
                     </span>
                   </>
-                ) : null
+                )
               }
               headerStatus={noteStatus}
               /* The faces on the sidebar's shelf say who is here and who is

@@ -93,6 +93,10 @@ interface Props {
   groups?: NoteGroup[];
   view?: ListView;
   toolbarActions?: ReactNode;
+  /** The list's options, opened from its name: given the name, returns the
+   *  control. Without it the name is a heading and the options sit in
+   *  `toolbarActions`. */
+  titleMenu?: (title: ReactNode) => ReactNode;
   /** Before the title, at the strip's leading edge: the sidebar toggle. */
   leading?: ReactNode;
   /** The note's sheet, flown out of where the note is drawn in its row. */
@@ -954,6 +958,7 @@ export function NoteList({
   groups = [{ id: "notes", label: "Notes", entries }],
   view = "list",
   toolbarActions,
+  titleMenu,
   leading,
   onInfo,
   topBar,
@@ -1423,7 +1428,11 @@ export function NoteList({
       className={`collection-column flex h-full w-full shrink-0 flex-col ${gallery ? "is-gallery" : ""}`}
     >
       {topBar}
-      <header className="collection-toolbar flex min-h-13 shrink-0 items-center gap-2 px-4">
+      <header
+        className={`collection-toolbar flex shrink-0 items-center gap-2 px-4 ${
+          titleMenu ? "is-titled" : "min-h-13"
+        }`}
+      >
         {leading}
         {/* One line, on the band's own baseline. Stacked, the name sat above
             the strip's middle and the tally below it, so nothing in this
@@ -1434,16 +1443,29 @@ export function NoteList({
             scope. The name keeps its place: when the strip is
             too narrow the readout after it truncates, then drops, first. */}
         <div className="collection-title min-w-0 flex-1">
-          <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
+          {titleMenu ? (
+            <h2 className="min-w-0 text-sm font-semibold text-ink">{titleMenu(folderLabel)}</h2>
+          ) : (
+            <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{folderLabel}</h2>
+          )}
           <p className="readout min-w-0 shrink-[100] truncate whitespace-nowrap text-ink-4">
-            {notice ?? (loading ? "Loading" : noteTally(entries.length, trashMode))}
-            {scopeLabel && !loading && !notice && <span className="scope-tag">{scopeLabel}</span>}
+            {notice ??
+              (loading
+                ? "Loading"
+                : titleMenu
+                  ? entries.length
+                  : noteTally(entries.length, trashMode))}
+            {scopeLabel && !titleMenu && !loading && !notice && (
+              <span className="scope-tag">{scopeLabel}</span>
+            )}
           </p>
         </div>
         {/* The compose control belongs beside the thing it adds to, not wedged
             into the search field where it covered the text being typed. */}
-        <span className="editor-tool-group glass-toolbar flex shrink-0 items-center">
-          {toolbarActions}
+        <span
+          className={`flex shrink-0 items-center ${titleMenu ? "" : "editor-tool-group glass-toolbar"}`}
+        >
+          {!titleMenu && toolbarActions}
           {canWrite && !trashMode && !archiveMode && (
             <button
               onClick={onNew}
