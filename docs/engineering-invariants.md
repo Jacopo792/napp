@@ -77,8 +77,6 @@ application model. Browser file pickers still require a real user gesture.
   backdrop filters and `blur(0)` instead of `none`.
 - Shared-grid tracks use `minmax(0, 1fr)` when content may overflow. Keep capped
   content centered rather than leaving an empty strip on one side.
-- Comment-margin cards live inside the document's scroller. Position updates
-  must not rerender the editor on every scroll; narrow panes retain the panel.
 - `platform().openFile` accepts a loader so the browser can synchronously claim
   a tab during the click before awaiting bytes. Do not move that await ahead
   of the shell's decision.

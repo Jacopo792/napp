@@ -3,6 +3,27 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.53 – 2026-11-13
+
+### Changed
+
+- The sidebar is a rail (people, Remarks, Archive, Recently Deleted, Settings and
+  account) beside the folder column; a presence dot marks a member who is here now.
+- Note list rows give the title two lines, with the preview and time under it; the
+  list's title carries the count. Sidebar, list and note toolbar share one 40px band.
+- In a framed Mac window the traffic lights sit centred in the top band and the
+  sidebar no longer steps down, so the three columns stay level.
+- Person, note, folder and archive sheets and a book's Trash use one flat layout:
+  evenly spaced numbers and History grouped by day.
+- Comments are a full-height column of the window with flat thread rows; the
+  floating margin mode is removed.
+- What's New is a page of Settings instead of a modal; after an update Settings
+  opens on it.
+- Palettes: Fjord, Rosewood, Night and Paper kept; Sage, Dune, Dusk, Mist, Blush and
+  Linen added; Fjord is the default. Retired palettes keep drawing for whoever
+  chose them; their background photographs are removed.
+- Settings in flat rows; interface icons come from Tabler.
+
 ## 0.9.52 – 2026-11-13
 
 ### Fixed

@@ -93,11 +93,11 @@ change its status without opening the page.
 
 ## Conversations and versions
 
-![Comments in the margin](docs/comments-preview.png)
+![Comments beside the note](docs/comments-preview.png)
 
-Select a passage and leave a remark. When the window has room, the conversation
-stands in the margin beside the words it is about. Replies, reactions and resolved
-threads stay attached to that context.
+Select a passage and leave a remark. Comments open as a column of the window
+beside the note. Replies, reactions and resolved threads stay attached to the
+words they are about.
 
 ![Note history](docs/history-preview.png)
 
@@ -106,11 +106,12 @@ Restoring an earlier version keeps the present as a named version first.
 
 ## Your spaces, your settings
 
-![Archive switch](docs/spaces-preview.png)
+![Archives in Settings](docs/spaces-preview.png)
 
 One account can belong to several archives: personal notes, a study group, shared
 writing or a book. Each archive has its own members, folders and organisation.
-Invitations come from **Settings → Members** and expire after seven days.
+Invitations come from the archive's sheet (**Settings → Profile**, then its
+members) and expire after seven days.
 
 ![Appearance settings](docs/appearance-settings-preview.png)
 

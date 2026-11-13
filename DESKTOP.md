@@ -16,7 +16,7 @@ what is different about running it in a window.
 ## Get it
 
 **[Download the latest release](https://github.com/Jacopo792/napp/releases/latest)** —
-or straight from What's New inside the app.
+or straight from **Settings → What's New** inside the app.
 
 | Platform           | File                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
@@ -84,9 +84,9 @@ same shortcut the interface answers to. Windows instead has one compact title
 bar, coloured from the active Napp palette: there is no black File/Edit strip or
 package-name label above the app. Keyboard shortcuts work on both platforms.
 
-**A window you can move and name.** The traffic lights get a gutter of their own
-in the leftmost column, which follows when you collapse the folders (⌘\) and
-disappears in full screen. The header strips are the title bar, so you drag the
+**A window you can move and name.** The traffic lights sit in the top band,
+above the rail, so the sidebar, the list and the note keep their headers level;
+they disappear in full screen. The header strips are the title bar, so you drag the
 window by them and double-click them to zoom. The window is titled after the
 note you are reading, which is what Mission Control, the Window menu and ⌘Tab
 have to go on. It reopens where you left it, unless that was on a display you no

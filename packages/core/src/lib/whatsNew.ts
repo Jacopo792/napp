@@ -45,6 +45,70 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.53",
+    date: "2026-11-13",
+    headline: "A quieter, more even window",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "A rail down the sidebar",
+            text: "Your faces, Remarks, Archive and Recently Deleted sit in a narrow rail on the left, with Settings and your account at its foot; folders have the column beside it. A small dot on a face says that person is here now.",
+            image: "0.9.53-window.jpg",
+          },
+          {
+            title: "Lists that give the title room",
+            text: "A note's title runs to two lines, with its preview and time under it. The list's title says how many notes it holds, and the sidebar, the list and the note's toolbar share one 40px band.",
+          },
+          {
+            title: "Level on a Mac",
+            text: "In a window that isn't full screen, the traffic lights sit in the top band and the sidebar no longer steps down for them, so the three columns stay level.",
+          },
+        ],
+      },
+      {
+        heading: "Sheets",
+        items: [
+          {
+            title: "Plain information sheets",
+            text: "Holding a note, a folder or a person opens a calmer sheet: three numbers spaced evenly, then what happened grouped by day, each row with a face, the time and the words changed. The archive's sheet and a book's Trash are drawn the same way.",
+            image: "0.9.53-sheets.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "A column of the window",
+            text: "Comments open as a full-height column like the sidebar and the list, with each conversation as a plain row: a face, the name and the time.",
+            image: "0.9.53-comments.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "Ten palettes",
+            text: "Fjord, Rosewood, Night and Paper stay, joined by Sage, Dune, Dusk, Mist, Blush and Linen, each shown as a small window. Fjord is where Napp starts. A palette you chose that is no longer offered keeps working.",
+            image: "0.9.53-palettes.jpg",
+          },
+          {
+            title: "What’s New lives in Settings",
+            text: "This page is now a section of Settings, under Napp, with every release as a row you can open. The installers are at the top.",
+            image: "0.9.53-whats-new.jpg",
+          },
+          {
+            title: "Flat rows and new icons",
+            text: "Settings are plain rows with small controls at their right, and the interface draws its icons from one consistent set.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.52",
     date: "2026-11-13",
     headline: "Titles save through the live document",
