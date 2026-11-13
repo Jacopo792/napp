@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/notes");
-  await page.getByRole("button", { name: "Close What's New", exact: true }).click();
+  await page.getByRole("button", { name: "Close settings", exact: true }).click();
 });
 
 test("the workspace opens a note and keeps edits when navigating between notes", async ({

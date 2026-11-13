@@ -272,7 +272,6 @@ type SheetEntry =
   | { kind: "trash" };
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
-import { WhatsNewSheet } from "@/components/WhatsNewSheet";
 import {
   CURRENT_RELEASE,
   compareVersions,
@@ -514,7 +513,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      given rarely and the list is a request the archive's own load does not make. */
   const [namedVersions, setNamedVersions] = useState<NamedVersion[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   /* Focus is the two panes put away and the page's own controls stepping back
      while you write. It is not a third layout: the workspace already knows how
      to run without the rail and the list, so this is that state plus a way in
@@ -3578,23 +3576,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      what was new, from the reading it was opened with. */
   const whatsNewUnseen =
     preferencesReady && compareVersions(CURRENT_RELEASE, flags.whatsNewSeen) > 0;
-  const [whatsNewFrom, setWhatsNewFrom] = useState("");
+  /* What's New is a page of Settings; opening the page is reading it. */
+  const markWhatsNewRead = useCallback(() => {
+    setFlags((current) => {
+      if (compareVersions(CURRENT_RELEASE, current.whatsNewSeen) <= 0) return current;
+      const whatsNewSeen = laterVersion(current.whatsNewSeen, CURRENT_RELEASE);
+      rememberWhatsNewSeen(whatsNewSeen);
+      return { ...current, whatsNewSeen };
+    });
+  }, []);
   const openWhatsNew = useCallback(() => {
-    setWhatsNewFrom(flags.whatsNewSeen);
-    rememberWhatsNewSeen(laterVersion(flags.whatsNewSeen, CURRENT_RELEASE));
-    setFlags((current) =>
-      compareVersions(CURRENT_RELEASE, current.whatsNewSeen) > 0
-        ? { ...current, whatsNewSeen: laterVersion(current.whatsNewSeen, CURRENT_RELEASE) }
-        : current,
-    );
-    setWhatsNewOpen(true);
-  }, [flags.whatsNewSeen]);
+    setSettingsSection("whats-new");
+    setSettingsOpen(true);
+  }, []);
   useEffect(() => {
     if (!whatsNewUnseen || loading || whatsNewShown) return;
     whatsNewShown = true;
     openWhatsNew();
   }, [whatsNewUnseen, loading, openWhatsNew]);
-  const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
 
   async function handleLock(removeLocalContent = true) {
     if (
@@ -5151,7 +5150,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         kind={docMode ? "document" : "notes"}
         onClose={() => setShortcutsOpen(false)}
       />
-      <WhatsNewSheet open={whatsNewOpen} seen={whatsNewFrom} onClose={closeWhatsNew} />
     </>
   );
 
@@ -5232,10 +5230,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           setSettingsSection(undefined);
         }}
         onLock={() => void handleLock()}
-        onWhatsNew={() => {
-          setSettingsOpen(false);
-          openWhatsNew();
-        }}
+        onWhatsNewRead={markWhatsNewRead}
+        whatsNewSeen={flags.whatsNewSeen}
         whatsNewUnseen={whatsNewUnseen}
       />
     </Suspense>

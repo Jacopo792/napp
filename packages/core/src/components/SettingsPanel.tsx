@@ -31,7 +31,6 @@ import {
   FolderInput,
   ImagePlus,
   Lock,
-  Sparkle,
   LockOpen,
   Monitor,
   MoreHorizontal,
@@ -117,6 +116,7 @@ import {
 } from "@/lib/writingPreferences";
 import { Avatar } from "./WorkspaceMenus";
 import { emerge } from "@/lib/motion";
+import { WhatsNewPage } from "./WhatsNewPage";
 /* Settings, in a chunk of its own.
  *
  * It is one panel behind one button, opened rarely and never on the way to a
@@ -352,7 +352,8 @@ export function SettingsPanel({
   onAutoLockChange,
   onClose,
   onLock,
-  onWhatsNew,
+  onWhatsNewRead,
+  whatsNewSeen,
   whatsNewUnseen = false,
 }: {
   open: boolean;
@@ -413,7 +414,10 @@ export function SettingsPanel({
   onClose: () => void;
   onLock: () => void;
   /** Release notes live here, beside the version they describe. */
-  onWhatsNew?: () => void;
+  /** The What's New page was opened: everything on it is read. */
+  onWhatsNewRead: () => void;
+  /** The last release read before this opening. */
+  whatsNewSeen: string;
   whatsNewUnseen?: boolean;
 }) {
   const axes = useAxes();
@@ -632,6 +636,9 @@ export function SettingsPanel({
                         {item.icon}
                       </span>
                       {item.name}
+                      {item.id === "whats-new" && whatsNewUnseen && (
+                        <span className="settings-nav-dot" aria-label="Unread" />
+                      )}
                     </button>
                   ))}
                 </Fragment>
@@ -643,13 +650,6 @@ export function SettingsPanel({
                 column, which is where an application has put "sign out" for
                 thirty years. The summary opposite keeps the sentence about
                 what leaving costs; this is the door. */}
-            {onWhatsNew && (
-              <button type="button" className="settings-nav-signout press" onClick={onWhatsNew}>
-                <Sparkle size={16} />
-                What’s New
-                {whatsNewUnseen && <span className="settings-nav-dot" aria-label="Unread" />}
-              </button>
-            )}
             <button type="button" className="settings-nav-signout press" onClick={onLock}>
               <Lock size={16} />
               Sign out
@@ -1272,6 +1272,10 @@ export function SettingsPanel({
               {/* The keys, where somebody looking for a setting will find them.
                 The same list the `?` sheet shows, from the same place — two
                 copies of this would be one copy and one lie. */}
+              {section === "whats-new" && (
+                <WhatsNewPage seen={whatsNewSeen} onRead={onWhatsNewRead} />
+              )}
+
               {section === "shortcuts" && (
                 <section>
                   {shortcutGroups(kind).map((group) => (

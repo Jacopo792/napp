@@ -13340,259 +13340,108 @@ button.sheet-chip:hover,
 }
 
 /* ══ What's New ══════════════════════════════════════════════════════════════
-   Every release, newest first: the versions down the side, the release on
-   the right in plain words. It opens by itself once after an update, on the
-   newest release, and is always at the foot of the sidebar and in ⌘K. */
-.palette.whats-new {
-  width: min(46rem, 100%);
-  max-height: min(40rem, calc(100dvh - 12vh));
-}
-
-.whats-new-head {
+   A page of Settings: the installers as a row, then every release as a row
+   that opens like Fine-tune, its items as titles with a grey line under. */
+.whats-new-downloads {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--rule);
-  padding: 16px 16px 14px 20px;
-}
-
-.whats-new-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: none;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: linear-gradient(145deg, #ffb340, #ff7a1a);
-  color: #ffffff;
-}
-
-.whats-new-heading {
-  min-width: 0;
-  flex: 1;
-}
-
-.whats-new-heading h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--text-lg, 17px);
-  font-weight: var(--weight-semibold);
-}
-
-.whats-new-heading p {
-  margin: 1px 0 0;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-
-.whats-new-body {
-  display: grid;
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
-}
-
-.whats-new-versions {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-  border-right: 1px solid var(--rule);
-  padding: 10px 8px;
-}
-
-.whats-new-version {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: var(--radius-xs);
-  padding: 6px 8px;
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-}
-
-.whats-new-version:hover {
-  background: var(--accent-wash);
-}
-
-.whats-new-version.is-current {
-  background: var(--accent-wash);
-  color: var(--ink);
-  font-weight: var(--weight-semibold);
-}
-
-.whats-new-badge {
-  border-radius: var(--radius-pill);
-  padding: 1px 7px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--text-2xs, 10px);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.02em;
-}
-
-.whats-new-version .whats-new-badge {
+  gap: 16px;
   margin-left: auto;
 }
 
-.whats-new-release {
-  overflow-y: auto;
-  padding: 16px 22px 20px;
-  animation: whats-new-release-in var(--dur-base) var(--ease-out) backwards;
+.whats-new-downloads a {
+  color: var(--ink-2);
 }
 
-@keyframes whats-new-release-in {
-  from {
-    opacity: 0;
-  }
+.whats-new-downloads a:last-child {
+  color: var(--ink-4);
+}
+
+.whats-new-downloads a:hover {
+  color: var(--ink);
+}
+
+/* On the rows' edges: 2px in, as every Settings row sits. */
+.settings-panel .whats-new-page .settings-disclosure {
+  min-width: 0;
+  padding: 6px 2px;
+}
+
+.whats-new-version {
+  flex: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .whats-new-headline {
-  margin: 0 0 14px;
-  color: var(--ink);
-  font-size: var(--text-md, 15px);
-  font-weight: var(--weight-semibold);
-  line-height: 1.35;
-}
-
-.whats-new-release section + section {
-  margin-top: 16px;
-}
-
-.whats-new-release h3 {
-  margin: 0 0 6px;
+  overflow: hidden;
+  min-width: 0;
   color: var(--ink-4);
-  font-size: var(--text-2xs, 10px);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.whats-new-release ul {
-  display: grid;
-  gap: 10px;
+.whats-new-badge {
+  flex: none;
+  color: var(--accent);
+  font-size: var(--text-xs);
+}
+
+.whats-new-page .settings-disclosure small {
+  flex: none;
+  padding-left: 12px;
+}
+
+/* A release's items sit on the disclosure's text edge: past the chevron. */
+.whats-new-section {
+  padding: 14px 0 4px 24px;
+  animation: settings-expand var(--dur-base) var(--ease-out) backwards;
+}
+
+.whats-new-section + .whats-new-section {
+  padding-top: 8px;
+}
+
+.whats-new-page .whats-new-section h3 {
+  margin: 0 0 2px;
+  padding: 0;
+}
+
+.whats-new-section ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.whats-new-release li {
-  display: grid;
+.whats-new-section li {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  border-left: 2px solid var(--rule);
-  padding-left: 10px;
-  font-size: var(--text-sm);
-  line-height: 1.45;
+  padding: 8px 0;
 }
 
-.whats-new-release li strong {
+.whats-new-section li + li {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.whats-new-section li b {
   color: var(--ink);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.whats-new-release li span {
-  color: var(--ink-2);
+.whats-new-section li span {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
-.whats-new-release li img {
-  display: block;
+.whats-new-section li img {
   width: 100%;
   margin-top: 8px;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
+  border-radius: 6px;
 }
 
-.whats-new-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--rule);
-  padding: 10px 16px;
-}
-
-.whats-new-done {
-  min-width: 6.5rem;
-  border-radius: var(--radius-md);
-  padding: 7px 16px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
-.whats-new-done:hover {
-  background: var(--accent-strong);
-}
-
-.whats-new-downloads {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.whats-new-download {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  padding: 6px 12px;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  text-decoration: none;
-}
-
-.whats-new-download:hover {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-}
-
-.whats-new-download.is-quiet {
-  border-color: transparent;
-  color: var(--ink-3);
-  font-weight: var(--weight-regular, 400);
-}
-
-/* On a phone the versions are a row across the top. */
-@media (max-width: 640px) {
-  .palette-layer.is-whats-new {
-    padding: 12px;
-  }
-
-  .whats-new-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .whats-new-versions {
-    flex-direction: row;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
-    padding: 8px 12px;
-  }
-
-  .whats-new-version {
-    flex: none;
-  }
-
-  .whats-new-release {
-    padding: 14px 16px 18px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .whats-new-release {
-    animation: none;
-  }
+.whats-new-release:last-child .whats-new-section:last-child {
+  padding-bottom: 0;
 }
 
 /* A passage arrived at from a quotation in a note: the words are lit for

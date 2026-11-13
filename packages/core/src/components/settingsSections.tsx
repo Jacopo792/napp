@@ -13,6 +13,7 @@ import {
   Layers,
   Palette,
   ShieldCheck,
+  Sparkle,
   Type,
   UserRound,
   Users,
@@ -102,6 +103,18 @@ export const SETTINGS_SECTIONS = [
         name: "Shortcuts",
         icon: <Keyboard size={16} />,
         keywords: "keyboard keys",
+      },
+    ],
+  },
+  {
+    group: "Napp",
+    items: [
+      {
+        id: "whats-new",
+        tone: "gray",
+        name: "What’s New",
+        icon: <Sparkle size={16} />,
+        keywords: "whats new release version changes update download mac windows installer",
       },
     ],
   },

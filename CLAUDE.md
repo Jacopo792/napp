@@ -140,6 +140,9 @@ inspect the rendered result as well as the source.
   commit, verify CI, then tag `v<version>` to build the desktop installers.
   Confirm both macOS DMGs and the Windows EXE are attached and publicly available.
   Do not call a build signed, notarized or store-approved without evidence.
+- A What's New item that changes what people see carries a screenshot of the
+  change (`image`, a file in `packages/core/src/assets/whats-new/`). Items with
+  no visible change need none.
 - Apply compatible schema additions before deploying clients that select them.
   Remove old columns only after replacement clients have deployed and older
   clients have been considered. Check `supabase migration list --linked` rather
