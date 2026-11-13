@@ -125,7 +125,9 @@ export async function login(page: Page, account: Account, path = "/") {
     await page.getByRole("button", { name: "Agree and continue" }).click();
   }
   await expect(page.getByRole("button", { name: "New note", exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Close settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Close settings", exact: true })
+    .click({ position: { x: 4, y: 4 } });
 }
 
 export async function seedNote(account: Account, title: string) {
