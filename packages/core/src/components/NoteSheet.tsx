@@ -23,7 +23,7 @@ import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
 import type { AvatarCrop } from "@/lib/image";
 import { loadVersions, type NoteVersion } from "@/lib/history";
-import { formatDateTime, plural } from "@/lib/format";
+import { dateBucket } from "@/lib/listPreferences";
 import { useStoredImage } from "@/lib/media";
 import type { AppSession } from "@/lib/session";
 import { SafetyActions } from "./SafetyActions";
@@ -135,7 +135,7 @@ export function NoteSheet({
     events.push({
       key: "edited",
       text: "Last edited",
-      meta: formatDateTime(note.updatedAt),
+      at: note.updatedAt,
       onOpen: () => onOpenNote(note.id),
     });
   for (const version of versions?.slice(0, RECENT) ?? []) {
@@ -150,7 +150,7 @@ export function NoteSheet({
         : version.label
           ? `${who} · “${version.label}”`
           : `${who} edited`,
-      meta: formatDateTime(version.createdAt),
+      at: version.createdAt,
       added: version.wordsAdded,
       removed: version.wordsRemoved,
       onOpen: () => onOpenNote(note.id, { history: version.id }),
@@ -167,12 +167,12 @@ export function NoteSheet({
     person: note.owner?.userId,
     mark: face(note.owner?.userId),
     text: note.owner ? `${nameOf(note.owner.userId)} created it` : "Created",
-    meta: formatDateTime(note.createdAt),
+    at: note.createdAt,
   });
 
   return (
     <Sheet label={note.title || "Untitled"}>
-      <div className="sheet-body is-timeline">
+      <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <SheetPortrait
             className="sheet-portrait sheet-note-glyph"
@@ -183,53 +183,49 @@ export function NoteSheet({
           >
             {photoUrl ? <img src={photoUrl} alt="" draggable={false} /> : glyph}
           </SheetPortrait>
-          <div>
-            <h2>{note.title || "Untitled"}</h2>
-            <p>
-              {note.folder ? (
-                <button type="button" onClick={() => onOpenFolder(note.folder!.id)}>
-                  {note.folder.name}
+          <h2>{note.title || "Untitled"}</h2>
+          <p>
+            {note.folder ? (
+              <button type="button" onClick={() => onOpenFolder(note.folder!.id)}>
+                {note.folder.name}
+              </button>
+            ) : (
+              "No folder"
+            )}
+            {note.owner && (
+              <>
+                {" · "}
+                <button type="button" onClick={() => onOpenPerson(note.owner!.userId)}>
+                  {note.owner.userId === session.userId ? "Yours" : `${note.owner.name}’s`}
                 </button>
-              ) : (
-                "No folder"
-              )}
-              {note.owner && (
-                <>
-                  {" · "}
-                  <button type="button" onClick={() => onOpenPerson(note.owner!.userId)}>
-                    {note.owner.userId === session.userId ? "Yours" : `${note.owner.name}’s`}
-                  </button>
-                </>
-              )}
-              {states.map((state) => ` · ${state}`)}
+              </>
+            )}
+            {states.map((state) => ` · ${state}`)}
+          </p>
+          {people.length > 0 && (
+            <p>
+              By <PeopleList people={people} nameOf={nameOf} onOpenPerson={onOpenPerson} />
             </p>
-          </div>
+          )}
         </header>
 
-        <p className="sheet-counts">
+        <div className="sheet-stats">
           <button type="button" onClick={() => onOpenNote(note.id)}>
-            {plural(note.words, "word")}
+            <small>Words</small>
+            <strong>{note.words}</strong>
           </button>
-          {" · "}
           <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
-            {versions ? plural(versions.length, "version") : "Versions"}
+            <small>Versions</small>
+            <strong>{versions ? versions.length : "–"}</strong>
           </button>
-          {" · "}
           <button type="button" onClick={() => onOpenNote(note.id, { comments: true })}>
-            {plural(note.openRemarks, "open remark")}
+            <small>Open remarks</small>
+            <strong>{note.openRemarks}</strong>
           </button>
-          {people.length > 0 && " · by "}
-          {people.map((userId, index) => (
-            <span key={userId}>
-              {index > 0 && (index === people.length - 1 ? " and " : ", ")}
-              <button type="button" onClick={() => onOpenPerson(userId)}>
-                {nameOf(userId)}
-              </button>
-            </span>
-          ))}
-        </p>
+        </div>
 
         <div className="sheet-work">
+          <h3>History</h3>
           {failure && (
             <p role="alert" className="sheet-quiet is-failure">
               {failure}
@@ -276,6 +272,26 @@ function LinkList({
   ));
 }
 
+/** Everyone named, joined the way a sentence joins them; each name opens them. */
+export function PeopleList({
+  people,
+  nameOf,
+  onOpenPerson,
+}: {
+  people: string[];
+  nameOf: (userId: string) => string;
+  onOpenPerson: (userId: string) => void;
+}) {
+  return people.map((userId, index) => (
+    <span key={userId}>
+      {index > 0 && (index === people.length - 1 ? " and " : ", ")}
+      <button type="button" onClick={() => onOpenPerson(userId)}>
+        {nameOf(userId)}
+      </button>
+    </span>
+  ));
+}
+
 export interface SheetEvent {
   key: string;
   /** Whose face marks it; pressing the face opens them. */
@@ -283,12 +299,27 @@ export interface SheetEvent {
   mark?: ReactNode;
   text: string;
   meta?: string;
+  /** When it happened: places it under its day and gives the row its time. */
+  at?: string;
   added?: number | null;
   removed?: number | null;
   onOpen?: () => void;
 }
 
-/** What happened, newest first, on one line drawn through the faces. */
+/** Today's and yesterday's rows need only the time; older ones the date too. */
+function stampOf(iso: string): string {
+  const date = new Date(iso);
+  const recent = ["today", "yesterday"].includes(dateBucket(iso).id);
+  return date.toLocaleString(undefined, {
+    ...(recent ? {} : { day: "numeric", month: "short" }),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** What happened, newest first, under the day it happened, the way the person
+ *  sheet lists its work: a face, what it was, and when at the row's end. A row
+ *  with no time stays under the day before it. */
 export function SheetTimeline({
   events,
   onOpenPerson,
@@ -296,18 +327,27 @@ export function SheetTimeline({
   events: SheetEvent[];
   onOpenPerson: (userId: string) => void;
 }) {
-  return (
-    <ol className="sheet-timeline">
-      {events.map((event) => {
+  const days: { label: string | null; events: SheetEvent[] }[] = [];
+  for (const event of events) {
+    const label = event.at ? dateBucket(event.at).label : (days.at(-1)?.label ?? null);
+    let day = days.at(-1);
+    if (!day || day.label !== label) days.push((day = { label, events: [] }));
+    day.events.push(event);
+  }
+  return days.map((day, index) => (
+    <section key={index} className="sheet-day">
+      {day.label && <p>{day.label}</p>}
+      {day.events.map((event) => {
+        const meta = [event.meta, event.at && stampOf(event.at)].filter(Boolean).join(" · ");
         const body = (
           <>
-            <span className="sheet-event-text">{event.text}</span>
-            {(event.meta || event.added != null) && (
-              <span className="sheet-event-meta">
-                {event.meta}
+            <span className="sheet-row-title">{event.text}</span>
+            {(meta || event.added != null) && (
+              <span className="sheet-row-meta">
+                {meta}
                 {event.added != null && (
                   <>
-                    {" · "}
+                    {meta && " · "}
                     <span className="is-added">+{event.added}</span>{" "}
                     <span className="is-removed">−{event.removed ?? 0}</span>
                   </>
@@ -317,7 +357,7 @@ export function SheetTimeline({
           </>
         );
         return (
-          <li key={event.key}>
+          <div key={event.key} className="sheet-entry">
             {event.person && event.mark ? (
               <button
                 type="button"
@@ -331,15 +371,15 @@ export function SheetTimeline({
               <span className="sheet-event-mark">{event.mark}</span>
             )}
             {event.onOpen ? (
-              <button type="button" className="sheet-event" onClick={event.onOpen}>
+              <button type="button" className="sheet-row press" onClick={event.onOpen}>
                 {body}
               </button>
             ) : (
-              <div className="sheet-event">{body}</div>
+              <div className="sheet-row">{body}</div>
             )}
-          </li>
+          </div>
         );
       })}
-    </ol>
-  );
+    </section>
+  ));
 }

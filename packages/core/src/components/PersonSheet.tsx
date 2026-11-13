@@ -115,7 +115,7 @@ export function PersonSheet({
 
   return (
     <Sheet label={name}>
-      <div className="sheet-body is-person" style={{ "--person": color } as CSSProperties}>
+      <div className="sheet-body is-plain" style={{ "--person": color } as CSSProperties}>
         <header className="sheet-hero">
           <SheetPortrait
             className="sheet-portrait is-round"

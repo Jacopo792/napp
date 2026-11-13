@@ -17,10 +17,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { FolderOpen, MessageSquare } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { SheetTimeline, type SheetEvent, type SheetPerson } from "@/components/NoteSheet";
+import {
+  PeopleList,
+  SheetTimeline,
+  type SheetEvent,
+  type SheetPerson,
+} from "@/components/NoteSheet";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { loadFolderVersions, type FolderVersion } from "@/lib/history";
-import { formatDateTime, plural } from "@/lib/format";
 import type { AppSession } from "@/lib/session";
 
 const WEEK_MS = 7 * 86_400_000;
@@ -115,7 +119,14 @@ export function FolderSheet({
       person: person?.userId,
       mark: person && <Avatar url={person.avatarUrl} name={person.name} email="" compact />,
       text: titleOf(version.noteId),
-      meta: `${restore ? `${who} restored it` : version.label ? `${who} · “${version.label}”` : who} · ${formatDateTime(version.createdAt)}`,
+      /* The face says who when it was one person; the words say it otherwise. */
+      meta: restore
+        ? `${who} restored it`
+        : version.label
+          ? `${who} · “${version.label}”`
+          : person && version.authorIds.length === 1
+            ? undefined
+            : who,
       added: version.wordsAdded,
       removed: version.wordsRemoved,
       onOpen: () => onOpenNote(version.noteId, { history: version.id }),
@@ -129,7 +140,7 @@ export function FolderSheet({
         key: `note-${note.id}`,
         at: note.updatedAt,
         text: note.title || "Untitled",
-        meta: `Edited ${formatDateTime(note.updatedAt)}`,
+        meta: "Edited",
         onOpen: () => onOpenNote(note.id),
       });
   happened.sort((a, b) => b.at.localeCompare(a.at));
@@ -137,55 +148,62 @@ export function FolderSheet({
 
   return (
     <Sheet label={folder.name}>
-      <div className="sheet-body is-timeline">
+      <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <span className="sheet-portrait sheet-note-glyph">
             <FolderOpen size={22} />
           </span>
-          <div>
-            <h2>{folder.name}</h2>
+          <h2>{folder.name}</h2>
+          <p>
+            {folder.parent ? (
+              <>
+                In{" "}
+                <button type="button" onClick={() => onOpenFolder(folder.parent!.id)}>
+                  {folder.parent.name}
+                </button>
+              </>
+            ) : (
+              "Top level"
+            )}
+            {folder.children.length > 0 && " · holds "}
+            {folder.children.map((child, index) => (
+              <span key={child.id}>
+                {index > 0 && ", "}
+                <button type="button" onClick={() => onOpenFolder(child.id)}>
+                  {child.name}
+                </button>
+              </span>
+            ))}
+          </p>
+          {people.length > 0 && (
             <p>
-              {folder.parent ? (
-                <>
-                  In{" "}
-                  <button type="button" onClick={() => onOpenFolder(folder.parent!.id)}>
-                    {folder.parent.name}
-                  </button>
-                </>
-              ) : (
-                "Top level"
-              )}
-              {folder.children.length > 0 && " · holds "}
-              {folder.children.map((child, index) => (
-                <span key={child.id}>
-                  {index > 0 && ", "}
-                  <button type="button" onClick={() => onOpenFolder(child.id)}>
-                    {child.name}
-                  </button>
-                </span>
-              ))}
+              By{" "}
+              <PeopleList
+                people={people.map((person) => person.userId)}
+                nameOf={nameOf}
+                onOpenPerson={onOpenPerson}
+              />
             </p>
-          </div>
+          )}
         </header>
 
-        <p className="sheet-counts">
+        <div className="sheet-stats">
           <button type="button" onClick={() => onShowFolder(folder.id)}>
-            {plural(folder.notes.length, "note")}
+            <small>Notes</small>
+            <strong>{folder.notes.length}</strong>
           </button>
-          {` · ${plural(words, "word")} · `}
-          {versions ? plural(week, "change") : "Changes"} this week
-          {people.length > 0 && " · by "}
-          {people.map((person, index) => (
-            <span key={person.userId}>
-              {index > 0 && (index === people.length - 1 ? " and " : ", ")}
-              <button type="button" onClick={() => onOpenPerson(person.userId)}>
-                {nameOf(person.userId)}
-              </button>
-            </span>
-          ))}
-        </p>
+          <div>
+            <small>Words</small>
+            <strong>{words}</strong>
+          </div>
+          <div>
+            <small>Changes this week</small>
+            <strong>{versions ? week : "–"}</strong>
+          </div>
+        </div>
 
         <div className="sheet-work">
+          <h3>History</h3>
           {failure && (
             <p role="alert" className="sheet-quiet is-failure">
               {failure}

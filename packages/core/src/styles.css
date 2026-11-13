@@ -10290,50 +10290,6 @@ button.sheet-chip:hover,
   }
 }
 
-/* A note's or a folder's sheet: one heading read left to right, its counts as
-   one line of doors, then what happened on a single line through the faces.
-   No tiles and no card per section. */
-.sheet-body.is-timeline .sheet-hero {
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  padding: 22px 64px 0 22px;
-  text-align: left;
-}
-
-/* Everything arrives with the sheet in one movement: bands landing a beat
-   apart read as the sheet stuttering open. */
-.sheet-body.is-timeline > * {
-  animation: none;
-}
-
-.sheet-body.is-timeline .sheet-hero > div {
-  min-width: 0;
-}
-
-.sheet-body.is-timeline .sheet-portrait {
-  margin: 0;
-}
-
-.sheet-body.is-timeline .sheet-note-glyph {
-  width: 44px;
-  height: 44px;
-  flex: none;
-  border-radius: 11px;
-}
-
-.sheet-body.is-timeline .sheet-hero h2 {
-  overflow: hidden;
-  font-size: var(--text-md);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sheet-body.is-timeline .sheet-hero p {
-  margin-top: 1px;
-}
-
-.sheet-counts,
 .sheet-links {
   padding: 14px 22px 0;
   color: var(--ink-4);
@@ -10342,12 +10298,10 @@ button.sheet-chip:hover,
   line-height: 1.6;
 }
 
-.sheet-counts button,
 .sheet-links button {
   color: var(--ink-2);
 }
 
-.sheet-counts button:hover,
 .sheet-links button:hover {
   color: var(--ink);
   text-decoration: underline;
@@ -10359,36 +10313,6 @@ button.sheet-chip:hover,
   border-top: 1px solid var(--rule);
   margin: 6px 10px 0;
   padding: 10px 12px 0;
-}
-
-.sheet-body.is-timeline .sheet-work {
-  padding: 16px 10px 14px;
-}
-
-.sheet-timeline {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The line runs between the marks, never under them: the sheet is glass, and
-   a mark painted over the line would show it through. */
-.sheet-timeline li:not(:last-child)::after {
-  position: absolute;
-  top: 32px;
-  bottom: -2px;
-  left: 23px;
-  width: 1px;
-  background: var(--rule);
-  content: "";
-}
-
-.sheet-timeline li {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 2px;
 }
 
 .sheet-event-mark {
@@ -10419,44 +10343,6 @@ button.sheet-chip:hover,
 
 .sheet-event-mark.is-face:hover {
   box-shadow: 0 0 0 2px var(--ink-4);
-}
-
-.sheet-event {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 1px;
-  border-radius: 8px;
-  padding: 6px 8px;
-  text-align: left;
-  font-family: var(--font-sans);
-}
-
-button.sheet-event:hover {
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-}
-
-.sheet-event-text {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sheet-event-meta {
-  color: var(--ink-4);
-  font-size: var(--text-2xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.sheet-event-meta .is-added {
-  color: var(--accent-strong);
-}
-
-.sheet-event-meta .is-removed {
-  color: var(--danger);
 }
 
 /* The note's own glyph, or its photograph: a square with the row's corner,
@@ -14991,22 +14877,23 @@ button.sheet-event:hover {
   padding-block: 0;
 }
 
-/* ── The person sheet, plain ──────────────────────────────────────────────────
-   The same parts in the same order, with room between them and nothing drawn
+/* ── The sheets, plain ────────────────────────────────────────────────────────
+   A person's, a note's and a folder's sheet share one drawing. The same parts
+   in the same order, with room between them and nothing drawn
    around them: a face with no ring, where they are as a line of text, three
    numbers in three columns, and each day's notes as ruled rows. Type is the
    list's own: 13px titles, 12px secondary lines and headings in grey. The
    face, the numbers and the rows share one left edge. */
-.sheet:has(.sheet-body.is-person) {
+.sheet:has(.sheet-body.is-plain) {
   border-radius: 12px;
 }
 
-.sheet-body.is-person {
+.sheet-body.is-plain {
   --sheet-inset: 20px;
   --sheet-rule: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
-.sheet-body.is-person .sheet-hero {
+.sheet-body.is-plain .sheet-hero {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   align-items: center;
@@ -15017,40 +14904,68 @@ button.sheet-event:hover {
 
 /* Opened from another sheet, it carries a back button in the corner the face
    stands in; the face steps down below it rather than under it. */
-.sheet:has(> .sheet-back) .sheet-body.is-person .sheet-hero {
+.sheet:has(> .sheet-back) .sheet-body.is-plain .sheet-hero {
   padding-top: 56px;
 }
 
-.sheet-body.is-person .sheet-hero > :not(.sheet-portrait) {
+.sheet-body.is-plain .sheet-hero > :not(.sheet-portrait) {
   grid-column: 2;
 }
 
-.sheet-body.is-person .sheet-portrait.is-round {
+.sheet-body.is-plain .sheet-portrait {
   grid-row: 1 / span 3;
   margin: 0;
   outline: none;
 }
 
-.sheet-body.is-person .sheet-portrait .avatar.is-large {
+.sheet-body.is-plain .sheet-portrait .avatar.is-large {
   width: 44px;
   height: 44px;
   font-size: 16px;
 }
 
-.sheet-body.is-person .sheet-hero > h2 {
+.sheet-body.is-plain .sheet-hero > h2 {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   letter-spacing: 0;
 }
 
-.sheet-body.is-person .sheet-hero > p {
+.sheet-body.is-plain .sheet-hero > p {
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
 
+/* A note's or a folder's glyph stands where the face does, filled and at its
+   size, so its edge is the face's edge. */
+.sheet-body.is-plain .sheet-note-glyph {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-3);
+}
+
+.sheet-body.is-plain .sheet-hero > h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-body.is-plain .sheet-hero p button,
+.sheet-body.is-plain .sheet-links button {
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
+}
+
+.sheet-body.is-plain .sheet-hero p button:hover,
+.sheet-body.is-plain .sheet-links button:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+
 /* Where they are now: a line of text, not a lozenge. */
-.sheet-body.is-person .sheet-now {
+.sheet-body.is-plain .sheet-now {
   max-width: 100%;
   justify-self: start;
   margin: 0;
@@ -15061,29 +14976,29 @@ button.sheet-event:hover {
   font-size: var(--text-xs);
 }
 
-.sheet-body.is-person .sheet-now:hover {
+.sheet-body.is-plain .sheet-now:hover {
   background: none;
 }
 
-.sheet-body.is-person .sheet-now strong {
+.sheet-body.is-plain .sheet-now strong {
   color: var(--ink-3);
   font-weight: var(--weight-regular);
 }
 
-.sheet-body.is-person .sheet-now:hover strong {
+.sheet-body.is-plain .sheet-now:hover strong {
   color: var(--ink);
 }
 
 /* The numbers: from the face's edge to the counts' edge, the same space
    between each. */
-.sheet-body.is-person .sheet-stats {
+.sheet-body.is-plain .sheet-stats {
   display: flex;
   justify-content: space-between;
   gap: 0;
   margin: 28px var(--sheet-inset) 0;
 }
 
-.sheet-body.is-person .sheet-stats > * {
+.sheet-body.is-plain .sheet-stats > * {
   gap: 2px;
   border-radius: 0;
   background: none;
@@ -15091,31 +15006,39 @@ button.sheet-event:hover {
   text-align: left;
 }
 
-.sheet-body.is-person .sheet-stats dd {
+.sheet-body.is-plain .sheet-stats > button:hover {
+  background: none;
+}
+
+.sheet-body.is-plain .sheet-stats > button:hover small {
+  color: var(--ink);
+}
+
+.sheet-body.is-plain .sheet-stats :is(dd, strong) {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.sheet-body.is-person .sheet-stats dt {
+.sheet-body.is-plain .sheet-stats :is(dt, small) {
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
 
 /* Each day: its name small and grey above, its notes as ruled rows. */
-.sheet-body.is-person .sheet-work {
+.sheet-body.is-plain .sheet-work {
   gap: 0;
   padding: 32px var(--sheet-inset) 20px;
 }
 
-.sheet-body.is-person .sheet-work > h3 {
+.sheet-body.is-plain .sheet-work > h3 {
   padding: 0;
   color: var(--ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
 }
 
-.sheet-body.is-person .sheet-day {
+.sheet-body.is-plain .sheet-day {
   gap: 0;
   margin-top: 0;
   border-radius: 0;
@@ -15123,7 +15046,7 @@ button.sheet-event:hover {
   padding: 0;
 }
 
-.sheet-body.is-person .sheet-day > p {
+.sheet-body.is-plain .sheet-day > p {
   padding: 16px 0 4px;
   color: var(--ink-3);
   font-size: var(--text-xs);
@@ -15131,47 +15054,117 @@ button.sheet-event:hover {
 }
 
 /* A row's press reaches 8px past its text, as the list's selection does; the
-   rule between rows spans the same width. */
-.sheet-body.is-person .sheet-day > .sheet-row {
+   rule between rows spans the same width. A note's or a folder's row carries
+   the face of whoever did it before what was done. */
+.sheet-body.is-plain .sheet-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-inline: -8px;
+  padding-left: 8px;
+}
+
+.sheet-body.is-plain .sheet-entry + .sheet-entry {
+  box-shadow: inset 0 1px 0 var(--sheet-rule);
+}
+
+.sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) {
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow: none;
+}
+
+.sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) + .sheet-entry {
+  box-shadow: none;
+}
+
+.sheet-body.is-plain .sheet-entry > .sheet-row {
+  min-width: 0;
+  flex: 1;
+  border-radius: 0;
+  background: none;
+  padding: 10px 8px 10px 0;
+}
+
+/* The title keeps at least half the row; a long note on the right gives way. */
+.sheet-body.is-plain .sheet-entry > .sheet-row {
+  flex-wrap: nowrap;
+}
+
+.sheet-body.is-plain .sheet-entry .sheet-row-title {
+  flex: 1 0 50%;
+  min-width: 0;
+}
+
+.sheet-body.is-plain .sheet-entry .sheet-row-meta {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-body.is-plain .sheet-entry .sheet-event-mark {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.sheet-body.is-plain .sheet-entry .sheet-event-mark .avatar.is-compact {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet-body.is-plain .sheet-entry .sheet-event-mark.is-face:hover {
+  box-shadow: none;
+  opacity: 0.8;
+}
+
+.sheet-body.is-plain .sheet-links {
+  margin: 0;
+  border-top: 0;
+  padding: 16px 0 0;
+}
+
+.sheet-body.is-plain .sheet-day > .sheet-row {
   margin-inline: -8px;
   border-radius: 0;
   background: none;
   padding: 10px 8px;
 }
 
-.sheet-body.is-person .sheet-day > .sheet-row + .sheet-row {
+.sheet-body.is-plain .sheet-day > .sheet-row + .sheet-row {
   box-shadow: inset 0 1px 0 var(--sheet-rule);
 }
 
-.sheet-body.is-person .sheet-day > .sheet-row:not(:disabled):hover {
+.sheet-body.is-plain .sheet-day > .sheet-row:not(:disabled):hover {
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
 
-.sheet-body.is-person .sheet-day > .sheet-row:not(:disabled):hover + .sheet-row {
+.sheet-body.is-plain .sheet-day > .sheet-row:not(:disabled):hover + .sheet-row {
   box-shadow: none;
 }
 
-.sheet-body.is-person .sheet-row-title {
+.sheet-body.is-plain .sheet-row-title {
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
 }
 
-.sheet-body.is-person .sheet-row-meta {
+.sheet-body.is-plain .sheet-row-meta {
   font-size: var(--text-xs);
 }
 
-.sheet-body.is-person .sheet-row-meta,
-.sheet-body.is-person .sheet-row-meta :is(.is-added, .is-removed),
-.sheet-body.is-person .sheet-label {
+.sheet-body.is-plain .sheet-row-meta,
+.sheet-body.is-plain .sheet-row-meta :is(.is-added, .is-removed),
+.sheet-body.is-plain .sheet-label {
   color: var(--ink-4);
 }
 
-.sheet-body.is-person .sheet-label {
+.sheet-body.is-plain .sheet-label {
   font-weight: var(--weight-regular);
 }
 
-.sheet:has(.sheet-body.is-person) :is(.sheet-close, .sheet-back) {
+.sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back) {
   top: 14px;
   width: 28px;
   min-width: 28px;
@@ -15182,14 +15175,14 @@ button.sheet-event:hover {
   padding: 0;
 }
 
-.sheet:has(.sheet-body.is-person) .sheet-close {
+.sheet:has(.sheet-body.is-plain) .sheet-close {
   right: 14px;
 }
 
-.sheet:has(.sheet-body.is-person) .sheet-back {
+.sheet:has(.sheet-body.is-plain) .sheet-back {
   left: 14px;
 }
 
-.sheet:has(.sheet-body.is-person) :is(.sheet-close, .sheet-back):hover {
+.sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back):hover {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
