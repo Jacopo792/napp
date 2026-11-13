@@ -56,19 +56,19 @@ export const PRESETS: Preset[] = [
     id: "compact",
     name: "Compact",
     role: "Dense & fast",
-    axes: { size: 14, measure: 78, weight: 430, leading: 1.5 },
+    axes: { size: 14, measure: 62, weight: 430, leading: 1.5 },
   },
   {
     id: "reading",
     name: "Reading",
     role: "Long-form",
-    axes: { size: 17, measure: 86, weight: 430, leading: 1.65 },
+    axes: { size: 17, measure: 68, weight: 430, leading: 1.65 },
   },
   {
     id: "study",
     name: "Study",
     role: "Large & airy",
-    axes: { size: 18, measure: 92, weight: 430, leading: 1.85 },
+    axes: { size: 18, measure: 74, weight: 430, leading: 1.85 },
   },
   {
     id: "focus",
