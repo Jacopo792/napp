@@ -114,7 +114,7 @@
 
   /* Reading controls — written by lib/axes.ts, read by title and editor. */
   --read-size: 17px;
-  --read-measure: 68ch;
+  --read-measure: 86ch;
   --read-weight: 430;
   --read-leading: 1.65;
 
