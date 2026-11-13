@@ -94,6 +94,9 @@ export function SpaceSwitch({
   onDelete: (archiveId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  /* Fixed at the button rather than absolute in it: the sidebar scrolls, so it
+     clips, and the menu is wider than the column it opens from. */
+  const [at, setAt] = useState<CSSProperties>();
   const [menu, setMenu] = useState<{ point: MenuPoint; items: MenuItem[] } | null>(null);
   const close = () => setOpen(false);
   const ref = useDismiss(open, close);
@@ -162,8 +165,10 @@ export function SpaceSwitch({
         className="space-switch press"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => {
+        onClick={(event) => {
           if (hold.current?.fired) return void (hold.current = null);
+          const box = event.currentTarget.getBoundingClientRect();
+          setAt({ top: box.bottom + 4, left: box.left });
           setOpen((now) => !now);
         }}
         onPointerDown={(event) => {
@@ -191,7 +196,7 @@ export function SpaceSwitch({
         <span className="space-switch-name">{current.name}</span>
         <ChevronDown size={14} className="space-switch-chevron" />
       </button>
-      <MenuSurface open={open} role="menu" className="popover menu-popover space-menu">
+      <MenuSurface open={open} role="menu" className="popover menu-popover space-menu" style={at}>
         {spaces.map((space) => (
           <div
             key={space.archiveId}

@@ -3,6 +3,13 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.54 – 2026-11-13
+
+### Fixed
+
+- The archive switch's menu is no longer clipped by the sidebar column; it opens
+  whole over the note list.
+
 ## 0.9.53 – 2026-11-13
 
 ### Changed

@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.54",
+    date: "2026-11-13",
+    headline: "The archive menu opens whole",
+    sections: [
+      {
+        heading: "Sidebar",
+        items: [
+          {
+            title: "A full archive menu",
+            text: "The menu under the archive's name opens over the note list instead of being cut off at the edge of the sidebar.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.53",
     date: "2026-11-13",
     headline: "A quieter, more even window",

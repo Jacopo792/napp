@@ -10407,11 +10407,8 @@ button.sheet-chip:hover,
 }
 
 .space-menu {
-  position: absolute;
+  position: fixed;
   z-index: 50;
-  top: calc(100% + 4px);
-  right: 0;
-  left: 0;
   min-width: 15rem;
   padding: 6px;
 }
