@@ -6279,14 +6279,17 @@
   display: none;
 }
 
-/* A Mac window keeps the room the traffic lights stand in, unruled and empty,
-   and the window is dragged by it. Full screen takes the lights away and the
-   room with them. 40px: the lights are 12 tall at y 20 in the window, and the
-   people start under them. */
-[data-shell="mac"]:not([data-fullscreen]) .sidebar-topbar:not(.has-close) {
-  display: flex;
-  height: 40px;
-  box-shadow: none;
+/* A Mac window in its own frame: the lights stand in the top band, centred
+   on it (y 14, 12 tall), so no column steps down for them. Only the rail does,
+   its faces starting under the lights; the archive's name stays level with
+   the list's title and the note's tools, past the lights on the rows' text
+   edge. Full screen takes the lights away and the room with them. */
+[data-shell="mac"]:not([data-fullscreen]) .sidebar-rail {
+  padding-top: 52px;
+}
+
+[data-shell="mac"]:not([data-fullscreen]) .sidebar-head {
+  padding-left: 25px;
 }
 
 /* With no band above it the shelf is the top of the column, so it takes the

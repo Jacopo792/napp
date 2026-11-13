@@ -214,15 +214,13 @@ function createWindow() {
           },
         }
       : {}),
-    /* Where the three buttons sit, and it is not decoration. `hiddenInset`
-       puts them at the window's own top-left, which is on top of the first row
-       of the sidebar — so they are moved down to the middle of the 52px header
-       strip, and the strip is given a gutter to stand in (`--titlebar-inset` in
-       the stylesheet). The two numbers are one decision in two files: change
-       one and the buttons are either over the avatar or floating in a gap. y is
-       the top of the buttons, which are 12px, so 20 centres them in a strip
-       that runs from 0 to 52. */
-    ...(isMac ? { trafficLightPosition: { x: 19, y: 20 } } : {}),
+    /* Where the three buttons sit, and it is not decoration: in the window's
+       top band, level with the archive's name, the list's title and the note's
+       tools, with the sidebar's rail starting under them and the name past
+       them (`--titlebar-inset` and the Mac rules in the stylesheet). The
+       numbers are one decision in two files. y is the top of the buttons,
+       which are 12px, so 14 centres them in the 40px band. */
+    ...(isMac ? { trafficLightPosition: { x: 19, y: 14 } } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
