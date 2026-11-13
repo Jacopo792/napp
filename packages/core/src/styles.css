@@ -6095,6 +6095,7 @@
    round each group was saying it three times. */
 :is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
   border-color: transparent;
+  border-radius: 5px;
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -14988,4 +14989,207 @@ button.sheet-event:hover {
 .editor-toolbar :is(.editor-tool-group, .editor-tool-cluster) {
   height: 34px;
   padding-block: 0;
+}
+
+/* ── The person sheet, plain ──────────────────────────────────────────────────
+   The same parts in the same order, with room between them and nothing drawn
+   around them: a face with no ring, where they are as a line of text, three
+   numbers in three columns, and each day's notes as ruled rows. Type is the
+   list's own: 13px titles, 12px secondary lines and headings in grey. The
+   face, the numbers and the rows share one left edge. */
+.sheet:has(.sheet-body.is-person) {
+  border-radius: 12px;
+}
+
+.sheet-body.is-person {
+  --sheet-inset: 20px;
+  --sheet-rule: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.sheet-body.is-person .sheet-hero {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 14px;
+  padding: 24px 56px 0 var(--sheet-inset);
+  text-align: left;
+}
+
+/* Opened from another sheet, it carries a back button in the corner the face
+   stands in; the face steps down below it rather than under it. */
+.sheet:has(> .sheet-back) .sheet-body.is-person .sheet-hero {
+  padding-top: 56px;
+}
+
+.sheet-body.is-person .sheet-hero > :not(.sheet-portrait) {
+  grid-column: 2;
+}
+
+.sheet-body.is-person .sheet-portrait.is-round {
+  grid-row: 1 / span 3;
+  margin: 0;
+  outline: none;
+}
+
+.sheet-body.is-person .sheet-portrait .avatar.is-large {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.sheet-body.is-person .sheet-hero > h2 {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+
+.sheet-body.is-person .sheet-hero > p {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+/* Where they are now: a line of text, not a lozenge. */
+.sheet-body.is-person .sheet-now {
+  max-width: 100%;
+  justify-self: start;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.sheet-body.is-person .sheet-now:hover {
+  background: none;
+}
+
+.sheet-body.is-person .sheet-now strong {
+  color: var(--ink-3);
+  font-weight: var(--weight-regular);
+}
+
+.sheet-body.is-person .sheet-now:hover strong {
+  color: var(--ink);
+}
+
+/* The numbers: from the face's edge to the counts' edge, the same space
+   between each. */
+.sheet-body.is-person .sheet-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 0;
+  margin: 28px var(--sheet-inset) 0;
+}
+
+.sheet-body.is-person .sheet-stats > * {
+  gap: 2px;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+
+.sheet-body.is-person .sheet-stats dd {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-body.is-person .sheet-stats dt {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+/* Each day: its name small and grey above, its notes as ruled rows. */
+.sheet-body.is-person .sheet-work {
+  gap: 0;
+  padding: 32px var(--sheet-inset) 20px;
+}
+
+.sheet-body.is-person .sheet-work > h3 {
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-body.is-person .sheet-day {
+  gap: 0;
+  margin-top: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+}
+
+.sheet-body.is-person .sheet-day > p {
+  padding: 16px 0 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+/* A row's press reaches 8px past its text, as the list's selection does; the
+   rule between rows spans the same width. */
+.sheet-body.is-person .sheet-day > .sheet-row {
+  margin-inline: -8px;
+  border-radius: 0;
+  background: none;
+  padding: 10px 8px;
+}
+
+.sheet-body.is-person .sheet-day > .sheet-row + .sheet-row {
+  box-shadow: inset 0 1px 0 var(--sheet-rule);
+}
+
+.sheet-body.is-person .sheet-day > .sheet-row:not(:disabled):hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow: none;
+}
+
+.sheet-body.is-person .sheet-day > .sheet-row:not(:disabled):hover + .sheet-row {
+  box-shadow: none;
+}
+
+.sheet-body.is-person .sheet-row-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+}
+
+.sheet-body.is-person .sheet-row-meta {
+  font-size: var(--text-xs);
+}
+
+.sheet-body.is-person .sheet-row-meta,
+.sheet-body.is-person .sheet-row-meta :is(.is-added, .is-removed),
+.sheet-body.is-person .sheet-label {
+  color: var(--ink-4);
+}
+
+.sheet-body.is-person .sheet-label {
+  font-weight: var(--weight-regular);
+}
+
+.sheet:has(.sheet-body.is-person) :is(.sheet-close, .sheet-back) {
+  top: 14px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+  background: none;
+  padding: 0;
+}
+
+.sheet:has(.sheet-body.is-person) .sheet-close {
+  right: 14px;
+}
+
+.sheet:has(.sheet-body.is-person) .sheet-back {
+  left: 14px;
+}
+
+.sheet:has(.sheet-body.is-person) :is(.sheet-close, .sheet-back):hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
