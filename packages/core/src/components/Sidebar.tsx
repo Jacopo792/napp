@@ -72,7 +72,8 @@ interface Props {
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
   /** The folder's sheet. */
-  onFolderInfo: (id: string) => void;
+  /** A folder's row held still: the folder shown while the press lasts. */
+  onFolderPeek: (id: string, point: { x: number; y: number }) => void;
   onClose: () => void;
   /** On the phone the column is a sheet and this is how it is put away; on
    *  the desktop hiding the columns lives in the list's own group. */
@@ -344,7 +345,7 @@ function Row({
   onSelect: () => void;
   onContextMenu?: (event: React.MouseEvent) => void;
   /** A mouse pressed and kept still; the click that ends it is not a select. */
-  onHold?: () => void;
+  onHold?: (point: { x: number; y: number }) => void;
   /** A folder that can be dragged to another place among the folders. */
   movable?: boolean;
   /** Where a folder being dragged over this one would land beside it. */
@@ -398,7 +399,7 @@ function Row({
           const press = { x: event.clientX, y: event.clientY, fired: false, timer: 0 };
           press.timer = window.setTimeout(() => {
             press.fired = true;
-            onHold();
+            onHold({ x: press.x, y: press.y });
           }, HOLD_MS);
           hold.current = press;
         }}
@@ -448,7 +449,7 @@ export function Sidebar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onFolderInfo,
+  onFolderPeek,
   onClose,
   closeInStrip = false,
   onSettings,
@@ -573,7 +574,7 @@ export function Sidebar({
           }
           /* The open folder pressed again closes it, back to every note. */
           onSelect={() => onSelect(active ? ALL : node.folder.id)}
-          onHold={() => onFolderInfo(node.folder.id)}
+          onHold={(point) => onFolderPeek(node.folder.id, point)}
           onContextMenu={(event) => {
             setConfirmDelete(false);
             folderMenu.open(event, node.folder);
@@ -885,20 +886,10 @@ export function Sidebar({
         />
       )}
 
-      {folderMenu.target && (
+      {folderMenu.target && canWrite && (
         <ContextMenu point={folderMenu.target} onClose={closeFolderMenu}>
-          <MenuButton
-            onClick={() => {
-              onFolderInfo(folderMenu.target!.item.id);
-              closeFolderMenu();
-            }}
-          >
-            <Info size={16} />
-            Folder info
-          </MenuButton>
           {canWrite && (
             <>
-              <div className="menu-separator" />
               <MenuButton
                 onClick={() => {
                   setRenaming(folderMenu.target!.item.id);

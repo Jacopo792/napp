@@ -14878,3 +14878,102 @@ button.sheet-chip:hover,
   margin-left: -6px;
   padding: 2px 6px;
 }
+
+/* ── A note, seen while its row is held ─────────────────────────────────────
+   The page itself, small: its picture, its title and opening lines in the
+   reading face, one grey line of facts. It grows out of the press and has
+   nothing to press. */
+.note-peek {
+  position: fixed;
+  z-index: 96;
+  width: 340px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--page);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent),
+    0 24px 60px rgb(0 0 0 / 0.42);
+  pointer-events: none;
+  animation: peek-in 220ms var(--ease-out) backwards;
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-peek {
+    animation: none;
+  }
+}
+
+.note-peek-photo {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.note-peek-page {
+  padding: 16px 18px 4px;
+}
+
+.note-peek-page h2 {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-family: var(--font-reading, var(--font-serif, Georgia, serif));
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.note-peek-page p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font-reading, var(--font-serif, Georgia, serif));
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+}
+
+.note-peek-facts {
+  padding: 10px 18px 14px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.note-peek-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 6px;
+  list-style: none;
+}
+
+.note-peek-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-sm);
+}
+
+.note-peek-list span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-peek-list time {
+  flex: none;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
