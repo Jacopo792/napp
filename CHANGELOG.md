@@ -3,6 +3,21 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.55 – 2026-11-14
+
+### Changed
+
+- ⌘B / Ctrl+B shows or hides the sidebar outside a note's text, where it stays
+  Bold; ⌘\ still works.
+- Delete account in Settings uses Settings' rows: a password row, a confirmation
+  and Cancel / Delete Account. The public deletion page is unchanged.
+
+### Fixed
+
+- Escape closes Settings (after reverting an edited nickname, and not while a
+  menu inside it is open).
+- The face beside a note's title in the list is no longer clipped.
+
 ## 0.9.54 – 2026-11-13
 
 ### Fixed

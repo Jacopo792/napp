@@ -14,9 +14,12 @@ import { PolicyLinks } from "./PolicyLinks";
 export function AccountDeletionForm({
   accountEmail,
   onErased,
+  onCancel,
 }: {
   accountEmail?: string;
   onErased?: () => void;
+  /** Given by Settings, which draws the form in its own rows. */
+  onCancel?: () => void;
 }) {
   const [email, setEmail] = useState(accountEmail ?? "");
   const [password, setPassword] = useState("");
@@ -73,6 +76,53 @@ export function AccountDeletionForm({
             : "Deletion continues automatically. You do not need to keep this page open."}
         </p>
       </div>
+    );
+
+  const ready = !busy && confirmed && Boolean(password) && Boolean(email.trim());
+
+  /* Inside Settings: the account is already known, and the policy links sit
+     in the row above, so neither is asked for again. */
+  if (onCancel)
+    return (
+      <form className="account-deletion-rows" onSubmit={(event) => void submit(event)}>
+        <p className="account-deletion-consequences">{ACCOUNT_DELETION_CONSEQUENCES}</p>
+        <input type="email" autoComplete="username" value={email} readOnly hidden />
+        <label className="appearance-row">
+          Password
+          <input
+            className="profile-field"
+            type="password"
+            autoComplete="current-password"
+            required
+            autoFocus
+            disabled={busy}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+        <label className="appearance-row account-deletion-check">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            disabled={busy}
+            onChange={(event) => setConfirmed(event.target.checked)}
+          />
+          Delete my notes too, including shared ones
+        </label>
+        {error ? (
+          <p className="account-deletion-consequences text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="appearance-row account-deletion-actions">
+          <button type="button" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="is-danger" disabled={!ready}>
+            {busy ? "Deleting…" : "Delete Account"}
+          </button>
+        </div>
+      </form>
     );
 
   return (

@@ -45,6 +45,44 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.55",
+    date: "2026-11-14",
+    headline: "Keys that behave like a Mac's",
+    sections: [
+      {
+        heading: "Keyboard",
+        items: [
+          {
+            title: "⌘B for the sidebar",
+            text: "⌘B (Ctrl+B on Windows) shows or hides the sidebar. In a note's text it is still Bold.",
+          },
+          {
+            title: "Escape closes Settings",
+            text: "Escape closes Settings. An unsaved nickname is put back first, and an open menu closes on its own.",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "A tidier Delete account",
+            text: "Deleting your account asks for your password in Settings' own rows, with Cancel beside it.",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Whole faces in the list",
+            text: "The small picture beside a note's title is no longer cut at the top.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.54",
     date: "2026-11-13",
     headline: "The archive menu opens whole",

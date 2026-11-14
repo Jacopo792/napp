@@ -428,6 +428,7 @@ export function SettingsPanel({
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
   const [closing, setClosing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while
      the panel is up is the button below, which sets it itself. */
@@ -786,10 +787,24 @@ export function SettingsPanel({
                     <div className="appearance-row">
                       <PolicyLinks />
                     </div>
-                    <details className="settings-disclosure">
-                      <summary className="appearance-row">Delete account permanently</summary>
-                      <AccountDeletionForm accountEmail={email} onErased={onAccountDeleted} />
-                    </details>
+                    {deleting ? (
+                      <AccountDeletionForm
+                        accountEmail={email}
+                        onErased={onAccountDeleted}
+                        onCancel={() => setDeleting(false)}
+                      />
+                    ) : (
+                      <div className="appearance-row">
+                        Delete account
+                        <button
+                          type="button"
+                          className="account-delete-open"
+                          onClick={() => setDeleting(true)}
+                        >
+                          Delete…
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
