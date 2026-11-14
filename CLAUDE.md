@@ -8,7 +8,8 @@ The implementation and configuration establish current behavior.
 ## Working safely in this repository
 
 - `main` is the public web/desktop release branch; `PP` is public pre-production.
-  `ios` and `android` already exist and are retained at Jacopo's request.
+  `ios` and `android` are local-only mobile branches; they were removed from
+  GitHub on 2026-11-14 and must not be pushed there again.
 - Do not create branches unless Jacopo explicitly names one. Do not open pull
   requests. Work in an existing checkout and inspect its status first.
 - Other sessions may be working concurrently. Preserve their changes and commits;
@@ -18,7 +19,6 @@ The implementation and configuration establish current behavior.
   `main:PP` or force either branch.
 - **The mobile client is commercial. Do not push its source, build artifacts,
   private development documents or commit history to the public repository.**
-  Existing remote mobile branches are not authorization for further mobile pushes.
   Prepare public work from `main`; copy only reviewed public changes, never merge
   a mobile branch into `main` or `PP`. Inspect the outgoing tree and history.
 - Public marketing screenshots are allowed. Use only images captured on an
