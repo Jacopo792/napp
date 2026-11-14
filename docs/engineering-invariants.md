@@ -20,7 +20,7 @@ the editor, and preserve the lock mark's single-holder schema semantics.
 exclusion rules into write locks. Persisted schema changes must be understood by
 all readers/serializers through `BASE_EXTENSIONS`.
 
-`lib/historyRestore.ts` preserves the current version before replacing anything.
+`restore()` in `features/editor/components/NoteHistory.tsx` preserves the current version before replacing anything.
 Check its cancellation and concurrent-edit guards when changing restore flows.
 Note/person activity and version history derive from the same version records;
 opening a document or publishing awareness is not an authored edit.

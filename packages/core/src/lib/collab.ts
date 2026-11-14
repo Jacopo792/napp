@@ -104,11 +104,9 @@ export { collaborationColor };
  * one socket; this is the same arrangement `packages/collab-server/src/integration.test.ts`
  * connects with.
  *
- * Holding it open has a second effect worth as much as the first: the free
- * Render instance sleeps after fifteen idle minutes and takes about fifty
- * seconds to wake, and an open socket is never idle. The cold start is paid
- * once at sign-in instead of at whichever note switch happens to fall after a
- * quarter hour of reading. */
+ * The connection is also paid once at sign-in rather than at every note
+ * switch, which matters most when the server is slow to answer, for example
+ * while it restarts during a deployment. */
 let shared: HocuspocusProviderWebsocket | null = null;
 
 function sharedSocket(): HocuspocusProviderWebsocket {
@@ -379,15 +377,14 @@ export function useCollaborativeNote(
     });
   }, [provider, userId, name]);
 
-  /* Four seconds is "the network is slow"; longer than that, on a plan whose
-     server sleeps after fifteen idle minutes, is the server getting up. Held
-     outside `state` so the timer cannot race the socket's own updates.
+  /* Four seconds is "the network is slow"; longer than that is usually the
+     server restarting, for example during a deployment. Held outside `state`
+     so the timer cannot race the socket's own updates.
 
      The second timer is the one that ends a wait that was never going to end.
-     It is deliberately well past the cold start: a sleeping Render instance
-     leaves the connection hanging for about fifty seconds, and a nudge inside
-     that window would abandon the attempt that was about to succeed and start
-     the same fifty seconds again. Past two minutes there is nothing left to
+     It is deliberately well past a restart: a starting instance can leave the
+     connection hanging for most of a minute, and a nudge inside that window
+     would abandon the attempt that was about to succeed and start again. Past two minutes there is nothing left to
      interrupt — the socket is hung, and one `connect()` is the difference
      between a note that opens and a window that has to be quit. */
   const [waking, setWaking] = useState(false);

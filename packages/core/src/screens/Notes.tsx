@@ -3955,18 +3955,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       {collaborative.refusal}
     </span>
   ) : selectedId && !collaborative.ready ? (
-    /* The free plan's server sleeps after fifteen idle minutes and takes about
-       fifty seconds to get up, and nothing opens until it has. Saying so is
-       most of the fix: an unexplained wait is indistinguishable from a fault,
-       and this one was being read as "live is broken again". What you type
-       meanwhile is kept and sent on arrival, which is the other half worth
+    /* Nothing opens until the collaboration server has answered, and while it
+       restarts (during a deployment) that can take most of a minute. Saying so
+       matters: an unexplained wait is indistinguishable from a fault. What you
+       type meanwhile is kept and sent on arrival, which is the other half worth
        saying — so it goes in the tooltip rather than in a second line. */
     <span
       key={collaborative.waking ? "waking" : "connecting"}
       className="label text-ink-4"
       title={
         collaborative.waking
-          ? "The collaboration server sleeps when nobody is writing and takes about a minute to wake. Anything you type now is kept on this device and sent when it arrives."
+          ? "The collaboration server is taking longer than usual to answer. Anything you type now is kept on this device and sent when it arrives."
           : undefined
       }
     >

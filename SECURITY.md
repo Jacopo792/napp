@@ -194,7 +194,8 @@ retry each minute. Other authors' documents, edits and necessary files remain.
 The requesting device attempts to remove the erased account's sessions, snapshots
 and Yjs/image/note caches; exported copies and offline devices cannot be recalled.
 Tombstones and write guards prevent stale clients from recreating erased data.
-See `docs/account-deletion-handoff.md` for the deployed contract and fixture tests.
+The contract and its tests are in `supabase/functions/delete-account/` and
+`scripts/verify-account-erasure-postgres.mjs`.
 
 Reports are private, operator review is service-only, and restrictive RLS filters
 notes/comments/files. Blocks stop direct invitations and hide the parties' own

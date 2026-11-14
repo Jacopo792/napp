@@ -160,13 +160,13 @@ node -e 'import("ws").then(({default:W})=>{const s=new W("wss://notes-collab.onr
 
 `refused 403` means the origin is missing from the list.
 
-**The first note of the day takes a minute.** The collaboration server is on a
-free plan that sleeps after fifteen idle minutes and takes about fifty seconds
-to wake, and an editor does not open until it has synced. The window says
-"Waking the server" rather than "Connecting" once it has been waiting four
-seconds, so you can tell that apart from a fault. Anything typed meanwhile is
-kept and sent when it arrives. A workflow pings the server through the hours
-anybody writes; the standing fix is a paid plan that does not sleep.
+**A note waits on "Waking the server".** The collaboration server is always
+on, but it restarts briefly during a deployment, and an editor does not open
+until it has synced. The window says "Waking the server" rather than
+"Connecting" once it has been waiting four seconds, so you can tell a slow
+answer apart from a fault. Anything typed meanwhile is kept and sent when it
+arrives. If the wait does not end, check `/readyz` and `/version` as described
+in `docs/backend-operations.md`.
 
 **An edit does not show as edited.** In a window left open for days this was a
 Realtime channel that had quietly died – the change reached the database and the

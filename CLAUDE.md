@@ -66,7 +66,7 @@ logo is artwork, not an encryption claim.
   anchors are document marks, not stored text offsets. Suggestion plugins need
   distinct keys. Local transaction filters must allow Yjs synchronization.
 - Restoring history must first preserve the present; stop on failure, concurrent
-  edits, permission changes or unmount. See `historyRestore.ts` and its tests.
+  edits, permission changes or unmount. See `restore()` in `NoteHistory.tsx`.
 - Explicit sign-out asks before removing local content, including unsynced edits.
   Removal is account-scoped and coordinated across tabs; block new opens and late
   writes until it finishes. Automatic lock and account switching retain recovery
