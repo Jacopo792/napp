@@ -65,3 +65,14 @@ test("a snippet keeps the match as written, accents included", () => {
 test("a match at the very start carries no leading ellipsis", () => {
   assert.deepEqual(snippetOf("Uno", "uno"), { before: "", match: "Uno", after: "" });
 });
+
+test("snippet offsets survive removed marks, expanded characters and emoji", () => {
+  assert.equal(snippetOf("Un caffe\u0301 e poi Perché", "perche")?.match, "Perché");
+  assert.equal(snippetOf("Prima \u0344 poi Fine", "fine")?.match, "Fine");
+  assert.equal(snippetOf("Prima 각 poi Fine", "fine")?.match, "Fine");
+  assert.equal(snippetOf("Prima 각 poi Fine", "\u1100\u1161\u11a8")?.match, "각");
+  assert.equal(snippetOf("📚 Perché studiare", "perche")?.match, "Perché");
+  assert.equal(snippetOf("📚 Perché studiare", "📚")?.match, "📚");
+  assert.equal(snippetOf("CAFFÈ\n\tPerché", "caffe perche")?.match, "CAFFÈ Perché");
+  assert.equal(snippetOf("Nessuna parola", ""), null);
+});

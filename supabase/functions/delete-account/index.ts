@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { processErasure, type ErasureBackend, type ErasureObject } from "./worker.ts";
+import { readErasureRequest } from "./request.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -50,11 +51,9 @@ Deno.serve(async (request) => {
   if (!authorization.startsWith("Bearer ")) return response(401, { error: "Sign in again" });
   let body: Record<string, unknown>;
   try {
-    const raw = await request.text();
-    if (raw.length > 8192) return response(413, { error: "Request too large" });
-    body = JSON.parse(raw);
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
-  } catch {
+    body = await readErasureRequest(request);
+  } catch (error) {
+    if (error instanceof RangeError) return response(413, { error: "Request too large" });
     return response(400, { error: "Invalid request" });
   }
   const deadline = Date.now() + 12_000;

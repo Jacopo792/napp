@@ -38,10 +38,9 @@ try {
     .filter(
       (name) =>
         name.endsWith(".sql") &&
-        (name < "20261024030000" ||
-          name === "20261024040000_safety_reports_and_blocks.sql" ||
-          name === "20261024050000_reviewed_report_retention.sql" ||
-          name === "20261024060000_erasure_mention_cleanup.sql"),
+        // Only pg_cron/pg_net scheduling needs the real Supabase stack.
+        // A date cutoff silently excluded every later security migration.
+        name !== "20261024030000_account_erasure_retry.sql",
     )
     .sort()) {
     stage = `migration ${file}`;
@@ -212,6 +211,52 @@ try {
     ]);
     if (id) await db.exec("set role authenticated");
   };
+  stage = "security hardening privileges and archive boundaries";
+  for (const fn of [
+    "public.set_archive_member_role(uuid,uuid,text)",
+    "private.change_archive_member_role(uuid,uuid,text)",
+  ])
+    assert.equal(
+      await scalar("select has_function_privilege('authenticated',$1,'EXECUTE')", [fn]),
+      false,
+      fn,
+    );
+  for (const table of [
+    "note_comments",
+    "note_versions",
+    "note_comment_reactions",
+    "archive_sources",
+    "media_text",
+  ])
+    assert.equal(
+      await scalar("select has_table_privilege('anon',$1,'SELECT')", [`public.${table}`]),
+      false,
+      table,
+    );
+  await asUser(two);
+  await db.query("update public.notes set archive_id=$1 where id=$2", [shared, safetyNote]);
+  assert.equal(
+    await scalar("select archive_id from public.notes where id=$1", [safetyNote]),
+    safetyArchive,
+    "A note cannot move away from its document, comments and versions",
+  );
+  await assert.rejects(
+    db.query(
+      "insert into public.note_comments(archive_id,note_id,thread_id,author_id,body) values ($1,$2,gen_random_uuid(),$3,'Wrong archive')",
+      [shared, safetyNote, two],
+    ),
+    /not in this archive/,
+  );
+  await db.query("select public.block_user($1)", [three]);
+  await assert.rejects(
+    db.query(
+      "insert into public.note_comments(archive_id,note_id,thread_id,author_id,body,assignee_id) values ($1,$2,gen_random_uuid(),$3,'Blocked assignee',$4)",
+      [shared, kept, two, three],
+    ),
+    /cannot mention a blocked account/,
+  );
+  await db.query("select public.unblock_user($1)", [three]);
+  stage = "safety reporting and blocking with actual RLS roles";
   await asUser(outsider);
   await assert.rejects(
     db.query("select public.report_safety_issue('harassment',$1)", [safetyNote]),

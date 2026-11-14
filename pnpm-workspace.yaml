@@ -11,3 +11,16 @@ allowBuilds:
   electron-winstaller: true
   core-js: false
   tesseract.js: false
+
+# Security fixes for transitive pins not advanced by their parent packages
+# (electron-builder, concurrently, typescript-eslint). Remove an entry once its
+# parent ships the fixed version.
+overrides:
+  "brace-expansion@2.1.4": 2.1.7
+  "brace-expansion@5.0.6": 5.0.12
+  "fast-uri@3.1.7": 3.1.9
+  "js-yaml@4.1.1": 4.3.2
+  "shell-quote@1.9.0": 1.11.0
+  "undici@6.28.0": 6.29.1
+  "glob@>=9 <14.0.2": 14.0.2
+  "minimatch@>=9 <11.0.1": 11.0.1

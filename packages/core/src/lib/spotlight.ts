@@ -88,22 +88,34 @@ export interface Snippet {
 /** The words around the first place `query` (already folded) occurs in
  *  `text`, with the match cut out exactly as it is written there — accents
  *  and capitals included, because that is what the editor is then asked to
- *  find. Folding is done a character at a time so the offsets in the folded
- *  string still point into the original one. */
+ *  find. Only non-ASCII characters need individual folding. Sparse offsets
+ *  track characters whose length changes instead of allocating one offset
+ *  per character of every note on each keystroke. */
 export function snippetOf(text: string, query: string, radius = 48): Snippet | null {
   if (!query) return null;
   const line = text.replace(/\s+/g, " ").trim();
-  let folded = "";
-  const at: number[] = [];
-  for (let index = 0; index < line.length; index += 1) {
-    const one = fold(line[index]);
-    for (let n = 0; n < one.length; n += 1) at.push(index);
-    folded += one;
-  }
+  const changes: { at: number; length: number }[] = [];
+  const folded = line
+    .replace(/[^ -~]/g, (character, at: number) => {
+      const one = fold(character);
+      if (one.length !== 1) changes.push({ at, length: one.length });
+      return one;
+    })
+    .replace(/[A-Z]+/g, (text) => text.toLowerCase());
   const hit = folded.indexOf(query);
   if (hit < 0) return null;
-  const start = at[hit];
-  const end = at[hit + query.length - 1] + 1;
+  const originalOffset = (offset: number) => {
+    let shift = 0;
+    for (const change of changes) {
+      const from = change.at + shift;
+      if (offset < from) break;
+      if (offset < from + change.length) return change.at;
+      shift += change.length - 1;
+    }
+    return offset - shift;
+  };
+  const start = originalOffset(hit);
+  const end = originalOffset(hit + query.length - 1) + 1;
 
   let from = Math.max(0, start - radius);
   let to = Math.min(line.length, end + radius);

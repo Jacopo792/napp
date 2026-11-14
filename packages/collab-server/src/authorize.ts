@@ -45,9 +45,8 @@ export type Authorizer = (
   options?: { fresh?: boolean },
 ) => Promise<Authorization>;
 
-/** Past this many entries the cache is swept before it is added to. A socket
- *  holds one note, so this is generous for a single instance. */
-const SWEEP_ABOVE = 256;
+/** Hard bound, including a burst of distinct tokens/notes within one TTL. */
+const MAX_ANSWERS = 256;
 
 export function createAuthorizer(
   lookup: Lookup,
@@ -55,7 +54,7 @@ export function createAuthorizer(
 ): Authorizer {
   const ttl = options.ttl ?? 5000;
   const now = options.now ?? Date.now;
-  const answers = new Map<string, { at: number; answer: Authorization }>();
+  const answers = new Map<string, { at: number; answer?: Authorization }>();
 
   return async function authorize(token, noteId, { fresh = false } = {}) {
     const key = `${token} ${noteId}`;
@@ -63,8 +62,19 @@ export function createAuthorizer(
 
     if (!fresh) {
       const cached = answers.get(key);
-      if (cached && at - cached.at < ttl) return cached.answer;
+      if (cached?.answer && at - cached.at < ttl) return cached.answer;
     }
+
+    // A fresh check supersedes any old grant even when the backend fails.
+    answers.delete(key);
+    if (answers.size >= MAX_ANSWERS) {
+      for (const [stale, entry] of answers) {
+        if (at - entry.at >= ttl) answers.delete(stale);
+      }
+      if (answers.size >= MAX_ANSWERS) answers.delete(answers.keys().next().value!);
+    }
+    const pending: { at: number; answer?: Authorization } = { at };
+    answers.set(key, pending);
 
     let answer: Authorization;
     try {
@@ -91,15 +101,12 @@ export function createAuthorizer(
          deliberately not cached: a database hiccup should not lock somebody out
          for the whole TTL. */
       console.warn("authorisation lookup failed:", error instanceof Error ? error.message : error);
+      if (answers.get(key) === pending) answers.delete(key);
       return { allowed: false, reason: "Try again" };
     }
 
-    if (answers.size > SWEEP_ABOVE) {
-      for (const [stale, entry] of answers) {
-        if (at - entry.at >= ttl) answers.delete(stale);
-      }
-    }
-    answers.set(key, { at, answer });
+    // A slow lookup cannot overwrite a newer revocation or reinsert an evicted key.
+    if (answers.get(key) === pending) pending.answer = answer;
     return answer;
   };
 }

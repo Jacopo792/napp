@@ -4,6 +4,7 @@ import type { Folder, Meta, Note, NoteMeta } from "./types";
 import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
 import { chapterFromStorage } from "./manuscript";
+import { readArchivePayloads, readArchiveRows } from "./archiveRead";
 import {
   adoptArchiveCache,
   noteCache,
@@ -63,6 +64,7 @@ interface FolderRow {
   owner_id: string | null;
   name: string | null;
   parent_id: string | null;
+  position: number;
 }
 
 /** Who is in this archive, in the order they joined. `nickname` is empty until
@@ -92,8 +94,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const archiveId = session.archiveId;
   adoptArchiveCache(archiveId);
   const [
-    notesResult,
-    foldersResult,
+    noteRows,
+    folderRows,
     membersResult,
     profilesResult,
     archiveResult,
@@ -102,17 +104,18 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
        finishes long before the network does. */
     persisted,
   ] = await Promise.all([
-    supabase
-      .from("notes")
-      .select(
-        "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, position, folder_id, version, content_version, page_icon, cover, chapter",
-      )
-      .eq("archive_id", archiveId),
-    supabase
-      .from("folders")
-      .select("id, owner_id, name, parent_id, position")
-      .eq("archive_id", archiveId)
-      .order("position"),
+    readArchiveRows<NoteRow>(
+      supabase,
+      "notes",
+      "id, owner_id, created_at, updated_at, trashed_at, archived_at, locked_by, pinned, position, folder_id, version, content_version, page_icon, cover, chapter",
+      archiveId,
+    ),
+    readArchiveRows<FolderRow>(
+      supabase,
+      "folders",
+      "id, owner_id, name, parent_id, position",
+      archiveId,
+    ).then((rows) => rows.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id))),
     supabase
       .from("archive_members")
       .select("user_id, created_at, role")
@@ -127,7 +130,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
      written has a moved version and is declared stale below regardless. */
   if (persisted)
     for (const [id, entry] of persisted) if (!noteCache.has(id)) noteCache.set(id, entry);
-  for (const result of [notesResult, foldersResult, membersResult, archiveResult]) {
+  for (const result of [membersResult, archiveResult]) {
     fail(result.error);
   }
 
@@ -168,9 +171,6 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   const scopeOf = (ownerId: string | null): string =>
     ownerId && members.some((member) => member.userId === ownerId) ? ownerId : fallbackOwner;
 
-  const noteRows = (notesResult.data ?? []) as NoteRow[];
-  const folderRows = (foldersResult.data ?? []) as FolderRow[];
-
   // Only rows whose version moved need their payload at all.
   const staleIds = noteRows
     .filter((row) => noteCache.get(row.id)?.version !== row.version)
@@ -188,13 +188,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
     }
   >();
   if (staleIds.length > 0) {
-    const changed = await supabase
-      .from("notes")
-      .select("id, title, body, content, legacy_body, page_icon, cover")
-      .eq("archive_id", archiveId)
-      .in("id", staleIds);
-    fail(changed.error);
-    for (const row of (changed.data ?? []) as {
+    const changed = await readArchivePayloads<{
       id: string;
       title: string | null;
       body: string | null;
@@ -202,7 +196,8 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       legacy_body: string | null;
       page_icon: unknown;
       cover: unknown;
-    }[]) {
+    }>(supabase, archiveId, "id, title, body, content, legacy_body, page_icon, cover", staleIds);
+    for (const row of changed) {
       payloads.set(row.id, row);
     }
   }

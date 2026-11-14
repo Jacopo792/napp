@@ -27,6 +27,13 @@ const {
   shell,
 } = require("electron");
 const { installMenu } = require("./menu");
+const {
+  trustedRendererUrl,
+  trustedSender,
+  rendererPermission,
+  rendererFile,
+  safeFileName,
+} = require("./security");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const fs = require("node:fs/promises");
@@ -94,16 +101,12 @@ protocol.registerSchemesAsPrivileged([
 function serveRenderer() {
   const root = path.join(__dirname, "..", "dist");
   protocol.handle("app", async (request) => {
-    const { pathname } = new URL(request.url);
-    /* One index.html for every path: the router is a hash history, so a real
-       path only ever appears here as a mistake, and answering it with the app
-       is kinder than answering it with nothing. */
-    const asset = path.join(root, pathname);
-    const file =
-      pathname === "/" || !path.extname(pathname) ? path.join(root, "index.html") : asset;
-    /* A request that climbs out of dist/ is not a request this app made. */
-    if (!path.resolve(file).startsWith(path.resolve(root)))
+    let file;
+    try {
+      file = rendererFile(root, request.url);
+    } catch {
       return new Response("", { status: 403 });
+    }
     /* `pathToFileURL` and not `file://${file}`. The concatenation survives on
        Windows only because WHATWG's parser special-cases a drive letter where a
        host should be — and it escapes nothing, so an install directory holding
@@ -229,6 +232,28 @@ function createWindow() {
     },
   });
 
+  // Native clipboard reads use the validated IPC bridge. The renderer only
+  // needs clipboard writes, the local font picker and video fullscreen;
+  // deny other device APIs.
+  window.webContents.session.setPermissionCheckHandler((contents, permission, origin) =>
+    Boolean(
+      contents &&
+      trustedRendererUrl(contents.mainFrame.url, isDev) &&
+      rendererPermission(permission, origin, isDev),
+    ),
+  );
+  window.webContents.session.setPermissionRequestHandler(
+    (contents, permission, callback, details) => {
+      callback(
+        Boolean(
+          contents &&
+          trustedRendererUrl(contents.mainFrame.url, isDev) &&
+          rendererPermission(permission, details.requestingUrl, isDev),
+        ),
+      );
+    },
+  );
+
   /* Painted before shown, so opening the app is not a white rectangle that
      becomes the archive a moment later. */
   window.once("ready-to-show", () => window.show());
@@ -333,15 +358,23 @@ function createWindow() {
      put a page nobody chose inside the application's own window, with the
      application's own permissions. */
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:$/.test(new URL(url).protocol)) void shell.openExternal(url);
+    try {
+      if (/^https?:$/.test(new URL(url).protocol)) void shell.openExternal(url).catch(() => {});
+    } catch {
+      // Malformed links do not escape into the main process.
+    }
     return { action: "deny" };
   });
 
   /* The window holds the bridge to the file system and the clipboard. It shows
      the application and nothing else, whatever a page asks it to load. */
   window.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith(isDev ? DEV_URL : `${APP_ORIGIN}/`)) event.preventDefault();
+    if (!trustedRendererUrl(url, isDev)) event.preventDefault();
   });
+  window.webContents.on("will-redirect", (event, url) => {
+    if (!trustedRendererUrl(url, isDev)) event.preventDefault();
+  });
+  window.webContents.on("will-attach-webview", (event) => event.preventDefault());
 
   void window.loadURL(isDev ? DEV_URL : `${APP_ORIGIN}/index.html`);
   return window;
@@ -350,6 +383,7 @@ function createWindow() {
 /* The renderer may choose colours, never window behaviour: only literal RGB
    values are accepted and only the window that sent the message is updated. */
 ipcMain.on("napp:frame-theme", (event, color, symbolColor) => {
+  if (!trustedSender(event, isDev)) return;
   if (process.platform !== "win32") return;
   if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(symbolColor)) return;
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -361,6 +395,8 @@ ipcMain.on("napp:frame-theme", (event, color, symbolColor) => {
 });
 
 async function chooseAndWrite(window, files, fallbackName) {
+  if (!Array.isArray(files) || !files.length) throw new Error("No files to save");
+  files = files.map((file) => ({ name: safeFileName(file.name), data: file.data }));
   if (files.length === 1) {
     const { canceled, filePath } = await dialog.showSaveDialog(window, {
       defaultPath: files[0].name,
@@ -375,12 +411,19 @@ async function chooseAndWrite(window, files, fallbackName) {
   });
   if (canceled || filePaths.length === 0) return "folder";
   for (const file of files) {
-    await fs.writeFile(path.join(filePaths[0], path.basename(file.name)), Buffer.from(file.data));
+    await fs.writeFile(path.join(filePaths[0], file.name), Buffer.from(file.data));
   }
   return "folder";
 }
 
-ipcMain.handle("napp:save", (event, files, fallbackName) =>
+function handle(channel, handler) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!trustedSender(event, isDev)) throw new Error("Untrusted IPC sender");
+    return handler(event, ...args);
+  });
+}
+
+handle("napp:save", (event, files, fallbackName) =>
   chooseAndWrite(BrowserWindow.fromWebContents(event.sender), files, fallbackName),
 );
 
@@ -397,11 +440,9 @@ const OPENS_IN_A_VIEWER = new Set(
   ).split(" "),
 );
 
-ipcMain.handle("napp:open", async (_event, name, data) => {
-  const file = path.join(
-    await fs.mkdtemp(path.join(os.tmpdir(), "napp-")),
-    path.basename(String(name)),
-  );
+handle("napp:open", async (_event, name, data) => {
+  const filename = safeFileName(name);
+  const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "napp-")), filename);
   await fs.writeFile(file, Buffer.from(data));
   if (!OPENS_IN_A_VIEWER.has(path.extname(file).slice(1).toLowerCase())) {
     shell.showItemInFolder(file);
@@ -411,18 +452,17 @@ ipcMain.handle("napp:open", async (_event, name, data) => {
   return failure || null;
 });
 
-ipcMain.handle("napp:print", (event) => {
+handle("napp:print", (event) => {
   event.sender.print({});
 });
 
 /* The page as the print stylesheet lays it out, written as a PDF with real
    text in it — the same pages "Print…" would send to the printer, without the
    print dialog in between. The browser has no equivalent and rasterises. */
-ipcMain.handle("napp:pdf", async (event, name) => {
+handle("napp:pdf", async (event, name) => {
+  const filename = safeFileName(name);
   const data = await event.sender.printToPDF({ preferCSSPageSize: true, printBackground: true });
-  await chooseAndWrite(BrowserWindow.fromWebContents(event.sender), [
-    { name: path.basename(String(name)), data },
-  ]);
+  await chooseAndWrite(BrowserWindow.fromWebContents(event.sender), [{ name: filename, data }]);
 });
 
 /* ── The menu the system draws ───────────────────────────────────────────────
@@ -463,7 +503,7 @@ function menuTemplate(items, chosen, depth = 1) {
   });
 }
 
-ipcMain.handle("napp:menu", (event, items) => {
+handle("napp:menu", (event, items) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return null;
   return new Promise((resolve) => {
@@ -539,7 +579,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-ipcMain.handle("napp:clipboard", async () => {
+handle("napp:clipboard", async () => {
   /* Electron 44 removed readHTML/readImage in favour of the W3C-shaped,
      asynchronous ClipboardItem API. Read one snapshot so all representations
      belong to the same copy operation. */

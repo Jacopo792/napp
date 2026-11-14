@@ -129,6 +129,44 @@ test("two accounts on one server never share an answer", async () => {
   );
 });
 
+test("a failed fresh check invalidates an earlier cached grant", async () => {
+  let down = false;
+  const authorize = createAuthorizer(async () => {
+    if (down) throw new Error("backend unavailable");
+    return { userId: "member", note: NOTE, role: "editor", nickname: "Jo" };
+  });
+  assert.equal((await authorize("token", "note")).allowed, true);
+  down = true;
+  assert.equal((await authorize("token", "note", { fresh: true })).allowed, false);
+  assert.equal((await authorize("token", "note")).allowed, false);
+});
+
+test("an old lookup cannot replace a newer revocation in the cache", async () => {
+  let release!: (value: Awaited<ReturnType<Lookup>>) => void;
+  let calls = 0;
+  const authorize = createAuthorizer(async () => {
+    if (++calls === 1) return new Promise((resolve) => (release = resolve));
+    return null;
+  });
+  const old = authorize("token", "note");
+  assert.equal((await authorize("token", "note", { fresh: true })).allowed, false);
+  release({ userId: "member", note: NOTE, role: "editor", nickname: "Jo" });
+  await old;
+  assert.equal((await authorize("token", "note")).allowed, false);
+  assert.equal(calls, 2);
+});
+
+test("a burst of unique authorization keys cannot retain an unbounded cache", async () => {
+  const world = archive({ role: "editor" });
+  const authorize = createAuthorizer(world.lookup, { now: () => 0 });
+  for (let index = 0; index < 300; index++) await authorize(`token-${index}`, "note");
+  assert.equal(world.calls(), 300);
+  await authorize("token-299", "note");
+  assert.equal(world.calls(), 300, "a recent answer should be reused");
+  await authorize("token-0", "note");
+  assert.equal(world.calls(), 301, "the oldest live entry should have been evicted");
+});
+
 /* `unverifiedSubject` only decides which profile row is worth fetching early.
    It must never throw on a token it cannot read, because the fallback path —
    ask again once `getUser` has answered — is what its `null` selects. */
