@@ -3,6 +3,25 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.56 – 2026-11-14
+
+### Security
+
+- Desktop: privileged calls are accepted only from the app's own main frame;
+  navigation, redirects, embedded webviews and device permissions are limited
+  to the app; saved and opened file names and app:// asset paths are validated.
+- Collaboration server: the authorisation cache is bounded, a fresh check
+  drops the previous grant even when it fails, and a slow check can no longer
+  overwrite a newer revocation.
+- Account deletion reads its request in chunks and refuses bodies over 8 KiB.
+- Electron 44.11.3, Vite 7.3.8 and patched transitive dependencies.
+
+### Fixed
+
+- Account deletion no longer fails on an old mention between blocked accounts
+  (migration `20261114010000_erasure_safe_assignees`).
+- Archives larger than the database's row limit load completely.
+
 ## 0.9.55 – 2026-11-14
 
 ### Changed

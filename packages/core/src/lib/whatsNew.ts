@@ -45,6 +45,43 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.56",
+    date: "2026-11-14",
+    headline: "Safer underneath",
+    sections: [
+      {
+        heading: "Security",
+        items: [
+          {
+            title: "A stricter desktop app",
+            text: "The Mac and Windows app only lets its own pages save files, print or read the clipboard, and stays on the app whatever a link asks it to open.",
+          },
+          {
+            title: "Access ends sooner",
+            text: "When someone loses access to a note, the collaboration server stops accepting their changes even if a check is slow or fails.",
+          },
+          {
+            title: "Up-to-date components",
+            text: "Electron and the tools that build the app are updated with their latest security fixes.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Deleting an account",
+            text: "Deleting an account no longer fails because of an old mention between two people who have blocked each other.",
+          },
+          {
+            title: "Large archives open whole",
+            text: "An archive with thousands of notes and folders loads all of them, not only the first page.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.55",
     date: "2026-11-14",
     headline: "Keys that behave like a Mac's",
