@@ -32,7 +32,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "Anywhere", keys: "\u2318S", what: "Save now" },
   { group: "Anywhere", keys: "\u2318,", what: "Settings" },
   { group: "Anywhere", keys: "\u2318.", what: "Focus mode" },
-  { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the folders", kind: NOTES },
+  { group: "Anywhere", keys: "\u2318B", what: "Show or hide the folders", kind: NOTES },
   { group: "Anywhere", keys: "\u2318\\", what: "Show or hide the structure", kind: DOC },
   { group: "Anywhere", keys: "\u2318/", what: "This list" },
   { group: "Anywhere", keys: "Esc", what: "Leave focus mode" },

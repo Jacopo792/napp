@@ -61,7 +61,15 @@ import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
 import type { Space } from "@/lib/spaces";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { forgetSpellings, learnedSpellings } from "@/features/editor/lib/autocorrect";
 import {
   AXIS_SPECS,
@@ -561,7 +569,7 @@ export function SettingsPanel({
      frames: a window that only ever animates in reads as one that was
      interrupted on the way out. The timer is the duration of the exit in the
      stylesheet; reduced motion closes at once. */
-  function close() {
+  const close = useCallback(() => {
     if (closing) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       onClose();
@@ -569,7 +577,21 @@ export function SettingsPanel({
     }
     setClosing(true);
     window.setTimeout(onClose, 160);
-  }
+  }, [closing, onClose]);
+
+  /* Escape closes it, as it does a sheet. Not while a menu inside it is open
+     (that Escape is the menu's), and not when a field has used the key. */
+  useEffect(() => {
+    if (!open) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      // `window.`: the `document` prop shadows the global here.
+      if (window.document.querySelector('[role="menu"]')) return;
+      close();
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [open, close]);
 
   if (!open) return null;
   return (
@@ -713,7 +735,10 @@ export function SettingsPanel({
                         onBlur={commitNickname}
                         onKeyDown={(event) => {
                           if (event.key === "Enter") event.currentTarget.blur();
-                          if (event.key === "Escape") setNickname(profile.nickname);
+                          if (event.key === "Escape" && nickname !== profile.nickname) {
+                            event.preventDefault();
+                            setNickname(profile.nickname);
+                          }
                         }}
                       />
                     </div>

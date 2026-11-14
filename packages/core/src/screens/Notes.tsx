@@ -2905,7 +2905,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         toggleFocus();
         return;
       }
-      if (mod && e.key === "\\") {
+      /* ⌘B too, as in other Mac apps with a sidebar — except in the text,
+         where ⌘B is still Bold. */
+      const sidebarB =
+        mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "b" && !el?.isContentEditable;
+      if ((mod && e.key === "\\") || sidebarB) {
         e.preventDefault();
         if (docMode && !compact) toggleBoard();
         else changeNavigation((current) => !current);
