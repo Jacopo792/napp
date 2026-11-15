@@ -24,7 +24,9 @@ function iso(daysAgo: number, hour = 11): string {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   d.setHours(hour, 24, 0, 0);
-  return d.toISOString();
+  /* Never in the future: before 11:24 a note "from today" would otherwise sort
+     above one made just now, and the list would not be the one people see. */
+  return new Date(Math.min(d.getTime(), Date.now() - 60_000)).toISOString();
 }
 
 type Seed = {
