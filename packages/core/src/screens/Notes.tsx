@@ -210,6 +210,8 @@ import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
 import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
+import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
+import { useNotesLayout } from "./useNotesLayout";
 import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import {
@@ -332,34 +334,10 @@ const TYPING_IDLE_MS = 2500;
 const RETRY_MIN_MS = 4000;
 const RETRY_MAX_MS = 60_000;
 
-const SIDEBAR_WIDTH_KEY = "napp:sidebar-width";
-const LIST_WIDTH_KEY = "napp:list-width";
-const SIDEBAR_DEFAULT = 248;
-const LIST_DEFAULT = 380;
-/* What the strip above the column has to hold: 88px of traffic-light gutter on
-   macOS, the 70px scope switch, and the two buttons at the end of it, with the
-   gaps. Narrower than this and the buttons are underneath the faces. */
-const SIDEBAR_MIN = 248;
-const SIDEBAR_MAX = 420;
 /* How long a press has to be held before it stops being a press and becomes a
    question. Long enough not to fire on a slow tap, short enough that nobody
    wonders whether it is going to. */
 const HOLD_MS = 420;
-const LIST_MIN = 300;
-const LIST_MAX = 620;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function loadPaneWidth(key: string, fallback: number, min: number, max: number): number {
-  try {
-    const stored = Number(localStorage.getItem(key));
-    return Number.isFinite(stored) && stored > 0 ? clamp(stored, min, max) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /* Enough of a fingerprint to notice that folders or note placement moved,
    without serialising every note's metadata on every realtime wake-up. */
@@ -492,19 +470,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [session]);
 
   const [dragId, setDragId] = useState<string | null>(null);
-  const [navigationOpen, setNavigationOpen] = useState(() => {
-    try {
-      return localStorage.getItem("napp:navigation") !== "closed";
-    } catch {
-      return true;
-    }
-  });
-  const [sidebarWidth, setSidebarWidth] = useState(() =>
-    loadPaneWidth(SIDEBAR_WIDTH_KEY, SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX),
-  );
-  const [listWidth, setListWidth] = useState(() =>
-    loadPaneWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX),
-  );
+  const {
+    navigationOpen,
+    changeNavigation,
+    focusMode,
+    toggleFocus,
+    setDockedPanel,
+    listOpen,
+    sidebarShown,
+    listShown,
+    sidebarMax,
+    listMax,
+    setSidebarWidth,
+    setListWidth,
+  } = useNotesLayout(windowWidth, compact);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -513,16 +492,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      given rarely and the list is a request the archive's own load does not make. */
   const [namedVersions, setNamedVersions] = useState<NamedVersion[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  /* Focus is the two panes put away and the page's own controls stepping back
-     while you write. It is not a third layout: the workspace already knows how
-     to run without the rail and the list, so this is that state plus a way in
-     that is not a small button in a corner, plus a class the stylesheet reads. */
-  const [focusMode, setFocusMode] = useState(false);
-  /* A docked column (comments, history, outline, inspector) is open, and which
-     panes it asked to be put away to keep the note readable. */
-  const [dockedPanel, setDockedPanel] = useState(false);
-  const [listAutoHidden, setListAutoHidden] = useState(false);
-  const autoHidden = useRef({ sidebar: false, handled: false });
   /* The second note, read beside the first. A note id and nothing else: the
      editor is already a component that takes an entry, and the collaboration
      hook is already a hook that takes a note id — two of each is the whole
@@ -767,23 +736,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     "Partner";
   const storedPreferences = listPreferences[viewAs] ?? createListPreferences(viewAs);
   const activeListPreferences = preferencesForFolder(storedPreferences, selectedFolderId);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("napp:navigation", navigationOpen ? "open" : "closed");
-    } catch {
-      /* The preference is optional; writing still works without local storage. */
-    }
-  }, [navigationOpen]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(sidebarWidth)));
-      localStorage.setItem(LIST_WIDTH_KEY, String(Math.round(listWidth)));
-    } catch {
-      /* Pane sizing is a convenience; the archive never depends on it. */
-    }
-  }, [sidebarWidth, listWidth]);
 
   useEffect(() => {
     if (!session) return;
@@ -1920,40 +1872,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [quiet]);
 
-  /* Focus puts the two panes away and gives them back on the way out — the
-     rail's own open state is remembered across the trip, because whether you
-     had it open is a different question from whether you are focusing. */
-  const restoreNavigation = useRef(true);
-  /* The slide is a view transition: the new layout is worked out once, and
-     what travels for the next 360ms is two pictures of it on the compositor.
-     It was a transition on the slot's `width`, which re-laid the whole note —
-     and re-ran its container queries — on every frame of the way, and could
-     not leave the width alone while `PaneResizer` was dragging it either.
-     `also` is for a change that has to land in the same frame, so the
-     picture taken after it is the finished one. */
-  const changeNavigation = useCallback(
-    (next: boolean | ((current: boolean) => boolean), also?: () => void) => {
-      const apply = () =>
-        flushSync(() => {
-          setNavigationOpen(next);
-          also?.();
-        });
-      if (
-        !document.startViewTransition ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        apply();
-        return;
-      }
-      const root = document.documentElement;
-      root.classList.add("is-sliding-navigation");
-      document
-        .startViewTransition(apply)
-        .finished.finally(() => root.classList.remove("is-sliding-navigation"));
-    },
-    [],
-  );
-
   /* A book's structure is its corkboard, laid in place of the sheet. The
      sheet and the board are the same window turned over, so the change is
      one crossfade of the whole picture while the cards settle in — see
@@ -1973,15 +1891,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       .startViewTransition(apply)
       .finished.finally(() => root.classList.remove("is-turning-board"));
   }, []);
-
-  const toggleFocus = useCallback(() => {
-    if (focusMode) {
-      changeNavigation(restoreNavigation.current, () => setFocusMode(false));
-      return;
-    }
-    restoreNavigation.current = navigationOpen;
-    changeNavigation(false, () => setFocusMode(true));
-  }, [focusMode, navigationOpen, changeNavigation]);
 
   useEffect(
     () => () => {
@@ -3690,77 +3599,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return found;
   }, [ownedEntries, trashedIds, selectedId, selectedTitle]);
 
-  /* ── Always leave a useful writing surface ──────────────────────────────
-     The handles already stopped before either navigation pane could eat the
-     editor. What they could not stop is the window itself getting smaller: a
-     pane keeps the width it was stored with, so shrinking the window took the
-     whole difference out of the note — at 900px the writing column was 232px
-     and everything in its toolbar was on top of everything else, which is the
-     "squashed in miniature" report.
-
-     So the *shown* widths are clamped to the room there is, and the stored ones
-     are left alone: widen the window again and the panes come back to where
-     they were put. The list gives ground first, because it is a preview column
-     and the folders are a fixed vocabulary that either fits or does not. */
-  const editorReserve = 380;
-  /** The docked columns are 320–340px; the note beside one keeps this much. */
-  const DOCKED_PANEL_WIDTH = 340;
-  const NOTE_COLUMN_MIN = 420;
-  const room = Math.max(SIDEBAR_MIN + LIST_MIN, windowWidth - editorReserve - 2);
-  const listShown = Math.max(LIST_MIN, Math.min(listWidth, room - SIDEBAR_MIN));
-  const sidebarShown = Math.max(SIDEBAR_MIN, Math.min(sidebarWidth, room - listShown));
-  const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, room - listShown));
-  const listMax = Math.max(LIST_MIN, Math.min(LIST_MAX, room - sidebarShown));
-
   /* Last hook in the body, and deliberately above the `!session` return so the
      order never changes between renders. */
   useAutoLock(autoLock, () => void handleLock(false));
-
-  const listOpen = (navigationOpen || !focusMode) && !listAutoHidden;
-
-  /* The note keeps a readable column beside a docked panel. Opening one that
-     would squeeze it puts the folders away, then the list, with the same slide
-     as the toggles; closing it brings back only what it put away. Looked at
-     once per opening, so a pane the reader shows or hides meanwhile is theirs. */
-  useEffect(() => {
-    const auto = autoHidden.current;
-    if (!dockedPanel) {
-      if (!auto.handled) return;
-      auto.handled = false;
-      if (auto.sidebar && !navigationOpen) changeNavigation(true);
-      auto.sidebar = false;
-      setListAutoHidden(false);
-      return;
-    }
-    if (compact || focusMode || auto.handled) return;
-    auto.handled = true;
-    const room = (open: boolean, width: number) => (open ? width + 1 : 0);
-    const note = (sidebar: boolean, list: boolean) =>
-      windowWidth - room(sidebar, sidebarShown) - room(list, listShown) - DOCKED_PANEL_WIDTH;
-    if (note(navigationOpen, listOpen) >= NOTE_COLUMN_MIN) return;
-    if (navigationOpen) {
-      auto.sidebar = true;
-      changeNavigation(false);
-    }
-    if (note(false, listOpen) < NOTE_COLUMN_MIN) setListAutoHidden(true);
-  }, [
-    dockedPanel,
-    compact,
-    focusMode,
-    navigationOpen,
-    listOpen,
-    windowWidth,
-    sidebarShown,
-    listShown,
-    changeNavigation,
-  ]);
-  /* Showing the folders by hand is the reader's say: it is not undone. */
-  useEffect(() => {
-    if (navigationOpen) {
-      autoHidden.current.sidebar = false;
-      setListAutoHidden(false);
-    }
-  }, [navigationOpen]);
 
   if (!session) return null;
 
