@@ -190,6 +190,7 @@ import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { visibleEntries } from "@/lib/visibleNotes";
 import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
 import { RETRY_MIN_MS, nextRetryDelay, waitUntilIdle } from "@/lib/writeDrain";
+import { type ArchiveDeparture, departArchive, enterArchive } from "@/lib/archiveExit";
 import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
@@ -3175,43 +3176,34 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     void addAccount().then(() => navigate({ to: "/" }));
   }
 
-  /* Leaving an archive and deleting one end the same way: whatever is still
-     waiting lands first, the act runs, and the window goes to another
-     archive — or, with none left, to the door. */
-  const goElsewhere = useCallback(
-    async (current: AppSession, act: () => Promise<void>) => {
-      /* Membership removal revokes the right to finish a write, so flush first
-         and fail closed if any note or metadata is still waiting locally. */
-      await settleWrites();
-      if (writesWaiting(pendingMetaRef.current)) {
-        throw new Error("Your latest changes could not be saved. Try again before leaving.");
-      }
-
-      await act();
-      clearDrafts();
-      const remaining = (await loadSpaces(current).catch(() => [])).filter(
-        (space) => space.archiveId !== current.archiveId,
-      );
-      if (remaining.length > 0) {
-        await chooseArchive(current, remaining[0].archiveId);
+  /* The way out of the archive on screen; the sequence is `archiveExit.ts`. */
+  const archiveExit = useCallback(
+    (current: AppSession): ArchiveDeparture => ({
+      settle: settleWrites,
+      waiting: () => writesWaiting(pendingMetaRef.current),
+      enter: async (archiveId) => {
+        await chooseArchive(current, archiveId);
         setSheets([]);
         await leaveScreen();
         document.documentElement.dataset.arriving = "";
         onReopen();
-        return;
-      }
-      await clearSession();
-      setSession(null);
-      navigate({ to: "/" });
-    },
+      },
+      remaining: async () => (await loadSpaces(current)).map((space) => space.archiveId),
+      clearDrafts,
+      signOut: async () => {
+        await clearSession();
+        setSession(null);
+        navigate({ to: "/" });
+      },
+    }),
     [settleWrites, navigate, onReopen],
   );
 
   const handleLeaveArchive = useCallback(async () => {
     const current = sessionRef.current;
     if (!current) throw new Error("Sign in again before leaving this archive");
-    await goElsewhere(current, () => leaveArchive(current));
-  }, [goElsewhere]);
+    await departArchive(current.archiveId, () => leaveArchive(current), archiveExit(current));
+  }, [archiveExit]);
 
   /* Its last member only; `deleteSpace` asks Postgres first and refuses
      before anything is removed. Another archive than this one goes without
@@ -3225,27 +3217,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         await refreshSpaces();
         return;
       }
-      await goElsewhere(current, () => deleteSpace(archiveId));
+      await departArchive(current.archiveId, () => deleteSpace(archiveId), archiveExit(current));
     },
-    [goElsewhere, refreshSpaces],
+    [archiveExit, refreshSpaces],
   );
 
-  /* Writes waiting here belong to this archive, so they land before the
-     window leaves it — and if they cannot, it does not leave. */
   const handleSwitchArchive = useCallback(
     async (archiveId: string) => {
       const current = sessionRef.current;
-      if (!current || current.archiveId === archiveId) return;
-      await settleWrites();
-      if (writesWaiting(pendingMetaRef.current))
-        throw new Error("Your latest changes are still saving. Try again in a moment.");
-      await chooseArchive(current, archiveId);
-      setSheets([]);
-      await leaveScreen();
-      document.documentElement.dataset.arriving = "";
-      onReopen();
+      if (!current) return;
+      await enterArchive(current.archiveId, archiveId, archiveExit(current));
     },
-    [settleWrites, onReopen],
+    [archiveExit],
   );
 
   /* Arrived: everything the archive needs is here. Each entrance is finished
