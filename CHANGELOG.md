@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.57 – 2026-11-15
+
+### Fixed
+
+- "Keep archived notes private" no longer turns itself off: profile saves
+  write only the field that changed, and Settings reloads the profile when
+  opened, so a window left open elsewhere can't overwrite it.
+
+### Changed
+
+- Internal: list filtering, shortcuts, pane layout, remarks, presence,
+  invitations and the metadata save queue moved out of the notes screen into
+  tested modules. No change in behaviour.
+
 ## 0.9.56 – 2026-11-14
 
 ### Security

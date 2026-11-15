@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.57",
+    date: "2026-11-15",
+    headline: "Privacy that stays put",
+    sections: [
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Archived notes stay private",
+            text: "Keep archived notes private no longer switches itself off when another window or device saves your profile.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.56",
     date: "2026-11-14",
     headline: "Safer underneath",
