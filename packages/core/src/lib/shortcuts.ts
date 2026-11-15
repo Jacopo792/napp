@@ -109,3 +109,99 @@ export function keyName(keys: string): string {
   if (APPLE) return keys;
   return keys.replace(/\u2318\s*/g, "Ctrl+").replace(/\u2325\s*/g, "Alt+");
 }
+
+/* What a keystroke in the window means, decided without the DOM so it can be
+   tested. The handler in `Notes.tsx` reads the target and the state, asks
+   this, and performs the answer; null leaves the key to whoever else wants it.
+   The order is the meaning: the chords come first because they are reached
+   for while writing, and only then does a field keep the keys typed into it. */
+
+export interface KeyPress {
+  key: string;
+  code: string;
+  /** ⌘ on a Mac, Ctrl elsewhere. */
+  mod: boolean;
+  alt: boolean;
+  shift: boolean;
+}
+
+export interface KeyContext {
+  /** The key went to an input, a text area, a select or editable text. */
+  typing: boolean;
+  /** …and it was editable text, where ⌘B is still Bold. */
+  inText: boolean;
+  /** Words are chosen in the note's text and may be linked (⌘K). */
+  linkable: boolean;
+  /** A note is open in the editor (⌘F finds in it rather than the list). */
+  noteOpen: boolean;
+  /** A note is selected in the list, open or still loading. */
+  noteSelected: boolean;
+  canEdit: boolean;
+  /** A document archive: ⌘N is a chapter and the list keys mean nothing. */
+  document: boolean;
+  /** ⌘\ shows the structure rather than the folders. */
+  structure: boolean;
+  focusMode: boolean;
+}
+
+export type WindowCommand =
+  | "save"
+  | "find"
+  | "search"
+  | "link"
+  | "palette"
+  | "draw"
+  | "previous-chapter"
+  | "next-chapter"
+  | "new-chapter"
+  | "new"
+  | "settings"
+  | "focus"
+  | "structure"
+  | "navigation"
+  | "shortcuts"
+  | "search-field"
+  | "down"
+  | "up"
+  | "next-group"
+  | "previous-group"
+  | "open-title";
+
+export function windowCommand(press: KeyPress, at: KeyContext): WindowCommand | null {
+  const { mod, alt } = press;
+  const key = press.key.toLowerCase();
+  if (mod && key === "s") return "save";
+  if (mod && key === "f") return at.noteOpen ? "find" : "search";
+  /* Inside the text ⌘K is still "link these words", but only while words are
+     chosen: with the caret merely in a book's text the palette was otherwise
+     out of reach. */
+  if (mod && key === "k") return at.canEdit && at.linkable ? "link" : "palette";
+  /* `code`, not `key`: Option and D together are "∂" on a Mac. */
+  if (alt && !mod && press.code === "KeyD" && at.noteSelected && at.canEdit) return "draw";
+  /* A document answers ⌘N with a chapter and walks its chapters with ⌥⌘↑ ⌥⌘↓. */
+  if (at.document && mod) {
+    if (alt && press.key === "ArrowUp") return "previous-chapter";
+    if (alt && press.key === "ArrowDown") return "next-chapter";
+    if (key === "n") return "new-chapter";
+  }
+  if (mod && key === "n") return "new";
+  if (mod && press.key === ",") return "settings";
+  if (mod && press.key === ".") return "focus";
+  /* ⌘B too, as in other Mac apps with a sidebar, except in the text (Bold). */
+  if ((mod && press.key === "\\") || (mod && !alt && !press.shift && key === "b" && !at.inText))
+    return at.structure ? "structure" : "navigation";
+  /* A chord, not a bare `?`: the desktop menu takes a printable accelerator
+     before the page sees it, so `?` typed into a note opened the sheet. */
+  if (mod && press.key === "/") return "shortcuts";
+  if (at.typing) return null;
+
+  if (press.key === "Escape" && at.focusMode) return "focus";
+  /* The bare keys below walk a note list, and a document has none. */
+  if (at.document) return null;
+  if (press.key === "n") return "new";
+  if (press.key === "/") return "search-field";
+  if (press.key === "ArrowDown" || press.key === "j") return alt ? "next-group" : "down";
+  if (press.key === "ArrowUp" || press.key === "k") return alt ? "previous-group" : "up";
+  if (press.key === "Enter" && at.noteSelected) return "open-title";
+  return null;
+}

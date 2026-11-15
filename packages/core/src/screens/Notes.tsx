@@ -256,7 +256,7 @@ import {
   type DocumentFeatures,
   type PageSetup,
 } from "@/lib/spaceShape";
-import { keyName } from "@/lib/shortcuts";
+import { keyName, windowCommand } from "@/lib/shortcuts";
 import { SpaceSwitch } from "@/components/SpaceSwitch";
 
 const BOOK_PRESET = ARCHIVE_PRESETS.find((preset) => preset.id === "book")!;
@@ -2761,146 +2761,68 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           el.tagName === "TEXTAREA" ||
           el.tagName === "SELECT" ||
           el.isContentEditable);
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        saveNow();
-        return;
-      }
-      if (mod && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        if (selected) noteEditorRef.current?.openFind();
-        else {
+      const command = windowCommand(
+        { key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, alt: e.altKey, shift: e.shiftKey },
+        {
+          typing,
+          inText: !!el?.isContentEditable,
+          linkable:
+            !!el?.closest(".rich-text-content") && !(window.getSelection()?.isCollapsed ?? true),
+          noteOpen: !!selected,
+          noteSelected: !!selectedId,
+          canEdit,
+          document: docKeys.current.docMode,
+          structure: docMode && !compact,
+          focusMode,
+        },
+      );
+      if (!command) return;
+      e.preventDefault();
+      switch (command) {
+        case "save":
+          return saveNow();
+        case "find":
+          return noteEditorRef.current?.openFind();
+        case "search":
           searchRef.current?.focus();
-          searchRef.current?.select();
-        }
-        return;
-      }
-      if (mod && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        /* Inside the text ⌘K is still "link these words" — that convention is
-           older than the palette's — but only while words are chosen. With
-           the caret merely in the text it opened an empty link form, so in a
-           book, where the caret is always in the text, the palette could not
-           be reached at all. */
-        if (
-          canEdit &&
-          el?.closest(".rich-text-content") &&
-          !(window.getSelection()?.isCollapsed ?? true)
-        ) {
-          noteEditorRef.current?.openLink();
-          return;
-        }
-        setPaletteQuery("");
-        setPaletteOpen(true);
-        return;
-      }
-      /* The pen, without the menu. Above the guard below because it is a thing
-         you reach for *while* writing, which is exactly when the guard says a
-         key belongs to the field it was typed in. */
-      /* `code`, not `key`: Option and D together are "∂" on a Mac, and a
-         shortcut that has to be spelled in dead keys is a shortcut nobody
-         writes down. */
-      if (e.altKey && !mod && e.code === "KeyD" && selectedId && canEdit) {
-        e.preventDefault();
-        noteEditorRef.current?.drawOnPage();
-        return;
-      }
-      /* A document answers ⌘N with a chapter, and walks its chapters with
-         ⌥⌘↑ and ⌥⌘↓ — Word's "previous / next heading", one level up. */
-      if (docKeys.current.docMode && mod) {
-        if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-          e.preventDefault();
-          docKeys.current.step(e.key === "ArrowDown" ? 1 : -1);
-          return;
-        }
-        if (e.key.toLowerCase() === "n") {
-          e.preventDefault();
-          docKeys.current.newChapter();
-          return;
-        }
-      }
-      if (mod && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        void handleNew();
-        return;
-      }
-      /* Three doors that had none, all above the `typing` guard because all
-         three are things you reach for *while* writing — which is exactly when
-         that guard hands the key back to the field it was typed in.
-
-         The keys are the conventions rather than choices: ⌘, is Preferences on
-         every Mac application there has ever been, and neither ⌘. nor ⌘\ means
-         anything inside the text, so no formatting shortcut loses its key. */
-      if (mod && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen(true);
-        return;
-      }
-      if (mod && e.key === ".") {
-        e.preventDefault();
-        toggleFocus();
-        return;
-      }
-      /* ⌘B too, as in other Mac apps with a sidebar — except in the text,
-         where ⌘B is still Bold. */
-      const sidebarB =
-        mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "b" && !el?.isContentEditable;
-      if ((mod && e.key === "\\") || sidebarB) {
-        e.preventDefault();
-        if (docMode && !compact) toggleBoard();
-        else changeNavigation((current) => !current);
-        return;
-      }
-      /* The shortcuts sheet, and it is a chord rather than the bare `?` it was
-         for the same reason ⌘, and ⌘. above are chords: it is a thing you
-         reach for while writing, so it has to be above the guard.
-
-         But the bare `?` had a second fault the guard could never have
-         answered. The desktop menu shows this item with its key beside it, and
-         macOS matches a menu's key equivalents in the window server *before*
-         the keystroke reaches the page — so `registerAccelerator: false`
-         notwithstanding, a menu item whose accelerator is a printable
-         character outranks the text field the character was being typed into.
-         A question mark typed into a note opened the sheet, in the app and
-         never in the browser, which is exactly the shape of a key taken above
-         the renderer.
-
-         A chord has no such failure: if the menu takes ⌘/ it performs this
-         command, which is what ⌘/ means anyway. The wrong outcome is no longer
-         reachable rather than merely guarded against. */
-      if (mod && e.key === "/") {
-        e.preventDefault();
-        setShortcutsOpen(true);
-        return;
-      }
-      if (typing) return;
-
-      if (e.key === "Escape" && focusMode) {
-        e.preventDefault();
-        toggleFocus();
-        return;
-      }
-      /* The bare keys below walk a note list, and a document has none. */
-      if (docKeys.current.docMode) return;
-
-      if (e.key === "n") {
-        e.preventDefault();
-        void handleNew();
-      } else if (e.key === "/") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      } else if (e.key === "ArrowDown" || e.key === "j") {
-        e.preventDefault();
-        if (e.altKey) moveByGroup(1);
-        else moveSelection(1);
-      } else if (e.key === "ArrowUp" || e.key === "k") {
-        e.preventDefault();
-        if (e.altKey) moveByGroup(-1);
-        else moveSelection(-1);
-      } else if (e.key === "Enter" && selectedId) {
-        e.preventDefault();
-        titleRef.current?.focus();
+          return searchRef.current?.select();
+        case "link":
+          return noteEditorRef.current?.openLink();
+        case "palette":
+          setPaletteQuery("");
+          return setPaletteOpen(true);
+        case "draw":
+          return noteEditorRef.current?.drawOnPage();
+        case "previous-chapter":
+          return docKeys.current.step(-1);
+        case "next-chapter":
+          return docKeys.current.step(1);
+        case "new-chapter":
+          return docKeys.current.newChapter();
+        case "new":
+          return void handleNew();
+        case "settings":
+          return setSettingsOpen(true);
+        case "focus":
+          return toggleFocus();
+        case "structure":
+          return toggleBoard();
+        case "navigation":
+          return changeNavigation((current) => !current);
+        case "shortcuts":
+          return setShortcutsOpen(true);
+        case "search-field":
+          return searchRef.current?.focus();
+        case "down":
+          return moveSelection(1);
+        case "up":
+          return moveSelection(-1);
+        case "next-group":
+          return moveByGroup(1);
+        case "previous-group":
+          return moveByGroup(-1);
+        case "open-title":
+          return titleRef.current?.focus();
       }
     }
     document.addEventListener("keydown", onKey);
