@@ -153,7 +153,7 @@ import {
 } from "@/lib/accountPreferences";
 import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
-import type { NoteEntry } from "@/lib/entries";
+import { mergeRemoteEntries, type NoteEntry } from "@/lib/entries";
 import { fold, formatDateTime } from "@/lib/format";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
@@ -319,17 +319,6 @@ const writesWaiting = (meta: MetaQueue) => hasPending() || meta.size > 0;
    question. Long enough not to fire on a slow tap, short enough that nobody
    wonders whether it is going to. */
 const HOLD_MS = 420;
-
-/* Enough of a fingerprint to notice that folders or note placement moved,
-   without serialising every note's metadata on every realtime wake-up. */
-function metaShape(meta: Meta): string {
-  let shape = `${meta.partnerName ?? ""}|${meta.folders.length}`;
-  for (const folder of meta.folders) shape += `|${folder.id}:${folder.name}`;
-  for (const note of meta.notes) {
-    shape += `|${note.id}:${note.folderId ?? ""}:${note.pinned ? 1 : 0}:${note.trashedAt ?? ""}:${note.archivedAt ?? ""}`;
-  }
-  return shape;
-}
 
 /* Switching archive is this whole screen starting again on another one, and
    it is done by remounting it rather than by resetting it. Every channel,
@@ -820,22 +809,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
    * note, and remote metadata is skipped while a metadata write is waiting.
    */
   const applySnapshot = useCallback((snapshot: ArchiveSnapshot, remote = true) => {
-    const localById = new Map(entriesRef.current.map((entry) => [entry.note.id, entry]));
-    const remoteById = new Map(snapshot.entries.map((entry) => [entry.note.id, entry]));
-    const changedIds = new Set<string>();
-    const entrySetChanged = localById.size !== remoteById.size;
-    for (const entry of snapshot.entries) {
-      if (localById.get(entry.note.id)?.version !== entry.version) changedIds.add(entry.note.id);
-    }
-
-    const next = snapshot.entries
-      .map((entry) => (isDirty(entry.note.id) ? (localById.get(entry.note.id) ?? entry) : entry))
-      .concat(
-        entriesRef.current.filter(
-          (entry) => isDirty(entry.note.id) && !remoteById.has(entry.note.id),
-        ),
-      )
-      .sort((a, b) => b.note.updatedAt.localeCompare(a.note.updatedAt));
+    const { entries: next, changed: changedIds } = mergeRemoteEntries(
+      entriesRef.current,
+      snapshot.entries,
+      isDirty,
+    );
     entriesRef.current = next;
     setEntries(next);
 
@@ -850,9 +828,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       return next;
     });
 
-    const metadataChanged = Object.entries(snapshot.metas).some(
-      ([owner, meta]) => metaShape(metasRef.current[owner] ?? EMPTY_META) !== metaShape(meta),
-    );
     // The open note, if the other device moved it and nothing local is queued.
     const open = selectedIdRef.current;
     if (!open || isDirty(open)) return;
