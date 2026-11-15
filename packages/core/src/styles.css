@@ -7320,6 +7320,50 @@ body:has(.sidebar-row.is-over) .drag-chip {
   color: var(--tint-blue);
 }
 
+/* The bubble's one colour button: an A over a bar of the colour the selection
+   wears, grey where it wears none. Its swatches mark the one in use. */
+.rich-bubble-color {
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+
+.rich-bubble-color > span {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: var(--weight-bold);
+}
+
+.rich-bubble-color > i {
+  width: 14px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-4);
+}
+
+.rich-bubble-color.is-yellow > i {
+  background: var(--tint-yellow);
+}
+.rich-bubble-color.is-purple > i {
+  background: var(--tint-purple);
+}
+.rich-bubble-color.is-pink > i {
+  background: var(--tint-pink);
+}
+.rich-bubble-color.is-orange > i {
+  background: var(--tint-orange);
+}
+.rich-bubble-color.is-mint > i {
+  background: var(--tint-mint);
+}
+.rich-bubble-color.is-blue > i {
+  background: var(--tint-blue);
+}
+
+.menu-swatch.is-on {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
 .menu-swatch.is-none {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--rule);
