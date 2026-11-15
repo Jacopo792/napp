@@ -736,7 +736,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     });
   }, [members, session]);
 
-  /* The signed-in account's own profile, read once the session exists. */
+  /* The signed-in account's own profile, read once the session exists and
+     again whenever Settings opens, so a switch changed on another device is
+     shown as it is rather than as this window last saw it. */
   useEffect(() => {
     if (!session) return;
     let live = true;
@@ -751,7 +753,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => {
       live = false;
     };
-  }, [session]);
+    /* `settingsOpen` only to read again on opening; closing reads too, harmlessly. */
+  }, [session, settingsOpen]);
 
   /* One roster load carries every member's avatar object. The byte URLs live in
      a module cache, so the sidebar, switch and Settings reuse one download and
@@ -3027,16 +3030,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* One writer for the profile, optimistic so the field does not snap back
      under the cursor, and rolled back with the reason if the write is refused.
-     The archive is refreshed afterwards because the roster — and so the scope
-     switch — carries the nickname that just changed. */
-  async function persistProfile(next: Profile) {
+     Only the changed field is written, so a stale copy cannot undo another
+     device's change. The archive is refreshed afterwards because the roster —
+     and so the scope switch — carries the nickname that just changed. */
+  async function persistProfile(change: Partial<Profile>) {
     if (!session) return;
     const previous = profile;
-    setProfile(next);
+    setProfile((current) => ({ ...current, ...change }));
     setProfileBusy(true);
     setProfileError("");
     try {
-      await saveProfile(session, next);
+      await saveProfile(session, change);
       /* `readSnapshot`, not the debounced wrapper: this one is waited on, and
          the wait is the point — the form stays busy until the roster it just
          changed has come back. */
@@ -3082,7 +3086,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       const blob = await prepareAvatar(file, crop);
       const objectId = await uploadAvatar(session, blob);
       const replaced = profile.avatarObject;
-      await persistProfile({ ...profile, avatarObject: objectId });
+      await persistProfile({ avatarObject: objectId });
       /* The old picture is removed only once the new one is the stored one, so
          a failed write never leaves the profile pointing at nothing. */
       if (replaced) await deleteAvatar(session, replaced).catch(() => {});
@@ -3097,7 +3101,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   async function handleAvatarRemove() {
     if (!session) return;
     const removed = profile.avatarObject;
-    await persistProfile({ ...profile, avatarObject: null });
+    await persistProfile({ avatarObject: null });
     if (removed) await deleteAvatar(session, removed).catch(() => {});
     if (removed) invalidateAvatarUrl(removed);
   }
@@ -4662,7 +4666,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         collaboratorsVisible={flags.collaborators}
         profileBusy={profileBusy}
         profileError={profileError}
-        onNicknameSave={(nickname) => void persistProfile({ ...profile, nickname })}
+        onNicknameSave={(nickname) => void persistProfile({ nickname })}
         onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
         onAvatarRemove={() => void handleAvatarRemove()}
         onOpenArchive={() => {
@@ -4695,7 +4699,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onWritingPreferencesChange={setWritingPreferences}
         /* Straight through the one profile writer: this is a column on the row,
          and Postgres reads it back to decide what the other member may fetch. */
-        onHideArchivedChange={(hideArchived) => void persistProfile({ ...profile, hideArchived })}
+        onHideArchivedChange={(hideArchived) => void persistProfile({ hideArchived })}
         onAutoLockChange={(autoLock) => changeFlags({ autoLock })}
         onClose={() => {
           setSettingsOpen(false);

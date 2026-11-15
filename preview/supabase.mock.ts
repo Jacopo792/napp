@@ -264,9 +264,9 @@ export async function loadProfile(_session: AppSession): Promise<Profile> {
   return { ...profile };
 }
 
-export async function saveProfile(_session: AppSession, next: Profile): Promise<void> {
+export async function saveProfile(_session: AppSession, change: Partial<Profile>): Promise<void> {
   await sleep(200);
-  profile = { ...next };
+  profile = { ...profile, ...change };
 }
 
 export async function uploadAvatar(_session: AppSession, file: Blob): Promise<string> {

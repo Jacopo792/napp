@@ -99,16 +99,16 @@ export async function loadProfile(session: AppSession): Promise<Profile> {
   };
 }
 
-export async function saveProfile(session: AppSession, profile: Profile): Promise<void> {
-  const result = await supabase.from("profiles").upsert(
-    {
-      user_id: session.userId,
-      nickname: profile.nickname,
-      avatar_object: profile.avatarObject,
-      hide_archived: profile.hideArchived,
-    },
-    { onConflict: "user_id" },
-  );
+/** Writes only the fields in `change`. A device holding an old copy of the
+ *  profile (a phone opened yesterday, a window left open) used to send the
+ *  whole row back with every nickname or picture change, and so switched
+ *  "Keep archived notes private" off behind the owner's back. */
+export async function saveProfile(session: AppSession, change: Partial<Profile>): Promise<void> {
+  const row: Record<string, unknown> = { user_id: session.userId };
+  if (change.nickname !== undefined) row.nickname = change.nickname;
+  if (change.avatarObject !== undefined) row.avatar_object = change.avatarObject;
+  if (change.hideArchived !== undefined) row.hide_archived = change.hideArchived;
+  const result = await supabase.from("profiles").upsert(row, { onConflict: "user_id" });
   fail(result.error);
 }
 
