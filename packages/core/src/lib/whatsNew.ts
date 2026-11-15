@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.58",
+    date: "2026-11-15",
+    headline: "Tidier underneath",
+    sections: [
+      {
+        heading: "Under the hood",
+        items: [
+          {
+            title: "Saving and switching, tested",
+            text: "How changes are saved, and how an archive is switched, left or deleted, now have their own tests. Nothing changes in how they work.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.57",
     date: "2026-11-15",
     headline: "Privacy that stays put",

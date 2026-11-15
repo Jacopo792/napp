@@ -3,6 +3,16 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.58 – 2026-11-15
+
+### Changed
+
+- Internal: the metadata save timing, the sequence for switching, leaving and
+  deleting an archive, and merging a remote snapshot's notes moved out of the
+  notes screen into tested modules. No change in behaviour.
+- Development: local Supabase runs without Logflare, whose out-of-memory
+  restarts stalled Auth during full-stack tests.
+
 ## 0.9.57 – 2026-11-15
 
 ### Fixed
