@@ -1,93 +1,108 @@
-import { readableMedia } from "@/lib/mediaTextShape";
-import { loadMediaText, saveMediaText, subscribeMediaText } from "@/lib/mediaText";
-import type { JSONContent } from "@tiptap/core";
-import { useNavigate } from "@tanstack/react-router";
+import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
+import { ChapterBoard } from "@/components/ChapterBoard";
+import { CommandPalette, ShortcutSheet } from "@/components/CommandPalette";
+import { FolderSheet } from "@/components/FolderSheet";
 import {
-  cloneElement,
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { flushSync } from "react-dom";
-import {
-  Archive,
+  Board,
+  ChevronDown,
   ChevronLeft,
-  Columns2,
-  FileText,
-  Folder,
-  FolderDown,
-  FolderTree,
-  Keyboard,
-  Lock,
-  Maximize2,
-  MessageSquare,
-  Minimize2,
-  NotebookText,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Pencil,
-  Search,
-  Settings,
-  SquarePen,
-  Trash2,
-  X,
   ChevronRight,
   Copy,
   FileDown,
+  FileText,
+  FolderTree,
   History,
-  Printer,
-  Structure,
-  Chapters,
-  Heading2,
-  Layers,
-  Pilcrow,
-  Footnote,
-  Sparkle,
-  UserRound,
-  Board,
-  ChevronDown,
+  Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pencil,
   Plus,
+  Printer,
+  Search,
+  Settings,
+  SquarePen,
+  Structure,
+  Trash2,
+  X,
 } from "@/components/icons";
+import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
+import { NoteSheet } from "@/components/NoteSheet";
+import { PaneResizer } from "@/components/PaneResizer";
+import { PersonSheet } from "@/components/PersonSheet";
 import type { SettingsSection } from "@/components/settingsSections";
-import { settingsSectionsFor } from "@/components/settingsSectionsFor";
-import { headingsOf, nameMatch, snippetOf } from "@/lib/spotlight";
+import { SheetStack } from "@/components/Sheet";
+import { Sidebar, type Scope } from "@/components/Sidebar";
+import { SpaceSwitch } from "@/components/SpaceSwitch";
+import { SpotlightLesson } from "@/components/SpotlightLesson";
+import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
+import { TrashSheet } from "@/components/TrashSheet";
+import { UpdateNotice } from "@/components/UpdateNotice";
+import { Avatar, CollectionMenu, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
+import { PageSetupButton, MenuButton as WritingMenuButton } from "@/components/WritingMenus";
+import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
+import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
+import { attachmentType } from "@/features/editor/lib/attachments";
+import {
+  EMPTY_RICH_TEXT,
+  RICH_TEXT_VERSION,
+  richTextToPlainText,
+} from "@/features/editor/lib/content";
+import {
+  clearDrafts,
+  dropDraft,
+  ensureDraft,
+  isDirty,
+  readDraft,
+  replaceDraft,
+} from "@/features/editor/lib/draft";
+import { exportFileName } from "@/features/editor/lib/exchange";
+import {
+  DEFAULT_FLAGS,
+  flagsOf,
+  heldRemarksSeen,
+  localPreferences,
+  mergeRemarksSeen,
+  preferencesWith,
+  pullAccountPreferences,
+  pushAccountPreferences,
+  subscribeToAccountPreferences,
+  unsubscribeFromAccountPreferences,
+  watchLocalStores,
+  type AccountFlags,
+} from "@/lib/accountPreferences";
+import { departArchive, enterArchive, type ArchiveDeparture } from "@/lib/archiveExit";
+import { useAutoLock } from "@/lib/autoLock";
+import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
+import { captureNote, takeCapture } from "@/lib/capture";
+import { useCollaborationPeers, useCollaborativeNote, wakeCollaboration } from "@/lib/collab";
+import type { RemarksSeen } from "@/lib/comments";
+import type { MenuPoint } from "@/lib/contextMenu";
+import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
+import { OPEN_PLACE, openPlace, type Place, type PlaceRequest } from "@/lib/documentContents";
+import { mergeRemoteEntries, type NoteEntry } from "@/lib/entries";
 import { FOLDER_DRAG, moveFolder } from "@/lib/folderOrder";
-import {
-  OPEN_PLACE,
-  openPlace,
-  referenceSnapshot,
-  setDocumentContents,
-  setDocumentReferences,
-  setDocumentSources,
-  setSourceImporter,
-  type PlaceRequest,
-  type Place,
-} from "@/lib/documentContents";
-import {
-  EMPTY_TARGETS,
-  REFERENCE_WORDS,
-  referenceText,
-  resolveReference,
-  targetKind,
-  targetsOf,
-  type ChapterTargets,
-} from "@/lib/references";
+import { fold } from "@/lib/format";
 import { loadContributions, loadNamedVersions, type NamedVersion } from "@/lib/history";
+import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
 import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  type DropAnimationFunction,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+  createListPreferences,
+  groupEntries,
+  loadListPreferences,
+  preferencesForFolder,
+  rememberRecent,
+  saveListPreferences,
+  type ListPreferences,
+  type ListPreferencesV1,
+} from "@/lib/listPreferences";
+import { intoPart, manuscriptOf, moveTo, positionBetween, topLevel } from "@/lib/manuscript";
+import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
+import { readableMedia } from "@/lib/mediaTextShape";
+import type { MenuItem } from "@/lib/menuShape";
+import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
+import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
+import { COVER_PRESETS } from "@/lib/pageProperties";
+import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
+import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import {
   addAccount,
   chooseArchive,
@@ -98,36 +113,40 @@ import {
   type AppSession,
 } from "@/lib/session";
 import { SESSION_KEY } from "@/lib/sessionRestore";
+import { keyName, windowCommand } from "@/lib/shortcuts";
 import {
   createSpace,
-  setDocumentFeatures,
-  setPageSetup,
-  setSpaceKind,
   deleteSpace,
   loadSpaces,
   renameSpace,
+  setDocumentFeatures,
+  setPageSetup,
+  setSpaceKind,
   setSpaceSeats,
-  findInOtherArchives,
-  loadSources,
-  saveSources,
   type Space,
 } from "@/lib/spaces";
-import { parseSources } from "@/lib/citations";
+import {
+  ARCHIVE_PRESETS,
+  DEFAULT_FEATURES,
+  DEFAULT_PAGE,
+  withLiveRoster,
+  type ArchiveKind,
+  type DocumentFeatures,
+  type PageSetup,
+} from "@/lib/spaceShape";
+import { headingsOf, snippetOf } from "@/lib/spotlight";
 import {
   createNote,
   deleteAvatar,
   deleteNotes,
-  leaveArchive,
   downloadImage,
   downloadObject,
+  leaveArchive,
   loadArchive,
-  NoteConflict,
   loadProfile,
   persistMetaDiff,
-  NoteRefused,
-  saveNote,
-  updateNoteProperties,
   saveProfile,
+  updateNoteProperties,
   uploadAvatar,
   uploadImage,
   uploadObject,
@@ -135,117 +154,63 @@ import {
   type ArchiveSnapshot,
   type Profile,
 } from "@/lib/supabase";
-import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
-import type { RemarksSeen } from "@/lib/comments";
-import {
-  DEFAULT_FLAGS,
-  flagsOf,
-  localPreferences,
-  heldRemarksSeen,
-  mergeRemarksSeen,
-  preferencesWith,
-  pullAccountPreferences,
-  pushAccountPreferences,
-  subscribeToAccountPreferences,
-  unsubscribeFromAccountPreferences,
-  watchLocalStores,
-  type AccountFlags,
-} from "@/lib/accountPreferences";
-import { prepareAvatar, prepareImageForNote, type AvatarCrop } from "@/lib/image";
-import { type Meta, type NoteLock, type NoteMeta, type Note, EMPTY_META } from "@/lib/types";
-import { mergeRemoteEntries, type NoteEntry } from "@/lib/entries";
-import { fold, formatDateTime } from "@/lib/format";
-import { COVER_PRESETS } from "@/lib/pageProperties";
-import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
-import {
-  clearDrafts,
-  dropDraft,
-  ensureDraft,
-  hasPending,
-  isDirty,
-  readDraft,
-  replaceDraft,
-  readBase,
-  rebaseDraft,
-  reconcileDraft,
-  requeue,
-  takePending,
-} from "@/features/editor/lib/draft";
-import {
-  EMPTY_RICH_TEXT,
-  RICH_TEXT_VERSION,
-  richTextToPlainText,
-} from "@/features/editor/lib/content";
-import { projectDocument } from "@/features/editor/lib/ydoc";
-import { mergeDocuments, mergeTitle } from "@/features/editor/lib/merge";
-import {
-  exportFileName,
-  markdownToNote,
-  noteToMarkdown,
-  uniqueFileNames,
-} from "@/features/editor/lib/exchange";
-import { platform } from "@/platform";
-import type { Draft } from "@/features/editor/lib/draft";
-import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
-import { visibleEntries } from "@/lib/visibleNotes";
-import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
-import { RETRY_MIN_MS, nextRetryDelay, waitUntilIdle } from "@/lib/writeDrain";
-import { type ArchiveDeparture, departArchive, enterArchive } from "@/lib/archiveExit";
-import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
-import { captureNote, takeCapture } from "@/lib/capture";
-import { attachmentType } from "@/features/editor/lib/attachments";
-import { PaneResizer } from "@/components/PaneResizer";
-import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
-import { useNotesLayout } from "./useNotesLayout";
+import { EMPTY_META, type Meta, type Note, type NoteLock, type NoteMeta } from "@/lib/types";
+import { visibleEntries } from "@/lib/visibleNotes";
+import {
+  CURRENT_RELEASE,
+  compareVersions,
+  laterVersion,
+  rememberSpotlightLearned,
+  rememberWhatsNewSeen,
+} from "@/lib/whatsNew";
+import { RETRY_MIN_MS, waitUntilIdle } from "@/lib/writeDrain";
+import {
+  presencePaletteFor,
+  setWritingPreferences,
+  useWritingPreferences,
+} from "@/lib/writingPreferences";
+import { platform } from "@/platform";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DropAnimationFunction,
+} from "@dnd-kit/core";
+import { useNavigate } from "@tanstack/react-router";
+import type { JSONContent } from "@tiptap/core";
+import {
+  Suspense,
+  cloneElement,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
 import { useArchiveInvites } from "./useArchiveInvites";
 import { useArchiveRemarks } from "./useArchiveRemarks";
+import { useArchiveWrites, writesWaiting } from "./useArchiveWrites";
+import { useDocumentReferences } from "./useDocumentReferences";
+import { useMediaIndexing } from "./useMediaIndexing";
+import { useNoteExchange } from "./useNoteExchange";
+import { useNotesLayout } from "./useNotesLayout";
 import { usePresence } from "./usePresence";
-import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
-import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
-import { useCollaborationPeers, useCollaborativeNote, wakeCollaboration } from "@/lib/collab";
-import { useAutoLock } from "@/lib/autoLock";
-import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
+import { workspacePalette } from "./workspacePalette";
 /* Lazily, and only once it is opened. Settings is one panel behind one button
    that nobody presses on the way to a note, and it was riding in the same
    chunk as the archive. */
 const SettingsPanel = lazy(() =>
   import("@/components/SettingsPanel").then((module) => ({ default: module.SettingsPanel })),
 );
-import type { MenuPoint } from "@/lib/contextMenu";
-import { ContextMenu } from "@/components/ContextMenu";
-import { PersonSheet } from "@/components/PersonSheet";
-import { SheetStack } from "@/components/Sheet";
-import { NoteSheet } from "@/components/NoteSheet";
-import { FolderSheet } from "@/components/FolderSheet";
-import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
-import { TrashSheet } from "@/components/TrashSheet";
-import { UpdateNotice } from "@/components/UpdateNotice";
-import { ChapterBoard } from "@/components/ChapterBoard";
-import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
-import { MenuButton as WritingMenuButton, PageSetupButton } from "@/components/WritingMenus";
-import type { MenuItem } from "@/lib/menuShape";
-import {
-  intoPart,
-  moveTo,
-  positionBetween,
-  manuscriptOf,
-  contentsOf,
-  topLevel,
-} from "@/lib/manuscript";
-import {
-  ARCHIVE_PRESETS,
-  DEFAULT_FEATURES,
-  DEFAULT_PAGE,
-  pageStyle,
-  withLiveRoster,
-  type ArchiveKind,
-  type DocumentFeatures,
-  type PageSetup,
-} from "@/lib/spaceShape";
-import { keyName, windowCommand } from "@/lib/shortcuts";
-import { SpaceSwitch } from "@/components/SpaceSwitch";
 
 const BOOK_PRESET = ARCHIVE_PRESETS.find((preset) => preset.id === "book")!;
 const SWITCH_KEYS = ["numbering", "footnotes", "citations", "review"] as const;
@@ -258,65 +223,10 @@ type SheetEntry =
   | { kind: "archive" }
   | { kind: "new-archive" }
   | { kind: "trash" };
-import { Sidebar, type Scope } from "@/components/Sidebar";
-import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
-import { SpotlightLesson } from "@/components/SpotlightLesson";
-import {
-  CURRENT_RELEASE,
-  compareVersions,
-  laterVersion,
-  rememberSpotlightLearned,
-  rememberWhatsNewSeen,
-} from "@/lib/whatsNew";
-import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
-import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
-import {
-  groupEntries,
-  createListPreferences,
-  loadListPreferences,
-  preferencesForFolder,
-  rememberRecent,
-  saveListPreferences,
-  type ListPreferences,
-  type ListPreferencesV1,
-} from "@/lib/listPreferences";
-import {
-  presencePaletteFor,
-  setWritingPreferences,
-  useWritingPreferences,
-} from "@/lib/writingPreferences";
 
 const NoteEditor = lazy(() =>
   import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
 );
-
-/** A Postgres row write is cheap enough to commit shortly after typing stops. */
-const AUTOSAVE_MS = 250;
-
-/* A chapter's targets, read once per projection: the content object is
-   replaced whenever the note changes, so it is its own cache key. */
-const targetCache = new WeakMap<object, ChapterTargets>();
-
-/** A Markdown export's cross-references say what the archive gives them
- *  now, rather than the words they were made with. */
-function citing(from: string) {
-  return {
-    reference: (attrs: Record<string, unknown>) => {
-      const { counted, settings, chapters } = referenceSnapshot();
-      if (!chapters.length || typeof attrs.target !== "string") return null;
-      const target = resolveReference(counted, {
-        target: attrs.target,
-        noteId: typeof attrs.noteId === "string" ? attrs.noteId : from,
-        kind: targetKind(attrs.kind),
-        match: typeof attrs.match === "string" ? attrs.match : "",
-      });
-      return target ? referenceText(target, from, settings) : null;
-    },
-  };
-}
-
-/** A note's text or a scope's metadata is still to be written. */
-const writesWaiting = (meta: MetaQueue) => hasPending() || meta.size > 0;
 
 /* How long a press has to be held before it stops being a press and becomes a
    question. Long enough not to fire on a slow tap, short enough that nobody
@@ -416,30 +326,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      slot for both read an import or a refused clipboard as "Save failed". */
   const [saveError, setSaveError] = useState("");
   const [error, setError] = useState("");
-  const [mediaTexts, setMediaTexts] = useState<Map<string, string>>(new Map());
-  const [indexingMedia, setIndexingMedia] = useState(false);
-  const indexingAbort = useRef<AbortController | null>(null);
-  useEffect(() => {
-    if (!session) return;
-    let live = true;
-    const read = () => {
-      void loadMediaText(session)
-        .then((rows) => {
-          if (live) setMediaTexts(rows);
-        })
-        .catch((reason) => {
-          if (live)
-            setError(reason instanceof Error ? reason.message : "Could not read attachment text");
-        });
-    };
-    read();
-    const stop = subscribeMediaText(session, read);
-    return () => {
-      live = false;
-      indexingAbort.current?.abort();
-      stop();
-    };
-  }, [session]);
+  const {
+    mediaTexts,
+    indexingMedia,
+    indexMedia: indexAttachments,
+  } = useMediaIndexing(session, setError, setStatusFlash);
 
   const [dragId, setDragId] = useState<string | null>(null);
   const {
@@ -1165,96 +1056,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [docMode, metas, entries, manuscriptOwner, viewAs],
   );
 
-  /* The table of contents, from the same rows the structure draws, with each
-     chapter's headings read out of its document. Handed to the `[TOC]` block
-     through `documentContents.ts`, because the block is drawn inside the
-     editor where nothing from here reaches it as a prop. */
-  const contents = useMemo(() => {
-    if (!manuscript) return [];
-    const byId = new Map(entries.map((entry) => [entry.note.id, entry.note]));
-    return contentsOf(
-      manuscript.rows,
-      manuscript.parts,
-      (id) => headingsOf(byId.get(id)?.content),
-      docFeatures.numbering,
-    );
-  }, [manuscript, entries, docFeatures.numbering]);
-  useEffect(() => setDocumentContents(contents), [contents]);
-
-  /* Every chapter's footnotes, captions and cited headings, from the same
-     projections, in the structure's order — what a cross-reference's words,
-     a sheet's first footnote number and the picker are counted from. The
-     notebook is there too, counted on its own, so a page of it can cite
-     and be cited like a chapter. */
-  const referenceChapters = useMemo(() => {
-    if (!manuscript) return [];
-    const byId = new Map(entries.map((entry) => [entry.note.id, entry.note]));
-    const read = (id: string): ChapterTargets => {
-      const content = byId.get(id)?.content;
-      if (!content || typeof content !== "object") return EMPTY_TARGETS;
-      let found = targetCache.get(content);
-      if (!found) targetCache.set(content, (found = targetsOf(content)));
-      return found;
-    };
-    return [
-      ...manuscript.chapters.map((item, index) => ({
-        id: item.id,
-        title: item.title,
-        number: index + 1,
-        targets: read(item.id),
-      })),
-      ...manuscript.notebook.map((item) => ({
-        id: item.id,
-        title: item.title,
-        number: null,
-        targets: read(item.id),
-      })),
-    ];
-  }, [manuscript, entries]);
   const page = currentSpace?.page ?? DEFAULT_PAGE;
-  useEffect(
-    () =>
-      setDocumentReferences(referenceChapters, {
-        numbered: docFeatures.numbering,
-        footnotes: page.footnoteNumbering,
-        language: page.labels,
-        citations: page.citationStyle,
-      }),
-    [
-      referenceChapters,
-      docFeatures.numbering,
-      page.footnoteNumbering,
-      page.labels,
-      page.citationStyle,
-    ],
-  );
-
-  /* The library, read when a document that cites opens, and taken in from a
-     file through the picker. Read again after an import rather than merged
-     here, so what is shown is what the table holds. */
-  const citingArchive = docMode && docFeatures.citations ? session?.archiveId : undefined;
-  useEffect(() => {
-    if (!citingArchive || !session) return;
-    let current = true;
-    const read = () =>
-      loadSources(session).then((sources) => {
-        if (current) setDocumentSources(sources);
-      });
-    read().catch((error) => console.warn("Could not read the sources", error));
-    setSourceImporter(async (text) => {
-      const sources = parseSources(text);
-      if (!sources.length) throw new Error("No BibTeX or CSL-JSON entries in that file");
-      await saveSources(session, sources);
-      await read();
-      return sources.length;
-    });
-    return () => {
-      current = false;
-      setSourceImporter(null);
-      setDocumentSources([]);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the archive, not the session object, decides
-  }, [citingArchive]);
+  const contents = useDocumentReferences({
+    manuscript,
+    entries,
+    docFeatures,
+    page,
+    docMode,
+    session,
+  });
 
   /* Words today: yours, from the versions the server writes after each
      stretch of writing, so it counts what was written on any device — and
@@ -1430,243 +1240,25 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => window.clearTimeout(timer);
   }, [error]);
 
-  const storeEntry = useCallback((note: Note, version: number) => {
-    const saved: NoteEntry = { note, version };
-    entriesRef.current = entriesRef.current.map((current) =>
-      current.note.id === note.id ? saved : current,
-    );
-    setEntries(entriesRef.current);
-  }, []);
-
-  /**
-   * Somebody else wrote this note while we were writing it.
-   *
-   * The document is the unit of the write, so the two versions cannot both be
-   * sent — but they can both be kept. `mergeDocuments` takes the blocks each
-   * side added or removed relative to the version this editor started from and
-   * produces one document holding both, which is exactly right for the case
-   * that lost text: two people adding paragraphs to the same note. Only when
-   * both edited the *same* block is there nothing to decide, and then the
-   * losing document is kept as a note of its own rather than discarded.
-   */
-  const resolveConflict = useCallback(
-    async (s: AppSession, id: string, taken: Draft, conflict: NoteConflict) => {
-      if (!conflict.entry) {
-        // ponytail: the row is gone, so there is nothing to merge onto and no
-        // metadata to recreate it under. Recreate it as a note if this ever
-        // happens to anybody in practice.
-        dropDraft(id);
-        setError("That note was removed somewhere else");
-        return;
-      }
-
-      let remote = conflict.entry;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const base = readBase(id) ?? taken;
-        const document = mergeDocuments(base.content, taken.content, remote.note.content);
-
-        if (!document) {
-          await keepUnmergedCopy(s, remote.note, taken);
-          storeEntry(remote.note, remote.version);
-          replaceDraft(
-            id,
-            {
-              title: remote.note.title,
-              body: remote.note.body,
-              content: remote.note.content,
-            },
-            remote.note.updatedAt,
-          );
-          setSyncRevision((n) => n + 1);
-          setMerge({
-            label: "Kept a copy",
-            detail:
-              "You and somebody else edited the same paragraph, so both versions could not become one. Theirs is in this note; yours is kept as a note of its own.",
-          });
-          return;
-        }
-
-        const merged: Note = {
-          ...remote.note,
-          title: mergeTitle(base.title, taken.title, remote.note.title),
-          body: richTextToPlainText(document),
-          content: document,
-          contentVersion: RICH_TEXT_VERSION,
-          updatedAt: new Date().toISOString(),
-        };
-
-        try {
-          const version = await saveNote(s, merged, remote.version);
-          storeEntry(merged, version);
-          adoptMerged(id, taken, {
-            title: merged.title,
-            body: merged.body,
-            content: document,
-          });
-          setMerge({
-            label: "Merged",
-            detail: "Somebody else wrote in this note while you did. Both changes are here.",
-          });
-          return;
-        } catch (err) {
-          // Written again while we were merging: merge onto the newer one.
-          if (!(err instanceof NoteConflict) || !err.entry) throw err;
-          remote = err.entry;
-        }
-      }
-      throw new Error("The note kept changing while it was being merged");
-    },
-    [storeEntry],
-  );
-
-  /**
-   * Puts the merged document on screen. Anything typed while the write was in
-   * flight descends from `taken`, and so does the merged document — so the same
-   * three-way merge re-applies those keystrokes on top of it. The base becomes
-   * what the archive now holds, never what is on screen, or the next merge
-   * would read the other person's blocks as a deletion.
-   */
-  function adoptMerged(id: string, taken: Draft, written: Draft) {
-    const current = readDraft(id);
-    const typedSince = isDirty(id) && current !== undefined;
-    if (!typedSince) {
-      replaceDraft(id, written);
-      setSyncRevision((n) => n + 1);
-      return;
-    }
-    const document =
-      mergeDocuments(taken.content, current.content, written.content) ?? written.content;
-    reconcileDraft(
-      id,
-      written,
-      {
-        title: mergeTitle(taken.title, current.title, written.title),
-        body: richTextToPlainText(document),
-        content: document,
-      },
-      true,
-    );
-    setSyncRevision((n) => n + 1);
-  }
-
-  /** The losing document, kept where it can be read. No marker reaches the
-   *  text of either version. */
-  async function keepUnmergedCopy(s: AppSession, remote: Note, local: Draft) {
-    const note: Note = {
-      id: crypto.randomUUID(),
-      title: `${remote.title || "Untitled"} — your version`,
-      body: local.body,
-      content: local.content,
-      contentVersion: RICH_TEXT_VERSION,
-      legacyBody: null,
-      photo: remote.photo,
-      cover: remote.cover,
-      ownerId: remote.ownerId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    const entry = await createNote(s, note, { id: note.id, folderId: null });
-    entriesRef.current = [entry, ...entriesRef.current];
-    setEntries(entriesRef.current);
-  }
-
-  const drain = useCallback(async () => {
-    const s = sessionRef.current;
-    if (!s || inFlightRef.current) return;
-    if (!hasPending() && pendingMetaRef.current.size === 0) return;
-
-    inFlightRef.current = true;
-    setSaving(true);
-    let failed = false;
-
-    try {
-      while (writesWaiting(pendingMetaRef.current)) {
-        for (const { id, draft: d, restoreUpdatedAt } of takePending()) {
-          const entry = entriesRef.current.find((e) => e.note.id === id);
-          if (!entry) {
-            dropDraft(id);
-            continue;
-          }
-
-          const updated: Note = {
-            ...entry.note,
-            title: d.title,
-            body: d.body,
-            content: d.content,
-            contentVersion: RICH_TEXT_VERSION,
-            updatedAt: restoreUpdatedAt ?? new Date().toISOString(),
-          };
-          try {
-            storeEntry(updated, await saveNote(s, updated, entry.version));
-            rebaseDraft(id, d);
-          } catch (err) {
-            if (!(err instanceof NoteConflict)) {
-              requeue(id);
-              throw err;
-            }
-            await resolveConflict(s, id, d, err);
-          }
-        }
-
-        await pendingMetaRef.current.flushAll((owner, before, after) =>
-          persistMetaDiff(s, owner, before, after),
-        );
-      }
-      setSaveError("");
-      retryDelayRef.current = RETRY_MIN_MS;
-    } catch (e) {
-      if (e instanceof NoteRefused) {
-        // ponytail: drops anything staged for this owner during the write too; per-row requeue if that bites.
-        pendingMetaRef.current.discard(e.owner);
-        realtimePendingRef.current = true;
-        setSaveError(e.message);
-      } else {
-        failed = true;
-        setSaveError(e instanceof Error ? e.message : "Save failed");
-      }
-    } finally {
-      inFlightRef.current = false;
-      setSaving(false);
-      setDirty(writesWaiting(pendingMetaRef.current));
-      if (failed) {
-        window.clearTimeout(retryRef.current);
-        retryRef.current = window.setTimeout(() => void drain(), retryDelayRef.current);
-        retryDelayRef.current = nextRetryDelay(retryDelayRef.current);
-      }
-      if (realtimePendingRef.current) {
-        realtimePendingRef.current = false;
-        window.setTimeout(() => void refreshRemote(), 0);
-      }
-    }
-  }, [refreshRemote, resolveConflict, storeEntry]);
-
-  /* `drain` steps aside while a save is already on its way, which is right for
-     a timer and wrong for leaving: the archive switch read that as "still
-     saving" and refused. Leaving waits for the save in flight, then flushes
-     what is left. Bounded, so a request that never answers cannot hold the
-     window; what is still waiting after that is refused as before. */
-  const settleWrites = useCallback(async () => {
-    await waitUntilIdle(() => inFlightRef.current, 8000);
-    await drain();
-  }, [drain]);
-
-  const schedule = useCallback(() => {
-    /* Drafts and metadata both: trashing or pinning a note writes no draft,
-       and asking only about drafts left it unsaved until the window hid. */
-    if (!writesWaiting(pendingMetaRef.current)) {
-      window.clearTimeout(timerRef.current);
-      setDirty(pendingMetaRef.current.size > 0);
-      return;
-    }
-    setDirty(true);
-    window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => void drain(), AUTOSAVE_MS);
-  }, [drain]);
-
-  const saveNow = useCallback(() => {
-    window.clearTimeout(timerRef.current);
-    void drain();
-  }, [drain]);
+  const { drain, settleWrites, schedule, saveNow } = useArchiveWrites({
+    sessionRef,
+    entriesRef,
+    pendingMetaRef,
+    inFlightRef,
+    timerRef,
+    retryRef,
+    retryDelayRef,
+    realtimePendingRef,
+    loading,
+    refreshRemote,
+    setEntries,
+    setSyncRevision,
+    setMerge,
+    setError,
+    setSaving,
+    setSaveError,
+    setDirty,
+  });
 
   /** One keystroke, two consequences: a save is queued, and whoever else has
    *  this note open is told somebody is writing in it. */
@@ -1723,37 +1315,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       .startViewTransition(apply)
       .finished.finally(() => root.classList.remove("is-turning-board"));
   }, []);
-
-  useEffect(
-    () => () => {
-      window.clearTimeout(timerRef.current);
-      window.clearTimeout(retryRef.current);
-    },
-    [],
-  );
-
-  /* A draft restored from the reload has never reached Postgres, and the
-     archive is the only place it is safe. `drain` needs the entry it belongs
-     to, so this waits for the catalogue rather than firing on mount. */
-  useEffect(() => {
-    if (loading || !hasPending()) return;
-    saveNow();
-  }, [loading, saveNow]);
-
-  // Never leave the tab holding unsaved words.
-  useEffect(() => {
-    function onHide() {
-      if (document.visibilityState === "hidden") saveNow();
-    }
-    // No "Leave site?" confirm: it cannot finish an async write anyway, and
-    // the flush above already runs before the tab is backgrounded or closed.
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", saveNow);
-    return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", saveNow);
-    };
-  }, [saveNow]);
 
   const handleUploadImage = useCallback(
     async (file: File): Promise<string> => {
@@ -1960,179 +1521,37 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      clipboard reach all three, and none of them needs an OAuth secret or the
      server this project does not have. */
 
-  const markdownFor = useCallback(
-    (entry: NoteEntry) => {
-      if (entry.note.id === selectedId && collaborative.ready && collaborative.doc) {
-        const live = projectDocument(collaborative.doc);
-        return noteToMarkdown(live.title, live.content, citing(entry.note.id));
-      }
-      /* What is on screen, not what last reached Postgres: exporting a note you
-       are still typing in should give you the words you can see. */
-      const draft = readDraft(entry.note.id);
-      return noteToMarkdown(
-        draft?.title ?? entry.note.title,
-        draft?.content ?? entry.note.content,
-        citing(entry.note.id),
-      );
-    },
-    [selectedId, collaborative.ready, collaborative.doc],
-  );
+  const indexMedia = () =>
+    indexAttachments({
+      entries,
+      canWriteArchive,
+      resolveFile,
+      resolveImage,
+      contentOf: (entry) =>
+        selected?.note.id === entry.note.id
+          ? (noteEditorRef.current?.getContent() ?? entry.note.content)
+          : entry.note.content,
+    });
 
-  const indexMedia = async () => {
-    if (!session || !canWriteArchive || indexingMedia) return;
-    const controller = new AbortController();
-    indexingAbort.current = controller;
-    const media = new Map(
-      entries
-        .flatMap((entry) =>
-          readableMedia(
-            selected?.note.id === entry.note.id
-              ? (noteEditorRef.current?.getContent() ?? entry.note.content)
-              : entry.note.content,
-          ),
-        )
-        .filter((one) => !mediaTexts.has(one.id))
-        .map((one) => [one.id, one]),
-    );
-    if (!media.size) {
-      setStatusFlash("Images and PDFs are searchable");
-      return;
-    }
-    setIndexingMedia(true);
-    setError("");
-    let recognizer:
-      | Awaited<ReturnType<typeof import("@/features/editor/lib/ocr").textRecognizer>>
-      | undefined;
-    try {
-      let done = 0;
-      for (const one of media.values()) {
-        if (controller.signal.aborted) break;
-        setStatusFlash(`Reading images and PDFs… ${done + 1}/${media.size}`);
-        const blob = one.type === "pdf" ? await resolveFile(one.id) : await resolveImage(one.id);
-        if (controller.signal.aborted) break;
-        const read = async (input: Blob | HTMLCanvasElement) => {
-          recognizer ??= await (await import("@/features/editor/lib/ocr")).textRecognizer();
-          return recognizer.read(input);
-        };
-        const text =
-          one.type === "pdf"
-            ? await (
-                await import("@/features/editor/lib/pdf")
-              ).extractPdfText(
-                new File([blob], one.label, { type: "application/pdf" }),
-                undefined,
-                read,
-              )
-            : await read(blob);
-        if (controller.signal.aborted) break;
-        await saveMediaText(session, one.id, text);
-        if (!controller.signal.aborted) setMediaTexts((rows) => new Map(rows).set(one.id, text));
-        done += 1;
-      }
-      if (!controller.signal.aborted) setStatusFlash("Images and PDFs are searchable");
-    } catch (reason) {
-      if (!controller.signal.aborted)
-        setError(reason instanceof Error ? reason.message : "Could not read attachment text");
-    } finally {
-      await recognizer?.close();
-      if (!controller.signal.aborted) setIndexingMedia(false);
-    }
-  };
-
-  const handleCopyMarkdown = useCallback(
-    async (entry: NoteEntry) => {
-      try {
-        await navigator.clipboard.writeText(markdownFor(entry));
-        setStatusFlash("Copied");
-      } catch {
-        setError("Could not copy");
-      }
-    },
-    [markdownFor],
-  );
-
-  const handleExportMarkdown = useCallback(
-    (entry: NoteEntry) => {
-      const draft = readDraft(entry.note.id);
-      void platform().saveFile(
-        exportFileName(draft?.title ?? entry.note.title),
-        markdownFor(entry),
-      );
-    },
-    [markdownFor],
-  );
-
-  const handleExportAll = useCallback(async () => {
-    const list = orderedVisible;
-    if (list.length === 0) {
-      setStatusFlash("Nothing to export");
-      return;
-    }
-    const names = uniqueFileNames(
-      list.map((entry) => readDraft(entry.note.id)?.title ?? entry.note.title),
-    );
-    try {
-      const shape = await platform().saveFolder(
-        list.map((entry, index) => ({ name: names[index], text: markdownFor(entry) })),
-        `${folderLabel}.md`,
-      );
-      /* The readout slot is 7.5rem and clips, so every one of these is kept
-         inside the width of "Updated elsewhere". */
-      setStatusFlash(
-        shape === "folder"
-          ? `Wrote ${list.length} file${list.length === 1 ? "" : "s"}`
-          : `Exported ${list.length} note${list.length === 1 ? "" : "s"}`,
-      );
-    } catch (e) {
-      /* The directory picker throws when it is dismissed, which is not an
-         error the reader needs told back to them. */
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(e instanceof Error ? e.message : "Export failed");
-    }
-  }, [orderedVisible, markdownFor, folderLabel]);
-
-  const handleImportFiles = useCallback(
-    async (files: FileList | null) => {
-      const s = sessionRef.current;
-      if (!s || !canWriteArchive || !files || files.length === 0) return;
-      setSaving(true);
-      setError("");
-      try {
-        const added: NoteMeta[] = [];
-        for (const file of [...files]) {
-          const { title, content } = markdownToNote(file.name, await file.text());
-          const note: Note = {
-            id: crypto.randomUUID(),
-            title,
-            body: richTextToPlainText(content),
-            content,
-            contentVersion: RICH_TEXT_VERSION,
-            legacyBody: null,
-            photo: null,
-            cover: null,
-            ownerId: viewAs,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          const metadata: NoteMeta = { id: note.id, folderId: null };
-          entriesRef.current = [await createNote(s, note, metadata), ...entriesRef.current];
-          added.push(metadata);
-        }
-        setEntries(entriesRef.current);
-        setMetas((current) => {
-          const base = current[viewAs] ?? metasRef.current[viewAs] ?? EMPTY_META;
-          return { ...current, [viewAs]: { ...base, notes: [...base.notes, ...added] } };
-        });
-        if (selectedFolderId === TRASH || selectedFolderId === ARCHIVE) setSelectedFolderId(ALL);
-        setStatusFlash(`Imported ${added.length} note${added.length === 1 ? "" : "s"}`);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Import failed");
-      } finally {
-        setSaving(false);
-      }
-    },
-    [canWriteArchive, viewAs, selectedFolderId],
-  );
+  const { handleCopyMarkdown, handleExportMarkdown, handleExportAll, handleImportFiles } =
+    useNoteExchange({
+      selectedId,
+      collaborative,
+      orderedVisible,
+      folderLabel,
+      sessionRef,
+      entriesRef,
+      metasRef,
+      viewAs,
+      selectedFolderId,
+      canWriteArchive,
+      setEntries,
+      setMetas,
+      setSaving,
+      setError,
+      setStatusFlash,
+      setSelectedFolderId,
+    });
 
   /** A new note, empty or started from a template or the day. */
   const handleNewFrom = useCallback(
@@ -3596,20 +3015,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const notesOf = (member: ArchiveMember) =>
     member.isSelf ? "Your notes" : `${member.nickname || "Another member"}'s notes`;
 
-  /* What a document finds is its own: chapters and the notebook, in whoever's
-     scope the structure keeps them; a notes archive finds the scope on screen,
-     as it always has. */
-  const searchable = !paletteOpen
-    ? []
-    : docMode && manuscript
-      ? (() => {
-          const ids = new Set(
-            [...manuscript.chapters, ...manuscript.notebook].map((item) => item.id),
-          );
-          return entries.filter((entry) => ids.has(entry.note.id));
-        })()
-      : ownedEntries;
-
   /* Opening what was found. In a document the structure's own path — the
      notes list's scope and filter are not on screen there — and then, if a
      place inside it was found, going to that place. */
@@ -3628,381 +3033,58 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (then) setOpenThen({ noteId: id, ...then });
   };
 
-  const paletteCommands: Command[] = ((): Command[] => {
-    if (!paletteOpen) return [];
-    const open = (id: string) => openFound(id);
-    const stamp = (entry: NoteEntry) => Date.parse(entry.note.updatedAt);
-    const chapters = manuscript?.chapters ?? [];
-    return [
-      ...(docMode && manuscript
-        ? [
-            {
-              id: "go:title",
-              group: "Go to",
-              name: "Title page",
-              keywords: "cover front document",
-              icon: <Chapters size={16} />,
-              run: () => setSelectedId(null),
-            },
-          ]
-        : scopes.map((scope) => ({
-            id: `scope:${scope.id}`,
-            group: "Go to",
-            name: scope.label,
-            icon:
-              scope.id === TRASH ? (
-                <Trash2 size={16} />
-              ) : scope.id === REMARKS ? (
-                <MessageSquare size={16} />
-              ) : scope.id === ARCHIVE ? (
-                <Archive size={16} />
-              ) : scope.id === ALL ? (
-                <NotebookText size={16} />
-              ) : (
-                <Folder size={16} />
-              ),
-            run: () => handleSelectFolder(scope.id),
-          }))),
-      /* The running text is found by the Text group below, with the line it
-         is in; here a note is found by its name. */
-      ...(docMode && manuscript
-        ? [
-            ...chapters.map((item, index) => ({
-              id: `note:${item.id}`,
-              group: "Chapters",
-              name: item.title || "Untitled",
-              hint: [
-                `Chapter ${index + 1}`,
-                item.folderId ? manuscript.parts.get(item.folderId) : undefined,
-              ]
-                .filter(Boolean)
-                .join(" · "),
-              icon: <FileText size={16} />,
-              run: open(item.id),
-            })),
-            ...manuscript.notebook.map((item) => ({
-              id: `note:${item.id}`,
-              group: "Notes",
-              name: item.title || "Untitled",
-              icon: <NotebookText size={16} />,
-              run: open(item.id),
-            })),
-            ...[...manuscript.parts].flatMap(([partId, name]) => {
-              const first = chapters.find((item) => item.folderId === partId);
-              return first
-                ? [
-                    {
-                      id: `part:${partId}`,
-                      group: "Parts",
-                      searchOnly: true,
-                      name,
-                      hint: first.title || "Untitled",
-                      icon: <Folder size={16} />,
-                      run: open(first.id),
-                    },
-                  ]
-                : [];
-            }),
-          ]
-        : ownedEntries.map((entry) => ({
-            id: `note:${entry.note.id}`,
-            group: "Notes",
-            name: entry.note.title || "Untitled",
-            hint: derivedOf(entry.note).preview || undefined,
-            at: stamp(entry),
-            icon: <FileText size={16} />,
-            run: open(entry.note.id),
-          }))),
-      /* What was said, searchable with everything else. A remark is the one
-         thing in this archive that was not reachable from here — and it is
-         the kind of thing you go looking for by its words rather than by the
-         note it is on. Opening one is opening its note in the scope that
-         opens conversations with it, which is the path that already exists. */
-      ...archiveComments.flatMap((remark) => {
-        const entry = searchable.find((candidate) => candidate.note.id === remark.noteId);
-        if (!entry) return [];
-        const title = entry.note.title || "Untitled";
-        return [
-          {
-            id: `remark:${remark.id}`,
-            group: "Remarks",
-            name: remark.body,
-            hint: title,
-            keywords: `${remark.body} ${title}`.toLowerCase(),
-            icon: <MessageSquare size={16} />,
-            run: docMode
-              ? () => {
-                  openFound(remark.noteId)();
-                  setOpenThen({ noteId: remark.noteId, comments: true });
-                }
-              : () => {
-                  setQuery("");
-                  setSelectedFolderId(REMARKS);
-                  handleSelectNote(remark.noteId);
-                },
-          },
-        ];
-      }),
-      ...roster.map((member) => ({
-        id: `person:${member.userId}`,
-        group: "People",
-        searchOnly: true,
-        name: nameOf(member),
-        icon: <UserRound size={16} />,
-        run: () => openSheet({ kind: "person", userId: member.userId }),
-      })),
-      ...namedVersions.flatMap((version) => {
-        const entry = entries.find((candidate) => candidate.note.id === version.noteId);
-        if (!entry || !version.label) return [];
-        return [
-          {
-            id: `version:${version.id}`,
-            group: "Versions",
-            searchOnly: true,
-            name: version.label,
-            hint: `${entry.note.title || "Untitled"} · ${formatDateTime(version.createdAt)}`,
-            at: Date.parse(version.createdAt),
-            icon: <History size={16} />,
-            run: openFound(version.noteId, { history: version.id }),
-          },
-        ];
-      }),
-      ...spaces
-        .filter((space) => space.archiveId !== session?.archiveId)
-        .map((space) => ({
-          id: `archive:${space.archiveId}`,
-          group: "Archives",
-          searchOnly: true,
-          name: space.name,
-          keywords: "archive space switch",
-          icon: <Layers size={16} />,
-          run: () => switchArchive(space.archiveId),
-        })),
-      {
-        id: "new",
-        group: "Do",
-        name: docMode ? "New chapter" : "New note",
-        hint: "⌘N",
-        icon: <SquarePen size={16} />,
-        run: () => (docMode ? handleNewChapter(null) : void handleNew()),
+  const { paletteCommands, paletteSearch, paletteRemote } = workspacePalette(
+    {
+      paletteOpen,
+      docMode,
+      manuscript,
+      entries,
+      ownedEntries,
+      scopes,
+      archiveComments,
+      roster,
+      namedVersions,
+      spaces,
+      archiveId: session?.archiveId,
+      templates,
+      canWriteArchive,
+      selectedId,
+      splitId,
+      trashedIds,
+      splitEntry,
+      focusMode,
+      indexingMedia,
+      mediaTexts,
+    },
+    {
+      openFound,
+      setSelectedId,
+      handleSelectFolder,
+      handleSelectNote,
+      setQuery,
+      setSelectedFolderId,
+      setOpenThen,
+      nameOf,
+      openSheet,
+      switchArchive,
+      handleNewChapter,
+      handleNew,
+      handleNewFrom,
+      setSplitId,
+      toggleFocus,
+      setSettingsOpen,
+      indexMedia,
+      handleExportAll,
+      openWhatsNew,
+      setShortcutsOpen,
+      handleLock,
+      setSettingsSection,
+      openInArchive: (archiveId, noteId) => {
+        openOnArrival = noteId;
+        switchArchive(archiveId);
       },
-      ...(docMode || !canWriteArchive
-        ? []
-        : [
-            ...templates.map((template) => ({
-              id: `template:${template.note.id}`,
-              group: "New from template",
-              name: template.note.title || "Untitled",
-              keywords: "template modello new",
-              icon: <SquarePen size={16} />,
-              run: () =>
-                void handleNewFrom({ title: template.note.title, content: template.note.content }),
-            })),
-          ]),
-      ...(selectedId && !docMode
-        ? ownedEntries
-            .filter(
-              (entry) =>
-                entry.note.id !== selectedId &&
-                entry.note.id !== splitId &&
-                !trashedIds.has(entry.note.id),
-            )
-            .map((entry) => ({
-              id: `split:${entry.note.id}`,
-              group: "Open beside",
-              name: entry.note.title || "Untitled",
-              keywords: `split side by side beside ${derivedOf(entry.note).haystack}`,
-              icon: <Columns2 size={16} />,
-              run: () => setSplitId(entry.note.id),
-            }))
-        : []),
-      ...(splitEntry
-        ? [
-            {
-              id: "unsplit",
-              group: "Do",
-              name: "Close the second note",
-              icon: <Columns2 size={16} />,
-              run: () => setSplitId(null),
-            },
-          ]
-        : []),
-      {
-        id: "focus",
-        group: "Do",
-        name: focusMode ? "Leave focus" : "Focus mode",
-        hint: focusMode ? "Esc" : "One column, nothing else",
-        keywords: "zen distraction free writing",
-        icon: focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />,
-        run: toggleFocus,
-      },
-      {
-        id: "settings",
-        group: "Do",
-        name: "Settings",
-        icon: <Settings size={16} />,
-        run: () => setSettingsOpen(true),
-      },
-      ...(canWriteArchive
-        ? [
-            {
-              id: "ocr",
-              group: "Do",
-              name: indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable",
-              icon: <Search size={16} />,
-              run: () => void indexMedia(),
-            },
-          ]
-        : []),
-      {
-        id: "export",
-        group: "Do",
-        name: "Export all as Markdown",
-        icon: <FolderDown size={16} />,
-        run: () => void handleExportAll(),
-      },
-      {
-        id: "whats-new",
-        group: "Do",
-        name: "What's New",
-        icon: <Sparkle size={16} />,
-        run: openWhatsNew,
-      },
-      {
-        id: "shortcuts",
-        group: "Do",
-        name: "Keyboard shortcuts",
-        hint: "\u2318/",
-        icon: <Keyboard size={16} />,
-        run: () => setShortcutsOpen(true),
-      },
-      {
-        id: "lock",
-        group: "Do",
-        name: "Lock & sign out",
-        icon: <Lock size={16} />,
-        run: () => handleLock(),
-      },
-      /* Every section of Settings, by its name and by the rows inside it. */
-      ...settingsSectionsFor(docMode ? "document" : "notes")
-        .flatMap((group) => group.items)
-        .map((item) => ({
-          id: `settings:${item.id}`,
-          group: "Settings",
-          searchOnly: true,
-          name: item.name,
-          keywords: `settings ${item.keywords}`,
-          icon: item.icon,
-          run: () => {
-            setSettingsSection(item.id);
-            setSettingsOpen(true);
-          },
-        })),
-    ];
-  })();
-
-  /* What only a typed query finds: the headings a note is divided by and the
-     line a word occurs in. From memory, on every keystroke — `haystack` is
-     already folded, so a note that does not hold the word costs one
-     `includes`. */
-  const paletteSearch = (q: string): Command[] => {
-    const found: Command[] = [];
-    const references = referenceSnapshot();
-    let lines = 0;
-    for (const entry of searchable) {
-      const id = entry.note.id;
-      const title = entry.note.title || "Untitled";
-      const at = Date.parse(entry.note.updatedAt);
-      /* A footnote's words are an attribute, outside the text the haystack
-         is made of, so they are asked before it can rule the note out. */
-      for (const target of references.counted.get(id)?.targets ?? []) {
-        if (target.kind !== "footnote" || !fold(target.text).includes(q)) continue;
-        found.push({
-          id: `footnote:${id}:${target.index}`,
-          group: "Footnotes",
-          name: target.text.length > 90 ? `${target.text.slice(0, 89)}…` : target.text,
-          hint: `${REFERENCE_WORDS[references.settings.language].footnote} ${target.number} · ${title}`,
-          rank: 4,
-          at,
-          icon: <Footnote size={16} />,
-          run: openFound(id, {
-            reveal: { kind: "footnote", id: target.id, index: target.index },
-          }),
-        });
-      }
-      const mediaText = readableMedia(entry.note.content)
-        .map((one) => mediaTexts.get(one.id) || "")
-        .join("\n");
-      if (fold(mediaText).includes(q) && mediaText)
-        found.push({
-          id: `media:${id}`,
-          group: "Images and PDFs",
-          name: title,
-          snippet: snippetOf(mediaText, q) ?? undefined,
-          rank: 6,
-          at,
-          icon: <Search size={16} />,
-          run: openFound(id),
-        });
-      if (!derivedOf(entry.note).haystack.includes(q)) continue;
-      headingsOf(entry.note.content).forEach((heading, index) => {
-        if (!fold(heading.text).includes(q)) return;
-        found.push({
-          id: `section:${id}:${index}`,
-          group: "Sections",
-          name: heading.text,
-          hint: title,
-          rank: 3,
-          at,
-          icon: <Heading2 size={16} />,
-          run: openFound(id, { reveal: heading.text }),
-        });
-      });
-      // ponytail: the first thirty notes that hold the word; a ranked cap if an archive outgrows it.
-      const snippet = lines < 30 ? snippetOf(entry.note.body, q) : null;
-      if (snippet) {
-        lines += 1;
-        found.push({
-          id: `text:${id}`,
-          group: "Text",
-          name: title,
-          snippet,
-          rank: 6,
-          at,
-          icon: <Pilcrow size={16} />,
-          run: openFound(id, { reveal: snippet.match }),
-        });
-      }
-    }
-    return found;
-  };
-
-  /* The titles in the other archives, which are not in memory. Choosing one
-     is changing archive, and the note is opened when the new one arrives. */
-  const paletteRemote = async (q: string): Promise<Command[]> => {
-    const others = spaces.filter((space) => space.archiveId !== session?.archiveId);
-    const far = await findInOtherArchives(
-      others.map((space) => space.archiveId),
-      q,
-    );
-    const folded = fold(q);
-    return far.map((note) => {
-      const match = nameMatch(note.title, folded);
-      return {
-        id: `far:${note.noteId}`,
-        group: "Other archives",
-        name: note.title || "Untitled",
-        hint: others.find((space) => space.archiveId === note.archiveId)?.name,
-        rank: match < 0 ? 2 : match,
-        at: Date.parse(note.updatedAt),
-        icon: <FileText size={16} />,
-        run: () => {
-          openOnArrival = note.noteId;
-          switchArchive(note.archiveId);
-        },
-      };
-    });
-  };
+    },
+  );
 
   /* ── Whose notes ───────────────────────────────────────────────────────────
      Faces, and no names. It carried both, side by side, for each member: two

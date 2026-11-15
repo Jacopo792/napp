@@ -2,9 +2,10 @@
 
 ## Automated checks
 
-`pnpm test:e2e` runs two UI smoke tests against the preview fixture. They cover
-navigation, editing and finding a new note through search. They do not prove
-backend authorization or persistence.
+`pnpm test:e2e` runs browser checks against the preview fixture. They cover
+navigation, editing, search, slash formatting, note links and drawing commit/cancel.
+They do not prove backend authorization or persistence. See
+[workspace-editor.md](workspace-editor.md) for module ownership.
 
 Start local Supabase with `supabase start`, then run `pnpm test:e2e:full` for
 browser tests against the production web app and a local collaboration server.
@@ -70,7 +71,7 @@ unrelated origin. Set `EXPECTED_REVISION` to a full Git SHA to require that
 version; `DEPLOY_WAIT_MS` bounds the optional rollout wait.
 
 CI checks the requested server revision, readiness and origins before publishing
-Pages. A missing deploy hook is explicitly reported as a skipped backend deploy.
+Pages. A missing deploy hook fails the production deployment.
 
 ## Practical limits
 

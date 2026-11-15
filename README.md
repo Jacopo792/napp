@@ -166,6 +166,9 @@ and the web and desktop shells mount the same application rather than
 implementing separate editors. Notes have a structured Tiptap representation and
 a plain-text projection for search and previews; Markdown is an exchange format.
 
+The [workspace and editor map](docs/workspace-editor.md) identifies the owner of
+each feature, its state and the checks to run before changing it.
+
 ## Development
 
 Use Node.js from [`.nvmrc`](.nvmrc) and pnpm 11 or later.

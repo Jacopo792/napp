@@ -79,6 +79,7 @@ logo is artwork, not an encryption claim.
   lazy. A change to a fixture's real API must update its preview stand-in too.
 
 See `docs/engineering-invariants.md` for media, export and rendering constraints.
+See `docs/workspace-editor.md` for workspace hooks, editor modules and their state ownership.
 
 ## Interface decisions
 
