@@ -6243,6 +6243,7 @@
   .list-in.is-cascading .note-group-heading,
   .page-in > *,
   .board-split,
+  .board-list > *,
   .board-card.is-detail,
   .editor-scroll .rich-text-editor,
   .popover,
@@ -11167,14 +11168,41 @@ button.sheet-chip:hover,
   touch-action: none;
 }
 
-.board-row:hover {
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-  color: var(--ink);
+/* The notes list's own motion: the wash arrives at once and leaves slowly,
+   so a pointer drawn down the list leaves a short trail; the selection is a
+   quiet wash, not a colour; a press gives a little; and the rows arrive in
+   reading order when the board does. */
+.board-row {
+  --row-wash: 240ms;
+  transition:
+    transform var(--dur-press) var(--ease-press),
+    color var(--dur-fast) var(--ease-press),
+    background-color var(--row-wash) var(--ease);
+}
+
+@media (hover: hover) {
+  .board-row:hover {
+    --row-wash: 70ms;
+  }
+
+  .board-row:hover:not(.is-chosen) {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    color: var(--ink);
+  }
+}
+
+.board-row.press:active {
+  transform: scale(0.99);
 }
 
 .board-row.is-chosen {
-  background: var(--accent-wash);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
   color: var(--ink);
+}
+
+.board-list > * {
+  animation: row-in 200ms var(--ease-out) backwards;
+  animation-delay: calc(min(sibling-index() - 1, 10) * 14ms);
 }
 
 .board-row.is-lifted {
