@@ -54,6 +54,12 @@ export class MetaQueue {
       throw err;
     }
   }
+
+  /** Every owner in turn; the first failure stops the rest and is thrown on. */
+  async flushAll(write: (owner: string, before: Meta, after: Meta) => Promise<void>) {
+    for (const owner of this.owners())
+      await this.flush(owner, (before, after) => write(owner, before, after));
+  }
 }
 
 /** A note somebody else has locked keeps the metadata it had, whatever the

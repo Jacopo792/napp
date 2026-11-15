@@ -189,6 +189,7 @@ import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { visibleEntries } from "@/lib/visibleNotes";
 import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
+import { RETRY_MIN_MS, nextRetryDelay, waitUntilIdle } from "@/lib/writeDrain";
 import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
@@ -310,10 +311,8 @@ function citing(from: string) {
   };
 }
 
-/* A failed write is retried on its own, backing off so a server that is down
-   is not hammered — but never so slowly that a recovered connection is missed. */
-const RETRY_MIN_MS = 4000;
-const RETRY_MAX_MS = 60_000;
+/** A note's text or a scope's metadata is still to be written. */
+const writesWaiting = (meta: MetaQueue) => hasPending() || meta.size > 0;
 
 /* How long a press has to be held before it stops being a press and becomes a
    question. Long enough not to fire on a slow tap, short enough that nobody
@@ -1602,7 +1601,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     let failed = false;
 
     try {
-      while (hasPending() || pendingMetaRef.current.size > 0) {
+      while (writesWaiting(pendingMetaRef.current)) {
         for (const { id, draft: d, restoreUpdatedAt } of takePending()) {
           const entry = entriesRef.current.find((e) => e.note.id === id);
           if (!entry) {
@@ -1630,10 +1629,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }
         }
 
-        for (const owner of pendingMetaRef.current.owners())
-          await pendingMetaRef.current.flush(owner, (before, after) =>
-            persistMetaDiff(s, owner, before, after),
-          );
+        await pendingMetaRef.current.flushAll((owner, before, after) =>
+          persistMetaDiff(s, owner, before, after),
+        );
       }
       setSaveError("");
       retryDelayRef.current = RETRY_MIN_MS;
@@ -1643,11 +1641,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     } finally {
       inFlightRef.current = false;
       setSaving(false);
-      setDirty(hasPending() || pendingMetaRef.current.size > 0);
+      setDirty(writesWaiting(pendingMetaRef.current));
       if (failed) {
         window.clearTimeout(retryRef.current);
         retryRef.current = window.setTimeout(() => void drain(), retryDelayRef.current);
-        retryDelayRef.current = Math.min(RETRY_MAX_MS, retryDelayRef.current * 2);
+        retryDelayRef.current = nextRetryDelay(retryDelayRef.current);
       }
       if (realtimePendingRef.current) {
         realtimePendingRef.current = false;
@@ -1662,9 +1660,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      what is left. Bounded, so a request that never answers cannot hold the
      window; what is still waiting after that is refused as before. */
   const settleWrites = useCallback(async () => {
-    const deadline = Date.now() + 8000;
-    while (inFlightRef.current && Date.now() < deadline)
-      await new Promise((resolve) => setTimeout(resolve, 30));
+    await waitUntilIdle(() => inFlightRef.current, 8000);
     await drain();
   }, [drain]);
 
@@ -2195,13 +2191,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           if (needsFlush) {
             window.clearTimeout(timerRef.current);
             window.clearTimeout(retryRef.current);
-            while (inFlightRef.current) {
-              await new Promise((resolve) => setTimeout(resolve, 30));
-            }
+            await waitUntilIdle(() => inFlightRef.current);
             await pendingMetaRef.current.flush(viewAs, (before, after) =>
               persistMetaDiff(s, viewAs, before, after),
             );
-            setDirty(pendingMetaRef.current.size > 0 || hasPending());
+            setDirty(writesWaiting(pendingMetaRef.current));
           }
         }
 
@@ -2668,7 +2662,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   async function flushMeta() {
     window.clearTimeout(timerRef.current);
     window.clearTimeout(retryRef.current);
-    while (inFlightRef.current) await new Promise((resolve) => setTimeout(resolve, 30));
+    await waitUntilIdle(() => inFlightRef.current);
     await drain();
   }
 
@@ -3189,7 +3183,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       /* Membership removal revokes the right to finish a write, so flush first
          and fail closed if any note or metadata is still waiting locally. */
       await settleWrites();
-      if (hasPending() || pendingMetaRef.current.size > 0) {
+      if (writesWaiting(pendingMetaRef.current)) {
         throw new Error("Your latest changes could not be saved. Try again before leaving.");
       }
 
@@ -3243,7 +3237,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       const current = sessionRef.current;
       if (!current || current.archiveId === archiveId) return;
       await settleWrites();
-      if (hasPending() || pendingMetaRef.current.size > 0)
+      if (writesWaiting(pendingMetaRef.current))
         throw new Error("Your latest changes are still saving. Try again in a moment.");
       await chooseArchive(current, archiveId);
       setSheets([]);

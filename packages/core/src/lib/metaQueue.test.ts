@@ -115,3 +115,22 @@ test("moves say where each row is thrown and whether it leaves the list", () => 
     [{ id: "m", to: ALL, leaves: false }],
   );
 });
+
+test("flushing all writes each owner once and stops at the first failure", async () => {
+  const queue = new MetaQueue();
+  queue.stage("me", a, b);
+  queue.stage("you", a, c);
+  queue.stage("them", b, c);
+  const written: string[] = [];
+  await assert.rejects(
+    queue.flushAll(async (owner) => {
+      if (owner === "you") throw new Error("offline");
+      written.push(owner);
+    }),
+    /offline/,
+  );
+  assert.deepEqual(written, ["me"]);
+  assert.deepEqual(queue.owners().sort(), ["them", "you"]);
+  await queue.flushAll(async (owner) => void written.push(owner));
+  assert.equal(queue.size, 0);
+});
