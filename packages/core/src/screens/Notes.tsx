@@ -115,18 +115,15 @@ import {
 import { parseSources } from "@/lib/citations";
 import {
   createNote,
-  createArchiveInvite,
   deleteAvatar,
   deleteNotes,
   leaveArchive,
   downloadImage,
   downloadObject,
   loadArchive,
-  loadPendingInvites,
   NoteConflict,
   loadProfile,
   persistMetaDiff,
-  revokeArchiveInvite,
   saveNote,
   updateNoteProperties,
   saveProfile,
@@ -135,7 +132,6 @@ import {
   uploadObject,
   type ArchiveMember,
   type ArchiveSnapshot,
-  type PendingInvite,
   type Profile,
 } from "@/lib/supabase";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
@@ -199,6 +195,7 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
 import { useNotesLayout } from "./useNotesLayout";
+import { useArchiveInvites } from "./useArchiveInvites";
 import { useArchiveRemarks } from "./useArchiveRemarks";
 import { usePresence } from "./usePresence";
 import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
@@ -238,6 +235,7 @@ import {
   DEFAULT_FEATURES,
   DEFAULT_PAGE,
   pageStyle,
+  withLiveRoster,
   type ArchiveKind,
   type DocumentFeatures,
   type PageSetup,
@@ -396,7 +394,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /** Seats, and the invitations already holding one. Loaded with Settings
    *  rather than with the archive: nothing outside that panel asks. */
   const [seatLimit, setSeatLimit] = useState(8);
-  const [invites, setInvites] = useState<PendingInvite[]>([]);
   /** Every archive this account is in, for the switch and its sheet. */
   const [spaces, setSpaces] = useState<Space[]>(knownSpaces);
 
@@ -3106,35 +3103,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
   }
 
-  /* Pending invitations are only ever looked at from Settings, so they are
-     fetched when it opens and after anything that could change the count. */
-  const refreshInvites = useCallback(async () => {
-    if (!session) return;
-    try {
-      setInvites(await loadPendingInvites(session));
-    } catch {
-      setInvites([]);
-    }
-  }, [session]);
-
   const archiveSheetOpen = sheets.some((sheet) => sheet.kind === "archive");
-  useEffect(() => {
-    if (settingsOpen || archiveSheetOpen) void refreshInvites();
-  }, [settingsOpen, archiveSheetOpen, refreshInvites]);
-
-  async function inviteLink(email: string): Promise<string> {
-    if (!session) throw new Error("Sign in again first");
-    const token = await createArchiveInvite(session, email);
-    const link = new URL(platform().webOrigin());
-    link.searchParams.set("invite", token);
-    await refreshInvites();
-    return link.toString();
-  }
-
-  async function withdrawInvite(inviteId: string) {
-    await revokeArchiveInvite(inviteId);
-    await refreshInvites();
-  }
+  const { invites, inviteLink, withdrawInvite } = useArchiveInvites(
+    session,
+    settingsOpen || archiveSheetOpen,
+  );
 
   /* The switch is asked for once a session; a missing answer only means the
      switch is not drawn, never that the archive fails to open. */
@@ -3150,21 +3123,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   useEffect(() => {
     void refreshSpaces();
   }, [refreshSpaces]);
-  /* The archive on screen answers from the live roster rather than from the
-     list the switch loaded, so somebody joining appears at once. */
-  const spacesView: Space[] = spaces.map((space) =>
-    space.archiveId === session?.archiveId && members.length > 0
-      ? {
-          ...space,
-          seatLimit,
-          members: members.map((member) => ({
-            userId: member.userId,
-            nickname: member.nickname,
-            avatarObject: member.avatarObject,
-          })),
-        }
-      : space,
-  );
+  const spacesView = withLiveRoster(spaces, session?.archiveId, members, seatLimit);
   /* The archive an account starts with — the first it joined. It stays
      notes and is never deleted from here; Postgres refuses the last one. */
   const defaultArchiveId = spaces[0]?.archiveId;

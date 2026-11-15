@@ -8,7 +8,9 @@ import {
   documentFeatures,
   pageSetup,
   printPageCss,
+  withLiveRoster,
 } from "./spaceShape.ts";
+import type { Space } from "./spaces.ts";
 
 test("an unknown kind is notes, including the retired 'thesis'", () => {
   assert.equal(archiveKind("document"), "document");
@@ -71,4 +73,30 @@ test("a printed chapter is set on the page setup, with heads only when asked", (
   assert.match(facing, /@page :right \{ @top-right \{ content: "Capitolo primo";.*@bottom-right/);
   assert.equal(pageSetup({ page: { headers: true, facing: "yes" } }).facing, false);
   assert.equal(pageSetup({ page: { headers: true } }).headers, true);
+});
+
+test("the open archive shows its live roster; the others what was loaded", () => {
+  const space = (archiveId: string): Space => ({
+    archiveId,
+    name: archiveId,
+    seatLimit: 8,
+    kind: "notes",
+    features: DEFAULT_FEATURES,
+    page: DEFAULT_PAGE,
+    members: [{ userId: "old", nickname: "Old", avatarObject: null }],
+    createdBy: null,
+  });
+  const spaces = [space("here"), space("there")];
+  const joined = [
+    { userId: "a", nickname: "Ada", avatarObject: "pic", email: "not copied" },
+    { userId: "b", nickname: "Bo", avatarObject: null },
+  ];
+  const [here, there] = withLiveRoster(spaces, "here", joined, 4);
+  assert.equal(here.seatLimit, 4);
+  assert.deepEqual(here.members, [
+    { userId: "a", nickname: "Ada", avatarObject: "pic" },
+    { userId: "b", nickname: "Bo", avatarObject: null },
+  ]);
+  assert.equal(there, spaces[1]);
+  assert.equal(withLiveRoster(spaces, "here", [], 4)[0], spaces[0], "a roster not loaded yet");
 });

@@ -3,6 +3,7 @@
  * reaches the Supabase client, which the preview swaps out — and a stand-in
  * cannot borrow these from the module it stands in for. */
 import type { CitationStyle } from "./citations.ts";
+import type { Space, SpaceMember } from "./spaces.ts";
 import {
   CAPTION_SEPARATORS,
   REFERENCE_WORDS,
@@ -279,4 +280,28 @@ export function printPageCss(page: PageSetup, heads: { book: string; chapter: st
       " }",
   );
   return rules.join("\n");
+}
+
+/** The archive on screen answers from the live roster rather than from the
+ *  list the switch loaded, so somebody joining appears at once. An empty
+ *  roster (not loaded yet) leaves the loaded list as it is. */
+export function withLiveRoster(
+  spaces: Space[],
+  archiveId: string | undefined,
+  members: Pick<SpaceMember, "userId" | "nickname" | "avatarObject">[],
+  seatLimit: number,
+): Space[] {
+  return spaces.map((space) =>
+    space.archiveId === archiveId && members.length > 0
+      ? {
+          ...space,
+          seatLimit,
+          members: members.map((member) => ({
+            userId: member.userId,
+            nickname: member.nickname,
+            avatarObject: member.avatarObject,
+          })),
+        }
+      : space,
+  );
 }
