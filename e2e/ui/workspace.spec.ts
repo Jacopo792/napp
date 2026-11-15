@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  // The first-launch ⌘K lesson covers the page until pressed.
+  await page.addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
   await page.goto("/notes");
   await page
     .getByRole("button", { name: "Close settings", exact: true })

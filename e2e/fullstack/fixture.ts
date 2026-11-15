@@ -94,6 +94,9 @@ export const test = base.extend<{
 export { expect };
 
 export async function login(page: Page, account: Account, path = "/") {
+  // The first-launch ⌘K lesson covers the page until pressed; these tests are
+  // about something else, so their browser has already learned it.
+  await page.context().addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
   await page.goto(path);
   await page.getByLabel("Email", { exact: true }).fill(account.email);
   await page.getByLabel("Password", { exact: true }).fill(account.password);
