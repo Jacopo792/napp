@@ -6242,6 +6242,8 @@
   .list-in.is-cascading .note-row-list,
   .list-in.is-cascading .note-group-heading,
   .page-in > *,
+  .board-split,
+  .board-card.is-detail,
   .editor-scroll .rich-text-editor,
   .popover,
   .context-menu,
@@ -11234,11 +11236,33 @@ button.sheet-chip:hover,
 
 .board-card.is-detail {
   min-height: 0;
-  animation: none;
+  animation: page-in 320ms var(--ease-out) backwards;
 }
 
-.board-card.is-detail .board-card-synopsis {
-  min-height: 96px;
+/* Picking another row turns the page the way opening another note does. */
+.board-card.is-detail[data-from="below"] {
+  animation-name: page-in-below;
+}
+
+.board-card.is-detail[data-from="above"] {
+  animation-name: page-in-above;
+}
+
+.board-card-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 12px 14px 4px;
+  color: var(--ink-2);
+  font-family: var(--font-reading);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 14;
+}
+
+/* The board arrives as the page does when the book switches to it. */
+.board-split {
+  animation: page-in 320ms var(--ease-out) backwards;
 }
 
 .board-card {

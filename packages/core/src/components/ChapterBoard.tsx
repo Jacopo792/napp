@@ -45,7 +45,9 @@ function Card({
   onGoalDone,
   index,
   detail = false,
+  direction = null,
 }: {
+  direction?: "down" | "up" | null;
   /** The chapter picked on the spine, drawn large under it: it is not picked
    *  up itself — its block on the spine is. */
   detail?: boolean;
@@ -84,6 +86,7 @@ function Card({
     <article
       ref={drop.setNodeRef}
       data-card={item.id}
+      data-from={detail && direction ? (direction === "down" ? "below" : "above") : undefined}
       className={`board-card ${detail ? "is-detail" : ""} ${drag.isDragging ? "is-lifted" : ""} ${over ? `is-over-${over}` : ""}`}
       style={{ "--index": index } as CSSProperties}
       onContextMenu={(event) => {
@@ -117,7 +120,12 @@ function Card({
           <MoreHorizontal size={16} />
         </button>
       )}
-      {canWrite && onChapter ? (
+      {detail ? (
+        /* The page itself, as far as it goes, rather than a summary of it. */
+        <p className="board-card-preview" translate="no">
+          {item.preview || "Empty page"}
+        </p>
+      ) : canWrite && onChapter ? (
         <textarea
           className="board-card-synopsis"
           aria-label={`Synopsis of ${item.title || "Untitled"}`}
@@ -301,6 +309,9 @@ export function ChapterBoard({
   const [goalFor, setGoalFor] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
+  /* Which way the detail arrives: from below when a later row is picked, from
+     above for an earlier one — the notes' own page turn. */
+  const [direction, setDirection] = useState<"down" | "up" | null>(null);
   const full: StructureActions | null = actions
     ? {
         ...actions,
@@ -396,6 +407,13 @@ export function ChapterBoard({
                 ...notebook.map((item) => ({ item })),
               ];
               const chosen = all.find((one) => one.item.id === chosenId) ?? all[0];
+              const choose = (id: string) => {
+                if (id === chosen?.item.id) return;
+                const from = all.findIndex((one) => one.item.id === chosen?.item.id);
+                const to = all.findIndex((one) => one.item.id === id);
+                setDirection(to > from ? "down" : "up");
+                setChosenId(id);
+              };
               const partWords = (folderId: string) =>
                 chapters
                   .filter((one) => one.item.folderId === folderId)
@@ -415,7 +433,7 @@ export function ChapterBoard({
                       ? over.kind
                       : null
                   }
-                  onChoose={() => setChosenId(item.id)}
+                  onChoose={() => choose(item.id)}
                   onOpen={() => onOpen(item.id)}
                   onMenu={
                     full
@@ -468,6 +486,7 @@ export function ChapterBoard({
                     <Card
                       key={chosen.item.id}
                       detail
+                      direction={direction}
                       item={chosen.item}
                       number={chosen.number}
                       canWrite={canWrite}
