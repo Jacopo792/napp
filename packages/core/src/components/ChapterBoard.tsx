@@ -160,10 +160,8 @@ function Card({
   );
 }
 
-/** Words a chapter is drawn as, so an empty one still has a width to press. */
-const spineWeight = (item: ChapterItem) => Math.max(item.words, 120);
-
-function SpineBlock({
+/** A chapter in the board's list: its number, its name, how far along. */
+function BoardRow({
   item,
   number,
   chosen,
@@ -174,7 +172,8 @@ function SpineBlock({
   onMenu,
 }: {
   item: ChapterItem;
-  number: number;
+  /** Absent for a page of the notebook, which is not in the book's order. */
+  number?: number;
   chosen: boolean;
   over: "before" | "after" | null;
   canWrite: boolean;
@@ -183,9 +182,8 @@ function SpineBlock({
   onMenu?: (point: MenuPoint) => void;
 }) {
   const drag = useDraggable({ id: item.id, disabled: !canWrite || !item.movable });
-  const drop = useDroppable({ id: `row:${item.id}` });
+  const drop = useDroppable({ id: `row:${item.id}`, disabled: number === undefined });
   const status = CHAPTER_STATUSES.find((one) => one.id === item.chapter?.status);
-  const title = item.title || item.preview || "Untitled";
   return (
     <button
       ref={(node) => {
@@ -193,11 +191,9 @@ function SpineBlock({
         drop.setNodeRef(node);
       }}
       type="button"
-      className={`spine-block press ${chosen ? "is-chosen" : ""} ${
+      className={`board-row press ${chosen ? "is-chosen" : ""} ${
         drag.isDragging ? "is-lifted" : ""
       } ${over ? `is-over-${over}` : ""}`}
-      style={{ flexGrow: spineWeight(item) }}
-      title={`${number} · ${title} · ${item.words.toLocaleString()} words`}
       {...drag.listeners}
       {...drag.attributes}
       aria-pressed={chosen}
@@ -210,67 +206,61 @@ function SpineBlock({
         onMenu({ x: event.clientX, y: event.clientY });
       }}
     >
-      <span className="spine-number">{number}</span>
-      <span className="spine-title">{title}</span>
+      {number !== undefined && <span className="board-row-number">{number}</span>}
+      <span className="board-row-title">{item.title || item.preview || "Untitled"}</span>
       {status && <i className={`structure-status is-${status.id}`} />}
+      <span className="board-row-words">{item.words.toLocaleString()}</span>
     </button>
   );
 }
 
-/** A part on the spine: its chapters side by side, its name under them, as
- *  wide together as they are long. Dropping on the name puts a chapter in it. */
-function SpinePart({
+/** A part's name over its chapters in the list, with their words together.
+ *  Dropping a chapter on it puts the chapter in the part. */
+function BoardPart({
   id,
   name,
-  weight,
   words,
-  children,
   editing,
   onMenu,
   onRename,
 }: {
-  id: string | null;
+  id: string;
   name: string;
-  weight: number;
   words: number;
-  children: ReactNode;
   editing: boolean;
   onMenu?: (point: MenuPoint) => void;
   /** Called with null to start or cancel, with a name to keep it. */
   onRename?: (name: string | null) => void;
 }) {
-  const drop = useDroppable({ id: id ? `part:${id}` : "spine:loose", disabled: !id });
+  const drop = useDroppable({ id: `part:${id}` });
   return (
-    <div className="spine-part" style={{ flexGrow: weight }}>
-      <div className="spine-run">{children}</div>
-      <div
-        ref={drop.setNodeRef}
-        className={`spine-part-name ${drop.isOver ? "is-over" : ""}`}
-        onContextMenu={(event) => {
-          if (!onMenu) return;
-          event.preventDefault();
-          onMenu({ x: event.clientX, y: event.clientY });
-        }}
-        onDoubleClick={() => id && onMenu && onRename?.(null)}
-      >
-        {editing && onRename ? (
-          <input
-            autoFocus
-            className="structure-part-field"
-            aria-label="Part name"
-            defaultValue={name}
-            maxLength={120}
-            onBlur={(event) => onRename(event.currentTarget.value.trim() || null)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-              if (event.key === "Escape") onRename(null);
-            }}
-          />
-        ) : (
-          <span className="truncate">{name}</span>
-        )}
-        <span className="spine-part-words">{words.toLocaleString()}</span>
-      </div>
+    <div
+      ref={drop.setNodeRef}
+      className={`board-list-head ${drop.isOver ? "is-over" : ""}`}
+      onContextMenu={(event) => {
+        if (!onMenu) return;
+        event.preventDefault();
+        onMenu({ x: event.clientX, y: event.clientY });
+      }}
+      onDoubleClick={() => onMenu && onRename?.(null)}
+    >
+      {editing && onRename ? (
+        <input
+          autoFocus
+          className="structure-part-field"
+          aria-label="Part name"
+          defaultValue={name}
+          maxLength={120}
+          onBlur={(event) => onRename(event.currentTarget.value.trim() || null)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") onRename(null);
+          }}
+        />
+      ) : (
+        <span className="truncate">{name || "Untitled part"}</span>
+      )}
+      <span className="board-row-words">{words.toLocaleString()}</span>
     </div>
   );
 }
@@ -394,86 +384,86 @@ export function ChapterBoard({
               )}
             </div>
           )}
-          {(() => {
-            /* The book as one strip, each chapter as wide as it is long, in
-               runs by part — where it is heavy or thin is seen before a word
-               of it is read. Under it, the chapter picked on the strip. */
-            const runs: {
-              id: string | null;
-              name: string;
-              items: { item: ChapterItem; number: number }[];
-            }[] = [];
-            for (const row of rows) {
-              if (row.kind === "part")
-                runs.push({ id: row.folderId, name: parts.get(row.folderId) ?? "", items: [] });
-              else {
-                if (!runs.length) runs.push({ id: null, name: "", items: [] });
-                runs[runs.length - 1].items.push({ item: row.item, number: row.number });
-              }
-            }
-            const chapters = runs.flatMap((run) => run.items);
-            const chosen =
-              chapters.find((one) => one.item.id === chosenId) ?? chapters[0] ?? undefined;
-            const renameFor = (folderId: string) =>
-              onRenamePart &&
-              ((name: string | null) => {
-                if (renaming === null) return setRenaming(folderId);
-                setRenaming(null);
-                if (name && name !== parts.get(folderId)) onRenamePart(folderId, name);
-              });
-            return (
-              chapters.length > 0 && (
-                <div className="spine-desk">
-                  <div className="spine">
-                    {runs.map((run, at) => (
-                      <SpinePart
-                        key={`${run.id ?? "loose"}:${at}`}
-                        id={run.id}
-                        name={run.id ? run.name || "Untitled part" : ""}
-                        weight={Math.max(
-                          run.items.reduce((sum, one) => sum + spineWeight(one.item), 0),
-                          120,
-                        )}
-                        words={run.items.reduce((sum, one) => sum + one.item.words, 0)}
-                        editing={run.id !== null && renaming === run.id}
-                        onRename={run.id ? renameFor(run.id) || undefined : undefined}
-                        onMenu={
-                          run.id && full && canWrite
-                            ? (point) =>
-                                setMenu({ point, items: partMenuItems(full, run.id as string) })
-                            : undefined
-                        }
-                      >
-                        {run.items.map(({ item, number }) => (
-                          <SpineBlock
-                            key={item.id}
-                            item={item}
-                            number={number}
-                            chosen={item.id === chosen?.item.id}
-                            canWrite={canWrite}
-                            over={
-                              over &&
-                              (over.kind === "before" || over.kind === "after") &&
-                              over.id === item.id
-                                ? over.kind
-                                : null
-                            }
-                            onChoose={() => setChosenId(item.id)}
-                            onOpen={() => onOpen(item.id)}
-                            onMenu={
-                              full
-                                ? (point) =>
-                                    setMenu({
-                                      point,
-                                      items: chapterMenuItems(full, item, point, true),
-                                    })
-                                : undefined
-                            }
-                          />
-                        ))}
-                      </SpinePart>
-                    ))}
-                  </div>
+          {(rows.length > 0 || notebook.length > 0) &&
+            (() => {
+              /* The book as a list on the left, by part, and the chapter picked
+                 in it on the right, where its synopsis is written. */
+              const chapters = rows.flatMap((row) =>
+                row.kind === "chapter" ? [{ item: row.item, number: row.number }] : [],
+              );
+              const all: { item: ChapterItem; number?: number }[] = [
+                ...chapters,
+                ...notebook.map((item) => ({ item })),
+              ];
+              const chosen = all.find((one) => one.item.id === chosenId) ?? all[0];
+              const partWords = (folderId: string) =>
+                chapters
+                  .filter((one) => one.item.folderId === folderId)
+                  .reduce((sum, one) => sum + one.item.words, 0);
+              const row = (item: ChapterItem, number?: number) => (
+                <BoardRow
+                  key={item.id}
+                  item={item}
+                  number={number}
+                  chosen={item.id === chosen?.item.id}
+                  canWrite={canWrite}
+                  over={
+                    number !== undefined &&
+                    over &&
+                    (over.kind === "before" || over.kind === "after") &&
+                    over.id === item.id
+                      ? over.kind
+                      : null
+                  }
+                  onChoose={() => setChosenId(item.id)}
+                  onOpen={() => onOpen(item.id)}
+                  onMenu={
+                    full
+                      ? (point) =>
+                          setMenu({
+                            point,
+                            items: chapterMenuItems(full, item, point, number !== undefined),
+                          })
+                      : undefined
+                  }
+                />
+              );
+              return (
+                <div className="board-split">
+                  <nav className="board-list" aria-label="Chapters">
+                    {rows.map((one) =>
+                      one.kind === "part" ? (
+                        <BoardPart
+                          key={`part:${one.folderId}:${one.continued}`}
+                          id={one.folderId}
+                          name={parts.get(one.folderId) ?? ""}
+                          words={partWords(one.folderId)}
+                          editing={renaming === one.folderId}
+                          onRename={
+                            onRenamePart &&
+                            ((name) => {
+                              if (renaming === null) return setRenaming(one.folderId);
+                              setRenaming(null);
+                              if (name && name !== parts.get(one.folderId))
+                                onRenamePart(one.folderId, name);
+                            })
+                          }
+                          onMenu={
+                            full && canWrite
+                              ? (point) =>
+                                  setMenu({ point, items: partMenuItems(full, one.folderId) })
+                              : undefined
+                          }
+                        />
+                      ) : (
+                        row(one.item, one.number)
+                      ),
+                    )}
+                    {notebook.length > 0 && (
+                      <div className="board-list-head is-notebook">{notebookName}</div>
+                    )}
+                    {notebook.map((item) => row(item))}
+                  </nav>
                   {chosen && (
                     <Card
                       key={chosen.item.id}
@@ -483,13 +473,22 @@ export function ChapterBoard({
                       canWrite={canWrite}
                       over={null}
                       onOpen={() => onOpen(chosen.item.id)}
-                      onChapter={onChapter && ((info) => onChapter(chosen.item.id, info))}
+                      onChapter={
+                        chosen.number !== undefined && onChapter
+                          ? (info) => onChapter(chosen.item.id, info)
+                          : undefined
+                      }
                       onMenu={
                         full
                           ? (point) =>
                               setMenu({
                                 point,
-                                items: chapterMenuItems(full, chosen.item, point, true),
+                                items: chapterMenuItems(
+                                  full,
+                                  chosen.item,
+                                  point,
+                                  chosen.number !== undefined,
+                                ),
                               })
                           : undefined
                       }
@@ -499,30 +498,8 @@ export function ChapterBoard({
                     />
                   )}
                 </div>
-              )
-            );
-          })()}
-          {notebook.length > 0 && (
-            <div className="board-grid">
-              <h3 className="board-part">{notebookName}</h3>
-              {notebook.map((item, at) => (
-                <Card
-                  key={item.id}
-                  item={item}
-                  canWrite={canWrite}
-                  over={null}
-                  onOpen={() => onOpen(item.id)}
-                  onMenu={
-                    full
-                      ? (point) =>
-                          setMenu({ point, items: chapterMenuItems(full, item, point, false) })
-                      : undefined
-                  }
-                  index={at + 1}
-                />
-              ))}
-            </div>
-          )}
+              );
+            })()}
         </div>
         <DragOverlay dropAnimation={null}>
           {lifted?.kind === "chapter" ? (

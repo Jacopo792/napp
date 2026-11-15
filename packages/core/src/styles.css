@@ -11111,159 +11111,125 @@ button.sheet-chip:hover,
   background: color-mix(in srgb, var(--surface) 86%, #000);
 }
 
-.board-grid {
+/* The board: the book as a list on the left, by part, and the chapter picked
+   in it on the right, large, where what happens in it is written. */
+.board-split {
   display: grid;
-  max-width: 1200px;
-  margin: 0 auto;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-}
-
-.board-part {
-  grid-column: 1 / -1;
-  margin: 12px 0 -4px;
-  border-radius: var(--radius-sm);
-  padding: 4px 2px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.02em;
-}
-
-.board-part.is-over {
-  background: var(--accent-wash);
-}
-
-/* The spine: the book as one strip, each chapter as wide as it is long, the
-   parts named under their runs. Under it, the chapter picked on it, large. */
-.spine-desk {
-  display: flex;
-  max-width: 1200px;
-  flex-direction: column;
-  gap: 24px;
+  max-width: 1000px;
   margin: 0 auto 32px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
 }
 
-.spine {
+.board-list {
   display: flex;
-  gap: 6px;
-}
-
-.spine-part {
-  display: flex;
-  min-width: 0;
-  flex-basis: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: 1px;
 }
 
-.spine-run {
+.board-list-head {
   display: flex;
-  gap: 3px;
-}
-
-.spine-part-name {
-  display: flex;
-  min-height: 22px;
+  min-height: 28px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-top: 1px solid var(--rule);
-  border-radius: 0;
-  padding: 4px 2px 0;
+  margin-top: 10px;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
   color: var(--ink-3);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
 }
 
-.spine-part-name.is-over {
-  border-top-color: var(--accent);
+.board-list-head:first-child {
+  margin-top: 0;
+}
+
+.board-list-head.is-over {
+  background: var(--accent-wash);
   color: var(--accent);
 }
 
-.spine-part-words {
-  flex: none;
-  color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--weight-regular);
-}
-
-.spine-block {
+.board-row {
   position: relative;
   display: flex;
-  min-width: 30px;
-  height: 64px;
-  flex-basis: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  overflow: hidden;
-  border: 1px solid var(--rule-soft);
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
   border-radius: var(--radius-sm);
-  background: var(--paper);
-  padding: 6px 8px;
+  padding: 6px 10px;
   color: var(--ink-2);
+  font-size: var(--text-sm);
   text-align: left;
   touch-action: none;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
 }
 
-.spine-block:hover {
-  border-color: var(--rule);
+.board-row:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
   color: var(--ink);
 }
 
-.spine-block.is-chosen {
-  border-color: var(--accent);
+.board-row.is-chosen {
   background: var(--accent-wash);
   color: var(--ink);
 }
 
-.spine-block.is-lifted {
+.board-row.is-lifted {
   opacity: 0.35;
 }
 
-.spine-number {
-  color: var(--ink-3);
+.board-row-number {
+  flex: none;
+  min-width: 14px;
+  color: var(--ink-4);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.spine-title {
-  width: 100%;
+.board-row-title {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.spine-block .structure-status {
-  position: absolute;
-  top: 8px;
-  right: 6px;
+.board-row .structure-status {
   margin: 0;
 }
 
-.spine-block.is-over-before::before,
-.spine-block.is-over-after::after {
+.board-row-words {
+  flex: none;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-regular);
+}
+
+.board-row.is-over-before::before,
+.board-row.is-over-after::after {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
+  right: 6px;
+  left: 6px;
+  height: 2px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   content: "";
 }
 
-.spine-block.is-over-before::before {
-  left: 1px;
+.board-row.is-over-before::before {
+  top: -1px;
 }
 
-.spine-block.is-over-after::after {
-  right: 1px;
+.board-row.is-over-after::after {
+  bottom: -1px;
+}
+
+@media (max-width: 720px) {
+  .board-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .board-card.is-detail {
