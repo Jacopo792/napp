@@ -88,7 +88,6 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   addAccount,
   chooseArchive,
@@ -140,20 +139,8 @@ import {
   type Profile,
 } from "@/lib/supabase";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
-import { subscribeToArchive, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
-import {
-  loadArchiveComments,
-  notesWithOpenRemarks,
-  unreadRemarks,
-  type RemarksSeen,
-  type ArchiveComment,
-} from "@/lib/comments";
-import {
-  announceNote,
-  subscribeToPresence,
-  unsubscribeFromPresence,
-  type Presence,
-} from "@/lib/presence";
+import { subscribeToArchive, unsubscribeFromArchive } from "@/lib/sync";
+import type { RemarksSeen } from "@/lib/comments";
 import {
   DEFAULT_FLAGS,
   flagsOf,
@@ -212,14 +199,11 @@ import { attachmentType } from "@/features/editor/lib/attachments";
 import { PaneResizer } from "@/components/PaneResizer";
 import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
 import { useNotesLayout } from "./useNotesLayout";
+import { useArchiveRemarks } from "./useArchiveRemarks";
+import { usePresence } from "./usePresence";
 import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteList";
 import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
-import {
-  announceTyping,
-  useCollaborationPeers,
-  useCollaborativeNote,
-  wakeCollaboration,
-} from "@/lib/collab";
+import { useCollaborationPeers, useCollaborativeNote, wakeCollaboration } from "@/lib/collab";
 import { useAutoLock } from "@/lib/autoLock";
 import { CollectionMenu, Avatar, NoteContextMenu, NoteMenu } from "@/components/WorkspaceMenus";
 /* Lazily, and only once it is opened. Settings is one panel behind one button
@@ -326,8 +310,6 @@ function citing(from: string) {
     },
   };
 }
-/** How long a pause has to be before the other person is told you stopped. */
-const TYPING_IDLE_MS = 2500;
 
 /* A failed write is retried on its own, backing off so a server that is down
    is not hammered — but never so slowly that a recovered connection is missed. */
@@ -534,12 +516,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [session]);
   const writingPreferences = useWritingPreferences();
   const [preferencesReady, setPreferencesReady] = useState(false);
-  const [present, setPresent] = useState<Presence>(() => new Map());
-  const onlineMemberIds = useMemo(() => new Set(present.keys()), [present]);
   const [scopeDirection, setScopeDirection] = useState<"next" | "previous" | null>(null);
-  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
-  const typingOffRef = useRef<number | undefined>(undefined);
-  const typingRef = useRef(false);
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
   /** The sheets that are up, the last on top, each with where the thing it
@@ -1083,57 +1060,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return watchLocalStores(push);
   }, [session, preferencesReady, flags, remarksSeen]);
 
-  useEffect(() => {
-    if (!session || !preferencesReady || !flags.presence) {
-      setPresent(new Map());
-      return;
-    }
-    const channel = subscribeToPresence(session, setPresent, () => selectedIdRef.current);
-    presenceChannelRef.current = channel;
-    return () => {
-      presenceChannelRef.current = null;
-      void unsubscribeFromPresence(channel);
-    };
-  }, [session, preferencesReady, flags.presence]);
-
-  /* Which note this tab has open, for the other member's list. Only once the
-     channel is up: the first announcement is made by the subscription itself. */
-  useEffect(() => {
-    const channel = presenceChannelRef.current;
-    if (channel && session) void announceNote(channel, session, selectedId).catch(() => {});
-  }, [selectedId, session]);
-
-  /* Writing is a fact about the note, so it is announced on the note's own
-     document rather than on the archive's presence channel — the same place
-     the face beside the title comes from, which is what stops the two
-     disagreeing. Changing note lowers the flag first, so it can never be left
-     raised on a page nobody is on. */
-  const typingProvider = collaborative.provider;
-  useEffect(() => {
-    window.clearTimeout(typingOffRef.current);
-    typingRef.current = false;
-    return () => {
-      window.clearTimeout(typingOffRef.current);
-      typingRef.current = false;
-      announceTyping(typingProvider, false);
-    };
-  }, [typingProvider]);
-
-  /* One announcement when the burst starts and one when it ends, rather than a
-     packet per keystroke. TYPING_IDLE_MS is how long a pause has to be before
-     the other person is told you stopped. */
-  const markTyping = useCallback(() => {
-    if (!typingProvider) return;
-    window.clearTimeout(typingOffRef.current);
-    if (!typingRef.current) {
-      typingRef.current = true;
-      announceTyping(typingProvider, true);
-    }
-    typingOffRef.current = window.setTimeout(() => {
-      typingRef.current = false;
-      announceTyping(typingProvider, false);
-    }, TYPING_IDLE_MS);
-  }, [typingProvider]);
+  const { present, onlineMemberIds, markTyping } = usePresence(
+    session,
+    preferencesReady && flags.presence,
+    selectedId,
+    selectedIdRef,
+    collaborative.provider,
+  );
 
   /** The owner's whole catalogue, unfiltered — what the rail and the scope
    *  strip count against. Memoised so their counts are not recomputed for an
@@ -1164,92 +1097,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const selfId = session?.userId ?? null;
 
-  /* Remarks, archive-wide. The panel beside a note answers "what was said
-     about this"; this answers the question a shared archive raises the moment
-     you sign in — has the other member said anything, anywhere, since you last
-     looked.
-
-     The line is a timestamp per note, held in this browser rather than in a
-     column, and deliberately: it is a fact about a device looking, not about
-     the archive, and a set of read ids is a thing nobody ever finishes
-     pruning. A new device therefore starts with everything unread, which is
-     the right answer for it. Per note rather than archive-wide because opening
-     a note is the act of having read what was said on it — one line for the
-     whole archive could only be moved by looking at the list, which left the
-     dot up after you had read the one remark under it. */
-  const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
-  const saidThreads = useMemo(
-    () => new Set(archiveComments.map((comment) => comment.threadId)),
-    [archiveComments],
-  );
-  /* Reading a note is having read its remarks. Written to the account, not to
-     this browser: it is a thing the person did, and a badge that says "unread"
-     for every conversation already read on the other device is a badge nobody
-     can clear. The push effect below carries it up. */
-  const markRemarksSeen = useCallback((noteId: string) => {
-    setRemarksSeen((current) => ({ ...current, [noteId]: new Date().toISOString() }));
-  }, []);
-
-  /* One read per burst, not one per row. Realtime announces every insert,
-     update and delete on `note_comments` separately, and a resolved thread of
-     six remarks is six announcements — each one re-reading every comment in
-     the archive. They arrive together, so they are answered together. */
-  const remarkTimer = useRef(0);
-  const refreshRemarks = useCallback(() => {
-    window.clearTimeout(remarkTimer.current);
-    remarkTimer.current = window.setTimeout(() => {
-      const current = sessionRef.current;
-      if (!current) return;
-      void loadArchiveComments(current)
-        .then(setArchiveComments)
-        /* A remark that will not load is not a reason to fail to open the
-           archive: the count simply stays where it was. */
-        .catch(() => undefined);
-    }, 400);
-  }, []);
-
-  useEffect(() => () => window.clearTimeout(remarkTimer.current), []);
-
-  useEffect(() => {
-    if (!session) return;
-    refreshRemarks();
-    const channel = subscribeToComments(session.archiveId, refreshRemarks);
-    return () => void unsubscribeFromArchive(channel);
-    /* `awake` for the same reason the archive channel takes it: a socket that
-       died while the machine slept announces nothing, and this one carries the
-       badge. */
-  }, [session, refreshRemarks, awake]);
-
-  const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
-  const unreadRemarkNotes = useMemo(
-    () =>
-      new Set(
-        selfId
-          ? unreadRemarks(archiveComments, selfId, remarksSeen).map((remark) => remark.noteId)
-          : [],
-      ),
-    [archiveComments, selfId, remarksSeen],
-  );
-  const unreadRemarkCount = useMemo(
-    () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
-    [archiveComments, selfId, remarksSeen],
-  );
-  /* The number on the icon in the Dock, which is the whole of what an
-     application can say to somebody who is not looking at it.
-     `navigator.setAppBadge` and not a bridge to `app.dock.setBadge`: it is a
-     standard the browser has too, Electron implements it and puts it on the
-     Dock, and a member on `platform.ts` for it would have been an interface
-     describing a habit. Absent in a plain tab, where it simply does nothing. */
-  useEffect(() => {
-    const badge = navigator as Navigator & {
-      setAppBadge?: (count?: number) => Promise<void>;
-      clearAppBadge?: () => Promise<void>;
-    };
-    if (!badge.setAppBadge || !badge.clearAppBadge) return;
-    void (
-      unreadRemarkCount > 0 ? badge.setAppBadge(unreadRemarkCount) : badge.clearAppBadge()
-    ).catch(() => undefined);
-  }, [unreadRemarkCount]);
+  const {
+    archiveComments,
+    saidThreads,
+    markRemarksSeen,
+    refreshRemarks,
+    remarkedIds,
+    unreadRemarkNotes,
+    unreadRemarkCount,
+  } = useArchiveRemarks(session, remarksSeen, setRemarksSeen, awake);
 
   /* Who has taken a note back, keyed by note. A lock is metadata on the row
      like the trash stamp beside it, and it is read from the same place — but
