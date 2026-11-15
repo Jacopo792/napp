@@ -4856,29 +4856,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             icon: <Maximize2 size={16} />,
             run: toggleFocus,
           },
-          ...(canWriteArchive
-            ? [
-                {
-                  kind: "item" as const,
-                  id: "ocr",
-                  label: indexingMedia
-                    ? "Reading images and PDFs…"
-                    : "Make images and PDFs searchable",
-                  icon: <Search size={16} />,
-                  run: () => void indexMedia(),
-                },
-              ]
-            : []),
           { kind: "separator" },
-          {
-            kind: "item",
-            id: "epub",
-            label: "Save book as EPUB",
-            icon: <FileDown size={16} />,
-            run: () => void saveBook(),
-          },
-          { kind: "separator" },
-          { kind: "label", label: chapterAt >= 0 ? "This chapter" : "This page" },
           {
             kind: "item",
             id: "pdf",
@@ -4907,6 +4885,19 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             icon: <Copy size={16} />,
             run: () => void handleCopyMarkdown(selected),
           },
+          ...(canWriteArchive
+            ? [
+                { kind: "separator" as const },
+                {
+                  kind: "item" as const,
+                  id: "trash",
+                  label: chapterAt >= 0 ? "Delete chapter" : "Delete page",
+                  danger: true,
+                  icon: <Trash2 size={16} />,
+                  run: () => handleTrashDocNote(selected.note.id),
+                },
+              ]
+            : []),
         ]
       : [];
 
@@ -4916,7 +4907,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
     /* Pages' arrangement: the window's chrome is one strip across the top —
        which book, which chapter, who else is in it — and ⋯ holds only what
-       acts on the book, the chapter and its Trash. Settings and What's New are reached
+       acts on the open page; the book's own acts are in its contents menu. Settings and What's New are reached
        the way the notes archive reaches them, from the archive switch. */
     const pageLabel = (item: ChapterItem) => item.title || item.preview || "Untitled";
     const chapterMenu: MenuItem[] = [
@@ -4959,17 +4950,23 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             },
           ]
         : []),
-      /* The menu that names the open page is where it is thrown away. */
-      ...(canWriteArchive && selected
+      /* What acts on the whole book stands with its contents. */
+      { kind: "separator" },
+      {
+        kind: "item",
+        id: "epub",
+        label: "Save book as EPUB",
+        icon: <FileDown size={16} />,
+        run: () => void saveBook(),
+      },
+      ...(canWriteArchive
         ? [
-            { kind: "separator" as const },
             {
               kind: "item" as const,
-              id: "trash",
-              label: "Move to Trash",
-              danger: true,
-              icon: <Trash2 size={16} />,
-              run: () => handleTrashDocNote(selected.note.id),
+              id: "ocr",
+              label: indexingMedia ? "Reading images and PDFs…" : "Make images and PDFs searchable",
+              icon: <Search size={16} />,
+              run: () => void indexMedia(),
             },
           ]
         : []),
@@ -5025,20 +5022,21 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           ) : null}
           <UpdateNotice />
           {roster.length > 1 && peopleShelf}
-          <WritingMenuButton
-            label="More"
-            items={[
-              ...chapterItems,
-              ...(chapterItems.length ? [{ kind: "separator" as const }] : []),
-              {
-                kind: "item",
-                id: "show-trash",
-                label: docTrash.length ? `Show Trash (${docTrash.length})` : "Show Trash",
-                icon: <Trash2 size={16} />,
-                run: () => openSheet({ kind: "trash" }),
-              },
-            ]}
-          />
+          {/* The bin is a place, as in the notes archive's rail, not an act on
+              the page; so it is a button of its own, and ⋯ is the page's menu. */}
+          <button
+            type="button"
+            className="toolbar-button press manuscript-trash"
+            aria-label={docTrash.length ? `Trash, ${docTrash.length}` : "Trash"}
+            title="Trash"
+            onClick={() => openSheet({ kind: "trash" })}
+          >
+            <Trash2 size={16} />
+            {docTrash.length > 0 && (
+              <span className="manuscript-trash-count">{docTrash.length}</span>
+            )}
+          </button>
+          {chapterItems.length > 0 && <WritingMenuButton label="More" items={chapterItems} />}
         </span>
       </div>
     );

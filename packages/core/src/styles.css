@@ -11472,6 +11472,19 @@ button.sheet-chip:hover,
   margin-left: auto;
 }
 
+.manuscript-trash {
+  width: auto;
+  min-width: 32px;
+  gap: 4px;
+  padding-inline: 8px;
+}
+
+.manuscript-trash-count {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 .manuscript-titlebar-end .people-shelf {
   width: 250px;
   margin: 0;
