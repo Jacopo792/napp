@@ -4433,34 +4433,28 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     </SheetStack>
   );
 
-  /* Asked for in Settings, or the window is on an archive that is not the
-     first — the one an account starts with. Away from it, the switch is the
-     only thing on screen saying which archive this is, and the way back. */
-  const spaceSwitch = session &&
-    (flags.spaceSwitch ||
-      /* A book's window has no sidebar to say which archive this is, so the
-         switch is its only way back to the notes. */
-      docMode ||
-      (spacesView.length > 0 && spacesView[0].archiveId !== session.archiveId)) && (
-      <SpaceSwitch
-        spaces={spacesView}
-        currentId={session.archiveId}
-        defaultId={defaultArchiveId}
-        onSwitch={switchArchive}
-        onInfo={() => openSheet({ kind: "archive" })}
-        onSettings={() => {
-          setFoldersOpen(false);
-          setSettingsSection(docMode ? "document" : "spaces");
-          setSettingsOpen(true);
-        }}
-        onCreate={() => openSheet({ kind: "new-archive" })}
-        onDelete={(archiveId) =>
-          void handleDeleteArchive(archiveId).catch((reason) =>
-            setError(reason instanceof Error ? reason.message : "The archive could not be deleted"),
-          )
-        }
-      />
-    );
+  /* Always shown: everything under it belongs to the archive it names, and
+     it is the way to another — in a book, the only way back to the notes. */
+  const spaceSwitch = session && (
+    <SpaceSwitch
+      spaces={spacesView}
+      currentId={session.archiveId}
+      defaultId={defaultArchiveId}
+      onSwitch={switchArchive}
+      onInfo={() => openSheet({ kind: "archive" })}
+      onSettings={() => {
+        setFoldersOpen(false);
+        setSettingsSection(docMode ? "document" : "spaces");
+        setSettingsOpen(true);
+      }}
+      onCreate={() => openSheet({ kind: "new-archive" })}
+      onDelete={(archiveId) =>
+        void handleDeleteArchive(archiveId).catch((reason) =>
+          setError(reason instanceof Error ? reason.message : "The archive could not be deleted"),
+        )
+      }
+    />
+  );
 
   const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
@@ -4644,8 +4638,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onDeleteArchive={handleDeleteArchive}
         onPresenceEnabledChange={(presence) => changeFlags({ presence })}
         onCollaboratorsVisibleChange={(collaborators) => changeFlags({ collaborators })}
-        spaceSwitchShown={flags.spaceSwitch}
-        onSpaceSwitchShownChange={(spaceSwitch) => changeFlags({ spaceSwitch })}
         proofreaderEnabled={proofreaderEnabled}
         autocorrectEnabled={autocorrectEnabled}
         writingPreferences={writingPreferences}
