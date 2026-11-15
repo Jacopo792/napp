@@ -188,6 +188,7 @@ import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
 import { visibleEntries } from "@/lib/visibleNotes";
+import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
 import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
@@ -686,7 +687,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /** Note edits waiting to be written live in the draft store (lib/draft.ts),
    *  keyed by note so switching notes or archive labels never strands one. */
-  const pendingMetaRef = useRef<Map<string, { before: Meta; after: Meta }>>(new Map());
+  const pendingMetaRef = useRef(new MetaQueue());
   const inFlightRef = useRef(false);
   const timerRef = useRef<number | undefined>(undefined);
   /** Retry after a failed write, backing off and giving up on unmount. */
@@ -1626,19 +1627,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }
         }
 
-        for (const [owner, pending] of [...pendingMetaRef.current]) {
-          pendingMetaRef.current.delete(owner);
-          try {
-            await persistMetaDiff(s, owner, pending.before, pending.after);
-          } catch (err) {
-            const newer = pendingMetaRef.current.get(owner);
-            pendingMetaRef.current.set(owner, {
-              before: pending.before,
-              after: newer?.after ?? pending.after,
-            });
-            throw err;
-          }
-        }
+        for (const owner of pendingMetaRef.current.owners())
+          await pendingMetaRef.current.flush(owner, (before, after) =>
+            persistMetaDiff(s, owner, before, after),
+          );
       }
       setSaveError("");
       retryDelayRef.current = RETRY_MIN_MS;
@@ -1886,48 +1878,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       /* A note somebody else has locked keeps the metadata it had. Every
          per-note change in this page — pinning, filing, trashing, shelving —
          is one call to this function, so the lock is honoured once here
-         rather than in each of them. Postgres refuses the write either way;
-         what this saves is a list that shows a move the archive rejected. */
-      const held = new Map(
-        base.notes
-          .filter((note) => note.lockedBy && note.lockedBy !== selfId)
-          .map((note) => [note.id, note]),
-      );
-      const m: Meta =
-        held.size === 0
-          ? proposed
-          : {
-              ...proposed,
-              notes: [
-                ...proposed.notes.map((note) => held.get(note.id) ?? note),
-                ...[...held.values()].filter(
-                  (note) => !proposed.notes.some((kept) => kept.id === note.id),
-                ),
-              ],
-            };
-      pendingMetaRef.current.set(owner, {
-        before: pending?.before ?? base,
-        after: m,
-      });
+         rather than in each of them. */
+      const m = keepLockedNotes(base, proposed, selfId);
+      pendingMetaRef.current.stage(owner, base, m);
       /* Where each note went, read while its row is still where it was: the
          row is thrown at that place in the sidebar, and the rows left behind
          are measured so they can close over the gap. */
-      const was = new Map(base.notes.map((note) => [note.id, note]));
-      const moves: { id: string; to: string | null; leaves: boolean }[] = [];
-      for (const note of m.notes) {
-        const prev = was.get(note.id);
-        const home = note.folderId ?? ALL;
-        if (!prev?.trashedAt && note.trashedAt)
-          moves.push({ id: note.id, to: TRASH, leaves: true });
-        else if (prev?.trashedAt && !note.trashedAt)
-          moves.push({ id: note.id, to: note.archivedAt ? ARCHIVE : home, leaves: true });
-        else if (!prev?.archivedAt && note.archivedAt)
-          moves.push({ id: note.id, to: ARCHIVE, leaves: true });
-        else if (prev?.archivedAt && !note.archivedAt)
-          moves.push({ id: note.id, to: home, leaves: true });
-        else if (prev && prev.folderId !== note.folderId)
-          moves.push({ id: note.id, to: home, leaves: selectedFolderId !== ALL });
-      }
+      const moves = noteMoves(base, m, selectedFolderId === ALL);
       captureRows();
       sendNotes(moves);
       setMetas((current) => ({ ...current, [owner]: m }));
@@ -2238,21 +2195,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             while (inFlightRef.current) {
               await new Promise((resolve) => setTimeout(resolve, 30));
             }
-            const currentPending = pendingMetaRef.current.get(viewAs);
-            if (currentPending) {
-              pendingMetaRef.current.delete(viewAs);
-              try {
-                await persistMetaDiff(s, viewAs, currentPending.before, currentPending.after);
-                setDirty(pendingMetaRef.current.size > 0 || hasPending());
-              } catch (err) {
-                const newer = pendingMetaRef.current.get(viewAs);
-                pendingMetaRef.current.set(viewAs, {
-                  before: currentPending.before,
-                  after: newer?.after ?? currentPending.after,
-                });
-                throw err;
-              }
-            }
+            await pendingMetaRef.current.flush(viewAs, (before, after) =>
+              persistMetaDiff(s, viewAs, before, after),
+            );
+            setDirty(pendingMetaRef.current.size > 0 || hasPending());
           }
         }
 
