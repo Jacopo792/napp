@@ -45,6 +45,10 @@ export type MenuItem =
       submenu?: MenuItem[];
       /** What an empty submenu says instead of being empty. */
       whenEmpty?: string;
+      /** A short name for the row of buttons a page menu opens with, for the
+       *  acts reached for most; set, the item is drawn there and not in the
+       *  list. Page only: the system lists it as an ordinary item. */
+      quick?: string;
     };
 
 /** The same list with everything a process boundary cannot carry taken off. A

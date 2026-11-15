@@ -1049,6 +1049,7 @@ export function NoteList({
             kind: "item",
             id: "info",
             label: "Note info",
+            quick: "Info",
             icon: <Info size={16} />,
             run: () => onInfo(entry.note.id),
           },
@@ -1089,6 +1090,7 @@ export function NoteList({
       kind: "item",
       id: "open",
       label: "Open note",
+      quick: "Open",
       icon: <FileText size={16} />,
       run: () => onSelect(entry.note.id),
     };

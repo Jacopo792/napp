@@ -304,8 +304,22 @@ function noteMenuItems({
   return [
     pinItem(pinned, onTogglePin),
     ...lockItems(lock),
-    { kind: "item", id: "find", label: "Find in note", icon: <Search size={16} />, run: onFind },
-    { kind: "item", id: "history", label: "History", icon: <History size={16} />, run: onHistory },
+    {
+      kind: "item",
+      id: "find",
+      label: "Find in note",
+      quick: "Find",
+      icon: <Search size={16} />,
+      run: onFind,
+    },
+    {
+      kind: "item",
+      id: "history",
+      label: "History",
+      quick: "History",
+      icon: <History size={16} />,
+      run: onHistory,
+    },
     {
       kind: "item",
       id: "focus",
