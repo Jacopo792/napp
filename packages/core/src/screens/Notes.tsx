@@ -204,6 +204,7 @@ import {
 import { platform } from "@/platform";
 import type { Draft } from "@/features/editor/lib/draft";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
+import { visibleEntries } from "@/lib/visibleNotes";
 import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
 import { isTemplateFolder } from "@/lib/templates";
 import { captureNote, takeCapture } from "@/lib/capture";
@@ -242,8 +243,7 @@ import {
   intoPart,
   moveTo,
   positionBetween,
-  splitManuscript,
-  structureRows,
+  manuscriptOf,
   contentsOf,
   topLevel,
 } from "@/lib/manuscript";
@@ -1329,55 +1329,28 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     [entries, mediaTexts],
   );
 
-  const visible = useMemo(() => {
-    const meta = activeMeta;
-    const index = indexOf(meta);
-    const folderOf = (id: string) => {
-      const fid = index.byNote.get(id)?.folderId ?? null;
-      return fid && index.byFolder.has(fid) ? fid : null;
-    };
-
-    let list = ownedEntries;
-
-    if (selectedFolderId === TRASH) {
-      list = list.filter((entry) => trashedIds.has(entry.note.id));
-    } else if (selectedFolderId === REMARKS) {
-      /* Not the trash: a note on its way out is nobody's to discuss. */
-      list = list.filter(
-        (entry) => remarkedIds.has(entry.note.id) && !trashedIds.has(entry.note.id),
-      );
-    } else if (selectedFolderId === ARCHIVE) {
-      list = list.filter((entry) => archivedIds.has(entry.note.id));
-    } else {
-      list = list.filter(
-        (entry) => !trashedIds.has(entry.note.id) && !archivedIds.has(entry.note.id),
-      );
-      if (selectedFolderId === UNFILED) {
-        list = list.filter((e) => folderOf(e.note.id) === null);
-      } else if (selectedFolderId !== ALL) {
-        list = list.filter((e) => folderOf(e.note.id) === selectedFolderId);
-      }
-    }
-
-    /* Folded, like the haystack it is looked for in. */
-    const q = fold(query.trim());
-    if (q) {
-      list = list.filter(
-        (e) => derivedOf(e.note).haystack.includes(q) || mediaHaystacks.get(e.note.id)?.includes(q),
-      );
-    }
-
-    return list;
-  }, [
-    ownedEntries,
-    activeMeta,
-    trashedIds,
-    archivedIds,
-    remarkedIds,
-    selectedFolderId,
-    query,
-    mediaHaystacks,
-  ]);
+  const visible = useMemo(
+    () =>
+      visibleEntries(ownedEntries, {
+        meta: activeMeta,
+        scope: selectedFolderId,
+        query,
+        trashedIds,
+        archivedIds,
+        remarkedIds,
+        mediaHaystacks,
+      }),
+    [
+      ownedEntries,
+      activeMeta,
+      trashedIds,
+      archivedIds,
+      remarkedIds,
+      selectedFolderId,
+      query,
+      mediaHaystacks,
+    ],
+  );
 
   const noteGroups = useMemo(() => {
     const pinnedIds = new Set(
@@ -1400,46 +1373,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const manuscriptOwner =
     docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
 
-  const manuscript = useMemo(() => {
-    if (!docMode) return null;
-    const metaOf = (owner: string) => metas[owner] ?? EMPTY_META;
-    const itemsOf = (owner: string): ChapterItem[] => {
-      const meta = metaOf(owner);
-      const byNote = new Map(meta.notes.map((note) => [note.id, note]));
-      const parts = new Set(meta.folders.map((folder) => folder.id));
-      return entries.flatMap((entry) => {
-        if (entry.note.ownerId !== owner) return [];
-        const row = byNote.get(entry.note.id);
-        if (row?.trashedAt || row?.archivedAt) return [];
-        return [
-          {
-            id: entry.note.id,
-            title: entry.note.title,
-            preview: derivedOf(entry.note).preview,
-            words: derivedOf(entry.note).words,
-            folderId: row?.folderId && parts.has(row.folderId) ? row.folderId : null,
-            position: row?.position ?? null,
-            movable: owner === manuscriptOwner,
-            chapter: row?.chapter,
-          },
-        ];
-      });
-    };
-    const own = splitManuscript(itemsOf(manuscriptOwner));
-    const notebook =
-      manuscriptOwner === viewAs ? own.notebook : splitManuscript(itemsOf(viewAs)).notebook;
-    const folders = metaOf(manuscriptOwner).folders.filter((folder) => !folder.parentId);
-    return {
-      chapters: own.chapters,
-      notebook,
-      rows: structureRows(
-        own.chapters,
-        folders.map((folder) => folder.id),
-      ),
-      parts: new Map(folders.map((folder) => [folder.id, folder.name])),
-      total: own.chapters.reduce((sum, item) => sum + item.words, 0),
-    };
-  }, [docMode, metas, entries, manuscriptOwner, viewAs]);
+  const manuscript = useMemo(
+    () => (docMode ? manuscriptOf(entries, metas, manuscriptOwner, viewAs) : null),
+    [docMode, metas, entries, manuscriptOwner, viewAs],
+  );
 
   /* The table of contents, from the same rows the structure draws, with each
      chapter's headings read out of its document. Handed to the `[TOC]` block

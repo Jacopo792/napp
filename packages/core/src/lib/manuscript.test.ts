@@ -6,11 +6,14 @@ import {
   dropTarget,
   headingNumbers,
   intoPart,
+  manuscriptOf,
   moveTo,
   positionBetween,
   splitManuscript,
   structureRows,
 } from "./manuscript.ts";
+import type { NoteEntry } from "./entries.ts";
+import type { Meta } from "./types.ts";
 
 const items = [
   { id: "intro", folderId: null, position: 1 },
@@ -122,4 +125,50 @@ test("a drop lands after the card under the hand going down, before it going up"
   assert.deepEqual(dropTarget("part:p1", "a", order), { kind: "part", folderId: "p1" });
   assert.deepEqual(dropTarget("notebook", "a", order), { kind: "notebook" });
   assert.equal(dropTarget(null, "a", order), null);
+});
+
+test("manuscriptOf: chapters from the owner, notebook from the viewer", () => {
+  const note = (id: string, ownerId: string, body = "") =>
+    ({ note: { id, title: id.toUpperCase(), body, ownerId }, version: 1 }) as NoteEntry;
+  const entries = [
+    note("c1", "lead", "one two three"),
+    note("c2", "lead", "four"),
+    note("loose", "lead"),
+    note("gone", "lead"),
+    note("mine", "me"),
+  ];
+  const metas: Record<string, Meta> = {
+    lead: {
+      v: 1,
+      folders: [
+        { id: "p1", name: "Part one" },
+        { id: "sub", name: "Nested", parentId: "p1" },
+      ],
+      notes: [
+        { id: "c1", folderId: "p1", position: 2 },
+        { id: "c2", folderId: "missing", position: 1 },
+        { id: "loose", folderId: null },
+        { id: "gone", folderId: null, position: 3, trashedAt: "2026-11-01" },
+      ],
+    },
+  };
+
+  const shared = manuscriptOf(entries, metas, "lead", "me");
+  assert.deepEqual(
+    shared.chapters.map((c) => [c.id, c.folderId, c.movable]),
+    [
+      ["c2", null, true],
+      ["c1", "p1", true],
+    ],
+  );
+  assert.deepEqual(
+    shared.notebook.map((c) => [c.id, c.movable]),
+    [["mine", false]],
+  );
+  assert.equal(shared.total, 4);
+  assert.deepEqual([...shared.parts], [["p1", "Part one"]], "only top-level folders are parts");
+  assert.deepEqual(
+    manuscriptOf(entries, metas, "lead", "lead").notebook.map((c) => c.id),
+    ["loose"],
+  );
 });

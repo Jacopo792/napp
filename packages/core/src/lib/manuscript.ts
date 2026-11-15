@@ -7,7 +7,23 @@
  * introduction) or after the last (a conclusion) without belonging to one.
  *
  * Pure, so `node --experimental-strip-types` can test it. */
-import type { ChapterInfo } from "./types.ts";
+import { derivedOf } from "./derived.ts";
+import type { NoteEntry } from "./entries.ts";
+import { EMPTY_META, type ChapterInfo, type Meta } from "./types.ts";
+
+export interface ChapterItem {
+  id: string;
+  title: string;
+  /** The first words, standing in for a title nobody has written yet. */
+  preview?: string;
+  words: number;
+  folderId: string | null;
+  position?: number | null;
+  /** May this one be placed in the manuscript? A partner's notebook note in
+   *  a shared manuscript is theirs — see `manuscriptOf`. */
+  movable: boolean;
+  chapter?: ChapterInfo;
+}
 
 export interface Placed {
   id: string;
@@ -240,4 +256,52 @@ export function dropTarget(
     return { kind: from >= 0 && from < order.indexOf(id) ? "after" : "before", id };
   }
   return null;
+}
+
+/** A document archive read as one piece of writing. The structure lives in
+ *  `owner`'s scope (the first member's, when the manuscript is shared), so it
+ *  is one for everybody; the notebook is `viewAs`'s. Trashed and archived notes
+ *  are in neither. Only `owner`'s notes can be moved. */
+export function manuscriptOf(
+  entries: NoteEntry[],
+  metas: Record<string, Meta>,
+  owner: string,
+  viewAs: string,
+) {
+  const metaOf = (scope: string) => metas[scope] ?? EMPTY_META;
+  const itemsOf = (scope: string): ChapterItem[] => {
+    const meta = metaOf(scope);
+    const byNote = new Map(meta.notes.map((note) => [note.id, note]));
+    const parts = new Set(meta.folders.map((folder) => folder.id));
+    return entries.flatMap((entry) => {
+      if (entry.note.ownerId !== scope) return [];
+      const row = byNote.get(entry.note.id);
+      if (row?.trashedAt || row?.archivedAt) return [];
+      return [
+        {
+          id: entry.note.id,
+          title: entry.note.title,
+          preview: derivedOf(entry.note).preview,
+          words: derivedOf(entry.note).words,
+          folderId: row?.folderId && parts.has(row.folderId) ? row.folderId : null,
+          position: row?.position ?? null,
+          movable: scope === owner,
+          chapter: row?.chapter,
+        },
+      ];
+    });
+  };
+  const own = splitManuscript(itemsOf(owner));
+  const notebook = owner === viewAs ? own.notebook : splitManuscript(itemsOf(viewAs)).notebook;
+  const folders = metaOf(owner).folders.filter((folder) => !folder.parentId);
+  return {
+    chapters: own.chapters,
+    notebook,
+    rows: structureRows(
+      own.chapters,
+      folders.map((folder) => folder.id),
+    ),
+    parts: new Map(folders.map((folder) => [folder.id, folder.name])),
+    total: own.chapters.reduce((sum, item) => sum + item.words, 0),
+  };
 }

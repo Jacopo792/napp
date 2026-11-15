@@ -39,24 +39,13 @@ import {
   type StructureRow,
 } from "@/lib/manuscript";
 import type { ChapterInfo } from "@/lib/types";
+import type { ChapterItem } from "@/lib/manuscript";
 import { keyName } from "@/lib/shortcuts";
 import { chapterMenuItems, partMenuItems, type StructureActions } from "./structureMenus";
 
 export type { StructureTarget };
 
-export interface ChapterItem {
-  id: string;
-  title: string;
-  /** The first words, standing in for a title nobody has written yet. */
-  preview?: string;
-  words: number;
-  folderId: string | null;
-  position?: number | null;
-  /** May this one be placed in the manuscript? A partner's notebook note in
-   *  a shared manuscript is theirs — see `Notes.tsx`. */
-  movable: boolean;
-  chapter?: ChapterInfo;
-}
+export type { ChapterItem };
 
 function Row({
   item,
