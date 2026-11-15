@@ -10707,26 +10707,20 @@ button.sheet-chip:hover,
 }
 
 /* ── A new archive ─────────────────────────────────────────────────────────
-   Three things in one column, one width: the name, what it is, and the
-   button. Every edge lines up with the one above it. */
-.new-archive .sheet-work {
-  gap: 12px;
-  padding: 18px 20px 20px;
+   The archive sheet's own hero, its name typed where it will stand, then
+   what it is and the button. Every edge lines up with the one above it. */
+/* Only a title beside the glyph, so the glyph takes one row, not three. */
+.sheet-body.is-plain.new-archive .sheet-portrait {
+  grid-row: 1;
 }
 
-.new-archive-name {
-  width: 100%;
-  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  padding: 10px 14px;
-  color: var(--ink);
-  font-size: var(--text-md);
-  outline: none;
+.sheet-body.is-plain.new-archive .sheet-title-field::placeholder {
+  color: var(--ink-4);
 }
 
-.new-archive-name:focus {
-  border-color: var(--accent);
+.sheet-body.is-plain.new-archive .sheet-work {
+  gap: 10px;
+  padding: 20px var(--sheet-inset);
 }
 
 .archive-kinds {
@@ -10740,8 +10734,8 @@ button.sheet-chip:hover,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 96px;
+  gap: 6px;
+  min-height: 76px;
   border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 3%, transparent);

@@ -304,14 +304,14 @@ export function NewArchiveSheet({
   const [kind, setKind] = useState<ArchiveKind>("notes");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const chosen = ARCHIVE_PRESETS.find((one) => one.kind === kind) ?? ARCHIVE_PRESETS[0];
 
   async function create() {
     if (!name.trim() || busy) return;
     setBusy(true);
     setStatus("");
     try {
-      const preset = ARCHIVE_PRESETS.find((one) => one.kind === kind) ?? ARCHIVE_PRESETS[0];
-      await onCreate(name.trim(), kind, { ...preset.features });
+      await onCreate(name.trim(), kind, { ...chosen.features });
     } catch (reason) {
       setStatus(reason instanceof Error ? reason.message : "The archive could not be made");
       setBusy(false);
@@ -321,29 +321,26 @@ export function NewArchiveSheet({
   return (
     <Sheet label="New archive" className="is-short">
       <form
-        className="sheet-body new-archive"
+        className="sheet-body is-plain new-archive"
         onSubmit={(event) => {
           event.preventDefault();
           void create();
         }}
       >
         <header className="sheet-hero">
-          <span className="sheet-portrait sheet-note-glyph">
-            <Plus size={30} />
-          </span>
-          <h2>New archive</h2>
-        </header>
-        <div className="sheet-work">
+          <span className="sheet-portrait sheet-note-glyph">{KIND_ICONS[chosen.id]}</span>
           <input
-            className="new-archive-name"
+            className="sheet-title-field"
             aria-label="Name"
             value={name}
             maxLength={80}
-            placeholder="Name"
+            placeholder="New archive"
             disabled={busy}
             autoFocus
             onChange={(event) => setName(event.target.value)}
           />
+        </header>
+        <div className="sheet-work">
           <KindPicker cards kind={kind} disabled={busy} onChange={setKind} />
           {status && (
             <p role="alert" className="sheet-quiet is-failure">

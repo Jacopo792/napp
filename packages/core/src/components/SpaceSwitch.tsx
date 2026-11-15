@@ -13,7 +13,15 @@ import { MenuSurface } from "@/components/MenuSurface";
  * it. A press held still opens the archive's sheet, the way a folder's row
  * and a note's row do; it grows out of the faces. */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ChevronDown, Info, Plus, Settings, Trash2 } from "@/components/icons";
+import {
+  BookOpen,
+  ChevronDown,
+  Info,
+  NotebookText,
+  Plus,
+  Settings,
+  Trash2,
+} from "@/components/icons";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { MenuButton, MenuItems } from "@/components/MenuPrimitives";
 import { ContextMenu } from "@/components/ContextMenu";
@@ -217,7 +225,9 @@ export function SpaceSwitch({
                 if (space.archiveId !== currentId) onSwitch(space.archiveId);
               }}
             >
-              <FaceStack members={space.members} />
+              {/* What it is, not who is in it: the names line up, and a book
+                  reads as a book before its name is read. */}
+              {space.kind === "document" ? <BookOpen size={16} /> : <NotebookText size={16} />}
               <span className="truncate">{space.name}</span>
             </MenuButton>
           </div>

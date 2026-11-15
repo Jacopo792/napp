@@ -4438,6 +4438,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      only thing on screen saying which archive this is, and the way back. */
   const spaceSwitch = session &&
     (flags.spaceSwitch ||
+      /* A book's window has no sidebar to say which archive this is, so the
+         switch is its only way back to the notes. */
+      docMode ||
       (spacesView.length > 0 && spacesView[0].archiveId !== session.archiveId)) && (
       <SpaceSwitch
         spaces={spacesView}
@@ -4912,19 +4915,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             icon: <Copy size={16} />,
             run: () => void handleCopyMarkdown(selected),
           },
-          ...(canWriteArchive
-            ? [
-                { kind: "separator" as const },
-                {
-                  kind: "item" as const,
-                  id: "trash",
-                  label: "Move to Trash",
-                  danger: true,
-                  icon: <Trash2 size={16} />,
-                  run: () => handleTrashDocNote(selected.note.id),
-                },
-              ]
-            : []),
         ]
       : [];
 
@@ -4933,32 +4923,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     ) : null;
 
     /* Pages' arrangement: the window's chrome is one strip across the top —
-       which book, which chapter, who else is in it, and the rest of the app
-       behind ⋯ — and the structure is a navigator opened when it is wanted,
-       not a column the sheet always shares the window with. */
-    const appItems: MenuItem[] = [
-      {
-        kind: "item",
-        id: "whats-new",
-        label: whatsNewUnseen ? "What's New •" : "What's New",
-        icon: <Sparkle size={16} />,
-        run: openWhatsNew,
-      },
-      {
-        kind: "item",
-        id: "settings",
-        label: "Settings",
-        icon: <Settings size={16} />,
-        run: () => setSettingsOpen(true),
-      },
-      {
-        kind: "item",
-        id: "trash",
-        label: docTrash.length ? `Show Trash (${docTrash.length})` : "Show Trash",
-        icon: <Trash2 size={16} />,
-        run: () => openSheet({ kind: "trash" }),
-      },
-    ];
+       which book, which chapter, who else is in it — and ⋯ holds only what
+       acts on the book, the chapter and its Trash. Settings and What's New are reached
+       the way the notes archive reaches them, from the archive switch. */
     const pageLabel = (item: ChapterItem) => item.title || item.preview || "Untitled";
     const chapterMenu: MenuItem[] = [
       ...manuscript.rows.map(
@@ -4997,6 +4964,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               label: "New chapter",
               icon: <Plus size={16} />,
               run: () => handleNewChapter(null),
+            },
+          ]
+        : []),
+      /* The menu that names the open page is where it is thrown away. */
+      ...(canWriteArchive && selected
+        ? [
+            { kind: "separator" as const },
+            {
+              kind: "item" as const,
+              id: "trash",
+              label: "Move to Trash",
+              danger: true,
+              icon: <Trash2 size={16} />,
+              run: () => handleTrashDocNote(selected.note.id),
             },
           ]
         : []),
@@ -5054,9 +5035,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           {roster.length > 1 && peopleShelf}
           <WritingMenuButton
             label="More"
-            items={
-              chapterItems.length ? [...chapterItems, { kind: "separator" }, ...appItems] : appItems
-            }
+            items={[
+              ...chapterItems,
+              ...(chapterItems.length ? [{ kind: "separator" as const }] : []),
+              {
+                kind: "item",
+                id: "show-trash",
+                label: docTrash.length ? `Show Trash (${docTrash.length})` : "Show Trash",
+                icon: <Trash2 size={16} />,
+                run: () => openSheet({ kind: "trash" }),
+              },
+            ]}
           />
         </span>
       </div>
