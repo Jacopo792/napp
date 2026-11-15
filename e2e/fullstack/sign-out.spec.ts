@@ -1,4 +1,4 @@
-import { test, expect, login, seedNote, openNote } from "./fixture.ts";
+import { test, expect, login, seedNote, openNote, openSettings } from "./fixture.ts";
 
 test("explicit sign-out requires consent and removes only the selected account's local documents", async ({
   page,
@@ -26,7 +26,7 @@ test("explicit sign-out requires consent and removes only the selected account's
     const pictures = await caches.open("napp:image:v1");
     await pictures.put("/local-picture", new Response("local cache"));
   }, other);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   page.once("dialog", (dialog) => dialog.dismiss());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   expect(await page.evaluate(() => localStorage.getItem("napp:archive-session"))).not.toBeNull();
@@ -60,7 +60,7 @@ test("sign-out releases another open tab before removing that account's IndexedD
   try {
     await second.goto("/notes");
     await openNote(second, id);
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await openSettings(page);
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page.getByLabel("Email", { exact: true })).toBeVisible();

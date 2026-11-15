@@ -180,3 +180,16 @@ export async function join(owner: Account, member: Account) {
   if (result.error) throw new Error(result.error.message);
   member.archiveId = owner.archiveId;
 }
+
+/** Opens Settings once any earlier one has finished leaving. `login` shuts
+ *  the Settings that What's New opens, and the panel takes 160ms to go: its
+ *  "Close settings" layer is still on screen meanwhile, and a click on the
+ *  rail in that window either lands on the departing layer or is mistaken
+ *  for an open panel that then disappears. */
+export async function openSettings(page: Page) {
+  await expect(page.locator(".settings-layer.is-closing")).toHaveCount(0);
+  const close = page.getByRole("button", { name: "Close settings", exact: true });
+  if (!(await close.isVisible()))
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(close).toBeVisible();
+}

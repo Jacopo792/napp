@@ -1,4 +1,4 @@
-import { test, expect, login, seedNote, openNote } from "./fixture.ts";
+import { test, expect, login, seedNote, openNote, openSettings } from "./fixture.ts";
 
 test("another tab cannot create a new document cache while account removal is in progress", async ({
   page,
@@ -33,7 +33,7 @@ test("another tab cannot create a new document cache while account removal is in
       },
       { archiveId: account.archiveId, userId: account.id },
     );
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await openSettings(page);
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect

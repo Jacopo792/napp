@@ -1,4 +1,4 @@
-import { test, expect, login, seedNote, openNote } from "./fixture.ts";
+import { test, expect, login, seedNote, openNote, openSettings } from "./fixture.ts";
 
 test("a blocked IndexedDB deletion cannot report sign-out as completed and can be retried", async ({
   page,
@@ -24,7 +24,7 @@ test("a blocked IndexedDB deletion cannot report sign-out as completed and can b
     },
     { archiveId: account.archiveId, userId: account.id },
   );
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   let failure = "";
   page.on("dialog", async (dialog) => {
     if (dialog.type() === "alert") failure = dialog.message();
