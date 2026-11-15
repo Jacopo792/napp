@@ -2,7 +2,7 @@
    a sheet that arrives over the window, is dismissed with Escape, and exists
    to be reached without the pointer. */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Search } from "@/components/icons";
 import { leave } from "@/lib/motion";
 import { fold } from "@/lib/format";
@@ -88,6 +88,8 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery);
+  /* A bud pressed: the palette stands in that one group. */
+  const [scope, setScope] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
   const list = useRef<HTMLDivElement>(null);
   const [far, setFar] = useState<{ query: string; items: Command[] }>({ query: "", items: [] });
@@ -109,6 +111,8 @@ export function CommandPalette({
 
   useEffect(() => {
     setQuery(open ? initialQuery : "");
+    setScope(null);
+    setListed(false);
     setCursor(0);
   }, [open, initialQuery]);
 
@@ -140,19 +144,38 @@ export function CommandPalette({
 
     const groups: { group: string; items: Command[] }[] = [];
     for (const command of ranked) {
+      if (scope && command.group !== scope) continue;
       const bucket = groups.find((entry) => entry.group === command.group);
       if (bucket) bucket.items.push(command);
       else groups.push({ group: command.group, items: [command] });
     }
-    return q ? groups : groups.map((g) => ({ ...g, items: g.items.slice(0, RESTING_LIMIT) }));
-  }, [commands, search, far, query]);
+    return q || scope
+      ? groups
+      : groups.map((g) => ({ ...g, items: g.items.slice(0, RESTING_LIMIT) }));
+  }, [commands, search, far, query, scope]);
+
+  /* The groups a resting palette offers, as round buds beside the field: the
+     way into one group without a word for it. Four at most — a row of them is
+     a choice, more is a toolbar. */
+  const buds = useMemo(() => {
+    const seen = new Map<string, ReactNode>();
+    for (const command of commands)
+      if (!command.searchOnly && !seen.has(command.group)) seen.set(command.group, command.icon);
+    return [...seen].slice(0, 4);
+  }, [commands]);
+
+  /* At rest it is only the field. It opens downward into results once there is
+     something to show: a word typed, a bud pressed, or the arrow asked for
+     the list. */
+  const [listed, setListed] = useState(false);
+  const expanded = query.trim() !== "" || scope !== null || listed;
 
   const flat = useMemo(() => matches.flatMap((group) => group.items), [matches]);
   const active = flat[Math.min(cursor, flat.length - 1)];
 
   useEffect(() => {
     setCursor(0);
-  }, [query]);
+  }, [query, scope]);
 
   // Keep the cursor in view when the arrows walk it past the fold.
   useEffect(() => {
@@ -171,68 +194,99 @@ export function CommandPalette({
   }
 
   return (
-    <div ref={layer} className="palette-layer" role="presentation">
+    <div ref={layer} className="palette-layer is-spotlight" role="presentation">
       <button type="button" aria-label="Close" className="settings-scrim" onClick={close} />
-      <div role="dialog" aria-modal="true" aria-label="Commands" className="palette glass-sheet">
-        <div className="palette-search">
-          <Search size={16} />
-          <input
-            autoFocus
-            type="text"
-            value={query}
-            placeholder="Search everything…"
-            aria-label="Search everything"
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") return close();
-              if (event.key === "Enter") {
-                event.preventDefault();
-                return choose(active);
-              }
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setCursor((current) => Math.min(flat.length - 1, current + 1));
-              }
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                setCursor((current) => Math.max(0, current - 1));
-              }
-            }}
-          />
-          <kbd>esc</kbd>
-        </div>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Commands"
+        className={`liquid spotlight ${expanded ? "is-open" : ""} ${expanded && !scope ? "" : "has-buds"}`}
+      >
+        <div className="liquid-card glass-sheet">
+          <div className="palette-search">
+            <Search size={18} />
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              placeholder={scope ? `Search ${scope}` : "Search everything…"}
+              aria-label="Search everything"
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  if (scope || listed) {
+                    setScope(null);
+                    return setListed(false);
+                  }
+                  return close();
+                }
+                if (event.key === "Backspace" && !query && scope) return setScope(null);
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  return choose(active);
+                }
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  if (!expanded) return setListed(true);
+                  setCursor((current) => Math.min(flat.length - 1, current + 1));
+                }
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setCursor((current) => Math.max(0, current - 1));
+                }
+              }}
+            />
+            <kbd>esc</kbd>
+          </div>
 
-        <div ref={list} className="palette-results">
-          {flat.length === 0 && <p className="palette-empty">Nothing matches that.</p>}
-          {matches.map((group) => (
-            <div key={group.group} className="palette-group">
-              <p className="palette-group-label">{group.group}</p>
-              {group.items.map((command) => (
-                <button
-                  key={command.id}
-                  type="button"
-                  className={`palette-row ${command === active ? "is-active" : ""}`}
-                  /* The pointer moves the cursor rather than fighting it: one
+          <div ref={list} className="palette-results" inert={!expanded}>
+            {flat.length === 0 && <p className="palette-empty">Nothing matches that.</p>}
+            {matches.map((group) => (
+              <div key={group.group} className="palette-group">
+                <p className="palette-group-label">{group.group}</p>
+                {group.items.map((command) => (
+                  <button
+                    key={command.id}
+                    type="button"
+                    className={`palette-row ${command === active ? "is-active" : ""}`}
+                    /* The pointer moves the cursor rather than fighting it: one
                      selection, whichever hand is driving. */
-                  onMouseMove={() => setCursor(flat.indexOf(command))}
-                  onClick={() => choose(command)}
-                >
-                  <span className="palette-row-icon">{command.icon}</span>
-                  <span className="min-w-0">
-                    <b>{command.name}</b>
-                    {command.snippet ? (
-                      <small>
-                        {command.snippet.before}
-                        <mark>{command.snippet.match}</mark>
-                        {command.snippet.after}
-                      </small>
-                    ) : (
-                      command.hint && <small>{command.hint}</small>
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
+                    onMouseMove={() => setCursor(flat.indexOf(command))}
+                    onClick={() => choose(command)}
+                  >
+                    <span className="palette-row-icon">{command.icon}</span>
+                    <span className="min-w-0">
+                      <b>{command.name}</b>
+                      {command.snippet ? (
+                        <small>
+                          {command.snippet.before}
+                          <mark>{command.snippet.match}</mark>
+                          {command.snippet.after}
+                        </small>
+                      ) : (
+                        command.hint && <small>{command.hint}</small>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="liquid-buds">
+          {buds.map(([group, icon], index) => (
+            <button
+              key={group}
+              type="button"
+              title={group}
+              aria-label={group}
+              aria-pressed={scope === group}
+              className="liquid-bud glass-sheet press"
+              style={{ "--bud": index } as CSSProperties}
+              onClick={() => setScope(group)}
+            >
+              {icon}
+            </button>
           ))}
         </div>
       </div>

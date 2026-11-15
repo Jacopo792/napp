@@ -91,7 +91,11 @@ export function ContextMenu({
 
   return createPortal(
     <MenuCloseContext.Provider value={requestClose}>
+      {/* Keyed by the point: a right-click while the menu is open is a new
+          menu at a new place, and it opens as one. Reusing the panel only moved
+          it, so the entrance played the first time and never again. */}
       <MenuSurface
+        key={`${point.x}:${point.y}`}
         open={closing !== point}
         onExit={onClose}
         ref={measure}
@@ -105,6 +109,8 @@ export function ContextMenu({
           width,
           visibility: size.h ? "visible" : "hidden",
           transformOrigin: `${point.x - left}px ${point.y - top}px`,
+          ["--ox" as string]: `${point.x - left}px`,
+          ["--oy" as string]: `${point.y - top}px`,
         }}
       >
         {children}

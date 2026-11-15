@@ -45,6 +45,62 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.59",
+    date: "2026-11-15",
+    headline: "One place to search",
+    sections: [
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "Search lives in the Spotlight",
+            text: "⌘K (Ctrl+K on Windows) searches notes, words inside them and commands. The search buttons in the note and the book are gone; ⌘F still finds and replaces in the open text.",
+            image: "0.9.59-spotlight.jpg",
+          },
+          {
+            title: "Find floats over the page",
+            text: "⌘F opens a find bar that floats over the note, its arrows set beside it like drops. In the Spotlight the group buttons bud off the field and the field opens downward into the results.",
+            image: "0.9.59-find.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Menus",
+        items: [
+          {
+            title: "Quick actions first",
+            text: "Note and row menus open with a row of quick actions — Pin, Lock, History — above the rest. Menus and right-click menus grow from where you press, and their rows follow.",
+            image: "0.9.59-menus.jpg",
+          },
+          {
+            title: "One colour button",
+            text: "The bubble over selected text has a single colour button instead of six swatches.",
+            image: "0.9.59-bubble.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "The Board is a list",
+            text: "A book's Board lists its chapters with the selected page beside them. The ⋯ holds the page's actions, the Trash has its own button, and the archive switch is always shown.",
+            image: "0.9.59-board.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Motion",
+        items: [
+          {
+            title: "One rhythm",
+            text: "The selection slides between notes and folders, a folder's notes and a Settings section's rows come in one after another, and everything moves to one shared tempo. Sliding the sidebar no longer shows the desktop through the page.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.58",
     date: "2026-11-15",
     headline: "Tidier underneath",
@@ -1806,6 +1862,24 @@ export function localWhatsNewSeen(): string {
 export function rememberWhatsNewSeen(version: string): void {
   try {
     localStorage.setItem(SEEN_KEY, version);
+  } catch {
+    /* Private window: the account row still carries it. */
+  }
+}
+
+const SPOTLIGHT_KEY = "napp:spotlight-learned";
+
+export function localSpotlightLearned(): boolean {
+  try {
+    return localStorage.getItem(SPOTLIGHT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function rememberSpotlightLearned(): void {
+  try {
+    localStorage.setItem(SPOTLIGHT_KEY, "1");
   } catch {
     /* Private window: the account row still carries it. */
   }

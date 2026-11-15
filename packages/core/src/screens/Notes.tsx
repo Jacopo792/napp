@@ -259,10 +259,12 @@ type SheetEntry =
   | { kind: "trash" };
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { CommandPalette, ShortcutSheet, type Command } from "@/components/CommandPalette";
+import { SpotlightLesson } from "@/components/SpotlightLesson";
 import {
   CURRENT_RELEASE,
   compareVersions,
   laterVersion,
+  rememberSpotlightLearned,
   rememberWhatsNewSeen,
 } from "@/lib/whatsNew";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
@@ -2470,6 +2472,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         case "link":
           return noteEditorRef.current?.openLink();
         case "palette":
+          /* Pressing it is the one thing that ends the first-launch lesson. */
+          setFlags((current) => {
+            if (current.spotlightLearned) return current;
+            rememberSpotlightLearned();
+            return { ...current, spotlightLearned: true };
+          });
           setPaletteQuery("");
           return setPaletteOpen(true);
         case "draw":
@@ -4560,8 +4568,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Both keyboard sheets travel with the settings panel, because both layouts
      mount that and neither wants a second copy of this. */
+  /* Once per account, after What's New has had its turn: the Spotlight's
+     shortcut, until it is pressed. */
+  const spotlightLesson =
+    preferencesReady &&
+    !flags.spotlightLearned &&
+    !loading &&
+    !settingsOpen &&
+    !paletteOpen &&
+    !shortcutsOpen;
   const keyboardSheets = (
     <>
+      {spotlightLesson && <SpotlightLesson />}
       <CommandPalette
         open={paletteOpen}
         commands={paletteCommands}
@@ -4694,43 +4712,31 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }).catch(() => undefined)
       : undefined;
 
-  const noteActions = selected ? (
-    <>
-      <button
-        type="button"
-        aria-label="Find in note"
-        className="toolbar-button press"
-        onClick={() => noteEditorRef.current?.openFind()}
-      >
-        <Search size={16} />
-      </button>
-      {canWriteArchive && (
-        <NoteMenu
-          lock={lockFor(selected.note.id)}
-          pinned={pinned}
-          folders={activeMeta.folders}
-          recent={recentNotes}
-          focusMode={focusMode}
-          onToggleFocus={toggleFocus}
-          onAddCover={addCover}
-          onOpenBeside={() => {
-            setPaletteQuery("beside ");
-            setPaletteOpen(true);
-          }}
-          onCopyMarkdown={() => void handleCopyMarkdown(selected)}
-          onExportMarkdown={() => handleExportMarkdown(selected)}
-          onPrint={() => void platform().print()}
-          onSavePdf={() => noteEditorRef.current?.savePdf()}
-          onTogglePin={() => handleTogglePin(selected.note.id)}
-          onFind={() => noteEditorRef.current?.openFind()}
-          onHistory={() => noteEditorRef.current?.openHistory()}
-          onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
-          onRecent={handleOpenRecent}
-          onDelete={() => handleMoveToTrash(selected)}
-        />
-      )}
-    </>
-  ) : null;
+  const noteActions =
+    selected && canWriteArchive ? (
+      <NoteMenu
+        lock={lockFor(selected.note.id)}
+        pinned={pinned}
+        folders={activeMeta.folders}
+        recent={recentNotes}
+        focusMode={focusMode}
+        onToggleFocus={toggleFocus}
+        onAddCover={addCover}
+        onOpenBeside={() => {
+          setPaletteQuery("beside ");
+          setPaletteOpen(true);
+        }}
+        onCopyMarkdown={() => void handleCopyMarkdown(selected)}
+        onExportMarkdown={() => handleExportMarkdown(selected)}
+        onPrint={() => void platform().print()}
+        onSavePdf={() => noteEditorRef.current?.savePdf()}
+        onTogglePin={() => handleTogglePin(selected.note.id)}
+        onHistory={() => noteEditorRef.current?.openHistory()}
+        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+        onRecent={handleOpenRecent}
+        onDelete={() => handleMoveToTrash(selected)}
+      />
+    ) : null;
 
   /* The same items the ⋯ carries, opened where the pointer is. The editor
      hands the click over only when it did not land on the words. */
@@ -4754,7 +4760,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onPrint={() => void platform().print()}
         onSavePdf={() => noteEditorRef.current?.savePdf()}
         onTogglePin={() => handleTogglePin(selected.note.id)}
-        onFind={() => noteEditorRef.current?.openFind()}
         onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}

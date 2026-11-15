@@ -15,7 +15,7 @@ import {
   type RemarksSeen,
 } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
-import { localWhatsNewSeen } from "@/lib/whatsNew";
+import { localSpotlightLearned, localWhatsNewSeen } from "@/lib/whatsNew";
 
 export { flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
@@ -28,6 +28,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autoLock: 0,
   spaceSwitch: false,
   whatsNewSeen: "",
+  spotlightLearned: false,
 };
 
 export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {
@@ -50,7 +51,14 @@ export function heldRemarksSeen(): RemarksSeen {
 let held: AccountPreferences | null = null;
 
 export function localPreferences(seen: RemarksSeen = {}) {
-  return held ?? preferencesWith({ ...DEFAULT_FLAGS, whatsNewSeen: localWhatsNewSeen() }, seen);
+  return held ?? preferencesWith(
+      {
+        ...DEFAULT_FLAGS,
+        whatsNewSeen: localWhatsNewSeen(),
+        spotlightLearned: localSpotlightLearned(),
+      },
+      seen,
+    );
 }
 
 export async function pullAccountPreferences() {

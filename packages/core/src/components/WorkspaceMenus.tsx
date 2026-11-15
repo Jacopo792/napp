@@ -287,7 +287,6 @@ function noteMenuItems({
   folders,
   recent,
   onTogglePin,
-  onFind,
   onHistory,
   onToggleFocus,
   focusMode,
@@ -304,14 +303,6 @@ function noteMenuItems({
   return [
     pinItem(pinned, onTogglePin),
     ...lockItems(lock),
-    {
-      kind: "item",
-      id: "find",
-      label: "Find in note",
-      quick: "Find",
-      icon: <Search size={16} />,
-      run: onFind,
-    },
     {
       kind: "item",
       id: "history",
@@ -427,7 +418,6 @@ interface NoteMenuActions {
   folders: Folder[];
   recent: { id: string; title: string }[];
   onTogglePin: () => void;
-  onFind: () => void;
   onHistory: () => void;
   onToggleFocus: () => void;
   focusMode: boolean;

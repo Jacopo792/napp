@@ -146,6 +146,19 @@
   --dur-swipe: 340ms;
   --dur-slow: 360ms;
 
+  /* ── One tempo for the moving family ──────────────────────────────────────
+     Spotlight, the find bar, menus, the travelling selection, the dealt-in
+     rows of a folder or a Settings section, the sliding navigation: every one
+     of them reads these, so nothing in the family runs at a speed of its own.
+     The glass changing shape and anything travelling take `shape`; what is
+     inside arrives in `content`, after `wait`, one row `step` behind the one
+     above; a window or a field arriving takes `enter`. */
+  --motion-shape: 440ms;
+  --motion-content: 260ms;
+  --motion-wait: 150ms;
+  --motion-step: 30ms;
+  --motion-enter: var(--dur-base);
+
   /* ── The sidebar rail ──────────────────────────────────────────────────────
      Every glyph in the left column — scopes, folders, the wastebasket, Settings
      and the lock — stands on one vertical line, and every section label starts
@@ -2188,7 +2201,7 @@
 }
 
 .is-sliding-navigation::view-transition-group(*) {
-  animation-duration: var(--dur-slow);
+  animation-duration: var(--motion-shape);
   animation-timing-function: var(--ease);
 }
 
@@ -2199,11 +2212,27 @@
   overflow: clip;
 }
 
+/* The page's picture is its words and cover over nothing: the body is
+   transparent and the pane's own background stays behind in the root, where
+   it is cut out with everything named. Gliding narrower or wider than the hole
+   it lands in, it showed whatever is behind the window — the desktop, through
+   a translucent sidebar — and the cover drifted off over it. The group carries
+   the page colour, and the whole transition stands on it, so no edge of any
+   picture is ever a window onto the wallpaper. */
+.is-sliding-navigation::view-transition {
+  background: var(--page);
+}
+
+.is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-split) {
+  background: var(--page);
+}
+
 .is-sliding-navigation::view-transition-old(*),
 .is-sliding-navigation::view-transition-new(*) {
   width: auto;
   height: auto;
-  animation-duration: var(--dur-slow);
+  animation-duration: var(--motion-shape);
   animation-timing-function: var(--ease);
 }
 
@@ -3718,9 +3747,19 @@
   outline-offset: -1px;
 }
 
-.find-bar {
+/* The find bar floats over the top of the page instead of taking a row of
+   it: opening it pushed the whole note down, and the page jumped. The dock is
+   a zero-height anchor in the flow; the bar hangs from it. */
+.find-dock {
   position: relative;
   z-index: 20;
+  height: 0;
+}
+
+.find-dock > .find-bar {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
 }
 
 .editor-tool-cluster {
@@ -3958,8 +3997,8 @@
   background: color-mix(in srgb, var(--ink) 11%, transparent);
   pointer-events: none;
   transition:
-    transform var(--dur-base) var(--ease),
-    height var(--dur-base) var(--ease);
+    transform var(--motion-shape) var(--ease),
+    height var(--motion-shape) var(--ease);
 }
 
 /* The sections are grouped, because "Profile" and "Appearance" are not the
@@ -5808,6 +5847,106 @@
   }
 }
 
+/* ── Menus: gems ─────────────────────────────────────────────────────────────
+   The same family as Spotlight: one glass that changes shape, controls that
+   bud off it like drops, words that wait for the glass. The menu opens as a
+   small capsule where the pointer went down, stretches across into the row
+   of quick actions, then down into the list; the quick actions leave the
+   corner it opened from as drops and round into buttons; the rows come in
+   last, one after another. The book's ribbon panels and font list open the
+   same way. Not the bubble or the slash menu: those sit in the text and stay
+   a quick scale; native `<select>` lists are drawn by the system. */
+:is(
+  .menu-popover:is([role="menu"], .editor-tool-menu, :has(> .menu-section)),
+  .ribbon-panel,
+  .font-picker-list
+) {
+  --ox: calc(100% - 16px);
+  --oy: 0px;
+  --bud-from: 22px;
+  animation: menu-gem var(--motion-shape) backwards;
+}
+
+:is(.menu-popover.left-0, .context-menu):is(
+  [role="menu"],
+  .editor-tool-menu,
+  :has(> .menu-section)
+),
+/* Doubled to outweigh the rule above: both open from their left corner. */
+.ribbon-panel.ribbon-panel,
+.font-picker-list.font-picker-list {
+  --ox: 16px;
+  --bud-from: -22px;
+}
+
+/* Eased per stretch, not over the whole: one curve front-loads both stretches
+   into the first frames and the capsule is never seen. */
+@keyframes menu-gem {
+  from {
+    opacity: 0.4;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+    clip-path: inset(
+      calc(var(--oy) - 14px) calc(100% - var(--ox) - 14px) calc(100% - var(--oy) - 14px)
+        calc(var(--ox) - 14px) round 14px
+    );
+  }
+
+  40% {
+    opacity: 1;
+    clip-path: inset(0 0 calc(100% - 66px) 0 round var(--radius-md));
+    animation-timing-function: var(--ease);
+  }
+
+  to {
+    clip-path: inset(0 round var(--radius-md));
+  }
+}
+
+.menu-popover .menu-quick-button {
+  animation: menu-bud var(--motion-shape) var(--ease-spring) backwards;
+  animation-delay: var(--motion-wait);
+  animation-delay: calc(
+    var(--motion-wait) + (sibling-count() - sibling-index()) * var(--motion-step)
+  );
+}
+
+:is(.menu-popover.left-0, .context-menu) .menu-quick-button {
+  animation-delay: calc(var(--motion-wait) + (sibling-index() - 1) * var(--motion-step));
+}
+
+@keyframes menu-bud {
+  from {
+    border-radius: 50%;
+    opacity: 0;
+    transform: translateX(var(--bud-from)) scale(0.5, 0.3);
+  }
+}
+
+:is(
+    .menu-popover:is([role="menu"], .editor-tool-menu, :has(> .menu-section)),
+    .ribbon-panel,
+    .font-picker-list
+  )
+  :is(.menu-row, .menu-label, .menu-separator, .font-picker-row) {
+  animation: menu-row-in var(--motion-content) var(--ease-out) backwards;
+  animation-delay: var(--motion-wait);
+  animation-delay: calc(var(--motion-wait) + min(sibling-index(), 8) * var(--motion-step));
+}
+
+@keyframes menu-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.menu-popover, .ribbon-panel, .font-picker-list),
+  :is(.menu-popover, .ribbon-panel, .font-picker-list) * {
+    animation: none !important;
+  }
+}
+
 .menu-row,
 .sidebar-target,
 .sidebar-footer-button,
@@ -5851,7 +5990,7 @@
   animation: fade-out var(--dur-fast) var(--ease-in-out) forwards;
 }
 
-.is-closing > :is(.settings-panel, .palette) {
+.is-closing > :is(.settings-panel, .palette, .liquid) {
   animation: settings-leave var(--dur-fast) var(--ease-in-out) forwards;
 }
 
@@ -5901,6 +6040,31 @@
    on arrival and nothing has to trigger it. */
 .settings-scroll > section {
   animation: settings-section-in var(--dur-fast) var(--ease-out) backwards;
+}
+
+/* And what is in it comes down into place one row after another, the way a
+   folder's notes are dealt in and a menu's rows arrive: each block of the
+   section carries a delay, the rows inside a block add theirs to it, and both
+   are capped so a long section is not a long wait. */
+.settings-scroll > section > * {
+  --group-delay: calc(min(sibling-index() - 1, 6) * 2 * var(--motion-step));
+}
+
+.settings-scroll > section > :not(.appearance-controls),
+.settings-scroll > section > .appearance-controls > * {
+  animation: row-in var(--motion-content) var(--ease-out) backwards;
+  animation-delay: var(--group-delay);
+}
+
+.settings-scroll > section > .appearance-controls > * {
+  animation-delay: calc(var(--group-delay) + min(sibling-index() - 1, 6) * var(--motion-step));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-scroll > section > *,
+  .settings-scroll > section > .appearance-controls > * {
+    animation: none;
+  }
 }
 
 @keyframes settings-section-in {
@@ -6224,9 +6388,16 @@
   animation: list-in var(--dur-base) var(--ease-out) backwards;
 }
 
-/* Opening a folder deals its notes in rather than swapping them under you:
-   capped group and row delays keep the entire cascade within 404ms, so a long
-   list is not a long wait. Not while searching — the list is rebuilt on every
+/* Its rows come down into it; the list itself rising under them would be two
+   directions at once, so a dealt list only fades. */
+.list-in.is-cascading {
+  animation-name: fade-in;
+}
+
+/* Opening a folder deals its notes in rather than swapping them under you,
+   one after another from above, the way a menu's rows arrive: capped group
+   and row delays keep the entire cascade within about 650ms, so a long list
+   is not a long wait. Not while searching — the list is rebuilt on every
    keystroke there, and a cascade per letter is a list that never holds
    still. */
 @property --group-delay {
@@ -6240,12 +6411,12 @@
    rather than restarting under every heading. Registered as a <time> so it
    is worked out on the section, not re-read on each row. */
 .list-in.is-cascading > .note-group {
-  --group-delay: calc(min(sibling-index() - 1, 4) * 30ms);
+  --group-delay: calc(min(sibling-index() - 1, 4) * 2 * var(--motion-step));
 }
 
 .list-in.is-cascading .note-group-heading,
 .list-in.is-cascading .note-row-list {
-  animation: row-in 200ms var(--ease-out) backwards;
+  animation: row-in var(--motion-content) var(--ease-out) backwards;
 }
 
 .list-in.is-cascading .note-group-heading {
@@ -6253,13 +6424,13 @@
 }
 
 .list-in.is-cascading .note-row-list {
-  animation-delay: calc(var(--group-delay) + min(sibling-index(), 6) * 14ms);
+  animation-delay: calc(var(--group-delay) + min(sibling-index(), 7) * var(--motion-step));
 }
 
 @keyframes row-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(-5px);
   }
 }
 
@@ -6483,6 +6654,12 @@
    brown — and a selection has to read the same in every palette. */
 .sidebar-row.is-active {
   background: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+
+/* While the travelling wash (`followSelection`) is on its way here, the row
+   waits for it rather than lighting up before it arrives. */
+:is(.sidebar-row, .note-row-list).is-arriving {
+  background: transparent !important;
 }
 
 /* The folder a note is being dragged onto says so before it is dropped. */
@@ -8186,7 +8363,9 @@ body:has(.sidebar-row.is-over) .drag-chip {
   display: grid;
   justify-items: center;
   align-content: start;
-  padding: max(9vh, 3rem) 1.25rem 1.25rem;
+  /* A full window sits in the middle of the screen; fewer results only make
+     it shorter below the field, which stays put. */
+  padding: max(3rem, calc(50dvh - 15rem)) 1.25rem 1.25rem;
 }
 
 /* Denser than the glass it inherits. A sheet that is mostly its own margins —
@@ -8210,6 +8389,220 @@ body:has(.sidebar-row.is-over) .drag-chip {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.985);
+  }
+}
+
+/* ── Spotlight ──────────────────────────────────────────────────────────────
+   One material that changes shape rather than windows that appear. It arrives
+   at once, a field and nothing under it, while the groups it can stand in bud
+   off its right end like drops leaving it — so the field draws in to make
+   room. A word typed takes the drops back in and the field opens downward
+   into its results; the results come in only once the glass has room for them.
+   Nothing behind it dims or moves: it is a question, not a window. */
+.palette-layer.is-spotlight > .settings-scrim {
+  background: transparent;
+}
+
+/* The track is the window, not the widest row: a row's nowrap text sized the
+   column to thousands of pixels and pushed the field off to the right. */
+.palette-layer.is-spotlight {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* `.liquid` is the shared material: Spotlight and the find bar are both a
+   field whose controls bud off its end. */
+.liquid {
+  --liquid-head: 52px;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  interpolate-size: allow-keywords;
+  animation: spotlight-in var(--motion-enter) var(--ease-out) backwards;
+}
+
+.spotlight {
+  width: min(46rem, 100%);
+}
+
+@keyframes spotlight-in {
+  from {
+    opacity: 0;
+    transform: scale(1.035);
+    filter: blur(6px);
+  }
+}
+
+.liquid-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: calc(var(--liquid-head) / 2);
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+  transition: border-radius var(--motion-shape) var(--ease);
+}
+
+.liquid.is-open .liquid-card {
+  border-radius: 22px;
+}
+
+.spotlight .palette-search {
+  height: var(--liquid-head);
+  border-bottom-color: transparent;
+  padding-inline: 18px 14px;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.spotlight.is-open .palette-search {
+  border-bottom-color: var(--rule);
+}
+
+.spotlight .palette-results {
+  height: 0;
+  max-height: min(26rem, calc(100dvh - 30vh));
+  padding-block: 0;
+  transition:
+    height var(--motion-shape) var(--ease),
+    padding var(--motion-shape) var(--ease);
+}
+
+.spotlight.is-open .palette-results {
+  height: auto;
+  padding-block: 6px;
+}
+
+/* The rows wait for the glass: words arriving in a pane still opening read as
+   a spill. Going away, they leave first. */
+.spotlight .palette-results > * {
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
+}
+
+.spotlight.is-open .palette-results > * {
+  opacity: 1;
+  transition: opacity var(--motion-content) var(--ease-out) var(--motion-wait);
+}
+
+.liquid-buds {
+  display: flex;
+  width: 0;
+  margin-left: 0;
+  gap: 10px;
+  transition:
+    width var(--motion-shape) var(--ease),
+    margin var(--motion-shape) var(--ease);
+}
+
+.liquid.has-buds .liquid-buds {
+  width: auto;
+  margin-left: 10px;
+  transition-delay: var(--motion-wait);
+}
+
+.liquid-bud {
+  display: grid;
+  width: var(--liquid-head);
+  height: var(--liquid-head);
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+  color: var(--ink-3);
+  /* Inside the field's end, pinched flat: where a drop is before it leaves. */
+  opacity: 0;
+  transform: translateX(calc((var(--bud) + 1) * (-10px - var(--liquid-head)))) scale(0.55, 0.3);
+  transition:
+    transform var(--motion-shape) var(--ease-spring),
+    opacity var(--motion-content) var(--ease-out);
+}
+
+.liquid.has-buds .liquid-bud {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--motion-wait) + var(--bud) * var(--motion-step));
+}
+
+@starting-style {
+  .liquid.has-buds .liquid-buds {
+    width: 0;
+    margin-left: 0;
+  }
+
+  .liquid.has-buds .liquid-bud {
+    opacity: 0;
+    transform: translateX(calc((var(--bud) + 1) * (-10px - var(--liquid-head)))) scale(0.55, 0.3);
+  }
+}
+
+.liquid-bud:hover {
+  color: var(--ink);
+}
+
+.liquid-bud[aria-pressed="true"] {
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+}
+
+.liquid-bud svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* The find bar: the same drops, smaller, and they stay — the arrows are what
+   the field is for. Replacing opens under the field once there is something
+   to replace. */
+.find-bar.liquid {
+  --liquid-head: 42px;
+}
+
+.find-bar .liquid-card {
+  padding-inline: 14px 12px;
+}
+
+.find-field {
+  display: flex;
+  height: var(--liquid-head);
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.find-bar .find-replace {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    height var(--motion-shape) var(--ease),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.find-bar.is-open .find-replace {
+  height: auto;
+  padding-bottom: 8px;
+  opacity: 1;
+  transition:
+    height var(--motion-shape) var(--ease),
+    opacity var(--motion-content) var(--ease-out) var(--motion-wait);
+}
+
+.find-bar .liquid-bud svg {
+  width: 17px;
+  height: 17px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid,
+  .liquid * {
+    animation: none !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -11290,8 +11683,8 @@ button.sheet-chip:hover,
 }
 
 .board-list > * {
-  animation: row-in 200ms var(--ease-out) backwards;
-  animation-delay: calc(min(sibling-index() - 1, 10) * 14ms);
+  animation: row-in var(--motion-content) var(--ease-out) backwards;
+  animation-delay: calc(min(sibling-index() - 1, 10) * var(--motion-step));
 }
 
 .board-row.is-lifted {
@@ -12219,14 +12612,9 @@ button.sheet-chip:hover,
 
 .find-replace {
   display: flex;
-  flex-basis: 100%;
   align-items: center;
   gap: 6px;
-  padding-left: 24px;
-}
-
-.find-bar:has(.find-replace) {
-  flex-wrap: wrap;
+  padding-left: 26px;
 }
 
 /* ── The desk and the sheet ── */
@@ -15473,4 +15861,70 @@ button.sheet-chip:hover,
   color: var(--ink-4);
   font-size: var(--text-xs);
   white-space: normal;
+}
+
+/* The first-launch lesson is the Spotlight's own field, with the shortcut
+   where the words go. Its keys arrive one after the other and keep being
+   pressed until the person presses them. Reduced motion keeps only the fade
+   (`.liquid *` drops the rest). */
+.spotlight-lesson {
+  animation: spotlight-lesson-fade var(--dur-base) var(--ease-out) backwards;
+}
+
+.spotlight-lesson .palette-search {
+  gap: 12px;
+}
+
+.spotlight-lesson-word {
+  flex: 1;
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+
+.spotlight-lesson-keys {
+  display: flex;
+  gap: 6px;
+}
+
+.spotlight-lesson .palette-search kbd {
+  min-width: 34px;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+  font-weight: var(--weight-semibold);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--text-lg);
+  text-align: center;
+  animation:
+    spotlight-lesson-key 420ms var(--ease-spring) calc(320ms + var(--key) * 90ms) backwards,
+    spotlight-lesson-press 2400ms var(--ease-press) calc(1400ms + var(--key) * 90ms) infinite;
+}
+
+@keyframes spotlight-lesson-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes spotlight-lesson-key {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes spotlight-lesson-press {
+  0%,
+  12%,
+  100% {
+    transform: none;
+  }
+  6% {
+    transform: translateY(1px) scale(0.94);
+    border-bottom-width: 1px;
+    background: var(--accent-wash);
+  }
 }

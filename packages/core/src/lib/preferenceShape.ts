@@ -40,6 +40,9 @@ export interface AccountFlags {
    *  last-write-wins — so a device that has read nothing cannot announce
    *  again what another one already showed. */
   whatsNewSeen: string;
+  /** The Spotlight's shortcut has been pressed once, which is the only way
+   *  the first-launch prompt goes. Merged with OR: once learned, learned. */
+  spotlightLearned: boolean;
 }
 
 export interface AccountPreferences extends AccountFlags {
@@ -85,6 +88,7 @@ export const DEFAULT_FLAGS: AccountFlags = {
   autoLock: 0,
   spaceSwitch: false,
   whatsNewSeen: "",
+  spotlightLearned: false,
 };
 
 /**
@@ -106,6 +110,7 @@ export function flagsOf(preferences: AccountFlags): AccountFlags {
     autoLock: preferences.autoLock,
     spaceSwitch: preferences.spaceSwitch,
     whatsNewSeen: preferences.whatsNewSeen,
+    spotlightLearned: preferences.spotlightLearned,
   };
 }
 
@@ -167,6 +172,7 @@ export function mergeAccountPreferences(
         local.whatsNewSeen ?? "",
         typeof row.whatsNewSeen === "string" ? row.whatsNewSeen : "",
       ),
+      spotlightLearned: Boolean(local.spotlightLearned) || row.spotlightLearned === true,
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
   );

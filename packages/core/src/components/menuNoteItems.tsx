@@ -6,7 +6,7 @@ import type { NoteLock } from "@/lib/types";
    A note is named in two places — the row it sits on in the catalogue, and the
    page it is open on — and a right-click in either offers a menu. They are not
    the same menu: a row offers Open note, a photograph and the scope's own two
-   acts, and a page offers Find, Focus, the exports and Print. What they share
+   acts, and a page offers History, Focus, the exports and Print. What they share
    is what is true of the note wherever you are looking at it, and those three
    were written out twice, with the same labels, in two files. Two copies of a
    label is one copy and one lie waiting to happen. ─────────────────────────── */

@@ -3,6 +3,31 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.59 – 2026-11-15
+
+### Changed
+
+- Search lives in the Spotlight (⌘K / Ctrl+K): the note and book search
+  buttons and the Find menu item are gone; a first-launch lesson asks for one
+  ⌘K, and its seen flag syncs with the account preferences. ⌘F still finds and
+  replaces in the open text.
+- The find bar floats over the page with its arrows as separate drops; the
+  Spotlight's group buttons bud off the field, which opens downward into the
+  results.
+- Menus and right-click menus open from the press point with a row of quick
+  actions; their rows follow.
+- The selection bubble has one colour button instead of six swatches.
+- Books: the Board is a chapter list with the selected page beside it; the ⋯
+  holds the page's actions and Trash is its own button; the archive switch is
+  always shown and its Settings toggle is removed.
+- Motion: the selection slides between notes and folders, folder notes and
+  Settings rows enter in sequence, and all animations share `--motion-*` tempo
+  tokens.
+
+### Fixed
+
+- Sliding the sidebar no longer shows the desktop through the page.
+
 ## 0.9.58 – 2026-11-15
 
 ### Changed

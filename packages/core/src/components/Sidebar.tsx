@@ -1,5 +1,6 @@
 import { MenuSurface } from "@/components/MenuSurface";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { followSelection } from "@/lib/motion";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { FOLDER_DRAG, folderDropSide } from "@/lib/folderOrder";
 import {
@@ -486,6 +487,15 @@ export function Sidebar({
   }, [expanded]);
 
   const counts = useMemo(() => new Map(scopes.map((scope) => [scope.id, scope.count])), [scopes]);
+  const navRef = useRef<HTMLElement>(null);
+  useLayoutEffect(
+    () =>
+      followSelection(
+        navRef.current?.querySelector<HTMLElement>(".sidebar-scroll") ?? null,
+        ".sidebar-row.is-active[data-scope-row]",
+      ),
+    [selectedId],
+  );
   const tree = useMemo(() => buildTree(folders, counts), [folders, counts]);
   const all = scopes.find((scope) => scope.id === ALL);
   const trash = scopes.find((scope) => scope.id === TRASH);
@@ -609,7 +619,11 @@ export function Sidebar({
   }
 
   return (
-    <nav aria-label="Folders" className="sidebar-column flex h-full w-full shrink-0 flex-col">
+    <nav
+      ref={navRef}
+      aria-label="Folders"
+      className="sidebar-column flex h-full w-full shrink-0 flex-col"
+    >
       {/* No band of its own. Mail and Notes draw the sidebar as one column
           from the top of the window to the bottom, with the traffic lights
           standing in it and the toolbar's hairline starting where the content

@@ -18,7 +18,6 @@ import {
   Keyboard,
   Maximize2,
 } from "@/components/icons";
-import { keyName } from "@/lib/shortcuts";
 import { countWords } from "@/lib/format";
 import { loadThreadIds } from "@/lib/comments";
 import { PointMenu } from "@/components/ContextMenu";
@@ -1154,93 +1153,114 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   };
 
   const findBar = findOpen && (
-    <div className="find-bar glass-toolbar mx-auto mt-3 flex w-[min(34rem,calc(100%_-_2rem))] shrink-0 items-center gap-2 px-3 py-2">
-      <Search size={16} className="shrink-0 text-ink-4" />
-      <input
-        ref={findRef}
-        value={findQuery}
-        onChange={(event) => {
-          const next = event.target.value;
-          setFindQuery(next);
-          setFindStatus(editorRef.current?.setSearch(next) ?? { current: 0, total: 0 });
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            setFindStatus(
-              event.shiftKey
-                ? (editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
-                : (editorRef.current?.findNext() ?? { current: 0, total: 0 }),
-            );
-          } else if (event.key === "Escape") closeFind();
-        }}
-        placeholder="Find in note"
-        aria-label="Find in note"
-        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
-      />
-      <span className="readout min-w-12 text-right text-ink-4">
-        {findStatus.total ? `${findStatus.current}/${findStatus.total}` : "0/0"}
-      </span>
-      <button
-        type="button"
-        aria-label="Previous result"
-        className="icon-button press h-8 w-8 text-ink-3"
-        onClick={() => setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })}
+    <div className="find-dock">
+      <div
+        className={`find-bar liquid has-buds mx-auto mt-3 w-[min(34rem,calc(100%_-_2rem))] ${
+          findStatus.total ? "is-open" : ""
+        }`}
       >
-        <ChevronUp size={16} />
-      </button>
-      <button
-        type="button"
-        aria-label="Next result"
-        className="icon-button press h-8 w-8 text-ink-3"
-        onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
-      >
-        <ChevronDown size={16} />
-      </button>
-      <button
-        type="button"
-        aria-label="Close find"
-        className="icon-button press h-8 w-8 text-ink-3"
-        onClick={closeFind}
-      >
-        <X size={16} />
-      </button>
-      {manuscript && canEdit && instance && (
-        <span className="find-replace">
-          <input
-            value={replaceTerm}
-            onChange={(event) => {
-              setReplaceTerm(event.target.value);
-              instance.commands.setReplaceTerm(event.target.value);
-            }}
-            placeholder="Replace with"
-            aria-label="Replace with"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
-          />
+        <div className="liquid-card glass-sheet">
+          <div className="find-field">
+            <Search size={16} className="shrink-0 text-ink-4" />
+            <input
+              ref={findRef}
+              value={findQuery}
+              onChange={(event) => {
+                const next = event.target.value;
+                setFindQuery(next);
+                setFindStatus(editorRef.current?.setSearch(next) ?? { current: 0, total: 0 });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  setFindStatus(
+                    event.shiftKey
+                      ? (editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
+                      : (editorRef.current?.findNext() ?? { current: 0, total: 0 }),
+                  );
+                } else if (event.key === "Escape") closeFind();
+              }}
+              placeholder="Find in note"
+              aria-label="Find in note"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
+            />
+            <span className="readout min-w-12 text-right text-ink-4">
+              {findStatus.total ? `${findStatus.current}/${findStatus.total}` : "0/0"}
+            </span>
+          </div>
+          {manuscript && canEdit && instance && (
+            <span className="find-replace">
+              <input
+                value={replaceTerm}
+                onChange={(event) => {
+                  setReplaceTerm(event.target.value);
+                  instance.commands.setReplaceTerm(event.target.value);
+                }}
+                placeholder="Replace with"
+                aria-label="Replace with"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
+              />
+              <button
+                type="button"
+                className="menu-small-button"
+                disabled={!findStatus.total}
+                onClick={() => {
+                  instance.commands.replace();
+                  setFindStatus(
+                    editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 },
+                  );
+                }}
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                className="menu-small-button"
+                disabled={!findStatus.total}
+                onClick={() => {
+                  instance.commands.replaceAll();
+                  setFindStatus(
+                    editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 },
+                  );
+                }}
+              >
+                All
+              </button>
+            </span>
+          )}
+        </div>
+        <div className="liquid-buds">
           <button
             type="button"
-            className="menu-small-button"
-            disabled={!findStatus.total}
-            onClick={() => {
-              instance.commands.replace();
-              setFindStatus(editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 });
-            }}
+            aria-label="Previous result"
+            className="liquid-bud glass-sheet press"
+            style={{ "--bud": 0 } as CSSProperties}
+            onClick={() =>
+              setFindStatus(editorRef.current?.findPrevious() ?? { current: 0, total: 0 })
+            }
           >
-            Replace
+            <ChevronUp />
           </button>
           <button
             type="button"
-            className="menu-small-button"
-            disabled={!findStatus.total}
-            onClick={() => {
-              instance.commands.replaceAll();
-              setFindStatus(editorRef.current?.setSearch(findQuery) ?? { current: 0, total: 0 });
-            }}
+            aria-label="Next result"
+            className="liquid-bud glass-sheet press"
+            style={{ "--bud": 1 } as CSSProperties}
+            onClick={() => setFindStatus(editorRef.current?.findNext() ?? { current: 0, total: 0 })}
           >
-            All
+            <ChevronDown />
           </button>
-        </span>
-      )}
+          <button
+            type="button"
+            aria-label="Close find"
+            className="liquid-bud glass-sheet press"
+            style={{ "--bud": 2 } as CSSProperties}
+            onClick={closeFind}
+          >
+            <X />
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -1431,19 +1451,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 <span className="ribbon-word">Typewriter</span>
               </button>
             )}
-            <button
-              type="button"
-              className={`ribbon-tool press ${findOpen ? "is-active" : ""}`}
-              aria-label="Find and replace"
-              title={`Find and replace · ${keyName("⌘F")}`}
-              onClick={() => {
-                setFindOpen(true);
-                window.setTimeout(() => findRef.current?.focus(), 0);
-              }}
-            >
-              <Search size={16} />
-              <span className="ribbon-word">Find</span>
-            </button>
             {session && commentAuthors && (
               <button
                 type="button"

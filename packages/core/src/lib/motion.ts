@@ -24,6 +24,11 @@ const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const OVERLAY_IN = { duration: 240, easing: EASE_OUT };
 export const OVERLAY_OUT = { duration: 160, easing: "cubic-bezier(0.65, 0, 0.35, 1)" };
 
+/** `--motion-shape` in the stylesheet: how long the moving family takes to
+ *  change shape or travel. Kept equal by hand, since a script cannot wait on a
+ *  custom property. */
+const SHAPE = 440;
+
 /** Lets a layer play its exit (`.is-closing` in the stylesheet) before it is
  *  closed, so a window that came in does not vanish between two frames. */
 export function leave(layer: Element | null, done: () => void): void {
@@ -84,6 +89,10 @@ export function originAtPress(el: HTMLElement) {
   const x = p.x - box.left;
   const y = p.y - box.top;
   el.style.transformOrigin = `${Math.round(x)}px ${Math.round(y)}px`;
+  /* The same point for a CSS entrance that opens a shape there rather than
+     scaling: a `clip-path` cannot read `transform-origin`. */
+  el.style.setProperty("--ox", `${Math.round(x)}px`);
+  el.style.setProperty("--oy", `${Math.round(y)}px`);
 }
 
 /** An overlay arriving: it rises a little into place and fades in.
@@ -124,6 +133,63 @@ export function emerge(el: HTMLElement | null, mode: "grow" | "zoom" = "grow") {
     ],
     { ...OVERLAY_IN, fill: "backwards" },
   );
+}
+
+/** The selection travelling from the row it left to the row it reached, as
+ *  one wash, rather than vanishing from one and appearing on the other. It
+ *  slides on the curve everything else that slides uses, under the words —
+ *  over them it lit the text up as it passed — and lands without overshoot.
+ *  Call it in a layout effect whenever the selection changes; it remembers
+ *  where the selection last stood in each container. */
+const lastSelected = new WeakMap<Element, DOMRect>();
+
+export function followSelection(container: HTMLElement | null, selector: string) {
+  if (!container) return;
+  const row = container.querySelector<HTMLElement>(selector);
+  const to = row?.getBoundingClientRect();
+  const from = lastSelected.get(container);
+  if (to) lastSelected.set(container, to);
+  else lastSelected.delete(container);
+  if (!row || !to || !from || reduced() || Math.abs(from.top - to.top) < 1) return;
+  /* A row scrolled out of sight is not a place the eye can follow from. */
+  const box = container.getBoundingClientRect();
+  if (from.bottom < box.top || from.top > box.bottom) return;
+  /* Behind the rows: the container becomes its own stacking context, so a
+     wash at z-index -1 sits over its background and under everything in it. */
+  if (getComputedStyle(container).position === "static") container.style.position = "relative";
+  container.style.isolation = "isolate";
+  const look = getComputedStyle(row);
+  const wash = document.createElement("div");
+  Object.assign(wash.style, {
+    position: "absolute",
+    left: `${to.left - box.left + container.scrollLeft}px`,
+    top: `${to.top - box.top + container.scrollTop}px`,
+    width: `${to.width}px`,
+    height: `${to.height}px`,
+    borderRadius: look.borderRadius,
+    background: look.backgroundColor,
+    pointerEvents: "none",
+    zIndex: "-1",
+  });
+  row.classList.add("is-arriving");
+  container.append(wash);
+  const flight = wash.animate(
+    [
+      { transform: `translateY(${from.top - to.top}px)`, height: `${from.height}px` },
+      { transform: "none", height: `${to.height}px` },
+    ],
+    { duration: SHAPE, easing: EASE },
+  );
+  const done = () => {
+    row.classList.remove("is-arriving");
+    wash.remove();
+  };
+  /* A hidden window runs no animations; the wash must not stay behind. */
+  const fallback = window.setTimeout(done, SHAPE + 150);
+  void flight.finished.then(() => {
+    window.clearTimeout(fallback);
+    done();
+  });
 }
 
 /* ── The rows that stay ─────────────────────────────────────────────────────

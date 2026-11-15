@@ -61,7 +61,7 @@ import {
 } from "./preferenceShape.ts";
 import type { AppSession } from "./session";
 import { fail, supabase } from "./supabaseClient";
-import { localWhatsNewSeen } from "./whatsNew.ts";
+import { localSpotlightLearned, localWhatsNewSeen } from "./whatsNew.ts";
 import {
   currentWritingPreferences,
   setWritingPreferences,
@@ -109,6 +109,7 @@ export function localPreferences(seen: RemarksSeen = {}, userId?: string): Accou
       autocorrect: loadAutocorrectPreference(),
       autoLock: loadAutoLock(),
       whatsNewSeen: localWhatsNewSeen(),
+      spotlightLearned: localSpotlightLearned(),
     },
     seen,
   );

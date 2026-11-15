@@ -75,6 +75,7 @@ test("the flags come away without the appearance riding along", () => {
     "presence",
     "proofreader",
     "spaceSwitch",
+    "spotlightLearned",
     "whatsNewSeen",
   ]);
   assert.equal(flags.presence, true);
@@ -162,4 +163,14 @@ test("What's New read on one device stays read on the other", () => {
   assert.equal(mergeAccountPreferences({ whatsNewSeen: "0.8.0" }, read).whatsNewSeen, "0.9.0");
   assert.equal(mergeAccountPreferences({ whatsNewSeen: "0.9.0" }, local).whatsNewSeen, "0.9.0");
   assert.equal(mergeAccountPreferences({ whatsNewSeen: 9 }, read).whatsNewSeen, "0.9.0");
+});
+
+test("the Spotlight, once learned on any device, is never taught again", () => {
+  const learned = { ...local, spotlightLearned: true };
+  assert.equal(
+    mergeAccountPreferences({ spotlightLearned: false }, learned).spotlightLearned,
+    true,
+  );
+  assert.equal(mergeAccountPreferences({ spotlightLearned: true }, local).spotlightLearned, true);
+  assert.equal(mergeAccountPreferences({ spotlightLearned: "yes" }, local).spotlightLearned, false);
 });

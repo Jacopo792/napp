@@ -52,7 +52,7 @@ import {
 import type { NoteEntry } from "@/lib/entries";
 import { readAdopting, type ListView, type NoteGroup } from "@/lib/listPreferences";
 import { ContextMenu } from "./ContextMenu";
-import { dropPin, playRows } from "@/lib/motion";
+import { dropPin, followSelection, playRows } from "@/lib/motion";
 import { useContextMenu } from "@/lib/contextMenu";
 import { MenuItems } from "./MenuPrimitives";
 import { pinItem, lockItems, moveItem } from "./menuNoteItems";
@@ -1012,6 +1012,11 @@ export function NoteList({
      move are put back where they were and let go. Cheap when nothing moved —
      there is no snapshot to read. */
   useLayoutEffect(playRows);
+  const listRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(
+    () => followSelection(listRef.current, ".note-row-list.is-selected"),
+    [selectedId],
+  );
   /* Which date groups are folded shut. The *closed* ones are what is stored, so
      a bucket that appears for the first time — a new month, a new year — opens
      rather than arriving already hidden. Same shape as the folder tree's
@@ -1523,6 +1528,7 @@ export function NoteList({
 
       <div
         key={`${folderLabel}:${query.trim()}`}
+        ref={listRef}
         role="listbox"
         aria-label={`Notes in ${folderLabel}`}
         onPointerOver={(event) => {
