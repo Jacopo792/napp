@@ -45,6 +45,45 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.60",
+    date: "2026-11-15",
+    headline: "Sharing that holds together",
+    sections: [
+      {
+        heading: "Drawing",
+        items: [
+          {
+            title: "A canvas of its own",
+            text: "Pictures and boards open full screen and grow out of their place in the note. The pens stand in a tray at the bottom left; shapes, colour and thickness open beside them.",
+            image: "0.9.60-drawing.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Members in Settings",
+            text: "Settings has a Members page: who is in the archive, the invitations still waiting, a new invitation, and leaving.",
+            image: "0.9.60-members.jpg",
+          },
+          {
+            title: "Invitations open the shared archive",
+            text: "Accepting an invitation opens the archive you joined straight away. An empty archive made for you automatically is removed, so only one remains.",
+          },
+          {
+            title: "Locked notes read in full",
+            text: "A note someone else has locked shows everything in it, and stays up to date while they write. It can't be changed or moved to the Trash.",
+          },
+          {
+            title: "One Trash for everyone",
+            text: "A note moved to the Trash is in the Trash for every member, straight away.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.59",
     date: "2026-11-15",
     headline: "One place to search",

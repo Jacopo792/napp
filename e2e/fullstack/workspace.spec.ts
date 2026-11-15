@@ -229,3 +229,146 @@ test("a note locked by another member remains readable but cannot be edited", as
     .select("id");
   expect(write.data ?? []).toEqual([]);
 });
+
+test("a member keeps reading what the lock holder writes after locking", async ({
+  page,
+  browser,
+  accounts,
+}) => {
+  const owner = await accounts.create("live-lock-owner");
+  const member = await accounts.create("live-lock-reader");
+  await join(owner, member);
+  const id = await seedNote(owner, "Live locked note");
+  await login(page, owner);
+  await openNote(page, id);
+  const other = await browser.newContext();
+  try {
+    const reader = await other.newPage();
+    await login(reader, member);
+    await showMemberNotes(reader, owner);
+    await openNote(reader, id);
+    const locked = await owner.client.from("notes").update({ locked_by: owner.id }).eq("id", id);
+    expect(locked.error).toBeNull();
+    await page.locator(".tiptap[contenteditable=true]").press("ControlOrMeta+End");
+    await page.keyboard.insertText(" Written after locking.");
+    await expect(reader.locator(".tiptap")).toContainText("Written after locking.");
+    await expect(reader.locator(".tiptap")).toHaveAttribute("contenteditable", "false");
+    await reader.reload();
+    await showMemberNotes(reader, owner);
+    await reader.locator(`[data-note-row="${id}"]`).click();
+    await expect(reader.locator(".tiptap")).toContainText("Written after locking.");
+  } finally {
+    await other.close();
+  }
+});
+
+test("a member opening a locked note sees everything written after locking", async ({
+  page,
+  browser,
+  accounts,
+}) => {
+  const owner = await accounts.create("late-lock-owner");
+  const member = await accounts.create("late-lock-reader");
+  await join(owner, member);
+  const id = await seedNote(owner, "Late locked note");
+  await login(page, owner);
+  await openNote(page, id);
+  const locked = await owner.client.from("notes").update({ locked_by: owner.id }).eq("id", id);
+  expect(locked.error).toBeNull();
+  await page.locator(".tiptap[contenteditable=true]").press("ControlOrMeta+End");
+  await page.keyboard.insertText(" Written before the reader arrived.");
+  await expect
+    .poll(
+      async () =>
+        (await owner.client.from("notes").select("body").eq("id", id).single()).data?.body,
+    )
+    .toContain("Written before the reader arrived.");
+  const other = await browser.newContext();
+  try {
+    const reader = await other.newPage();
+    await login(reader, member);
+    await showMemberNotes(reader, owner);
+    await reader.locator(`[data-note-row="${id}"]`).click();
+    await expect(reader.locator(".tiptap")).toContainText("Written before the reader arrived.");
+  } finally {
+    await other.close();
+  }
+});
+
+test("words the server refused under a lock do not linger on the member's screen", async ({
+  page,
+  browser,
+  accounts,
+}) => {
+  const owner = await accounts.create("race-lock-owner");
+  const member = await accounts.create("race-lock-reader");
+  await join(owner, member);
+  const id = await seedNote(owner, "Raced locked note");
+  await login(page, owner);
+  await openNote(page, id);
+  const other = await browser.newContext();
+  try {
+    const reader = await other.newPage();
+    // The member never hears about the lock, as in the moment before it lands.
+    await reader.routeWebSocket(/\/realtime\//, () => {});
+    await login(reader, member);
+    await showMemberNotes(reader, owner);
+    await openNote(reader, id);
+    const locked = await owner.client.from("notes").update({ locked_by: owner.id }).eq("id", id);
+    expect(locked.error).toBeNull();
+    // Past the collaboration server's authorization cache.
+    await reader.waitForTimeout(6_000);
+    await reader.locator(".tiptap[contenteditable=true]").press("ControlOrMeta+End");
+    await reader.keyboard.insertText(" Refused words.");
+    await page.locator(".tiptap[contenteditable=true]").press("ControlOrMeta+End");
+    await page.keyboard.insertText(" The holder's words.");
+    await expect(reader.locator(".tiptap")).toContainText("The holder's words.");
+    await expect(reader.locator(".tiptap")).not.toContainText("Refused words.");
+    await expect(page.locator(".tiptap")).not.toContainText("Refused words.");
+  } finally {
+    await other.close();
+  }
+});
+
+test("a member who trashes a note just locked by its holder gets it back", async ({
+  page,
+  accounts,
+}) => {
+  const owner = await accounts.create("trash-lock-owner");
+  const member = await accounts.create("trash-lock-reader");
+  await join(owner, member);
+  const id = await seedNote(owner, "Trash raced lock");
+  // The member never hears about the lock, as in the moment before it lands.
+  await page.routeWebSocket(/\/realtime\//, () => {});
+  await login(page, member);
+  await showMemberNotes(page, owner);
+  const row = page.locator(`[data-note-row="${id}"]`);
+  await expect(row).toBeVisible();
+  const locked = await owner.client.from("notes").update({ locked_by: owner.id }).eq("id", id);
+  expect(locked.error).toBeNull();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  const stored = await owner.client.from("notes").select("trashed_at").eq("id", id).single();
+  expect(stored.data?.trashed_at).toBeNull();
+});
+
+test("a member's trash is everybody's trash", async ({ page, accounts }) => {
+  const owner = await accounts.create("shared-trash-owner");
+  const member = await accounts.create("shared-trash-member");
+  await join(owner, member);
+  const id = await seedNote(owner, "Shared trash note");
+  await login(page, member);
+  await showMemberNotes(page, owner);
+  const row = page.locator(`[data-note-row="${id}"]`);
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(row).toHaveCount(0);
+  await expect
+    .poll(
+      async () =>
+        (await owner.client.from("notes").select("trashed_at").eq("id", id).single()).data
+          ?.trashed_at ?? null,
+    )
+    .not.toBeNull();
+});

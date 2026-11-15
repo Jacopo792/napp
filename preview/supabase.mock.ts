@@ -355,3 +355,11 @@ export function projectPreviewNote(noteId: string, document: Doc): void {
     return;
   }
 }
+
+/** The real module's refusal, so `instanceof` has something to compare with.
+ *  The preview never refuses a note. */
+export class NoteRefused extends Error {
+  constructor(readonly owner: string) {
+    super("That note was changed by another member");
+  }
+}

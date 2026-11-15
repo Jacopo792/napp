@@ -53,7 +53,9 @@ import {
   PaintBucket,
   Palette,
   Pencil,
+  Redo2,
   RotateCw,
+  Smartphone,
   Square,
   Trash2,
   Type,
@@ -66,6 +68,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -135,6 +138,14 @@ import { commentQuotes } from "@/features/editor/lib/commentAnchors";
 import { BODY_FRAGMENT } from "@/features/editor/lib/ydoc";
 import { platform } from "@/platform";
 import { emerge, leave } from "@/lib/motion";
+import {
+  drawKey,
+  holdForDesk,
+  lendToPhone,
+  onPhonePresence,
+  phonePresent,
+  type DrawTarget,
+} from "@/lib/drawHandoff";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { ySyncPluginKey } from "y-prosemirror";
 import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
@@ -315,6 +326,9 @@ type Resolver = (objectId: string) => Promise<Blob>;
 
 interface PrivateImageOptions {
   resolve: Resolver;
+  /** The note this is in, for lending a picture to the phone. A video's
+   *  view has none: a video is not drawn on. */
+  noteId?: () => string | undefined;
   open: (src: string, alt: string) => void;
 }
 
@@ -910,10 +924,21 @@ function PrivateImageView({
   );
   const shaped = !isWholeView(view) && natural !== null && !video;
   const plane = shaped ? planeCss(view, natural, view.turns) : null;
-  /* Marking up happens in a panel of its own, on a draft of the strokes: the
+  /* Marking up happens on a stage of its own, on a draft of the strokes: the
      note's document is written once, on Done, and not at all on Cancel. */
-  const [markup, setMarkup] = useState(false);
   const frame = useRef<HTMLSpanElement>(null);
+  const stage = useStage(
+    editor,
+    () => {
+      const noteId = options.noteId?.();
+      return noteId && !video ? { noteId, objectId } : null;
+    },
+    () =>
+      (frame.current?.querySelector(".rich-media-image-open") ?? frame.current)?.scrollIntoView({
+        block: "center",
+        behavior: "instant",
+      }),
+  );
   const ink = useInk({
     strokes,
     write: () => {},
@@ -1042,12 +1067,7 @@ function PrivateImageView({
           className="rich-media-remove is-ink"
           aria-label="Mark up this picture"
           title="Mark up this picture"
-          onClick={() => {
-            (
-              frame.current?.querySelector(".rich-media-image-open") ?? frame.current
-            )?.scrollIntoView({ block: "center", behavior: "instant" });
-            setMarkup(true);
-          }}
+          onClick={() => stage.open("own")}
           contentEditable={false}
         >
           <Pencil size={16} />
@@ -1065,38 +1085,42 @@ function PrivateImageView({
           <Trash2 size={16} />
         </button>
       )}
-      {markup && frame.current && natural && (
-        <ImageMarkup
-          src={src}
-          alt={alt}
+      {stage.mode && frame.current && natural && src && (
+        <DrawingStage
+          subject={{ kind: "image", src, alt, view, natural }}
           initial={strokes}
-          initialView={view}
-          natural={natural}
+          live={strokes}
           anchor={
             frame.current.querySelector<HTMLElement>(".rich-media-image-open") ?? frame.current
           }
-          onClose={(next) => {
-            setMarkup(false);
-            if (next)
-              updateAttributes({
-                strokes: JSON.stringify(next.strokes),
-                crop: writeCrop(next.view.crop),
-                turns: next.view.turns,
-              });
-          }}
+          phone={stage.phone}
+          until={stage.until}
+          onDraft={
+            stage.mode === "lent"
+              ? (next) => updateAttributes({ strokes: JSON.stringify(next) })
+              : undefined
+          }
+          onKeep={(next) =>
+            updateAttributes({
+              strokes: JSON.stringify(next.strokes),
+              ...(next.view ? { crop: writeCrop(next.view.crop), turns: next.view.turns } : {}),
+            })
+          }
+          onClose={stage.close}
         />
       )}
     </NodeViewWrapper>
   );
 }
 
-/* ── Marking up a picture ────────────────────────────────────────────────────
-   The picture grows out of its place in the note into one panel above the
-   window, and the rest of the window waits behind a scrim. Everything is in a
-   single row of tools; options open from the tool they belong to. The strokes
-   are a draft held here: Done writes them to the note once, Cancel and Escape
-   leave the document exactly as it was. */
-const MARKUP_BAR = 44;
+/* ── Drawing on a stage ──────────────────────────────────────────────────────
+   A picture or a board is drawn on full-bleed: it grows out of its place in
+   the note onto a black ground that covers the whole window, the pens stand
+   in a tray in the bottom-left corner, and the top edge holds nothing but
+   Cancel, undo and redo, and Done. The same layout on a Mac, a PC and a phone,
+   because the hand is the same hand. The strokes are a draft held here: Done
+   writes them to the note once, Cancel and Escape leave the document exactly
+   as it was. Lent to the phone, the draft is the document itself. */
 
 /** A motion token as the stylesheet defines it, so the panel moves on the same
  *  curve as the rest of the app and not on a copy of it. */
@@ -1129,146 +1153,475 @@ function planeCss(
 const MIN_CROP_SIZE = 0.06;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-function ImageMarkup({
-  src,
-  alt,
+type Hand = ReturnType<typeof useInk>["hand"];
+
+/** Said on the editor's element by a host the desk asked to draw a block:
+ *  `detail` is the `DrawTarget`, and the block it names opens its stage. */
+export const DRAW_HERE = "napp:draw-here";
+/** Said on the window while a stage is up, so a host can give it the screen. */
+export const STAGE_STATE = "napp:stage";
+
+function usePhonePresent() {
+  const [present, setPresent] = useState(phonePresent);
+  useEffect(() => onPhonePresence(setPresent), []);
+  return present;
+}
+
+/** A block's stage: whether it is up, whose hand is on it, and the phone. */
+function useStage(editor: Editor, target: () => DrawTarget | null, reveal: () => void) {
+  const present = usePhonePresent();
+  const [mode, setMode] = useState<"own" | "lent" | null>(null);
+  const [hold, setHold] = useState<ReturnType<typeof holdForDesk> | null>(null);
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  const revealRef = useRef(reveal);
+  revealRef.current = reveal;
+  useEffect(() => {
+    const dom = editor.view.dom;
+    const heard = (event: Event) => {
+      const asked = (event as CustomEvent<DrawTarget>).detail;
+      const mine = targetRef.current();
+      if (!mine || drawKey(asked) !== drawKey(mine)) return;
+      event.preventDefault();
+      revealRef.current();
+      setHold(holdForDesk(mine));
+      setMode("lent");
+    };
+    dom.addEventListener(DRAW_HERE, heard);
+    return () => dom.removeEventListener(DRAW_HERE, heard);
+  }, [editor]);
+  const mine = mode === "own" && present ? target() : null;
+  return {
+    mode,
+    open: (next: "own" | "lent") => {
+      revealRef.current();
+      setMode(next);
+    },
+    phone: mine ? { present, lend: () => lendToPhone(mine) } : null,
+    until: hold?.cancelled,
+    close: () => {
+      hold?.finish();
+      setHold(null);
+      setMode(null);
+    },
+  };
+}
+
+/* ── The pen tray ────────────────────────────────────────────────────────────
+   The pens stand side by side and the one in the hand is lifted out of the
+   row, its tip in the ink it lays. Shapes, captions and moving a mark are one
+   press further, on the square; the colour and the nib on the well beside it.
+   Both open upwards, out of the tray, because the tray is at the foot of the
+   screen. */
+const PENS = [
+  { pen: "pen", label: "Pen" },
+  { pen: "marker", label: "Highlighter" },
+  { pen: "eraser", label: "Eraser" },
+] as const;
+
+function Nib({ pen, ink }: { pen: (typeof PENS)[number]["pen"]; ink: string }) {
+  return (
+    <svg className="pen-tray-nib" viewBox="0 0 18 52" aria-hidden="true">
+      {pen === "pen" && (
+        <>
+          <path d="M3 16 L9 2 L15 16 Z" className="pen-tray-wood" />
+          <path d="M7 6.5 L9 2 L11 6.5 Z" fill={ink} />
+        </>
+      )}
+      {pen === "marker" && (
+        <>
+          <path d="M4 16 L5 8 L13 5 L14 16 Z" fill={`${ink}cc`} />
+        </>
+      )}
+      {pen === "eraser" && (
+        <rect x="3" y="4" width="12" height="13" rx="4" className="pen-tray-rubber" />
+      )}
+      <rect x="3" y="16" width="12" height="36" rx="2.5" className="pen-tray-body" />
+      {pen !== "eraser" && <rect x="3" y="20" width="12" height="3" fill={ink} />}
+    </svg>
+  );
+}
+
+function PenTray({ hand, children }: { hand: Hand; children?: React.ReactNode }) {
+  const [open, setOpen] = useState<"shapes" | "ink" | null>(null);
+  const tray = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!tray.current?.contains(event.target as globalThis.Node)) setOpen(null);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [open]);
+  const held = hand.erasing
+    ? "eraser"
+    : hand.shape !== null
+      ? null
+      : hand.marker
+        ? "marker"
+        : "pen";
+  const custom = !DRAWING_INKS.includes(hand.ink as (typeof DRAWING_INKS)[number]);
+  const ShapeGlyph =
+    DRAWING_TOOLS.find((each) => each.tool === hand.shape && !hand.erasing)?.Glyph ?? Square;
+  return (
+    <div
+      ref={tray}
+      className="pen-tray"
+      /* A press on a tool must not move focus: on the page layer the editor
+         around it would take it, and on a phone that is the keyboard coming up
+         over the pen. The colour well is a label and keeps its default, or its
+         picker never opens. */
+      onMouseDown={(event) => {
+        if (!(event.target as Element).closest("label")) event.preventDefault();
+      }}
+    >
+      <span className="pen-tray-pens">
+        {PENS.map(({ pen, label }) => (
+          <button
+            key={pen}
+            type="button"
+            className={`pen-tray-pen ${held === pen ? "is-held" : ""}`}
+            aria-label={label}
+            title={label}
+            aria-pressed={held === pen}
+            onClick={() => {
+              setOpen(null);
+              if (pen === "pen") hand.pen();
+              else if (pen === "marker") {
+                hand.pen();
+                hand.toggleMarker();
+              } else if (!hand.erasing) hand.toggleErase();
+            }}
+          >
+            <Nib pen={pen} ink={hand.ink} />
+          </button>
+        ))}
+      </span>
+      <span className="pen-tray-rule" />
+      <span className="pen-tray-wrap">
+        <button
+          type="button"
+          className={`pen-tray-tool ${held === null ? "is-active" : ""}`}
+          aria-label="Shapes"
+          title="Shapes"
+          aria-haspopup="menu"
+          aria-expanded={open === "shapes"}
+          onClick={() => setOpen((now) => (now === "shapes" ? null : "shapes"))}
+        >
+          <ShapeGlyph size={18} />
+        </button>
+        {open === "shapes" && (
+          <div role="menu" className="pen-tray-menu">
+            {DRAWING_TOOLS.map(({ tool, label, Glyph }) => (
+              <button
+                key={tool}
+                type="button"
+                role="menuitemradio"
+                aria-checked={!hand.erasing && hand.shape === tool}
+                className="menu-row"
+                onClick={() => {
+                  if (hand.erasing) hand.toggleErase();
+                  if (hand.shape !== tool) hand.toggleShape(tool);
+                  setOpen(null);
+                }}
+              >
+                <Glyph size={16} />
+                {label}
+                {!hand.erasing && hand.shape === tool && (
+                  <Check size={14} className="pen-tray-check" />
+                )}
+              </button>
+            ))}
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={hand.filling}
+              className="menu-row"
+              disabled={!hand.closed}
+              onClick={hand.toggleFill}
+            >
+              <PaintBucket size={16} />
+              Fill
+              {hand.filling && <Check size={14} className="pen-tray-check" />}
+            </button>
+          </div>
+        )}
+      </span>
+      <span className="pen-tray-wrap">
+        <button
+          type="button"
+          className="pen-tray-well"
+          style={{ background: hand.ink }}
+          aria-label="Colour and thickness"
+          title="Colour and thickness"
+          aria-haspopup="menu"
+          aria-expanded={open === "ink"}
+          onClick={() => setOpen((now) => (now === "ink" ? null : "ink"))}
+        />
+        {open === "ink" && (
+          <div role="menu" className="pen-tray-menu">
+            <div className="pen-tray-swatches">
+              {DRAWING_INKS.map((colour) => (
+                <button
+                  key={colour}
+                  type="button"
+                  role="menuitemradio"
+                  className={`drawing-ink ${colour === hand.ink ? "is-chosen" : ""}`}
+                  style={{ background: colour }}
+                  aria-label={`Draw in ${colour}`}
+                  aria-checked={colour === hand.ink}
+                  onClick={() => hand.choose(colour)}
+                />
+              ))}
+              <label
+                className={`drawing-ink is-any ${custom ? "is-chosen" : ""}`}
+                style={custom ? { background: hand.ink } : undefined}
+                title="Any colour"
+              >
+                <input
+                  type="color"
+                  value={hand.ink}
+                  aria-label="Draw in any colour"
+                  onChange={(event) => hand.choose(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="pen-tray-nibs">
+              {DRAWING_NIBS.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={!hand.marker && hand.nib === size}
+                  aria-label={`Thickness ${size}`}
+                  className={`pen-tray-size ${!hand.marker && hand.nib === size ? "is-chosen" : ""}`}
+                  onClick={() => {
+                    hand.chooseNib(size);
+                    setOpen(null);
+                  }}
+                >
+                  <span style={{ width: size + 2, height: size + 2 }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** What a stage is drawing on: a picture in the note, or a board. */
+type StageSubject =
+  | { kind: "image"; src: string; alt: string; view: ImageView; natural: { w: number; h: number } }
+  | { kind: "board" };
+
+/** Lending the drawing to the phone signed into the same account. */
+export interface StagePhone {
+  /** A phone is listening now. */
+  present: boolean;
+  /** Ask it to draw this; `done` settles when it has put the pen down. */
+  lend: () => { done: Promise<void>; cancel: () => void };
+}
+
+function DrawingStage({
+  subject,
   initial,
-  initialView,
-  natural,
+  live,
   anchor,
+  phone,
+  until,
+  onDraft,
+  onKeep,
   onClose,
 }: {
-  src: string;
-  alt: string;
+  subject: StageSubject;
   initial: DrawingMark[];
-  initialView: ImageView;
-  natural: { w: number; h: number };
+  /** The document's strokes as they stand, shown while the phone holds the pen. */
+  live: DrawingMark[];
   anchor: HTMLElement;
-  onClose: (next: { strokes: DrawingMark[]; view: ImageView } | null) => void;
+  phone?: StagePhone | null;
+  /** The desk took the pen back: close, keeping what is drawn. */
+  until?: Promise<void>;
+  /** This stage is the phone's half of a lend: every change goes straight to
+   *  the document, so the screen that asked watches the drawing arrive. */
+  onDraft?: (strokes: DrawingMark[]) => void;
+  /** Write the drawing to the note: on Done, and before lending it. */
+  onKeep: (next: { strokes: DrawingMark[]; view: ImageView | null }) => void;
+  onClose: () => void;
 }) {
+  const image = subject.kind === "image" ? subject : null;
   const [draft, setDraft] = useState(initial);
+  const [ahead, setAhead] = useState<DrawingMark[][]>([]);
+  const [behind, setBehind] = useState<DrawingMark[][]>([]);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onKeepRef = useRef(onKeep);
+  onKeepRef.current = onKeep;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const write = useCallback((next: DrawingMark[]) => {
+    setBehind((stack) => [...stack, draftRef.current]);
+    setAhead([]);
+    setDraft(next);
+  }, []);
   const ink = useInk({
     strokes: draft,
-    write: setDraft,
-    fit: "width",
+    write,
+    fit: image ? "width" : "board",
     editable: true,
-    turned: true,
+    turned: Boolean(image),
   });
-  const [crop, setCrop] = useState(initialView.crop);
-  const [spin, setSpin] = useState(initialView.turns);
+  const hand = ink.hand;
+  const [crop, setCrop] = useState(image?.view.crop ?? WHOLE_CROP);
+  const [spin, setSpin] = useState(image?.view.turns ?? 0);
   const [cropping, setCropping] = useState(false);
   /* The rectangle being sized, on the whole picture as it is turned now. */
   const [rect, setRect] = useState<Crop>(WHOLE_CROP);
+  /* The phone has the pen: this stage only watches. */
+  const [away, setAway] = useState<(() => void) | null>(null);
   const imageBox = useRef<HTMLDivElement>(null);
   const turns = ((spin % 4) + 4) % 4;
-  const hand = ink.hand;
-  const MARKUP_SHAPES = DRAWING_TOOLS.slice(0, 4);
-  const [menu, setMenu] = useState<"shape" | "nib" | "colour" | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const panel = useRef<HTMLDivElement>(null);
-  const scrim = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLDivElement>(null);
+  const ground = useRef<HTMLDivElement>(null);
+  const chrome = useRef<HTMLDivElement>(null);
 
-  /* Where the picture sits now. The panel is laid out once, against it: centred
-     on the picture and wider than it, a margin from every edge of the window. */
-  const layout = useMemo(() => {
-    const from = anchor.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const margin = Number.parseFloat(motionToken("--markup-margin", "32")) || 32;
-    const width = Math.min(vw - 2 * margin, Math.max(from.width + 160, 520));
-    const height = Math.min(Math.max(from.height, 220), vh - 2 * margin - MARKUP_BAR);
-    const centre = from.top + from.height / 2;
-    return {
-      from,
-      width,
-      height,
-      left: clamp(from.left + from.width / 2 - width / 2, margin, vw - margin - width),
-      top: clamp(centre - height / 2 - MARKUP_BAR, margin, vh - margin - height - MARKUP_BAR),
-    };
-    // The anchor is read once, on entry: the panel does not follow the note.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* Grows from the picture's own place, and goes back to it. */
+  /* Grows out of the block's place in the note, and goes back to it: the
+     canvas travels, the ground and the controls fade. */
   const fly = useCallback(
     (entering: boolean) => {
-      const element = panel.current;
+      const element = canvas.current;
       if (!element) return Promise.resolve();
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const duration = reduced ? 0 : Number.parseFloat(motionToken("--dur-slow", "360")) || 360;
       const options: KeyframeAnimationOptions = {
-        duration: reduced ? 0 : Number.parseFloat(motionToken("--dur-slow", "360")) || 360,
+        duration,
         easing: motionToken("--ease-out", "ease-out"),
         fill: "both",
       };
-      const { from, left, top, width } = layout;
-      const small = `translate(${from.left - left}px, ${from.top - top}px) scale(${from.width / width})`;
-      const frames = [
-        { transform: small, opacity: 0 },
-        { transform: "none", opacity: 1 },
-      ];
-      if (!entering) frames.reverse();
-      scrim.current?.animate(
-        [{ opacity: entering ? 0 : 1 }, { opacity: entering ? 1 : 0 }],
-        options,
-      );
+      const from = anchor.getBoundingClientRect();
+      const to = element.getBoundingClientRect();
+      const small =
+        from.width > 0 && to.width > 0
+          ? `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`
+          : "scale(0.96)";
+      const frames = [{ transform: small }, { transform: "none" }];
+      const fade = [{ opacity: 0 }, { opacity: 1 }];
+      if (!entering) {
+        frames.reverse();
+        fade.reverse();
+      }
+      ground.current?.animate(fade, options);
+      chrome.current?.animate(fade, { ...options, duration: duration * 0.6 });
       return element.animate(frames, options).finished.then(() => undefined);
     },
-    [layout],
+    [anchor],
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     void fly(true);
+    window.dispatchEvent(new CustomEvent(STAGE_STATE, { detail: true }));
+    return () => {
+      window.dispatchEvent(new CustomEvent(STAGE_STATE, { detail: false }));
+    };
   }, [fly]);
 
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
+  /* Lent to the phone, the draft is the document: each change is written as
+     it is made, the way a stroke on the page is. */
+  const onDraftRef = useRef(onDraft);
+  onDraftRef.current = onDraft;
+  const firstDraft = useRef(draft);
+  useEffect(() => {
+    if (draft !== firstDraft.current) onDraftRef.current?.(draft);
+  }, [draft]);
   const settled = useRef({ crop, rect, turns, cropping });
   settled.current = { crop, rect, turns, cropping };
+  /* What Done writes. Done while sizing a crop takes the rectangle as it stands. */
+  const kept = useCallback(() => {
+    const now = settled.current;
+    const final = now.cropping ? unturnRect(now.turns, now.rect) : now.crop;
+    return { strokes: draftRef.current, view: image ? { crop: final, turns: now.turns } : null };
+  }, [image]);
   const finish = useCallback(
     (commit: boolean) => {
       if (leaving) return;
       setLeaving(true);
-      setMenu(null);
-      const now = settled.current;
-      /* Done while sizing a crop takes the rectangle as it stands. */
-      const final = now.cropping ? unturnRect(now.turns, now.rect) : now.crop;
-      void fly(false).then(() =>
-        onClose(
-          commit ? { strokes: draftRef.current, view: { crop: final, turns: now.turns } } : null,
-        ),
-      );
+      /* Lent, the draft was the document all along: Cancel puts it back. */
+      if (!commit && draftRef.current !== firstDraft.current)
+        onDraftRef.current?.(firstDraft.current);
+      if (commit) onKeepRef.current(kept());
+      void fly(false).then(() => onCloseRef.current());
     },
-    [fly, leaving, onClose],
+    [fly, leaving, kept],
   );
   const finishRef = useRef(finish);
   finishRef.current = finish;
-  const menuRef = useRef(menu);
-  menuRef.current = menu;
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      if (menuRef.current) setMenu(null);
-      else if (settled.current.cropping) setCropping(false);
-      else finishRef.current(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (settled.current.cropping) setCropping(false);
+        else finishRef.current(false);
+      }
+      if (event.key.toLowerCase() === "z" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.shiftKey) redoRef.current();
+        else undoRef.current();
+      }
     };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
   }, []);
-  useEffect(() => {
-    if (!menu) return;
-    const close = (event: PointerEvent) => {
-      if (!(event.target as Element).closest?.(".markup-tool-wrap")) setMenu(null);
-    };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [menu]);
 
-  const shown: ImageView = { crop: cropping ? WHOLE_CROP : crop, turns };
-  const plane = planeCss(shown, natural, spin);
-  const boxWidth = Math.min(layout.width, layout.height * plane.aspect);
-  const boxHeight = boxWidth / plane.aspect;
+  const undo = () => {
+    if (!behind.length) return;
+    setAhead((stack) => [draft, ...stack]);
+    setDraft(behind[behind.length - 1]);
+    setBehind((stack) => stack.slice(0, -1));
+  };
+  const redo = () => {
+    if (!ahead.length) return;
+    setBehind((stack) => [...stack, draft]);
+    setDraft(ahead[0]);
+    setAhead((stack) => stack.slice(1));
+  };
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
+  const redoRef = useRef(redo);
+  redoRef.current = redo;
+
+  /* Asking the phone. The stage stays up and shows the note's own strokes as
+     they arrive; the phone's Done is this stage's Done. */
+  const lend = () => {
+    if (!phone) return;
+    /* The phone starts from what is drawn here so far. */
+    onKeepRef.current(kept());
+    setCropping(false);
+    const asked = phone.lend();
+    setAway(() => asked.cancel);
+    void asked.done.then(
+      () => finishRef.current(false),
+      () => setAway(null),
+    );
+  };
+  useEffect(() => () => away?.(), [away]);
+  useEffect(() => {
+    void until?.then(() => finishRef.current(true));
+  }, [until]);
+  /* While the phone has it, the canvas is the note's own strokes. */
+  useEffect(() => {
+    if (away) setDraft(live);
+  }, [away, live]);
+
+  const aspect = image
+    ? planeCss({ crop: cropping ? WHOLE_CROP : crop, turns }, image.natural, spin).aspect
+    : DRAWING_BOX.width / DRAWING_BOX.height;
+  const plane = image
+    ? planeCss({ crop: cropping ? WHOLE_CROP : crop, turns }, image.natural, spin)
+    : null;
   const startCrop = () => {
-    setMenu(null);
     if (cropping) return setCropping(false);
     setRect(turnRect(turns, crop));
     setCropping(true);
@@ -1313,279 +1666,175 @@ function ImageMarkup({
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", up);
     };
-  const penActive = !hand.erasing && !hand.marker && hand.shape === null;
-  const shapeGlyph = MARKUP_SHAPES.find((each) => each.tool === hand.shape) ?? MARKUP_SHAPES[0];
-  const ShapeGlyph =
-    hand.shape === null || hand.shape === "text" || hand.shape === "move"
-      ? Square
-      : shapeGlyph.Glyph;
-  const tool = (
-    label: string,
-    Glyph: typeof Pencil,
-    active: boolean,
-    onClick: () => void,
-    disabled = false,
-    whileCropping = false,
-  ) => (
+
+  const surfaceClass = away
+    ? ""
+    : cropping
+      ? ""
+      : hand.erasing
+        ? "is-erasing"
+        : hand.shape === "move"
+          ? "is-arranging"
+          : "is-drawing";
+  const button = (label: string, Glyph: typeof Pencil, onClick: () => void, disabled = false) => (
     <button
       type="button"
-      className={`markup-tool ${active ? "is-active" : ""}`}
+      className="draw-stage-button"
       aria-label={label}
       title={label}
-      aria-pressed={active}
-      disabled={disabled || (cropping && !whileCropping)}
-      onClick={() => {
-        setMenu(null);
-        onClick();
-      }}
+      disabled={disabled}
+      onClick={onClick}
     >
-      <Glyph size={16} />
+      <Glyph size={18} />
     </button>
   );
-  const dropdown = (
-    name: "shape" | "nib" | "colour",
-    label: string,
-    Glyph: typeof Pencil,
-    active: boolean,
-    body: React.ReactNode,
-  ) => (
-    <span className="markup-tool-wrap">
-      <button
-        type="button"
-        className={`markup-tool is-menu ${active ? "is-active" : ""}`}
-        aria-label={label}
-        title={label}
-        aria-haspopup="menu"
-        disabled={cropping}
-        aria-expanded={menu === name}
-        onClick={() => setMenu((open) => (open === name ? null : name))}
-      >
-        <Glyph size={16} />
-        <ChevronDown size={10} />
-      </button>
-      {menu === name && (
-        <div role="menu" className="markup-menu">
-          {body}
-        </div>
-      )}
-    </span>
+  const surface = (
+    <svg
+      ref={ink.surface}
+      className={`${image ? "rich-media-image-ink" : "draw-stage-board-ink"} ${surfaceClass}`}
+      viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
+      preserveAspectRatio={image ? "xMinYMin meet" : "none"}
+      onPointerDown={away ? undefined : ink.start}
+    >
+      {ink.inked}
+    </svg>
   );
-  const custom = !DRAWING_INKS.includes(hand.ink as (typeof DRAWING_INKS)[number]);
 
   return createPortal(
-    <>
-      <div ref={scrim} className="markup-scrim" />
-      <div
-        ref={panel}
-        className="markup-panel"
-        role="dialog"
-        aria-label="Mark up picture"
-        style={{ left: layout.left, top: layout.top, width: layout.width }}
-      >
-        <div className="markup-bar">
-          {tool("Pen", Pencil, penActive, hand.pen)}
-          {tool("Highlighter", Highlighter, !hand.erasing && hand.marker, hand.toggleMarker)}
-          {tool("Eraser", Eraser, hand.erasing, hand.toggleErase)}
-          {dropdown(
-            "shape",
-            "Shapes",
-            ShapeGlyph,
-            !hand.erasing && MARKUP_SHAPES.some((each) => each.tool === hand.shape),
-            MARKUP_SHAPES.map(({ tool: shape, label, Glyph }) => (
+    <div className="draw-stage" role="dialog" aria-modal="true" aria-label="Drawing">
+      <div ref={ground} className="draw-stage-ground" />
+      <div ref={chrome} className="draw-stage-chrome">
+        <div className="draw-stage-top">
+          <span className="draw-stage-group">{button("Cancel", X, () => finish(false))}</span>
+          <span className="draw-stage-group">
+            {!away && button("Undo", Undo2, undo, behind.length === 0)}
+            {!away && button("Redo", Redo2, redo, ahead.length === 0)}
+            {image && !away && button("Rotate", RotateCw, () => setSpin((n) => n + 1))}
+            {image && !away && (
               <button
-                key={shape}
                 type="button"
-                role="menuitemradio"
-                aria-checked={hand.shape === shape}
-                className="menu-row"
-                onClick={() => {
-                  if (hand.shape !== shape) hand.toggleShape(shape);
-                  setMenu(null);
-                }}
+                className={`draw-stage-button ${cropping ? "is-active" : ""}`}
+                aria-label="Crop"
+                title="Crop"
+                aria-pressed={cropping}
+                onClick={startCrop}
               >
-                <Glyph size={16} />
-                {label}
-                {hand.shape === shape && <Check size={14} className="markup-check" />}
+                <CropIcon size={18} />
               </button>
-            )),
-          )}
-          {tool("Text box", Type, !hand.erasing && hand.shape === "text", () =>
-            hand.toggleShape("text"),
-          )}
-          {tool("Move a mark", Move, !hand.erasing && hand.shape === "move", () =>
-            hand.toggleShape("move"),
-          )}
-          <span className="markup-rule" />
-          {dropdown(
-            "nib",
-            "Stroke thickness",
-            AlignJustify,
-            false,
-            DRAWING_NIBS.map((size) => (
-              <button
-                key={size}
-                type="button"
-                role="menuitemradio"
-                aria-checked={!hand.marker && hand.nib === size}
-                aria-label={`Thickness ${size}`}
-                className="menu-row"
-                onClick={() => {
-                  hand.chooseNib(size);
-                  setMenu(null);
-                }}
-              >
-                <span className="markup-nib" style={{ height: Math.max(2, size / 2) }} />
-                {!hand.marker && hand.nib === size && <Check size={14} className="markup-check" />}
-              </button>
-            )),
-          )}
-          {dropdown(
-            "colour",
-            "Stroke colour",
-            Palette,
-            false,
-            <div className="markup-swatches">
-              {DRAWING_INKS.map((colour) => (
-                <button
-                  key={colour}
-                  type="button"
-                  role="menuitemradio"
-                  className={`drawing-ink ${colour === hand.ink ? "is-chosen" : ""}`}
-                  style={{ background: colour }}
-                  aria-label={`Draw in ${colour}`}
-                  aria-checked={colour === hand.ink}
-                  onClick={() => {
-                    hand.choose(colour);
-                    setMenu(null);
-                  }}
-                />
-              ))}
-              <label
-                className={`drawing-ink is-any ${custom ? "is-chosen" : ""}`}
-                style={custom ? { background: hand.ink } : undefined}
-                title="Any colour"
-              >
-                <input
-                  type="color"
-                  value={hand.ink}
-                  aria-label="Draw in any colour"
-                  onChange={(event) => hand.choose(event.target.value)}
-                />
-              </label>
-            </div>,
-          )}
-          {tool(
-            "Fill the shape",
-            PaintBucket,
-            hand.closed && hand.filling,
-            hand.toggleFill,
-            !hand.closed,
-          )}
-          {tool(
-            "Undo the last mark",
-            Undo2,
-            false,
-            () => setDraft((now) => now.slice(0, -1)),
-            draft.length === 0,
-          )}
-          <span className="markup-rule" />
-          {tool("Rotate", RotateCw, false, () => setSpin((n) => n + 1))}
-          {tool("Crop", CropIcon, cropping, startCrop, false, true)}
-          <span className="markup-spacer" />
-          {cropping && (
-            <button type="button" className="markup-text-button is-done" onClick={applyCrop}>
-              Crop
-            </button>
-          )}
-          <button type="button" className="markup-text-button" onClick={() => finish(false)}>
-            Cancel
-          </button>
-          <button type="button" className="markup-text-button is-done" onClick={() => finish(true)}>
-            Done
-          </button>
-        </div>
-        <div className="markup-stage" style={{ height: layout.height }}>
-          {/* The empty sides are the picture again, blurred and darkened. */}
-          <img className="markup-backdrop" src={src} alt="" draggable={false} />
-          <div
-            ref={imageBox}
-            className="markup-image"
-            style={{ width: boxWidth, height: boxHeight }}
-          >
-            <div className="media-plane" style={plane.style}>
-              <img src={src} alt={alt || "Image"} draggable={false} />
-              <svg
-                ref={ink.surface}
-                className={`rich-media-image-ink ${
-                  cropping
-                    ? ""
-                    : hand.erasing
-                      ? "is-erasing"
-                      : hand.shape === "move"
-                        ? "is-arranging"
-                        : "is-drawing"
-                }`}
-                viewBox={`0 0 ${ink.box.width} ${ink.box.height}`}
-                preserveAspectRatio="xMinYMin meet"
-                onPointerDown={ink.start}
-              >
-                {ink.inked}
-              </svg>
-            </div>
-            {cropping && (
-              <div className="markup-crop">
-                <span
-                  className="markup-dim"
-                  style={{ left: 0, top: 0, right: 0, height: `${rect.y * 100}%` }}
-                />
-                <span
-                  className="markup-dim"
-                  style={{ left: 0, bottom: 0, right: 0, top: `${(rect.y + rect.h) * 100}%` }}
-                />
-                <span
-                  className="markup-dim"
-                  style={{
-                    left: 0,
-                    top: `${rect.y * 100}%`,
-                    width: `${rect.x * 100}%`,
-                    height: `${rect.h * 100}%`,
-                  }}
-                />
-                <span
-                  className="markup-dim"
-                  style={{
-                    right: 0,
-                    top: `${rect.y * 100}%`,
-                    left: `${(rect.x + rect.w) * 100}%`,
-                    height: `${rect.h * 100}%`,
-                  }}
-                />
-                <div
-                  className="markup-crop-rect"
-                  style={{
-                    left: `${rect.x * 100}%`,
-                    top: `${rect.y * 100}%`,
-                    width: `${rect.w * 100}%`,
-                    height: `${rect.h * 100}%`,
-                  }}
-                  onPointerDown={grab("move")}
-                >
-                  {(["n", "e", "s", "w", "nw", "ne", "sw", "se"] as const).map((corner) => (
-                    <span
-                      key={corner}
-                      className={`markup-handle is-${corner}`}
-                      data-corner={corner}
-                      onPointerDown={grab(corner)}
-                    />
-                  ))}
-                </div>
-              </div>
             )}
+            {away && (
+              <span className="draw-stage-away" role="status">
+                <Smartphone size={16} />
+                Drawing on iPhone
+              </span>
+            )}
+          </span>
+          <span className="draw-stage-group">
+            {phone?.present &&
+              !onDraft &&
+              !away &&
+              !cropping &&
+              button("Draw on iPhone", Smartphone, lend)}
+            {cropping ? (
+              <button
+                type="button"
+                className="draw-stage-button is-done"
+                aria-label="Crop"
+                title="Crop"
+                onClick={applyCrop}
+              >
+                <Check size={18} />
+              </button>
+            ) : (
+              !away && (
+                <button
+                  type="button"
+                  className="draw-stage-button is-done"
+                  aria-label="Done"
+                  title="Done"
+                  onClick={() => finish(true)}
+                >
+                  <Check size={18} />
+                </button>
+              )
+            )}
+          </span>
+        </div>
+        {!away && !cropping && (
+          <div className="draw-stage-tray">
+            <PenTray hand={hand} />
           </div>
+        )}
+      </div>
+      <div className="draw-stage-room">
+        <div
+          ref={canvas}
+          className={`draw-stage-canvas ${image ? "" : "is-board"}`}
+          style={{ ["--aspect" as string]: aspect }}
+        >
+          {image && plane ? (
+            <div ref={imageBox} className="markup-image">
+              <div className="media-plane" style={plane.style}>
+                <img src={image.src} alt={image.alt || "Image"} draggable={false} />
+                {surface}
+              </div>
+              {cropping && (
+                <div className="markup-crop">
+                  <span
+                    className="markup-dim"
+                    style={{ left: 0, top: 0, right: 0, height: `${rect.y * 100}%` }}
+                  />
+                  <span
+                    className="markup-dim"
+                    style={{ left: 0, bottom: 0, right: 0, top: `${(rect.y + rect.h) * 100}%` }}
+                  />
+                  <span
+                    className="markup-dim"
+                    style={{
+                      left: 0,
+                      top: `${rect.y * 100}%`,
+                      width: `${rect.x * 100}%`,
+                      height: `${rect.h * 100}%`,
+                    }}
+                  />
+                  <span
+                    className="markup-dim"
+                    style={{
+                      right: 0,
+                      top: `${rect.y * 100}%`,
+                      left: `${(rect.x + rect.w) * 100}%`,
+                      height: `${rect.h * 100}%`,
+                    }}
+                  />
+                  <div
+                    className="markup-crop-rect"
+                    style={{
+                      left: `${rect.x * 100}%`,
+                      top: `${rect.y * 100}%`,
+                      width: `${rect.w * 100}%`,
+                      height: `${rect.h * 100}%`,
+                    }}
+                    onPointerDown={grab("move")}
+                  >
+                    {(["n", "e", "s", "w", "nw", "ne", "sw", "se"] as const).map((corner) => (
+                      <span
+                        key={corner}
+                        className={`markup-handle is-${corner}`}
+                        data-corner={corner}
+                        onPointerDown={grab(corner)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            surface
+          )}
         </div>
       </div>
       {ink.menu}
-    </>,
+    </div>,
     document.body,
   );
 }
@@ -1702,6 +1951,8 @@ const TAKE_UP_THE_PEN = "napp:take-up-the-pen";
  *  to write drew instead. It cannot be an attribute either: an attribute is
  *  the document, and the document is the other member's too. */
 let penWanted = false;
+/** The same for a board: one just inserted opens straight onto its stage. */
+let boardWanted = false;
 
 /** The ink and the nib outlive the drawing they were chosen on: picking red
  *  once should not have to be done again on the next sketch, on the next
@@ -2190,138 +2441,6 @@ function useInk({
     </>
   );
 
-  const custom = !DRAWING_INKS.includes(ink as (typeof DRAWING_INKS)[number]);
-  const tools = (
-    <>
-      {DRAWING_INKS.map((colour) => (
-        <button
-          key={colour}
-          type="button"
-          className={`drawing-ink ${!erasing && colour === ink ? "is-chosen" : ""}`}
-          style={{ background: colour }}
-          aria-label={`Draw in ${colour}`}
-          aria-pressed={!erasing && colour === ink}
-          onClick={() => choose(colour)}
-        />
-      ))}
-      {/* Every other colour, from the one picker the machine already has. The
-          input itself is the whole control and is invisible: styling a
-          `color` input means three vendor pseudo-elements and a focus ring
-          nobody asked for, and one of them was drawing a blue halo round the
-          swatch. A label with the input inside it is the same click. */}
-      <label
-        className={`drawing-ink is-any ${custom && !erasing ? "is-chosen" : ""}`}
-        style={custom ? { background: ink } : undefined}
-        title="Any colour"
-      >
-        <input
-          type="color"
-          value={ink}
-          aria-label="Draw in any colour"
-          onChange={(event) => choose(event.target.value)}
-        />
-      </label>
-
-      <span className="drawing-tools-rule" />
-
-      {DRAWING_NIBS.map((size) => (
-        <button
-          key={size}
-          type="button"
-          className={`drawing-nib ${!erasing && !marker && size === nib ? "is-chosen" : ""}`}
-          aria-label={`Nib ${size}`}
-          aria-pressed={!erasing && !marker && size === nib}
-          onClick={() => {
-            lastNib = size;
-            lastMarker = false;
-            setNib(size);
-            setMarker(false);
-            setErasing(false);
-          }}
-        >
-          <span style={{ width: size + 2, height: size + 2 }} />
-        </button>
-      ))}
-      <button
-        type="button"
-        className={`rich-media-file-action ${!erasing && marker ? "is-active" : ""}`}
-        aria-label="Highlighter"
-        aria-pressed={!erasing && marker}
-        title="Highlighter"
-        onClick={() => {
-          lastMarker = !marker;
-          setMarker((on) => !on);
-          setErasing(false);
-        }}
-      >
-        <Highlighter size={16} />
-      </button>
-
-      <span className="drawing-tools-rule" />
-
-      {/* The four shapes, and the pen is the one that is not pressed. A fifth
-          button saying "freehand" would be a second way to say what putting a
-          shape down already says, and the highlighter and the eraser beside
-          them are toggles for the same reason. */}
-      {DRAWING_TOOLS.map(({ tool, label, Glyph }) => (
-        <button
-          key={tool}
-          type="button"
-          className={`rich-media-file-action ${!erasing && shape === tool ? "is-active" : ""}`}
-          aria-label={label}
-          aria-pressed={!erasing && shape === tool}
-          title={label}
-          onClick={() => {
-            const next = shape === tool ? null : tool;
-            lastShape = next;
-            setShape(next);
-            setErasing(false);
-            setComposing(null);
-          }}
-        >
-          <Glyph size={16} />
-        </button>
-      ))}
-      <button
-        type="button"
-        className={`rich-media-file-action ${!erasing && closed && filling ? "is-active" : ""}`}
-        aria-label="Fill the shape"
-        aria-pressed={!erasing && closed && filling}
-        title="Fill the shape"
-        disabled={!closed}
-        onClick={() => {
-          lastFilling = !filling;
-          setFilling((on) => !on);
-        }}
-      >
-        <PaintBucket size={16} />
-      </button>
-
-      <span className="drawing-tools-rule" />
-
-      <button
-        type="button"
-        className={`rich-media-file-action ${erasing ? "is-active" : ""}`}
-        aria-label="Erase strokes"
-        aria-pressed={erasing}
-        title="Erase strokes"
-        onClick={() => setErasing((on) => !on)}
-      >
-        <Eraser size={16} />
-      </button>
-      <button
-        type="button"
-        className="rich-media-file-action"
-        aria-label="Undo the last stroke"
-        title="Undo the last stroke"
-        disabled={strokes.length === 0}
-        onClick={() => write(strokes.slice(0, -1))}
-      >
-        <Undo2 size={16} />
-      </button>
-    </>
-  );
-
   /* The field a caption is typed into. Portalled beside the menu and for the
      same reason: an SVG takes no typing, and putting an input inside each of
      the three surfaces means a `position: relative` and a stacking context on
@@ -2439,7 +2558,6 @@ function useInk({
     box,
     start,
     inked,
-    tools,
     hand,
     erasing,
     arranging: shape === "move",
@@ -2452,7 +2570,14 @@ function useInk({
   };
 }
 
-function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
+function DrawingView({
+  node,
+  updateAttributes,
+  deleteNode,
+  editor,
+  extension,
+  getPos,
+}: NodeViewProps) {
   const strokes = useMemo(() => drawingMarks(node.attrs.strokes as string), [node.attrs.strokes]);
   const onPage = drawingSurface(node.attrs.surface) === "page";
   /* The pen is in hand only if this layer is the one that was just asked for.
@@ -2522,12 +2647,40 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
     },
     [updateAttributes, onPage, strokes, editor],
   );
-  const { surface, box, start, inked, tools, erasing, arranging, menu } = useInk({
+  const { surface, box, start, inked, hand, erasing, arranging, menu } = useInk({
     strokes,
     write,
     fit: onPage ? "width" : "board",
-    editable: editor.isEditable,
+    /* A board is drawn on its stage; in the note it is only shown. */
+    editable: editor.isEditable && onPage,
   });
+  const sheet = useRef<HTMLButtonElement>(null);
+  const stage = useStage(
+    editor,
+    () => {
+      const noteId = (extension.options as { noteId: () => string | undefined }).noteId();
+      const at = typeof getPos === "function" ? getPos() : undefined;
+      if (!noteId || onPage || at === undefined) return null;
+      /* A board is named by its place among the note's boards: it has no id
+         of its own, and the two screens hold the same document. */
+      let board = 0;
+      editor.state.doc.descendants((each, pos) => {
+        if (pos >= at) return false;
+        if (each.type.name === node.type.name && drawingSurface(each.attrs.surface) !== "page")
+          board++;
+      });
+      return { noteId, board };
+    },
+    () => sheet.current?.scrollIntoView({ block: "center", behavior: "instant" }),
+  );
+  const openStage = stage.open;
+  useEffect(() => {
+    if (onPage || !boardWanted) return;
+    boardWanted = false;
+    openStage("own");
+    // Once, for the board that was just asked for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const remove = (
     <button
@@ -2576,20 +2729,37 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
         {editor.isEditable && (
           <span className={`drawing-overlay-tools ${pen ? "" : "is-put-away"}`}>
             {pen ? (
-              <>
-                {tools}
-                {remove}
-                <span className="drawing-tools-rule" />
+              <PenTray hand={hand}>
+                <span className="pen-tray-rule" />
                 <button
                   type="button"
-                  className="rich-media-file-action"
+                  className="pen-tray-tool"
+                  aria-label="Undo the last stroke"
+                  title="Undo the last stroke"
+                  disabled={strokes.length === 0}
+                  onClick={() => write(strokes.slice(0, -1))}
+                >
+                  <Undo2 size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="pen-tray-tool"
+                  aria-label="Remove the drawing layer"
+                  title="Remove the drawing layer"
+                  onClick={deleteNode}
+                >
+                  <Trash2 size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="pen-tray-tool is-done"
                   aria-label="Put the pen down"
                   title="Put the pen down"
                   onClick={() => setPen(false)}
                 >
-                  <Check size={16} />
+                  <Check size={18} />
                 </button>
-              </>
+              </PenTray>
             ) : (
               <button
                 type="button"
@@ -2609,23 +2779,54 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
 
   return (
     <NodeViewWrapper className="rich-media-drawing">
-      {menu}
-      <span className="rich-media-drawing-sheet" contentEditable={false}>
+      <button
+        ref={sheet}
+        type="button"
+        className="rich-media-drawing-sheet"
+        contentEditable={false}
+        aria-label="Draw"
+        disabled={!editor.isEditable}
+        onClick={() => stage.open("own")}
+      >
         <svg
           ref={surface}
-          className={`rich-media-drawing-surface ${erasing ? "is-erasing" : ""}`}
+          className="rich-media-drawing-surface"
           viewBox={`0 0 ${box.width} ${box.height}`}
           preserveAspectRatio="none"
-          onPointerDown={start}
         >
           {inked}
         </svg>
-      </span>
+      </button>
       {editor.isEditable && (
         <span className="rich-media-drawing-tools" contentEditable={false}>
-          {tools}
+          <button
+            type="button"
+            className="rich-media-file-action"
+            aria-label="Draw"
+            title="Draw"
+            onClick={() => stage.open("own")}
+          >
+            <Pencil size={16} />
+          </button>
           {remove}
         </span>
+      )}
+      {stage.mode && sheet.current && (
+        <DrawingStage
+          subject={{ kind: "board" }}
+          initial={strokes}
+          live={strokes}
+          anchor={sheet.current}
+          phone={stage.phone}
+          until={stage.until}
+          onDraft={
+            stage.mode === "lent"
+              ? (next) => updateAttributes({ strokes: JSON.stringify(next) })
+              : undefined
+          }
+          onKeep={(next) => updateAttributes({ strokes: JSON.stringify(next.strokes) })}
+          onClose={stage.close}
+        />
       )}
     </NodeViewWrapper>
   );
@@ -2633,17 +2834,22 @@ function DrawingView({ node, updateAttributes, deleteNode, editor }: NodeViewPro
 
 /* The schema lives in `content.ts`, where the collaboration server can read it
    without React. What is added here is only what a browser can do with it. */
-function privateImageExtension(resolve: Resolver, open: PrivateImageOptions["open"]) {
+function privateImageExtension(
+  resolve: Resolver,
+  open: PrivateImageOptions["open"],
+  noteId: () => string | undefined,
+) {
   return PrivateImage.extend<PrivateImageOptions>({
-    addOptions: () => ({ resolve, open }),
+    addOptions: () => ({ resolve, open, noteId }),
     addNodeView() {
       return ReactNodeViewRenderer(PrivateImageView);
     },
   });
 }
 
-function drawingExtension() {
-  return Drawing.extend({
+function drawingExtension(noteId: () => string | undefined) {
+  return Drawing.extend<{ noteId: () => string | undefined }>({
+    addOptions: () => ({ noteId }),
     addNodeView() {
       return ReactNodeViewRenderer(DrawingView);
     },
@@ -2829,11 +3035,17 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   onLocalEditRef.current = onLocalEdit;
   onPasteImageRef.current = onPasteImage;
 
+  const noteIdRef = useRef(noteId);
+  noteIdRef.current = noteId;
   const mediaExtensions = useMemo(
     () => [
-      privateImageExtension(resolveImage, (src, alt) => setPreview({ src, alt })),
+      privateImageExtension(
+        resolveImage,
+        (src, alt) => setPreview({ src, alt }),
+        () => noteIdRef.current,
+      ),
       privateFileExtension(resolveFile),
-      drawingExtension(),
+      drawingExtension(() => noteIdRef.current),
       mediaPaste({
         upload: (file) => onPasteImageRef.current?.(file) ?? Promise.resolve(null),
         load: (src) => pasteSourceRef.current?.(src) ?? Promise.resolve(null),
@@ -2870,8 +3082,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
   saidThreadsRef.current = saidThreads;
   const unsaidComments = useMemo(() => unsaidCommentsExtension(saidThreadsRef), []);
 
-  const noteIdRef = useRef(noteId);
-  noteIdRef.current = noteId;
   const crossReferences = useMemo(() => crossReferenceExtension(() => noteIdRef.current), []);
   const footnotesRef = useRef(footnotes);
   footnotesRef.current = footnotes;
@@ -3111,6 +3321,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(function R
         else if (action === "table-delete-row") chain.deleteRow().run();
         else if (action === "table-delete") chain.deleteTable().run();
       } else if (action === "drawing") {
+        boardWanted = true;
         chain.insertContent({ type: "drawing", attrs: { strokes: "[]", surface: "board" } }).run();
       } else if (action === "drawing-page") {
         /* One layer to a note. A second would be a second transparent sheet

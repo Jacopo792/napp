@@ -113,12 +113,12 @@ function accountFlow(
   return { api: exports, calls, storage };
 }
 
-test("invited registration claims the invitation and returns both archives for selection", async () => {
+test("invited registration claims the invitation and opens the joined archive", async () => {
   const flow = accountFlow({ invited: true });
   const result = await flow.api.registerAccount(user.email, "test-password", true);
   assert.equal(result.confirmationRequired, false);
   if (result.confirmationRequired) throw new Error("Unexpected confirmation");
-  assert.equal(result.session, null);
+  assert.equal(result.session?.archiveId, "shared");
   assert.equal(result.account.userId, user.id);
   assert.deepEqual(
     Array.from(result.archives, (archive) => archive.archiveId),
@@ -128,7 +128,7 @@ test("invited registration claims the invitation and returns both archives for s
     { name: "ensure_personal_archive", token: undefined },
     { name: "claim_archive_invite", token: inviteToken },
   ]);
-  assert.equal(flow.storage.size, 0);
+  assert.deepEqual([...flow.storage.keys()], ["session"]);
 });
 
 test("ordinary registration opens the personal archive without claiming an invitation", async () => {

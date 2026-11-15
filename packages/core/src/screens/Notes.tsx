@@ -124,6 +124,7 @@ import {
   NoteConflict,
   loadProfile,
   persistMetaDiff,
+  NoteRefused,
   saveNote,
   updateNoteProperties,
   saveProfile,
@@ -1614,8 +1615,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       setSaveError("");
       retryDelayRef.current = RETRY_MIN_MS;
     } catch (e) {
-      failed = true;
-      setSaveError(e instanceof Error ? e.message : "Save failed");
+      if (e instanceof NoteRefused) {
+        // ponytail: drops anything staged for this owner during the write too; per-row requeue if that bites.
+        pendingMetaRef.current.discard(e.owner);
+        realtimePendingRef.current = true;
+        setSaveError(e.message);
+      } else {
+        failed = true;
+        setSaveError(e instanceof Error ? e.message : "Save failed");
+      }
     } finally {
       inFlightRef.current = false;
       setSaving(false);
@@ -1643,7 +1651,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [drain]);
 
   const schedule = useCallback(() => {
-    if (!hasPending()) {
+    /* Drafts and metadata both: trashing or pinning a note writes no draft,
+       and asking only about drafts left it unsaved until the window hid. */
+    if (!writesWaiting(pendingMetaRef.current)) {
       window.clearTimeout(timerRef.current);
       setDirty(pendingMetaRef.current.size > 0);
       return;
@@ -4636,9 +4646,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onNicknameSave={(nickname) => void persistProfile({ nickname })}
         onAvatarPick={(file, crop) => void handleAvatarPick(file, crop)}
         onAvatarRemove={() => void handleAvatarRemove()}
-        onOpenArchive={() => {
+        selfId={session.userId}
+        avatarUrls={avatarUrls}
+        invites={invites}
+        onCreateInvite={inviteLink}
+        onRevokeInvite={withdrawInvite}
+        onLeaveArchive={async () => {
+          await handleLeaveArchive();
           setSettingsOpen(false);
-          openSheet({ kind: "archive" });
         }}
         spaces={spacesView}
         currentArchiveId={session.archiveId}
@@ -4734,7 +4749,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}
-        onDelete={() => handleMoveToTrash(selected)}
+        onDelete={canEdit ? () => handleMoveToTrash(selected) : undefined}
       />
     ) : null;
 
@@ -4763,7 +4778,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onHistory={() => noteEditorRef.current?.openHistory()}
         onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
         onRecent={handleOpenRecent}
-        onDelete={() => handleMoveToTrash(selected)}
+        onDelete={canEdit ? () => handleMoveToTrash(selected) : undefined}
       />
     ) : null;
 

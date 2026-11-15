@@ -34,6 +34,10 @@ export class MetaQueue {
     return [...this.pending.keys()];
   }
 
+  discard(owner: string): void {
+    this.pending.delete(owner);
+  }
+
   /** `base` is what the scope is now, used only if nothing is waiting yet. */
   stage(owner: string, base: Meta, after: Meta): void {
     this.pending.set(owner, { before: this.pending.get(owner)?.before ?? base, after });

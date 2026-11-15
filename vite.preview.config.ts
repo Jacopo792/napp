@@ -62,6 +62,7 @@ export default defineConfig(({ mode }) => ({
       { find: /^@\/lib\/history$/, replacement: here("./preview/history.mock.ts") },
       { find: /^@\/lib\/mediaText$/, replacement: here("./preview/mediaText.mock.ts") },
       { find: /^@\/lib\/spaces$/, replacement: here("./preview/spaces.mock.ts") },
+      { find: /^@\/lib\/drawHandoff$/, replacement: here("./preview/drawHandoff.mock.ts") },
     ],
   },
   plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root: here(".") })],

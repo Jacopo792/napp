@@ -60,6 +60,7 @@ import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape"
 import type { SettingsSection } from "@/components/settingsSections";
 import { settingsSectionsFor } from "@/components/settingsSectionsFor";
 import { FaceStack } from "@/components/SpaceSwitch";
+import { Invitations } from "@/components/Invitations";
 import type { Space } from "@/lib/spaces";
 import {
   Fragment,
@@ -335,7 +336,12 @@ export function SettingsPanel({
   currentArchiveId,
   onSwitchArchive,
   onNewArchive,
-  onOpenArchive,
+  selfId,
+  avatarUrls,
+  invites,
+  onCreateInvite,
+  onRevokeInvite,
+  onLeaveArchive,
   defaultArchiveId,
   onDeleteArchive,
   onPresenceEnabledChange,
@@ -392,8 +398,13 @@ export function SettingsPanel({
   currentArchiveId: string;
   onSwitchArchive: (archiveId: string) => Promise<void>;
   onNewArchive: () => void;
-  /** Members, invitations and leaving live in the archive's own sheet. */
-  onOpenArchive: () => void;
+  /** Members: who is in the archive on screen, who is invited, the way out. */
+  selfId: string;
+  avatarUrls: Record<string, string | null>;
+  invites: { id: string; email: string; expiresAt: string }[];
+  onCreateInvite: (email: string) => Promise<string>;
+  onRevokeInvite: (inviteId: string) => Promise<void>;
+  onLeaveArchive: () => Promise<void>;
   /** The account's first archive, which is never offered for deletion. */
   defaultArchiveId: string | undefined;
   onDeleteArchive: (archiveId: string) => Promise<void>;
@@ -439,6 +450,7 @@ export function SettingsPanel({
   const [spaceStatus, setSpaceStatus] = useState("");
   const [spaceBusy, setSpaceBusy] = useState(false);
   const [deletingSpace, setDeletingSpace] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const wallpaperRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
   const navList = useRef<HTMLDivElement>(null);
@@ -745,7 +757,7 @@ export function SettingsPanel({
                       <button
                         type="button"
                         className="space-list-button press"
-                        onClick={onOpenArchive}
+                        onClick={() => setSection("members")}
                       >
                         {memberCount} {memberCount === 1 ? "member" : "members"}
                       </button>
@@ -1424,6 +1436,73 @@ export function SettingsPanel({
                   </div>
                 </section>
               )}
+
+              {section === "members" &&
+                (() => {
+                  const space = spaces.find((one) => one.archiveId === currentArchiveId);
+                  if (!space) return null;
+                  const taken = space.members.length + invites.length;
+                  /* As the archive's sheet: whoever made a second archive
+                     deletes it rather than leaving it to the others. */
+                  const mayLeave =
+                    space.members.length > 1 &&
+                    !(space.createdBy === selfId && space.archiveId !== defaultArchiveId);
+                  return (
+                    <section>
+                      <h3>
+                        {space.name} · {taken} of {space.seatLimit} seats
+                      </h3>
+                      <div className="appearance-controls">
+                        {space.members.map((member) => (
+                          <div key={member.userId} className="appearance-row">
+                            <Avatar
+                              url={avatarUrls[member.userId] ?? null}
+                              name={member.nickname}
+                              email={member.userId === selfId ? email : ""}
+                              compact
+                            />
+                            <span className="settings-label">
+                              <b>{member.nickname || "Member"}</b>
+                            </span>
+                            {member.userId === selfId && (
+                              <span className="space-list-current">You</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <Invitations
+                        invites={invites}
+                        seatsFull={taken >= space.seatLimit}
+                        canManage
+                        onCreate={onCreateInvite}
+                        onRevoke={onRevokeInvite}
+                      />
+
+                      {mayLeave && (
+                        <button
+                          type="button"
+                          className={`space-list-new is-danger press ${leaving ? "is-confirm" : ""}`}
+                          disabled={spaceBusy}
+                          onBlur={() => setLeaving(false)}
+                          onClick={() => {
+                            if (!leaving) return setLeaving(true);
+                            setLeaving(false);
+                            void spaceAct(onLeaveArchive);
+                          }}
+                        >
+                          <LogOut size={16} />
+                          {leaving ? "Leave — press again" : "Leave this archive"}
+                        </button>
+                      )}
+                      {spaceStatus && (
+                        <p className="profile-note text-danger" role="alert">
+                          {spaceStatus}
+                        </p>
+                      )}
+                    </section>
+                  );
+                })()}
 
               {section === "spaces" && (
                 <section>

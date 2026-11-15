@@ -68,6 +68,7 @@ import { PageSpread } from "./PageSpread";
 import { snapshotSheet, type SheetSnapshot } from "../lib/pageSnapshot";
 import { setLiveTargets, useReferences, type Place } from "@/lib/documentContents";
 import { adoptionsFor, sheetCounters } from "@/lib/references";
+import { attachDrawing } from "@/lib/drawHandoff";
 
 /** What a chapter of a document is framed by instead of a note's header:
  *  the page it is set on, the line over its title, and what comes after it. */
@@ -509,6 +510,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   /* The archive-wide set is the newest remarks only, so an old thread is
      asked of this note directly, once, when it opens. */
   const [noteThreads, setNoteThreads] = useState<Set<string> | null>(null);
+  /* Listening for a phone of this account, so a picture or a board can be
+     offered to it to draw on. */
+  const drawingAccount = session?.userId;
+  useEffect(
+    () => (drawingAccount ? attachDrawing({ userId: drawingAccount }, "desk") : undefined),
+    [drawingAccount],
+  );
   useEffect(() => {
     setNoteThreads(null);
     const noteId = entry?.note.id;
@@ -1900,6 +1908,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 revision={syncRevision}
                 readOnly={!canEdit}
                 placeholder="Start writing…"
+                noteId={entry.note.id}
                 onChange={(content, body) => {
                   if (!canEdit) return;
                   editBody(entry.note.id, body, content);

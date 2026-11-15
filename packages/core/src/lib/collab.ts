@@ -20,7 +20,9 @@
 import {
   HocuspocusProvider,
   HocuspocusProviderWebsocket,
+  MessageType,
   WebSocketStatus,
+  type onMessageParameters,
 } from "@hocuspocus/provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -159,6 +161,8 @@ interface Held {
   state: Omit<CollaborativeNote, "waking">;
   users: number;
   listeners: Set<(state: Omit<CollaborativeNote, "waking">) => void>;
+  /** Called once this note has been thrown away and should be opened again. */
+  reopen: Set<() => void>;
 }
 
 const held = new Map<string, Held>();
@@ -191,6 +195,19 @@ window.addEventListener("napp:erase-account", (event) => {
       drop(entry);
     }
 });
+
+function discardRefused(entry: Held): void {
+  if (held.get(entry.key) !== entry) return;
+  held.delete(entry.key);
+  entry.provider.destroy();
+  void entry.local
+    .clearData()
+    .catch(() => {})
+    .finally(() => {
+      entry.doc.destroy();
+      for (const reopen of entry.reopen) reopen();
+    });
+}
 
 function drop(entry: Held): void {
   held.delete(entry.key);
@@ -247,6 +264,7 @@ function acquire(archiveId: string, userId: string, noteId: string): Held | null
     },
     users: 1,
     listeners: new Set(),
+    reopen: new Set(),
   };
   const update = (change: Partial<CollaborativeNote>) => {
     entry.state = { ...entry.state, ...change };
@@ -272,6 +290,18 @@ function acquire(archiveId: string, userId: string, noteId: string): Held | null
      `manageSocket` is only true when it built the socket. For the same
      reason `provider.destroy()` in `drop` leaves the shared socket alone. */
   entry.provider.attach();
+
+  /* A write the server refused — the note is locked by somebody else, in the
+     trash, or no longer yours to write — is never undone by Yjs: it stays in
+     this document and in IndexedDB, and from then on this device draws a note
+     nobody else has. The lock can land a moment after this device last heard
+     about it, so a keystroke in that moment is enough. The server is the only
+     copy that counts, so the local one is discarded and the note reopened. */
+  entry.provider.on("message", ({ message }: onMessageParameters) => {
+    message.readVarString();
+    if (message.readVarUint() === MessageType.SyncStatus && message.readVarUint() === 0)
+      discardRefused(entry);
+  });
 
   /* The local store, which is milliseconds away rather than a continent.
      Its job is only to put the words on screen; it decides nothing. What
@@ -323,6 +353,7 @@ export function useCollaborativeNote(
   identity: CollaborationIdentity | null,
 ): CollaborativeNote {
   const [state, setState] = useState<Omit<CollaborativeNote, "waking">>(CLOSED);
+  const [opening, setOpening] = useState(0);
   const userId = identity?.userId ?? null;
   const archiveId = identity?.archiveId ?? null;
   const name = identity?.name ?? "";
@@ -342,13 +373,16 @@ export function useCollaborativeNote(
       setState(CLOSED);
       return;
     }
+    const reopen = () => setOpening((count) => count + 1);
     entry.listeners.add(setState);
+    entry.reopen.add(reopen);
     setState(entry.state);
     return () => {
       entry.listeners.delete(setState);
+      entry.reopen.delete(reopen);
       release(entry);
     };
-  }, [noteId, userId, archiveId]);
+  }, [noteId, userId, archiveId, opening]);
 
   /* Who you are is a separate question from which note is open, and it arrives
      later: `name` is read from the profile after sign-in and `publishPresence`

@@ -399,15 +399,19 @@ function noteMenuItems({
       icon: <Printer size={16} />,
       run: onPrint,
     },
-    { kind: "separator" },
-    {
-      kind: "item",
-      id: "delete",
-      label: "Delete note",
-      icon: <Trash2 size={16} />,
-      danger: true,
-      run: onDelete,
-    },
+    ...(onDelete
+      ? [
+          { kind: "separator" as const },
+          {
+            kind: "item" as const,
+            id: "delete",
+            label: "Delete note",
+            icon: <Trash2 size={16} />,
+            danger: true,
+            run: onDelete,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -430,7 +434,8 @@ interface NoteMenuActions {
   onExportMarkdown: () => void;
   onPrint: () => void;
   onSavePdf: () => void;
-  onDelete: () => void;
+  /** Absent while somebody else holds the note's lock. */
+  onDelete?: () => void;
 }
 
 export function NoteMenu(props: NoteMenuActions) {

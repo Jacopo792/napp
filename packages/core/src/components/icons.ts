@@ -124,6 +124,7 @@ export {
   IconTypography as Type,
   IconArrowBackUp as Undo2,
   IconArrowForwardUp as Redo2,
+  IconDeviceMobile as Smartphone,
   IconAlignLeft as AlignLeft,
   IconAlignCenter as AlignCenter,
   IconAlignRight as AlignRight,

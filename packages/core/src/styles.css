@@ -9061,6 +9061,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
 
 .rich-media-drawing-sheet {
   display: block;
+  width: 100%;
+  padding: 0;
   border: 1px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--paper);
@@ -9071,18 +9073,17 @@ body:has(.sidebar-row.is-over) .drag-chip {
   display: block;
   width: 100%;
   aspect-ratio: 1000 / 560;
-  touch-action: none;
-  cursor: crosshair;
 }
 
-/* It wraps, because the row is as long as the tools in it and the column it
-   sits in is as narrow as the reader has dragged it. A strip that overflows
-   takes the last of its tools off the side of the note, where nothing says
-   they are there. */
+.rich-media-drawing-sheet:enabled {
+  cursor: pointer;
+}
+
+/* Draw and remove, at the sheet's foot. */
 .rich-media-drawing-tools {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.3rem;
   padding-top: 0.4rem;
 }
@@ -9097,16 +9098,6 @@ body:has(.sidebar-row.is-over) .drag-chip {
 
 .drawing-ink.is-chosen {
   border-color: var(--ink-3);
-}
-
-.rich-media-drawing-tools .rich-media-file-action:disabled {
-  opacity: 0.35;
-}
-
-/* The last two tools sit apart from the six inks: choosing a colour and
-   throwing the drawing away are not the same kind of act. */
-.rich-media-drawing-tools .rich-media-file-action:first-of-type {
-  margin-left: 0.35rem;
 }
 
 /* Any colour at all, from the machine's own picker. The input is the control
@@ -9130,42 +9121,6 @@ body:has(.sidebar-row.is-over) .drag-chip {
   border: none;
   opacity: 0;
   cursor: pointer;
-}
-
-/* Three nibs, drawn at the width they draw. */
-.drawing-nib {
-  display: flex;
-  width: 1.35rem;
-  height: 1.35rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  color: var(--ink-3);
-}
-
-.drawing-nib span {
-  border-radius: var(--radius-pill);
-  background: currentcolor;
-}
-
-.drawing-nib:hover {
-  background: var(--surface);
-}
-
-.drawing-nib.is-chosen {
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.drawing-tools-rule {
-  width: 1px;
-  height: 1rem;
-  margin: 0 0.35rem;
-  background: var(--rule);
-}
-
-.rich-media-drawing-surface.is-erasing {
-  cursor: cell;
 }
 
 /* ── Ink over the page ───────────────────────────────────────────────────────
@@ -9213,23 +9168,12 @@ body:has(.sidebar-row.is-over) .drag-chip {
    to. */
 .drawing-overlay-tools {
   position: sticky;
-  bottom: 1.1rem;
+  bottom: max(1.1rem, calc(env(safe-area-inset-bottom) + 0.75rem));
   z-index: 1;
   display: flex;
-  /* Wraps rather than running off the column, and stays centred when it does.
-     The pill's ends are drawn by a radius larger than the box, so two rows of
-     it are a rounded rectangle rather than a broken pill. */
-  flex-wrap: wrap;
   max-width: 100%;
-  align-self: center;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  /* The pen tray, in the bottom-left corner, as on the stage. */
+  align-self: flex-start;
   pointer-events: auto;
 }
 
@@ -11159,6 +11103,15 @@ button.sheet-chip:hover,
 
 .space-list-new:hover:not(:disabled) {
   background: var(--accent-wash);
+}
+
+.space-list-new.is-danger {
+  color: var(--danger);
+}
+
+.space-list-new.is-danger:hover:not(:disabled),
+.space-list-new.is-danger.is-confirm {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .invite-withdraw.is-neutral:hover:not(:disabled) {
@@ -14816,158 +14769,346 @@ button.sheet-chip:hover,
   padding: 0 14px;
 }
 
-/* ── Marking up a picture ────────────────────────────────────────────────────
-   One panel grown from the picture's place in the note, over a scrim; one row
-   of tools; options as small menus under the tool that owns them. */
-:root {
-  --markup-margin: 32px;
-}
-
-.markup-scrim {
+/* ── Drawing on a stage ──────────────────────────────────────────────────────
+   Full-bleed: a black ground over the whole window, the canvas as large as the
+   room between the top edge and the tray allows, the pens in the bottom-left
+   corner. The stage is dark under every theme, because the ground is the
+   absence of the note rather than a surface of it. */
+.draw-stage {
+  --stage-ink: #f0efed;
+  --stage-ink-2: #a9a8a6;
+  --stage-plate: #202020;
+  --stage-plate-2: #2b2b2b;
+  --stage-rule: #343434;
   position: fixed;
   inset: 0;
-  z-index: 800;
-  background: var(--scrim);
-}
-
-.markup-panel {
-  position: fixed;
   z-index: 810;
-  transform-origin: 0 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  color: var(--stage-ink);
 }
 
-.markup-bar {
+.draw-stage-ground {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.draw-stage-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.draw-stage-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+}
+
+.draw-stage-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.draw-stage-button {
+  display: inline-flex;
+  width: 44px;
   height: 44px;
   align-items: center;
-  gap: 2px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--rule);
-  color: var(--ink-3);
-}
-
-.markup-tool-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.markup-tool {
-  display: inline-flex;
-  min-width: 30px;
-  height: 28px;
-  align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 0 6px;
-  border-radius: var(--radius-xs);
-  color: var(--ink-3);
+  border-radius: var(--radius-pill);
+  color: var(--stage-ink);
   transition:
     background-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+    opacity var(--dur-fast) var(--ease);
 }
 
-.markup-tool:hover:not(:disabled) {
-  background: var(--accent-wash);
-  color: var(--ink);
+.draw-stage-button:hover:not(:disabled),
+.draw-stage-button.is-active {
+  background: var(--stage-plate-2);
 }
 
-.markup-tool.is-active {
-  color: var(--accent);
+.draw-stage-button:disabled {
+  opacity: 0.32;
 }
 
-.markup-tool:disabled {
-  opacity: 0.35;
+.draw-stage-button.is-done {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-.markup-rule {
-  width: 1px;
-  height: 14px;
-  margin: 0 6px;
-  background: var(--rule);
-}
-
-.markup-spacer {
-  flex: 1;
-}
-
-.markup-text-button {
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--radius-xs);
+.draw-stage-away {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--stage-ink-2);
 }
 
-.markup-text-button:hover {
-  background: var(--accent-wash);
-  color: var(--ink);
+.draw-stage-room {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: calc(env(safe-area-inset-top) + 64px) 16px calc(env(safe-area-inset-bottom) + 96px);
+  container-type: size;
 }
 
-.markup-text-button.is-done {
-  font-weight: var(--weight-semibold, 600);
-  color: var(--accent);
+.draw-stage-canvas {
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--aspect)));
+  aspect-ratio: var(--aspect);
+  transform-origin: 0 0;
 }
 
-.markup-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 2;
-  min-width: 11rem;
-  padding: 4px;
-  border: 1px solid var(--rule);
+.draw-stage-canvas > .markup-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* A board keeps its paper on the stage: it is a sheet, and its inks were
+   chosen against it. */
+.draw-stage-canvas.is-board {
+  overflow: hidden;
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--paper);
+}
+
+.draw-stage-board-ink {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.draw-stage-board-ink.is-drawing {
+  cursor: crosshair;
+}
+
+.draw-stage-board-ink.is-erasing {
+  cursor: cell;
+}
+
+.draw-stage-tray {
+  position: absolute;
+  left: 14px;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  pointer-events: auto;
+}
+
+/* ── The pen tray ───────────────────────────────────────────────────────────
+   The pens stand in a row, cut off by the tray's foot; the one in the hand
+   rises out of it. */
+.pen-tray {
+  --stage-ink: #f0efed;
+  --stage-plate: #202020;
+  --stage-plate-2: #2b2b2b;
+  --stage-rule: #343434;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 72px;
+  padding: 0 10px;
+  border: 1px solid var(--stage-rule);
+  border-radius: 20px;
+  background: var(--stage-plate);
+  color: var(--stage-ink);
   box-shadow: var(--shadow-soft);
-  transform-origin: top left;
+}
+
+.pen-tray-pens {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-end;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.pen-tray-pen {
+  display: block;
+  width: 30px;
+  height: 72px;
+  padding: 0 4px;
+  transform: translateY(18px);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.pen-tray-pen.is-held {
+  transform: translateY(4px);
+}
+
+.pen-tray-nib {
+  display: block;
+  width: 22px;
+  height: 64px;
+}
+
+.pen-tray-body {
+  fill: #e9e8e6;
+}
+
+.pen-tray-wood {
+  fill: #d8c7a6;
+}
+
+.pen-tray-rubber {
+  fill: #b9b8b6;
+}
+
+.pen-tray-rule {
+  align-self: center;
+  width: 1px;
+  height: 24px;
+  margin: 0 2px;
+  background: var(--stage-rule);
+}
+
+.pen-tray-wrap {
+  position: relative;
+  display: inline-flex;
+  align-self: center;
+}
+
+.pen-tray-tool {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  color: var(--stage-ink);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.pen-tray-tool:hover:not(:disabled),
+.pen-tray-tool.is-active {
+  background: var(--stage-plate-2);
+}
+
+.pen-tray-tool:disabled {
+  opacity: 0.32;
+}
+
+.pen-tray-tool.is-done {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.pen-tray-well {
+  width: 28px;
+  height: 28px;
+  margin: 8px;
+  border-radius: var(--radius-pill);
+  box-shadow:
+    0 0 0 2px var(--stage-plate),
+    0 0 0 4px var(--stage-ink);
+}
+
+.pen-tray-menu {
+  position: absolute;
+  bottom: calc(100% + 18px);
+  left: -8px;
+  z-index: 2;
+  min-width: 12rem;
+  padding: 4px;
+  border: 1px solid var(--stage-rule);
+  border-radius: var(--radius-md);
+  background: var(--stage-plate);
+  color: var(--stage-ink);
+  box-shadow: var(--shadow-soft);
+  transform-origin: bottom left;
   animation: fade-in var(--dur-fast) var(--ease-out) backwards;
 }
 
-.markup-menu .menu-row {
+.pen-tray-menu .menu-row {
   justify-content: flex-start;
+  color: var(--stage-ink);
 }
 
-.markup-check {
+.pen-tray-menu .menu-row:disabled {
+  opacity: 0.4;
+}
+
+.pen-tray-check {
   margin-left: auto;
-  color: var(--accent);
 }
 
-.markup-nib {
-  display: block;
-  width: 5rem;
+.pen-tray-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1.6rem);
+  gap: 10px;
+  padding: 8px;
+}
+
+.pen-tray-swatches .drawing-ink {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.pen-tray-swatches .drawing-ink.is-chosen {
+  border-color: var(--stage-ink);
+}
+
+.pen-tray-nibs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px 8px;
+  border-top: 1px solid var(--stage-rule);
+}
+
+.pen-tray-size {
+  display: flex;
+  width: 44px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm, 8px);
+  color: var(--stage-ink);
+}
+
+.pen-tray-size span {
   border-radius: var(--radius-pill);
-  background: var(--ink-2);
+  background: currentcolor;
 }
 
-.markup-swatches {
-  display: grid;
-  grid-template-columns: repeat(4, 1.1rem);
-  gap: 8px;
-  padding: 6px;
+.pen-tray-size.is-chosen {
+  background: var(--stage-plate-2);
 }
 
-/* The picture, centred at its own proportions. The sides are the same picture
-   enlarged, blurred and darkened rather than a flat colour. */
-.markup-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
+/* A phone's column: the same tray, a little tighter. */
+@media (max-width: 480px) {
+  .pen-tray {
+    gap: 2px;
+    padding: 0 8px;
+  }
+
+  .pen-tray-pen {
+    width: 28px;
+  }
+
+  .pen-tray-tool {
+    width: 40px;
+  }
 }
 
-.markup-backdrop {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.2);
-  filter: blur(28px) brightness(0.5);
+@media (prefers-reduced-motion: reduce) {
+  .pen-tray-pen,
+  .pen-tray-menu {
+    transition: none;
+    animation: none;
+  }
 }
 
 .markup-image {

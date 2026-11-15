@@ -3,6 +3,32 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.60 – 2026-11-15
+
+### Added
+
+- Settings › Members lists the archive's members and waiting invitations,
+  creates and withdraws invitations, and leaves the archive.
+- Drawing opens pictures and boards on a full-screen canvas with a pen tray;
+  a board can be handed to a phone signed into the same account over a
+  private per-account Realtime channel.
+
+### Changed
+
+- Accepting an invitation opens the joined archive at once and removes an
+  automatically created, empty default archive (no notes, folders, files or
+  other members). Migration `20261115010000`.
+
+### Fixed
+
+- A write the collaboration server refused (a note locked by someone else, in
+  the Trash, or no longer writable) is discarded on the device and the note
+  reopened from the server, so a locked note always shows its real content.
+- A metadata write refused by row level security now reverts instead of
+  leaving the note in the Trash on one device only; trashing, pinning and
+  filing save immediately rather than when the window hides.
+- Notes locked by another member no longer offer Delete.
+
 ## 0.9.59 – 2026-11-15
 
 ### Changed

@@ -90,6 +90,14 @@ async function loadArchiveOptions(userId: string): Promise<ArchiveOption[]> {
   }));
 }
 
+/** Joins the archive an invitation is for and answers its id. Postgres also
+ *  discards the account's own default archive if it is still empty. */
+export async function claimInvite(token: string): Promise<string> {
+  const claim = await supabase.rpc("claim_archive_invite", { token });
+  if (claim.error) throw new Error(claim.error.message);
+  return claim.data as string;
+}
+
 async function openAccount(
   userId: string,
   email: string,
@@ -100,10 +108,8 @@ async function openAccount(
     throw new Error(bootstrap.error?.message ?? "Could not create an archive for this account");
   }
 
-  if (inviteToken) {
-    const claim = await supabase.rpc("claim_archive_invite", { token: inviteToken });
-    if (claim.error) throw new Error(claim.error.message);
-  }
+  let joined: string | undefined;
+  if (inviteToken) joined = await claimInvite(inviteToken);
 
   await ensureProfile(userId, email);
   const { restoreAccountContent } = await import("./accountContent");
@@ -111,8 +117,17 @@ async function openAccount(
   const archives = await loadArchiveOptions(userId);
   if (archives.length === 0) throw new Error("Could not open this account");
 
+  /* The archive just joined opens, however many others the account has. */
+  const opening =
+    archives.length === 1
+      ? archives[0].archiveId
+      : joined && archives.find((archive) => archive.archiveId === joined)?.archiveId;
+  if (!opening) {
+    localStorage.removeItem(SESSION_KEY);
+    resetArchiveCache();
+  }
   return {
-    session: archives.length === 1 ? storeSession(userId, email, archives[0].archiveId) : null,
+    session: opening ? storeSession(userId, email, opening) : null,
     account: { userId, email },
     archives,
   };

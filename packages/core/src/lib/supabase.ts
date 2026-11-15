@@ -558,10 +558,14 @@ export async function persistMetaDiff(
       !sameJson(previous.chapter ?? null, metadata.chapter ?? null)
     );
   });
-  await all([
+  /* Row level security refuses a row by not returning it, not with an error:
+     a note the other member locked a moment before this device heard about
+     it comes back as zero rows. Unnoticed, this device went on showing the
+     note in Trash while it stood untouched for everybody else. */
+  const placed = await Promise.all(
     // Each note carries its own values, so these stay separate statements —
     // but they no longer wait on one another.
-    ...movedNotes.map((metadata) =>
+    movedNotes.map((metadata) =>
       supabase
         .from("notes")
         .update({
@@ -574,9 +578,12 @@ export async function persistMetaDiff(
           chapter: metadata.chapter ?? null,
         })
         .eq("archive_id", archiveId)
-        .eq("id", metadata.id),
+        .eq("id", metadata.id)
+        .select("id"),
     ),
-  ]);
+  );
+  for (const result of placed) fail(result.error);
+  const refused = placed.some((result) => !result.data?.length);
 
   // ── 3. What nothing points at any more ──────────────────────────────────
   const goneFolders = [...beforeFolders.keys()].filter((id) => !afterFolders.has(id));
@@ -584,5 +591,15 @@ export async function persistMetaDiff(
     await all([
       supabase.from("folders").delete().eq("archive_id", archiveId).in("id", goneFolders),
     ]);
+  }
+  if (refused) throw new NoteRefused(ownerId);
+}
+
+/** Some of an owner's notes were refused — locked by the other member, or
+ *  gone. Everything else was written; what this device believes about the
+ *  refused rows is wrong and has to be read again, not retried. */
+export class NoteRefused extends Error {
+  constructor(readonly owner: string) {
+    super("That note was changed by another member");
   }
 }

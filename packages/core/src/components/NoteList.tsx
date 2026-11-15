@@ -1100,6 +1100,9 @@ export function NoteList({
       run: () => onSelect(entry.note.id),
     };
     if (!canWrite) return [open, ...infoItem(entry)];
+    /* Somebody else's lock: theirs to change, file or throw away. */
+    const lock = lockOf?.(entry.note.id);
+    if (lock?.holderName && !lock.mine) return [open, ...infoItem(entry), ...lockItems(lock)];
     if (trashMode)
       return [
         ...infoItem(entry),
@@ -1293,7 +1296,9 @@ export function NoteList({
                 peerTyping={peerTypingNoteIds?.has(entry.note.id) ?? false}
                 trashMode={trashMode}
                 archiveMode={archiveMode}
-                canWrite={canWrite}
+                canWrite={
+                  canWrite && !(lockOf?.(entry.note.id)?.holderName && !lockOf(entry.note.id)?.mine)
+                }
                 onSelect={selectEntry}
                 onMoveToTrash={onMoveToTrash}
                 onRestore={onRestore}
