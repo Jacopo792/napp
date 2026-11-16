@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { usePresence } from "@/components/usePresence";
-import { OVERLAY_OUT } from "@/lib/motion";
+import { OVERLAY_IN } from "@/lib/motion";
 
 /** Keeps a docked column drawn, inert, for its way out. `display: contents`:
  *  the column stays the flex child it was; styles.css animates it by
@@ -8,7 +8,7 @@ import { OVERLAY_OUT } from "@/lib/motion";
 export function Exits({ open, children }: { open: boolean; children: ReactNode }) {
   const [last, setLast] = useState(children);
   if (open && last !== children) setLast(children);
-  const present = usePresence(open, OVERLAY_OUT.duration);
+  const present = usePresence(open, OVERLAY_IN.duration);
   if (!present) return null;
   return (
     <div className="exits" data-exiting={!open || undefined} inert={!open}>

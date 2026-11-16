@@ -418,6 +418,24 @@ export function sendNotes(moves: { id: string; to: string | null; leaves: boolea
   });
 }
 
+/* ── Two views of one window ─────────────────────────────────────────────────
+   A book's sheet and its board, the sheet and its pages: the same window
+   turned over, so the one being left fades out and then the other fades in,
+   as an archive switch does (`.is-turning-view` in the stylesheet), never a
+   swap between two frames. `apply` must commit synchronously (`flushSync`),
+   so the picture taken after it is the finished one. */
+export function turnView(apply: () => void) {
+  if (typeof document === "undefined" || !document.startViewTransition || reduced()) {
+    apply();
+    return;
+  }
+  const root = document.documentElement;
+  root.classList.add("is-turning-view");
+  void document
+    .startViewTransition(apply)
+    .finished.finally(() => root.classList.remove("is-turning-view"));
+}
+
 /* ── Which way a note came from ─────────────────────────────────────────────
    Opening the next note down the list is moving down a long page, so the new
    note rises into place and the old one leaves upward; the note above comes

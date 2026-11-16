@@ -335,6 +335,7 @@ export function SettingsPanel({
   currentArchiveId,
   onSwitchArchive,
   onNewArchive,
+  onEditArchive,
   selfId,
   avatarUrls,
   invites,
@@ -397,6 +398,8 @@ export function SettingsPanel({
   currentArchiveId: string;
   onSwitchArchive: (archiveId: string) => Promise<void>;
   onNewArchive: () => void;
+  /** Its maker opens an archive's own sheet from the list to change it. */
+  onEditArchive: (archiveId: string) => void;
   /** Members: who is in the archive on screen, who is invited, the way out. */
   selfId: string;
   avatarUrls: Record<string, string | null>;
@@ -1514,6 +1517,16 @@ export function SettingsPanel({
                               onClick={() => void spaceAct(() => onSwitchArchive(space.archiveId))}
                             >
                               Open
+                            </button>
+                          )}
+                          {space.createdBy === selfId && (
+                            <button
+                              type="button"
+                              className="space-list-button is-edit press"
+                              disabled={spaceBusy}
+                              onClick={() => onEditArchive(space.archiveId)}
+                            >
+                              Edit
                             </button>
                           )}
                           {space.archiveId !== defaultArchiveId && (

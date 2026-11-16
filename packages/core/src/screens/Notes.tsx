@@ -99,7 +99,7 @@ import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import { readableMedia } from "@/lib/mediaTextShape";
 import type { MenuItem } from "@/lib/menuShape";
 import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
-import { aimNote, captureRows, markPinned, sendNotes, settleBack } from "@/lib/motion";
+import { aimNote, captureRows, markPinned, sendNotes, settleBack, turnView } from "@/lib/motion";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
@@ -220,7 +220,8 @@ type SheetEntry =
   | { kind: "note"; noteId: string }
   | { kind: "person"; userId: string }
   | { kind: "folder"; folderId: string }
-  | { kind: "archive" }
+  /* Without an id, the archive on screen; with one, any its maker edits. */
+  | { kind: "archive"; archiveId?: string }
   | { kind: "new-archive" }
   | { kind: "trash" };
 
@@ -252,11 +253,17 @@ const shellElement = () =>
   document.querySelector<HTMLElement>(".workspace-shell, .mobile-workspace");
 const stillMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** What fades: the screen together with the wallpaper behind it. Fading the
+ *  screen alone uncovered the picture at full strength for a beat — a book
+ *  hides it behind an opaque page — and the window flashed it between two
+ *  archives. Between them now is only the window's own surface. */
+const switchLayer = () => document.getElementById("root");
+
 /** Fades the screen out, and resolves even in a window too hidden to animate. */
 function leaveScreen(): Promise<void> {
-  const shell = shellElement();
-  if (!shell || stillMotion()) return Promise.resolve();
-  const fade = shell.animate([{ opacity: 1 }, { opacity: 0 }], { ...SWITCH_OUT, fill: "forwards" });
+  const layer = switchLayer();
+  if (!layer || !shellElement() || stillMotion()) return Promise.resolve();
+  const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], { ...SWITCH_OUT, fill: "forwards" });
   return Promise.race([
     fade.finished.then(() => undefined),
     new Promise<void>((resolve) => window.setTimeout(resolve, SWITCH_OUT.duration + 100)),
@@ -1296,25 +1303,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [quiet]);
 
-  /* A book's structure is its corkboard, laid in place of the sheet. The
-     sheet and the board are the same window turned over, so the change is
-     one crossfade of the whole picture while the cards settle in — see
-     `.is-turning-board` in the stylesheet. */
-  const toggleBoard = useCallback(() => {
-    const apply = () => flushSync(() => setBoardOpen((open) => !open));
-    if (
-      !document.startViewTransition ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      apply();
-      return;
-    }
-    const root = document.documentElement;
-    root.classList.add("is-turning-board");
-    document
-      .startViewTransition(apply)
-      .finished.finally(() => root.classList.remove("is-turning-board"));
-  }, []);
+  /* A book's structure is its corkboard, laid in place of the sheet: the
+     same window turned over (`turnView`) while the cards settle in. */
+  const toggleBoard = useCallback(
+    () => turnView(() => flushSync(() => setBoardOpen((open) => !open))),
+    [],
+  );
 
   const handleUploadImage = useCallback(
     async (file: File): Promise<string> => {
@@ -2460,10 +2454,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     }
   }
 
-  const archiveSheetOpen = sheets.some((sheet) => sheet.kind === "archive");
+  const archiveSheet = sheets.find((sheet) => sheet.kind === "archive");
+  /* An archive edited from the list in Settings need not be the one on
+     screen: its invitations are asked of it. Postgres decides either way. */
+  const editedArchiveId = archiveSheet?.kind === "archive" ? archiveSheet.archiveId : undefined;
+  const inviteSession = useMemo(
+    () =>
+      session && editedArchiveId && editedArchiveId !== session.archiveId
+        ? { ...session, archiveId: editedArchiveId }
+        : session,
+    [session, editedArchiveId],
+  );
   const { invites, inviteLink, withdrawInvite } = useArchiveInvites(
-    session,
-    settingsOpen || archiveSheetOpen,
+    inviteSession,
+    settingsOpen || Boolean(archiveSheet),
   );
 
   /* The switch is asked for once a session; a missing answer only means the
@@ -2651,11 +2655,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     const root = document.documentElement;
     if (!arrived || !("arriving" in root.dataset)) return;
     const shell = shellElement();
+    const layer = switchLayer();
     delete root.dataset.arriving;
-    if (!shell || stillMotion()) return;
+    /* The way out held the layer at nothing; that fill must not outlast it. */
+    for (const animation of layer?.getAnimations() ?? []) animation.cancel();
+    if (!shell || !layer || stillMotion()) return;
     for (const animation of shell.getAnimations({ subtree: true }))
       if (animation.effect?.getComputedTiming().endTime !== Infinity) animation.finish();
-    shell.animate([{ opacity: 0 }, { opacity: 1 }], SWITCH_IN);
+    layer.animate([{ opacity: 0 }, { opacity: 1 }], SWITCH_IN);
   }, [arrived]);
 
   const switchArchive = (archiveId: string) =>
@@ -3407,38 +3414,43 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
-  /* The archive on screen: its people, its seats, who is waiting to come in.
-     The current archive's faces come from the live roster rather than the
-     list the switch loaded, so somebody joining appears here at once. */
-  function renderArchiveSheet(key: string) {
-    const space = spacesView.find((one) => one.archiveId === session?.archiveId);
+  /* An archive's sheet: its people, its seats, who is waiting to come in.
+     The archive on screen takes its faces from the live roster rather than
+     the list the switch loaded, so somebody joining appears here at once;
+     another archive, opened from Settings by its maker, has only that list,
+     so its counts and its people's sheets are left out. */
+  function renderArchiveSheet(sheet: { archiveId?: string }, key: string) {
+    const archiveId = sheet.archiveId ?? session?.archiveId;
+    const space = spacesView.find((one) => one.archiveId === archiveId);
     if (!session || !space) return null;
-    const live = entries.filter((entry) => !trashedIds.has(entry.note.id));
+    const here = space.archiveId === session.archiveId;
+    const target = here ? session : { ...session, archiveId: space.archiveId };
+    const live = here ? entries.filter((entry) => !trashedIds.has(entry.note.id)) : null;
     return (
       <ArchiveSheet
         key={key}
         space={space}
         selfId={session.userId}
         avatarUrls={avatarUrls}
-        notes={live.length}
-        words={live.reduce((sum, entry) => sum + derivedOf(entry.note).words, 0)}
+        notes={live?.length}
+        words={live?.reduce((sum, entry) => sum + derivedOf(entry.note).words, 0)}
         invites={invites}
         onRename={async (name) => {
-          await renameSpace(session, name);
+          await renameSpace(target, name);
           await refreshSpaces();
         }}
         onSeats={async (seats) => {
-          await setSpaceSeats(session, seats);
-          setSeatLimit(seats);
+          await setSpaceSeats(target, seats);
+          if (here) setSeatLimit(seats);
           await refreshSpaces();
         }}
         isDefault={space.archiveId === defaultArchiveId}
-        onKind={saveArchiveKind}
-        onOptions={saveDocumentOptions}
+        onKind={(kind) => saveArchiveKind(kind, target, space)}
+        onOptions={(features) => saveDocumentOptions(features, target)}
         onCreateInvite={inviteLink}
         onRevokeInvite={withdrawInvite}
-        onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
-        onLeave={handleLeaveArchive}
+        onOpenPerson={here ? (userId) => pushSheet({ kind: "person", userId }) : undefined}
+        onLeave={here ? handleLeaveArchive : undefined}
         onDelete={() => handleDeleteArchive(space.archiveId)}
       />
     );
@@ -3499,7 +3511,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         const key = `${index}:${sheet.kind}`;
         if (sheet.kind === "note") return renderNoteSheet(sheet, `${key}:${sheet.noteId}`);
         if (sheet.kind === "folder") return renderFolderSheet(sheet, `${key}:${sheet.folderId}`);
-        if (sheet.kind === "archive") return renderArchiveSheet(key);
+        if (sheet.kind === "archive") return renderArchiveSheet(sheet, key);
         if (sheet.kind === "trash")
           return (
             <TrashSheet
@@ -3641,20 +3653,20 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
-  async function saveDocumentOptions(features: DocumentFeatures) {
-    if (!session) return;
-    await setDocumentFeatures(session, features);
+  async function saveDocumentOptions(features: DocumentFeatures, target = session) {
+    if (!target) return;
+    await setDocumentFeatures(target, features);
     await refreshSpaces();
   }
 
   /* Notes into a book or back, from the archive's own sheet. A book that has
      never had a tool switched on gets the book's set. */
-  async function saveArchiveKind(kind: ArchiveKind) {
-    if (!session || !currentSpace) return;
-    await setSpaceKind(session, kind);
-    const { features } = currentSpace;
+  async function saveArchiveKind(kind: ArchiveKind, target = session, space = currentSpace) {
+    if (!target || !space) return;
+    await setSpaceKind(target, kind);
+    const { features } = space;
     if (kind === "document" && !SWITCH_KEYS.some((key) => features[key]))
-      await setDocumentFeatures(session, { ...BOOK_PRESET.features });
+      await setDocumentFeatures(target, { ...BOOK_PRESET.features });
     await refreshSpaces();
   }
 
@@ -3748,6 +3760,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
              thing in front of you, so Settings steps aside for it. */
           setSettingsOpen(false);
           openSheet({ kind: "new-archive" });
+        }}
+        onEditArchive={(archiveId) => {
+          setSettingsOpen(false);
+          openSheet({ kind: "archive", archiveId });
         }}
         defaultArchiveId={defaultArchiveId}
         onDeleteArchive={handleDeleteArchive}

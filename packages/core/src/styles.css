@@ -1059,8 +1059,15 @@
    name in the 40px band the toolbar stops short of. The panel is pulled up
    over the band's last 320px rather than the toolbar being rebuilt around it. */
 @container editor (min-width: 701px) {
-  .editor-shell:has(> .editor-body > .exits > .note-comments) > .editor-toolbar {
+  /* The band makes room on the panel's own beat, both ways. */
+  .editor-shell > .editor-toolbar {
+    transition: margin-right var(--dur-base) var(--ease-in-out);
+  }
+
+  .editor-shell:has(> .editor-body > .exits:not([data-exiting]) > .note-comments)
+    > .editor-toolbar {
     margin-right: 320px;
+    transition: margin-right var(--motion-shape) var(--ease);
   }
 
   .editor-body > .exits > .note-comments {
@@ -2186,13 +2193,17 @@
   view-transition-name: note-split;
 }
 
-/* A book turns between its sheet and its corkboard (`toggleBoard`): one
-   crossfade of the window, short, while the cards fade in after it in
-   reading order. */
-.is-turning-board::view-transition-old(root),
-.is-turning-board::view-transition-new(root) {
-  animation-duration: var(--dur-base);
-  animation-timing-function: var(--ease);
+/* Two views of one window: the one being left goes first, then the other
+   comes in — the archive switch's own fade-through and its timing (SWITCH_OUT,
+   SWITCH_IN in Notes.tsx), so the two never cross as a double exposure. */
+.is-turning-view::view-transition-old(root) {
+  animation: fade-out 140ms cubic-bezier(0.4, 0, 1, 1) both;
+  mix-blend-mode: normal;
+}
+
+.is-turning-view::view-transition-new(root) {
+  animation: fade-in 200ms var(--ease-out) 140ms both;
+  mix-blend-mode: normal;
 }
 
 .is-sliding-navigation::view-transition-old(root),
@@ -11004,8 +11015,18 @@ button.sheet-chip:hover,
    column, whether a row has two faces or three, a delete or none. */
 .space-list .appearance-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 64px 64px;
+  grid-template-columns: 48px minmax(0, 1fr) 64px 64px 64px;
   gap: 12px;
+}
+
+/* Edit and delete keep their own columns, so a row without Edit (an archive
+   somebody else made) does not pull its delete in under the others' Edit. */
+.space-list .space-list-button.is-edit {
+  grid-column: 4;
+}
+
+.space-list .space-list-button.is-danger {
+  grid-column: 5;
 }
 
 .space-list .face-stack {
@@ -11110,8 +11131,7 @@ button.sheet-chip:hover,
 
 /* Between two archives: the new screen is mounted and not yet shown. See
    `NotesPage` for why the way across is a single fade. */
-[data-arriving] .workspace-shell,
-[data-arriving] .mobile-workspace {
+[data-arriving] #root {
   opacity: 0;
 }
 
@@ -13275,33 +13295,49 @@ button.sheet-chip:hover,
   background: color-mix(in srgb, var(--surface) 72%, var(--paper));
 }
 
-/* A docked column arrives from the edge it is docked to. These were the only
-   surfaces in the app that appeared between two frames. Inside the inspector
-   a tab replaces a tab in place, so only the column itself travels. */
+/* A docked column fades in where it will stay, and the room it takes opens on
+   the travel beat: its margin starts a whole column past the edge, so the page
+   beside it slides over instead of jumping half a column in one frame — the
+   jolt every panel used to give the screen. The column is held in place over
+   that slide (the transform cancels the margin), so only the page travels,
+   and it keeps its width throughout, so nothing inside it reflows. Inside the
+   inspector a tab replaces a tab in place, so only the column itself enters. */
+.manuscript-inspector,
+.note-comments {
+  --dock: 320px;
+}
+.note-outline {
+  --dock: 232px;
+}
 .manuscript-inspector,
 :is(.note-comments, .note-outline, .note-history):not(.manuscript-inspector *) {
-  animation: panel-in var(--dur-base) var(--ease-out) backwards;
+  animation:
+    dock-room var(--motion-shape) var(--ease) backwards,
+    fade-in var(--motion-enter) var(--ease-out) backwards;
 }
 
-@keyframes panel-in {
+@keyframes dock-room {
   from {
-    opacity: 0;
-    transform: translateX(12px);
+    margin-right: calc(-1 * var(--dock));
+    transform: translateX(calc(-1 * var(--dock)));
   }
 }
 
-/* Back to the edge, faster than it came (OVERLAY_OUT). */
+/* The same way back, quicker than it came. Exits keeps it drawn for
+   OVERLAY_IN's duration, which is `--dur-base`. */
 .exits {
   display: contents;
 }
 .exits[data-exiting] > :is(.manuscript-inspector, .note-comments, .note-outline, .note-history) {
   pointer-events: none;
-  animation: panel-out var(--dur-fast) var(--ease-in-out) forwards;
+  animation:
+    dock-leave var(--dur-base) var(--ease-in-out) forwards,
+    fade-out var(--dur-fast) var(--ease-in-out) forwards;
 }
-@keyframes panel-out {
+@keyframes dock-leave {
   to {
-    opacity: 0;
-    transform: translateX(12px);
+    margin-right: calc(-1 * var(--dock));
+    transform: translateX(calc(-1 * var(--dock)));
   }
 }
 
@@ -13311,6 +13347,9 @@ button.sheet-chip:hover,
   .note-outline,
   .note-history {
     animation: none;
+  }
+  .editor-shell > .editor-toolbar {
+    transition: none !important;
   }
 }
 
@@ -13359,6 +13398,18 @@ button.sheet-chip:hover,
 
 .inspector-pane[hidden] {
   display: none;
+}
+
+/* A tab replaces a tab in place: no direction to travel, so the new pane's
+   words fade in on the content beat rather than appearing between frames. */
+.inspector-pane:not([hidden]) {
+  animation: fade-in var(--motion-content) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector-pane:not([hidden]) {
+    animation: none;
+  }
 }
 
 .inspector-close {

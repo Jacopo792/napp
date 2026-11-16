@@ -84,8 +84,9 @@ export function ArchiveSheet({
   /** The archive an account starts with: always notes, never deleted. */
   isDefault: boolean;
   avatarUrls: Record<string, string | null>;
-  notes: number;
-  words: number;
+  /** Counted for the archive on screen only. */
+  notes?: number;
+  words?: number;
   invites: { id: string; email: string; expiresAt: string }[];
   onRename: (name: string) => Promise<void>;
   onSeats: (seats: number) => Promise<void>;
@@ -93,8 +94,8 @@ export function ArchiveSheet({
   onOptions: (features: DocumentFeatures) => Promise<void>;
   onCreateInvite: (email: string) => Promise<string>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
-  onOpenPerson: (userId: string) => void;
-  onLeave: () => Promise<void>;
+  onOpenPerson?: (userId: string) => void;
+  onLeave?: () => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [name, setName] = useState(space.name);
@@ -155,14 +156,18 @@ export function ArchiveSheet({
         </header>
 
         <div className="sheet-stats">
-          <div>
-            <small>Notes</small>
-            <strong>{notes}</strong>
-          </div>
-          <div>
-            <small>Words</small>
-            <strong>{words.toLocaleString()}</strong>
-          </div>
+          {notes !== undefined && (
+            <div>
+              <small>Notes</small>
+              <strong>{notes}</strong>
+            </div>
+          )}
+          {words !== undefined && (
+            <div>
+              <small>Words</small>
+              <strong>{words.toLocaleString()}</strong>
+            </div>
+          )}
           <div className="sheet-stepper">
             <small>Seats</small>
             <span>
@@ -220,7 +225,8 @@ export function ArchiveSheet({
                 key={member.userId}
                 type="button"
                 className="sheet-face press"
-                onClick={() => onOpenPerson(member.userId)}
+                disabled={!onOpenPerson}
+                onClick={() => onOpenPerson?.(member.userId)}
               >
                 <Avatar
                   url={avatarUrls[member.userId] ?? null}
@@ -249,7 +255,7 @@ export function ArchiveSheet({
             </p>
           )}
 
-          {!alone && !(maker && !isDefault) && (
+          {onLeave && !alone && !(maker && !isDefault) && (
             <button
               type="button"
               className={`sheet-leave press ${leaving ? "is-confirm" : ""}`}

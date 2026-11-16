@@ -38,6 +38,8 @@ import {
 } from "react";
 import { BotanicalFlower } from "@/components/BotanicalFlowers";
 import { flowerFor } from "@/lib/botanical";
+import { turnView } from "@/lib/motion";
+import { flushSync } from "react-dom";
 import type { NoteEntry } from "@/lib/entries";
 import type { NoteLock } from "@/lib/types";
 import { editBody, readDraft } from "@/features/editor/lib/draft";
@@ -1401,11 +1403,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               aria-label="Pages"
               aria-pressed={Boolean(pages)}
               title={pages ? "Return to editing" : "Read as pages"}
-              onClick={() =>
-                setPages(
-                  pages || !sheetRef.current ? null : snapshotSheet(sheetRef.current, chapterTitle),
-                )
-              }
+              onClick={() => {
+                const next =
+                  pages || !sheetRef.current ? null : snapshotSheet(sheetRef.current, chapterTitle);
+                turnView(() => flushSync(() => setPages(next)));
+              }}
             >
               <BookOpen size={16} />
               <span>{pages ? "Edit" : "Pages"}</span>
