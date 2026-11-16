@@ -45,6 +45,50 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.62",
+    date: "2026-11-16",
+    headline: "Smoother, and fewer things that do nothing",
+    sections: [
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Calmer openings",
+            text: "Menus, Spotlight, Settings and sheets open in one smooth movement, without the small bounce or the flash of light at the end.",
+          },
+          {
+            title: "Cleaner Info",
+            text: "The Info of a note or folder lines up in the light theme too: equal tiles, and a history that reads as one list.",
+            image: "0.9.62-info.jpg",
+          },
+          {
+            title: "Tidier folders",
+            text: "Folder counts line up with All notes. A folder's actions are in its right-click menu; the ⋯ button that opened behind the sidebar is gone.",
+            image: "0.9.62-folders.jpg",
+          },
+          {
+            title: "A shorter toolbar in books",
+            text: "Focus, Typewriter and Editing are gone from the book's toolbar, and the switch between you and your partner is drawn like Write | Board.",
+            image: "0.9.62-toolbar.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Drawing answers the first click",
+            text: "Undo, redo and handing the board to the phone work on the first click in the desktop app.",
+          },
+          {
+            title: "A light sidebar on a dark Mac",
+            text: "With the light theme on a Mac set to dark, the sidebar no longer turns black, with or without a wallpaper, and switching account no longer leaves it dark until Napp is reopened.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.61",
     date: "2026-11-16",
     headline: "A clearer privacy notice",

@@ -38,7 +38,7 @@ export function UsageDashboard() {
         </p>
       )}
 
-      <h3>{data.total ? `${data.total} ${data.total === 1 ? "device" : "devices"}` : "Devices"}</h3>
+      <h3>{data.total ? `${data.total} ${data.total === 1 ? "entry" : "entries"}` : "Accounts"}</h3>
       <div className="appearance-controls">
         {data.rows.map((row) => (
           <div
@@ -50,19 +50,29 @@ export function UsageDashboard() {
               <small>{row.email || row.user_id}</small>
             </span>
             <span className="usage-where">
-              <span>
-                {row.device} · {USAGE_CLIENT[row.client]}
-              </span>
-              <small>
-                {row.os}
-                {row.browser ? ` · ${row.browser}` : ""} ·{" "}
-                <time
-                  dateTime={row.last_active_at}
-                  title={new Date(row.last_active_at).toLocaleString()}
-                >
-                  {usageAgo(row.last_active_at)}
-                </time>
-              </small>
+              {row.client ? (
+                <>
+                  <span>
+                    {row.device} · {USAGE_CLIENT[row.client]}
+                  </span>
+                  <small>
+                    {row.os}
+                    {row.browser ? ` · ${row.browser}` : ""} ·{" "}
+                    <time
+                      dateTime={row.last_active_at ?? undefined}
+                      title={
+                        row.last_active_at
+                          ? new Date(row.last_active_at).toLocaleString()
+                          : undefined
+                      }
+                    >
+                      {usageAgo(row.last_active_at)}
+                    </time>
+                  </small>
+                </>
+              ) : (
+                <small>{usageAgo(null)}</small>
+              )}
             </span>
           </div>
         ))}

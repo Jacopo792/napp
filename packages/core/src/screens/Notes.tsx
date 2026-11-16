@@ -4398,16 +4398,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     today: statsShown ? wordsToday : null,
                   },
                   numbered: docFeatures.numbering ? chapterAt + 1 : null,
-                  writing: {
-                    focus: focusMode ? writingPreferences.focusScope : "off",
-                    typewriter: writingPreferences.typewriter,
-                  },
-                  onToggleFocus: toggleFocus,
-                  onToggleTypewriter: () =>
-                    setWritingPreferences({
-                      ...writingPreferences,
-                      typewriter: !writingPreferences.typewriter,
-                    }),
                   topLevel: topLevel(
                     headingsOf(selected.note.content).map((heading) => heading.level),
                   ),

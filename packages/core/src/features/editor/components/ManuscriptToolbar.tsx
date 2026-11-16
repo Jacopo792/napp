@@ -43,7 +43,6 @@ import {
   Outdent,
   PageBreak,
   Plus,
-  Review,
   Search,
   Strikethrough,
   Subscript,
@@ -525,9 +524,8 @@ export function ManuscriptToolbar({
   page: Pick<PageSetup, "tableCaption">;
   onLink: () => void;
   onImage: () => void;
-  /** Present when the document has Suggested changes on: whether this writer
-   *  is suggesting, and the switch. */
-  review?: { on: boolean; toggle: () => void };
+  /** The document has Suggested changes on: accept or reject what is there. */
+  review?: boolean;
 }) {
   /* Which picker is open off the Insert menu: a cross-reference or a
      citation. One slot, because the two stand in the same place. */
@@ -1017,20 +1015,10 @@ export function ManuscriptToolbar({
         </span>
       </div>
 
-      {/* Word's Review tab, cut to its three acts: propose instead of
-          writing, and accept or reject what was proposed — the change the
-          caret is in, or every one in the chapter from the menu. */}
-      {review && (
+      {/* Word's Review tab: accept or reject what was proposed — the change
+          the caret is in, or every one in the chapter from the menu. */}
+      {review && (state?.here || (state?.pending ?? 0) > 0) && (
         <div className="ribbon-group is-review">
-          <Tool
-            label={review.on ? "Suggesting — your edits are proposals" : "Suggest changes"}
-            active={review.on}
-            disabled={off}
-            onPress={review.toggle}
-          >
-            <Review size={15} />
-            <span className="ribbon-word">{review.on ? "Suggesting" : "Editing"}</span>
-          </Tool>
           {state?.here && (
             <>
               <Tool

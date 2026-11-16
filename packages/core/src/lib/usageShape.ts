@@ -7,14 +7,16 @@ export interface UsageDevice {
 
 export const USAGE_CLIENT = { web: "Web", desktop: "Desktop app", mobile: "Phone app" } as const;
 
-/** "Now", "42 minutes ago", "3 days ago", then a date. */
-export function usageAgo(iso: string, now = Date.now()) {
-  const relative = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  const minutes = Math.round((Date.parse(iso) - now) / 60_000);
-  if (minutes > -1) return "Now";
-  if (minutes > -60) return relative.format(minutes, "minute");
-  if (minutes > -1440) return relative.format(Math.round(minutes / 60), "hour");
-  if (minutes > -10080) return relative.format(Math.round(minutes / 1440), "day");
+/** "Now", "42 minutes ago", "3 days ago", then a date. Plain strings, not
+ *  `Intl.RelativeTimeFormat`: the phone's Hermes engine has no such constructor. */
+export function usageAgo(iso: string | null, now = Date.now()) {
+  if (!iso) return "No activity yet";
+  const minutes = Math.floor((now - Date.parse(iso)) / 60_000);
+  const ago = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  if (minutes < 1) return "Now";
+  if (minutes < 60) return ago(minutes, "minute");
+  if (minutes < 1440) return ago(Math.floor(minutes / 60), "hour");
+  if (minutes < 10080) return ago(Math.floor(minutes / 1440), "day");
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 

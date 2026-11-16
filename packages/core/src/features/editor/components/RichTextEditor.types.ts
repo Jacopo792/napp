@@ -5,7 +5,6 @@ import type { HocuspocusProvider } from "@hocuspocus/provider";
 import { type Editor, type JSONContent } from "@tiptap/core";
 import type * as Y from "yjs";
 import { type SuggestionMode } from "../lib/suggestions";
-import { type WritingFocusSettings } from "../lib/writingFocus";
 
 export type FormatAction =
   | "bold"
@@ -140,9 +139,6 @@ export interface RichTextEditorProps {
   /** Whether this writer's edits are proposals, and in whose name. Read on
    *  every transaction, so switching needs no new editor. */
   suggesting?: SuggestionMode;
-  /** A document only: what focus mode leaves lit, and whether the line being
-   *  written is kept mid-window. */
-  writing?: WritingFocusSettings;
   /** The note this editor holds, for a cross-reference to say "in chapter 2"
    *  only of what is not in this one. */
   noteId?: string;

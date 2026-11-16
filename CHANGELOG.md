@@ -3,6 +3,31 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.62 – 2026-11-16
+
+### Changed
+
+- UI previews skip the first-launch ⌘K lesson.
+- Opening animations no longer overshoot or brighten at the end (springy
+  curve, late glass blur and menu shadow pop removed).
+- Note and folder Info sheets are aligned in the light theme.
+- Folder counts align with All notes; the folder ⋯ button is removed in
+  favour of the right-click menu (also Shift+F10 / the context-menu key).
+- The book toolbar drops Focus, Typewriter and Editing (suggested changes);
+  the You/Partner switch matches the Write | Board segment.
+- Usage lists every account with an email, including those not yet seen from
+  an updated client. Migration `20261116020000`.
+
+### Fixed
+
+- Drawing controls ignored clicks in the desktop app: the toolbars under the
+  stage were window-drag regions.
+- On macOS in dark mode, the light theme showed a black sidebar: the native
+  material now follows Napp's theme (`nativeTheme.themeSource`), and switching
+  account loads the device's wallpaper whenever one is turned on.
+- The phone's Usage page crashed: relative times no longer use
+  `Intl.RelativeTimeFormat`.
+
 ## 0.9.61 – 2026-11-16
 
 ### Added

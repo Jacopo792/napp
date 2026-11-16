@@ -54,7 +54,6 @@ import { createPortal } from "react-dom";
 import { ySyncPluginKey } from "y-prosemirror";
 import { UniqueBlockAnchors } from "../lib/blockAnchors";
 import { suggestionsExtension, type SuggestionMode } from "../lib/suggestions";
-import { WRITING_FOCUS, WritingFocus, type WritingFocusSettings } from "../lib/writingFocus";
 import { TAKE_UP_THE_PEN, requestDrawing } from "./drawingRequests";
 import { noteLinkExtension, slashMenuExtension } from "./editorSuggestions";
 import { ImageLightbox, ImagePreview } from "./ImageLightbox";
@@ -139,7 +138,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       collaboration = null,
       onEditor,
       manuscript = false,
-      writing,
       noteId = "",
       footnotes = false,
       onTargets,
@@ -150,10 +148,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     const suggestingRef = useRef<SuggestionMode>({ on: false, author: "" });
     suggestingRef.current = suggesting ?? { on: false, author: "" };
     const suggestions = useMemo(() => suggestionsExtension(() => suggestingRef.current), []);
-    /* Read by the plugin on every transaction, so a change of setting needs no
-     new editor — only the empty transaction below, to draw it again. */
-    const writingRef = useRef<WritingFocusSettings>(writing ?? { focus: "off", typewriter: false });
-    writingRef.current = writing ?? { focus: "off", typewriter: false };
     const [preview, setPreview] = useState<ImagePreview | null>(null);
     const onChangeRef = useRef(onChange);
     const onLocalEditRef = useRef(onLocalEdit);
@@ -284,14 +278,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           PassageFlash,
           sentenceCapitalize,
           autocorrect,
-          ...(manuscript
-            ? [
-                ManuscriptKeys,
-                footnoteShortcut,
-                suggestions,
-                WritingFocus.configure({ read: () => writingRef.current }),
-              ]
-            : []),
+          ...(manuscript ? [ManuscriptKeys, footnoteShortcut, suggestions] : []),
         ],
         content: collaboration ? undefined : value,
         editable: !readOnly,
@@ -816,12 +803,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     useEffect(() => {
       if (editor && editor.isEditable !== !readOnly) editor.setEditable(!readOnly, false);
     }, [editor, readOnly]);
-
-    const focusSetting = writing?.focus ?? "off";
-    useEffect(() => {
-      if (editor && !editor.isDestroyed)
-        editor.view.dispatch(editor.state.tr.setMeta(WRITING_FOCUS, focusSetting));
-    }, [editor, focusSetting]);
 
     useEffect(() => {
       if (!editor || collaboration || appliedRevision.current === revision) return;

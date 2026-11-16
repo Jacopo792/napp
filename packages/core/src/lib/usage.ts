@@ -1,15 +1,17 @@
 import { supabase } from "./supabaseClient";
 import { createActivityReporter, type UsageDevice } from "./usageShape";
 
-export interface UsageRow extends UsageDevice {
+/** One account on one installation; device fields are null for an account
+ *  that has not reported from an updated client yet. */
+export type UsageRow = { [K in keyof UsageDevice]: UsageDevice[K] | null } & {
   user_id: string;
   email: string | null;
   nickname: string;
-  device_id: string;
+  device_id: string | null;
   first_seen_at: string;
-  last_active_at: string;
+  last_active_at: string | null;
   total_count: number;
-}
+};
 
 export async function isUsageAdministrator(): Promise<boolean> {
   const { data, error } = await supabase.rpc("is_usage_administrator");

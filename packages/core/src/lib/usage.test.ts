@@ -61,24 +61,23 @@ test("usage data is server-owned and readable only by the pinned administrator",
       create schema auth; create schema private;
       grant usage on schema public, auth, private to anon, authenticated;
       alter default privileges in schema public grant all on tables to anon, authenticated;
-      create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
+      create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz, created_at timestamptz default now());
       create function auth.uid() returns uuid language sql stable as
         $$select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid$$;
       create table public.profiles(user_id uuid primary key, nickname text);
       create table private.account_erasure_jobs(user_id uuid);
       insert into auth.users values
         ('${owner}', 'ansalonenahida@gmail.com', now()), ('${other}', 'reader@example.test', now());
+      insert into auth.users(id) values ('44444444-4444-4444-8444-444444444444');
       insert into public.profiles values ('${other}', 'Reader');
     `);
-    await db.exec(
-      await readFile(
-        new URL(
-          "../../../../supabase/migrations/20261116010000_usage_dashboard.sql",
-          import.meta.url,
+    for (const migration of ["20261116010000_usage_dashboard", "20261116020000_usage_all_accounts"])
+      await db.exec(
+        await readFile(
+          new URL(`../../../../supabase/migrations/${migration}.sql`, import.meta.url),
+          "utf8",
         ),
-        "utf8",
-      ),
-    );
+      );
     await asUser(other);
     assert.equal(await scalar("select public.is_usage_administrator()"), false);
     await assert.rejects(db.query("select * from public.list_usage_activity()"), /Access denied/);
@@ -97,8 +96,12 @@ test("usage data is server-owned and readable only by the pinned administrator",
         "select * from public.list_usage_activity()",
       )
     ).rows;
-    assert.equal(rows.length, 1);
+    // Active device first, then the account that never reported; the anonymous
+    // account with no activity is left out.
+    assert.equal(rows.length, 2);
     assert.equal(rows[0].user_id, other);
+    assert.equal(rows[1].user_id, owner);
+    assert.equal((rows[1] as unknown as { device: string | null }).device, null);
     assert.equal(rows[0].email, "reader@example.test");
     assert.equal(await scalar("select count(*)::int from public.list_usage_activity('Reader')"), 1);
     assert.equal(await scalar("select count(*)::int from public.list_usage_activity('absent')"), 0);
@@ -145,6 +148,10 @@ test("last activity reads as a short relative time", () => {
   const now = Date.parse("2026-11-16T12:00:00Z");
   const at = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   assert.equal(usageAgo(at(0), now), "Now");
-  assert.notEqual(usageAgo(at(42), now), usageAgo(at(180), now));
+  assert.equal(usageAgo(at(1), now), "1 minute ago");
+  assert.equal(usageAgo(at(42), now), "42 minutes ago");
+  assert.equal(usageAgo(at(180), now), "3 hours ago");
+  assert.equal(usageAgo(at(2 * 1440), now), "2 days ago");
   assert.match(usageAgo(at(30 * 1440), now), /\d/);
+  assert.equal(usageAgo(null, now), "No activity yet");
 });

@@ -15,7 +15,7 @@ import {
   type RemarksSeen,
 } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
-import { localSpotlightLearned, localWhatsNewSeen } from "@/lib/whatsNew";
+import { localWhatsNewSeen } from "@/lib/whatsNew";
 
 export { flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
@@ -55,7 +55,8 @@ export function localPreferences(seen: RemarksSeen = {}) {
       {
         ...DEFAULT_FLAGS,
         whatsNewSeen: localWhatsNewSeen(),
-        spotlightLearned: localSpotlightLearned(),
+        // Previews are for looking at screens, not for the first-launch ⌘K lesson.
+        spotlightLearned: true,
       },
       seen,
     );

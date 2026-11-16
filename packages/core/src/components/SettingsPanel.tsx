@@ -48,8 +48,6 @@ import {
   MousePointer2,
   Users,
   X,
-  AlignCenter,
-  Target,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
 import { AccountDeletionForm } from "@/components/AccountDeletionForm";
@@ -110,7 +108,6 @@ import { MenuButton } from "./MenuPrimitives";
 import { useDismiss } from "./useDismiss";
 import {
   PRESENCE_PALETTES,
-  type FocusScope,
   type SheetTone,
   type WritingPreferences,
 } from "@/lib/writingPreferences";
@@ -1254,28 +1251,6 @@ export function SettingsPanel({
                     <>
                       <h3>While writing</h3>
                       <div className="appearance-controls">
-                        <div className="appearance-row">
-                          <RowLead icon={<Target size={16} />} label="Focus" />
-                          <Segmented
-                            label="Focus"
-                            value={writingPreferences.focusScope}
-                            options={[
-                              { id: "paragraph", name: "Paragraph" },
-                              { id: "sentence", name: "Sentence" },
-                              { id: "off", name: "Everything" },
-                            ]}
-                            onChange={(id) => setWriting({ focusScope: id as FocusScope })}
-                          />
-                        </div>
-                        <label className="appearance-row">
-                          <RowLead icon={<AlignCenter size={16} />} label="Typewriter scrolling" />
-                          <input
-                            type="checkbox"
-                            role="switch"
-                            checked={writingPreferences.typewriter}
-                            onChange={(event) => setWriting({ typewriter: event.target.checked })}
-                          />
-                        </label>
                         <label className="appearance-row">
                           <RowLead icon={<Clock3 size={16} />} label="Words today" />
                           <input

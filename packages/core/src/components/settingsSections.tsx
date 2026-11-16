@@ -102,7 +102,7 @@ export const SETTINGS_SECTIONS = [
         keywords:
           "proofreading spelling correct as I type autocorrect words you kept live presence",
         documentKeywords:
-          "proofreading spelling correct as I type autocorrect words you kept live presence focus typewriter statistics words today session",
+          "proofreading spelling correct as I type autocorrect words you kept live presence statistics words today session",
       },
       {
         id: "shortcuts",

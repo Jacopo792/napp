@@ -396,10 +396,12 @@ export function applyAppearance(config = current): void {
      palette remains the visual bridge between the two. */
   const nativeFrame = (
     window as unknown as {
-      napp?: { setFrameTheme?: (color: string, symbolColor: string) => void };
+      napp?: {
+        setFrameTheme?: (color: string, symbolColor: string, mode: ThemeMode) => void;
+      };
     }
   ).napp;
-  nativeFrame?.setFrameTheme?.(background, foreground);
+  nativeFrame?.setFrameTheme?.(background, foreground, config.theme);
   root.style.setProperty("--ink-2", mix(foreground, dark ? 0.16 : 0.22, dark ? "black" : "white"));
   /* The two muted inks are the whole legibility budget of the interface: every
      metadata line, every list marker and every idle glyph is one of them, and
@@ -593,16 +595,31 @@ export function initAppearance(): void {
   media.addEventListener("change", () => current.theme === "system" && applyAppearance());
   current = read();
   applyAppearance();
-  if (current.wallpaper)
-    void readWallpaper()
-      .then(replaceWallpaperUrl)
-      .catch(() => undefined);
+  loadHeldWallpaper();
+}
+
+/* The device's copy of the picture, read whenever a wallpaper is on and none
+   is showing — not only at boot. Switching account boots with the previous
+   account's appearance and only then applies this one's: a wallpaper turned on
+   that way had no bytes, `has-wallpaper` stayed off, and on a Mac the columns
+   fell through to the dark system material until the app was relaunched. */
+let readingWallpaper = false;
+function loadHeldWallpaper(): void {
+  if (!current.wallpaper || wallpaperUrl || readingWallpaper) return;
+  readingWallpaper = true;
+  void readWallpaper()
+    .then((blob) => {
+      if (blob && !wallpaperUrl) replaceWallpaperUrl(blob);
+    })
+    .catch(() => undefined)
+    .finally(() => (readingWallpaper = false));
 }
 
 export function setAppearance(next: Appearance): void {
   current = next;
   localStorage.setItem(KEY, JSON.stringify(next));
   scheduleAppearanceCommit();
+  loadHeldWallpaper();
 }
 
 export function setTheme(theme: ThemeMode): void {

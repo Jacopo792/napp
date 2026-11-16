@@ -269,7 +269,7 @@ export function dropPin(el: Element | null, noteId: string) {
       { opacity: 1, offset: 0.35 },
       { opacity: 1, transform: "none" },
     ],
-    { duration: 460, delay: 220, easing: "cubic-bezier(0.34, 1.42, 0.64, 1)", fill: "backwards" },
+    { duration: 460, delay: 220, easing: EASE_OUT, fill: "backwards" },
   );
 }
 

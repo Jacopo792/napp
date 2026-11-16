@@ -123,7 +123,8 @@
      `--ease` is the curve macOS and iOS use for anything that slides — a hard
      start and a very long settle, which is what makes a panel read as a thing
      with mass rather than a fade. `--ease-out` lands overlays, `--ease-spring`
-     gives an appearing menu the small overshoot a real one has, and
+     is the quick settle for things that grow in — it never passes its rest
+     point: an overshoot read as a bounce at the end of every opening — and
      `--ease-press` is the immediate one, for the finger already on the button.
 
      Durations are short on purpose: 90ms is below the threshold where a press
@@ -132,7 +133,7 @@
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* What stands between an open window and the app behind it. One value:
@@ -142,7 +143,6 @@
   --dur-press: 90ms;
   --dur-fast: 160ms;
   --dur-base: 240ms;
-  /* Long enough for the overshoot above to be a movement rather than a blip. */
   --dur-swipe: 340ms;
   --dur-slow: 360ms;
 
@@ -5897,8 +5897,10 @@
     animation-timing-function: var(--ease);
   }
 
+  /* Opened out past the edges, so the shadow (which a clip-path cuts too)
+     comes in with the glass instead of appearing when the clip is dropped. */
   to {
-    clip-path: inset(0 round var(--radius-md));
+    clip-path: inset(-96px round calc(var(--radius-md) + 96px));
   }
 }
 
@@ -6703,8 +6705,9 @@
 
 /* The disclosure column is always there, occupied or not, so every name in the
    tree starts on the same vertical line whatever its depth. */
-/* At the tail of the row, after the count: the ⋯ that comes up on hover takes
-   the count's place to the left of it, so the arrow never goes under it. */
+/* At the tail of the row, after the count. Once any folder has one, every row
+   keeps the column, empty or not, so all the counts — and the headings'
+   buttons above them — still end on one edge. */
 .sidebar-twisty {
   display: inline-flex;
   flex-shrink: 0;
@@ -6713,8 +6716,12 @@
   justify-content: center;
 }
 
-.sidebar-twisty + .sidebar-actions {
-  right: calc(var(--rail-twisty) + 6px);
+.sidebar-scroll:not(.is-nested) .sidebar-twisty:empty {
+  display: none;
+}
+
+.sidebar-scroll.is-nested .sidebar-heading {
+  padding-right: calc(10px + var(--rail-twisty) + 6px);
 }
 
 .sidebar-disclosure {
@@ -7018,6 +7025,7 @@
 .sidebar-name {
   min-width: 0;
   flex: 1 1 auto;
+  align-self: baseline;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7055,40 +7063,26 @@
   color: var(--ink-2);
 }
 
+/* Every count, on every row, ends on one right edge and sits on its name's
+   baseline: one weight whatever the row's state (a heavier numeral on the
+   active row is a wider one), tabular figures, right-aligned in a fixed slot,
+   and baseline-aligned rather than box-centred, since a smaller numeral
+   centred beside a larger name lands above its line. */
 .sidebar-count {
   flex-shrink: 0;
+  align-self: baseline;
+  min-width: 2ch;
   color: var(--ink-4);
   font-family: var(--font-sans);
-  font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-/* The ⋯ stays out of the way until the row is pointed at — but never while its
-   own menu is open, which would be the control vanishing under your cursor. */
-.sidebar-actions {
-  position: absolute;
-  right: 0.25rem;
-  display: flex;
-  align-items: center;
-  padding-right: 0.25rem;
-  opacity: 0;
-  transform: translateX(3px);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.sidebar-row:hover .sidebar-actions,
-.sidebar-actions:focus-within,
-.sidebar-actions:has(.is-open) {
-  opacity: 1;
-  transform: none;
-}
-
-.sidebar-row:hover .sidebar-count,
-.sidebar-row:focus-within .sidebar-count {
-  opacity: 0;
+/* On a pale ground the fourth ink at this size reads as a smudge. */
+:root[data-theme="light"] .sidebar-row:not(.is-active) .sidebar-count {
+  color: var(--ink-3);
 }
 
 .sidebar-action {
@@ -7104,25 +7098,10 @@
     background-color var(--dur-fast) var(--ease);
 }
 
-/* It painted `--surface`, which in this palette is #020202 — a near-black tile
-   dropped onto a row that is a wash, so opening a folder's menu put a hole in
-   the column. Every other pressable thing in the sidebar answers with the
-   accent wash; there was never a reason for this one to be its own colour. */
-.sidebar-action:hover,
-.sidebar-action.is-open {
+/* Every pressable thing in the sidebar answers with the accent wash. */
+.sidebar-action:hover {
   background: var(--accent-wash);
   color: var(--ink);
-}
-
-/* The folder menu escapes the scrolling column it is anchored in. */
-.sidebar-menu {
-  position: absolute;
-  top: calc(100% + 0.3rem);
-  right: 0;
-  z-index: 60;
-  width: 14.5rem;
-  padding: 0.35rem;
-  text-align: left;
 }
 
 .sidebar-input {
@@ -8420,15 +8399,21 @@ body:has(.sidebar-row.is-over) .drag-chip {
   animation: spotlight-in var(--motion-enter) var(--ease-out) backwards;
 }
 
+/* The fade is on the glass, not on `.liquid`: opacity or a filter on an
+   ancestor cuts a backdrop-filter off from the page behind it, so the blur
+   and saturation snapped on when the entrance ended — the glass brightened
+   in its last frame. */
+.liquid > .liquid-card {
+  animation: fade-in var(--motion-enter) var(--ease-out) backwards;
+}
+
 .spotlight {
   width: min(46rem, 100%);
 }
 
 @keyframes spotlight-in {
   from {
-    opacity: 0;
     transform: scale(1.035);
-    filter: blur(6px);
   }
 }
 
@@ -9722,15 +9707,19 @@ text.ink-stroke {
   position: sticky;
   z-index: 3;
   top: 0;
-  display: flex;
+  /* Equal segments as wide as the widest name, so the thumb's arithmetic
+     holds and "You" is not padded out to a fixed width. */
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   margin: 0 0 10px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--ink) 6%, var(--paper));
-  padding: 3px;
+  padding: 2px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  --face-size: 22px;
+  --face-size: 18px;
 }
 
 .people-shelf::-webkit-scrollbar {
@@ -9746,12 +9735,13 @@ text.ink-stroke {
 .people-face {
   position: relative;
   display: flex;
-  flex: 1 1 0;
   min-width: 0;
+  height: 26px;
   align-items: center;
-  gap: 7px;
-  border-radius: 6px;
-  padding: 4px 8px 4px 4px;
+  justify-content: center;
+  gap: 6px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 0 10px 0 5px;
   color: var(--ink-3);
   transition: color var(--dur-fast) var(--ease);
 }
@@ -9767,15 +9757,14 @@ text.ink-stroke {
    over the names in the desktop window whenever one did not finish. */
 .people-thumb {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc((100% - 6px) / var(--count, 2));
-  border-radius: 6px;
-  background: var(--page);
-  box-shadow:
-    0 0 0 0.5px var(--rule),
-    0 1px 2px rgb(0 0 0 / 0.18);
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--count, 2));
+  border-radius: calc(var(--radius-sm) - 2px);
+  /* The plate of the app's other segments (Write | Board), in both themes. */
+  background: color-mix(in srgb, var(--ink) 15%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
   transform: translateX(calc(var(--index, 0) * 100%));
   transition: transform var(--dur-base) var(--ease);
   pointer-events: none;
@@ -12056,8 +12045,8 @@ button.sheet-chip:hover,
 }
 
 .manuscript-titlebar-end .people-shelf {
-  width: 250px;
   margin: 0;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 /* ── The writing bar ── */
@@ -13214,26 +13203,6 @@ button.sheet-chip:hover,
 
 .page-break.ProseMirror-selectednode {
   border-top-color: var(--accent);
-}
-
-/* Focus in a document: everything but the paragraph being written steps
-   back, and in sentence focus the paragraph itself steps back but for the
-   sentence. Colour rather than opacity inside the paragraph, because a child
-   cannot be more opaque than the block it is in. */
-.ProseMirror[data-writing-focus] > * {
-  transition: opacity var(--dur-base) var(--ease);
-}
-
-.ProseMirror[data-writing-focus] > :not(.is-writing-focus) {
-  opacity: 0.25;
-}
-
-.ProseMirror[data-writing-focus="sentence"] > .is-writing-focus {
-  color: color-mix(in srgb, var(--ink) 30%, transparent);
-}
-
-.ProseMirror[data-writing-focus="sentence"] .is-writing-sentence {
-  color: var(--ink);
 }
 
 /* The open chapter's headings, under its row in the structure. */
@@ -14723,6 +14692,7 @@ button.sheet-chip:hover,
 }
 
 :root[data-theme="light"]
+  .sheet-body:not(.is-plain)
   :is(.sheet-stats > *, .sheet-card, .sheet-day, .sheet-work > .safety-actions) {
   background: color-mix(in srgb, white 70%, transparent);
 }
@@ -14786,6 +14756,29 @@ button.sheet-chip:hover,
   display: flex;
   flex-direction: column;
   color: var(--stage-ink);
+}
+
+/* Electron builds its window-drag map from every element marked `drag`,
+   whatever is stacked above it, so the toolbars under the stage turned its
+   top row into a handle for the window: Undo, Done and Draw on iPhone moved
+   the window instead of answering. The stage is portalled last, and a no-drag
+   region laid after a drag one cuts it out. */
+[data-shell] .draw-stage {
+  -webkit-app-region: no-drag;
+}
+
+/* Clear of the traffic lights, and of Windows' caption buttons, which are
+   drawn over the page and cannot be covered by it. */
+[data-shell="mac"]:not([data-fullscreen]) .draw-stage-top {
+  padding-left: var(--titlebar-inset);
+}
+
+[data-shell="windows"]:not([data-fullscreen]) .draw-stage-top {
+  padding-top: 50px;
+}
+
+[data-shell="windows"]:not([data-fullscreen]) .draw-stage-room {
+  margin-top: 104px;
 }
 
 .draw-stage-ground {
@@ -15047,14 +15040,14 @@ button.sheet-chip:hover,
 
 .pen-tray-swatches {
   display: grid;
-  grid-template-columns: repeat(4, 1.6rem);
+  grid-template-columns: repeat(4, 1.75rem);
   gap: 10px;
   padding: 8px;
 }
 
 .pen-tray-swatches .drawing-ink {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .pen-tray-swatches .drawing-ink.is-chosen {
@@ -15673,8 +15666,11 @@ button.sheet-chip:hover,
 }
 
 .sheet-body.is-plain .sheet-stats :is(dt, small) {
+  overflow: hidden;
   color: var(--ink-4);
   font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Each day: its name small and grey above, its notes as ruled rows. */
@@ -15713,10 +15709,11 @@ button.sheet-chip:hover,
   align-items: center;
   gap: 10px;
   margin-inline: -8px;
-  padding-left: 8px;
+  padding-inline: 8px;
 }
 
-.sheet-body.is-plain .sheet-entry + .sheet-entry {
+/* The rule starts under the text and ends with it, as Settings' rows do. */
+.sheet-body.is-plain .sheet-entry + .sheet-entry > .sheet-row {
   box-shadow: inset 0 1px 0 var(--sheet-rule);
 }
 
@@ -15726,7 +15723,8 @@ button.sheet-chip:hover,
   box-shadow: none;
 }
 
-.sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) + .sheet-entry {
+.sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) > .sheet-row,
+.sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) + .sheet-entry > .sheet-row {
   box-shadow: none;
 }
 
@@ -15735,7 +15733,7 @@ button.sheet-chip:hover,
   flex: 1;
   border-radius: 0;
   background: none;
-  padding: 10px 8px 10px 0;
+  padding: 10px 0;
 }
 
 /* The title keeps at least half the row; a long note on the right gives way. */

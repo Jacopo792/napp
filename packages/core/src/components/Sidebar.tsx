@@ -1,4 +1,3 @@
-import { MenuSurface } from "@/components/MenuSurface";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { followSelection } from "@/lib/motion";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
@@ -14,7 +13,6 @@ import {
   Plus,
   Users,
   MessageSquare,
-  MoreHorizontal,
   NotebookText,
   PanelLeftClose,
   Pencil,
@@ -43,7 +41,7 @@ import { MenuButton } from "./MenuPrimitives";
    So this is the shape every notes application has settled on: a column of
    destinations, each with a glyph, the scopes first, the folder tree next, the
    wastebasket last. A folder can hold folders, each one's actions live behind
-   the same ⋯ the rest of the interface uses, and nothing here is quiet: these
+   its context menu, and nothing here is quiet: these
    are the names of your own material, so they are set at reading weight rather
    than as small grey labels. ────────────────────────────────────────────── */
 
@@ -172,102 +170,6 @@ function buildTree(folders: FolderType[], counts: Map<string, number>): TreeNode
   return roots;
 }
 
-/** The ⋯ menu a folder carries: everything you can do to the folder itself. */
-function FolderMenu({
-  onRename,
-  onNewSubfolder,
-  onDelete,
-}: {
-  onRename: () => void;
-  onNewSubfolder: () => void;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const dismiss = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", dismiss);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("mousedown", dismiss);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) setConfirm(false);
-  }, [open]);
-
-  return (
-    <div ref={root} className="relative">
-      <button
-        type="button"
-        aria-label="Folder actions"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={`sidebar-action ${open ? "is-open" : ""}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen((current) => !current);
-        }}
-      >
-        <MoreHorizontal size={16} />
-      </button>
-      <MenuSurface open={open} role="menu" className="popover menu-popover sidebar-menu">
-        <button
-          type="button"
-          role="menuitem"
-          className="menu-row text-ink-2"
-          onClick={() => {
-            setOpen(false);
-            onRename();
-          }}
-        >
-          <Pencil size={16} className="text-ink-3" />
-          Rename folder
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          className="menu-row text-ink-2"
-          onClick={() => {
-            setOpen(false);
-            onNewSubfolder();
-          }}
-        >
-          <FolderPlus size={16} className="text-ink-3" />
-          New folder inside
-        </button>
-        <div className="menu-separator" />
-        <button
-          type="button"
-          role="menuitem"
-          className="menu-row text-danger"
-          onClick={() => {
-            if (!confirm) {
-              setConfirm(true);
-              return;
-            }
-            setOpen(false);
-            onDelete();
-          }}
-        >
-          <Trash2 size={16} />
-          {confirm ? "Delete — click to confirm" : "Delete folder"}
-        </button>
-      </MenuSurface>
-    </div>
-  );
-}
-
 /** A name being typed: a new folder, or an old one being renamed. */
 function NameField({
   value,
@@ -325,7 +227,6 @@ function Row({
   active,
   droppable = true,
   disclosure,
-  actions,
   onSelect,
   onContextMenu,
   onHold,
@@ -341,7 +242,6 @@ function Row({
   active: boolean;
   droppable?: boolean;
   disclosure?: React.ReactNode;
-  actions?: React.ReactNode;
   onSelect: () => void;
   onContextMenu?: (event: React.MouseEvent) => void;
   /** A mouse pressed and kept still; the click that ends it is not a select. */
@@ -412,6 +312,29 @@ function Row({
           )
             holdEnd();
         }}
+        /* The keyboard's way to the same menu the right button opens, set
+           under the row and with its first item focused. */
+        onKeyDown={(event) => {
+          if (!onContextMenu) return;
+          if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+          event.preventDefault();
+          const box = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              cancelable: true,
+              clientX: box.left + 24,
+              clientY: box.bottom,
+            }),
+          );
+          /* Two frames: the panel stays hidden until it has been measured,
+             and a hidden button cannot take focus. */
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              document.querySelector<HTMLElement>(".context-menu button")?.focus(),
+            ),
+          );
+        }}
         onPointerUp={holdEnd}
         onPointerLeave={holdEnd}
         onPointerCancel={holdEnd}
@@ -431,8 +354,9 @@ function Row({
           <span className="sidebar-count">{scope.count || ""}</span>
         )}
       </button>
-      {disclosure && <span className="sidebar-twisty">{disclosure}</span>}
-      {actions && <span className="sidebar-actions">{actions}</span>}
+      {/* Empty on a row with nothing to disclose; the stylesheet keeps the
+          column for every row once any folder has one (`.is-nested`). */}
+      <span className="sidebar-twisty">{disclosure}</span>
     </div>
   );
 }
@@ -469,7 +393,8 @@ export function Sidebar({
   /** Where a new folder is being typed: null for none, "" for the top level. */
   const [adding, setAdding] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  /* The same three actions the folder's own ⋯ carries, on the right button. */
+  /* The one way into a folder's actions: the right button, or the context-menu
+     key / Shift+F10 on the focused row (see `Row`). */
   const folderMenu = useContextMenu<FolderType>();
   const [accountMenu, setAccountMenu] = useState<(MenuPoint & { items: MenuItem[] }) | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -567,15 +492,6 @@ export function Sidebar({
                 <ChevronRight size={16} />
               </button>
             ) : null
-          }
-          actions={
-            canWrite ? (
-              <FolderMenu
-                onRename={() => setRenaming(node.folder.id)}
-                onNewSubfolder={() => startSubfolder(node.folder.id)}
-                onDelete={() => onDeleteFolder(node.folder.id)}
-              />
-            ) : undefined
           }
           movable={canWrite}
           dropSide={(draggedId) =>
@@ -768,7 +684,11 @@ export function Sidebar({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <div
+            className={`sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2 ${
+              tree.some((node) => node.children.length) ? "is-nested" : ""
+            }`}
+          >
             <div className="sidebar-head">
               <div className="sidebar-head-name">
                 {spaceSwitch || <span className="sidebar-head-title">{scopeLabel}</span>}

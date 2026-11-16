@@ -21,6 +21,7 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeTheme,
   net,
   protocol,
   screen,
@@ -382,8 +383,13 @@ function createWindow() {
 
 /* The renderer may choose colours, never window behaviour: only literal RGB
    values are accepted and only the window that sent the message is updated. */
-ipcMain.on("napp:frame-theme", (event, color, symbolColor) => {
+ipcMain.on("napp:frame-theme", (event, color, symbolColor, mode) => {
   if (!trustedSender(event, isDev)) return;
+  /* The sidebar's material is drawn by macOS in the system's appearance, not
+     the page's: a light palette on a Mac in dark mode showed a black sidebar
+     whenever no wallpaper covered it. "system" keeps following macOS. */
+  if (process.platform === "darwin" && ["system", "light", "dark"].includes(mode))
+    nativeTheme.themeSource = mode;
   if (process.platform !== "win32") return;
   if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(symbolColor)) return;
   const window = BrowserWindow.fromWebContents(event.sender);

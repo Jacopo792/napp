@@ -6,7 +6,7 @@
  * turned a book into notes, and the Settings section that could have turned
  * it back belonged to the book and went with it. */
 import { useState, type ReactNode } from "react";
-import { Footnote, ListOrdered, Quote, Review, Target, Users } from "@/components/icons";
+import { Footnote, ListOrdered, Quote, Target, Users } from "@/components/icons";
 import type { DocumentFeatures } from "@/lib/spaceShape";
 
 const SWITCHES: {
@@ -17,7 +17,6 @@ const SWITCHES: {
   { key: "numbering", name: "Numbered headings and contents", icon: <ListOrdered size={16} /> },
   { key: "footnotes", name: "Footnotes", icon: <Footnote size={16} /> },
   { key: "citations", name: "Citations", icon: <Quote size={16} /> },
-  { key: "review", name: "Suggested changes", icon: <Review size={16} /> },
 ];
 
 function Row({ icon, name, children }: { icon: ReactNode; name: string; children: ReactNode }) {

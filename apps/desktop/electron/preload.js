@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld("napp", {
   savePdf: (name) => ipcRenderer.invoke("napp:pdf", name),
   /* Colour is deliberately a one-way cosmetic message, not a privileged
    * capability. The main process validates it before painting the frame. */
-  setFrameTheme: (color, symbolColor) => ipcRenderer.send("napp:frame-theme", color, symbolColor),
+  setFrameTheme: (color, symbolColor, mode) =>
+    ipcRenderer.send("napp:frame-theme", color, symbolColor, mode),
   /* A menu the system draws, and the id of what was chosen in it. The page
    * describes the menu and hears the answer; it never holds a `Menu`. */
   popUpMenu: (items) => ipcRenderer.invoke("napp:menu", items),

@@ -15,8 +15,6 @@ import {
   Search,
   X,
   BookOpen,
-  Keyboard,
-  Maximize2,
 } from "@/components/icons";
 import { countWords } from "@/lib/format";
 import { loadThreadIds } from "@/lib/comments";
@@ -24,7 +22,6 @@ import { PointMenu } from "@/components/ContextMenu";
 import { Exits } from "@/components/Exits";
 import type { MenuPoint } from "@/lib/contextMenu";
 import type { MenuItem } from "@/lib/menuShape";
-import type { WritingFocusSettings } from "../lib/writingFocus";
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import {
   forwardRef,
@@ -87,11 +84,6 @@ export interface ManuscriptFrame {
   numbered?: number | null;
   /** The heading level the chapter's sections are written in. */
   topLevel?: number;
-  /** Focus mode and typewriter scrolling, as the reader set them. */
-  writing?: WritingFocusSettings;
-  /** Both are one press in the bar: tucked in Settings, nobody found them. */
-  onToggleFocus?: () => void;
-  onToggleTypewriter?: () => void;
   /** The document has footnotes on: Insert and ⌥⌘F offer one. */
   footnotes?: boolean;
   /** The document cites sources. */
@@ -107,10 +99,6 @@ export interface ManuscriptFrame {
   /** The whole book's count, at the right of the status bar. */
   bookWords?: { total: number; goal?: number; today: number | null };
 }
-
-/* Whether this hand is suggesting, kept across chapters the way the pen is:
-   it is a fact about the writer, not about the chapter or the document. */
-let suggestingWanted = false;
 
 /** Word's status bar: where you are in the chapter and how much of it there
  *  is, under the desk rather than in the structure, where the eye is not.
@@ -558,7 +546,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      which is a thread that has been anchored and not yet said anything in. */
   const [focusThread, setFocusThread] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Map<string, string>>(() => new Map());
-  const [suggesting, setSuggesting] = useState(suggestingWanted);
   const [findOpen, setFindOpen] = useState(false);
   /* The chapter as pages, copied out of the sheet when asked for. */
   const [pageView, setPageView] = useState<{ noteId: string; snapshot: SheetSnapshot } | null>(
@@ -1398,17 +1385,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               page={manuscript.page}
               onLink={openLinkForm}
               onImage={() => imageRef.current?.click()}
-              review={
-                manuscript.review && canEdit
-                  ? {
-                      on: suggesting,
-                      toggle: () => {
-                        suggestingWanted = !suggesting;
-                        setSuggesting(!suggesting);
-                      },
-                    }
-                  : undefined
-              }
+              review={Boolean(manuscript.review)}
             />
           ) : (
             <span className="manuscript-bar-quiet">{pages ? "Pages" : headerStatus}</span>
@@ -1433,32 +1410,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               <BookOpen size={16} />
               <span>{pages ? "Edit" : "Pages"}</span>
             </button>
-            {manuscript.onToggleFocus && (
-              <button
-                type="button"
-                className={`ribbon-tool press ${manuscript.writing?.focus !== "off" ? "is-active" : ""}`}
-                aria-label="Focus mode"
-                aria-pressed={manuscript.writing?.focus !== "off"}
-                title="Focus mode · Esc to leave"
-                onClick={manuscript.onToggleFocus}
-              >
-                <Maximize2 size={16} />
-                <span className="ribbon-word">Focus</span>
-              </button>
-            )}
-            {manuscript.onToggleTypewriter && (
-              <button
-                type="button"
-                className={`ribbon-tool press ${manuscript.writing?.typewriter ? "is-active" : ""}`}
-                aria-label="Typewriter scrolling"
-                aria-pressed={Boolean(manuscript.writing?.typewriter)}
-                title="Typewriter scrolling"
-                onClick={manuscript.onToggleTypewriter}
-              >
-                <Keyboard size={16} />
-                <span className="ribbon-word">Typewriter</span>
-              </button>
-            )}
             {session && commentAuthors && (
               <button
                 type="button"
@@ -1561,13 +1512,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   key={entry.note.id}
                   ref={editorRef}
                   manuscript
-                  writing={manuscript.writing}
                   noteId={entry.note.id}
                   footnotes={manuscript.footnotes}
-                  suggesting={{
-                    on: Boolean(manuscript.review) && suggesting,
-                    author: session?.userId ?? "",
-                  }}
                   onTargets={(targets) => setLiveTargets(entry.note.id, targets)}
                   onEditor={setInstance}
                   value={readDraft(entry.note.id)?.content ?? entry.note.content}
