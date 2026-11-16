@@ -3,6 +3,24 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.61 – 2026-11-16
+
+### Added
+
+- A private Usage section in Settings, under What's New, visible only to the
+  administrator account pinned on the server: one row per account, app
+  installation and client, with device, system and last activity. Clients
+  report activity on opening and interaction, at most once a minute. Migration
+  `20261116010000`.
+
+### Changed
+
+- The privacy notice describes app and device activity records; its version
+  is bumped, so it is shown once again.
+- The workspace screen and the editor are split into focused modules, with
+  browser coverage for drawing, suggestions and heading search. No change in
+  behaviour.
+
 ## 0.9.60 – 2026-11-15
 
 ### Added

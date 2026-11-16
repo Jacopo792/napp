@@ -6,6 +6,7 @@
    its own rather than as the default every generated interface ships with.
    A glyph changes here, once, and never at a call site. */
 export {
+  IconChartBar as ChartBar,
   IconArchive as Archive,
   IconRestore as ArchiveRestore,
   IconSortAscendingLetters as ArrowDownAZ,

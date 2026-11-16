@@ -1,0 +1,94 @@
+/* Usage rides on the flat Settings rows; only the search bar, the right-hand
+   device column and the pager are its own. */
+.usage-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.usage-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding-inline: 8px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-4);
+}
+
+.usage-search:focus-within {
+  border-color: var(--accent);
+}
+
+.usage-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+.usage-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-2);
+}
+
+.usage-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  color: var(--ink);
+}
+
+.usage-icon:disabled {
+  opacity: 0.4;
+}
+
+.usage-where {
+  display: flex;
+  max-width: 55%;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: right;
+}
+
+.usage-where > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-empty {
+  color: var(--ink-4);
+}
+
+.usage-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.usage-pager span {
+  margin-right: 6px;
+}

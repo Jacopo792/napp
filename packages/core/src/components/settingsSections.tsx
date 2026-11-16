@@ -8,6 +8,7 @@
    kind the rows it has and nothing else. */
 import {
   BookOpen,
+  ChartBar,
   Chapters,
   Keyboard,
   Layers,
@@ -121,6 +122,14 @@ export const SETTINGS_SECTIONS = [
         name: "What’s New",
         icon: <Sparkle size={16} />,
         keywords: "whats new release version changes update download mac windows installer",
+      },
+      {
+        id: "usage",
+        tone: "gray",
+        name: "Usage",
+        icon: <ChartBar size={16} />,
+        keywords: "usage activity users devices",
+        adminOnly: true,
       },
     ],
   },

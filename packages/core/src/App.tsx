@@ -25,6 +25,7 @@ import { initAppearance } from "./lib/appearance";
 import { initWritingPreferences } from "./lib/writingPreferences";
 import { keepCapture } from "./lib/capture";
 import { PolicyGate } from "@/components/PolicyGate";
+import { UsageTracking } from "@/components/UsageTracking";
 
 /* Before React, as they always have been: these write CSS custom properties on
    the document element, and a first paint that happens first is a flash of the
@@ -103,6 +104,7 @@ export function App({ history, basepath }: AppProps) {
   const [router] = useState(() => createAppRouter({ history, basepath }));
   return (
     <StrictMode>
+      <UsageTracking />
       <RouterProvider router={router} />
     </StrictMode>
   );

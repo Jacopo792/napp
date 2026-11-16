@@ -6,15 +6,18 @@ import type { ArchiveKind } from "@/lib/spaceShape";
 type SectionItem = (typeof SETTINGS_SECTIONS)[number]["items"][number] & {
   only?: ArchiveKind;
   documentKeywords?: string;
+  adminOnly?: boolean;
 };
 
 /** The groups and sections an archive of this kind shows, with the words
  *  that find each one there. */
-export function settingsSectionsFor(kind: ArchiveKind) {
+export function settingsSectionsFor(kind: ArchiveKind, usageAdministrator = false) {
   return SETTINGS_SECTIONS.map((group) => ({
     group: group.group,
     items: (group.items as readonly SectionItem[])
-      .filter((item) => !item.only || item.only === kind)
+      .filter(
+        (item) => (!item.only || item.only === kind) && (!item.adminOnly || usageAdministrator),
+      )
       .map((item) => ({
         ...item,
         keywords: (kind === "document" && item.documentKeywords) || item.keywords,

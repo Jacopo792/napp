@@ -1,6 +1,6 @@
 import { platform } from "@/platform";
 
-export const POLICY_VERSION = "2026-10-24";
+export const POLICY_VERSION = "2026-11-16";
 export const NAPP_CONTROLLER = "Jacopo Vincenzo Ansalone";
 export const NAPP_SUPPORT_EMAIL = "ansalonejacpo@gmail.com";
 
@@ -28,6 +28,10 @@ export const PRIVACY_SECTIONS = [
   {
     title: "Why data is used",
     text: "Account and content data is used to provide the service you request: storing, synchronising and sharing your writing with the people you choose. The legal basis for account and content processing is performing the service contract. Security and diagnostic information is used on the basis of legitimate interests in protecting accounts, preventing abuse and investigating failures. Optional presence and appearance settings are controlled in the app. Napp does not include advertising or third-party advertising trackers.",
+  },
+  {
+    title: "App and device activity",
+    text: "To understand use of Napp and support the service, Napp records your account, a random identifier for each app installation or browser profile, whether you use the web, desktop or mobile app, the device category, operating system, browser and the most recent activity time. Activity is reported when you open or interact with Napp, at most once per minute. An idle window does not continuously report activity. The private usage dashboard is accessible only to the designated administrator. These records do not include note contents, keystrokes, precise hardware identifiers or location, and are deleted with your account. Clearing local app or browser storage creates a new installation identifier.",
   },
   {
     title: "Who can access it",

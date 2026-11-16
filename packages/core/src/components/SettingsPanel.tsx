@@ -53,6 +53,8 @@ import {
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
 import { AccountDeletionForm } from "@/components/AccountDeletionForm";
+import { UsageDashboard } from "@/components/UsageDashboard";
+import { useUsageAdministrator } from "@/lib/useUsageDashboard";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
@@ -564,7 +566,8 @@ export function SettingsPanel({
     { id: "dark", name: "Dark" },
   ];
 
-  const sections = settingsSectionsFor(kind);
+  const usageAdministrator = useUsageAdministrator(email);
+  const sections = settingsSectionsFor(kind, usageAdministrator);
   const isDocument = kind === "document";
   const setWriting = (patch: Partial<WritingPreferences>) =>
     onWritingPreferencesChange({ ...writingPreferences, ...patch });
@@ -1322,6 +1325,8 @@ export function SettingsPanel({
               {section === "whats-new" && (
                 <WhatsNewPage seen={whatsNewSeen} onRead={onWhatsNewRead} />
               )}
+
+              {section === "usage" && usageAdministrator && <UsageDashboard />}
 
               {section === "shortcuts" && (
                 <section>

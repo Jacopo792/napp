@@ -45,6 +45,22 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.61",
+    date: "2026-11-16",
+    headline: "A clearer privacy notice",
+    sections: [
+      {
+        heading: "Privacy",
+        items: [
+          {
+            title: "What Napp records about use",
+            text: "The privacy notice now says what Napp keeps about how it is used: web, desktop or phone, the kind of device, and when it was last used. Never note contents, keystrokes or location. Napp asks you to read it once.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.60",
     date: "2026-11-15",
     headline: "Sharing that holds together",
