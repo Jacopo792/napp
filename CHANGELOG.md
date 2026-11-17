@@ -3,6 +3,14 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.65 – 2026-11-17
+
+### Fixed
+
+- Opening Chat while the archive remark counter was subscribed could crash the
+  app. Each reader now owns an independent realtime subscription.
+- Maintenance patches retain the current What's New announcement and read state.
+
 ## 0.9.64 – 2026-11-17
 
 ### Added

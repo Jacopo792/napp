@@ -2,10 +2,11 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 const TABLES = ["archives", "notes", "folders"] as const;
+let nextSubscription = 0;
 
 /** Realtime is a wake-up signal; the caller reloads a coherent snapshot. */
 export function subscribeToArchive(archiveId: string, onChange: () => void): RealtimeChannel {
-  const channel = supabase.channel(`archive:${archiveId}`);
+  const channel = supabase.channel(`archive:${archiveId}:${++nextSubscription}`);
   for (const table of TABLES) {
     channel.on(
       "postgres_changes",
@@ -32,8 +33,11 @@ export function subscribeToArchive(archiveId: string, onChange: () => void): Rea
  *  either member makes. A remark is rarer than a keystroke and needs a much
  *  cheaper answer, so it wakes the one reader that cares. */
 export function subscribeToComments(archiveId: string, onChange: () => void): RealtimeChannel {
+  /* Supabase reuses a channel with the same topic. The archive's remark
+     counter and an open chat are independent readers: each must own its
+     subscription, including while an older reader is still closing. */
   return supabase
-    .channel(`remarks:${archiveId}`)
+    .channel(`remarks:${archiveId}:${++nextSubscription}`)
     .on(
       "postgres_changes",
       {
