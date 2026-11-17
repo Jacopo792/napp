@@ -221,8 +221,8 @@ type SheetEntry =
   | { kind: "person"; userId: string }
   | { kind: "folder"; folderId: string }
   /* Without an id, the archive on screen; with one, any its maker edits. */
-  | { kind: "archive"; archiveId?: string }
-  | { kind: "new-archive" }
+  | { kind: "archive"; archiveId?: string; fromSettings?: boolean }
+  | { kind: "new-archive"; fromSettings?: boolean }
   | { kind: "trash" };
 
 const NoteEditor = lazy(() =>
@@ -3504,6 +3504,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     <SheetStack
       onBack={() => setSheets((stack) => stack.slice(0, -1))}
       onClose={() => setSheets([])}
+      onBackOut={
+        sheets[0] && "fromSettings" in sheets[0] && sheets[0].fromSettings
+          ? () => {
+              setSheets([]);
+              setSettingsSection("spaces");
+              setSettingsOpen(true);
+            }
+          : undefined
+      }
     >
       {sheets.map((sheet, index) => {
         /* The place in the stack is part of the key: a folder's sheet can
@@ -3759,11 +3768,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           /* Settings stands over the sheets; the new archive is the next
              thing in front of you, so Settings steps aside for it. */
           setSettingsOpen(false);
-          openSheet({ kind: "new-archive" });
+          openSheet({ kind: "new-archive", fromSettings: true });
         }}
         onEditArchive={(archiveId) => {
           setSettingsOpen(false);
-          openSheet({ kind: "archive", archiveId });
+          openSheet({ kind: "archive", archiveId, fromSettings: true });
         }}
         defaultArchiveId={defaultArchiveId}
         onDeleteArchive={handleDeleteArchive}
@@ -4381,6 +4390,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           linkable={linkableNotes}
           onOpenNote={handleOpenRecent}
           onRemarksChanged={refreshRemarks}
+          onRemarksRead={markRemarksSeen}
           saidThreads={saidThreads}
           onContinueAsNote={
             chapterAt >= 0 && canWriteArchive
@@ -4620,6 +4630,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     mentions={mentions}
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
+                    onRemarksRead={markRemarksSeen}
                     saidThreads={saidThreads}
                   />
                 </Suspense>
@@ -4874,6 +4885,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               mentions={mentions}
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
+              onRemarksRead={markRemarksSeen}
               saidThreads={saidThreads}
             />
           </Suspense>
@@ -4917,6 +4929,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   linkable={linkableNotes}
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
+                  onRemarksRead={markRemarksSeen}
                   saidThreads={saidThreads}
                   headerActions={
                     <button

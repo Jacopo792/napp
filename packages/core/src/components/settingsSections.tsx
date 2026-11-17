@@ -12,6 +12,7 @@ import {
   Chapters,
   Keyboard,
   Layers,
+  MessagesSquare,
   Palette,
   ShieldCheck,
   Sparkle,
@@ -103,6 +104,14 @@ export const SETTINGS_SECTIONS = [
           "proofreading spelling correct as I type autocorrect words you kept live presence",
         documentKeywords:
           "proofreading spelling correct as I type autocorrect words you kept live presence statistics words today session",
+      },
+      {
+        id: "chat",
+        tone: "pink",
+        name: "Chat",
+        icon: <MessagesSquare size={16} />,
+        keywords:
+          "chat messages comments bubble animal cat frog bunny bear penguin fox panda duck axolotl quick reactions emoji",
       },
       {
         id: "shortcuts",

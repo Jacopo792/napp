@@ -57,6 +57,8 @@ interface StackPlace {
   leave: () => void;
   back: () => void;
   close: () => void;
+  /** The first sheet came from somewhere (Settings) and Back returns there. */
+  backOut?: () => void;
 }
 
 const Place = createContext<StackPlace | null>(null);
@@ -65,10 +67,12 @@ const Place = createContext<StackPlace | null>(null);
 export function SheetStack({
   onBack,
   onClose,
+  onBackOut,
   children,
 }: {
   onBack: () => void;
   onClose: () => void;
+  onBackOut?: () => void;
   children: ReactNode;
 }) {
   const backdrop = useRef<HTMLDivElement>(null);
@@ -97,6 +101,7 @@ export function SheetStack({
               onBack();
             },
             close: onClose,
+            backOut: onBackOut,
           }}
         >
           {sheet}
@@ -161,7 +166,10 @@ export function Sheet({
     (whole: boolean) => {
       if (leaving.current) return;
       leaving.current = true;
-      const done = whole ? place.close : place.back;
+      /* Back from the first sheet leaves the stack whole, for where it came from. */
+      const out = !whole && index === 0 ? place.backOut : undefined;
+      if (out) whole = true;
+      const done = out ?? (whole ? place.close : place.back);
       if (!whole) place.leave();
       const sheet = sheetRef.current;
       if (!sheet || !flight.current || still()) return done();
@@ -178,7 +186,7 @@ export function Sheet({
         done();
       });
     },
-    [place, backdrop],
+    [place, backdrop, index],
   );
 
   /* Only the sheet on top answers Escape and a press outside. */
@@ -204,7 +212,7 @@ export function Sheet({
       inert={!onTop}
       className={`sheet ${className}`}
     >
-      {index > 0 && (
+      {(index > 0 || place.backOut) && (
         <button
           type="button"
           className="sheet-back toolbar-button press"

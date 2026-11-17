@@ -114,6 +114,7 @@ import {
 import { Avatar } from "./WorkspaceMenus";
 import { emerge } from "@/lib/motion";
 import { WhatsNewPage } from "./WhatsNewPage";
+import { ChatSettings } from "./ChatSettings";
 /* Settings, in a chunk of its own.
  *
  * It is one panel behind one button, opened rarely and never on the way to a
@@ -1295,6 +1296,10 @@ export function SettingsPanel({
                     ))}
                   </div>
                 </section>
+              )}
+
+              {section === "chat" && (
+                <ChatSettings preferences={writingPreferences} onChange={setWriting} />
               )}
 
               {/* The keys, where somebody looking for a setting will find them.

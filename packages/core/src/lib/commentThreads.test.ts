@@ -84,16 +84,18 @@ test("a note leaves the remarks list when its last thread is dealt with", () => 
   assert.deepEqual([...notesWithOpenRemarks(settled)], ["n2"]);
 });
 
-/* Resolution is written to every row in a thread, but a reply that arrived
-   before the resolve is still in the list — one unresolved row must not keep
-   a settled conversation alive. */
-test("one unresolved row does not reopen a settled thread", () => {
+/* Resolving is gone: a remark resolved before the chat stays settled, but a
+   message sent since on the same passage is news like any other. */
+test("a message on a once-resolved passage is still news", () => {
   const rows = [
     remark({ id: "1", threadId: "t1", resolvedAt: "2026-09-02T10:00:00Z" }),
     remark({ id: "2", threadId: "t1" }),
   ];
-  assert.equal(notesWithOpenRemarks(rows).size, 0);
-  assert.equal(unreadRemarks(rows, ME, {}).length, 0);
+  assert.equal(notesWithOpenRemarks(rows).size, 1);
+  assert.deepEqual(
+    unreadRemarks(rows, ME, {}).map((r) => r.id),
+    ["2"],
+  );
 });
 
 test("what is new is what somebody else said since you last looked", () => {

@@ -114,7 +114,7 @@ export function PersonSheet({
   }, [work]);
 
   return (
-    <Sheet label={name}>
+    <Sheet label={name} className="is-centered">
       <div className="sheet-body is-plain" style={{ "--person": color } as CSSProperties}>
         <header className="sheet-hero">
           <SheetPortrait
@@ -126,8 +126,15 @@ export function PersonSheet({
             <Avatar url={avatarUrl} name={name} email="" large />
           </SheetPortrait>
           <h2>{isSelf ? `${name} (you)` : name}</h2>
-          <p>Member since {memberSince(joinedAt)}</p>
-          {now && (
+          <p>
+            Since {memberSince(joinedAt)}
+            {` · ${noteCount === 1 ? "1 note" : `${noteCount} notes`}`}
+            {work && week.changes > 0 && ` · +${week.added.toLocaleString()} words this week`}
+          </p>
+        </header>
+
+        {now && (
+          <div className="sheet-actions">
             <button
               type="button"
               className="sheet-now press"
@@ -144,23 +151,8 @@ export function PersonSheet({
               )}
               {now.typing ? "Writing in" : "In"} <strong>{now.title || "Untitled"}</strong>
             </button>
-          )}
-        </header>
-
-        <dl className="sheet-stats">
-          <div>
-            <dt>Notes</dt>
-            <dd>{noteCount}</dd>
           </div>
-          <div>
-            <dt>Changes this week</dt>
-            <dd>{work ? week.changes : "–"}</dd>
-          </div>
-          <div>
-            <dt>Words this week</dt>
-            <dd>{work ? `+${week.added}` : "–"}</dd>
-          </div>
-        </dl>
+        )}
 
         <div className="sheet-work">
           <h3>Recent work</h3>

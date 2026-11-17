@@ -3,6 +3,29 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.64 – 2026-11-17
+
+### Added
+
+- A chat beside each note, with passage replies, mentions, reactions, message
+  editing and a larger conversation view.
+- Settings > Chat: animal bubbles and six personal quick reactions. Migration
+  `20261117010000` adds the bubble carried by each message.
+
+### Changed
+
+- Archive, person, note and folder sheets share a centered heading and concise
+  details; Back from an archive sheet returns to Settings.
+- Continuous corners, finer borders and quieter menu shadows throughout the
+  web and desktop interface.
+
+### Fixed
+
+- Sending a message moves the conversation in one direction without bouncing;
+  reaction pickers stay within the chat.
+- Enforcing a passage lock takes back only the offending update and preserves
+  concurrent changes from other writers.
+
 ## 0.9.63 – 2026-11-17
 
 ### Added

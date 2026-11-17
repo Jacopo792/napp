@@ -45,6 +45,47 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.64",
+    date: "2026-11-17",
+    headline: "A conversation beside every note",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Talk beside your words",
+            text: "Messages, passage replies, mentions and reactions stay beside the note. Open the larger view when the conversation needs more room.",
+            image: "0.9.64-chat.jpg",
+          },
+          {
+            title: "Your bubble, your reactions",
+            text: "Choose an animal bubble and your six quick reactions in Settings › Chat.",
+            image: "0.9.64-chat-settings.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Details at a glance",
+            text: "Archive, person, note and folder sheets share a centered heading, with finer edges and continuous corners across the app.",
+            image: "0.9.64-sheets.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Keep everyone's words",
+            text: "Protecting a held passage preserves what other writers changed at the same time.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.63",
     date: "2026-11-17",
     headline: "Books that move calmly, and archives you can edit",

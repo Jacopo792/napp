@@ -34,6 +34,7 @@ function seed(noteId: string): void {
       resolvedAt: null,
       mentions: [PREVIEW_U1],
       assigneeId: PREVIEW_U1,
+      bubble: "frog",
     },
     {
       id: "seed-2",
@@ -44,11 +45,38 @@ function seed(noteId: string): void {
       resolvedAt: null,
       mentions: [],
       assigneeId: PREVIEW_U1,
+      bubble: "cat",
     },
   ]);
 }
 
 seed(FIXTURE_NOTES[0].id);
+
+/* The other member, so a message can be seen arriving: a reply a moment after
+   each one you send, in her bubble. `subscribeToComments` in the sync stand-in
+   listens here, the way Realtime would announce the insert. */
+export const chatListeners = new Set<() => void>();
+const ANSWERS = ["Ok!", "Ci penso io 🙌", "Sì, mi piace.", "Ne parliamo stasera?", "👀"];
+let answered = 0;
+function answerLater(noteId: string, threadId: string): void {
+  window.setTimeout(() => {
+    store.set(noteId, [
+      ...(store.get(noteId) ?? []),
+      {
+        id: crypto.randomUUID(),
+        threadId,
+        authorId: PREVIEW_U2,
+        body: ANSWERS[answered++ % ANSWERS.length]!,
+        createdAt: new Date().toISOString(),
+        resolvedAt: null,
+        mentions: [],
+        assigneeId: null,
+        bubble: "frog",
+      },
+    ]);
+    chatListeners.forEach((listener) => listener());
+  }, 2600);
+}
 
 export async function loadComments(
   _session: AppSession,
@@ -70,6 +98,7 @@ export async function addComment(
   body: string,
   mentions: string[] = [],
   assigneeId: string | null = null,
+  bubble: string | null = null,
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
@@ -81,9 +110,11 @@ export async function addComment(
     resolvedAt: null,
     mentions,
     assigneeId,
+    bubble,
   };
   store.set(noteId, [...(store.get(noteId) ?? []), saved]);
   archiveOf.set(noteId, session.archiveId);
+  answerLater(noteId, threadId);
   return saved;
 }
 

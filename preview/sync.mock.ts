@@ -1,3 +1,4 @@
+import { chatListeners } from "./comments.mock";
 /* Preview-only stand-in for src/lib/sync.ts. There is no server to listen to, so
    subscribing is inert and the caller simply never receives a wake-up. */
 export type RealtimeChannel = { topic: string; stop?: () => void };
@@ -8,8 +9,9 @@ export function subscribeToArchive(archiveId: string, onChange: () => void): Rea
  return {topic: `archive:${archiveId}`, stop: () => window.removeEventListener("napp:preview-archive-changed", listener)};
 }
 
-export function subscribeToComments(archiveId: string, _onChange: () => void): RealtimeChannel {
-  return { topic: `remarks:${archiveId}` };
+export function subscribeToComments(archiveId: string, onChange: () => void): RealtimeChannel {
+  chatListeners.add(onChange);
+  return { topic: `remarks:${archiveId}`, stop: () => chatListeners.delete(onChange) };
 }
 
 export async function unsubscribeFromArchive(_channel: RealtimeChannel): Promise<void> {

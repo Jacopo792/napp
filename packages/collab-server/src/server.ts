@@ -22,12 +22,8 @@ import { Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
 import IORedis from "ioredis";
 import { setTimeout, clearTimeout } from "node:timers";
-import {
-  broken as lockBroken,
-  guard as lockGuard,
-  restore as restoreLocked,
-  type Guard,
-} from "@notes-app/core/editor/writeLocks.ts";
+import * as Y from "yjs";
+import { revertIfBroken } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
 import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
@@ -108,18 +104,13 @@ export interface Context {
   since: string;
 }
 
-/* What one connection has to have remembered for the message being applied.
+/* What has to be taken back after the message in flight is applied: the
+ * inverse of an update that broke a passage somebody else holds.
  *
- * A note nobody has locked a passage of stores nothing: `lockGuard` walks the
- * document once, finds no foreign lock, and answers null, which is the cost of
- * this whole feature on every note that does not use it. Only a note somebody
- * has taken a passage of pays for the projection that makes putting it back
- * possible.
- *
- * Keyed by connection rather than kept on the context, because it is about the
- * message in flight and nothing else — and a WeakMap forgets it when the
- * socket goes, without anybody having to. */
-const guards = new WeakMap<object, Guard | null>();
+ * A note nobody has locked a passage of stores nothing: `revertIfBroken` walks
+ * the document once, finds no foreign lock and answers null. Keyed by
+ * connection because it is about the message in flight and nothing else. */
+const reverts = new WeakMap<object, Uint8Array>();
 
 /* When each connection last proved it may still be here. Asking for a token is
    only a request: a client that never answers would otherwise keep receiving a
@@ -317,7 +308,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        so this is a map lookup for all but one keystroke in a few seconds —
        and the flag it sets is read by the receiver on this very message, so a
        demotion takes effect on the update that arrives after it. */
-    async beforeHandleMessage({ connection, context, documentName, document }) {
+    async beforeHandleMessage({ connection, context, documentName }) {
       const noteId = noteIdOf(documentName);
       if (!noteId || !context?.token) return;
 
@@ -327,23 +318,25 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
         throw new Error(answer.reason);
       }
       connection.readOnly = answer.readOnly;
-
-      /* A passage the other member has taken back is the one boundary Postgres
-         cannot hold: the mark lives inside a document both of them are
-         entitled to write, so no policy will ever see it. It is held here
-         instead, and held the only way a CRDT allows — by remembering what the
-         locked passages said before this message and putting them back
-         afterwards if they no longer say it. */
-      guards.set(connection, answer.readOnly ? null : lockGuard(document, context.userId));
     },
 
-    /* The message has been applied and broadcast is next. Nothing but a
-       document somebody else holds a passage of gets this far with a guard. */
+    /* A passage the other member has taken back is the one boundary Postgres
+       cannot hold: the mark lives inside a document both of them are entitled
+       to write, so no policy will ever see it. It is held here instead, the
+       only way a CRDT allows: the update is judged on its own, and if it broke
+       a lock its exact inverse is applied once it has landed. */
+    async beforeSync({ connection, context, document, type, payload }) {
+      /* Step 1 asks for state; steps 2 and updates carry it. */
+      if (type === 0 || connection.readOnly || !context?.userId) return;
+      const revert = revertIfBroken(document, payload, context.userId);
+      if (revert) reverts.set(connection, revert);
+    },
+
     async afterHandleMessage({ connection, document }) {
-      const before = guards.get(connection);
-      guards.delete(connection);
-      if (!before || !lockBroken(document, before)) return;
-      restoreLocked(document, before);
+      const revert = reverts.get(connection);
+      if (!revert) return;
+      reverts.delete(connection);
+      Y.applyUpdate(document, revert);
     },
 
     /* Nothing a browser says about who it is, is believed. The identity that

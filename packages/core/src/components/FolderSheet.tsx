@@ -15,7 +15,7 @@
  * person, and Back comes back here; a note, a version or a remark opens the
  * note itself. */
 import { useEffect, useMemo, useState } from "react";
-import { FolderOpen, MessageSquare } from "@/components/icons";
+import { FolderOpen, List, MessageSquare } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import {
   PeopleList,
@@ -147,7 +147,7 @@ export function FolderSheet({
   events.push(...happened);
 
   return (
-    <Sheet label={folder.name}>
+    <Sheet label={folder.name} className="is-centered">
       <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <span className="sheet-portrait sheet-note-glyph">
@@ -174,6 +174,9 @@ export function FolderSheet({
                 </button>
               </span>
             ))}
+            {` · ${folder.notes.length === 1 ? "1 note" : `${folder.notes.length} notes`}`}
+            {` · ${words.toLocaleString()} words`}
+            {versions && week > 0 && ` · ${week === 1 ? "1 change" : `${week} changes`} this week`}
           </p>
           {people.length > 0 && (
             <p>
@@ -187,19 +190,11 @@ export function FolderSheet({
           )}
         </header>
 
-        <div className="sheet-stats">
-          <button type="button" onClick={() => onShowFolder(folder.id)}>
-            <small>Notes</small>
-            <strong>{folder.notes.length}</strong>
+        <div className="sheet-actions">
+          <button type="button" className="press" onClick={() => onShowFolder(folder.id)}>
+            <List size={15} />
+            Show its notes
           </button>
-          <div>
-            <small>Words</small>
-            <strong>{words}</strong>
-          </div>
-          <div>
-            <small>Changes this week</small>
-            <strong>{versions ? week : "–"}</strong>
-          </div>
         </div>
 
         <div className="sheet-work">

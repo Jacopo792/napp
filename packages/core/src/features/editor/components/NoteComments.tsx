@@ -1,71 +1,66 @@
-/* The conversation about a note.
+/* The chat about a note.
  *
- * A thread is a passage in the document plus the remarks about it. The passage
- * is a mark in the Yjs document and the remarks are rows in `note_comments`, so
- * this panel is the one place the two halves are put back together: the quote
- * comes from the live document, the words from the archive.
+ * Until November 2026 this was a column of threads, each a passage and the
+ * remarks about it, to be resolved and put away. It is a conversation now:
+ * every message the members of the archive send about this note, oldest at
+ * the top and newest by the composer, the way any chat reads.
  *
- * ── A column that starts at the top ─────────────────────────────────────────
- * The cards were briefly pinned to the exact height of their passages, and it
- * was wrong for a reason that only shows once you use it: a card level with its
- * passage is off screen whenever the passage is, so opening the panel on a note
- * you are reading from the top showed an empty column, and a thread on a
- * passage near the foot of the pane was cut off by the panel's bottom edge with
- * nothing to scroll — the column had no scrolling of its own, by construction.
- * Every position in it was decided by where the document happened to be.
+ * A message may still be about a passage. The passage stays a mark in the
+ * note's Yjs document and the message carries its id as `thread_id`, so the
+ * quote shows inside the bubble and a press on it takes you to the words. A
+ * message about the note as a whole uses the note's own id as its thread,
+ * which no passage can have.
  *
- * So the column starts at the top and grows downward, in the order the passages
- * appear in the note. The first thread is always the first thing you see, the
- * panel scrolls like a panel, and `scrollIntoView` works because there is
- * something to scroll.
+ * The column opens beside the note as before and can be enlarged into a sheet
+ * over the window: the same surface, changing shape, with its contents
+ * arriving once it has room (the moving family's `shape`/`wait`/`content`).
  *
- * What that costs is the eye-line between a card and its passage, and that is
- * paid back a different way: the open card lights its own passage in the text,
- * and clicking a passage opens and scrolls to its card. The link is stated
- * rather than implied by alignment, and unlike alignment it survives the
- * passage being off screen.
- *
- * It loads for itself. Comments are not part of the catalogue and must not be
- * on the way to opening a note — the panel is closed until somebody asks for
- * it, and the note is readable long before this has finished. */
+ * It loads for itself and listens for itself. Comments are not part of the
+ * catalogue and must not be on the way to opening a note. */
 import {
-  Check,
+  ArrowUp,
   ChevronDown,
+  Flag,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
   Pencil,
-  RotateCcw,
+  Quote,
   Smile,
   Trash2,
-  UserPlus,
   X,
 } from "@/components/icons";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
 import { SafetyActions } from "@/components/SafetyActions";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
-  assignThread,
   deleteComment,
   loadComments,
   loadReactions,
-  resolveThread,
   setReaction,
-  threadsOf,
   type NoteComment,
   type Reaction,
   updateComment,
 } from "@/lib/comments";
-import {
-  REACTIONS,
-  isForYou,
-  mentionQuery,
-  mentionedIn,
-  tally,
-  type CommentThread,
-} from "@/lib/commentThreads";
-import { collaborationColor } from "@/features/editor/lib/ydoc";
-import { formatStamp } from "@/lib/format";
+import { mentionQuery, mentionedIn, tally } from "@/lib/commentThreads";
+import { EASE, EASE_OUT, OVERLAY_OUT, SHAPE } from "@/lib/motion";
 import type { AppSession } from "@/lib/session";
+import { subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
+import { useWritingPreferences } from "@/lib/writingPreferences";
+import { EmojiPicker } from "@/components/ChatSettings";
+import { ChatBubble } from "./ChatBubble";
+import "./chat.css";
 
 export interface CommentAuthor {
   userId: string;
@@ -77,28 +72,60 @@ interface Props {
   session: AppSession;
   noteId: string;
   canEdit: boolean;
-  /** Who the archive holds, so a remark is signed with a name and a face. */
+  /** Who the archive holds, so a message is signed with a name and a face. */
   authors: Map<string, CommentAuthor>;
   /** The passage each thread is attached to, read from the live document. */
   quotes: Map<string, string>;
-  /** A thread the bubble menu has just anchored and not yet said anything in. */
+  /** A passage the bubble menu has just anchored, waiting for its first message. */
   pendingThread: string | null;
   onPendingHandled: () => void;
-  /** A thread arrived at by clicking its passage in the note. */
+  /** A passage arrived at by clicking it in the note. */
   focusThread: string | null;
   onFocusHandled: () => void;
   onClose: () => void;
   onReveal: (threadId: string) => void;
   onRemoveAnchor: (threadId: string) => void;
-  onResolveAnchor: (threadId: string, resolved: boolean) => void;
-  /** Something was said, resolved or taken back — so lists outside this
-   *  panel can read again now rather than when Realtime gets round to it. */
+  /** Something was said or taken back — so lists outside this panel can read
+   *  again now rather than when Realtime gets round to it. */
   onChanged?: () => void;
+  /** Somebody else's message arrived and was seen arriving. */
+  onRead?: () => void;
 }
 
-/** A thread longer than this is folded in the middle. Somebody arriving at a
- *  conversation wants how it opened and how it stands, not the middle of it. */
-const REPLIES_SHOWN = 2;
+/** A message on its way: shown at once, replaced by the saved row. */
+interface ChatMessage extends NoteComment {
+  sending?: boolean;
+  failed?: boolean;
+}
+
+/** Messages closer than this, from one person, are one group: one name. */
+const GROUP_GAP = 5 * 60_000;
+
+/** One to three emoji, with their skin tones, joiners and variation marks. */
+const JUMBO =
+  /^(?:\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u;
+
+const reduced = () =>
+  typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const dayOf = (iso: string) => new Date(iso).toDateString();
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(d.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+const clock = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
 export function NoteComments({
   session,
@@ -113,224 +140,383 @@ export function NoteComments({
   onClose,
   onReveal,
   onRemoveAnchor,
-  onResolveAnchor,
   onChanged,
+  onRead,
 }: Props) {
-  const [comments, setComments] = useState<NoteComment[]>([]);
+  const { chatBubble: myBubble, quickReactions } = useWritingPreferences();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState("");
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const [showResolved, setShowResolved] = useState(false);
-  /** Which thread the reader is in. Drives the accent on the card, the
-   *  underline in the text, and whether the composer is more than a line. */
-  const [active, setActive] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [draft, setDraft] = useState("");
+  /** The passage the next message is about, if any. */
+  const [about, setAbout] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  const [reactions, setReactions] = useState<Reaction[]>([]);
-  /** Only the threads handed to this reader or naming them. */
-  const [forYou, setForYou] = useState(false);
-  /** The composer an @ is being typed in, and the name so far. */
-  const [suggesting, setSuggesting] = useState<{ threadId: string; query: string } | null>(null);
-  /** Which thread's Assign menu, or which remark's reactions, is open. */
-  const [assigning, setAssigning] = useState<string | null>(null);
   const [reacting, setReacting] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  /** The menu opens upwards when its message is low in the column. */
+  const [menuUp, setMenuUp] = useState(false);
+  const [tapBelow, setTapBelow] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  /** Messages that arrived while this was open, to be seen arriving. */
+  const [arrived, setArrived] = useState<ReadonlySet<string>>(() => new Set());
+  const [unseen, setUnseen] = useState(0);
+
   const members = useMemo(() => [...authors.values()], [authors]);
-  /* One of each is open at a time, so one ref each, on the one that is. */
-  const closeAssign = useCallback(() => setAssigning(null), []);
   const closeReact = useCallback(() => setReacting(null), []);
-  const assignRef = useDismiss<HTMLSpanElement>(assigning !== null, closeAssign);
-  const reactRef = useDismiss<HTMLSpanElement>(reacting !== null, closeReact);
+  const closeMenu = useCallback(() => {
+    setMenuFor(null);
+    setReporting(null);
+  }, []);
+  const reactRef = useDismiss<HTMLDivElement>(reacting !== null, closeReact);
+  const closePicker = useCallback(() => setPicking(false), []);
+  const pickerRef = useDismiss<HTMLDivElement>(picking, closePicker);
+  const menuRef = useDismiss<HTMLDivElement>(menuFor !== null, closeMenu);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const threadRefs = useRef(new Map<string, HTMLElement>());
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+  const atBottom = useRef(true);
+  /** The id each saved message is drawn under: its local one, so the bubble
+   *  that flew in is not replaced by a new one when the row comes back. */
+  const keys = useRef(new Map<string, string>());
+  const known = useRef<Set<string> | null>(null);
+  const readRef = useRef(onRead);
+  readRef.current = onRead;
+
+  /* ── Reading, and listening ─────────────────────────────────────────── */
+
+  const read = useCallback(async () => {
+    const [rows, given] = await Promise.all([
+      loadComments(session, noteId),
+      /* Reactions are a convenience over the conversation: failing to read
+         them must not keep the messages from showing. */
+      loadReactions(session, noteId).catch(() => null),
+    ]);
+    if (given) setReactions(given);
+    const fresh = known.current
+      ? rows.filter((row) => !known.current!.has(row.id) && row.authorId !== session.userId)
+      : [];
+    known.current = new Set(rows.map((row) => row.id));
+    if (fresh.length > 0) {
+      setArrived((current) => new Set([...current, ...fresh.map((r) => r.id)]));
+      readRef.current?.();
+    }
+    setMessages((current) => [
+      ...rows,
+      ...current.filter((message) => message.sending || message.failed),
+    ]);
+  }, [session, noteId]);
 
   useEffect(() => {
     let live = true;
     setLoading(true);
-    /* Reactions are a convenience over the conversation: failing to read them
-       must not keep the remarks from showing. */
-    loadReactions(session, noteId)
-      .then((rows) => live && setReactions(rows))
-      .catch(() => live && setReactions([]));
-    loadComments(session, noteId)
-      .then((rows) => {
-        if (!live) return;
-        setComments(rows);
-        /* Older anchors predate the resolved attribute. Bring them in step
-           with the database once the comments are deliberately opened. */
-        for (const thread of threadsOf(rows)) {
-          onResolveAnchor(thread.threadId, thread.resolved);
-        }
-      })
+    read()
       .catch(
         (reason) =>
-          live && setFailure(reason instanceof Error ? reason.message : "Could not load comments"),
+          live && setFailure(reason instanceof Error ? reason.message : "Couldn't load the chat"),
       )
       .finally(() => live && setLoading(false));
+    /* One read per burst: Realtime announces every row separately. */
+    let timer = 0;
+    const channel = subscribeToComments(session.archiveId, () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void read().catch(() => undefined), 250);
+    });
     return () => {
       live = false;
+      window.clearTimeout(timer);
+      void unsubscribeFromArchive(channel);
     };
-  }, [session, noteId, onResolveAnchor]);
+  }, [session, read]);
 
-  /* A thread just anchored has no row yet, so it cannot come from the archive.
-     It is shown as an empty conversation with the composer already focused —
-     the passage is selected, the panel is open, and the next thing to happen
-     is typing. */
+  /* ── Where the next message is about ───────────────────────────────── */
+
   useEffect(() => {
-    if (pendingThread) {
-      setActive(pendingThread);
-      composerRef.current?.focus();
-    }
+    if (!pendingThread) return;
+    setAbout(pendingThread);
+    composerRef.current?.focus();
   }, [pendingThread]);
 
-  const say = useCallback(
-    async (threadId: string) => {
-      const body = (draft[threadId] ?? "").trim();
-      if (!body) return;
-      try {
-        const assignee =
-          comments.find((comment) => comment.threadId === threadId)?.assigneeId ?? null;
-        const saved = await addComment(
-          session,
-          noteId,
-          threadId,
-          body,
-          mentionedIn(body, members),
-          assignee,
-        );
-        setComments((current) => [...current, saved]);
-        setDraft((current) => ({ ...current, [threadId]: "" }));
-        setFailure("");
-        if (threadId === pendingThread) onPendingHandled();
-        onChanged?.();
-      } catch (reason) {
-        setFailure(reason instanceof Error ? reason.message : "Could not save that comment");
-      }
-    },
-    [draft, session, noteId, pendingThread, onPendingHandled, onChanged, comments, members],
-  );
-
-  /* Oldest first, so the column is a log: the thread you opened first stays at
-     the top and each new one is added underneath. `threadsOf` already sorts
-     that way.
-
-     Not document order, which this briefly was. Ordering by where the passage
-     sits reads well until you go back and remark on something earlier — and
-     then the remark you just made appears *above* the one before it, in a
-     column you were watching grow downward. A conversation is a sequence of
-     things said, and the panel is read as one. */
-  const threads = useMemo(() => threadsOf(comments), [comments]);
-  const pendingIsNew = pendingThread && !threads.some((t) => t.threadId === pendingThread);
-  const forYouCount = threads.filter(
-    (thread) => !thread.resolved && isForYou(thread, session.userId),
-  ).length;
-  const shown = threads.filter(
-    (thread) => (showResolved || !thread.resolved) && (!forYou || isForYou(thread, session.userId)),
-  );
-  const resolvedCount = threads.filter((thread) => thread.resolved).length;
-
-  /* Arriving from the passage. The thread may be hidden — a resolved one is
-     filtered out — so unhide first, or clicking its underline opens a panel
-     with nothing in it and looks broken. */
+  /* A passage pressed in the note: the conversation about it comes into view
+     and the composer is ready to add to it. */
   useEffect(() => {
-    if (!focusThread) return;
-    const isResolved = comments.some(
-      (comment) => comment.threadId === focusThread && comment.resolvedAt,
+    if (!focusThread || loading) return;
+    setAbout(focusThread);
+    const last = [...messages].reverse().find((message) => message.threadId === focusThread);
+    const node =
+      last && scrollRef.current?.querySelector<HTMLElement>(`[data-message="${last.id}"]`);
+    if (node) {
+      node.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
+      node.classList.remove("is-arrived");
+      void node.offsetWidth;
+      node.classList.add("is-arrived");
+    }
+    onFocusHandled();
+  }, [focusThread, loading, messages, onFocusHandled]);
+
+  const aboutQuote = about ? quotes.get(about) : undefined;
+
+  function dropAbout() {
+    /* A passage anchored for a first message that never came is a highlight
+       nothing points at: take it out of the text again. */
+    if (about && about === pendingThread) {
+      onRemoveAnchor(about);
+      onPendingHandled();
+    }
+    setAbout(null);
+    composerRef.current?.focus();
+  }
+
+  /* ── Staying at the newest ─────────────────────────────────────────── */
+
+  /* The composer grows with what is typed, up to six lines.
+     Before the pinning below, which must see the room it leaves. */
+  useLayoutEffect(() => {
+    const field = composerRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight, 132)}px`;
+  }, [draft, expanded]);
+
+  /* By the key it is drawn under: a sent message being replaced by its saved
+     row is the same message, and must not scroll the column a second time. */
+  const lastId = messages.at(-1)?.id;
+  const lastKey = lastId && (keys.current.get(lastId) ?? lastId);
+  const lastMine = messages.at(-1)?.authorId === session.userId;
+  /** The conversation's height when last laid out, to know how far a new
+   *  message pushed everything up. */
+  const streamHeight = useRef(0);
+  const viewHeight = useRef(0);
+  const glide = useRef<Animation | null>(null);
+  /* Pinned to the newest the way a chat is. A new message — and the room its
+     run's animal moves out of in the same frame — pushes the conversation up
+     by one distance; that distance is played as a single glide, so the
+     column moves once, the way iMessage's does, instead of jumping and then
+     settling back. */
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const stream = scroller?.querySelector<HTMLElement>(".chat-stream");
+    if (!scroller || loading) return;
+    const before = streamHeight.current;
+    const after = stream?.offsetHeight ?? 0;
+    const view = scroller.clientHeight;
+    /* The composer emptying as it sends gives the conversation room below;
+       that is part of the same movement, not a drop before the rise. */
+    const opened = view - viewHeight.current;
+    streamHeight.current = after;
+    viewHeight.current = view;
+    if (atBottom.current || lastMine) {
+      atBottom.current = true;
+      /* A glide still under way when the next message comes is carried on
+         from where it is, not snapped to its end. */
+      const carried =
+        stream && glide.current?.playState === "running"
+          ? new DOMMatrixReadOnly(getComputedStyle(stream).transform).m42
+          : 0;
+      glide.current?.cancel();
+      scroller.scrollTop = scroller.scrollHeight;
+      setUnseen(0);
+      const rise = Math.min(after - before - opened + carried, view);
+      if (stream && before > 0 && rise > 0 && !reduced()) {
+        const run = stream.animate(
+          [{ transform: `translateY(${rise}px)` }, { transform: "none" }],
+          { duration: SHAPE * 0.8, easing: EASE },
+        );
+        glide.current = run;
+        void run.finished
+          .then(() => {
+            if (atBottom.current) scroller.scrollTop = scroller.scrollHeight;
+          })
+          .catch(() => undefined);
+      }
+    } else setUnseen((count) => count + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new last message moves it
+  }, [lastKey, loading, expanded]);
+
+  const empty = messages.length === 0;
+  /* Anything below that changes height afterwards — a reaction, an edit, the
+     composer — keeps it pinned. */
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    const stream = scroller?.querySelector<HTMLElement>(".chat-stream");
+    if (!scroller || !stream) return;
+    const pin = new ResizeObserver(() => {
+      streamHeight.current = stream.offsetHeight;
+      viewHeight.current = scroller.clientHeight;
+      /* While the glide runs, its transform reaches below the end and
+         `scrollHeight` counts it: pinning to that would overshoot, and the
+         column would drop back when the glide ends. It pins once it has. */
+      if (glide.current?.playState === "running") return;
+      if (atBottom.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    pin.observe(stream);
+    pin.observe(scroller);
+    return () => pin.disconnect();
+  }, [loading, expanded, empty]);
+
+  /* Only the reader's own scrolling unpins it; the pinning itself fires
+     scroll events too, and those must not be read as leaving the bottom. */
+  const onScroll = () => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const near = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48;
+    if (near) {
+      atBottom.current = true;
+      setUnseen(0);
+    } else if (reading.current) atBottom.current = false;
+  };
+  const reading = useRef(false);
+  const readingTimer = useRef(0);
+  const byHand = () => {
+    reading.current = true;
+    window.clearTimeout(readingTimer.current);
+    readingTimer.current = window.setTimeout(() => (reading.current = false), 200);
+  };
+
+  /* ── Saying something ──────────────────────────────────────────────── */
+
+  async function send(retry?: ChatMessage) {
+    const body = (retry?.body ?? draft).trim();
+    if (!body) return;
+    const threadId = retry?.threadId ?? (about && quotes.has(about) ? about : noteId);
+    const local: ChatMessage = retry ?? {
+      id: `local-${crypto.randomUUID()}`,
+      threadId,
+      authorId: session.userId,
+      body,
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
+      mentions: mentionedIn(body, members),
+      assigneeId: null,
+      bubble: myBubble,
+    };
+    setMessages((current) =>
+      retry
+        ? current.map((m) => (m.id === local.id ? { ...m, sending: true, failed: false } : m))
+        : [...current, { ...local, sending: true }],
     );
-    if (isResolved && !showResolved) {
-      setShowResolved(true);
+    if (!retry) {
+      setDraft("");
+      setSuggesting(null);
+      if (threadId === pendingThread) onPendingHandled();
+      setAbout(null);
+    }
+    try {
+      const saved = await addComment(
+        session,
+        noteId,
+        threadId,
+        body,
+        local.mentions,
+        null,
+        local.bubble ?? null,
+      );
+      keys.current.set(saved.id, local.id);
+      known.current?.add(saved.id);
+      setMessages((current) => {
+        const rest = current.filter((m) => m.id !== local.id && m.id !== saved.id);
+        return [...rest, saved].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      });
+      setFailure("");
+      onChanged?.();
+    } catch {
+      setMessages((current) =>
+        current.map((m) => (m.id === local.id ? { ...m, sending: false, failed: true } : m)),
+      );
+    }
+  }
+
+  async function saveEdit(message: ChatMessage) {
+    const body = editDraft.trim();
+    if (!body || body === message.body) return setEditing(null);
+    try {
+      const saved = await updateComment(session, message.id, body, mentionedIn(body, members));
+      setMessages((current) => current.map((m) => (m.id === message.id ? saved : m)));
+      setEditing(null);
+    } catch (reason) {
+      setFailure(reason instanceof Error ? reason.message : "Couldn't edit that message");
+    }
+  }
+
+  async function remove(message: ChatMessage) {
+    closeMenu();
+    if (message.failed) {
+      setMessages((current) => current.filter((m) => m.id !== message.id));
       return;
     }
-    setActive(focusThread);
-    const row = threadRefs.current.get(focusThread);
-    if (!row) return;
-    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    row.classList.add("is-arrived");
-    const timer = window.setTimeout(() => row.classList.remove("is-arrived"), 1400);
-    onFocusHandled();
-    return () => window.clearTimeout(timer);
-  }, [focusThread, comments, loading, showResolved, onFocusHandled]);
-
-  async function toggleResolved(threadId: string, resolved: boolean) {
     try {
-      await resolveThread(session, noteId, threadId, resolved);
+      await deleteComment(session, message.id);
+      const rest = messages.filter((m) => m.id !== message.id);
+      setMessages(rest);
       onChanged?.();
-      const at = resolved ? new Date().toISOString() : null;
-      setComments((current) =>
-        current.map((c) => (c.threadId === threadId ? { ...c, resolvedAt: at } : c)),
-      );
-      onResolveAnchor(threadId, resolved);
-      setActive(null);
+      /* The last word about a passage gone, its underline goes too. */
+      if (message.threadId !== noteId && !rest.some((m) => m.threadId === message.threadId))
+        onRemoveAnchor(message.threadId);
     } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : "Could not update that thread");
+      setFailure(reason instanceof Error ? reason.message : "Couldn't delete that message");
     }
   }
 
-  async function saveEdit(comment: NoteComment) {
-    const body = editDraft.trim();
-    if (!body) return;
-    try {
-      const saved = await updateComment(session, comment.id, body, mentionedIn(body, members));
-      setComments((current) =>
-        current.map((candidate) => (candidate.id === comment.id ? saved : candidate)),
-      );
-      setEditing(null);
-      setEditDraft("");
-      setFailure("");
-    } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : "Could not edit that comment");
-    }
-  }
-
-  async function assign(threadId: string, assigneeId: string | null) {
-    setAssigning(null);
-    try {
-      await assignThread(session, noteId, threadId, assigneeId);
-      setComments((current) =>
-        current.map((c) => (c.threadId === threadId ? { ...c, assigneeId } : c)),
-      );
-      onChanged?.();
-    } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : "Could not hand that thread over");
-    }
-  }
-
-  async function react(commentId: string, emoji: string, on: boolean) {
+  async function react(messageId: string, emoji: string, on: boolean) {
     setReacting(null);
     const mine = (r: Reaction) =>
-      r.commentId === commentId && r.userId === session.userId && r.emoji === emoji;
+      r.commentId === messageId && r.userId === session.userId && r.emoji === emoji;
     const before = reactions;
-    /* Shown at once and put back on refusal: a reaction is the one act here
-       that should feel like nothing happened between pressing and seeing. */
     setReactions((current) =>
       on
-        ? [...current.filter((r) => !mine(r)), { commentId, userId: session.userId, emoji }]
+        ? [
+            ...current.filter((r) => !mine(r)),
+            { commentId: messageId, userId: session.userId, emoji },
+          ]
         : current.filter((r) => !mine(r)),
     );
     try {
-      await setReaction(session, noteId, commentId, emoji, on);
+      await setReaction(session, noteId, messageId, emoji, on);
     } catch (reason) {
       setReactions(before);
-      setFailure(reason instanceof Error ? reason.message : "Could not save that reaction");
+      setFailure(reason instanceof Error ? reason.message : "Couldn't save that reaction");
     }
   }
 
-  /** The draft with the @name being typed replaced by the chosen member. */
-  function pickMention(threadId: string, name: string) {
-    const field = document.activeElement;
-    const text = draft[threadId] ?? "";
-    const caret = field instanceof HTMLTextAreaElement ? field.selectionStart : text.length;
-    const start = text.slice(0, caret).lastIndexOf("@");
+  /* ── Naming people ─────────────────────────────────────────────────── */
+
+  const offered = useMemo(() => {
+    if (suggesting === null) return [];
+    const wanted = suggesting.toLocaleLowerCase();
+    return members
+      .filter((m) => m.userId !== session.userId && m.name.toLocaleLowerCase().startsWith(wanted))
+      .slice(0, 5);
+  }, [suggesting, members, session.userId]);
+
+  /** An emoji where the caret is, and the caret after it. */
+  function insertEmoji(emoji: string) {
+    const field = composerRef.current;
+    const start = field?.selectionStart ?? draft.length;
+    const end = field?.selectionEnd ?? draft.length;
+    setDraft(`${draft.slice(0, start)}${emoji}${draft.slice(end)}`);
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
+
+  function pickMention(name: string) {
+    const field = composerRef.current;
+    const caret = field?.selectionStart ?? draft.length;
+    const start = draft.slice(0, caret).lastIndexOf("@");
     if (start < 0) return;
-    const next = `${text.slice(0, start)}@${name} ${text.slice(caret)}`;
-    setDraft((current) => ({ ...current, [threadId]: next }));
+    setDraft(`${draft.slice(0, start)}@${name} ${draft.slice(caret)}`);
     setSuggesting(null);
   }
 
-  /** A remark's words, with the members it names drawn as names. */
-  function words(comment: NoteComment) {
-    const named = members.filter((member) => comment.mentions.includes(member.userId));
-    if (named.length === 0) return comment.body;
+  function words(message: ChatMessage) {
+    const named = members.filter((member) => message.mentions.includes(member.userId));
+    if (named.length === 0) return message.body;
     const pattern = new RegExp(
       `(@(?:${named
         .map((member) => member.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
@@ -338,9 +524,9 @@ export function NoteComments({
         .join("|")}))`,
       "giu",
     );
-    return comment.body.split(pattern).map((part, index) =>
+    return message.body.split(pattern).map((part, index) =>
       index % 2 === 1 ? (
-        <span key={index} className="note-comment-mention">
+        <span key={index} className="chat-mention">
           {part}
         </span>
       ) : (
@@ -349,513 +535,569 @@ export function NoteComments({
     );
   }
 
-  async function remove(comment: NoteComment, lastInThread: boolean) {
-    try {
-      await deleteComment(session, comment.id);
-      onChanged?.();
-      setComments((current) => current.filter((c) => c.id !== comment.id));
-      /* The last remark gone means nothing is being said about that passage
-         any more, so the underline goes too rather than being left behind
-         pointing at a conversation that no longer exists. */
-      if (lastInThread) onRemoveAnchor(comment.threadId);
-    } catch (reason) {
-      setFailure(reason instanceof Error ? reason.message : "Could not delete that comment");
-    }
+  /* ── Enlarging ─────────────────────────────────────────────────────── */
+
+  const from = useRef<DOMRect | null>(null);
+
+  function enlarge() {
+    from.current = columnRef.current?.getBoundingClientRect() ?? null;
+    setExpanded(true);
   }
 
-  function suggestions(threadId: string) {
-    if (!suggesting || suggesting.threadId !== threadId) return [];
-    const wanted = suggesting.query.toLocaleLowerCase();
-    return members
-      .filter((member) => member.name && member.name.toLocaleLowerCase().startsWith(wanted))
-      .slice(0, 5);
-  }
-
-  function composer(threadId: string, placeholder: string, open: boolean) {
-    return (
-      <div
-        className={`note-comment-composer ${open ? "is-open" : ""}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <textarea
-          ref={threadId === pendingThread ? composerRef : undefined}
-          value={draft[threadId] ?? ""}
-          onChange={(event) => {
-            const text = event.target.value;
-            setDraft((c) => ({ ...c, [threadId]: text }));
-            const query = mentionQuery(text, event.target.selectionStart ?? text.length);
-            setSuggesting(query === null ? null : { threadId, query });
-          }}
-          onFocus={() => setActive(threadId)}
-          onKeyDown={(event) => {
-            const offered = suggestions(threadId);
-            if (offered.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
-              event.preventDefault();
-              pickMention(threadId, offered[0].name);
-              return;
-            }
-            if (event.key === "Escape" && suggesting) {
-              event.stopPropagation();
-              setSuggesting(null);
-              return;
-            }
-            /* Enter sends. A remark is a line or two said to one other person,
-               so the common case is the one that should cost one key — ⌘↵ made
-               the short reply the awkward one. Shift+Enter is the way to a new
-               line, and ⌘↵ still works for the hands that already learnt it.
-
-               `isComposing` is the guard that matters: while an input method
-               is mid-word, Enter is how the *word* is accepted, and sending
-               there would post a half-typed one. */
-            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
-            if (event.shiftKey) return;
-            event.preventDefault();
-            void say(threadId);
-          }}
-          placeholder={placeholder}
-          rows={open ? 2 : 1}
-          aria-label={placeholder}
-        />
-        {suggestions(threadId).length > 0 && (
-          <div className="note-comment-suggestions" role="listbox">
-            {suggestions(threadId).map((member, index) => (
-              <button
-                key={member.userId}
-                type="button"
-                role="option"
-                aria-selected={index === 0}
-                className="note-comment-suggestion press"
-                onMouseDown={(event) => {
-                  // Before the textarea loses focus, or the caret is gone.
-                  event.preventDefault();
-                  pickMention(threadId, member.name);
-                }}
-              >
-                <Avatar url={member.avatarUrl} name={member.name} email="" compact />
-                {member.name}
-              </button>
-            ))}
-          </div>
-        )}
-        {open && (
-          <div className="note-comment-composer-actions">
-            <button
-              type="button"
-              className="note-comment-send press"
-              disabled={!(draft[threadId] ?? "").trim()}
-              onClick={() => void say(threadId)}
-            >
-              {threadId === pendingThread ? "Comment" : "Reply"}
-            </button>
-          </div>
-        )}
-      </div>
+  /* The column's own rectangle opening out into the sheet. The surface is
+     clipped rather than scaled, so nothing in it is ever stretched; what is
+     inside waits for it to have room and then arrives. */
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current;
+    const start = from.current;
+    if (!expanded || !sheet || !start || reduced()) return;
+    const end = sheet.getBoundingClientRect();
+    const inset = `inset(${start.top - end.top}px ${end.right - start.right}px ${end.bottom - start.bottom}px ${start.left - end.left}px round 0px)`;
+    sheet.animate([{ clipPath: inset }, { clipPath: "inset(0px round 16px)" }], {
+      duration: SHAPE,
+      easing: EASE,
+    });
+    sheet.querySelector(".chat-inner")?.animate(
+      [
+        { opacity: 0, transform: "translateY(6px)" },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 260, delay: 150, easing: EASE_OUT, fill: "backwards" },
     );
-  }
+    composerRef.current?.focus();
+  }, [expanded]);
 
-  /** One remark. `head` is the one that opened the thread — full weight, its
-   *  own line for the name. A reply is quieter and sits under the rail, so the
-   *  shape of the card says which is which before a word is read. */
-  function remark(comment: NoteComment, head: boolean, onlyOne: boolean, extra?: ReactNode) {
-    const author = authors.get(comment.authorId);
+  const shrink = useCallback(() => {
+    const sheet = sheetRef.current;
+    const end = columnRef.current?.getBoundingClientRect();
+    if (!sheet || !end || reduced()) return setExpanded(false);
+    const start = sheet.getBoundingClientRect();
+    const inset = `inset(${end.top - start.top}px ${start.right - end.right}px ${start.bottom - end.bottom}px ${end.left - start.left}px round 0px)`;
+    sheet.closest(".chat-layer")?.classList.add("is-closing");
+    sheet.querySelector(".chat-inner")?.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: OVERLAY_OUT.duration,
+      easing: OVERLAY_OUT.easing,
+      fill: "forwards",
+    });
+    sheet
+      .animate([{ clipPath: "inset(0px round 16px)" }, { clipPath: inset }], {
+        duration: SHAPE * 0.8,
+        easing: EASE,
+        fill: "forwards",
+      })
+      .finished.then(() => setExpanded(false))
+      .catch(() => setExpanded(false));
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || reacting || menuFor || editing) return;
+      event.stopPropagation();
+      shrink();
+    };
+    window.addEventListener("keydown", escape, true);
+    return () => window.removeEventListener("keydown", escape, true);
+  }, [expanded, shrink, reacting, menuFor, editing]);
+
+  /* ── Drawing ───────────────────────────────────────────────────────── */
+
+  const faces = members.filter((member) => member.userId !== session.userId).slice(0, 4);
+
+  function message(m: ChatMessage, index: number) {
+    const previous = messages[index - 1];
+    const next = messages[index + 1];
+    const mine = m.authorId === session.userId;
+    const newDay = !previous || dayOf(previous.createdAt) !== dayOf(m.createdAt);
+    const joins = (a?: ChatMessage, b?: ChatMessage) =>
+      Boolean(
+        a &&
+        b &&
+        a.authorId === b.authorId &&
+        dayOf(a.createdAt) === dayOf(b.createdAt) &&
+        Math.abs(Date.parse(b.createdAt) - Date.parse(a.createdAt)) < GROUP_GAP,
+      );
+    const first = !joins(previous, m);
+    const last = !joins(m, next);
+    const author = authors.get(m.authorId);
     const name = author?.name || "Someone";
-    const mine = comment.authorId === session.userId;
-    /* The same colour this person's caret has in the text. Two people writing
-       to each other need to be told apart at a glance and one grey name above
-       another does not do it — but a second colour system would be worse than
-       none, so this is the one the note already uses. */
-    const colour = collaborationColor(comment.authorId);
+    const quote = m.threadId !== noteId ? quotes.get(m.threadId) : undefined;
+    const showQuote = quote && (first || previous?.threadId !== m.threadId);
+    /* A few emoji and nothing else are said large and without a bubble. */
+    const jumbo = !showQuote && editing !== m.id && JUMBO.test(m.body.trim());
+    const counted = tally(reactions, m.id, session.userId);
+    const motion =
+      keys.current.has(m.id) || m.sending ? "is-sent" : arrived.has(m.id) ? "is-received" : "";
+
     return (
-      <div
-        key={comment.id}
-        className={`note-comment ${head ? "is-head" : "is-reply"} ${mine ? "is-mine" : ""}`}
-        style={{ "--author": colour } as React.CSSProperties}
-      >
-        {/* Who and when on the left, what can be done on the right — Docs'
-            card. The tools were a row of words under the remark, which put
-            the most-used one (Resolve) the furthest from the eye. */}
-        <div className="note-comment-head">
-          <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
-          <span className="note-comment-who">
-            <span className="note-comment-name truncate">{name}</span>
-            <span className="readout note-comment-stamp">{formatStamp(comment.createdAt)}</span>
-          </span>
-          <span className="note-comment-tools" onClick={(event) => event.stopPropagation()}>
-            {canEdit && reactTool(comment)}
-            {mine && (
-              <button
-                type="button"
-                className="note-comment-tool is-quiet press"
-                aria-label={head ? "Edit this comment" : "Edit this reply"}
-                title={head ? "Edit this comment" : "Edit this reply"}
-                onClick={() => {
-                  setEditing(comment.id);
-                  setEditDraft(comment.body);
-                }}
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-            {mine && (
-              <button
-                type="button"
-                className="note-comment-tool is-quiet is-delete press"
-                aria-label={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                title={head && onlyOne ? "Delete this comment" : "Delete this reply"}
-                onClick={() => void remove(comment, onlyOne)}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-            {extra}
-          </span>
-        </div>
-        {editing === comment.id ? (
-          <div className="note-comment-editor" onClick={(event) => event.stopPropagation()}>
-            <textarea
-              value={editDraft}
-              onChange={(event) => setEditDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setEditing(null);
-                  setEditDraft("");
-                } else if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void saveEdit(comment);
-                }
-              }}
-              aria-label={head ? "Edit comment" : "Edit reply"}
-              autoFocus
-            />
-            <div className="note-comment-editor-actions">
-              <button
-                type="button"
-                className="note-comment-action press"
-                onClick={() => {
-                  setEditing(null);
-                  setEditDraft("");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="note-comment-send press"
-                disabled={!editDraft.trim() || editDraft.trim() === comment.body}
-                onClick={() => void saveEdit(comment)}
-              >
-                Save
-              </button>
-            </div>
+      <div key={keys.current.get(m.id) ?? m.id} className="chat-row-wrap">
+        {newDay && (
+          <div className="chat-day" role="separator">
+            <span>{dayLabel(m.createdAt)}</span>
           </div>
-        ) : (
-          <p className="note-comment-body">{words(comment)}</p>
         )}
-        {reactionRow(comment)}
-        {!mine ? (
-          <SafetyActions noteId={noteId} userId={comment.authorId} commentId={comment.id} compact />
-        ) : null}
-      </div>
-    );
-  }
-
-  /** The chips under a remark. Only there when somebody has reacted: an
-   *  empty row held a gap under every remark for a button nobody saw. */
-  function reactionRow(comment: NoteComment) {
-    const counted = tally(reactions, comment.id, session.userId);
-    if (counted.length === 0) return null;
-    return (
-      <div className="note-comment-reactions" onClick={(event) => event.stopPropagation()}>
-        {counted.map(({ emoji, count, mine }) => (
-          <button
-            key={emoji}
-            type="button"
-            className={`note-comment-reaction press ${mine ? "is-mine" : ""}`}
-            disabled={!canEdit}
-            aria-pressed={mine}
-            title={reactors(comment.id, emoji)}
-            onClick={() => void react(comment.id, emoji, !mine)}
-          >
-            <span>{emoji}</span>
-            <span className="readout">{count}</span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  function reactTool(comment: NoteComment) {
-    const counted = tally(reactions, comment.id, session.userId);
-    return (
-      <span className="note-comment-react" ref={reacting === comment.id ? reactRef : undefined}>
-        <button
-          type="button"
-          className="note-comment-tool is-quiet press"
-          aria-label="React"
-          title="React"
-          aria-expanded={reacting === comment.id}
-          onClick={() => setReacting((open) => (open === comment.id ? null : comment.id))}
+        <div
+          data-message={m.id}
+          className={`chat-row ${mine ? "is-mine" : "is-theirs"} ${first ? "is-first" : ""} ${
+            last ? "is-last" : ""
+          } ${motion} ${m.sending ? "is-sending" : ""} ${m.failed ? "is-failed" : ""}`}
         >
-          <Smile size={14} />
-        </button>
-        {reacting === comment.id && (
-          <span className="note-comment-palette">
-            {REACTIONS.map((emoji) => {
-              const mine = counted.some((one) => one.emoji === emoji && one.mine);
-              return (
+          {first && (
+            <div className="chat-sender">
+              {!mine && <span className="chat-sender-name">{name}</span>}
+              <time className="readout" dateTime={m.createdAt}>
+                {clock(m.createdAt)}
+              </time>
+            </div>
+          )}
+          <div className="chat-line">
+            {!mine && (
+              <span className="chat-face">
+                {last && <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />}
+              </span>
+            )}
+            {jumbo ? (
+              <span className="chat-jumbo">{m.body.trim()}</span>
+            ) : (
+              <ChatBubble bubble={m.bubble} mine={mine} bare={!last}>
+                {showQuote && (
+                  <button
+                    type="button"
+                    className="chat-quote"
+                    onClick={() => onReveal(m.threadId)}
+                    title="Show in the note"
+                  >
+                    {quote}
+                  </button>
+                )}
+                {editing === m.id ? (
+                  <textarea
+                    className="chat-edit"
+                    value={editDraft}
+                    autoFocus
+                    rows={Math.min(6, editDraft.split("\n").length)}
+                    aria-label="Edit message"
+                    onChange={(event) => setEditDraft(event.target.value)}
+                    onBlur={() => void saveEdit(m)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.stopPropagation();
+                        setEditing(null);
+                      } else if (
+                        event.key === "Enter" &&
+                        !event.shiftKey &&
+                        !event.nativeEvent.isComposing
+                      ) {
+                        event.preventDefault();
+                        void saveEdit(m);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="chat-words">{words(m)}</span>
+                )}
+              </ChatBubble>
+            )}
+            {!m.sending && !m.failed && editing !== m.id && (
+              <>
+                <div
+                  className="chat-tools"
+                  data-open={reacting === m.id || menuFor === m.id || undefined}
+                >
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="chat-tool press"
+                      aria-label="React"
+                      title="React"
+                      aria-expanded={reacting === m.id}
+                      onClick={(event) => {
+                        /* Above the bubble, unless that is off the top of the column. */
+                        const scroller = scrollRef.current?.getBoundingClientRect();
+                        const line = event.currentTarget
+                          .closest(".chat-line")
+                          ?.getBoundingClientRect();
+                        setTapBelow(Boolean(scroller && line && line.top - scroller.top < 56));
+                        setReacting((open) => (open === m.id ? null : m.id));
+                      }}
+                    >
+                      <Smile size={15} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="chat-tool press"
+                    aria-label="More"
+                    title="More"
+                    aria-expanded={menuFor === m.id}
+                    onClick={(event) => {
+                      const scroller = scrollRef.current?.getBoundingClientRect();
+                      const at = event.currentTarget.getBoundingClientRect();
+                      setMenuUp(Boolean(scroller && at.top > scroller.top + scroller.height / 2));
+                      setMenuFor((open) => (open === m.id ? null : m.id));
+                    }}
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                </div>
+                {menuFor === m.id && (
+                  <div
+                    className={`chat-menu popover ${menuUp ? "is-above" : ""}`}
+                    ref={menuRef}
+                    role="menu"
+                  >
+                    {reporting === m.id ? (
+                      <SafetyActions noteId={noteId} userId={m.authorId} commentId={m.id} compact />
+                    ) : (
+                      <>
+                        {quote && canEdit && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="menu-row press"
+                            onClick={() => {
+                              closeMenu();
+                              setAbout(m.threadId);
+                              composerRef.current?.focus();
+                            }}
+                          >
+                            <Quote size={15} />
+                            Reply about this passage
+                          </button>
+                        )}
+                        {mine && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="menu-row press"
+                            onClick={() => {
+                              closeMenu();
+                              setEditing(m.id);
+                              setEditDraft(m.body);
+                            }}
+                          >
+                            <Pencil size={15} />
+                            Edit
+                          </button>
+                        )}
+                        {mine && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="menu-row press is-danger"
+                            onClick={() => void remove(m)}
+                          >
+                            <Trash2 size={15} />
+                            Delete
+                          </button>
+                        )}
+                        {!mine && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="menu-row press"
+                            onClick={() => setReporting(m.id)}
+                          >
+                            <Flag size={15} />
+                            Report
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {reacting === m.id && (
+              <div
+                className={`chat-tapback ${tapBelow ? "is-below" : ""}`}
+                ref={reactRef}
+                role="menu"
+              >
+                {quickReactions.map((emoji, at) => {
+                  const on = counted.some((one) => one.emoji === emoji && one.mine);
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={on}
+                      className={`chat-tapback-emoji ${on ? "is-on" : ""}`}
+                      style={{ "--at": at } as CSSProperties}
+                      onClick={() => void react(m.id, emoji, !on)}
+                    >
+                      {emoji}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {counted.length > 0 && (
+            <div className="chat-reactions">
+              {counted.map(({ emoji, count, mine: ownReaction }) => (
                 <button
                   key={emoji}
                   type="button"
-                  className={`note-comment-palette-emoji press ${mine ? "is-mine" : ""}`}
-                  onClick={() => void react(comment.id, emoji, !mine)}
+                  className={`chat-reaction press ${ownReaction ? "is-mine" : ""}`}
+                  disabled={!canEdit}
+                  aria-pressed={ownReaction}
+                  title={reactions
+                    .filter((r) => r.commentId === m.id && r.emoji === emoji)
+                    .map((r) =>
+                      r.userId === session.userId
+                        ? "You"
+                        : authors.get(r.userId)?.name || "Someone",
+                    )
+                    .join(", ")}
+                  onClick={() => void react(m.id, emoji, !ownReaction)}
                 >
-                  {emoji}
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="readout">{count}</span>}
                 </button>
-              );
-            })}
-          </span>
-        )}
-      </span>
-    );
-  }
-
-  /** Who gave this reaction, by name — the reaction's own tooltip. */
-  function reactors(commentId: string, emoji: string) {
-    return reactions
-      .filter((r) => r.commentId === commentId && r.emoji === emoji)
-      .map((r) => (r.userId === session.userId ? "You" : authors.get(r.userId)?.name || "Someone"))
-      .join(", ");
-  }
-
-  /** Resolve, always in reach, and Assign beside it on hover. */
-  function threadTools(thread: CommentThread) {
-    return (
-      <>
-        {!thread.resolved && (
-          <span
-            className="note-comment-assign"
-            ref={assigning === thread.threadId ? assignRef : undefined}
-          >
-            <button
-              type="button"
-              className="note-comment-tool is-quiet press"
-              aria-label="Assign"
-              title="Assign"
-              aria-expanded={assigning === thread.threadId}
-              onClick={() =>
-                setAssigning((open) => (open === thread.threadId ? null : thread.threadId))
-              }
-            >
-              <UserPlus size={14} />
+              ))}
+            </div>
+          )}
+          {m.failed && (
+            <button type="button" className="chat-retry press" onClick={() => void send(m)}>
+              Not sent · Retry
             </button>
-            {assigning === thread.threadId && (
-              <span className="note-comment-assign-menu" role="menu">
-                {members.map((member) => (
-                  <button
-                    key={member.userId}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={thread.assigneeId === member.userId}
-                    className="note-comment-suggestion press"
-                    onClick={() => void assign(thread.threadId, member.userId)}
-                  >
-                    <Avatar url={member.avatarUrl} name={member.name} email="" compact />
-                    {member.userId === session.userId ? "Me" : member.name || "Someone"}
-                    {thread.assigneeId === member.userId && <Check size={12} />}
-                  </button>
-                ))}
-                {thread.assigneeId && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="note-comment-suggestion press"
-                    onClick={() => void assign(thread.threadId, null)}
-                  >
-                    Nobody
-                  </button>
-                )}
-              </span>
-            )}
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const inner = (
+    <div className="chat-inner">
+      <header className="chat-header">
+        <span className="chat-title">Chat</span>
+        {faces.length > 0 && (
+          <span className="chat-faces" aria-label={faces.map((face) => face.name).join(", ")}>
+            {faces.map((face) => (
+              <Avatar key={face.userId} url={face.avatarUrl} name={face.name} email="" compact />
+            ))}
           </span>
         )}
-        <button
-          type="button"
-          className="note-comment-tool is-resolve press"
-          aria-label={thread.resolved ? "Reopen" : "Resolve"}
-          title={thread.resolved ? "Reopen" : "Resolve"}
-          onClick={() => void toggleResolved(thread.threadId, !thread.resolved)}
-        >
-          {thread.resolved ? <RotateCcw size={14} /> : <Check size={15} stroke={2.5} />}
-        </button>
-      </>
-    );
-  }
-
-  function card(thread: CommentThread) {
-    const [head, ...replies] = thread.comments;
-    const isActive = active === thread.threadId;
-    const folded = !expanded[thread.threadId] && replies.length > REPLIES_SHOWN;
-    const visibleReplies = folded ? replies.slice(-REPLIES_SHOWN) : replies;
-    const hiddenCount = replies.length - visibleReplies.length;
-
-    return (
-      <article
-        key={thread.threadId}
-        data-thread={thread.threadId}
-        ref={(node) => {
-          if (node) threadRefs.current.set(thread.threadId, node);
-          else threadRefs.current.delete(thread.threadId);
-        }}
-        className={`note-comment-thread ${thread.resolved ? "is-resolved" : ""} ${
-          isActive ? "is-active" : ""
-        }`}
-        onClick={() => {
-          setActive(thread.threadId);
-          onReveal(thread.threadId);
-        }}
-      >
-        {/* In a list the quote is the only way to know what is being discussed.
-            Standing beside the passage it is a repetition of what the reader is
-            already looking at, so it shrinks to a label and stops being a
-            paragraph of its own. */}
-        {/* The passage, as the thread's title. It is how you know what is being
-            discussed without hunting for the underline, and clicking the card
-            lights that underline in the text. */}
-        <p className={`note-comment-quote ${quotes.has(thread.threadId) ? "" : "is-orphan"}`}>
-          {quotes.get(thread.threadId) || "The passage this was about is gone"}
-        </p>
-        {thread.assigneeId && (
-          <p className="note-comment-assignee">
-            <UserPlus size={12} />
-            {thread.assigneeId === session.userId
-              ? "Yours"
-              : authors.get(thread.assigneeId)?.name || "Someone"}
-          </p>
-        )}
-
-        {remark(head, true, thread.comments.length === 1, canEdit && threadTools(thread))}
-
-        {hiddenCount > 0 && (
+        <span className="chat-header-tools">
           <button
             type="button"
-            className="note-comment-more press"
-            onClick={(event) => {
-              event.stopPropagation();
-              setExpanded((current) => ({ ...current, [thread.threadId]: true }));
-            }}
+            className="chat-tool press"
+            aria-label={expanded ? "Make smaller" : "Enlarge"}
+            title={expanded ? "Make smaller" : "Enlarge"}
+            onClick={expanded ? shrink : enlarge}
           >
-            <ChevronDown size={12} />
-            {hiddenCount} earlier {hiddenCount === 1 ? "reply" : "replies"}
+            {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
-        )}
-
-        {visibleReplies.map((reply) => remark(reply, false, false))}
-
-        {/* The reply box belongs to the thread being read. One under every
-            card was most of the column's weight — five threads, five empty
-            fields asking to be filled. */}
-        {canEdit &&
-          !thread.resolved &&
-          (isActive || (draft[thread.threadId] ?? "") !== "") &&
-          composer(thread.threadId, "Reply…", true)}
-      </article>
-    );
-  }
-
-  const body = (
-    <>
-      {loading && <p className="note-comments-empty">Loading…</p>}
-
-      {!loading && shown.length === 0 && !pendingIsNew && (
-        <p className="note-comments-empty">
-          Nothing here yet. Select a passage and use the comment button to say something about it.
-        </p>
-      )}
-
-      {shown.map(card)}
-
-      {/* The one being written goes last, where it is about to land.
-          Rendered first, it appeared above every existing thread while you
-          typed and then jumped to the foot of the column the moment you sent
-          it — so the newest remark was at the top for exactly as long as it
-          was unsent, which is the opposite of what the column says it does. */}
-      {pendingIsNew && (
-        <article
-          data-thread={pendingThread}
-          ref={(node) => {
-            if (node) threadRefs.current.set(pendingThread, node);
-          }}
-          className="note-comment-thread is-pending is-active"
-        >
-          <p className="note-comment-quote">{quotes.get(pendingThread) || "This passage"}</p>
-          {composer(pendingThread, "Add a comment…", true)}
-        </article>
-      )}
-    </>
-  );
-
-  /* The other half of the link. A card knows which passage it belongs to and
-     says so by standing beside it; the passage has to be able to say it back,
-     or the reader is still guessing which underline the open card came from.
-     Written as one rule aimed at that thread's mark rather than by putting a
-     class on the span: the spans are ProseMirror's to render, and a class this
-     component wrote there would be dropped on its next redraw. The id comes
-     from `crypto.randomUUID`, and is checked against that shape before it is
-     put in a stylesheet. */
-  const lit = active && /^[a-zA-Z0-9-]+$/.test(active) ? active : null;
-
-  const panel = (
-    <aside className="note-comments" aria-label="Comments on this note">
-      {lit && (
-        <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 30%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
-      )}
-      <header className="note-comments-header">
-        <span className="note-comments-title">
-          Comments
-          {threads.length > 0 && <span className="note-comments-count">{threads.length}</span>}
+          <button
+            type="button"
+            className="chat-tool press"
+            aria-label="Close chat"
+            title="Close chat"
+            onClick={expanded ? () => (shrink(), onClose()) : onClose}
+          >
+            <X size={16} />
+          </button>
         </span>
-        {forYouCount > 0 && (
-          <button
-            type="button"
-            className={`note-comment-action press note-comments-toggle ${forYou ? "is-on" : ""}`}
-            aria-pressed={forYou}
-            onClick={() => setForYou((on) => !on)}
-          >
-            For you
-            <span className="note-comments-count">{forYouCount}</span>
-          </button>
-        )}
-        {resolvedCount > 0 && (
-          <button
-            type="button"
-            className="note-comment-action press note-comments-toggle"
-            onClick={() => setShowResolved((open) => !open)}
-          >
-            {showResolved ? "Hide resolved" : `${resolvedCount} resolved`}
-          </button>
-        )}
-        <button
-          type="button"
-          className="note-comment-action press"
-          aria-label="Close comments"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </header>
 
       {failure && (
-        <p role="alert" className="note-comments-failure">
+        <p role="alert" className="chat-failure">
           {failure}
         </p>
       )}
 
-      <div className="note-comments-scroll">{body}</div>
+      <div
+        className="chat-scroll"
+        ref={scrollRef}
+        onScroll={onScroll}
+        onWheel={byHand}
+        onTouchMove={byHand}
+        onKeyDown={byHand}
+        onPointerDown={byHand}
+      >
+        {loading ? (
+          <p className="chat-quiet">Loading…</p>
+        ) : messages.length === 0 ? (
+          <div className="chat-empty">
+            <ChatBubble bubble={myBubble} mine>
+              Say hi 👋
+            </ChatBubble>
+          </div>
+        ) : (
+          <div className="chat-stream">{messages.map(message)}</div>
+        )}
+      </div>
+
+      {unseen > 0 && (
+        <button
+          type="button"
+          className="chat-unseen press"
+          onClick={() =>
+            scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
+          }
+        >
+          <ChevronDown size={14} />
+          {unseen === 1 ? "New message" : `${unseen} new messages`}
+        </button>
+      )}
+
+      {canEdit && (
+        <div className="chat-composer">
+          {about && aboutQuote && (
+            <div className="chat-about">
+              <Quote size={13} />
+              <span className="chat-about-words">{aboutQuote}</span>
+              <button
+                type="button"
+                className="chat-tool press"
+                aria-label="Not about this passage"
+                onClick={dropAbout}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          {offered.length > 0 && (
+            <div className="chat-suggestions popover" role="listbox">
+              {offered.map((member, index) => (
+                <button
+                  key={member.userId}
+                  type="button"
+                  role="option"
+                  aria-selected={index === 0}
+                  className="menu-row press"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    pickMention(member.name);
+                  }}
+                >
+                  <Avatar url={member.avatarUrl} name={member.name} email="" compact />
+                  {member.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="chat-compose-row">
+            <div className="chat-field">
+              <textarea
+                ref={composerRef}
+                rows={1}
+                value={draft}
+                placeholder="Message"
+                aria-label="Message"
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  setSuggesting(mentionQuery(event.target.value, event.target.selectionStart ?? 0));
+                }}
+                onKeyDown={(event) => {
+                  if (offered.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
+                    event.preventDefault();
+                    pickMention(offered[0]!.name);
+                    return;
+                  }
+                  if (event.key === "Escape" && suggesting !== null) {
+                    event.stopPropagation();
+                    setSuggesting(null);
+                    return;
+                  }
+                  /* Enter sends; Shift+Enter is a new line. While an input method
+                   is mid-word, Enter accepts the word, not the message. */
+                  if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing)
+                    return;
+                  event.preventDefault();
+                  void send();
+                }}
+              />
+              <button
+                type="button"
+                className="chat-send press"
+                aria-label="Send"
+                data-ready={draft.trim() ? "" : undefined}
+                disabled={!draft.trim()}
+                onClick={() => void send()}
+              >
+                <ArrowUp size={16} stroke={2.4} />
+              </button>
+            </div>
+            {/* iMessage's place for it: beside the field, outside it. */}
+            <span className="chat-emoji-slot">
+              <button
+                type="button"
+                className={`chat-tool chat-emoji-button press ${picking ? "is-open" : ""}`}
+                aria-label="Emoji"
+                title="Emoji"
+                aria-expanded={picking}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setPicking((open) => !open)}
+              >
+                <Smile size={19} />
+              </button>
+              {picking && (
+                <div
+                  ref={pickerRef}
+                  className="emoji-picker popover is-above"
+                  role="dialog"
+                  aria-label="Emoji"
+                >
+                  <EmojiPicker chosen={[]} onPick={insertEmoji} />
+                </div>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  /* The passage of the message being written is lit in the text, as the
+     open thread used to be. A rule aimed at that mark rather than a class on
+     ProseMirror's span, which its next redraw would drop. */
+  const lit = about && /^[a-zA-Z0-9-]+$/.test(about) ? about : null;
+  const light = lit && (
+    <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 24%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
+  );
+
+  return (
+    <aside
+      ref={columnRef}
+      className={`note-comments chat ${expanded ? "is-away" : ""}`}
+      aria-label="Chat about this note"
+    >
+      {light}
+      {expanded ? (
+        <>
+          <header className="chat-header">
+            <span className="chat-title">Chat</span>
+          </header>
+          {createPortal(
+            <div className="chat-layer" role="presentation">
+              <button
+                type="button"
+                className="chat-scrim"
+                aria-label="Make smaller"
+                onClick={shrink}
+              />
+              {/* The shadow is drawn by the frame from what the sheet shows,
+                  so it follows the surface while it is still changing shape. */}
+              <div className="chat-sheet-frame">
+                <section
+                  ref={sheetRef}
+                  className="chat chat-sheet"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Chat"
+                >
+                  {inner}
+                </section>
+              </div>
+            </div>,
+            document.body,
+          )}
+        </>
+      ) : (
+        inner
+      )}
     </aside>
   );
-  return panel;
 }

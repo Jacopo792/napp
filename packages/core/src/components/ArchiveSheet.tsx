@@ -10,8 +10,18 @@
  * (`archives_seat_limit_check`, `archives_seats_hold_members`); the stepper
  * stops before either refuses. Leaving is here too, at the foot, and takes
  * two presses, because the way back in is somebody else's invitation. */
-import { useState } from "react";
-import { BookOpen, LogOut, Minus, NotebookText, Plus, Trash2 } from "@/components/icons";
+import { useRef, useState } from "react";
+import {
+  BookOpen,
+  ChevronRight,
+  LogOut,
+  Minus,
+  NotebookText,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+} from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Invitations } from "@/components/Invitations";
 import { FaceStack } from "@/components/SpaceSwitch";
@@ -103,6 +113,8 @@ export function ArchiveSheet({
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const nameField = useRef<HTMLInputElement>(null);
   const taken = space.members.length + invites.length;
   const alone = space.members.length <= 1;
   /* Whoever made it ends it, for everybody; leaving would keep it alive for
@@ -129,13 +141,14 @@ export function ArchiveSheet({
   }
 
   return (
-    <Sheet label={space.name}>
+    <Sheet label={space.name} className="is-centered">
       <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <span className="sheet-portrait">
             <FaceStack members={space.members} large />
           </span>
           <input
+            ref={nameField}
             className="sheet-title-field"
             aria-label="Archive name"
             value={name}
@@ -149,52 +162,94 @@ export function ArchiveSheet({
             }}
           />
           <p>
-            {space.members.length === 1 ? "1 member" : `${space.members.length} members`}
-            {" · "}
-            {taken} of {space.seatLimit} seats
+            {space.kind === "document" ? "Book" : "Notes"}
+            {notes !== undefined && ` · ${notes === 1 ? "1 note" : `${notes} notes`}`}
+            {words !== undefined && ` · ${words.toLocaleString()} words`}
           </p>
         </header>
 
-        <div className="sheet-stats">
-          {notes !== undefined && (
-            <div>
-              <small>Notes</small>
-              <strong>{notes}</strong>
-            </div>
-          )}
-          {words !== undefined && (
-            <div>
-              <small>Words</small>
-              <strong>{words.toLocaleString()}</strong>
-            </div>
-          )}
-          <div className="sheet-stepper">
-            <small>Seats</small>
+        <div className="sheet-actions">
+          <button
+            type="button"
+            className={`press ${inviting ? "is-active" : ""}`}
+            aria-expanded={inviting}
+            onClick={() => setInviting((open) => !open)}
+          >
+            <UserPlus size={15} />
+            Invite
+          </button>
+          <span className="archive-seats" role="group" aria-label="Seats">
+            <button
+              type="button"
+              className="press"
+              aria-label="One seat fewer"
+              disabled={busy || space.seatLimit <= Math.max(1, taken)}
+              onClick={() => void act(() => onSeats(space.seatLimit - 1))}
+            >
+              <Minus size={13} />
+            </button>
             <span>
-              <button
-                type="button"
-                className="press"
-                aria-label="One seat fewer"
-                disabled={busy || space.seatLimit <= Math.max(1, taken)}
-                onClick={() => void act(() => onSeats(space.seatLimit - 1))}
-              >
-                <Minus size={14} />
-              </button>
-              <strong>{space.seatLimit}</strong>
-              <button
-                type="button"
-                className="press"
-                aria-label="One seat more"
-                disabled={busy || space.seatLimit >= MAX_SEATS}
-                onClick={() => void act(() => onSeats(space.seatLimit + 1))}
-              >
-                <Plus size={14} />
-              </button>
+              {taken} of {space.seatLimit} seats
             </span>
-          </div>
+            <button
+              type="button"
+              className="press"
+              aria-label="One seat more"
+              disabled={busy || space.seatLimit >= MAX_SEATS}
+              onClick={() => void act(() => onSeats(space.seatLimit + 1))}
+            >
+              <Plus size={13} />
+            </button>
+          </span>
+          <button
+            type="button"
+            className="press"
+            onClick={() => {
+              nameField.current?.focus();
+              nameField.current?.select();
+            }}
+          >
+            <Pencil size={15} />
+            Rename
+          </button>
         </div>
 
         <div className="sheet-work">
+          {(inviting || invites.length > 0) && (
+            <div className="sheet-invitations">
+              <Invitations
+                invites={invites}
+                seatsFull={taken >= space.seatLimit}
+                canManage
+                onCreate={onCreateInvite}
+                onRevoke={onRevokeInvite}
+              />
+            </div>
+          )}
+
+          <h3>Members</h3>
+          <div className="archive-members">
+            {space.members.map((member) => (
+              <button
+                key={member.userId}
+                type="button"
+                className="archive-member press"
+                disabled={!onOpenPerson}
+                onClick={() => onOpenPerson?.(member.userId)}
+              >
+                <Avatar
+                  url={avatarUrls[member.userId] ?? null}
+                  name={member.nickname}
+                  email=""
+                  compact
+                />
+                <span>{member.userId === selfId ? "You" : member.nickname || "Member"}</span>
+                {member.userId === space.createdBy && <small>Maker</small>}
+                {onOpenPerson && <ChevronRight size={15} />}
+              </button>
+            ))}
+          </div>
+
           {/* The way back as well as the way in: nothing is lost either way,
               because a chapter is a note with a position. */}
           {!isDefault && (
@@ -217,37 +272,6 @@ export function ArchiveSheet({
               />
             </>
           )}
-
-          <h3>Members</h3>
-          <div className="sheet-faces">
-            {space.members.map((member) => (
-              <button
-                key={member.userId}
-                type="button"
-                className="sheet-face press"
-                disabled={!onOpenPerson}
-                onClick={() => onOpenPerson?.(member.userId)}
-              >
-                <Avatar
-                  url={avatarUrls[member.userId] ?? null}
-                  name={member.nickname}
-                  email=""
-                  compact
-                />
-                {member.userId === selfId ? "You" : member.nickname || "Member"}
-              </button>
-            ))}
-          </div>
-
-          <div className="sheet-invitations">
-            <Invitations
-              invites={invites}
-              seatsFull={taken >= space.seatLimit}
-              canManage
-              onCreate={onCreateInvite}
-              onRevoke={onRevokeInvite}
-            />
-          </div>
 
           {status && (
             <p role="alert" className="sheet-quiet is-failure">

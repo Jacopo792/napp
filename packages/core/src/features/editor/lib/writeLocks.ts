@@ -7,20 +7,15 @@
  * one place every update passes through — the collaboration server — and this
  * file is what it asks.
  *
- * It reads the Yjs document directly rather than the ProseMirror projection.
- * Two reasons: converting a whole note on every keystroke to find out whether
- * anything is locked is the expensive half of the work, and the delta already
- * carries marks as attributes, which is all this needs. The projection is used
- * only when something is locked and has to be put back.
+ * It reads the Yjs document directly rather than the ProseMirror projection:
+ * the delta already carries marks as attributes, which is all this needs.
  *
  * The editor also refuses to write a foreign lock, using ProseMirror's own
  * marks. That is a courtesy and reads as one: it keeps the caret out of a
  * passage that would bounce. This file is the rule. */
-import type { JSONContent } from "@tiptap/core";
-import { updateYFragment } from "y-prosemirror";
 import * as Y from "yjs";
 import { WRITE_LOCK_MARK } from "./content.ts";
-import { BODY_FRAGMENT, noteSchema, projectDocument } from "./ydoc.ts";
+import { BODY_FRAGMENT } from "./ydoc.ts";
 
 /** Every locked passage in the body, keyed by the account holding it.
  *
@@ -63,52 +58,46 @@ export function heldByAnother(held: Map<string, string>, userId: string): boolea
   return false;
 }
 
-/** What has to be remembered before an update from `userId` is applied, or
- *  null when this document holds nothing they could break. */
-export interface Guard {
-  held: Map<string, string>;
-  snapshot: JSONContent;
-  userId: string;
-}
-
-export function guard(doc: Y.Doc, userId: string): Guard | null {
+/** Whether `update`, sent by `userId`, changes something it had no business
+ *  changing — the text under somebody else's lock, the lock itself, or a new
+ *  lock stamped with somebody else's name — and if so, the update that takes
+ *  exactly that change back. Null when there is nothing to take back.
+ *
+ *  Judged on a copy, from the update alone. The server awaits between hearing a
+ *  message and applying it, and other members' updates land in that gap; a
+ *  judgement that compared the whole document before and after blamed this
+ *  writer for their changes, and putting the whole document back erased
+ *  whatever anybody else had typed in the meantime. Undoing this update by its
+ *  own items touches nothing else, whenever it is applied. */
+export function revertIfBroken(doc: Y.Doc, update: Uint8Array, userId: string): Uint8Array | null {
   const held = lockedPassages(doc);
   if (!heldByAnother(held, userId)) return null;
-  return { held, snapshot: projectDocument(doc).content, userId };
+
+  const trial = new Y.Doc({ gc: false });
+  Y.applyUpdate(trial, Y.encodeStateAsUpdate(doc));
+  const judged = Symbol("judged");
+  const undo = new Y.UndoManager(trial.getXmlFragment(BODY_FRAGMENT), {
+    trackedOrigins: new Set([judged]),
+    captureTimeout: 0,
+  });
+  try {
+    Y.applyUpdate(trial, update, judged);
+    if (!broken(lockedPassages(trial), held, userId)) return null;
+    const applied = Y.encodeStateVector(trial);
+    undo.undo();
+    return Y.encodeStateAsUpdate(trial, applied);
+  } finally {
+    undo.destroy();
+    trial.destroy();
+  }
 }
 
-/** Whether an update changed something it had no business changing: the text
- *  under somebody else's lock, the lock itself, or a new lock stamped with
- *  somebody else's name. */
-export function broken(doc: Y.Doc, before: Guard): boolean {
-  const now = lockedPassages(doc);
-  for (const [owner, text] of before.held) {
-    if (owner !== before.userId && now.get(owner) !== text) return true;
+function broken(now: Map<string, string>, before: Map<string, string>, userId: string): boolean {
+  for (const [owner, text] of before) {
+    if (owner !== userId && now.get(owner) !== text) return true;
   }
   for (const owner of now.keys()) {
-    if (owner !== before.userId && !before.held.has(owner)) return true;
+    if (owner !== userId && !before.has(owner)) return true;
   }
   return false;
-}
-
-/** Put the document back as it was. Yjs has no undo that does not need a
- *  history to walk, so the way back is the way in: diff the remembered
- *  projection into the fragment, which is exactly what the editor's own
- *  binding does with every keystroke.
- *
- *  Coarse on purpose. An update that broke a lock is reverted whole, including
- *  anything legitimate it carried alongside — in ordinary use it never fires,
- *  because the editor refuses first, and a client that got here went round it.
- */
-export function restore(doc: Y.Doc, before: Guard): void {
-  const node = noteSchema().nodeFromJSON(before.snapshot);
-  doc.transact(() => {
-    /* An empty binding cache, which is all a one-off diff needs: the mapping
-       is what an editor carries between keystrokes, and `isOMark` is a lookup
-       table this fills as it goes. */
-    updateYFragment(doc, doc.getXmlFragment(BODY_FRAGMENT), node, {
-      mapping: new Map(),
-      isOMark: new Map(),
-    });
-  });
 }

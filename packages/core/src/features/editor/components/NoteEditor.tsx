@@ -258,6 +258,8 @@ interface Props {
   onContinueAsNote?: (quote: string) => void;
   /** A remark was added, resolved or deleted here. */
   onRemarksChanged?: () => void;
+  /** Messages on this note were read as they arrived, with the chat open. */
+  onRemarksRead?: (noteId: string) => void;
   /** Every thread in the archive somebody has written in, kept live by the
    *  archive's remarks channel. Absent, every anchored passage is drawn. */
   saidThreads?: ReadonlySet<string>;
@@ -374,6 +376,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     mentions,
     onOpenNote,
     onRemarksChanged,
+    onRemarksRead,
     saidThreads,
     onContinueAsNote,
     manuscript,
@@ -981,10 +984,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     </>
   );
 
-  const syncCommentResolution = useCallback((threadId: string, resolved: boolean) => {
-    editorRef.current?.setCommentResolved(threadId, resolved);
-  }, []);
-
   /* A note opened from Remarks arrives with its conversation showing. This
      component is not rebuilt per note — only its `section` is keyed — so the
      initial state above answers for the first note only, and this answers for
@@ -1317,8 +1316,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         editorRef.current?.removeComment(threadId);
         setQuotes(editorRef.current?.commentQuotes() ?? new Map());
       }}
-      onResolveAnchor={syncCommentResolution}
       onChanged={onRemarksChanged}
+      onRead={() => onRemarksRead?.(entry.note.id)}
     />
   );
   const sidePanels = (
@@ -1362,7 +1361,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     { id: "headings", name: "Headings", shown: true },
     {
       id: "comments",
-      name: "Comments",
+      name: "Chat",
       shown: Boolean(session && commentAuthors),
     },
     { id: "versions", name: "Versions", shown: Boolean(session) },
@@ -1416,9 +1415,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
               <button
                 type="button"
                 className={`ribbon-tool press ${inspectorTab === "comments" ? "is-active" : ""}`}
-                aria-label="Comments"
+                aria-label="Chat"
                 aria-pressed={inspectorTab === "comments"}
-                title="Comments"
+                title="Chat"
                 onClick={() => showTab(inspectorTab === "comments" ? null : "comments")}
               >
                 <MessageSquare size={16} />
@@ -1648,9 +1647,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     <button
       type="button"
       className={`toolbar-button press ${commentsOpen ? "is-active" : ""}`}
-      aria-label="Comments"
+      aria-label="Chat"
       aria-pressed={commentsOpen}
-      title="Comments"
+      title="Chat"
       onClick={() => {
         if (commentsOpen) {
           closeComments();

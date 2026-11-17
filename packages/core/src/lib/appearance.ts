@@ -333,9 +333,9 @@ const SEMANTIC = {
     "--tint-orange": "#efa86f",
     "--tint-mint": "#79ddb2",
     "--tint-blue": "#8fb6f5",
-    "--glass-highlight": "rgb(255 255 255 / 0.06)",
+    "--glass-highlight": "transparent",
     "--shadow-soft": "0 1px 2px rgb(0 0 0 / 0.28), 0 10px 28px -12px rgb(0 0 0 / 0.5)",
-    "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.44)",
+    "--shadow-popover": "0 0 0 0.5px rgb(0 0 0 / 0.6), 0 10px 30px -6px rgb(0 0 0 / 0.55)",
   },
   light: {
     "--danger": "#b0232a",
@@ -348,9 +348,9 @@ const SEMANTIC = {
     "--tint-orange": "#9c4f12",
     "--tint-mint": "#0f7355",
     "--tint-blue": "#2757b0",
-    "--glass-highlight": "rgb(255 255 255 / 0.72)",
+    "--glass-highlight": "transparent",
     "--shadow-soft": "0 1px 2px rgb(0 0 0 / 0.05), 0 10px 28px -12px rgb(0 0 0 / 0.18)",
-    "--shadow-popover": "0 22px 64px rgb(0 0 0 / 0.16)",
+    "--shadow-popover": "0 0 0 0.5px rgb(0 0 0 / 0.12), 0 10px 30px -6px rgb(0 0 0 / 0.2)",
   },
 } as const;
 
@@ -473,7 +473,7 @@ export function applyAppearance(config = current): void {
     "--glass",
     config.translucentSidebar ? `${background}cc` : mix(background, 0.09, dark ? "white" : "black"),
   );
-  root.style.setProperty("--glass-border", mix(background, 0.15, dark ? "white" : "black"));
+  root.style.setProperty("--glass-border", dark ? "rgb(255 255 255 / 0.1)" : "rgb(0 0 0 / 0.1)");
   root.classList.toggle("has-translucent-sidebar", config.translucentSidebar);
   root.classList.toggle("has-frosted-glass", config.frosted);
   /* Liquid Glass: the share of the palette laid over a translucent surface.

@@ -135,7 +135,6 @@ export function Invitations({
             </span>
             <span className="settings-label">
               <dt>No seat free</dt>
-              <dd>Withdraw an invitation nobody claimed and its seat comes back.</dd>
             </span>
           </div>
         </dl>

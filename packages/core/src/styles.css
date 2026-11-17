@@ -41,8 +41,9 @@
   --tint-blue: #8fb6f5;
 
   --glass: #242424;
-  --glass-border: #3c3c3c;
-  --glass-highlight: rgb(255 255 255 / 0.06);
+  --glass-border: rgb(255 255 255 / 0.1);
+  --glass-highlight: transparent;
+  --edge-soft: rgb(255 255 255 / 0.08);
 
   /* A 40px black blur at 0.22, spread evenly around a rounded card, does not
      read as lift over a wallpaper — it reads as soot ringing the card. Two
@@ -64,7 +65,7 @@
      26px at 0.5, 70px at 0.55, each one a guess made once. */
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.28), 0 10px 28px -12px rgb(0 0 0 / 0.5);
   --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.24), 0 14px 36px -14px rgb(0 0 0 / 0.52);
-  --shadow-popover: 0 22px 64px rgb(0 0 0 / 0.44);
+  --shadow-popover: 0 0 0 0.5px rgb(0 0 0 / 0.6), 0 10px 30px -6px rgb(0 0 0 / 0.55);
 
   /* ── The corner ────────────────────────────────────────────────────────────
      Five values, and nothing in the app is allowed a sixth. There were
@@ -77,8 +78,13 @@
      The steps are the system's: a control, a row, a card, a sheet, a capsule.
      `50%` is not on the ramp and is not meant to be — a circle is a shape, not
      a radius. */
+  /* `tile` is the small square corner for things that are not controls: a
+     key cap, inline code, a swatch, a glyph plate. Every corner on the ramp
+     is drawn continuous where the engine can (see the `corner-shape` block at
+     the end of this file). */
   --radius-xs: 5px;
   --radius-sm: 8px;
+  --radius-tile: 5px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;
@@ -465,7 +471,7 @@
    contrast fixed and spares the one surface that scrolls a live blur. */
 .soft-pane {
   position: relative;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-lg);
   /* The lit edge is what separates glass from a translucent rectangle: a real
      edge catches the light above it. One hairline inside the border, so it
@@ -651,14 +657,14 @@
 }
 
 .soft-control {
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-pill);
   background: var(--paper);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 .popover {
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-md);
   background: var(--page);
   box-shadow: var(--shadow-popover);
@@ -1020,28 +1026,6 @@
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-/* Landing. A panel that scrolls without saying where it stopped leaves the
-   reader to find the thread a second time, so the one they asked for is held
-   up for a beat and then let go. It is a fade, not a flash: the thread is
-   already the one in view, and this only has to say which. */
-.note-comment-thread.is-arrived {
-  animation: comment-arrived 1.4s var(--ease) backwards;
-}
-
-@keyframes comment-arrived {
-  0%,
-  55% {
-    border-color: color-mix(in srgb, var(--accent) 58%, transparent);
-    background: color-mix(in srgb, var(--accent) 13%, transparent);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .note-comment-thread.is-arrived {
-    animation-duration: 1ms;
-  }
-}
-
 /* The panel is a column beside the page, not a layer over it: reading the
    remark and reading the passage it is about is one act, and a popover that
    covers the text makes them two. */
@@ -1101,14 +1085,6 @@
   color: var(--ink-3);
 }
 
-.note-comments-count {
-  margin-left: 6px;
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
 .note-comments-title {
   flex: 1;
   font-family: var(--font-sans);
@@ -1140,256 +1116,7 @@
   color: var(--danger);
 }
 
-/* ── One conversation ────────────────────────────────────────────────────────
-   Quiet until it is the one you are in. A column of cards all outlined at the
-   same weight is a column of boxes; the reader has to find the live one every
-   time. So: no border at rest, a ground that separates the card from the page,
-   and the accent spent on exactly one card — the one being read or replied
-   to. */
-.note-comment-thread {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-bottom: 1px solid var(--rule-soft);
-  padding: 12px 0;
-  cursor: default;
-}
-
-/* Ruled rows, like the sheets: the thread being read is told apart by the
-   list's own selection ground, not by a ring of accent around a card. */
-.note-comment-thread.is-active {
-  margin: 0 -8px;
-  border-radius: 5px;
-  border-bottom-color: transparent;
-  padding: 12px 8px;
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-}
-
-/* A thread nobody needs to act on any more steps back rather than disappearing:
-   what was said stays readable, and stops asking to be read. */
-.note-comment-thread.is-resolved {
-  opacity: 0.58;
-}
-
-/* The quotation is the thread's title, so it is set like one — and clipped,
-   because a comment on three paragraphs must not push the remark off screen. */
-.note-comment-quote {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  text-align: left;
-}
-
-.note-comment-quote.is-link:hover {
-  color: var(--ink);
-}
-
-/* A thread whose passage has been deleted has nothing to point at, so it stops
-   pretending to: no accent rule, and the sentence says what happened. */
-.note-comment-quote.is-orphan {
-  color: var(--ink-4);
-}
-
-/* A remark is a line saying who and when, with what can be done at its right
-   end, and the words under it at the card's full width — Docs' card. The tools
-   used to be a row of words under the last remark, so Resolve, the act a
-   thread exists to end in, was the thing furthest from the eye; and a reply sat
-   on a rail of its own, which made a conversation of two lines look like an
-   outline. A reply is now the same shape after a hairline. */
-.note-comment {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.note-comment.is-reply {
-  padding-top: 4px;
-}
-
-/* Face, name, and the time at the row's end — the sheets' history row. What
-   follows the name is indented to it, so the faces make one edge. */
-.note-comment-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-}
-
-.note-comment-head > .avatar.is-compact {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  font-size: 9px;
-  box-shadow: none;
-}
-
-.note-comment-who {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.note-comment-name {
-  min-width: 0;
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
-}
-
-.note-comment-stamp {
-  margin-left: auto;
-  flex-shrink: 0;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-}
-
-.note-comment > :not(.note-comment-head) {
-  margin-left: 28px;
-}
-
-/* The time keeps the row's end, the edge every sheet ends its rows on; what
-   can be done with a remark takes that place under the pointer. A touch
-   screen has no pointer to wait for, so there the tools stay in the row. */
-@media (hover: hover) {
-  .note-comment-head {
-    position: relative;
-  }
-
-  .note-comment-head > .note-comment-tools {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 24px;
-    margin: 0 -5px 0 0;
-    opacity: 0;
-  }
-
-  .note-comment-head .note-comment-tool.is-quiet {
-    opacity: 1;
-  }
-
-  .note-comment:is(:hover, :focus-within) > .note-comment-head > .note-comment-tools,
-  .note-comment-tools:has([aria-expanded="true"]) {
-    opacity: 1;
-  }
-
-  .note-comment:is(:hover, :focus-within) .note-comment-stamp,
-  .note-comment:has(.note-comment-tools [aria-expanded="true"]) .note-comment-stamp {
-    visibility: hidden;
-  }
-}
-
-.note-comment-tools {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0;
-  margin-right: -5px;
-}
-
-.note-comment-tool {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  color: var(--ink-4);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
-}
-
-.note-comment-tool:hover,
-.note-comment-tool[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  color: var(--ink);
-}
-
-/* Edit, delete, react and assign wait under the pointer: destructive ones do
-   not sit there all day inviting a mis-click, and four glyphs on every remark
-   would be the loudest thing in the column. Resolve is always there. */
-.note-comment-tool.is-quiet {
-  opacity: 0;
-}
-
-.note-comment:hover .note-comment-tool.is-quiet,
-.note-comment-tool.is-quiet:focus-visible,
-.note-comment-tool.is-quiet[aria-expanded="true"] {
-  opacity: 1;
-}
-
-.note-comment-tool.is-delete:hover {
-  color: var(--danger);
-}
-
-.note-comment-tool.is-resolve:hover {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-}
-
 /* The folded middle of a long conversation. */
-.note-comment-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  padding: 0 0 0 28px;
-  color: var(--ink-4);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  transition: color var(--dur-fast) var(--ease);
-}
-
-.note-comment-more:hover {
-  color: var(--ink-2);
-}
-
-.note-comment-body {
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.note-comment-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.note-comment-editor textarea {
-  width: 100%;
-  min-height: 2.6em;
-  field-sizing: content;
-  max-height: 12em;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  padding: 7px 9px;
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  resize: none;
-}
-
-.note-comment-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
 
 .note-comment-action {
   display: inline-flex;
@@ -1405,177 +1132,6 @@
 
 .note-comment-action:hover {
   color: var(--ink);
-}
-
-/* ── Addressed, handed over, answered without words ─────────────────────────
-   The names a remark is said to read as names; the person a thread is handed
-   to sits under its passage, where the reader looks first; and a reaction is
-   a chip under the words it answers, counted, with your own lit. */
-.note-comment-mention {
-  color: var(--accent);
-  font-weight: var(--weight-semibold);
-}
-
-.note-comment-assignee {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-3);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-}
-
-.note-comment-reactions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.note-comment-reaction {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-
-.note-comment-reaction.is-mine {
-  color: var(--accent);
-  font-weight: var(--weight-semibold);
-}
-
-.note-comment-react,
-.note-comment-assign,
-.note-comment-composer {
-  position: relative;
-}
-
-.note-comment-palette,
-.note-comment-assign-menu,
-.note-comment-suggestions {
-  position: absolute;
-  z-index: 5;
-  display: flex;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: var(--page);
-  box-shadow: var(--shadow-popover);
-  animation: menu-in 140ms var(--ease-out) backwards;
-}
-
-.note-comment-palette {
-  top: calc(100% + 4px);
-  right: 0;
-  gap: 2px;
-  padding: 4px;
-}
-
-.note-comment-palette-emoji {
-  border-radius: var(--radius-sm);
-  padding: 2px 5px;
-  font-size: var(--text-sm);
-}
-
-.note-comment-palette-emoji:hover,
-.note-comment-palette-emoji.is-mine {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.note-comment-assign-menu,
-.note-comment-suggestions {
-  flex-direction: column;
-  min-width: 160px;
-  padding: 4px;
-}
-
-.note-comment-assign-menu {
-  top: calc(100% + 4px);
-  right: 0;
-}
-
-.note-comment-suggestions {
-  bottom: calc(100% + 4px);
-  left: 0;
-}
-
-.note-comment-suggestion {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-sm);
-  padding: 5px 8px;
-  color: var(--ink-2);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  text-align: left;
-}
-
-.note-comment-suggestion:hover,
-.note-comment-suggestion[aria-selected="true"] {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--ink);
-}
-
-.note-comments-toggle.is-on {
-  color: var(--accent);
-}
-
-/* The reply box is the thread's being read, and only that one's (see
-   `NoteComments`). It grows with what is typed rather than standing open at
-   three lines, and Enter sends — the button is for the hand on the mouse. */
-.note-comment-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: stretch;
-}
-
-.note-comment-composer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: -4px;
-}
-
-.note-comment-composer textarea {
-  width: 100%;
-  min-height: 1.45em;
-  field-sizing: content;
-  max-height: 12em;
-  border: 0;
-  border-top: 1px solid var(--rule-soft);
-  border-radius: 0;
-  padding: 8px 0 0;
-  background: none;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  resize: none;
-  transition: border-color var(--dur-fast) var(--ease);
-}
-
-.note-comment-composer textarea:focus,
-.note-comment-editor textarea:focus {
-  outline: none;
-}
-
-.note-comment-composer textarea::placeholder {
-  color: var(--ink-4);
-}
-
-.note-comment-send {
-  padding: 4px 0 4px 8px;
-  color: var(--accent);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
-.note-comment-send:disabled {
-  color: var(--ink-4);
 }
 
 /* The phone has no room for a column beside the page, so the panel takes the
@@ -1814,7 +1370,7 @@
   width: 100%;
   height: 44px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   padding: 0 0.85rem;
   color: var(--ink);
@@ -1911,7 +1467,7 @@
   height: 44px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-md);
   background: var(--accent-wash);
   color: var(--accent);
@@ -1973,7 +1529,7 @@
 
 .login-invite-note {
   margin-top: 1rem;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--accent-wash);
   padding: 12px 12px;
@@ -2006,7 +1562,7 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 2px 12px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   padding: 12px 16px;
   background: var(--surface);
@@ -2500,7 +2056,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-pill);
   padding: 4px;
   color: var(--ink-2);
@@ -2740,7 +2296,7 @@
   bottom: 100%;
   left: -2px;
   z-index: 20;
-  border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) 0;
+  border-radius: var(--radius-tile) var(--radius-tile) var(--radius-tile) 0;
   padding: 1px 6px;
   color: #fff;
   font-family: var(--font-sans);
@@ -2792,7 +2348,7 @@
      brightest edge in a control that already carries a ring per face — four
      concentric outlines in seventy pixels, of which the outermost was winning.
      The recess is the ink; the edge only has to close it. */
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   /* Fully round. The two halves each hold a face, and a face is a circle; a
      0.8rem rectangle around two circles is a box with something round rattling
      inside it. The pill is the shape the contents already have. */
@@ -2921,7 +2477,7 @@
   width: 26px;
   height: 26px;
   place-items: center;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-sm);
   background: var(--paper);
   color: var(--ink-3);
@@ -2944,7 +2500,7 @@
   left: 8px;
   max-width: min(36rem, calc(100vw - 16px));
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-sm);
   padding: 3px 8px;
   background: var(--paper);
@@ -3019,7 +2575,7 @@
 .glass-toolbar,
 .popover,
 .glass-sheet {
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   background: var(--glass);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
@@ -3463,7 +3019,7 @@
    read as a fault rather than an answer. Selection was a rectangle running
    into both edges. */
 .note-row-list {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
 }
 
 /* Two motions on one row, on two properties with two curves. `transform` is
@@ -3549,7 +3105,7 @@
   height: 40px;
   align-self: center;
   margin: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-tile);
 }
 
 .note-row-glyph.is-sketch.is-thumb {
@@ -4419,7 +3975,7 @@
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-tile);
   background: var(--palette-bg);
   box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.25);
 }
@@ -4665,7 +4221,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   color: var(--ink-3);
   font-size: var(--text-xs);
@@ -4927,7 +4483,7 @@
    than being a number in `ch` that means nothing until you close the sheet. */
 .settings-specimen {
   margin-bottom: 16px;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   background: var(--page);
   padding: 16px 20px;
@@ -5141,7 +4697,7 @@
 .member-role-list {
   display: grid;
   gap: 1px;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   background: var(--rule-soft);
   overflow: hidden;
@@ -5174,7 +4730,7 @@
 }
 
 .member-role-list select {
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-sm);
   padding: 6px 32px 6px 8px;
   background: var(--paper);
@@ -5184,6 +4740,7 @@
 
 .invite-form label {
   display: grid;
+  min-width: 0;
   flex: 1;
   gap: 6px;
   color: var(--ink-3);
@@ -5208,7 +4765,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   padding-inline: 12px;
   color: var(--ink-2);
@@ -5313,7 +4870,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
   color: var(--ink-3);
@@ -5458,7 +5015,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   color: var(--ink-2);
   font-size: var(--text-sm);
@@ -6317,7 +5874,7 @@
    round each group was saying it three times. */
 :is(.editor-tool-group, .editor-tool-cluster).glass-toolbar {
   border-color: transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -7236,7 +6793,7 @@
   width: 1.75rem;
   height: 1.75rem;
   margin-top: 0.05rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-tile);
   color: var(--ink-4);
   transition:
     background-color var(--dur-fast) var(--ease),
@@ -7286,7 +6843,7 @@
      glyph a fraction off the device grid. */
   gap: 6px;
   height: 32px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--paper);
   padding: 0 12px;
@@ -7315,7 +6872,7 @@
   align-items: center;
   gap: 0.35rem;
   max-width: 12rem;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-pill);
   background: var(--accent-wash);
   padding: 0.2rem 0.5rem 0.2rem 0.65rem;
@@ -7367,6 +6924,9 @@ body:has(.sidebar-row.is-over) .drag-chip {
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
 .editor-toolbar-compact-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   grid-column: 1 / -1;
   grid-row: 2;
   justify-self: center;
@@ -7447,7 +7007,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   justify-content: center;
   width: 1.65rem;
   height: 1.65rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-tile);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--rule-soft);
   font-family: var(--font-display);
@@ -7680,8 +7240,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
   text-decoration-thickness: 1px;
 }
 .rich-text-content code {
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-xs);
+  border: 0.5px solid var(--rule-soft);
+  border-radius: var(--radius-tile);
   background: var(--surface);
   padding: 0.05em 0.3em;
   font-family: var(--font-mono);
@@ -7689,7 +7249,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 }
 .rich-text-content pre {
   overflow-x: auto;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: 0.8rem 1rem;
@@ -7822,7 +7382,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .rich-text-content td {
   position: relative;
   min-width: 5rem;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   padding: 0.45rem 0.55rem;
   vertical-align: top;
 }
@@ -7872,7 +7432,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   display: block;
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   background: var(--surface);
   cursor: zoom-in;
@@ -7936,7 +7496,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   width: 2rem;
   height: 2rem;
   place-items: center;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-pill);
   background: var(--paper);
   color: var(--danger);
@@ -7964,7 +7524,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   padding: 16px;
   color: var(--ink-3);
@@ -7973,7 +7533,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 }
 
 .rich-media-retry {
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   padding: 4px 8px;
   color: var(--ink-2);
@@ -8039,7 +7599,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   align-items: center;
   gap: 0.5rem;
   margin: 0.35rem 0;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: 0.55rem 0.65rem;
@@ -8077,7 +7637,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   flex-shrink: 0;
   width: 2.1rem;
   height: 2.4rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-tile);
   background: var(--danger-fill);
   color: var(--on-danger);
   font-family: var(--font-mono);
@@ -8254,7 +7814,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 
 .note-cover-grid button {
   height: 52px;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
 }
 
@@ -8631,8 +8191,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
 .palette kbd,
 .shortcut-sheet kbd {
   flex-shrink: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-xs);
+  border: 0.5px solid var(--rule);
+  border-radius: var(--radius-tile);
   padding: 2px 6px;
   color: var(--ink-4);
   font-family: var(--font-sans);
@@ -8692,7 +8252,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-tile);
   background: var(--glass);
   color: var(--ink-3);
 }
@@ -8959,7 +8519,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   align-items: center;
   gap: 6px;
   overflow: hidden;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
   color: var(--ink-3);
@@ -8985,8 +8545,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
    about is a shortcut nobody has. */
 .menu-key {
   margin-left: auto;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-xs);
+  border: 0.5px solid var(--rule);
+  border-radius: var(--radius-tile);
   padding: 1px 6px;
   color: var(--ink-4);
   font-family: var(--font-sans);
@@ -8998,8 +8558,8 @@ body:has(.sidebar-row.is-over) .drag-chip {
 /* A key, as a value in a settings row. */
 .settings-key {
   flex-shrink: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-xs);
+  border: 0.5px solid var(--rule);
+  border-radius: var(--radius-tile);
   padding: 4px 8px;
   color: var(--ink-2);
   font-family: var(--font-sans);
@@ -9059,7 +8619,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
   display: block;
   width: 100%;
   padding: 0;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--paper);
   overflow: hidden;
@@ -9664,7 +9224,7 @@ text.ink-stroke {
   position: fixed;
   z-index: 1000;
   padding: 0.5rem;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -9678,7 +9238,7 @@ text.ink-stroke {
   z-index: 1000;
   width: 14rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -9724,7 +9284,7 @@ text.ink-stroke {
   grid-auto-columns: 1fr;
   grid-auto-flow: column;
   margin: 0 0 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 6%, var(--paper));
   padding: 2px;
   overflow-x: auto;
@@ -9751,7 +9311,7 @@ text.ink-stroke {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: calc(var(--radius-sm) - 2px);
+  border-radius: var(--radius-tile);
   padding: 0 10px 0 5px;
   color: var(--ink-3);
   transition: color var(--dur-fast) var(--ease);
@@ -9772,7 +9332,7 @@ text.ink-stroke {
   bottom: 2px;
   left: 2px;
   width: calc((100% - 4px) / var(--count, 2));
-  border-radius: calc(var(--radius-sm) - 2px);
+  border-radius: var(--radius-tile);
   /* The plate of the app's other segments (Write | Board), in both themes. */
   background: color-mix(in srgb, var(--ink) 15%, transparent);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
@@ -10050,7 +9610,7 @@ text.ink-stroke {
 .note-history-name input {
   min-width: 0;
   flex: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--page);
   padding: 5px 9px;
   color: var(--ink);
@@ -10078,7 +9638,7 @@ text.ink-stroke {
 }
 
 .note-version {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   transition: background var(--dur-fast) var(--ease);
 }
 
@@ -10091,7 +9651,7 @@ text.ink-stroke {
   width: 100%;
   align-items: flex-start;
   gap: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 8px;
   text-align: left;
 }
@@ -10196,7 +9756,7 @@ text.ink-stroke {
 .note-version-page {
   max-height: 22rem;
   overflow-y: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-tile);
   background: var(--paper);
   padding: 10px 12px;
   color: var(--ink-3);
@@ -10273,7 +9833,7 @@ text.ink-stroke {
   height: min(40rem, calc(100vh - 32px));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: 22px;
   background: var(--glass);
   box-shadow:
@@ -10518,7 +10078,7 @@ button.sheet-chip:hover,
   display: flex;
   flex-direction: column-reverse;
   gap: 2px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   padding: 10px 8px;
   text-align: center;
@@ -10619,7 +10179,7 @@ button.sheet-chip:hover,
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 7px 8px;
   text-align: left;
   font-family: var(--font-sans);
@@ -10925,7 +10485,7 @@ button.sheet-chip:hover,
 /* ── The archive's sheet ───────────────────────────────────────────────────── */
 .sheet-title-field {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   padding: 2px 6px;
   color: var(--ink);
@@ -11011,12 +10571,26 @@ button.sheet-chip:hover,
   gap: 0;
 }
 
-/* A grid, so every name starts at one edge and every button stands in one
-   column, whether a row has two faces or three, a delete or none. */
+/* One grid for the whole list, rows on its columns: every name starts at one
+   edge and every button stands in one column, whether a row has two faces or
+   three, a delete or none — and a column widens for all rows at once when a
+   larger text size makes a button wider, instead of spilling into the next. */
+.space-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  column-gap: 12px;
+}
+
 .space-list .appearance-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 64px 64px 64px;
-  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.space-list .space-list-current,
+.space-list .space-list-button:not(.is-danger) {
+  justify-self: stretch;
 }
 
 /* Edit and delete keep their own columns, so a row without Edit (an archive
@@ -11104,6 +10678,8 @@ button.sheet-chip:hover,
   align-items: center;
   gap: 8px;
   margin-top: 10px;
+  /* The plus stands where the faces do. */
+  margin-inline-start: -10px;
   border-radius: var(--radius-sm);
   padding: 7px 12px;
   color: var(--accent);
@@ -11490,7 +11066,7 @@ button.sheet-chip:hover,
 .structure-field {
   width: calc(100% - 16px);
   margin: 2px 8px 6px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   background: var(--page);
@@ -11742,7 +11318,7 @@ button.sheet-chip:hover,
   display: flex;
   min-height: 132px;
   flex-direction: column;
-  border: 1px solid var(--rule-soft);
+  border: 0.5px solid var(--rule-soft);
   border-radius: var(--radius-md);
   background: var(--paper);
   box-shadow: var(--shadow-soft);
@@ -11917,7 +11493,7 @@ button.sheet-chip:hover,
 
 .structure-notebook {
   margin-top: 18px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border-top: 1px solid var(--rule-soft);
   padding-top: 6px;
 }
@@ -12421,7 +11997,7 @@ button.sheet-chip:hover,
   width: 16rem;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--glass-border);
+  border: 0.5px solid var(--glass-border);
   border-radius: var(--radius-md);
   background: var(--page);
   box-shadow: var(--shadow-popover);
@@ -12553,7 +12129,7 @@ button.sheet-chip:hover,
 .ribbon-swatch {
   position: relative;
   aspect-ratio: 1;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-tile);
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
 }
 
@@ -12869,7 +12445,7 @@ button.sheet-chip:hover,
    count from, so it is a mark rather than a wrong number. */
 .footnote-ref {
   padding: 0 1px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-tile);
   color: var(--accent);
   font-size: 0.72em;
   font-variant-numeric: tabular-nums;
@@ -12940,7 +12516,7 @@ button.sheet-chip:hover,
 
 /* A cross-reference reads as words of the sentence and goes where it says. */
 .cross-reference {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-tile);
   color: var(--accent);
   text-decoration: underline dotted;
   text-decoration-thickness: 1px;
@@ -12962,7 +12538,7 @@ button.sheet-chip:hover,
 /* A citation is words of the sentence too, and says so only on hover: in
    print it is just "(Rossi 2020)". */
 .citation {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-tile);
   transition: background-color var(--dur-fast) var(--ease);
 }
 
@@ -12979,7 +12555,7 @@ button.sheet-chip:hover,
 /* The works cited, set with a hanging indent as a bibliography is. */
 .bibliography-block {
   margin: 1em 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   user-select: none;
 }
 
@@ -13041,7 +12617,7 @@ button.sheet-chip:hover,
   width: calc(100% + 0.6em);
   margin: 0 -0.3em;
   gap: 0.5em;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-tile);
   padding: 0.12em 0.3em;
   color: var(--ink-2);
   font: inherit;
@@ -13079,7 +12655,7 @@ button.sheet-chip:hover,
 .footnote-panel textarea,
 .xref-search {
   width: 100%;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   background: transparent;
@@ -13437,13 +13013,8 @@ button.sheet-chip:hover,
   display: none;
 }
 
-/* Outline and history have nothing left in their header; comments keep the
-   one control theirs carries, the resolved threads. */
+/* Outline and history have nothing left in their header. */
 .manuscript-inspector :is(.note-outline, .note-history) > .note-comments-header {
-  display: none;
-}
-
-.manuscript-inspector .note-comments-header:not(:has(.note-comments-toggle)) {
   display: none;
 }
 
@@ -13529,7 +13100,7 @@ button.sheet-chip:hover,
 
 .contents-block {
   margin: 1em 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   user-select: none;
 }
 
@@ -13820,7 +13391,7 @@ button.sheet-chip:hover,
 .page-spread-navigation input {
   width: 4.5em;
   padding: 3px 5px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
@@ -14029,7 +13600,7 @@ button.sheet-chip:hover,
 .whats-new-section li img {
   width: 100%;
   margin-top: 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-tile);
 }
 
 .whats-new-release:last-child .whats-new-section:last-child {
@@ -14523,7 +14094,7 @@ button.sheet-chip:hover,
 /* 5px: a selected row is a row, not a card. */
 .note-group .note-row-list {
   margin-block: 1px;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
 }
 
 .note-group .note-row-list.is-selected {
@@ -15443,7 +15014,7 @@ button.sheet-chip:hover,
   align-items: center;
   gap: 5px;
   margin-left: -7px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 4px 7px;
   color: inherit;
   font: inherit;
@@ -15505,7 +15076,7 @@ button.sheet-chip:hover,
   right: 12px;
   width: 20px;
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--radius-tile);
 }
 
 .note-group .note-row-list .note-row-glyph.is-sketch.is-thumb {
@@ -15583,7 +15154,7 @@ button.sheet-chip:hover,
    list's own: 13px titles, 12px secondary lines and headings in grey. The
    face, the numbers and the rows share one left edge. */
 .sheet:has(.sheet-body.is-plain) {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .sheet-body.is-plain {
@@ -15639,7 +15210,7 @@ button.sheet-chip:hover,
 .sheet-body.is-plain .sheet-note-glyph {
   width: 44px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: var(--radius-tile);
   background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink-3);
 }
@@ -15700,7 +15271,7 @@ button.sheet-chip:hover,
 .sheet-body.is-plain .sheet-stats > * {
   align-items: center;
   gap: 2px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   padding: 12px 8px;
   text-align: center;
@@ -15769,7 +15340,7 @@ button.sheet-chip:hover,
 }
 
 .sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover) {
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -15871,7 +15442,7 @@ button.sheet-chip:hover,
   min-width: 28px;
   height: 28px;
   min-height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   padding: 0;
 }
@@ -15914,7 +15485,7 @@ button.sheet-chip:hover,
 .sheet-body.is-plain .sheet-hero > .sheet-title-field {
   align-self: auto;
   margin-left: -6px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   padding: 1px 6px;
   font-family: var(--font-sans);
   font-size: var(--text-sm);
@@ -15930,7 +15501,7 @@ button.sheet-chip:hover,
 .sheet-body.is-plain .sheet-stepper button {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: none;
   color: var(--ink-3);
 }
@@ -15976,7 +15547,7 @@ button.sheet-chip:hover,
 }
 
 .sheet-body.is-plain .sheet-face:hover {
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   box-shadow: none;
 }
@@ -15999,7 +15570,7 @@ button.sheet-chip:hover,
   align-self: stretch;
   justify-content: flex-start;
   margin: 20px -8px 0;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   padding: 10px 8px;
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
@@ -16078,13 +15649,13 @@ button.sheet-chip:hover,
 
 .spotlight-lesson .palette-search kbd {
   min-width: 34px;
-  border: 1px solid var(--rule);
+  border: 0.5px solid var(--rule);
   border-bottom-width: 2px;
   background: color-mix(in srgb, var(--ink) 8%, transparent);
   padding: 4px 10px;
   font-family: var(--font-sans);
   font-weight: var(--weight-semibold);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-tile);
   color: var(--ink);
   font-size: var(--text-lg);
   text-align: center;
@@ -16116,5 +15687,339 @@ button.sheet-chip:hover,
     transform: translateY(1px) scale(0.94);
     border-bottom-width: 1px;
     background: var(--accent-wash);
+  }
+}
+
+/* ── A centred sheet: archive, person, note, folder ──────────────────────────
+   The portrait, the name, what it holds in one line, and a row of what is
+   done to it. What happened is rows below. */
+.sheet.is-centered .sheet-body.is-plain .sheet-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 30px 56px 14px;
+  text-align: center;
+}
+
+.sheet.is-centered .sheet-body.is-plain .sheet-hero > .sheet-portrait {
+  margin: 0 0 8px;
+}
+
+.sheet.is-centered .sheet-body.is-plain .sheet-hero > .sheet-title-field {
+  width: 100%;
+  text-align: center;
+}
+
+.sheet.is-centered .sheet-body.is-plain .sheet-hero > p {
+  align-self: center;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px 6px;
+}
+
+.sheet-actions > button,
+.archive-seats {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding-inline: 12px;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.sheet-actions > button:hover,
+.sheet-actions > button.is-active {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  color: var(--ink);
+}
+
+.archive-seats {
+  padding-inline: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.archive-seats > button {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-3);
+}
+
+.archive-seats > button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+}
+
+.archive-seats > button:disabled {
+  opacity: 0.35;
+}
+
+.archive-members {
+  display: flex;
+  flex-direction: column;
+}
+
+.archive-member {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 6px 8px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.archive-member:last-child {
+  border-bottom: 0;
+}
+
+.archive-member > .avatar {
+  flex: none;
+}
+
+.archive-member > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-member > small {
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+}
+
+.archive-member > svg {
+  color: var(--ink-4);
+}
+
+.archive-member:hover:not(:disabled) {
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.sheet.is-centered .sheet-body.is-plain .sheet-hero > h2 {
+  align-self: center;
+}
+
+.sheet.is-centered .sheet-body.is-plain .sheet-hero > h2 {
+  margin-top: 2px;
+}
+
+.sheet-actions > button > b {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
+.sheet-body.is-plain .sheet-actions > button.sheet-now {
+  max-width: 100%;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  padding-inline: 12px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  overflow: hidden;
+}
+
+.sheet-body.is-plain .sheet-actions > button.sheet-now strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Continuous corners ─────────────────────────────────────────────────────
+   A circular arc meets a straight edge with a jump in curvature, and the eye
+   reads that kink as a cheap corner, so every rounded rectangle on the ramp
+   is drawn with a continuous one where the engine can. Capsules and circles
+   are not on the list: a squircle at half the height flattens a capsule's
+   ends into a box. `:is()` so one selector the engine cannot parse does not
+   drop the rest. */
+@supports (corner-shape: squircle) {
+  :is(
+    .account-delete-open,
+    .account-deletion-actions button,
+    .archive-choice-list button,
+    .archive-goal,
+    .archive-kinds button,
+    .archive-member:hover:not(:disabled),
+    .bibliography-block,
+    .board-card-more,
+    .board-list-head,
+    .book-view-switch,
+    .book-view-switch button,
+    .citation,
+    .code-copy,
+    .collaboration-carets__label,
+    .collection-column:not(.is-gallery) .note-group-heading:focus-visible,
+    .collection-title-button,
+    .contents-block,
+    .cropper-actions button,
+    .cropper-panel,
+    .cropper-stage,
+    .cross-reference,
+    .drag-chip,
+    .draw-stage-canvas.is-board,
+    .draw-stage-menu,
+    .draw-stage-minimap-sheet,
+    .draw-stage-paper-swatch,
+    .font-picker-list,
+    .font-picker-row,
+    .footnote-panel textarea,
+    .footnote-ref,
+    .glass-search,
+    .glass-sheet,
+    .glass-toolbar,
+    .icon-button,
+    .ink-caption-field,
+    .ink-delete-menu,
+    .inspector-close,
+    .inspector-tabs [role="tab"],
+    .invite-form > button,
+    .invite-form input,
+    .invite-link-row button,
+    .invite-link-row input,
+    .invite-mail,
+    .invite-ready,
+    .invite-withdraw,
+    .leave-archive-card,
+    .leave-archive-card button,
+    .lightbox-figure img,
+    .link-peek,
+    .liquid.is-open .liquid-card,
+    .login-input,
+    .login-invite-note,
+    .login-mark,
+    .login-panel,
+    .login-reveal,
+    .manuscript-continue,
+    .manuscript-titlebar-chapter,
+    .manuscript-turn button,
+    .member-presence-follow,
+    .member-role-list,
+    .member-role-list select,
+    .menu-key,
+    .menu-quick-button,
+    .menu-row,
+    .menu-segments button,
+    .menu-small-button,
+    .menu-swatch,
+    .new-archive-create,
+    .new-note-button,
+    .note-backlink,
+    .note-comment-action,
+    .note-cover-actions > span,
+    .note-cover-grid button,
+    .note-flight-card,
+    .note-gallery-item,
+    .note-group .note-row-list,
+    .note-group .note-row-list .is-thumb,
+    .note-history-name input,
+    .note-outline-row,
+    .note-property-action,
+    .note-row .is-thumb,
+    .note-row-list,
+    .note-version,
+    .note-version-diff,
+    .note-version-head,
+    .note-version-page,
+    .note-write-lock,
+    .page-setup-row select,
+    .page-spread-navigation input,
+    .palette kbd,
+    .palette-row,
+    .palette-row-icon,
+    .palette-tile,
+    .pen-tray,
+    .pen-tray-menu,
+    .popover,
+    .portrait-zoom img,
+    .portrait-zoom.is-wide img,
+    .presence-palette-picker button,
+    .profile-field,
+    .ribbon-select,
+    .ribbon-swatch,
+    .ribbon-tool,
+    .rich-drag-handle,
+    .rich-media-drawing-sheet,
+    .rich-media-file,
+    .rich-media-file-action,
+    .rich-media-file-badge,
+    .rich-media-image-open,
+    .rich-media-loading,
+    .rich-media-retry,
+    .rich-text-content .ProseMirror-selectednode,
+    .rich-text-content > img,
+    .rich-text-content code,
+    .rich-text-content pre,
+    .safety-actions .account-deletion :is(select, textarea),
+    .settings-identity,
+    .settings-key,
+    .settings-lead,
+    .settings-nav button,
+    .settings-nav-marker,
+    .settings-panel .leave-archive-card,
+    .settings-reset,
+    .settings-row-action,
+    .settings-segment,
+    .settings-segment button,
+    .settings-specimen,
+    .sheet,
+    .sheet-body.is-plain .sheet-entry:has(> button.sheet-row:hover),
+    .sheet-body.is-plain .sheet-hero > .sheet-title-field,
+    .sheet-body.is-plain .sheet-note-glyph,
+    .sheet-body.is-plain .sheet-stats > *,
+    .sheet-body.is-plain .sheet-stepper button,
+    .sheet-card,
+    .sheet-day,
+    .sheet-footnote,
+    .sheet-note-glyph,
+    .sheet-row,
+    .sheet-stats > *,
+    .sheet-title-field,
+    .sheet-work > .safety-actions,
+    .sheet:has(.sheet-body.is-plain),
+    .sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back),
+    .shortcut-sheet kbd,
+    .sidebar-action,
+    .sidebar-disclosure,
+    .sidebar-footer-button,
+    .sidebar-heading-action,
+    .sidebar-heading-add,
+    .sidebar-rail-button,
+    .soft-pane,
+    .space-list-button,
+    .space-list-current,
+    .space-list-new,
+    .space-switch,
+    .spotlight-lesson .palette-search kbd,
+    .structure-end,
+    .structure-field,
+    .structure-headings button,
+    .structure-new,
+    .structure-notebook,
+    .structure-part,
+    .structure-part-field,
+    .style-row,
+    .toc button,
+    .toolbar-button,
+    .wallpaper-actions button,
+    .whats-new-section li img,
+    .xref-search
+  ) {
+    corner-shape: squircle;
   }
 }

@@ -16,6 +16,8 @@ export interface NoteComment {
   mentions: string[];
   /** Whose job the thread is. Carried on every row, read off the first. */
   assigneeId: string | null;
+  /** The bubble its author sent it in (`chatBubbles.ts`); absent is plain. */
+  bubble?: string | null;
 }
 
 /** Somebody answering a remark without words. */
@@ -49,6 +51,7 @@ export interface CommentRow {
   resolved_at: string | null;
   mentions?: string[] | null;
   assignee_id?: string | null;
+  bubble?: string | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -60,6 +63,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   resolvedAt: row.resolved_at,
   mentions: row.mentions ?? [],
   assigneeId: row.assignee_id ?? null,
+  bubble: row.bubble ?? null,
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening
@@ -94,19 +98,13 @@ export interface ArchiveComment extends NoteComment {
   noteId: string;
 }
 
-/** The notes carrying a conversation still open.
+/** The notes carrying a conversation still going.
  *
- *  Resolved threads are left out on purpose: this is what is waiting, not what
- *  has ever been said. A note whose every thread is dealt with leaves the list
- *  the moment the last one is, which is what makes the list worth opening. */
+ *  Read row by row. Resolving was retired when the comments became a chat
+ *  (2026-11-17): a remark resolved before then is settled, and anything said
+ *  since, even on that same passage, is not. */
 export function notesWithOpenRemarks(comments: ArchiveComment[]): Set<string> {
-  const resolvedThreads = new Set<string>();
-  for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
-  const notes = new Set<string>();
-  for (const comment of comments) {
-    if (!resolvedThreads.has(comment.threadId)) notes.add(comment.noteId);
-  }
-  return notes;
+  return new Set(comments.filter((c) => !c.resolvedAt).map((c) => c.noteId));
 }
 
 /** When this browser last read each note's remarks, keyed by note. */
@@ -115,8 +113,8 @@ export type RemarksSeen = Record<string, string>;
 /** Remarks somebody else wrote since this browser last opened their note, in
  *  an open thread.
  *
- *  Your own are never news, and a thread already dealt with is not waiting for
- *  you. The line is drawn per note rather than across the archive because that
+ *  Your own are never news, and a remark resolved before the chat is not
+ *  waiting for you. The line is drawn per note rather than across the archive because that
  *  is the granularity of having read one: opening a note is the act, and a
  *  single archive-wide line meant reading one conversation marked every other
  *  member's remark read along with it — or, when nothing moved the line, meant
@@ -131,12 +129,10 @@ export function unreadRemarks(
   selfId: string,
   seen: RemarksSeen,
 ): ArchiveComment[] {
-  const resolvedThreads = new Set<string>();
-  for (const comment of comments) if (comment.resolvedAt) resolvedThreads.add(comment.threadId);
   return comments.filter(
     (comment) =>
       comment.authorId !== selfId &&
-      !resolvedThreads.has(comment.threadId) &&
+      !comment.resolvedAt &&
       comment.createdAt > (seen[comment.noteId] ?? ""),
   );
 }

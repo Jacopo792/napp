@@ -28,7 +28,8 @@ export type {
   RemarksSeen,
 } from "./commentThreads";
 
-const COLUMNS = "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id";
+const COLUMNS =
+  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble";
 
 export async function loadComments(session: AppSession, noteId: string): Promise<NoteComment[]> {
   const result = await supabase
@@ -63,12 +64,14 @@ export async function addComment(
   body: string,
   mentions: string[] = [],
   assigneeId: string | null = null,
+  bubble: string | null = null,
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
   const result = await supabase
     .from("note_comments")
     .insert({
+      bubble,
       archive_id: session.archiveId,
       note_id: noteId,
       thread_id: threadId,

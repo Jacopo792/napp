@@ -14,8 +14,8 @@
 const reduced = () =>
   typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
-const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
+export const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 
 /** One entrance and one exit for every window that opens over the app, in
  *  script what `--dur-base`/`--ease-out` and `--dur-fast`/`--ease-in-out` are
@@ -27,7 +27,7 @@ export const OVERLAY_OUT = { duration: 160, easing: "cubic-bezier(0.65, 0, 0.35,
 /** `--motion-shape` in the stylesheet: how long the moving family takes to
  *  change shape or travel. Kept equal by hand, since a script cannot wait on a
  *  custom property. */
-const SHAPE = 440;
+export const SHAPE = 440;
 
 /** Lets a layer play its exit (`.is-closing` in the stylesheet) before it is
  *  closed, so a window that came in does not vanish between two frames. */

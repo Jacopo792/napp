@@ -17,7 +17,7 @@
  * opens the conversation, a link opens the note at the other end. The sheet is
  * a map with doors, not a page to read and close. */
 import { useEffect, useState, type ReactNode } from "react";
-import { FileText, MessageSquare, Trash2 } from "@/components/icons";
+import { FileText, History, MessageSquare, Trash2 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { SheetPortrait } from "@/components/SheetPortrait";
 import { Avatar } from "@/components/WorkspaceMenus";
@@ -171,7 +171,7 @@ export function NoteSheet({
   });
 
   return (
-    <Sheet label={note.title || "Untitled"}>
+    <Sheet label={note.title || "Untitled"} className="is-centered">
       <div className="sheet-body is-plain">
         <header className="sheet-hero">
           <SheetPortrait
@@ -201,6 +201,7 @@ export function NoteSheet({
               </>
             )}
             {states.map((state) => ` · ${state}`)}
+            {` · ${note.words === 1 ? "1 word" : `${note.words.toLocaleString()} words`}`}
           </p>
           {people.length > 0 && (
             <p>
@@ -209,18 +210,26 @@ export function NoteSheet({
           )}
         </header>
 
-        <div className="sheet-stats">
-          <button type="button" onClick={() => onOpenNote(note.id)}>
-            <small>Words</small>
-            <strong>{note.words}</strong>
+        <div className="sheet-actions">
+          <button type="button" className="press" onClick={() => onOpenNote(note.id)}>
+            <FileText size={15} />
+            Open
           </button>
-          <button type="button" onClick={() => onOpenNote(note.id, { history: true })}>
-            <small>Versions</small>
-            <strong>{versions ? versions.length : "–"}</strong>
+          <button
+            type="button"
+            className="press"
+            onClick={() => onOpenNote(note.id, { history: true })}
+          >
+            <History size={15} />
+            Versions{versions && versions.length > 0 && <b>{versions.length}</b>}
           </button>
-          <button type="button" onClick={() => onOpenNote(note.id, { comments: true })}>
-            <small>Open remarks</small>
-            <strong>{note.openRemarks}</strong>
+          <button
+            type="button"
+            className="press"
+            onClick={() => onOpenNote(note.id, { comments: true })}
+          >
+            <MessageSquare size={15} />
+            Remarks{note.openRemarks > 0 && <b>{note.openRemarks}</b>}
           </button>
         </div>
 

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { CHAT_BUBBLES, DEFAULT_REACTIONS, type ChatBubble } from "./chatBubbles.ts";
 
 export const PRESENCE_PALETTES = [
   { id: "amber", name: "Amber", color: "#e8a55b", wash: "#e8a55b26" },
@@ -31,6 +32,10 @@ export interface WritingPreferences {
   /** On a dark sheet, the colours chosen for the text are turned to keep
    *  their hue and lose their darkness — Word's behaviour — or left alone. */
   adaptInk: boolean;
+  /** The bubble your chat messages are sent in, seen by everyone. */
+  chatBubble: ChatBubble;
+  /** The emoji offered first when reacting to a message, in order. */
+  quickReactions: string[];
 }
 
 export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
@@ -40,6 +45,8 @@ export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   writingStats: true,
   sheetTone: "paper",
   adaptInk: true,
+  chatBubble: "ink",
+  quickReactions: [...DEFAULT_REACTIONS],
 };
 
 /** Whatever was stored, read field by field: a field that is missing or
@@ -64,7 +71,20 @@ export function writingPreferencesFrom(
     writingStats: flag(value?.writingStats, fallback.writingStats),
     sheetTone: one(SHEET_TONES, value?.sheetTone, fallback.sheetTone),
     adaptInk: flag(value?.adaptInk, fallback.adaptInk),
+    chatBubble: one(
+      CHAT_BUBBLES.map((bubble) => bubble.id),
+      value?.chatBubble,
+      fallback.chatBubble,
+    ),
+    quickReactions: reactionsFrom(value?.quickReactions) ?? fallback.quickReactions,
   };
+}
+
+/** Exactly six short strings, none repeated, or nothing usable. */
+function reactionsFrom(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length !== DEFAULT_REACTIONS.length) return null;
+  const ok = value.every((one) => typeof one === "string" && one.length > 0 && one.length <= 16);
+  return ok && new Set(value).size === value.length ? (value as string[]) : null;
 }
 
 const KEY = "napp:writing-preferences:v1";
