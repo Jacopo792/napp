@@ -859,10 +859,30 @@
   display: flex;
   width: min(760px, calc(100vw - 96px));
   height: min(860px, calc(100dvh - 96px));
-  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.18)) drop-shadow(0 24px 40px rgb(0 0 0 / 0.32));
+}
+
+/* The shadow is its own layer, painted once and faded in as the sheet
+   opens. A drop-shadow filter over the clipped sheet followed its shape but
+   was blurred again on every frame of the clip: in the desktop app's
+   transparent window that halved the frame rate, and the sheet stuttered. */
+.chat-sheet-frame::before {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 0.18),
+    0 24px 40px rgb(0 0 0 / 0.32);
+  content: "";
+  pointer-events: none;
+  animation: fade-in var(--motion-shape) var(--ease-in-out) backwards;
+}
+
+.chat-layer.is-closing .chat-sheet-frame::before {
+  animation: fade-out var(--dur-base) var(--ease-out) forwards;
 }
 
 .chat-sheet {
+  position: relative;
   display: flex;
   flex: 1;
   overflow: hidden;

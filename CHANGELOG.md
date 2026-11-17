@@ -3,6 +3,13 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.68 – 2026-11-17
+
+### Fixed
+
+- In the desktop app the chat sheet stuttered as it opened and closed: its
+  shadow was blurred again on every frame. It is now drawn once.
+
 ## 0.9.67 – 2026-11-17
 
 ### Fixed
