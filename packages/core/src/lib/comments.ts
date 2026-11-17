@@ -29,9 +29,31 @@ export type {
 } from "./commentThreads";
 
 const COLUMNS =
-  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble";
+  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to";
 
-export async function loadComments(session: AppSession, noteId: string): Promise<NoteComment[]> {
+/* The archive's general chat is the same conversation with no note under it:
+   its own tables (`archive_messages`), read here through the same calls with
+   `noteId` null, and shaped into the same rows. Its thread is the archive. */
+const GENERAL_COLUMNS = "id, author_id, body, created_at, mentions, bubble, reply_to";
+
+type GeneralRow = Omit<CommentRow, "thread_id" | "resolved_at" | "assignee_id">;
+
+const fromGeneral = (session: AppSession, row: GeneralRow): NoteComment =>
+  toComment({ ...row, thread_id: session.archiveId, resolved_at: null, assignee_id: null });
+
+export async function loadComments(
+  session: AppSession,
+  noteId: string | null,
+): Promise<NoteComment[]> {
+  if (noteId === null) {
+    const general = await supabase
+      .from("archive_messages")
+      .select(GENERAL_COLUMNS)
+      .eq("archive_id", session.archiveId)
+      .order("created_at");
+    fail(general.error);
+    return ((general.data ?? []) as GeneralRow[]).map((row) => fromGeneral(session, row));
+  }
   const result = await supabase
     .from("note_comments")
     .select(COLUMNS)
@@ -59,19 +81,37 @@ export async function loadThreadIds(session: AppSession, noteId: string): Promis
  *  merely in this call. */
 export async function addComment(
   session: AppSession,
-  noteId: string,
+  noteId: string | null,
   threadId: string,
   body: string,
   mentions: string[] = [],
   assigneeId: string | null = null,
   bubble: string | null = null,
+  replyTo: string | null = null,
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
+  if (noteId === null) {
+    const general = await supabase
+      .from("archive_messages")
+      .insert({
+        archive_id: session.archiveId,
+        author_id: session.userId,
+        body: trimmed,
+        mentions,
+        bubble,
+        reply_to: replyTo,
+      })
+      .select(GENERAL_COLUMNS)
+      .single();
+    fail(general.error);
+    return fromGeneral(session, general.data as GeneralRow);
+  }
   const result = await supabase
     .from("note_comments")
     .insert({
       bubble,
+      reply_to: replyTo,
       archive_id: session.archiveId,
       note_id: noteId,
       thread_id: threadId,
@@ -121,7 +161,21 @@ export async function assignThread(
   fail(result.error);
 }
 
-export async function loadReactions(session: AppSession, noteId: string): Promise<Reaction[]> {
+export async function loadReactions(
+  session: AppSession,
+  noteId: string | null,
+): Promise<Reaction[]> {
+  if (noteId === null) {
+    const general = await supabase
+      .from("archive_message_reactions")
+      .select("message_id, user_id, emoji")
+      .eq("archive_id", session.archiveId)
+      .order("created_at");
+    fail(general.error);
+    return ((general.data ?? []) as { message_id: string; user_id: string; emoji: string }[]).map(
+      (row) => ({ commentId: row.message_id, userId: row.user_id, emoji: row.emoji }),
+    );
+  }
   const result = await supabase
     .from("note_comment_reactions")
     .select("comment_id, user_id, emoji")
@@ -138,11 +192,28 @@ export async function loadReactions(session: AppSession, noteId: string): Promis
  *  holds both directions to the caller's own name. */
 export async function setReaction(
   session: AppSession,
-  noteId: string,
+  noteId: string | null,
   commentId: string,
   emoji: string,
   on: boolean,
 ): Promise<void> {
+  if (noteId === null) {
+    const general = on
+      ? await supabase.from("archive_message_reactions").insert({
+          message_id: commentId,
+          archive_id: session.archiveId,
+          user_id: session.userId,
+          emoji,
+        })
+      : await supabase
+          .from("archive_message_reactions")
+          .delete()
+          .eq("message_id", commentId)
+          .eq("user_id", session.userId)
+          .eq("emoji", emoji);
+    fail(general.error);
+    return;
+  }
   const result = on
     ? await supabase.from("note_comment_reactions").insert({
         comment_id: commentId,
@@ -161,9 +232,14 @@ export async function setReaction(
 }
 
 /** Only your own, and the database is what enforces that. */
-export async function deleteComment(session: AppSession, commentId: string): Promise<void> {
+export async function deleteComment(
+  session: AppSession,
+  commentId: string,
+  /** Set for a message in the archive's general chat. */
+  general = false,
+): Promise<void> {
   const result = await supabase
-    .from("note_comments")
+    .from(general ? "archive_messages" : "note_comments")
     .delete()
     .eq("archive_id", session.archiveId)
     .eq("id", commentId);
@@ -178,9 +254,22 @@ export async function updateComment(
   commentId: string,
   body: string,
   mentions: string[],
+  general = false,
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
+  if (general) {
+    const edited = await supabase
+      .from("archive_messages")
+      .update({ body: trimmed, mentions })
+      .eq("archive_id", session.archiveId)
+      .eq("id", commentId)
+      .eq("author_id", session.userId)
+      .select(GENERAL_COLUMNS)
+      .single();
+    fail(edited.error);
+    return fromGeneral(session, edited.data as GeneralRow);
+  }
   const result = await supabase
     .from("note_comments")
     .update({ body: trimmed, mentions })

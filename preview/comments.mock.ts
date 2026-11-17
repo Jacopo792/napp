@@ -13,10 +13,11 @@ export {
 export type { ArchiveComment, NoteComment, CommentThread, Reaction } from "@/lib/commentThreads";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const store = new Map<string, NoteComment[]>();
+/** Keyed by note; `null` is the archive's general chat. */
+const store = new Map<string | null, NoteComment[]>();
 /* Which archive a note's remarks belong to, the way `note_comments` carries an
    `archive_id`: the archive-wide read must not count another archive's. */
-const archiveOf = new Map<string, string>([[FIXTURE_NOTES[0].id, PREVIEW_ARCHIVE]]);
+const archiveOf = new Map<string | null, string>([[FIXTURE_NOTES[0].id, PREVIEW_ARCHIVE]]);
 
 /** One conversation, on the first note in the fixture and there from the
  *  start — so both readers of this store have something to show: the panel
@@ -52,13 +53,29 @@ function seed(noteId: string): void {
 
 seed(FIXTURE_NOTES[0].id);
 
+/* The archive's general chat, about no note. */
+store.set(null, [
+  {
+    id: "general-1",
+    threadId: PREVIEW_ARCHIVE,
+    authorId: PREVIEW_U2,
+    body: "Stasera ci vediamo per rivedere tutto? 🙌",
+    createdAt: new Date(Date.now() - 5_400_000).toISOString(),
+    resolvedAt: null,
+    mentions: [],
+    assigneeId: null,
+    bubble: "frog",
+  },
+]);
+archiveOf.set(null, PREVIEW_ARCHIVE);
+
 /* The other member, so a message can be seen arriving: a reply a moment after
    each one you send, in her bubble. `subscribeToComments` in the sync stand-in
    listens here, the way Realtime would announce the insert. */
 export const chatListeners = new Set<() => void>();
 const ANSWERS = ["Ok!", "Ci penso io 🙌", "Sì, mi piace.", "Ne parliamo stasera?", "👀"];
 let answered = 0;
-function answerLater(noteId: string, threadId: string): void {
+function answerLater(noteId: string | null, threadId: string): void {
   window.setTimeout(() => {
     store.set(noteId, [
       ...(store.get(noteId) ?? []),
@@ -80,7 +97,7 @@ function answerLater(noteId: string, threadId: string): void {
 
 export async function loadComments(
   _session: AppSession,
-  noteId: string,
+  noteId: string | null,
 ): Promise<NoteComment[]> {
   await sleep(120);
   return [...(store.get(noteId) ?? [])];
@@ -93,12 +110,13 @@ export async function loadThreadIds(_session: AppSession, noteId: string): Promi
 
 export async function addComment(
   session: AppSession,
-  noteId: string,
+  noteId: string | null,
   threadId: string,
   body: string,
   mentions: string[] = [],
   assigneeId: string | null = null,
   bubble: string | null = null,
+  replyTo: string | null = null,
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
@@ -111,6 +129,7 @@ export async function addComment(
     mentions,
     assigneeId,
     bubble,
+    replyTo,
   };
   store.set(noteId, [...(store.get(noteId) ?? []), saved]);
   archiveOf.set(noteId, session.archiveId);
@@ -168,8 +187,8 @@ export async function updateComment(
 export async function loadArchiveComments(session: AppSession): Promise<ArchiveComment[]> {
   await sleep(90);
   return [...store]
-    .filter(([noteId]) => archiveOf.get(noteId) === session.archiveId)
-    .flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId })));
+    .filter(([noteId]) => noteId !== null && archiveOf.get(noteId) === session.archiveId)
+    .flatMap(([noteId, rows]) => rows.map((row) => ({ ...row, noteId: noteId! })));
 }
 
 export async function assignThread(
@@ -185,18 +204,18 @@ export async function assignThread(
   );
 }
 
-let reactions: (Reaction & { noteId: string })[] = [
+let reactions: (Reaction & { noteId: string | null })[] = [
   { noteId: FIXTURE_NOTES[0].id, commentId: "seed-2", userId: PREVIEW_U2, emoji: "👍" },
 ];
 
-export async function loadReactions(_session: AppSession, noteId: string): Promise<Reaction[]> {
+export async function loadReactions(_session: AppSession, noteId: string | null): Promise<Reaction[]> {
   await sleep(80);
   return reactions.filter((reaction) => reaction.noteId === noteId);
 }
 
 export async function setReaction(
   session: AppSession,
-  noteId: string,
+  noteId: string | null,
   commentId: string,
   emoji: string,
   on: boolean,

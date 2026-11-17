@@ -13,6 +13,7 @@ import {
   Plus,
   Users,
   MessageSquare,
+  MessagesSquare,
   NotebookText,
   PanelLeftClose,
   Pencil,
@@ -77,6 +78,9 @@ interface Props {
    *  the desktop hiding the columns lives in the list's own group. */
   closeInStrip?: boolean;
   onSettings: () => void;
+  /** The archive's general chat, opened from the control that asked for it.
+   *  Set, the chat in the rail offers it beside the chats in notes. */
+  onGeneralChat?: (origin: DOMRect) => void;
   onLock: () => void;
   accountEmail: string;
   accounts: () => { userId: string; email: string }[];
@@ -377,6 +381,7 @@ export function Sidebar({
   onClose,
   closeInStrip = false,
   onSettings,
+  onGeneralChat,
   onLock,
   accountEmail,
   accounts,
@@ -614,7 +619,35 @@ export function Sidebar({
                       scope.unread ? `${scope.label}, ${scope.unread} unread` : scope.label
                     }
                     title={scope.label}
-                    onClick={() => onSelect(id)}
+                    aria-haspopup={id === REMARKS && onGeneralChat ? "menu" : undefined}
+                    onClick={(event) => {
+                      if (id !== REMARKS || !onGeneralChat) return onSelect(id);
+                      /* Which chat: everyone's, or the ones in the notes. */
+                      const box = event.currentTarget.getBoundingClientRect();
+                      setAccountMenu({
+                        x: box.right + 6,
+                        y: box.top,
+                        items: [
+                          {
+                            kind: "item",
+                            id: "chat-general",
+                            label: "General chat",
+                            icon: <MessagesSquare size={16} />,
+                            run: () => onGeneralChat(box),
+                          },
+                          {
+                            kind: "item",
+                            id: "chat-notes",
+                            label: scope.unread
+                              ? `Chats in notes (${scope.unread})`
+                              : "Chats in notes",
+                            icon: <MessageSquare size={16} />,
+                            checked: selectedId === REMARKS,
+                            run: () => onSelect(REMARKS),
+                          },
+                        ],
+                      });
+                    }}
                   >
                     {glyph}
                     {scope.unread ? (

@@ -20,12 +20,14 @@
 import {
   ArrowUp,
   ChevronDown,
+  Copy,
   Flag,
   Maximize2,
   Minimize2,
   MoreHorizontal,
   Pencil,
   Quote,
+  Reply,
   Smile,
   Trash2,
   X,
@@ -38,9 +40,13 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { PointMenu } from "@/components/ContextMenu";
 import { SafetyActions } from "@/components/SafetyActions";
+import type { MenuPoint } from "@/lib/contextMenu";
+import type { MenuItem } from "@/lib/menuShape";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
@@ -56,7 +62,7 @@ import {
 import { mentionQuery, mentionedIn, tally } from "@/lib/commentThreads";
 import { EASE, EASE_OUT, OVERLAY_OUT, SHAPE } from "@/lib/motion";
 import type { AppSession } from "@/lib/session";
-import { subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
+import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble } from "./ChatBubble";
@@ -70,7 +76,11 @@ export interface CommentAuthor {
 
 interface Props {
   session: AppSession;
+  /** The note this chat is about — or, for the general chat, the archive. */
   noteId: string;
+  /** The archive's general chat: about no note, opened as a sheet from where
+   *  it was asked for, and gone when it closes. */
+  general?: { origin: DOMRect | null };
   canEdit: boolean;
   /** Who the archive holds, so a message is signed with a name and a face. */
   authors: Map<string, CommentAuthor>;
@@ -130,6 +140,7 @@ const clock = (iso: string) =>
 export function NoteComments({
   session,
   noteId,
+  general,
   canEdit,
   authors,
   quotes,
@@ -154,28 +165,35 @@ export function NoteComments({
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [reacting, setReacting] = useState<string | null>(null);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
-  /** The menu opens upwards when its message is low in the column. */
-  const [menuUp, setMenuUp] = useState(false);
+  /** A message's menu, where it was asked for: the same list for a
+   *  right-click and for the ⋯ beside the bubble. */
+  const [menu, setMenu] = useState<(MenuPoint & { id: string }) | null>(null);
+  const menuFor = menu?.id ?? null;
+  /** The report form opens upwards when its message is low in the column. */
+  const [reportUp, setReportUp] = useState(false);
+  /** The message the next one answers, if any — yours as much as anyone's. */
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const [tapBelow, setTapBelow] = useState(false);
   const [picking, setPicking] = useState(false);
   const [reporting, setReporting] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(Boolean(general));
+  /** What the calls below read and write: a note's chat, or (null) the
+   *  archive's general one. */
+  const isGeneral = Boolean(general);
+  const source = isGeneral ? null : noteId;
   /** Messages that arrived while this was open, to be seen arriving. */
   const [arrived, setArrived] = useState<ReadonlySet<string>>(() => new Set());
   const [unseen, setUnseen] = useState(0);
 
   const members = useMemo(() => [...authors.values()], [authors]);
   const closeReact = useCallback(() => setReacting(null), []);
-  const closeMenu = useCallback(() => {
-    setMenuFor(null);
-    setReporting(null);
-  }, []);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const closeReport = useCallback(() => setReporting(null), []);
   const reactRef = useDismiss<HTMLDivElement>(reacting !== null, closeReact);
   const closePicker = useCallback(() => setPicking(false), []);
   const pickerRef = useDismiss<HTMLDivElement>(picking, closePicker);
-  const menuRef = useDismiss<HTMLDivElement>(menuFor !== null, closeMenu);
+  const reportRef = useDismiss<HTMLDivElement>(reporting !== null, closeReport);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLElement>(null);
@@ -187,30 +205,50 @@ export function NoteComments({
   const known = useRef<Set<string> | null>(null);
   const readRef = useRef(onRead);
   readRef.current = onRead;
+  /** Messages whose arrival has been played. A bubble drawn again — the
+   *  column enlarged into the sheet and back — is not arriving again. */
+  const settled = useRef(new Set<string>());
 
   /* ── Reading, and listening ─────────────────────────────────────────── */
 
   const read = useCallback(async () => {
     const [rows, given] = await Promise.all([
-      loadComments(session, noteId),
+      loadComments(session, source),
       /* Reactions are a convenience over the conversation: failing to read
          them must not keep the messages from showing. */
-      loadReactions(session, noteId).catch(() => null),
+      loadReactions(session, source).catch(() => null),
     ]);
     if (given) setReactions(given);
     const fresh = known.current
       ? rows.filter((row) => !known.current!.has(row.id) && row.authorId !== session.userId)
       : [];
+    const first = known.current === null;
     known.current = new Set(rows.map((row) => row.id));
+    if (first) rows.forEach((row) => settled.current.add(row.id));
     if (fresh.length > 0) {
       setArrived((current) => new Set([...current, ...fresh.map((r) => r.id)]));
       readRef.current?.();
     }
-    setMessages((current) => [
-      ...rows,
-      ...current.filter((message) => message.sending || message.failed),
-    ]);
-  }, [session, noteId]);
+    setMessages((current) => {
+      /* Realtime can announce your own message before the insert has
+         answered. The saved row takes the place of the bubble already on its
+         way, under its key, instead of standing beside it for a moment and
+         then replacing it — the doubling and the jump back were the bounce. */
+      const waiting = current.filter((message) => message.sending || message.failed);
+      for (const row of rows) {
+        if (row.authorId !== session.userId || keys.current.has(row.id)) continue;
+        const at = waiting.findIndex(
+          (m) => m.sending && m.body === row.body && m.threadId === row.threadId,
+        );
+        if (at < 0) continue;
+        keys.current.set(row.id, waiting[at]!.id);
+        waiting.splice(at, 1);
+      }
+      /* Updaters may run twice; the second run finds the keys already set. */
+      const placed = new Set(rows.map((row) => keys.current.get(row.id)));
+      return [...rows, ...waiting.filter((m) => !placed.has(m.id))];
+    });
+  }, [session, source]);
 
   useEffect(() => {
     let live = true;
@@ -223,16 +261,19 @@ export function NoteComments({
       .finally(() => live && setLoading(false));
     /* One read per burst: Realtime announces every row separately. */
     let timer = 0;
-    const channel = subscribeToComments(session.archiveId, () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => void read().catch(() => undefined), 250);
-    });
+    const channel = (isGeneral ? subscribeToArchiveChat : subscribeToComments)(
+      session.archiveId,
+      () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => void read().catch(() => undefined), 250);
+      },
+    );
     return () => {
       live = false;
       window.clearTimeout(timer);
       void unsubscribeFromArchive(channel);
     };
-  }, [session, read]);
+  }, [session, read, isGeneral]);
 
   /* ── Where the next message is about ───────────────────────────────── */
 
@@ -260,6 +301,7 @@ export function NoteComments({
   }, [focusThread, loading, messages, onFocusHandled]);
 
   const aboutQuote = about ? quotes.get(about) : undefined;
+  const replying = replyTo ? messages.find((m) => m.id === replyTo) : undefined;
 
   function dropAbout() {
     /* A passage anchored for a first message that never came is a highlight
@@ -394,6 +436,7 @@ export function NoteComments({
       mentions: mentionedIn(body, members),
       assigneeId: null,
       bubble: myBubble,
+      replyTo: replyTo && messages.some((m) => m.id === replyTo) ? replyTo : null,
     };
     setMessages((current) =>
       retry
@@ -405,17 +448,20 @@ export function NoteComments({
       setSuggesting(null);
       if (threadId === pendingThread) onPendingHandled();
       setAbout(null);
+      setReplyTo(null);
     }
     try {
       const saved = await addComment(
         session,
-        noteId,
+        source,
         threadId,
         body,
         local.mentions,
         null,
         local.bubble ?? null,
+        local.replyTo ?? null,
       );
+      /* Realtime may have put it in place already, under this same key. */
       keys.current.set(saved.id, local.id);
       known.current?.add(saved.id);
       setMessages((current) => {
@@ -435,7 +481,13 @@ export function NoteComments({
     const body = editDraft.trim();
     if (!body || body === message.body) return setEditing(null);
     try {
-      const saved = await updateComment(session, message.id, body, mentionedIn(body, members));
+      const saved = await updateComment(
+        session,
+        message.id,
+        body,
+        mentionedIn(body, members),
+        isGeneral,
+      );
       setMessages((current) => current.map((m) => (m.id === message.id ? saved : m)));
       setEditing(null);
     } catch (reason) {
@@ -450,7 +502,7 @@ export function NoteComments({
       return;
     }
     try {
-      await deleteComment(session, message.id);
+      await deleteComment(session, message.id, isGeneral);
       const rest = messages.filter((m) => m.id !== message.id);
       setMessages(rest);
       onChanged?.();
@@ -476,7 +528,7 @@ export function NoteComments({
         : current.filter((r) => !mine(r)),
     );
     try {
-      await setReaction(session, noteId, messageId, emoji, on);
+      await setReaction(session, source, messageId, emoji, on);
     } catch (reason) {
       setReactions(before);
       setFailure(reason instanceof Error ? reason.message : "Couldn't save that reaction");
@@ -537,7 +589,12 @@ export function NoteComments({
 
   /* ── Enlarging ─────────────────────────────────────────────────────── */
 
-  const from = useRef<DOMRect | null>(null);
+  /** Where the sheet grows out of and goes back to: the column, or for the
+   *  general chat the control that opened it. */
+  const from = useRef<DOMRect | null>(general?.origin ?? null);
+  const origin = general?.origin ?? null;
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   function enlarge() {
     from.current = columnRef.current?.getBoundingClientRect() ?? null;
@@ -569,8 +626,11 @@ export function NoteComments({
 
   const shrink = useCallback(() => {
     const sheet = sheetRef.current;
-    const end = columnRef.current?.getBoundingClientRect();
-    if (!sheet || !end || reduced()) return setExpanded(false);
+    /* The general chat has no column to go back into: it closes into where
+       it came from, and then it is gone. */
+    const done = isGeneral ? () => closeRef.current() : () => setExpanded(false);
+    const end = isGeneral ? origin : columnRef.current?.getBoundingClientRect();
+    if (!sheet || !end || reduced()) return done();
     const start = sheet.getBoundingClientRect();
     const inset = `inset(${end.top - start.top}px ${start.right - end.right}px ${start.bottom - end.bottom}px ${end.left - start.left}px round 0px)`;
     sheet.closest(".chat-layer")?.classList.add("is-closing");
@@ -585,20 +645,126 @@ export function NoteComments({
         easing: EASE,
         fill: "forwards",
       })
-      .finished.then(() => setExpanded(false))
-      .catch(() => setExpanded(false));
-  }, []);
+      .finished.then(done)
+      .catch(done);
+  }, [isGeneral, origin]);
 
   useEffect(() => {
     if (!expanded) return;
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || reacting || menuFor || editing) return;
+      if (event.key !== "Escape" || reacting || menuFor || reporting || editing) return;
       event.stopPropagation();
       shrink();
     };
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
-  }, [expanded, shrink, reacting, menuFor, editing]);
+  }, [expanded, shrink, reacting, menuFor, reporting, editing]);
+
+  /* ── A message's menu ──────────────────────────────────────────────── */
+
+  function openMenu(m: ChatMessage, point: MenuPoint) {
+    if (m.sending || m.failed || editing === m.id) return;
+    setReacting(null);
+    setReporting(null);
+    setMenu({ ...point, id: m.id });
+  }
+
+  /** Right-click on a message is its menu. Anywhere else in the chat the
+   *  note's own menu must not answer: the chat is not the page. The field
+   *  keeps the browser's menu, for spelling and paste. */
+  function onChatContextMenu(event: ReactMouseEvent) {
+    event.stopPropagation();
+    const target = event.target as HTMLElement;
+    if (target.closest("textarea, input")) return;
+    event.preventDefault();
+    const id = target.closest<HTMLElement>("[data-message]")?.dataset.message;
+    const m = id ? messages.find((one) => one.id === id) : undefined;
+    if (m) openMenu(m, { x: event.clientX, y: event.clientY });
+  }
+
+  function replyToMessage(m: ChatMessage) {
+    setReplyTo(m.id);
+    /* An answer to something said about a passage is about that passage too. */
+    if (m.threadId !== noteId && quotes.has(m.threadId)) setAbout(m.threadId);
+    composerRef.current?.focus();
+  }
+
+  function menuItems(m: ChatMessage): MenuItem[] {
+    const mine = m.authorId === session.userId;
+    const items: MenuItem[] = [];
+    if (canEdit) {
+      items.push({
+        kind: "item",
+        id: "chat-reply",
+        label: mine ? "Reply to yourself" : "Reply",
+        icon: <Reply size={16} />,
+        run: () => replyToMessage(m),
+      });
+      items.push({
+        kind: "item",
+        id: "chat-react",
+        label: "React",
+        icon: <Smile size={16} />,
+        run: () => {
+          const line = scrollRef.current?.querySelector(`[data-message="${m.id}"] .chat-line`);
+          const box = scrollRef.current?.getBoundingClientRect();
+          const at = line?.getBoundingClientRect();
+          setTapBelow(Boolean(box && at && at.top - box.top < 56));
+          setReacting(m.id);
+        },
+      });
+    }
+    items.push({
+      kind: "item",
+      id: "chat-copy",
+      label: "Copy",
+      icon: <Copy size={16} />,
+      run: () => void navigator.clipboard?.writeText(m.body).catch(() => undefined),
+    });
+    if (mine) {
+      items.push(
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "chat-edit",
+          label: "Edit",
+          icon: <Pencil size={16} />,
+          run: () => {
+            setEditing(m.id);
+            setEditDraft(m.body);
+          },
+        },
+        {
+          kind: "item",
+          id: "chat-delete",
+          label: "Delete",
+          danger: true,
+          icon: <Trash2 size={16} />,
+          run: () => void remove(m),
+        },
+      );
+    } else {
+      items.push(
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "chat-report",
+          label: "Report",
+          icon: <Flag size={16} />,
+          run: () => {
+            const row = scrollRef.current?.querySelector(`[data-message="${m.id}"]`);
+            const box = scrollRef.current?.getBoundingClientRect();
+            const at = row?.getBoundingClientRect();
+            setReportUp(Boolean(box && at && at.top > box.top + box.height / 2));
+            setReporting(m.id);
+          },
+        },
+      );
+    }
+    return items;
+  }
+
+  const menuMessage = menu ? messages.find((m) => m.id === menu.id) : undefined;
 
   /* ── Drawing ───────────────────────────────────────────────────────── */
 
@@ -626,11 +792,23 @@ export function NoteComments({
     /* A few emoji and nothing else are said large and without a bubble. */
     const jumbo = !showQuote && editing !== m.id && JUMBO.test(m.body.trim());
     const counted = tally(reactions, m.id, session.userId);
-    const motion =
-      keys.current.has(m.id) || m.sending ? "is-sent" : arrived.has(m.id) ? "is-received" : "";
+    const key = keys.current.get(m.id) ?? m.id;
+    const motion = settled.current.has(key)
+      ? ""
+      : keys.current.has(m.id) || m.sending
+        ? "is-sent"
+        : arrived.has(m.id)
+          ? "is-received"
+          : "";
+    const answered = m.replyTo ? messages.find((one) => one.id === m.replyTo) : undefined;
+    const answeredName = answered
+      ? answered.authorId === session.userId
+        ? "You"
+        : authors.get(answered.authorId)?.name || "Someone"
+      : "";
 
     return (
-      <div key={keys.current.get(m.id) ?? m.id} className="chat-row-wrap">
+      <div key={key} className="chat-row-wrap">
         {newDay && (
           <div className="chat-day" role="separator">
             <span>{dayLabel(m.createdAt)}</span>
@@ -640,7 +818,17 @@ export function NoteComments({
           data-message={m.id}
           className={`chat-row ${mine ? "is-mine" : "is-theirs"} ${first ? "is-first" : ""} ${
             last ? "is-last" : ""
-          } ${motion} ${m.sending ? "is-sending" : ""} ${m.failed ? "is-failed" : ""}`}
+          } ${motion} ${m.sending ? "is-sending" : ""} ${m.failed ? "is-failed" : ""} ${
+            menuFor === m.id ? "is-menu" : ""
+          }`}
+          onAnimationEnd={(event) => {
+            /* Played once: the animal is the last thing to arrive. */
+            if (
+              event.animationName === "chat-piece" ||
+              !event.currentTarget.querySelector(".chat-bubble-piece")
+            )
+              settled.current.add(key);
+          }}
         >
           {first && (
             <div className="chat-sender">
@@ -656,10 +844,33 @@ export function NoteComments({
                 {last && <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />}
               </span>
             )}
-            {jumbo ? (
+            {jumbo && !answered ? (
               <span className="chat-jumbo">{m.body.trim()}</span>
             ) : (
               <ChatBubble bubble={m.bubble} mine={mine} bare={!last}>
+                {answered && (
+                  <button
+                    type="button"
+                    className="chat-replied"
+                    title="Show the message this answers"
+                    onClick={() => {
+                      const node = scrollRef.current?.querySelector<HTMLElement>(
+                        `[data-message="${answered.id}"]`,
+                      );
+                      if (!node) return;
+                      node.scrollIntoView({
+                        block: "center",
+                        behavior: reduced() ? "auto" : "smooth",
+                      });
+                      node.classList.remove("is-arrived");
+                      void node.offsetWidth;
+                      node.classList.add("is-arrived");
+                    }}
+                  >
+                    <span className="chat-replied-name">{answeredName}</span>
+                    <span className="chat-replied-words">{answered.body}</span>
+                  </button>
+                )}
                 {showQuote && (
                   <button
                     type="button"
@@ -729,81 +940,31 @@ export function NoteComments({
                     className="chat-tool press"
                     aria-label="More"
                     title="More"
+                    aria-haspopup="menu"
                     aria-expanded={menuFor === m.id}
                     onClick={(event) => {
-                      const scroller = scrollRef.current?.getBoundingClientRect();
+                      if (menuFor === m.id) return closeMenu();
+                      /* Under the button, the way a right-click opens it. */
                       const at = event.currentTarget.getBoundingClientRect();
-                      setMenuUp(Boolean(scroller && at.top > scroller.top + scroller.height / 2));
-                      setMenuFor((open) => (open === m.id ? null : m.id));
+                      openMenu(m, { x: at.left, y: at.bottom + 4 });
                     }}
                   >
                     <MoreHorizontal size={15} />
                   </button>
                 </div>
-                {menuFor === m.id && (
+                {reporting === m.id && (
                   <div
-                    className={`chat-menu popover ${menuUp ? "is-above" : ""}`}
-                    ref={menuRef}
-                    role="menu"
+                    className={`chat-menu popover ${reportUp ? "is-above" : ""}`}
+                    ref={reportRef}
+                    role="dialog"
+                    aria-label="Report"
                   >
-                    {reporting === m.id ? (
-                      <SafetyActions noteId={noteId} userId={m.authorId} commentId={m.id} compact />
-                    ) : (
-                      <>
-                        {quote && canEdit && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="menu-row press"
-                            onClick={() => {
-                              closeMenu();
-                              setAbout(m.threadId);
-                              composerRef.current?.focus();
-                            }}
-                          >
-                            <Quote size={15} />
-                            Reply about this passage
-                          </button>
-                        )}
-                        {mine && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="menu-row press"
-                            onClick={() => {
-                              closeMenu();
-                              setEditing(m.id);
-                              setEditDraft(m.body);
-                            }}
-                          >
-                            <Pencil size={15} />
-                            Edit
-                          </button>
-                        )}
-                        {mine && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="menu-row press is-danger"
-                            onClick={() => void remove(m)}
-                          >
-                            <Trash2 size={15} />
-                            Delete
-                          </button>
-                        )}
-                        {!mine && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="menu-row press"
-                            onClick={() => setReporting(m.id)}
-                          >
-                            <Flag size={15} />
-                            Report
-                          </button>
-                        )}
-                      </>
-                    )}
+                    <SafetyActions
+                      noteId={isGeneral ? undefined : noteId}
+                      userId={m.authorId}
+                      commentId={m.id}
+                      compact
+                    />
                   </div>
                 )}
               </>
@@ -871,7 +1032,7 @@ export function NoteComments({
   const inner = (
     <div className="chat-inner">
       <header className="chat-header">
-        <span className="chat-title">Chat</span>
+        <span className="chat-title">{isGeneral ? "General chat" : "Chat"}</span>
         {faces.length > 0 && (
           <span className="chat-faces" aria-label={faces.map((face) => face.name).join(", ")}>
             {faces.map((face) => (
@@ -880,21 +1041,23 @@ export function NoteComments({
           </span>
         )}
         <span className="chat-header-tools">
-          <button
-            type="button"
-            className="chat-tool press"
-            aria-label={expanded ? "Make smaller" : "Enlarge"}
-            title={expanded ? "Make smaller" : "Enlarge"}
-            onClick={expanded ? shrink : enlarge}
-          >
-            {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
+          {!isGeneral && (
+            <button
+              type="button"
+              className="chat-tool press"
+              aria-label={expanded ? "Make smaller" : "Enlarge"}
+              title={expanded ? "Make smaller" : "Enlarge"}
+              onClick={expanded ? shrink : enlarge}
+            >
+              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          )}
           <button
             type="button"
             className="chat-tool press"
             aria-label="Close chat"
             title="Close chat"
-            onClick={expanded ? () => (shrink(), onClose()) : onClose}
+            onClick={isGeneral ? shrink : expanded ? () => (shrink(), onClose()) : onClose}
           >
             <X size={16} />
           </button>
@@ -944,6 +1107,30 @@ export function NoteComments({
 
       {canEdit && (
         <div className="chat-composer">
+          {replying && (
+            <div className="chat-about chat-replying">
+              <Reply size={13} />
+              <span className="chat-about-words">
+                <strong>
+                  {replying.authorId === session.userId
+                    ? "Yourself"
+                    : authors.get(replying.authorId)?.name || "Someone"}
+                </strong>{" "}
+                {replying.body}
+              </span>
+              <button
+                type="button"
+                className="chat-tool press"
+                aria-label="Not a reply"
+                onClick={() => {
+                  setReplyTo(null);
+                  composerRef.current?.focus();
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
           {about && aboutQuote && (
             <div className="chat-about">
               <Quote size={13} />
@@ -1058,42 +1245,64 @@ export function NoteComments({
     <style>{`.rich-text-content span[data-comment-thread="${lit}"]{background:color-mix(in srgb,var(--accent) 24%,transparent);border-bottom-color:var(--accent);border-bottom-style:solid}`}</style>
   );
 
+  const menuLayer = menu && menuMessage && (
+    <PointMenu
+      key={`${menu.x}:${menu.y}`}
+      point={menu}
+      items={menuItems(menuMessage)}
+      close={closeMenu}
+    />
+  );
+
+  const sheet = createPortal(
+    <div className="chat-layer" role="presentation" onContextMenu={onChatContextMenu}>
+      <button
+        type="button"
+        className="chat-scrim"
+        aria-label={isGeneral ? "Close chat" : "Make smaller"}
+        onClick={shrink}
+      />
+      {/* The shadow is drawn by the frame from what the sheet shows,
+          so it follows the surface while it is still changing shape. */}
+      <div className="chat-sheet-frame">
+        <section
+          ref={sheetRef}
+          className="chat chat-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={isGeneral ? "General chat" : "Chat"}
+        >
+          {inner}
+        </section>
+      </div>
+    </div>,
+    document.body,
+  );
+
+  if (isGeneral)
+    return (
+      <>
+        {menuLayer}
+        {sheet}
+      </>
+    );
+
   return (
     <aside
       ref={columnRef}
       className={`note-comments chat ${expanded ? "is-away" : ""}`}
       aria-label="Chat about this note"
+      /* The sheet is portalled, but its events still come through here. */
+      onContextMenu={onChatContextMenu}
     >
       {light}
+      {menuLayer}
       {expanded ? (
         <>
           <header className="chat-header">
             <span className="chat-title">Chat</span>
           </header>
-          {createPortal(
-            <div className="chat-layer" role="presentation">
-              <button
-                type="button"
-                className="chat-scrim"
-                aria-label="Make smaller"
-                onClick={shrink}
-              />
-              {/* The shadow is drawn by the frame from what the sheet shows,
-                  so it follows the surface while it is still changing shape. */}
-              <div className="chat-sheet-frame">
-                <section
-                  ref={sheetRef}
-                  className="chat chat-sheet"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Chat"
-                >
-                  {inner}
-                </section>
-              </div>
-            </div>,
-            document.body,
-          )}
+          {sheet}
         </>
       ) : (
         inner

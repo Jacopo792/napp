@@ -14,6 +14,11 @@ export function subscribeToComments(archiveId: string, onChange: () => void): Re
   return { topic: `remarks:${archiveId}`, stop: () => chatListeners.delete(onChange) };
 }
 
+export function subscribeToArchiveChat(archiveId: string, onChange: () => void): RealtimeChannel {
+  chatListeners.add(onChange);
+  return { topic: `general-chat:${archiveId}`, stop: () => chatListeners.delete(onChange) };
+}
+
 export async function unsubscribeFromArchive(_channel: RealtimeChannel): Promise<void> {
   _channel.stop?.();
 }

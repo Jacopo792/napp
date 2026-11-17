@@ -61,6 +61,33 @@ export function subscribeToComments(archiveId: string, onChange: () => void): Re
     .subscribe();
 }
 
+/** The archive's general chat: its messages and their reactions. */
+export function subscribeToArchiveChat(archiveId: string, onChange: () => void): RealtimeChannel {
+  return supabase
+    .channel(`general-chat:${archiveId}:${++nextSubscription}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "archive_messages",
+        filter: `archive_id=eq.${archiveId}`,
+      },
+      onChange,
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "archive_message_reactions",
+        filter: `archive_id=eq.${archiveId}`,
+      },
+      onChange,
+    )
+    .subscribe();
+}
+
 export async function unsubscribeFromArchive(channel: RealtimeChannel): Promise<void> {
   await supabase.removeChannel(channel);
 }

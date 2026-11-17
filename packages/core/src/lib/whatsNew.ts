@@ -45,6 +45,37 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.66",
+    date: "2026-11-17",
+    headline: "A chat for everyone in the archive",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "General chat",
+            text: "Press the chat in the sidebar to talk with everyone in the archive, or to go to the chats in your notes.",
+            image: "0.9.66-general-chat.jpg",
+          },
+          {
+            title: "Reply, even to yourself",
+            text: "Right-click a message to reply, react, copy, edit or delete it. A reply shows the message it answers.",
+            image: "0.9.66-message-menu.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Steadier messages",
+            text: "Sending, enlarging and editing no longer make messages bounce or jump sideways, and right-clicking a message no longer opens the note's menu.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.64",
     date: "2026-11-17",
     headline: "A conversation beside every note",

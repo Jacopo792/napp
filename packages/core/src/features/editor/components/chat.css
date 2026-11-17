@@ -87,6 +87,9 @@
   flex-direction: column;
   overflow: hidden auto;
   overscroll-behavior: contain;
+  /* Where scroll bars take room, they take it from the start: a bar
+     appearing with the message that overflows shifted every bubble sideways. */
+  scrollbar-gutter: stable;
   padding: 4px 14px 10px;
 }
 
@@ -345,13 +348,58 @@
 }
 
 .chat-edit {
-  min-width: 12rem;
+  /* Edited where it stands, at the size it already is: a fixed minimum made
+     a one-word bubble jump wide the moment Edit was chosen. */
+  field-sizing: content;
+  min-width: 1ch;
+  max-width: 100%;
+  padding: 0;
   resize: none;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   outline: none;
+}
+
+/* The message this one answers, over its words, the way the passage is. */
+.chat-replied {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-self: stretch;
+  border-left: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  padding: 1px 0 1px 8px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.3;
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  white-space: normal;
+  cursor: pointer;
+}
+
+.chat-replied:hover {
+  border-left-color: currentColor;
+  color: inherit;
+}
+
+.chat-replied-name {
+  font-weight: var(--weight-semibold);
+}
+
+.chat-replied-words {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.chat-replying strong {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
 }
 
 /* ── Arriving ──────────────────────────────────────────────────────────────

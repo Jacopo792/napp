@@ -45,6 +45,7 @@ export {
   IconColumns3 as Columns4,
   IconContrast as Contrast,
   IconCopy as Copy,
+  IconArrowBackUp as Reply,
   IconDownload as Download,
   IconEraser as Eraser,
   IconExternalLink as ExternalLink,

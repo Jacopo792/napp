@@ -3,6 +3,28 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.66 – 2026-11-17
+
+### Added
+
+- A general chat for everyone in the archive, opened from the chat in the
+  sidebar beside the chats in notes. Migration `20261117030000` adds
+  `archive_messages` and its reactions, with the note chat's access rules.
+- Replies to a message, your own included. Migration `20261117020000` adds the
+  message a reply answers.
+
+### Changed
+
+- A message's menu (right-click or ⋯) is the app's shared menu: Reply, React,
+  Copy, Edit, Delete or Report.
+
+### Fixed
+
+- Right-clicking in the chat opened the note's menu.
+- Sent messages could appear twice and bounce when realtime answered first;
+  enlarging the chat replayed every arrival; editing widened the bubble; a
+  scroll bar appearing shifted every message.
+
 ## 0.9.65 – 2026-11-17
 
 ### Fixed

@@ -18,6 +18,8 @@ export interface NoteComment {
   assigneeId: string | null;
   /** The bubble its author sent it in (`chatBubbles.ts`); absent is plain. */
   bubble?: string | null;
+  /** The message this one answers, if it answers one. */
+  replyTo?: string | null;
 }
 
 /** Somebody answering a remark without words. */
@@ -52,6 +54,7 @@ export interface CommentRow {
   mentions?: string[] | null;
   assignee_id?: string | null;
   bubble?: string | null;
+  reply_to?: string | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -64,6 +67,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   mentions: row.mentions ?? [],
   assigneeId: row.assignee_id ?? null,
   bubble: row.bubble ?? null,
+  replyTo: row.reply_to ?? null,
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening

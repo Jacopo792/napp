@@ -228,6 +228,12 @@ type SheetEntry =
 const NoteEditor = lazy(() =>
   import("@/features/editor/components/NoteEditor").then((m) => ({ default: m.NoteEditor })),
 );
+/* The archive's general chat: the note chat with no note under it. */
+const GeneralChat = lazy(() =>
+  import("@/features/editor/components/NoteComments").then((m) => ({ default: m.NoteComments })),
+);
+const NO_QUOTES = new Map<string, string>();
+const nothing = () => undefined;
 
 /* How long a press has to be held before it stops being a press and becomes a
    question. Long enough not to fire on a slow tap, short enough that nobody
@@ -2722,6 +2728,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Who may sign a remark: the archive's own roster, with the avatars already
      resolved for the sidebar. Comments name people, and a comment from "an id"
      is not a conversation. */
+  /** The general chat while it is open, and where it was opened from. */
+  const [generalChat, setGeneralChat] = useState<{ origin: DOMRect } | null>(null);
+  const closeGeneralChat = useCallback(() => setGeneralChat(null), []);
   const commentAuthors = useMemo(
     () =>
       new Map(
@@ -3601,6 +3610,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         setFoldersOpen(false);
         setSettingsOpen(true);
       }}
+      onGeneralChat={
+        session
+          ? (origin) => {
+              setFoldersOpen(false);
+              setGeneralChat({ origin });
+            }
+          : undefined
+      }
       onLock={() => void handleLock()}
       accountEmail={session?.email ?? ""}
       accounts={() => (session ? otherAccounts(session.userId) : [])}
@@ -3706,6 +3723,26 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         kind={docMode ? "document" : "notes"}
         onClose={() => setShortcutsOpen(false)}
       />
+      {generalChat && session && (
+        <Suspense fallback={null}>
+          <GeneralChat
+            key={session.archiveId}
+            session={session}
+            noteId={session.archiveId}
+            general={generalChat}
+            canEdit={canWriteArchive}
+            authors={commentAuthors}
+            quotes={NO_QUOTES}
+            pendingThread={null}
+            onPendingHandled={nothing}
+            focusThread={null}
+            onFocusHandled={nothing}
+            onClose={closeGeneralChat}
+            onReveal={nothing}
+            onRemoveAnchor={nothing}
+          />
+        </Suspense>
+      )}
     </>
   );
 
