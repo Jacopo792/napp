@@ -16,14 +16,20 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     await page.getByRole("menuitem", { name: "Tesi — Plotino", exact: true }).click();
     const editor = page.locator(".tiptap[contenteditable=true]");
     await expect(editor).toBeVisible();
+    await expect(page.locator(".book-view-switch button")).toHaveCount(2);
+    await expect(editor).toContainText("Enneadi");
     const original = await editor.innerText();
     // Native/browser input waits for animations. Dispatch directly to exercise
     // repeated requests before a previous view transition has finished.
     await page.evaluate(async () => {
       for (let i = 0; i < 10; i++) {
-        (document.querySelectorAll(".book-view-switch button")[1] as HTMLButtonElement).click();
+        (
+          document.querySelectorAll(".book-view-switch button")[1] as HTMLButtonElement | undefined
+        )?.click();
         await new Promise((resolve) => setTimeout(resolve, 20));
-        (document.querySelectorAll(".book-view-switch button")[0] as HTMLButtonElement).click();
+        (
+          document.querySelectorAll(".book-view-switch button")[0] as HTMLButtonElement | undefined
+        )?.click();
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
     });
