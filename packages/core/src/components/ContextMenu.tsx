@@ -126,12 +126,14 @@ export function PointMenu({
   point,
   items,
   close,
+  native = true,
 }: {
   point: MenuPoint;
   items: MenuItem[];
   close: () => void;
+  native?: boolean;
 }) {
-  const taken = useSystemMenu(items, close);
+  const taken = useSystemMenu(items, close, native);
   if (taken) return null;
   return (
     <ContextMenu point={point} onClose={close}>

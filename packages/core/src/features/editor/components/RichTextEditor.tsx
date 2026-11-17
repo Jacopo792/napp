@@ -8,6 +8,7 @@ import {
   Lock,
   LockOpen,
   MessageSquarePlus,
+  MessagesSquare,
   NotebookPen,
 } from "@/components/icons";
 import { commentQuotes } from "@/features/editor/lib/commentAnchors";
@@ -126,6 +127,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       onOpenLink,
       onComment,
       onContinueAsNote,
+      onDiscuss,
       writeLockOwner = null,
       saidThreads,
       notes,
@@ -927,7 +929,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                 if (selection.empty) return false;
                 /* A document formats from its bar, so the bubble keeps only
                  what the bar does not carry: the remark and the lock. */
-                if (manuscript && !onComment && !onContinueAsNote && !writeLockOwner) return false;
+                if (manuscript && !onComment && !onContinueAsNote && !onDiscuss && !writeLockOwner)
+                  return false;
                 return !(
                   selection instanceof NodeSelection &&
                   ["privateImage", "privateFile", "drawing"].includes(selection.node.type.name)
@@ -1039,9 +1042,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                       })()}
                     </>
                   )}
-                  {!manuscript && (onComment || onContinueAsNote || writeLockOwner) && (
-                    <span className="menu-separator rich-bubble-separator" />
-                  )}
+                  {!manuscript &&
+                    (onComment || onDiscuss || onContinueAsNote || writeLockOwner) && (
+                      <span className="menu-separator rich-bubble-separator" />
+                    )}
                   {onComment && (
                     <button
                       type="button"
@@ -1057,6 +1061,26 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                       <MessageSquarePlus size={16} />
                     </button>
                   )}
+                  {onDiscuss && (
+                    <button
+                      type="button"
+                      className="toolbar-button press"
+                      aria-label="Discuss in chat"
+                      title="Discuss in chat"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        const { from, to } = editor.state.selection;
+                        const quote = editor.state.doc.textBetween(from, to, " ", " ").trim();
+                        if (!quote) return;
+                        const range = window.getSelection()?.rangeCount
+                          ? window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+                          : null;
+                        onDiscuss(quote, range);
+                      }}
+                    >
+                      <MessagesSquare size={16} />
+                    </button>
+                  )}
                   {onContinueAsNote && (
                     <button
                       type="button"
@@ -1066,7 +1090,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
                         const { from, to } = editor.state.selection;
-                        const quote = editor.state.doc.textBetween(from, to, " ").trim();
+                        const quote = editor.state.doc.textBetween(from, to, " ", " ").trim();
                         if (quote) onContinueAsNote(quote);
                       }}
                     >

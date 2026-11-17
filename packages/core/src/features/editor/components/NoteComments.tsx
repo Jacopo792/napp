@@ -24,7 +24,7 @@ import {
   Flag,
   Maximize2,
   Minimize2,
-  MoreHorizontal,
+  NotebookText,
   Pencil,
   Quote,
   Reply,
@@ -59,7 +59,7 @@ import {
   type Reaction,
   updateComment,
 } from "@/lib/comments";
-import { mentionQuery, mentionedIn, tally } from "@/lib/commentThreads";
+import { mentionQuery, mentionedIn, noteQuery, tally, type NoteRef } from "@/lib/commentThreads";
 import { EASE, EASE_OUT, OVERLAY_OUT, SHAPE } from "@/lib/motion";
 import type { AppSession } from "@/lib/session";
 import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
@@ -111,7 +111,15 @@ interface Props {
   onChanged?: () => void;
   /** Somebody else's message arrived and was seen arriving. */
   onRead?: () => void;
+  /** General chat: the notes "#" can name. */
+  notes?: { id: string; title: string }[];
+  /** General chat: a passage brought over from a note to be talked about. */
+  quoteDraft?: NoteRef | null;
+  /** General chat: go to a note a message talks about. */
+  onOpenNote?: (ref: NoteRef) => void;
 }
+
+const titled = (title: string) => title.trim() || "Untitled";
 
 /** A message on its way: shown at once, replaced by the saved row. */
 interface ChatMessage extends NoteComment {
@@ -164,6 +172,9 @@ export function NoteComments({
   onRemoveAnchor,
   onChanged,
   onRead,
+  notes,
+  quoteDraft,
+  onOpenNote,
 }: Props) {
   const { chatBubble: myBubble, quickReactions } = useWritingPreferences();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -188,6 +199,10 @@ export function NoteComments({
   const [picking, setPicking] = useState(false);
   const [reporting, setReporting] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<string | null>(null);
+  /** General chat: the passage the next message quotes, and the notes it names. */
+  const [quoted, setQuoted] = useState<NoteRef | null>(quoteDraft ?? null);
+  const [noteChips, setNoteChips] = useState<NoteRef[]>([]);
+  const [findingNote, setFindingNote] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(Boolean(general));
   /** What the calls below read and write: a note's chat, or (null) the
    *  archive's general one. */
@@ -244,8 +259,10 @@ export function NoteComments({
     if (first) rows.forEach((row) => settled.current.add(row.id));
     if (fresh.length > 0) {
       setArrived((current) => new Set([...current, ...fresh.map((r) => r.id)]));
-      readRef.current?.();
     }
+    /* Opening the chat is reading it, not only a message arriving while it
+       is open: a note already selected never passes through the list again. */
+    if (first || fresh.length > 0) readRef.current?.();
     setMessages((current) => {
       /* Realtime can announce your own message before the insert has
          answered. The saved row takes the place of the bubble already on its
@@ -454,6 +471,15 @@ export function NoteComments({
       assigneeId: null,
       bubble: myBubble,
       replyTo: replyTo && messages.some((m) => m.id === replyTo) ? replyTo : null,
+      /* Only the notes still named in the words: a chip deleted while
+         writing is not something the message is about. */
+      refs: [
+        ...(quoted ? [quoted] : []),
+        ...noteChips.filter(
+          (ref, at, all) =>
+            body.includes(`#${ref.title}`) && all.findIndex((one) => one.note === ref.note) === at,
+        ),
+      ].slice(0, 8),
     };
     setMessages((current) =>
       retry
@@ -466,6 +492,9 @@ export function NoteComments({
       if (threadId === pendingThread) onPendingHandled();
       setAbout(null);
       setReplyTo(null);
+      setQuoted(null);
+      setNoteChips([]);
+      setFindingNote(null);
     }
     try {
       const saved = await addComment(
@@ -477,6 +506,7 @@ export function NoteComments({
         null,
         local.bubble ?? null,
         local.replyTo ?? null,
+        local.refs ?? [],
       );
       /* Realtime may have put it in place already, under this same key. */
       keys.current.set(saved.id, local.id);
@@ -585,23 +615,79 @@ export function NoteComments({
 
   function words(message: ChatMessage) {
     const named = members.filter((member) => message.mentions.includes(member.userId));
-    if (named.length === 0) return message.body;
+    const chips = (message.refs ?? []).filter((ref) => !ref.quote && ref.title);
+    const tokens = [
+      ...named.map((member) => `@${member.name}`),
+      ...chips.map((ref) => `#${ref.title}`),
+    ];
+    if (tokens.length === 0) return message.body;
     const pattern = new RegExp(
-      `(@(?:${named
-        .map((member) => member.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      `(${tokens
         .sort((a, b) => b.length - a.length)
-        .join("|")}))`,
+        .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("|")})`,
       "giu",
     );
-    return message.body.split(pattern).map((part, index) =>
-      index % 2 === 1 ? (
-        <span key={index} className="chat-mention">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
-    );
+    return message.body.split(pattern).map((part, index) => {
+      if (index % 2 === 0) return part;
+      const chip =
+        part.startsWith("#") &&
+        chips.find((ref) => `#${ref.title}`.toLocaleLowerCase() === part.toLocaleLowerCase());
+      if (!chip)
+        return (
+          <span key={index} className="chat-mention">
+            {part}
+          </span>
+        );
+      return (
+        <button
+          key={index}
+          type="button"
+          className="chat-note-chip press"
+          title={`Open ${titled(chip.title)}`}
+          onClick={() => openNote(chip)}
+        >
+          <NotebookText size={12} />
+          {part.slice(1)}
+        </button>
+      );
+    });
+  }
+
+  /** A note a message talks about is still there to go to. */
+  const reachable = (ref: NoteRef) => !notes || notes.some((note) => note.id === ref.note);
+
+  /** To the note, and the sheet back where it came from while it opens. */
+  function openNote(ref: NoteRef) {
+    if (!onOpenNote || !reachable(ref)) return;
+    onOpenNote(ref);
+    if (isGeneral) shrink();
+  }
+
+  /* ── Naming notes ──────────────────────────────────────────────────── */
+
+  const offeredNotes = useMemo(() => {
+    if (findingNote === null || !notes) return [];
+    const wanted = findingNote.toLocaleLowerCase();
+    return notes
+      .filter((note) => note.title.trim() && note.title.toLocaleLowerCase().includes(wanted))
+      .slice(0, 5);
+  }, [findingNote, notes]);
+
+  function pickNote(note: { id: string; title: string }) {
+    const field = composerRef.current;
+    const caret = field?.selectionStart ?? draft.length;
+    const start = draft.slice(0, caret).lastIndexOf("#");
+    if (start < 0) return;
+    const title = note.title.trim();
+    const next = `${draft.slice(0, start)}#${title} ${draft.slice(caret)}`;
+    setDraft(next);
+    setNoteChips((current) => [...current, { note: note.id, title }]);
+    setFindingNote(null);
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(start + title.length + 2, start + title.length + 2);
+    });
   }
 
   /* ── Enlarging ─────────────────────────────────────────────────────── */
@@ -625,6 +711,28 @@ export function NoteComments({
     const sheet = sheetRef.current;
     const start = from.current;
     if (!expanded || !sheet || !start || reduced()) return;
+    if (isGeneral) {
+      /* The general chat zooms out of the control or passage that asked for
+         it. Scale and opacity only, on the frame that carries the shadow: the
+         compositor runs them, where an animated clip repainted the whole
+         sheet every frame and stuttered in the desktop app's window. */
+      const frame = sheet.parentElement;
+      if (!frame) return;
+      const box = frame.getBoundingClientRect();
+      frame.style.transformOrigin = `${start.left + start.width / 2 - box.left}px ${
+        start.top + start.height / 2 - box.top
+      }px`;
+      frame.animate(
+        [
+          { transform: "scale(0.6)", opacity: 0 },
+          { opacity: 1, offset: 0.3 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: SHAPE, easing: EASE },
+      );
+      composerRef.current?.focus();
+      return;
+    }
     const inset = clipTo(start, sheet.getBoundingClientRect());
     sheet.animate([{ clipPath: inset }, { clipPath: "inset(0px round 16px)" }], {
       duration: SHAPE,
@@ -638,7 +746,7 @@ export function NoteComments({
       { duration: 260, delay: 150, easing: EASE_OUT, fill: "backwards" },
     );
     composerRef.current?.focus();
-  }, [expanded]);
+  }, [expanded, isGeneral]);
 
   const shrink = useCallback(() => {
     const sheet = sheetRef.current;
@@ -647,8 +755,27 @@ export function NoteComments({
     const done = isGeneral ? () => closeRef.current() : () => setExpanded(false);
     const end = isGeneral ? origin : columnRef.current?.getBoundingClientRect();
     if (!sheet || !end || reduced()) return done();
+    const layer = sheet.closest(".chat-layer");
+    layer?.classList.add("is-closing");
+    if (isGeneral && sheet.parentElement) {
+      /* Back into where it came from, whole: the words go with the surface,
+         so it never shrinks as an empty box. The scrim keeps its time. */
+      const away = { duration: SHAPE * 0.6, easing: OVERLAY_OUT.easing, fill: "forwards" } as const;
+      layer?.querySelector(".chat-scrim")?.animate([{ opacity: 1 }, { opacity: 0 }], away);
+      sheet.parentElement
+        .animate(
+          [
+            { transform: "none", opacity: 1 },
+            { opacity: 1, offset: 0.5 },
+            { transform: "scale(0.6)", opacity: 0 },
+          ],
+          away,
+        )
+        .finished.then(done)
+        .catch(done);
+      return;
+    }
     const inset = clipTo(end, sheet.getBoundingClientRect());
-    sheet.closest(".chat-layer")?.classList.add("is-closing");
     sheet.querySelector(".chat-inner")?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: OVERLAY_OUT.duration,
       easing: OVERLAY_OUT.easing,
@@ -886,6 +1013,24 @@ export function NoteComments({
                     <span className="chat-replied-words">{answered.body}</span>
                   </button>
                 )}
+                {m.refs
+                  ?.filter((ref) => ref.quote)
+                  .map((ref) => (
+                    <button
+                      key={`${ref.note}:${ref.quote}`}
+                      type="button"
+                      className="chat-note-quote"
+                      title={`Show in ${titled(ref.title)}`}
+                      onClick={() => openNote(ref)}
+                      aria-disabled={!reachable(ref) || undefined}
+                    >
+                      <span className="chat-note-quote-title">
+                        <NotebookText size={12} />
+                        {titled(ref.title)}
+                      </span>
+                      <span className="chat-note-quote-words">{ref.quote}</span>
+                    </button>
+                  ))}
                 {showQuote && (
                   <button
                     type="button"
@@ -950,22 +1095,17 @@ export function NoteComments({
                       <Smile size={15} />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="chat-tool press"
-                    aria-label="More"
-                    title="More"
-                    aria-haspopup="menu"
-                    aria-expanded={menuFor === m.id}
-                    onClick={(event) => {
-                      if (menuFor === m.id) return closeMenu();
-                      /* Under the button, the way a right-click opens it. */
-                      const at = event.currentTarget.getBoundingClientRect();
-                      openMenu(m, { x: at.left, y: at.bottom + 4 });
-                    }}
-                  >
-                    <MoreHorizontal size={15} />
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="chat-tool press"
+                      aria-label={m.authorId === session.userId ? "Reply to yourself" : "Reply"}
+                      title="Reply"
+                      onClick={() => replyToMessage(m)}
+                    >
+                      <Reply size={15} />
+                    </button>
+                  )}
                 </div>
                 {reporting === m.id && (
                   <div
@@ -1166,6 +1306,45 @@ export function NoteComments({
               </button>
             </div>
           )}
+          {quoted && (
+            <div className="chat-about chat-about-note">
+              <NotebookText size={13} />
+              <span className="chat-about-words">
+                <strong>{titled(quoted.title)}</strong> {quoted.quote}
+              </span>
+              <button
+                type="button"
+                className="chat-tool press"
+                aria-label="Not about this passage"
+                onClick={() => {
+                  setQuoted(null);
+                  composerRef.current?.focus();
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          {offeredNotes.length > 0 && (
+            <div className="chat-suggestions popover" role="listbox" aria-label="Notes">
+              {offeredNotes.map((note, index) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  role="option"
+                  aria-selected={index === 0}
+                  className="menu-row press"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    pickNote(note);
+                  }}
+                >
+                  <NotebookText size={16} />
+                  <span className="chat-suggestion-title">{note.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {offered.length > 0 && (
             <div className="chat-suggestions popover" role="listbox">
               {offered.map((member, index) => (
@@ -1196,9 +1375,21 @@ export function NoteComments({
                 aria-label="Message"
                 onChange={(event) => {
                   setDraft(event.target.value);
-                  setSuggesting(mentionQuery(event.target.value, event.target.selectionStart ?? 0));
+                  const caret = event.target.selectionStart ?? 0;
+                  setSuggesting(mentionQuery(event.target.value, caret));
+                  if (notes) setFindingNote(noteQuery(event.target.value, caret));
                 }}
                 onKeyDown={(event) => {
+                  if (offeredNotes.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
+                    event.preventDefault();
+                    pickNote(offeredNotes[0]!);
+                    return;
+                  }
+                  if (event.key === "Escape" && findingNote !== null) {
+                    event.stopPropagation();
+                    setFindingNote(null);
+                    return;
+                  }
                   if (offered.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
                     event.preventDefault();
                     pickMention(offered[0]!.name);

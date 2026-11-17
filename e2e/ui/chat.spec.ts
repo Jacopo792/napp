@@ -33,8 +33,11 @@ test("chat keeps sent messages, receives replies, and edits without losing the c
   await expect(sent).toHaveCount(1);
   await expect(sent).not.toHaveClass(/is-sending|is-failed/);
   await expect(chat.locator(".chat-row").filter({ hasText: "Ok!" })).toBeVisible();
+  /* Hovering offers the answer; the whole menu is a right-click. */
   await sent.hover();
-  await sent.getByRole("button", { name: "More", exact: true }).click();
+  await expect(sent.getByRole("button", { name: "Reply to yourself", exact: true })).toBeVisible();
+  await expect(sent.getByRole("button", { name: "More", exact: true })).toHaveCount(0);
+  await sent.locator(".chat-bubble-body").click({ button: "right" });
   /* The message's menu is the app's menu, portalled like every other. */
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await sent

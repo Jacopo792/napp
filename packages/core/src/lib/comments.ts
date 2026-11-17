@@ -17,12 +17,14 @@ import {
   type Reaction,
   type CommentRow,
   type NoteComment,
+  type NoteRef,
 } from "./commentThreads";
 
 export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
 export type {
   ArchiveComment,
   NoteComment,
+  NoteRef,
   CommentThread,
   Reaction,
   RemarksSeen,
@@ -34,7 +36,7 @@ const COLUMNS =
 /* The archive's general chat is the same conversation with no note under it:
    its own tables (`archive_messages`), read here through the same calls with
    `noteId` null, and shaped into the same rows. Its thread is the archive. */
-const GENERAL_COLUMNS = "id, author_id, body, created_at, mentions, bubble, reply_to";
+const GENERAL_COLUMNS = "id, author_id, body, created_at, mentions, bubble, reply_to, refs";
 
 type GeneralRow = Omit<CommentRow, "thread_id" | "resolved_at" | "assignee_id">;
 
@@ -88,6 +90,8 @@ export async function addComment(
   assigneeId: string | null = null,
   bubble: string | null = null,
   replyTo: string | null = null,
+  /** For the general chat only: the notes the message is about. */
+  refs: NoteRef[] = [],
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed) throw new Error("A comment needs something in it");
@@ -101,6 +105,7 @@ export async function addComment(
         mentions,
         bubble,
         reply_to: replyTo,
+        refs,
       })
       .select(GENERAL_COLUMNS)
       .single();

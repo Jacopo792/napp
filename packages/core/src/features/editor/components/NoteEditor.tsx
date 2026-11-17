@@ -17,7 +17,7 @@ import {
   BookOpen,
 } from "@/components/icons";
 import { countWords } from "@/lib/format";
-import { loadThreadIds } from "@/lib/comments";
+import { loadThreadIds, type NoteRef } from "@/lib/comments";
 import { PointMenu } from "@/components/ContextMenu";
 import { Exits } from "@/components/Exits";
 import type { MenuPoint } from "@/lib/contextMenu";
@@ -256,6 +256,8 @@ interface Props {
   onOpenNote?: (noteId: string, passage?: string) => void;
   /** Start a note from the chosen words of this chapter. Book only. */
   onContinueAsNote?: (quote: string) => void;
+  /** Talk about chosen words in the archive's general chat. */
+  onDiscussInChat?: (ref: NoteRef, at: DOMRect | null) => void;
   /** A remark was added, resolved or deleted here. */
   onRemarksChanged?: () => void;
   /** Messages on this note were read as they arrived, with the chat open. */
@@ -379,6 +381,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onRemarksRead,
     saidThreads,
     onContinueAsNote,
+    onDiscussInChat,
     manuscript,
   },
   ref,
@@ -1048,6 +1051,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
 
   const canComment = Boolean(session && commentAuthors && canEdit);
 
+  /** The chosen words, carried to the general chat with the note they are from. */
+  const discuss =
+    onDiscussInChat && !manuscript && entry
+      ? (quote: string, at: DOMRect | null) =>
+          onDiscussInChat(
+            { note: entry.note.id, title: entry.note.title, quote: quote.slice(0, 600) },
+            at,
+          )
+      : undefined;
+
   function startComment() {
     const threadId = crypto.randomUUID();
     /* A second selection replaces a pending thread that never got a remark;
@@ -1064,7 +1077,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      Without a selection the system's own menu stays — spelling, paste —
      because there is nothing for a comment to be about. */
   const onPassageMenu = (event: ReactMouseEvent) => {
-    if (!canComment && !onContinueAsNote && !canEdit) return;
+    if (!canComment && !onContinueAsNote && !discuss && !canEdit) return;
     const chosen = window.getSelection();
     if ((!chosen || chosen.isCollapsed || !chosen.toString().trim()) && !canEdit) return;
     if (!(event.target as HTMLElement).closest(".rich-text-content")) return;
@@ -1108,6 +1121,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             label: "Comment",
             icon: <MessageSquarePlus size={16} />,
             run: startComment,
+          },
+        ]
+      : []),
+    ...(discuss && passageHasSelection
+      ? [
+          {
+            kind: "item" as const,
+            id: "discuss",
+            label: "Discuss in chat",
+            icon: <MessagesSquare size={16} />,
+            run: () => {
+              const chosen = window.getSelection();
+              const quote = chosen?.toString().trim();
+              if (quote)
+                discuss(
+                  quote,
+                  chosen?.rangeCount ? chosen.getRangeAt(0).getBoundingClientRect() : null,
+                );
+            },
           },
         ]
       : []),
@@ -1535,6 +1567,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                   onOpenLink={openLinkForm}
                   onComment={canComment ? startComment : undefined}
                   onContinueAsNote={onContinueAsNote}
+                  onDiscuss={discuss}
                   writeLockOwner={canEdit && session ? session.userId : null}
                   saidThreads={knownThreads}
                   mobile={mobile}
@@ -1873,6 +1906,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
                 onOpenLink={openLinkForm}
                 onComment={canComment ? startComment : undefined}
                 onContinueAsNote={onContinueAsNote}
+                onDiscuss={discuss}
                 /* Locking a passage is the smaller half of locking the note,
                    and it is offered on the same terms: only where this account
                    may write at all. */

@@ -9,8 +9,8 @@ import { forSystem, findItem, type MenuItem } from "@/lib/menuShape";
  *  The items are read through a ref rather than closed over, so that a save
  *  landing while the menu is open does not pop a second one on the re-render
  *  that follows. It opens once, when it opens. */
-export function useSystemMenu(items: MenuItem[], close: () => void): boolean {
-  const popUp = platform().popUpMenu;
+export function useSystemMenu(items: MenuItem[], close: () => void, enabled = true): boolean {
+  const popUp = enabled ? platform().popUpMenu : undefined;
   const latest = useRef({ items, close });
   latest.current = { items, close };
 

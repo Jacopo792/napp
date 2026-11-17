@@ -3,14 +3,20 @@
    as the tab, like everything else in the preview. */
 import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
-import type { ArchiveComment, NoteComment, Reaction } from "@/lib/commentThreads";
+import type { ArchiveComment, NoteComment, NoteRef, Reaction } from "@/lib/commentThreads";
 
 export {
   notesWithOpenRemarks,
   threadsOf,
   unreadRemarks,
 } from "@/lib/commentThreads";
-export type { ArchiveComment, NoteComment, CommentThread, Reaction } from "@/lib/commentThreads";
+export type {
+  ArchiveComment,
+  NoteComment,
+  NoteRef,
+  CommentThread,
+  Reaction,
+} from "@/lib/commentThreads";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Keyed by note; `null` is the archive's general chat. */
@@ -117,6 +123,7 @@ export async function addComment(
   assigneeId: string | null = null,
   bubble: string | null = null,
   replyTo: string | null = null,
+  refs: NoteRef[] = [],
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
@@ -130,6 +137,7 @@ export async function addComment(
     assigneeId,
     bubble,
     replyTo,
+    refs,
   };
   store.set(noteId, [...(store.get(noteId) ?? []), saved]);
   archiveOf.set(noteId, session.archiveId);

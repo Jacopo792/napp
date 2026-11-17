@@ -52,9 +52,17 @@ export function useArchiveRemarks(
      this browser: it is a thing the person did, and a badge that says "unread"
      for every conversation already read on the other device is a badge nobody
      can clear. The caller pushes it with the account preferences. */
+  const commentsRef = useRef(archiveComments);
+  commentsRef.current = archiveComments;
   const markRemarksSeen = useCallback(
     (noteId: string) => {
-      setRemarksSeen((current) => ({ ...current, [noteId]: new Date().toISOString() }));
+      /* Past the newest remark on the note as well as now: a clock running
+         behind the server's would otherwise leave what was just read unread. */
+      const newest = commentsRef.current
+        .filter((comment) => comment.noteId === noteId)
+        .reduce((latest, comment) => Math.max(latest, Date.parse(comment.createdAt) + 1), 0);
+      const at = new Date(Math.max(Date.now(), newest)).toISOString();
+      setRemarksSeen((current) => ({ ...current, [noteId]: at }));
     },
     [setRemarksSeen],
   );

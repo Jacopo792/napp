@@ -4,6 +4,7 @@ import {
   isForYou,
   mentionQuery,
   mentionedIn,
+  noteQuery,
   notesWithOpenRemarks,
   tally,
   threadsOf,
@@ -168,4 +169,27 @@ test("reactions are counted per emoji, in the offered order, with your own marke
     { emoji: "👍", count: 2, mine: true },
     { emoji: "✅", count: 1, mine: true },
   ]);
+});
+
+test("a # at the caret asks for a note by title, spaces and all", () => {
+  assert.equal(noteQuery("look at #Kor", 12), "Kor");
+  assert.equal(noteQuery("#Korean conglo", 14), "Korean conglo");
+  assert.equal(noteQuery("look at #", 9), "");
+  /* A space at the end closes the question, so a picked title stops asking. */
+  assert.equal(noteQuery("look at #Korean ", 16), null);
+  assert.equal(noteQuery("issue#3", 7), null);
+  assert.equal(noteQuery("no hash here", 12), null);
+});
+
+test("opening a note reads what was said on it, even ahead of this clock", () => {
+  const rows: ArchiveComment[] = [
+    {
+      ...comment({ id: "a", authorId: "them", createdAt: "2026-11-17T15:42:00.123456+00:00" }),
+      noteId: "n",
+    },
+  ];
+  /* The line is drawn past the newest remark, as markRemarksSeen does. */
+  const seen = new Date(Date.parse(rows[0]!.createdAt) + 1).toISOString();
+  assert.deepEqual(unreadRemarks(rows, "me", { n: seen }), []);
+  assert.equal(unreadRemarks(rows, "me", {}).length, 1);
 });

@@ -79,6 +79,27 @@ export const SETTINGS_SECTIONS = [
         documentKeywords: "colour color tint highlight icon style material translucency",
       },
       {
+        id: "shortcuts",
+        tone: "gray",
+        name: "Shortcuts",
+        icon: <Keyboard size={16} />,
+        keywords: "keyboard keys",
+      },
+    ],
+  },
+  {
+    group: "Notes and chat",
+    documentGroup: "Document and chat",
+    items: [
+      {
+        id: "chat",
+        tone: "pink",
+        name: "Chat",
+        icon: <MessagesSquare size={16} />,
+        keywords:
+          "chat messages comments bubble animal cat frog bunny bear penguin fox panda duck axolotl quick reactions emoji",
+      },
+      {
         id: "reading",
         tone: "orange",
         name: "Reading",
@@ -104,21 +125,6 @@ export const SETTINGS_SECTIONS = [
           "proofreading spelling correct as I type autocorrect words you kept live presence",
         documentKeywords:
           "proofreading spelling correct as I type autocorrect words you kept live presence statistics words today session",
-      },
-      {
-        id: "chat",
-        tone: "pink",
-        name: "Chat",
-        icon: <MessagesSquare size={16} />,
-        keywords:
-          "chat messages comments bubble animal cat frog bunny bear penguin fox panda duck axolotl quick reactions emoji",
-      },
-      {
-        id: "shortcuts",
-        tone: "gray",
-        name: "Shortcuts",
-        icon: <Keyboard size={16} />,
-        keywords: "keyboard keys",
       },
     ],
   },

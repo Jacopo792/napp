@@ -3,6 +3,27 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.69 – 2026-11-17
+
+### Added
+
+- The general chat can talk about notes: "Discuss in chat" brings a selected
+  passage in as a quote, and `#` names a note as a chip. Either one opens the
+  note and shows the passage. Migration `20261117040000` adds
+  `archive_messages.refs`, limited to notes of the same archive and fixed when
+  a message is edited.
+- Hovering over a message shows Reply. The full menu is on right-click.
+- Settings groups Chat, Reading and Writing under "Notes and chat" ("Document
+  and chat" in document archives).
+
+### Fixed
+
+- Opening a note's chat now clears its unread badge.
+- The general chat opens and closes by scaling from where it was opened
+  instead of animating a clip-path.
+- The rail's chat and account menus use the in-app menu in the desktop app,
+  where the native menu did not always open.
+
 ## 0.9.68 – 2026-11-17
 
 ### Fixed

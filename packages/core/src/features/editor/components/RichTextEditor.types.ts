@@ -108,6 +108,9 @@ export interface RichTextEditorProps {
   onOpenNote?: (noteId: string, passage?: string) => void;
   /** Offered on chosen words in a book: carry them into a new note. */
   onContinueAsNote?: (quote: string) => void;
+  /** Offered on chosen words: talk about them in the general chat, which
+   *  grows out of `at`, where they are. */
+  onDiscuss?: (quote: string, at: DOMRect | null) => void;
   /** Clicking the underlined passage opens the conversation about it. */
   onOpenComment?: (threadId: string) => void;
   /** Open a comment on whatever is selected. Absent when the note cannot be

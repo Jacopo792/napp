@@ -827,6 +827,7 @@ export function Sidebar({
       {accountMenu && (
         <PointMenu
           point={accountMenu}
+          native={false}
           items={accountMenu.items}
           close={() => setAccountMenu(null)}
         />

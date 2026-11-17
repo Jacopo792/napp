@@ -45,6 +45,45 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.69",
+    date: "2026-11-17",
+    headline: "Talk about your notes in the general chat",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Quote a passage, name a note",
+            text: "Select words in a note and press Discuss in chat to bring them into the general chat, or type # to name a note. Press either one to open the note.",
+            image: "0.9.69-note-quote.jpg",
+          },
+          {
+            title: "Reply on hover",
+            text: "Pointing at a message shows Reply beside the reactions. Right-click for everything else.",
+          },
+          {
+            title: "Notes and chat in Settings",
+            text: "Chat, Reading and Writing now sit together in one group.",
+            image: "0.9.69-notes-and-chat.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Unread clears when you read",
+            text: "Opening a note's chat now clears its unread count in the sidebar.",
+          },
+          {
+            title: "A smoother general chat",
+            text: "The general chat now grows from where you opened it and shrinks back into it, without stuttering in the desktop app.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.66",
     date: "2026-11-17",
     headline: "A chat for everyone in the archive",

@@ -20,6 +20,16 @@ export interface NoteComment {
   bubble?: string | null;
   /** The message this one answers, if it answers one. */
   replyTo?: string | null;
+  /** The notes a general-chat message is about: quoted from, or named with #. */
+  refs?: NoteRef[];
+}
+
+/** A note a general-chat message talks about, as it was when sent: its title,
+ *  and for a quoted passage the words quoted. */
+export interface NoteRef {
+  note: string;
+  title: string;
+  quote?: string;
 }
 
 /** Somebody answering a remark without words. */
@@ -55,6 +65,7 @@ export interface CommentRow {
   assignee_id?: string | null;
   bubble?: string | null;
   reply_to?: string | null;
+  refs?: NoteRef[] | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -68,6 +79,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   assigneeId: row.assignee_id ?? null,
   bubble: row.bubble ?? null,
   replyTo: row.reply_to ?? null,
+  refs: row.refs ?? [],
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening
@@ -164,6 +176,15 @@ export function mentionedIn(body: string, members: { userId: string; name: strin
     }
   }
   return members.filter(({ userId }) => named.has(userId)).map(({ userId }) => userId);
+}
+
+/** The note title being typed after a # at the caret, or null — what the
+ *  general chat's note suggestions are filtered by. Titles have spaces, so a
+ *  space inside is allowed; one at the end closes the question. */
+export function noteQuery(text: string, caret: number): string | null {
+  const match = /(?:^|\s)#([^#\n]{0,40})$/u.exec(text.slice(0, caret));
+  if (!match || /\s$/u.test(match[1]!)) return null;
+  return match[1]!;
 }
 
 /** The name being typed after an @ at the caret, or null — what the

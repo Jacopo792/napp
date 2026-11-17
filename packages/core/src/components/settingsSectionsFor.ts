@@ -13,7 +13,7 @@ type SectionItem = (typeof SETTINGS_SECTIONS)[number]["items"][number] & {
  *  that find each one there. */
 export function settingsSectionsFor(kind: ArchiveKind, usageAdministrator = false) {
   return SETTINGS_SECTIONS.map((group) => ({
-    group: group.group,
+    group: (kind === "document" && "documentGroup" in group && group.documentGroup) || group.group,
     items: (group.items as readonly SectionItem[])
       .filter(
         (item) => (!item.only || item.only === kind) && (!item.adminOnly || usageAdministrator),

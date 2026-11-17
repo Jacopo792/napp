@@ -75,7 +75,7 @@ import { useAutoLock } from "@/lib/autoLock";
 import { acquireAvatarUrl, invalidateAvatarUrl } from "@/lib/avatarCache";
 import { captureNote, takeCapture } from "@/lib/capture";
 import { useCollaborationPeers, useCollaborativeNote, wakeCollaboration } from "@/lib/collab";
-import type { RemarksSeen } from "@/lib/comments";
+import type { NoteRef, RemarksSeen } from "@/lib/comments";
 import type { MenuPoint } from "@/lib/contextMenu";
 import { derivedOf, indexOf, linkedNoteIds, linksTo, mentionOf } from "@/lib/derived";
 import { OPEN_PLACE, openPlace, type Place, type PlaceRequest } from "@/lib/documentContents";
@@ -2729,8 +2729,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      resolved for the sidebar. Comments name people, and a comment from "an id"
      is not a conversation. */
   /** The general chat while it is open, and where it was opened from. */
-  const [generalChat, setGeneralChat] = useState<{ origin: DOMRect } | null>(null);
+  const [generalChat, setGeneralChat] = useState<{
+    origin: DOMRect | null;
+    quote?: NoteRef;
+  } | null>(null);
   const closeGeneralChat = useCallback(() => setGeneralChat(null), []);
+  /** Chosen words of a note, carried into the general chat to be talked about. */
+  const discussInChat = useCallback((quote: NoteRef, origin: DOMRect | null) => {
+    setFoldersOpen(false);
+    setGeneralChat({ origin, quote });
+  }, []);
   const commentAuthors = useMemo(
     () =>
       new Map(
@@ -3740,6 +3748,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             onClose={closeGeneralChat}
             onReveal={nothing}
             onRemoveAnchor={nothing}
+            notes={linkableNotes}
+            quoteDraft={generalChat.quote ?? null}
+            onOpenNote={(ref) => handleOpenRecent(ref.note, ref.quote)}
           />
         </Suspense>
       )}
@@ -4428,6 +4439,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           onOpenNote={handleOpenRecent}
           onRemarksChanged={refreshRemarks}
           onRemarksRead={markRemarksSeen}
+          onDiscussInChat={canWriteArchive ? discussInChat : undefined}
           saidThreads={saidThreads}
           onContinueAsNote={
             chapterAt >= 0 && canWriteArchive
@@ -4668,6 +4680,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
                     onRemarksRead={markRemarksSeen}
+                    onDiscussInChat={canWriteArchive ? discussInChat : undefined}
                     saidThreads={saidThreads}
                   />
                 </Suspense>
@@ -4923,6 +4936,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
               onRemarksRead={markRemarksSeen}
+              onDiscussInChat={canWriteArchive ? discussInChat : undefined}
               saidThreads={saidThreads}
             />
           </Suspense>
@@ -4967,6 +4981,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
                   onRemarksRead={markRemarksSeen}
+                  onDiscussInChat={canWriteArchive ? discussInChat : undefined}
                   saidThreads={saidThreads}
                   headerActions={
                     <button
