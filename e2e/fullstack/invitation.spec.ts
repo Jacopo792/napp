@@ -16,6 +16,8 @@ test("signing in through an invitation opens the shared archive and drops the em
   const token = await invite(owner, member);
   const memberDefault = member.archiveId;
 
+  // As in `login()`: the first-launch ⌘K lesson is not what this tests.
+  await page.context().addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
   await page.goto(`/?invite=${encodeURIComponent(token)}`);
   await page.getByLabel("Email", { exact: true }).fill(member.email);
   await page.getByLabel("Password", { exact: true }).fill(member.password);
