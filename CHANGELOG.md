@@ -3,6 +3,23 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.63 – 2026-11-17
+
+### Added
+
+- An archive's maker can edit it from Settings > Archives (Edit opens its sheet).
+
+### Changed
+
+- Book: Write/Board and Edit/Pages fade through with the archive switch's
+  timing; docked panels open on the travel beat instead of jolting the page.
+- Switching archives fades the wallpaper with the screen.
+
+### Fixed
+
+- Rapid Write/Board switches could leave the chapter uneditable: a new view
+  transition now skips the unfinished one.
+
 ## 0.9.62 – 2026-11-16
 
 ### Changed

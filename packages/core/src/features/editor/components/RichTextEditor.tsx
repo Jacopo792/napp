@@ -829,7 +829,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
      browser already shows it, so only the desktop shell gets this one. */
     const [peek, setPeek] = useState<string | null>(null);
     useEffect(() => {
-      if (!editor || !document.documentElement.dataset.shell) return;
+      if (!editor || editor.isDestroyed || !document.documentElement.dataset.shell) return;
       const dom = editor.view.dom;
       const over = (event: MouseEvent) => {
         const link = (event.target as Element).closest?.("a[href]:not(.note-link)");
@@ -854,7 +854,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     const [codeCopied, setCodeCopied] = useState(false);
     const copyButton = useRef<HTMLButtonElement>(null);
     useEffect(() => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) return;
       const dom = editor.view.dom;
       const over = (event: MouseEvent) => {
         const block = (event.target as Element).closest?.("pre") as HTMLElement | null;

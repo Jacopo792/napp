@@ -45,6 +45,36 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.63",
+    date: "2026-11-17",
+    headline: "Books that move calmly, and archives you can edit",
+    sections: [
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Calmer books",
+            text: "Write and Board, Edit and Pages fade into each other with the same timing as switching archives, and panels open without shaking the page.",
+          },
+          {
+            title: "Edit your archive",
+            text: "If you made an archive, Settings › Archives has Edit: rename it or invite more people.",
+            image: "0.9.63-archive-edit.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "No flash between archives",
+            text: "The wallpaper fades with the screen when you switch archives instead of flashing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.62",
     date: "2026-11-16",
     headline: "Smoother, and fewer things that do nothing",

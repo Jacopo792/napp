@@ -424,16 +424,25 @@ export function sendNotes(moves: { id: string; to: string | null; leaves: boolea
    as an archive switch does (`.is-turning-view` in the stylesheet), never a
    swap between two frames. `apply` must commit synchronously (`flushSync`),
    so the picture taken after it is the finished one. */
+let turningView: ViewTransition | null = null;
 export function turnView(apply: () => void) {
   if (typeof document === "undefined" || !document.startViewTransition || reduced()) {
     apply();
     return;
   }
   const root = document.documentElement;
+  turningView?.skipTransition();
   root.classList.add("is-turning-view");
-  void document
-    .startViewTransition(apply)
-    .finished.finally(() => root.classList.remove("is-turning-view"));
+  const transition = document.startViewTransition(apply);
+  turningView = transition;
+  // Starting another transition rejects `ready` for the skipped picture.
+  // Its update still runs, so the most recent view remains the requested one.
+  void transition.ready.catch(() => undefined);
+  void transition.finished.finally(() => {
+    if (turningView !== transition) return;
+    turningView = null;
+    root.classList.remove("is-turning-view");
+  });
 }
 
 /* ── Which way a note came from ─────────────────────────────────────────────
