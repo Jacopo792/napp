@@ -659,6 +659,9 @@
   background: var(--page);
   font-size: 12px;
   color: var(--ink-2);
+}
+
+.chat-reaction.is-new {
   animation: chat-reaction-in var(--dur-base) var(--ease-spring) backwards;
 }
 

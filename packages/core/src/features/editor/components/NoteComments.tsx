@@ -68,6 +68,17 @@ import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble } from "./ChatBubble";
 import "./chat.css";
 
+/** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
+ *  the rail control the general chat opens from — is brought to the sheet's
+ *  nearest edge: negative insets drew a stray strip that then snapped open. */
+function clipTo(rect: DOMRect, box: DOMRect) {
+  const x = (v: number) => Math.min(Math.max(v, box.left), box.right);
+  const y = (v: number) => Math.min(Math.max(v, box.top), box.bottom);
+  return `inset(${y(rect.top) - box.top}px ${box.right - x(rect.right)}px ${
+    box.bottom - y(rect.bottom)
+  }px ${x(rect.left) - box.left}px round 0px)`;
+}
+
 export interface CommentAuthor {
   userId: string;
   name: string;
@@ -208,6 +219,9 @@ export function NoteComments({
   /** Messages whose arrival has been played. A bubble drawn again — the
    *  column enlarged into the sheet and back — is not arriving again. */
   const settled = useRef(new Set<string>());
+  /** Reactions already shown, by message and emoji: only one given while
+   *  the chat is open pops in; opening or enlarging it does not replay them. */
+  const shownReactions = useRef<Set<string> | null>(null);
 
   /* ── Reading, and listening ─────────────────────────────────────────── */
 
@@ -218,7 +232,10 @@ export function NoteComments({
          them must not keep the messages from showing. */
       loadReactions(session, source).catch(() => null),
     ]);
-    if (given) setReactions(given);
+    if (given) {
+      shownReactions.current ??= new Set(given.map((r) => `${r.commentId}:${r.emoji}`));
+      setReactions(given);
+    }
     const fresh = known.current
       ? rows.filter((row) => !known.current!.has(row.id) && row.authorId !== session.userId)
       : [];
@@ -608,8 +625,7 @@ export function NoteComments({
     const sheet = sheetRef.current;
     const start = from.current;
     if (!expanded || !sheet || !start || reduced()) return;
-    const end = sheet.getBoundingClientRect();
-    const inset = `inset(${start.top - end.top}px ${end.right - start.right}px ${end.bottom - start.bottom}px ${start.left - end.left}px round 0px)`;
+    const inset = clipTo(start, sheet.getBoundingClientRect());
     sheet.animate([{ clipPath: inset }, { clipPath: "inset(0px round 16px)" }], {
       duration: SHAPE,
       easing: EASE,
@@ -631,8 +647,7 @@ export function NoteComments({
     const done = isGeneral ? () => closeRef.current() : () => setExpanded(false);
     const end = isGeneral ? origin : columnRef.current?.getBoundingClientRect();
     if (!sheet || !end || reduced()) return done();
-    const start = sheet.getBoundingClientRect();
-    const inset = `inset(${end.top - start.top}px ${start.right - end.right}px ${start.bottom - end.bottom}px ${end.left - start.left}px round 0px)`;
+    const inset = clipTo(end, sheet.getBoundingClientRect());
     sheet.closest(".chat-layer")?.classList.add("is-closing");
     sheet.querySelector(".chat-inner")?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: OVERLAY_OUT.duration,
@@ -1000,7 +1015,13 @@ export function NoteComments({
                 <button
                   key={emoji}
                   type="button"
-                  className={`chat-reaction press ${ownReaction ? "is-mine" : ""}`}
+                  className={`chat-reaction press ${ownReaction ? "is-mine" : ""} ${
+                    shownReactions.current?.has(`${m.id}:${emoji}`) ? "" : "is-new"
+                  }`}
+                  onAnimationEnd={(event) => {
+                    event.stopPropagation();
+                    shownReactions.current?.add(`${m.id}:${emoji}`);
+                  }}
                   disabled={!canEdit}
                   aria-pressed={ownReaction}
                   title={reactions

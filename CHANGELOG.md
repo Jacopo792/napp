@@ -3,6 +3,14 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.67 – 2026-11-17
+
+### Fixed
+
+- The general chat opened as a narrow strip that snapped to full size; it now
+  grows smoothly from the edge nearest the sidebar and closes back into it.
+- Reactions popped in again every time a chat opened or was enlarged.
+
 ## 0.9.66 – 2026-11-17
 
 ### Added
