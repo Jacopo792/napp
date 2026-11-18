@@ -980,6 +980,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const selfId = session?.userId ?? null;
 
+  /* What "Chats in notes" lists (see `visibleEntries`): this scope's notes,
+     not the trash. Only news there is news this person can go and read. */
+  const reachableRemarkNotes = useMemo(
+    () => new Set(ownedEntries.map((entry) => entry.note.id).filter((id) => !trashedIds.has(id))),
+    [ownedEntries, trashedIds],
+  );
+
   const {
     archiveComments,
     saidThreads,
@@ -988,7 +995,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     remarkedIds,
     unreadRemarkNotes,
     unreadRemarkCount,
-  } = useArchiveRemarks(session, remarksSeen, setRemarksSeen, awake);
+    unreadGeneralCount,
+  } = useArchiveRemarks(session, remarksSeen, setRemarksSeen, awake, reachableRemarkNotes);
 
   /* Who has taken a note back, keyed by note. A lock is metadata on the row
      like the trash stamp beside it, and it is read from the same place — but
@@ -2734,6 +2742,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     quote?: NoteRef;
   } | null>(null);
   const closeGeneralChat = useCallback(() => setGeneralChat(null), []);
+  const markGeneralSeen = useCallback(() => {
+    if (session) markRemarksSeen(session.archiveId);
+  }, [session, markRemarksSeen]);
   /** Chosen words of a note, carried into the general chat to be talked about. */
   const discussInChat = useCallback((quote: NoteRef, origin: DOMRect | null) => {
     setFoldersOpen(false);
@@ -3626,6 +3637,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             }
           : undefined
       }
+      generalUnread={unreadGeneralCount}
       onLock={() => void handleLock()}
       accountEmail={session?.email ?? ""}
       accounts={() => (session ? otherAccounts(session.userId) : [])}
@@ -3746,6 +3758,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             focusThread={null}
             onFocusHandled={nothing}
             onClose={closeGeneralChat}
+            onRead={markGeneralSeen}
             onReveal={nothing}
             onRemoveAnchor={nothing}
             notes={linkableNotes}

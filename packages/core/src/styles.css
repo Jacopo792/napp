@@ -9033,11 +9033,11 @@ body:has(.sidebar-row.is-over) .drag-chip {
 /* The window's own edge. `transparent: true` is what lets the vibrancy through
    and it also means macOS stops drawing the hairline it draws around an opaque
    window — so the app ended at nothing, which is the one thing every Mac window
-   has that this one did not. 10px is the system's window radius since Big Sur;
-   the ring is drawn inside it so the two corners are the same corner. */
+   has that this one did not. No radius: the wallpaper (`#root::before`) runs
+   to the window's square edge, and a rounded ring inside it left a square
+   corner of picture outside the curve. Nothing at the edge is clipped. */
 [data-shell="mac"] .workspace-shell,
 [data-shell="mac"] .login-shell {
-  border-radius: 10px;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.11);
 }
 

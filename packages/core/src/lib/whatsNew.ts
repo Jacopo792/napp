@@ -45,6 +45,52 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.70",
+    date: "2026-11-18",
+    headline: "A tidier chat and a badge that tells the truth",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Names stay with their message",
+            text: "A name now lines up with its bubble and sits beside the animal on it, and reactions sit below the bubble instead of over it.",
+            image: "0.9.70-chat-names.jpg",
+          },
+          {
+            title: "One badge for both chats",
+            text: "The chat button counts new messages in the general chat too, and only those in notes you can open. The menu shows each count.",
+          },
+          {
+            title: "Report a message in the general chat",
+            text: "Report now works there, and blocking someone hides their general-chat messages too.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Moves and pins no longer undo each other",
+            text: "When two people change the same note at once, a pin no longer puts back the folder the other person had just moved it out of.",
+          },
+          {
+            title: "Long chats keep their newest messages",
+            text: "A chat past a thousand messages now shows the latest ones.",
+          },
+          {
+            title: "Formatting is kept in history",
+            text: "A change made only with bold, headings or other formatting now saves a version you can go back to.",
+          },
+          {
+            title: "Square window corners on the Mac",
+            text: "A background picture now reaches the window's edge without a square corner showing outside the curve.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.69",
     date: "2026-11-17",
     headline: "Talk about your notes in the general chat",

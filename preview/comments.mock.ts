@@ -234,3 +234,11 @@ export async function setReaction(
   );
   if (on) reactions.push({ noteId, commentId, userId: session.userId, emoji });
 }
+
+/** The general chat's messages for the unread count, as remarks on the
+ *  archive. Only this archive has a general chat in the preview. */
+export async function loadRecentGeneral(session: AppSession): Promise<ArchiveComment[]> {
+  await sleep(90);
+  if (session.archiveId !== PREVIEW_ARCHIVE) return [];
+  return (store.get(null) ?? []).map((row) => ({ ...row, noteId: session.archiveId }));
+}

@@ -18,6 +18,8 @@ export async function reportSafetyIssue(input: {
   noteId?: string;
   userId?: string;
   commentId?: string;
+  /** A message in the archive's general chat. */
+  messageId?: string;
   details?: string;
 }): Promise<string> {
   const { data, error } = await supabase.rpc("report_safety_issue", {
@@ -26,6 +28,9 @@ export async function reportSafetyIssue(input: {
     target_user_id: input.userId ?? null,
     target_comment_id: input.commentId ?? null,
     report_details: input.details?.trim() ?? "",
+    /* Sent only when set, so a report still reaches a database that has not
+       had the general chat's safety migration. */
+    ...(input.messageId ? { target_message_id: input.messageId } : {}),
   });
   if (error || typeof data !== "string")
     throw new Error("Could not submit this report. Please try again or contact support.");

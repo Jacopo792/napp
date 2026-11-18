@@ -9,13 +9,14 @@ import {
 } from "react";
 import {
   loadArchiveComments,
+  loadRecentGeneral,
   notesWithOpenRemarks,
   unreadRemarks,
   type ArchiveComment,
   type RemarksSeen,
 } from "@/lib/comments";
 import type { AppSession } from "@/lib/session";
-import { subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
+import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
 
 /** Every remark in the archive, which notes have open ones, and which of them
  *  somebody else wrote since this account last read them. `remarksSeen` stays
@@ -26,6 +27,10 @@ export function useArchiveRemarks(
   remarksSeen: RemarksSeen,
   setRemarksSeen: Dispatch<SetStateAction<RemarksSeen>>,
   awake: number,
+  /** Notes the "Chats in notes" list can show: this scope's, not in the
+   *  trash. A badge counting a remark nobody can reach is one nobody can
+   *  clear — which is what members saw after a general-chat message. */
+  reachable: ReadonlySet<string>,
 ) {
   /* Remarks, archive-wide. The panel beside a note answers "what was said
      about this"; this answers the question a shared archive raises the moment
@@ -44,6 +49,8 @@ export function useArchiveRemarks(
   sessionRef.current = session;
   const selfId = session?.userId ?? null;
   const [archiveComments, setArchiveComments] = useState<ArchiveComment[]>([]);
+  /** The general chat, as remarks on the "note" whose id is the archive's. */
+  const [generalMessages, setGeneralMessages] = useState<ArchiveComment[]>([]);
   const saidThreads = useMemo(
     () => new Set(archiveComments.map((comment) => comment.threadId)),
     [archiveComments],
@@ -54,11 +61,13 @@ export function useArchiveRemarks(
      can clear. The caller pushes it with the account preferences. */
   const commentsRef = useRef(archiveComments);
   commentsRef.current = archiveComments;
+  const generalRef = useRef(generalMessages);
+  generalRef.current = generalMessages;
   const markRemarksSeen = useCallback(
     (noteId: string) => {
       /* Past the newest remark on the note as well as now: a clock running
          behind the server's would otherwise leave what was just read unread. */
-      const newest = commentsRef.current
+      const newest = [...commentsRef.current, ...generalRef.current]
         .filter((comment) => comment.noteId === noteId)
         .reduce((latest, comment) => Math.max(latest, Date.parse(comment.createdAt) + 1), 0);
       const at = new Date(Math.max(Date.now(), newest)).toISOString();
@@ -85,32 +94,61 @@ export function useArchiveRemarks(
     }, 400);
   }, []);
 
-  useEffect(() => () => window.clearTimeout(remarkTimer.current), []);
+  const generalTimer = useRef(0);
+  const refreshGeneral = useCallback(() => {
+    window.clearTimeout(generalTimer.current);
+    generalTimer.current = window.setTimeout(() => {
+      const current = sessionRef.current;
+      if (!current) return;
+      void loadRecentGeneral(current)
+        .then(setGeneralMessages)
+        .catch(() => undefined);
+    }, 400);
+  }, []);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(remarkTimer.current);
+      window.clearTimeout(generalTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!session) return;
     refreshRemarks();
+    refreshGeneral();
     const channel = subscribeToComments(session.archiveId, refreshRemarks);
-    return () => void unsubscribeFromArchive(channel);
+    const general = subscribeToArchiveChat(session.archiveId, refreshGeneral);
+    return () => {
+      void unsubscribeFromArchive(channel);
+      void unsubscribeFromArchive(general);
+    };
     /* `awake` for the same reason the archive channel takes it: a socket that
        died while the machine slept announces nothing, and this one carries the
        badge. */
-  }, [session, refreshRemarks, awake]);
+  }, [session, refreshRemarks, refreshGeneral, awake]);
 
   const remarkedIds = useMemo(() => notesWithOpenRemarks(archiveComments), [archiveComments]);
-  const unreadRemarkNotes = useMemo(
+  const unreadInNotes = useMemo(
     () =>
-      new Set(
-        selfId
-          ? unreadRemarks(archiveComments, selfId, remarksSeen).map((remark) => remark.noteId)
-          : [],
-      ),
-    [archiveComments, selfId, remarksSeen],
+      selfId
+        ? unreadRemarks(archiveComments, selfId, remarksSeen).filter((remark) =>
+            reachable.has(remark.noteId),
+          )
+        : [],
+    [archiveComments, selfId, remarksSeen, reachable],
   );
-  const unreadRemarkCount = useMemo(
-    () => (selfId ? unreadRemarks(archiveComments, selfId, remarksSeen).length : 0),
-    [archiveComments, selfId, remarksSeen],
+  const unreadRemarkNotes = useMemo(
+    () => new Set(unreadInNotes.map((remark) => remark.noteId)),
+    [unreadInNotes],
   );
+  const unreadRemarkCount = unreadInNotes.length;
+  const unreadGeneralCount = useMemo(
+    () => (selfId ? unreadRemarks(generalMessages, selfId, remarksSeen).length : 0),
+    [generalMessages, selfId, remarksSeen],
+  );
+  const unreadTotal = unreadRemarkCount + unreadGeneralCount;
   /* The number on the icon in the Dock, which is the whole of what an
      application can say to somebody who is not looking at it.
      `navigator.setAppBadge` and not a bridge to `app.dock.setBadge`: it is a
@@ -123,10 +161,10 @@ export function useArchiveRemarks(
       clearAppBadge?: () => Promise<void>;
     };
     if (!badge.setAppBadge || !badge.clearAppBadge) return;
-    void (
-      unreadRemarkCount > 0 ? badge.setAppBadge(unreadRemarkCount) : badge.clearAppBadge()
-    ).catch(() => undefined);
-  }, [unreadRemarkCount]);
+    void (unreadTotal > 0 ? badge.setAppBadge(unreadTotal) : badge.clearAppBadge()).catch(
+      () => undefined,
+    );
+  }, [unreadTotal]);
 
   return {
     archiveComments,
@@ -136,5 +174,6 @@ export function useArchiveRemarks(
     remarkedIds,
     unreadRemarkNotes,
     unreadRemarkCount,
+    unreadGeneralCount,
   };
 }

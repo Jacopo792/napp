@@ -3,6 +3,35 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.70 – 2026-11-18
+
+### Changed
+
+- Chat names line up with the bubble's edge and sit beside the bubble's
+  animal; reactions sit below the bubble instead of over its foot, and an
+  animal never reaches into the line above.
+- The chat button's badge counts unread general-chat messages and only note
+  chats the reader can open (this scope, not the trash); opening the general
+  chat marks it read.
+
+### Security
+
+- The general chat follows blocks (messages, reactions, new mentions) and its
+  messages can be reported. A member who leaves or is erased is removed from
+  general-chat mentions. Migration `20261118010000_archive_chat_safety`.
+
+### Fixed
+
+- Note placement writes only the columns that changed, so concurrent moves,
+  pins and trash actions no longer overwrite one another.
+- Chats load their newest 800 messages and newest reactions instead of the
+  oldest rows under the API's 1,000-row cap.
+- Formatting-only edits produce a history version.
+
+- On macOS the window's corners are no longer rounded. A background picture
+  reaches the window's edge, and the rounded border inside it left a square
+  corner of picture outside the curve.
+
 ## 0.9.69 – 2026-11-17
 
 ### Added

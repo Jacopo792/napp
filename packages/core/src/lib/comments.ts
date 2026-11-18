@@ -40,6 +40,13 @@ const GENERAL_COLUMNS = "id, author_id, body, created_at, mentions, bubble, repl
 
 type GeneralRow = Omit<CommentRow, "thread_id" | "resolved_at" | "assignee_id">;
 
+/* The newest messages, read newest-first and put back in order. Read oldest
+   first, a conversation past the API's row cap (1,000) kept returning its
+   first thousand and the new ones never appeared.
+   ponytail: no "load earlier" — older than this is not shown; page by
+   created_at when a chat outgrows it. */
+const CHAT_WINDOW = 800;
+
 const fromGeneral = (session: AppSession, row: GeneralRow): NoteComment =>
   toComment({ ...row, thread_id: session.archiveId, resolved_at: null, assignee_id: null });
 
@@ -52,18 +59,22 @@ export async function loadComments(
       .from("archive_messages")
       .select(GENERAL_COLUMNS)
       .eq("archive_id", session.archiveId)
-      .order("created_at");
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(CHAT_WINDOW);
     fail(general.error);
-    return ((general.data ?? []) as GeneralRow[]).map((row) => fromGeneral(session, row));
+    return ((general.data ?? []) as GeneralRow[]).reverse().map((row) => fromGeneral(session, row));
   }
   const result = await supabase
     .from("note_comments")
     .select(COLUMNS)
     .eq("archive_id", session.archiveId)
     .eq("note_id", noteId)
-    .order("created_at");
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(CHAT_WINDOW);
   fail(result.error);
-  return ((result.data ?? []) as CommentRow[]).map(toComment);
+  return ((result.data ?? []) as CommentRow[]).reverse().map(toComment);
 }
 
 /** Which threads on a note have had anything said in them. A passage whose
@@ -175,22 +186,25 @@ export async function loadReactions(
       .from("archive_message_reactions")
       .select("message_id, user_id, emoji")
       .eq("archive_id", session.archiveId)
-      .order("created_at");
+      /* Newest first, so a cap drops the oldest reactions, not today's. */
+      .order("created_at", { ascending: false })
+      .limit(1000);
     fail(general.error);
-    return ((general.data ?? []) as { message_id: string; user_id: string; emoji: string }[]).map(
-      (row) => ({ commentId: row.message_id, userId: row.user_id, emoji: row.emoji }),
-    );
+    return ((general.data ?? []) as { message_id: string; user_id: string; emoji: string }[])
+      .reverse()
+      .map((row) => ({ commentId: row.message_id, userId: row.user_id, emoji: row.emoji }));
   }
   const result = await supabase
     .from("note_comment_reactions")
     .select("comment_id, user_id, emoji")
     .eq("archive_id", session.archiveId)
     .eq("note_id", noteId)
-    .order("created_at");
+    .order("created_at", { ascending: false })
+    .limit(1000);
   fail(result.error);
-  return ((result.data ?? []) as { comment_id: string; user_id: string; emoji: string }[]).map(
-    (row) => ({ commentId: row.comment_id, userId: row.user_id, emoji: row.emoji }),
-  );
+  return ((result.data ?? []) as { comment_id: string; user_id: string; emoji: string }[])
+    .reverse()
+    .map((row) => ({ commentId: row.comment_id, userId: row.user_id, emoji: row.emoji }));
 }
 
 /** Your own reaction, given or taken back. Nobody else's can be: the policy
@@ -302,5 +316,22 @@ export async function loadArchiveComments(session: AppSession): Promise<ArchiveC
   return ((result.data ?? []) as (CommentRow & { note_id: string })[]).map((row) => ({
     ...toComment(row),
     noteId: row.note_id,
+  }));
+}
+
+/** The general chat's recent messages, shaped like remarks whose "note" is the
+ *  archive — so its unread line is `RemarksSeen[archiveId]` and the same
+ *  `unreadRemarks` counts it. Bounded for the same reason as above. */
+export async function loadRecentGeneral(session: AppSession): Promise<ArchiveComment[]> {
+  const result = await supabase
+    .from("archive_messages")
+    .select(GENERAL_COLUMNS)
+    .eq("archive_id", session.archiveId)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  fail(result.error);
+  return ((result.data ?? []) as GeneralRow[]).map((row) => ({
+    ...fromGeneral(session, row),
+    noteId: session.archiveId,
   }));
 }

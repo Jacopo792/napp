@@ -35,7 +35,14 @@ function snapshot(document: Y.Doc) {
   const projected = projectDocument(document);
   const content = withoutInvisibleDocumentEnding(projected.content);
   const title = projected.title.trimEnd();
-  return { title, content, text: `${title}\n${richTextToPlainText(content)}` };
+  return {
+    title,
+    content,
+    text: `${title}\n${richTextToPlainText(content)}`,
+    /* What decides whether anything changed: the structure, so bold or a
+       heading alone is a version too. The text only counts the words. */
+    shape: JSON.stringify([title, content]),
+  };
 }
 
 export function versionKeeper(service: SupabaseClient, stretchMs = STRETCH_MS) {
@@ -43,14 +50,14 @@ export function versionKeeper(service: SupabaseClient, stretchMs = STRETCH_MS) {
   /* What the note said when the current stretch began — the far side of the
      "+12 −3" on the version that ends it. Taken when the note is loaded and
      again at every version, so it costs no query. */
-  const baselines = new Map<string, string>();
+  const baselines = new Map<string, { text: string; shape: string }>();
 
   async function write(noteId: string, stretch: Stretch, document: Y.Doc): Promise<void> {
     const now = snapshot(document);
     const before = baselines.get(noteId);
-    baselines.set(noteId, now.text);
-    if (before === now.text) return;
-    const tally = before === undefined ? null : wordTally(textChanges(before, now.text));
+    baselines.set(noteId, now);
+    if (before?.shape === now.shape) return;
+    const tally = before === undefined ? null : wordTally(textChanges(before.text, now.text));
     const result = await service.from("note_versions").insert({
       archive_id: stretch.archiveId,
       note_id: noteId,
@@ -65,7 +72,7 @@ export function versionKeeper(service: SupabaseClient, stretchMs = STRETCH_MS) {
 
   return {
     loaded(noteId: string, document: Y.Doc): void {
-      baselines.set(noteId, snapshot(document).text);
+      baselines.set(noteId, snapshot(document));
     },
 
     touched(noteId: string, archiveId: string, userId: string): void {

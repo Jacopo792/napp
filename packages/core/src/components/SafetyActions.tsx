@@ -18,11 +18,13 @@ export function SafetyActions({
   noteId,
   userId,
   commentId,
+  messageId,
   compact = false,
 }: {
   noteId?: string;
   userId?: string;
   commentId?: string;
+  messageId?: string;
   compact?: boolean;
 }) {
   const [reason, setReason] = useState<ReportReason>("harassment");
@@ -35,7 +37,7 @@ export function SafetyActions({
     setBusy(true);
     setError("");
     try {
-      await reportSafetyIssue({ noteId, userId, commentId, reason, details });
+      await reportSafetyIssue({ noteId, userId, commentId, messageId, reason, details });
       setStatus("Report submitted for review.");
       changed();
     } catch (reason) {
@@ -49,7 +51,7 @@ export function SafetyActions({
       {!compact && <h3>Safety</h3>}
       <details>
         <summary className="sheet-row press">
-          Report {commentId ? "comment" : noteId ? "note" : "user"}
+          Report {messageId ? "message" : commentId ? "comment" : noteId ? "note" : "user"}
         </summary>
         <form className="account-deletion" onSubmit={(event) => void report(event)}>
           <label>

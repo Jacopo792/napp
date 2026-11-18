@@ -443,12 +443,41 @@ const DRESSES: Record<string, Dress> = {
   },
 };
 
+/** How far the animals reach above the body: at least what the dress asks
+ *  for, and never less than the tallest piece actually rises — a hand-set
+ *  room 2px short let the bunny's ears into the reactions above. */
+function roomAbove(dress: Dress): number {
+  return Math.max(dress.room.top, ...dress.pieces.map((piece) => -(piece.at.top ?? 0)));
+}
+
+/** The band above a dressed bubble, as the name over it needs to know it.
+ *  `far` when every animal up there stands away from the name's edge — the
+ *  name can then sit beside them in the band instead of over it; `reach` is
+ *  how much of the bubble's width they take from that far edge. */
+export function dressBand(
+  bubble: string | null | undefined,
+): { top: number; far: boolean; reach: number } | null {
+  const dress = DRESSES[chatBubble(bubble).id];
+  if (!dress) return null;
+  const rising = dress.pieces.filter((piece) => (piece.at.top ?? 0) < 0);
+  return {
+    top: roomAbove(dress),
+    /* Written for your side, mirrored for theirs: `left` is the far edge
+       from the name either way (theirs carry the name at the left, and the
+       mirror moves a `left` piece to the right; yours carry the time at the
+       right). */
+    far: rising.every((piece) => piece.at.left !== undefined && piece.at.left >= 0),
+    reach: Math.max(0, ...rising.map((piece) => (piece.at.left ?? 0) + piece.w)),
+  };
+}
+
 export function ChatBubble({
   bubble,
   mine,
   bare = false,
   children,
   className = "",
+  minWidth,
 }: {
   bubble: string | null | undefined;
   mine: boolean;
@@ -457,6 +486,8 @@ export function ChatBubble({
   bare?: boolean;
   children: ReactNode;
   className?: string;
+  /** Wide enough for the name sitting beside the animals in their band. */
+  minWidth?: number;
 }) {
   const style = chatBubble(bubble);
   const dress = bare ? undefined : DRESSES[style.id];
@@ -474,8 +505,9 @@ export function ChatBubble({
         {
           ...(style.fill ? { "--bubble-fill": style.fill } : {}),
           ...(dress
-            ? { "--room-top": `${dress.room.top}px`, "--room-bottom": `${dress.room.bottom}px` }
+            ? { "--room-top": `${roomAbove(dress)}px`, "--room-bottom": `${dress.room.bottom}px` }
             : {}),
+          ...(minWidth ? { minWidth } : {}),
         } as CSSProperties
       }
     >

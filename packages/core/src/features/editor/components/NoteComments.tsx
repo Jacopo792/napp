@@ -65,7 +65,7 @@ import type { AppSession } from "@/lib/session";
 import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble, dressBand } from "./ChatBubble";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -949,6 +949,14 @@ export function NoteComments({
         : authors.get(answered.authorId)?.name || "Someone"
       : "";
 
+    /* A lone dressed message: its name sits in the animal's band rather than
+       above it, so it stays with its bubble. Only when the animal stands at
+       the other edge, and with the bubble made wide enough for both.
+       ponytail: the name's width is estimated from its length (11px text). */
+    const band = first && last && !(jumbo && !answered) ? dressBand(m.bubble) : null;
+    const nameWidth = (mine ? 0 : name.length * 6.6 + 6) + 30;
+    const nested = band?.far ? { gap: 4 - band.top, width: nameWidth + 12 + band.reach } : null;
+
     return (
       <div key={key} className="chat-row-wrap">
         {newDay && (
@@ -973,7 +981,7 @@ export function NoteComments({
           }}
         >
           {first && (
-            <div className="chat-sender">
+            <div className="chat-sender" style={nested ? { marginBottom: nested.gap } : undefined}>
               {!mine && <span className="chat-sender-name">{name}</span>}
               <time className="readout" dateTime={m.createdAt}>
                 {clock(m.createdAt)}
@@ -989,7 +997,7 @@ export function NoteComments({
             {jumbo && !answered ? (
               <span className="chat-jumbo">{m.body.trim()}</span>
             ) : (
-              <ChatBubble bubble={m.bubble} mine={mine} bare={!last}>
+              <ChatBubble bubble={m.bubble} mine={mine} bare={!last} minWidth={nested?.width}>
                 {answered && (
                   <button
                     type="button"
@@ -1117,7 +1125,8 @@ export function NoteComments({
                     <SafetyActions
                       noteId={isGeneral ? undefined : noteId}
                       userId={m.authorId}
-                      commentId={m.id}
+                      commentId={isGeneral ? undefined : m.id}
+                      messageId={isGeneral ? m.id : undefined}
                       compact
                     />
                   </div>

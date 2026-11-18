@@ -81,6 +81,8 @@ interface Props {
   /** The archive's general chat, opened from the control that asked for it.
    *  Set, the chat in the rail offers it beside the chats in notes. */
   onGeneralChat?: (origin: DOMRect) => void;
+  /** General-chat messages this account has not read. */
+  generalUnread?: number;
   onLock: () => void;
   accountEmail: string;
   accounts: () => { userId: string; email: string }[];
@@ -382,6 +384,7 @@ export function Sidebar({
   closeInStrip = false,
   onSettings,
   onGeneralChat,
+  generalUnread = 0,
   onLock,
   accountEmail,
   accounts,
@@ -608,16 +611,17 @@ export function Sidebar({
                   [archive, ARCHIVE, <Archive key="a" size={18} />],
                   [trash, TRASH, <Trash2 key="t" size={18} />],
                 ] as const
-              ).map(([scope, id, glyph]) =>
-                scope ? (
+              ).map(([scope, id, glyph]) => {
+                /* The chat button speaks for both chats: the general one
+                   opens from it too, so its news belongs on it. */
+                const unread = (scope?.unread ?? 0) + (id === REMARKS ? generalUnread : 0);
+                return scope ? (
                   <button
                     key={id}
                     type="button"
                     className={`sidebar-rail-button press ${selectedId === id ? "is-active" : ""}`}
                     aria-pressed={selectedId === id}
-                    aria-label={
-                      scope.unread ? `${scope.label}, ${scope.unread} unread` : scope.label
-                    }
+                    aria-label={unread ? `${scope.label}, ${unread} unread` : scope.label}
                     title={scope.label}
                     aria-haspopup={id === REMARKS && onGeneralChat ? "menu" : undefined}
                     onClick={(event) => {
@@ -631,7 +635,9 @@ export function Sidebar({
                           {
                             kind: "item",
                             id: "chat-general",
-                            label: "General chat",
+                            label: generalUnread
+                              ? `General chat (${generalUnread})`
+                              : "General chat",
                             icon: <MessagesSquare size={16} />,
                             run: () => onGeneralChat(box),
                           },
@@ -650,12 +656,10 @@ export function Sidebar({
                     }}
                   >
                     {glyph}
-                    {scope.unread ? (
-                      <span className="sidebar-place-badge">{scope.unread}</span>
-                    ) : null}
+                    {unread ? <span className="sidebar-place-badge">{unread}</span> : null}
                   </button>
-                ) : null,
-              )}
+                ) : null;
+              })}
             </div>
           )}
 

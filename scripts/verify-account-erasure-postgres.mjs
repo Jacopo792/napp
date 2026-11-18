@@ -406,9 +406,41 @@ try {
     "insert into public.note_comments(id,thread_id,note_id,archive_id,author_id,body,mentions) values ($1,$1,$2,$3,$4,'Retained fixture',$5)",
     [retainedSafetyComment, retainedSafetyNote, safetyArchive, two, [three, outsider]],
   );
+  stage = "general chat follows reports, blocks and departures";
+  const generalMessage = crypto.randomUUID();
+  await db.query(
+    "insert into public.archive_messages(id,archive_id,author_id,body,mentions) values ($1,$2,$3,'General fixture',$4)",
+    [generalMessage, safetyArchive, two, [three, outsider]],
+  );
+  await asUser(outsider);
+  assert.match(
+    await scalar("select public.report_safety_issue('harassment',target_message_id=>$1)::text", [
+      generalMessage,
+    ]),
+    /^[0-9a-f-]{36}$/,
+    "A general-chat message can be reported",
+  );
   await asUser(two);
   await db.query("select public.block_user($1)", [outsider]);
   await db.query("select public.block_user($1)", [three]);
+  await db.query(
+    "update public.archive_messages set body='Old mentions do not freeze it' where id=$1",
+    [generalMessage],
+  );
+  await asUser(three);
+  assert.equal(
+    await scalar("select count(*)::int from public.archive_messages where id=$1", [generalMessage]),
+    0,
+    "A block hides general-chat messages too",
+  );
+  await assert.rejects(
+    db.query(
+      "insert into public.archive_messages(archive_id,author_id,body,mentions) values ($1,$2,'Naming the blocker',$3)",
+      [safetyArchive, three, [two]],
+    ),
+    /cannot mention a blocked account/,
+  );
+  await asUser(two);
   await asUser(two);
   await assert.rejects(
     db.query("update public.note_comments set body='Still blocked' where id=$1", [
@@ -426,6 +458,12 @@ try {
       ])
     ).rows[0].mentions,
     [outsider],
+  );
+  assert.deepEqual(
+    (await db.query("select mentions from public.archive_messages where id=$1", [generalMessage]))
+      .rows[0].mentions,
+    [outsider],
+    "Erasure takes the account out of general-chat mentions",
   );
   assert.equal(await scalar("select public.finish_account_erasure($1)", [three]), true);
   assert.equal(

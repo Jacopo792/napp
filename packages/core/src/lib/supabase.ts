@@ -5,6 +5,7 @@ import { fail, supabase } from "./supabaseClient";
 import { coverFromStorage, notePhotoFromStorage, withPageProperties } from "./pageProperties";
 import { chapterFromStorage } from "./manuscript";
 import { readArchivePayloads, readArchiveRows } from "./archiveRead";
+import { placementPatch } from "./placement";
 import {
   adoptArchiveCache,
   noteCache,
@@ -545,18 +546,13 @@ export async function persistMetaDiff(
   ]);
 
   // ── 2. Note placement ───────────────────────────────────────────────────
-  const movedNotes = [...afterNotes.values()].filter((metadata) => {
+  /* Only the columns this change touched. Writing the whole placement let a
+     device that had not yet heard another member's move put the old folder
+     back while it pinned the note. */
+  const movedNotes = [...afterNotes.values()].flatMap((metadata) => {
     const previous = beforeNotes.get(metadata.id);
-    return (
-      !previous ||
-      previous.folderId !== metadata.folderId ||
-      previous.pinned !== metadata.pinned ||
-      previous.position !== metadata.position ||
-      previous.trashedAt !== metadata.trashedAt ||
-      previous.archivedAt !== metadata.archivedAt ||
-      previous.lockedBy !== metadata.lockedBy ||
-      !sameJson(previous.chapter ?? null, metadata.chapter ?? null)
-    );
+    const patch = placementPatch(previous, metadata);
+    return Object.keys(patch).length ? [{ id: metadata.id, patch }] : [];
   });
   /* Row level security refuses a row by not returning it, not with an error:
      a note the other member locked a moment before this device heard about
@@ -565,21 +561,8 @@ export async function persistMetaDiff(
   const placed = await Promise.all(
     // Each note carries its own values, so these stay separate statements —
     // but they no longer wait on one another.
-    movedNotes.map((metadata) =>
-      supabase
-        .from("notes")
-        .update({
-          folder_id: metadata.folderId,
-          pinned: metadata.pinned ?? false,
-          position: metadata.position ?? null,
-          trashed_at: metadata.trashedAt ?? null,
-          archived_at: metadata.archivedAt ?? null,
-          locked_by: metadata.lockedBy ?? null,
-          chapter: metadata.chapter ?? null,
-        })
-        .eq("archive_id", archiveId)
-        .eq("id", metadata.id)
-        .select("id"),
+    movedNotes.map(({ id, patch }) =>
+      supabase.from("notes").update(patch).eq("archive_id", archiveId).eq("id", id).select("id"),
     ),
   );
   for (const result of placed) fail(result.error);

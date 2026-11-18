@@ -152,7 +152,8 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin: 0 6px 4px 36px;
+  /* On the bubble's edge: the face (24px) and the line's gap (6px). */
+  margin: 0 0 4px 30px;
   font-family: var(--font-sans);
   font-size: 11px;
   color: var(--ink-4);
@@ -213,6 +214,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 4px;
+  flex-grow: 1;
   border-radius: 18px;
   padding: 7px 12px 8px;
   background: var(--bubble-fill);
@@ -735,7 +737,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: -4px 8px 0 38px;
+  /* Under the bubble, not over its foot, with air before the next one. */
+  margin: 3px 0 4px 30px;
 }
 
 .is-mine > .chat-reactions {
