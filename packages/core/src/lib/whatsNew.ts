@@ -45,6 +45,23 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.74",
+    date: "2026-11-18",
+    headline: "Links show what they are",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Link previews",
+            text: "Paste a link in a chat and a card with the page's title, description and picture appears before you send. Close it if you'd rather send the plain link. Everyone sees the same card, and nobody's address reaches the site.",
+            image: "0.9.74-link-previews.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.73",
     date: "2026-11-18",
     headline: "Send photos and videos in any chat",

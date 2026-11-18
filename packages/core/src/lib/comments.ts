@@ -16,14 +16,16 @@ import {
   type ArchiveComment,
   type Reaction,
   type CommentRow,
+  type ChatLink,
   type ChatMedia,
   type NoteComment,
   type NoteRef,
 } from "./commentThreads";
 
-export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
+export { firstLink, notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
 export type {
   ArchiveComment,
+  ChatLink,
   ChatMedia,
   NoteComment,
   NoteRef,
@@ -33,13 +35,13 @@ export type {
 } from "./commentThreads";
 
 const COLUMNS =
-  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to, attachments";
+  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to, attachments, link";
 
 /* The archive's general chat is the same conversation with no note under it:
    its own tables (`archive_messages`), read here through the same calls with
    `noteId` null, and shaped into the same rows. Its thread is the archive. */
 const GENERAL_COLUMNS =
-  "id, author_id, body, created_at, mentions, bubble, reply_to, refs, attachments";
+  "id, author_id, body, created_at, mentions, bubble, reply_to, refs, attachments, link";
 
 const MEDIA_BUCKET = "chat-media";
 
@@ -64,6 +66,43 @@ export async function uploadChatMedia(
     .upload(path, data, { contentType, upsert: false });
   fail(result.error);
 }
+
+/** A link's card, read by the collaboration server so that no member's
+ *  address reaches the site, with its picture as a file to keep with the
+ *  message. Null when the page has none or cannot be read. */
+export async function fetchLinkPreview(
+  session: AppSession,
+  url: string,
+  signal?: AbortSignal,
+): Promise<{ link: ChatLink; image: Blob | null } | null> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return null;
+  const endpoint = new URL(import.meta.env.VITE_COLLAB_URL as string);
+  endpoint.protocol = endpoint.protocol === "wss:" ? "https:" : "http:";
+  endpoint.pathname = "/link-preview";
+  endpoint.search = "";
+  endpoint.searchParams.set("url", url);
+  endpoint.searchParams.set("archive", session.archiveId);
+  const response = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${data.session.access_token}` },
+    signal,
+  });
+  if (!response.ok) return null;
+  const found = (await response.json()) as ChatLink & {
+    image?: { type: string; data: string; width?: number; height?: number };
+  };
+  const { image, ...link } = found;
+  if (!image) return { link, image: null };
+  const bytes = Uint8Array.from(atob(image.data), (c) => c.charCodeAt(0));
+  return {
+    link: { ...link, width: image.width, height: image.height },
+    image: new Blob([bytes], { type: image.type }),
+  };
+}
+
+/** Where a message's link picture lives, by its type. */
+export const chatLinkPath = (session: AppSession, messageId: string, type: string): string =>
+  `${session.archiveId}/${messageId}.link.${{ "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[type] ?? "jpg"}`;
 
 /* Signed addresses, kept until shortly before they lapse: a chat redraws
    often and every picture in it would otherwise ask again. */
@@ -173,7 +212,7 @@ export async function addComment(
   refs: NoteRef[] = [],
   /** The message's own id, chosen before its files were uploaded under it,
    *  and those files. */
-  media?: { id: string; attachments: ChatMedia[] },
+  media?: { id: string; attachments: ChatMedia[]; link?: ChatLink | null },
 ): Promise<NoteComment> {
   const trimmed = body.trim();
   if (!trimmed && !media?.attachments.length) throw new Error("A comment needs something in it");
@@ -181,7 +220,9 @@ export async function addComment(
     const general = await supabase
       .from("archive_messages")
       .insert({
-        ...(media ? { id: media.id, attachments: media.attachments } : {}),
+        ...(media
+          ? { id: media.id, attachments: media.attachments, link: media.link ?? null }
+          : {}),
         archive_id: session.archiveId,
         author_id: session.userId,
         body: trimmed,
@@ -198,7 +239,7 @@ export async function addComment(
   const result = await supabase
     .from("note_comments")
     .insert({
-      ...(media ? { id: media.id, attachments: media.attachments } : {}),
+      ...(media ? { id: media.id, attachments: media.attachments, link: media.link ?? null } : {}),
       bubble,
       reply_to: replyTo,
       archive_id: session.archiveId,
@@ -331,6 +372,8 @@ export async function deleteComment(
   general = false,
   /** Its photos and videos, removed once the message is gone. */
   attachments: ChatMedia[] = [],
+  /** Its link card's picture, removed with them. */
+  linkImage?: string,
 ): Promise<void> {
   const result = await supabase
     .from(general ? "archive_messages" : "note_comments")
@@ -338,10 +381,9 @@ export async function deleteComment(
     .eq("archive_id", session.archiveId)
     .eq("id", commentId);
   fail(result.error);
-  if (attachments.length) {
-    const removed = await supabase.storage
-      .from(MEDIA_BUCKET)
-      .remove(attachments.map((item) => item.path));
+  const files = [...attachments.map((item) => item.path), ...(linkImage ? [linkImage] : [])];
+  if (files.length) {
+    const removed = await supabase.storage.from(MEDIA_BUCKET).remove(files);
     fail(removed.error);
   }
 }

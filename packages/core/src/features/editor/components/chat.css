@@ -221,6 +221,88 @@
   border-radius: 18px;
 }
 
+/* A link's card, as wide as a single photo: picture, then the page's words. */
+.chat-link-card {
+  display: flex;
+  width: 280px;
+  max-width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0.5px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--page);
+  color: inherit;
+  text-decoration: none;
+}
+
+.chat-link-picture {
+  display: block;
+  width: 100%;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.chat-link-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.chat-link-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px 11px;
+}
+
+.chat-link-site {
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+
+.chat-link-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-link-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.chat-row.is-mine .chat-link-card {
+  align-self: flex-end;
+}
+
+.chat-link-draft .chat-about-words {
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-style: normal;
+}
+
+.chat-link-draft strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.chat-link-draft img {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 .chat-media-item img {
   display: block;
   width: 100%;

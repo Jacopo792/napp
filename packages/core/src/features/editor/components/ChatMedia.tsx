@@ -4,7 +4,7 @@
  * Storage refuses (a block, a report) is left as an empty tile. A photo opens
  * whole in a new window; a video plays in place with the browser's controls. */
 import { useEffect, useState } from "react";
-import { chatMediaUrls, type ChatMedia as Media } from "@/lib/comments";
+import { chatMediaUrls, type ChatLink, type ChatMedia as Media } from "@/lib/comments";
 
 const WIDTH = 240;
 
@@ -13,12 +13,13 @@ const WIDTH = 240;
  *  ponytail: object URLs are never revoked; a session sends few enough. */
 export const localChatMedia = new Map<string, string>();
 
-export function ChatMedia({ media }: { media: Media[] }) {
+/** Loadable addresses for a message's files: its own copies first. */
+function useChatUrls(paths: string[]): Map<string, string> {
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
-  const key = media.map((item) => item.path).join("|");
+  const key = paths.join("|");
   useEffect(() => {
     let live = true;
-    const remote = key.split("|").filter((path) => !localChatMedia.has(path));
+    const remote = key.split("|").filter((path) => path && !localChatMedia.has(path));
     if (!remote.length) return;
     void chatMediaUrls(remote).then(
       (found) => live && setUrls(found),
@@ -28,6 +29,11 @@ export function ChatMedia({ media }: { media: Media[] }) {
       live = false;
     };
   }, [key]);
+  return urls;
+}
+
+export function ChatMedia({ media }: { media: Media[] }) {
+  const urls = useChatUrls(media.map((item) => item.path));
   const single = media.length === 1;
   return (
     <div className={`chat-media ${single ? "is-single" : ""}`}>
@@ -62,5 +68,27 @@ export function ChatMedia({ media }: { media: Media[] }) {
         );
       })}
     </div>
+  );
+}
+
+/** A link's card under its message, as the sender's window read it: the
+ *  page's picture, site, title and description, opening the page. */
+export function ChatLinkCard({ link }: { link: ChatLink }) {
+  const urls = useChatUrls(link.image ? [link.image] : []);
+  const picture = link.image && (localChatMedia.get(link.image) ?? urls.get(link.image));
+  const ratio = Math.min(2, Math.max(1, (link.width || 1200) / (link.height || 630)));
+  return (
+    <a className="chat-link-card press" href={link.url} target="_blank" rel="noreferrer">
+      {link.image && (
+        <span className="chat-link-picture" style={{ aspectRatio: String(ratio) }}>
+          {picture && <img src={picture} alt="" loading="lazy" draggable={false} />}
+        </span>
+      )}
+      <span className="chat-link-words">
+        {link.site && <span className="chat-link-site">{link.site}</span>}
+        <span className="chat-link-title">{link.title}</span>
+        {link.description && <span className="chat-link-description">{link.description}</span>}
+      </span>
+    </a>
   );
 }

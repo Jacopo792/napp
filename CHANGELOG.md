@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.74 – 2026-11-18
+
+### Added
+
+- Link previews in every chat. The collaboration server reads the first link's
+  page (`/link-preview`, members of the archive only, public HTTPS addresses
+  only, the same pinned-DNS fetch as image imports) and the sender keeps its
+  title, description, site and picture with the message; the picture is copied
+  into `chat-media` as `<archive>/<message>.link.<ext>`. Migration
+  `20261118040000_chat_link_previews`.
+
 ## 0.9.73 – 2026-11-18
 
 ### Added

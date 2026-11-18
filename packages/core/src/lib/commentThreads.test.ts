@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  firstLink,
   isForYou,
   mentionQuery,
   mentionedIn,
@@ -192,4 +193,12 @@ test("opening a note reads what was said on it, even ahead of this clock", () =>
   const seen = new Date(Date.parse(rows[0]!.createdAt) + 1).toISOString();
   assert.deepEqual(unreadRemarks(rows, "me", { n: seen }), []);
   assert.equal(unreadRemarks(rows, "me", {}).length, 1);
+});
+
+test("a message's card is for its first web address, without closing punctuation", () => {
+  assert.equal(firstLink("guarda https://example.com/a?b=1."), "https://example.com/a?b=1");
+  assert.equal(firstLink("(see http://example.com/x)"), "https://example.com/x");
+  assert.equal(firstLink("one https://a.example two https://b.example"), "https://a.example/");
+  assert.equal(firstLink("no link here"), null);
+  assert.equal(firstLink("https://localhost/x"), null);
 });

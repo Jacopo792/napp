@@ -6,6 +6,7 @@ import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
 import type {
   ArchiveComment,
+  ChatLink,
   ChatMedia,
   NoteComment,
   NoteRef,
@@ -13,12 +14,14 @@ import type {
 } from "@/lib/commentThreads";
 
 export {
+  firstLink,
   notesWithOpenRemarks,
   threadsOf,
   unreadRemarks,
 } from "@/lib/commentThreads";
 export type {
   ArchiveComment,
+  ChatLink,
   ChatMedia,
   NoteComment,
   NoteRef,
@@ -161,12 +164,13 @@ export async function addComment(
   bubble: string | null = null,
   replyTo: string | null = null,
   refs: NoteRef[] = [],
-  media?: { id: string; attachments: ChatMedia[] },
+  media?: { id: string; attachments: ChatMedia[]; link?: ChatLink | null },
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
     id: media?.id ?? crypto.randomUUID(),
     attachments: media?.attachments ?? [],
+    link: media?.link ?? null,
     threadId,
     authorId: session.userId,
     body: body.trim(),
@@ -314,3 +318,28 @@ export async function chatMediaUrls(paths: string[]): Promise<Map<string, string
 }
 
 export async function emptyChatMedia(_archiveId: string): Promise<void> {}
+
+/* Any link has a card in the preview: its host for a title and one of the
+   fixture's drawings, as the collaboration server would hand back. */
+export async function fetchLinkPreview(
+  _session: AppSession,
+  url: string,
+): Promise<{ link: ChatLink; image: Blob | null } | null> {
+  await sleep(500);
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const image = await (await fetch(PREVIEW_LANDSCAPE)).blob();
+  return {
+    link: {
+      url,
+      title: `A page on ${host}`,
+      description: "What the page says about itself, in a sentence or two.",
+      site: host,
+      width: 1200,
+      height: 630,
+    },
+    image,
+  };
+}
+
+export const chatLinkPath = (session: AppSession, messageId: string, type: string): string =>
+  `${session.archiveId}/${messageId}.link.${type === "image/png" ? "png" : "jpg"}`;

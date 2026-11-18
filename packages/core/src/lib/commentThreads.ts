@@ -24,6 +24,34 @@ export interface NoteComment {
   refs?: NoteRef[];
   /** The photos and videos a message carries, in order. */
   attachments?: ChatMedia[];
+  /** The card of the first link in its words, as it was when sent. */
+  link?: ChatLink | null;
+}
+
+/** A link's card: the page's own title, description and site name, and its
+ *  picture copied into `chat-media` as `<archive>/<message>.link.<ext>`. */
+export interface ChatLink {
+  url: string;
+  title: string;
+  description?: string;
+  site?: string;
+  image?: string;
+  width?: number;
+  height?: number;
+}
+
+/** The first web address in a message, the one its card is for. */
+export function firstLink(text: string): string | null {
+  const found = /\bhttps?:\/\/[^\s<>"']+/i.exec(text)?.[0];
+  if (!found) return null;
+  /* A sentence's closing punctuation is not part of the address. */
+  const trimmed = found.replace(/[.,;:!?)\]}'"»]+$/, "");
+  try {
+    const url = new URL(trimmed.replace(/^http:/i, "https:"));
+    return url.hostname.includes(".") ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A photo or video in a chat: a file of the private `chat-media`
@@ -81,6 +109,7 @@ export interface CommentRow {
   reply_to?: string | null;
   refs?: NoteRef[] | null;
   attachments?: ChatMedia[] | null;
+  link?: ChatLink | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -96,6 +125,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   replyTo: row.reply_to ?? null,
   refs: row.refs ?? [],
   attachments: row.attachments ?? [],
+  link: row.link ?? null,
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening

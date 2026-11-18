@@ -52,9 +52,13 @@ import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
+  chatLinkPath,
   chatMediaPath,
   deleteComment,
+  fetchLinkPreview,
+  firstLink,
   uploadChatMedia,
+  type ChatLink,
   loadComments,
   loadReactions,
   setReaction,
@@ -69,7 +73,7 @@ import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } f
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
-import { ChatMedia, localChatMedia } from "./ChatMedia";
+import { ChatLinkCard, ChatMedia, localChatMedia } from "./ChatMedia";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -140,6 +144,14 @@ interface Staged {
   width?: number;
   height?: number;
   duration?: number;
+}
+
+/** A link's card read while writing, and its picture to send with it. */
+interface Card {
+  url: string;
+  link: ChatLink;
+  image: Blob | null;
+  picture: string | null;
 }
 
 /* What the bucket takes, by type, and the name each is stored under. */
@@ -265,7 +277,39 @@ export function NoteComments({
   const fileRef = useRef<HTMLInputElement>(null);
   /** The files of each message on its way, and which are already up, so a
    *  retry sends only what is missing. */
-  const outbox = useRef(new Map<string, { files: Staged[]; up: Set<number> }>());
+  const outbox = useRef(new Map<string, { files: Staged[]; up: Set<number>; card: Card | null }>());
+  /** The card of the first link being written, read as it is typed. */
+  const [card, setCard] = useState<Card | null>(null);
+  /** Links whose card the writer closed: not offered again in this draft. */
+  const declined = useRef(new Set<string>());
+  const linked = firstLink(draft);
+  useEffect(() => {
+    if (!linked) {
+      declined.current.clear();
+      return setCard(null);
+    }
+    if (declined.current.has(linked)) return setCard(null);
+    if (card?.url === linked) return;
+    const stop = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetchLinkPreview(session, linked, stop.signal).then(
+        (found) =>
+          found &&
+          setCard({
+            url: linked,
+            link: found.link,
+            image: found.image,
+            picture: found.image ? URL.createObjectURL(found.image) : null,
+          }),
+        () => {},
+      );
+    }, 450);
+    return () => {
+      window.clearTimeout(timer);
+      stop.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read again only for another link
+  }, [linked, session]);
   /** What the calls below read and write: a note's chat, or (null) the
    *  archive's general one. */
   const isGeneral = Boolean(general);
@@ -532,9 +576,15 @@ export function NoteComments({
     const id = retry ? retry.id.slice("local-".length) : crypto.randomUUID();
     const outgoing = retry
       ? outbox.current.get(retry.id)
-      : { files: staged, up: new Set<number>() };
+      : { files: staged, up: new Set<number>(), card: card?.url === firstLink(body) ? card : null };
     const files = outgoing?.files ?? [];
     if (!body && !files.length) return;
+    const sent = outgoing?.card ?? null;
+    const imagePath = sent?.image ? chatLinkPath(session, id, sent.image.type) : undefined;
+    const link: ChatLink | null = sent
+      ? { ...sent.link, ...(imagePath ? { image: imagePath } : {}) }
+      : null;
+    if (imagePath && sent?.picture) localChatMedia.set(imagePath, sent.picture);
     const attachments = files.map((item, index) => ({
       path: chatMediaPath(session, id, index, item.extension),
       kind: item.kind,
@@ -546,6 +596,7 @@ export function NoteComments({
     const local: ChatMessage = retry ?? {
       id: `local-${id}`,
       attachments,
+      link,
       threadId,
       authorId: session.userId,
       body,
@@ -571,8 +622,9 @@ export function NoteComments({
         : [...current, { ...local, sending: true }],
     );
     if (!retry) {
-      if (files.length) outbox.current.set(local.id, outgoing!);
+      if (files.length || sent) outbox.current.set(local.id, outgoing!);
       setStaged([]);
+      setCard(null);
       setDraft("");
       setSuggesting(null);
       if (threadId === pendingThread) onPendingHandled();
@@ -590,6 +642,10 @@ export function NoteComments({
           outgoing!.up.add(index);
         }),
       );
+      if (imagePath && sent?.image && !outgoing!.up.has(-1)) {
+        await uploadChatMedia(imagePath, sent.image, sent.image.type);
+        outgoing!.up.add(-1);
+      }
       const saved = await addComment(
         session,
         source,
@@ -600,7 +656,7 @@ export function NoteComments({
         local.bubble ?? null,
         local.replyTo ?? null,
         local.refs ?? [],
-        files.length ? { id, attachments } : undefined,
+        files.length || link ? { id, attachments, link } : undefined,
       );
       outbox.current.delete(local.id);
       /* Realtime may have put it in place already, under this same key. */
@@ -644,7 +700,13 @@ export function NoteComments({
       return;
     }
     try {
-      await deleteComment(session, message.id, isGeneral, message.attachments ?? []);
+      await deleteComment(
+        session,
+        message.id,
+        isGeneral,
+        message.attachments ?? [],
+        message.link?.image,
+      );
       const rest = messages.filter((m) => m.id !== message.id);
       setMessages(rest);
       onChanged?.();
@@ -1188,6 +1250,7 @@ export function NoteComments({
                   )}
                 </ChatBubble>
               )}
+              {m.link && <ChatLinkCard link={m.link} />}
             </div>
             {!m.sending && !m.failed && editing !== m.id && (
               <>
@@ -1494,6 +1557,26 @@ export function NoteComments({
                   {member.name}
                 </button>
               ))}
+            </div>
+          )}
+          {card && (
+            <div className="chat-about chat-link-draft">
+              {card.picture && <img src={card.picture} alt="" draggable={false} />}
+              <span className="chat-about-words">
+                <strong>{card.link.title}</strong> {card.link.site}
+              </span>
+              <button
+                type="button"
+                className="chat-tool press"
+                aria-label="No preview"
+                onClick={() => {
+                  declined.current.add(card.url);
+                  setCard(null);
+                  composerRef.current?.focus();
+                }}
+              >
+                <X size={13} />
+              </button>
             </div>
           )}
           {staged.length > 0 && (

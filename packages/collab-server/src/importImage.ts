@@ -26,11 +26,29 @@ export function publicAddress(address: string): boolean {
   );
 }
 
-/** Fetch only public HTTPS images. Pin the validated DNS answer for each redirect. */
-export async function importImage(
+const IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+  "image/avif",
+];
+
+/** Fetch only public HTTPS images. */
+export async function importImage(source: string): Promise<{ bytes: Buffer; type: string }> {
+  return fetchPublic(source, IMAGE_TYPES, LIMIT);
+}
+
+/** GET a public HTTPS address and return its body if it is one of `types`.
+ *  Pin the validated DNS answer for each redirect, so a name cannot be
+ *  checked as public and then connected to as private. */
+export async function fetchPublic(
   source: string,
+  types: string[],
+  limit: number,
   redirects = 0,
-): Promise<{ bytes: Buffer; type: string }> {
+): Promise<{ bytes: Buffer; type: string; url: string }> {
   const url = new URL(source);
   if (
     url.protocol !== "https:" ||
@@ -39,11 +57,11 @@ export async function importImage(
     (url.port && url.port !== "443") ||
     redirects > 3
   )
-    throw new Error("Image address is not supported");
+    throw new Error("Address is not supported");
   const host = url.hostname.replace(/^\[|\]$/g, "");
   const addresses = await lookup(host, { all: true });
   if (!addresses.length || addresses.some(({ address }) => !publicAddress(address)))
-    throw new Error("Image address is not public");
+    throw new Error("Address is not public");
   const address = addresses[0];
   return new Promise((resolve, reject) => {
     const req = request(
@@ -51,7 +69,11 @@ export async function importImage(
       {
         lookup: (_hostname, _options, callback) => callback(null, [address]),
         headers: {
-          accept: "image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/avif",
+          accept: types.join(","),
+          /* Sites hand their preview tags to link unfurlers, and some refuse
+             a request that names no client at all. */
+          "user-agent": "Mozilla/5.0 (compatible; NappLinkPreview/1.0)",
+          "accept-language": "en,*;q=0.5",
         },
       },
       (response) => {
@@ -60,47 +82,46 @@ export async function importImage(
           response.headers.location
         ) {
           response.resume();
-          resolve(importImage(new URL(response.headers.location, url).href, redirects + 1));
+          resolve(
+            fetchPublic(new URL(response.headers.location, url).href, types, limit, redirects + 1),
+          );
           return;
         }
         const rawType = response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() ?? "";
         // Normalise jpeg aliases; the blob type is what prepareImageForNote checks.
         const type = rawType === "image/jpg" || rawType === "image/pjpeg" ? "image/jpeg" : rawType;
-        if (
-          response.statusCode !== 200 ||
-          ![
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif",
-            "image/svg+xml",
-            "image/avif",
-          ].includes(type)
-        ) {
+        if (response.statusCode !== 200 || !types.includes(type)) {
           response.resume();
-          reject(new Error("Source did not return an image"));
+          reject(new Error("Source did not return what was asked for"));
           return;
         }
-        if (Number(response.headers["content-length"]) > LIMIT) {
+        /* A page's preview tags are in its head: a long page is read only
+           as far as the limit, never refused for its length. */
+        const partial = type === "text/html";
+        if (!partial && Number(response.headers["content-length"]) > limit) {
           response.destroy();
-          reject(new Error("Image exceeds 20 MB"));
+          reject(new Error("Response is too large"));
           return;
         }
         const chunks: Buffer[] = [];
         let size = 0;
         response.on("data", (chunk: Buffer) => {
           size += chunk.length;
-          if (size > LIMIT) {
-            response.destroy(new Error("Image exceeds 20 MB"));
+          if (size > limit) {
+            if (partial) {
+              chunks.push(chunk);
+              response.destroy();
+              resolve({ bytes: Buffer.concat(chunks), type, url: url.href });
+            } else response.destroy(new Error("Response is too large"));
             return;
           }
           chunks.push(chunk);
         });
-        response.on("end", () => resolve({ bytes: Buffer.concat(chunks), type }));
+        response.on("end", () => resolve({ bytes: Buffer.concat(chunks), type, url: url.href }));
         response.on("error", reject);
       },
     );
-    const timer = setTimeout(() => req.destroy(new Error("Image request timed out")), 15000);
+    const timer = setTimeout(() => req.destroy(new Error("Request timed out")), 15000);
     req.on("close", () => clearTimeout(timer));
     req.on("error", reject);
     req.end();

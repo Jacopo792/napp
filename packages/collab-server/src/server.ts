@@ -25,6 +25,7 @@ import { setTimeout, clearTimeout } from "node:timers";
 import * as Y from "yjs";
 import { revertIfBroken } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
+import { linkPreview } from "./linkPreview.ts";
 import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
@@ -199,6 +200,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
     probe: Promise<[Awaited<ReturnType<typeof probeSupabase>>, boolean | null]>;
   } | null = null;
   let importing = 0;
+  let previewing = 0;
 
   return new Server<Context>({
     port: config.port,
@@ -448,6 +450,45 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
           importing--;
         }
         throw null;
+      }
+      /* A link's card, for a member about to send it in their archive's
+         chat. Read here so no reader's address reaches the site. */
+      if (url.pathname === "/link-preview") {
+        const origin = request.headers.origin;
+        if (!originAllowed(origin, config.allowedOrigins))
+          return respond(response, 403, { error: "Origin refused" });
+        response.setHeader("Access-Control-Allow-Origin", origin!);
+        response.setHeader("Vary", "Origin");
+        response.setHeader("Access-Control-Allow-Headers", "authorization");
+        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        if (request.method === "OPTIONS") {
+          response.writeHead(204);
+          response.end();
+          throw null;
+        }
+        if (request.method !== "GET") return respond(response, 405, { error: "Method refused" });
+        const archiveId = url.searchParams.get("archive") ?? "";
+        const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
+        if (!/^[0-9a-f-]{36}$/i.test(archiveId) || !token || token.length > MAX_TOKEN)
+          return respond(response, 401, { error: "Sign in to preview links" });
+        /* Row level security answers: a caller sees a membership row only of
+           an archive they belong to. */
+        const member = await asCaller(token)
+          .from("archive_members")
+          .select("archive_id")
+          .eq("archive_id", archiveId)
+          .limit(1);
+        if (member.error || !member.data?.length)
+          return respond(response, 403, { error: "Not a member of this archive" });
+        if (previewing >= 6) return respond(response, 429, { error: "Try again in a moment" });
+        previewing++;
+        const preview = await linkPreview(url.searchParams.get("url") ?? "")
+          .catch(() => undefined)
+          .finally(() => previewing--);
+        if (preview === undefined)
+          return respond(response, 422, { error: "Could not read this page" });
+        if (!preview) return respond(response, 404, { error: "This page has no preview" });
+        return respond(response, 200, { ...preview });
       }
       if (request.url === "/healthz") {
         return respond(response, 200, { status: "ok" });
