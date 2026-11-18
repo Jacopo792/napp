@@ -22,11 +22,11 @@ export interface NoteComment {
   replyTo?: string | null;
   /** The notes a general-chat message is about: quoted from, or named with #. */
   refs?: NoteRef[];
-  /** The photos and videos a general-chat message carries, in order. */
+  /** The photos and videos a message carries, in order. */
   attachments?: ChatMedia[];
 }
 
-/** A photo or video in the general chat: a file of the private `chat-media`
+/** A photo or video in a chat: a file of the private `chat-media`
  *  bucket, named `<archive>/<message>.<n>.<ext>`, and the size it was taken
  *  at so its place can be kept before it has loaded. */
 export interface ChatMedia {

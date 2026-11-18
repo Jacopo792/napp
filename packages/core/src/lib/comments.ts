@@ -33,7 +33,7 @@ export type {
 } from "./commentThreads";
 
 const COLUMNS =
-  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to";
+  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to, attachments";
 
 /* The archive's general chat is the same conversation with no note under it:
    its own tables (`archive_messages`), read here through the same calls with
@@ -171,8 +171,8 @@ export async function addComment(
   replyTo: string | null = null,
   /** For the general chat only: the notes the message is about. */
   refs: NoteRef[] = [],
-  /** For the general chat only: the message's own id, chosen before its
-   *  files were uploaded under it, and those files. */
+  /** The message's own id, chosen before its files were uploaded under it,
+   *  and those files. */
   media?: { id: string; attachments: ChatMedia[] },
 ): Promise<NoteComment> {
   const trimmed = body.trim();
@@ -198,6 +198,7 @@ export async function addComment(
   const result = await supabase
     .from("note_comments")
     .insert({
+      ...(media ? { id: media.id, attachments: media.attachments } : {}),
       bubble,
       reply_to: replyTo,
       archive_id: session.archiveId,

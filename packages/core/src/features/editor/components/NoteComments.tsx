@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Copy,
   Flag,
+  ImagePlus,
   Maximize2,
   Minimize2,
   NotebookText,
@@ -51,7 +52,9 @@ import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
+  chatMediaPath,
   deleteComment,
+  uploadChatMedia,
   loadComments,
   loadReactions,
   setReaction,
@@ -66,7 +69,7 @@ import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } f
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
-import { ChatMedia } from "./ChatMedia";
+import { ChatMedia, localChatMedia } from "./ChatMedia";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -126,6 +129,59 @@ const titled = (title: string) => title.trim() || "Untitled";
 interface ChatMessage extends NoteComment {
   sending?: boolean;
   failed?: boolean;
+}
+
+/** A photo or video chosen for the next message, not yet uploaded. */
+interface Staged {
+  file: File;
+  url: string;
+  kind: "image" | "video";
+  extension: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
+
+/* What the bucket takes, by type, and the name each is stored under. */
+const MEDIA_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+};
+const MAX_FILES = 10;
+const MAX_BYTES = 100 * 1024 * 1024;
+
+/** A chosen file, with the size it was taken at so its tile keeps its place. */
+function measure(file: File): Promise<Staged> {
+  const url = URL.createObjectURL(file);
+  const kind = file.type.startsWith("video/") ? "video" : "image";
+  const base = { file, url, kind, extension: MEDIA_TYPES[file.type]! } as const;
+  return new Promise((done) => {
+    if (kind === "image") {
+      const img = new window.Image();
+      img.onload = () => done({ ...base, width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => done(base);
+      img.src = url;
+      return;
+    }
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () =>
+      done({
+        ...base,
+        width: video.videoWidth,
+        height: video.videoHeight,
+        ...(Number.isFinite(video.duration) ? { duration: video.duration } : {}),
+      });
+    video.onerror = () => done(base);
+    video.src = url;
+  });
 }
 
 /** Messages closer than this, from one person, are one group: one name. */
@@ -205,6 +261,11 @@ export function NoteComments({
   const [noteChips, setNoteChips] = useState<NoteRef[]>([]);
   const [findingNote, setFindingNote] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(Boolean(general));
+  const [staged, setStaged] = useState<Staged[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  /** The files of each message on its way, and which are already up, so a
+   *  retry sends only what is missing. */
+  const outbox = useRef(new Map<string, { files: Staged[]; up: Set<number> }>());
   /** What the calls below read and write: a note's chat, or (null) the
    *  archive's general one. */
   const isGeneral = Boolean(general);
@@ -457,12 +518,34 @@ export function NoteComments({
 
   /* ── Saying something ──────────────────────────────────────────────── */
 
+  async function stage(files: Iterable<File>) {
+    const chosen = [...files].filter((file) => file.type in MEDIA_TYPES);
+    const fit = chosen.filter((file) => file.size <= MAX_BYTES);
+    if (fit.length < chosen.length) setFailure("Photos and videos can be up to 100 MB");
+    const measured = await Promise.all(fit.map(measure));
+    setStaged((current) => [...current, ...measured].slice(0, MAX_FILES));
+    composerRef.current?.focus();
+  }
+
   async function send(retry?: ChatMessage) {
     const body = (retry?.body ?? draft).trim();
-    if (!body) return;
+    const id = retry ? retry.id.slice("local-".length) : crypto.randomUUID();
+    const outgoing = retry
+      ? outbox.current.get(retry.id)
+      : { files: staged, up: new Set<number>() };
+    const files = outgoing?.files ?? [];
+    if (!body && !files.length) return;
+    const attachments = files.map((item, index) => ({
+      path: chatMediaPath(session, id, index, item.extension),
+      kind: item.kind,
+      ...(item.width ? { width: item.width, height: item.height } : {}),
+      ...(item.duration ? { duration: item.duration } : {}),
+    }));
+    attachments.forEach((item, index) => localChatMedia.set(item.path, files[index]!.url));
     const threadId = retry?.threadId ?? (about && quotes.has(about) ? about : noteId);
     const local: ChatMessage = retry ?? {
-      id: `local-${crypto.randomUUID()}`,
+      id: `local-${id}`,
+      attachments,
       threadId,
       authorId: session.userId,
       body,
@@ -488,6 +571,8 @@ export function NoteComments({
         : [...current, { ...local, sending: true }],
     );
     if (!retry) {
+      if (files.length) outbox.current.set(local.id, outgoing!);
+      setStaged([]);
       setDraft("");
       setSuggesting(null);
       if (threadId === pendingThread) onPendingHandled();
@@ -498,6 +583,13 @@ export function NoteComments({
       setFindingNote(null);
     }
     try {
+      await Promise.all(
+        files.map(async (item, index) => {
+          if (outgoing!.up.has(index)) return;
+          await uploadChatMedia(attachments[index]!.path, item.file, item.file.type);
+          outgoing!.up.add(index);
+        }),
+      );
       const saved = await addComment(
         session,
         source,
@@ -508,7 +600,9 @@ export function NoteComments({
         local.bubble ?? null,
         local.replyTo ?? null,
         local.refs ?? [],
+        files.length ? { id, attachments } : undefined,
       );
+      outbox.current.delete(local.id);
       /* Realtime may have put it in place already, under this same key. */
       keys.current.set(saved.id, local.id);
       known.current?.add(saved.id);
@@ -1294,7 +1388,17 @@ export function NoteComments({
       )}
 
       {canEdit && (
-        <div className="chat-composer">
+        <div
+          className="chat-composer"
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files.length) return;
+            event.preventDefault();
+            void stage(event.dataTransfer.files);
+          }}
+        >
           {replying && (
             <div className="chat-about chat-replying">
               <Reply size={13} />
@@ -1392,7 +1496,49 @@ export function NoteComments({
               ))}
             </div>
           )}
+          {staged.length > 0 && (
+            <div className="chat-staged">
+              {staged.map((item, index) => (
+                <span key={item.url} className="chat-staged-item">
+                  {item.kind === "video" ? (
+                    <video src={item.url} muted playsInline preload="metadata" />
+                  ) : (
+                    <img src={item.url} alt="" draggable={false} />
+                  )}
+                  <button
+                    type="button"
+                    className="chat-staged-remove press"
+                    aria-label="Remove"
+                    onClick={() => setStaged((current) => current.filter((_, at) => at !== index))}
+                  >
+                    <X size={11} stroke={2.6} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="chat-compose-row">
+            <button
+              type="button"
+              className="chat-tool chat-attach-button press"
+              aria-label="Photos and videos"
+              title="Photos and videos"
+              disabled={staged.length >= MAX_FILES}
+              onClick={() => fileRef.current?.click()}
+            >
+              <ImagePlus size={19} />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              hidden
+              multiple
+              accept={Object.keys(MEDIA_TYPES).join(",")}
+              onChange={(event) => {
+                if (event.target.files) void stage(event.target.files);
+                event.target.value = "";
+              }}
+            />
             <div className="chat-field">
               <textarea
                 ref={composerRef}
@@ -1400,6 +1546,11 @@ export function NoteComments({
                 value={draft}
                 placeholder="Message"
                 aria-label="Message"
+                onPaste={(event) => {
+                  if (!event.clipboardData.files.length) return;
+                  event.preventDefault();
+                  void stage(event.clipboardData.files);
+                }}
                 onChange={(event) => {
                   setDraft(event.target.value);
                   const caret = event.target.selectionStart ?? 0;
@@ -1439,8 +1590,8 @@ export function NoteComments({
                 type="button"
                 className="chat-send press"
                 aria-label="Send"
-                data-ready={draft.trim() ? "" : undefined}
-                disabled={!draft.trim()}
+                data-ready={draft.trim() || staged.length ? "" : undefined}
+                disabled={!draft.trim() && !staged.length}
                 onClick={() => void send()}
               >
                 <ArrowUp size={16} stroke={2.4} />
