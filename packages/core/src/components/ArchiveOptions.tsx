@@ -6,7 +6,7 @@
  * turned a book into notes, and the Settings section that could have turned
  * it back belonged to the book and went with it. */
 import { useState, type ReactNode } from "react";
-import { Footnote, ListOrdered, Quote, Target, Users } from "@/components/icons";
+import { Footnote, ListOrdered, Quote, Target } from "@/components/icons";
 import type { DocumentFeatures } from "@/lib/spaceShape";
 
 const SWITCHES: {
@@ -61,33 +61,6 @@ export function ArchiveOptions({
   return (
     <div className="archive-options">
       <div className="appearance-controls">
-        <div className="appearance-row">
-          <span className="settings-lead" aria-hidden="true">
-            <Users size={16} />
-          </span>
-          <span className="settings-label">
-            <b>Manuscript</b>
-          </span>
-          <div className="settings-segment is-inline" role="group" aria-label="Manuscript">
-            {(
-              [
-                ["own", "One each"],
-                ["shared", "Shared"],
-              ] as const
-            ).map(([id, name]) => (
-              <button
-                key={id}
-                type="button"
-                disabled={disabled}
-                aria-pressed={features.manuscript === id}
-                className={`press ${features.manuscript === id ? "is-active" : ""}`}
-                onClick={() => onChange({ ...features, manuscript: id })}
-              >
-                <span>{name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
         <Row icon={<Target size={16} />} name="Word goal">
           <input
             className="archive-goal"

@@ -3,6 +3,22 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.72 – 2026-11-18
+
+### Fixed
+
+- A book could leave a member on a page with no titlebar and no way out. A
+  page that is not a chapter now keeps the book's titlebar.
+- The shared manuscript option is removed. It kept the book in the first
+  member's scope, but a note always belongs to its author
+  (`keep_note_author`, 0.9.46), so other members' chapters disappeared and new
+  ones were lost. Every book is now one each; a stored `manuscript` value is
+  ignored, and existing chapters reappear in their author's book.
+- A book opens on its first chapter instead of an empty desk with a "Begin the
+  first chapter" button; an empty book of your own starts with Chapter 1.
+- A dressed chat bubble is as wide as its words, or as its animal needs, rather
+  than at least 80px or stretched to fit the sender's name beside the animal.
+
 ## 0.9.71 – 2026-11-18
 
 ### Added

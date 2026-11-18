@@ -13122,15 +13122,6 @@ button.sheet-chip:hover,
   justify-content: center;
 }
 
-.manuscript-continue {
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  padding: 9px 18px;
-  color: var(--on-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
 /* Previous and next, under the sheet rather than on it: they are about the
    document, and nothing that is not the text belongs on the page. */
 .manuscript-turn {
@@ -15913,7 +15904,6 @@ button.sheet-chip:hover,
     .login-mark,
     .login-panel,
     .login-reveal,
-    .manuscript-continue,
     .manuscript-titlebar-chapter,
     .manuscript-turn button,
     .member-presence-follow,

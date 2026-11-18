@@ -70,7 +70,6 @@ const spaces: Space[] = [
     seatLimit: 2,
     kind: "document",
     features: {
-      manuscript: "shared",
       numbering: true,
       footnotes: true,
       citations: true,

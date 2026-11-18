@@ -22,9 +22,9 @@ test("features are read, not trusted", () => {
   assert.deepEqual(documentFeatures(null), DEFAULT_FEATURES);
   assert.deepEqual(documentFeatures({ partnerName: "x" }), DEFAULT_FEATURES);
   const read = documentFeatures({
-    features: { manuscript: "own", footnotes: true, review: "yes", wordGoal: -4 },
+    features: { manuscript: "shared", footnotes: true, review: "yes", wordGoal: -4 },
   });
-  assert.equal(read.manuscript, "own");
+  assert.equal("manuscript" in read, false);
   assert.equal(read.footnotes, true);
   assert.equal(read.review, false);
   assert.equal(read.wordGoal, undefined);

@@ -314,8 +314,7 @@
 /* Wide enough that the animal always stands on a straight edge, never on
    the curve of a corner — even under a one-word message. */
 .chat-bubble.is-dressed .chat-bubble-body {
-  min-width: 80px;
-  /* A word shorter than that stands in the middle of its bubble, not
+  /* A word shorter than its animal stands in the middle of its bubble, not
      against one end of it; longer text fills the line and reads left. */
   align-items: center;
 }

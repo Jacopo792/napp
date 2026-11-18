@@ -471,6 +471,24 @@ export function dressBand(
   };
 }
 
+/** As wide as the animal needs, measured from the edge each piece hangs on,
+ *  so a short word gets a bubble its own size rather than a fixed floor. */
+function dressWidth(dress: Dress | undefined): number {
+  if (!dress) return 0;
+  /* Pieces hung on opposite edges (a bear's two ears) need room for both. */
+  const reach = (side: "left" | "right") =>
+    Math.max(
+      0,
+      ...dress.pieces.map((piece) => {
+        const offset = piece.at[side];
+        return offset === undefined ? 0 : Math.max(0, offset) + piece.w;
+      }),
+    );
+  const left = reach("left");
+  const right = reach("right");
+  return left && right ? left + right + 4 : left + right;
+}
+
 export function ChatBubble({
   bubble,
   mine,
@@ -507,7 +525,7 @@ export function ChatBubble({
           ...(dress
             ? { "--room-top": `${roomAbove(dress)}px`, "--room-bottom": `${dress.room.bottom}px` }
             : {}),
-          ...(minWidth ? { minWidth } : {}),
+          ...(minWidth || dress ? { minWidth: Math.max(minWidth ?? 0, dressWidth(dress)) } : {}),
         } as CSSProperties
       }
     >

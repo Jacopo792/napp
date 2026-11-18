@@ -1062,19 +1062,16 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* ── A document ──────────────────────────────────────────────────────────
      The same notes, read as one piece of writing: chapters in the order
      `position` gives them, parts over stretches of it, and a notebook of
-     everything not placed. A shared manuscript lives in the scope of the
-     archive's first member, so the structure is one for everybody and the
-     switch beside the faces chooses whose notebook is open. Nothing here
-     changes what a notes archive reads or writes. */
+     everything not placed. Each member writes their own, and the switch
+     beside the faces chooses whose. Nothing here changes what a notes
+     archive reads or writes. */
   const currentSpace = spaces.find((space) => space.archiveId === session?.archiveId);
   const docMode = currentSpace?.kind === "document";
   const docFeatures = currentSpace?.features ?? DEFAULT_FEATURES;
-  const manuscriptOwner =
-    docMode && docFeatures.manuscript === "shared" ? (members[0]?.userId ?? viewAs) : viewAs;
 
   const manuscript = useMemo(
-    () => (docMode ? manuscriptOf(entries, metas, manuscriptOwner, viewAs) : null),
-    [docMode, metas, entries, manuscriptOwner, viewAs],
+    () => (docMode ? manuscriptOf(entries, metas, viewAs, viewAs) : null),
+    [docMode, metas, entries, viewAs],
   );
 
   const page = currentSpace?.page ?? DEFAULT_PAGE;
@@ -1114,18 +1111,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     };
   }, [statsShown, session]);
 
-  /* Trashed notes of either scope the document reads, for its own Trash. */
+  /* Trashed notes of the book on screen, for its own Trash. */
   const docTrash = useMemo(() => {
     if (!docMode) return [];
-    const owners = new Set([manuscriptOwner, viewAs]);
     return entries.filter((entry) => {
-      if (!owners.has(entry.note.ownerId ?? "")) return false;
+      if (entry.note.ownerId !== viewAs) return false;
       const row = (metas[entry.note.ownerId ?? ""] ?? EMPTY_META).notes.find(
         (note) => note.id === entry.note.id,
       );
       return Boolean(row?.trashedAt);
     });
-  }, [docMode, entries, metas, manuscriptOwner, viewAs]);
+  }, [docMode, entries, metas, viewAs]);
 
   const docSelected =
     docMode && selectedId && !docTrash.some((entry) => entry.note.id === selectedId)
@@ -2094,7 +2090,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (!canWriteArchive) return;
     const s = sessionRef.current;
     if (!s) return;
-    const owner = place ? manuscriptOwner : viewAs;
+    const owner = viewAs;
     const now = new Date().toISOString();
     const body = richTextToPlainText(content);
     const note: Note = {
@@ -2189,6 +2185,37 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     void createDocNote(moveTo(chapters, "", open < 0 ? chapters.length : open + 1));
   }
 
+  /* A book opens on its writing, never on an empty desk: the first chapter,
+     or — in your own book with none yet — a first chapter made for you. One
+     attempt per empty book, so a refused insert does not repeat. */
+  const firstChapterFor = useRef<string | null>(null);
+  const bookKey = `${session?.archiveId}:${viewAs}`;
+  const firstChapterId = manuscript?.chapters[0]?.id ?? null;
+  const newChapterRef = useRef(handleNewChapter);
+  useLayoutEffect(() => {
+    newChapterRef.current = handleNewChapter;
+  });
+  useEffect(() => {
+    if (!docMode || loading || !manuscript || selectedId) return;
+    if (firstChapterId) {
+      firstChapterFor.current = null;
+      setSelectedId(firstChapterId);
+    } else if (canWriteArchive && viewAs === selfId && firstChapterFor.current !== bookKey) {
+      firstChapterFor.current = bookKey;
+      newChapterRef.current(null);
+    }
+  }, [
+    docMode,
+    loading,
+    manuscript,
+    selectedId,
+    firstChapterId,
+    canWriteArchive,
+    viewAs,
+    selfId,
+    bookKey,
+  ]);
+
   function setNoteRow(owner: string, noteId: string, change: Partial<NoteMeta>) {
     handleMetaChangeFor(owner, (prev) => {
       const existing = prev.notes.some((note) => note.id === noteId);
@@ -2218,22 +2245,22 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                 ...moveTo(chapters, id, at(target.id) + (target.kind === "after" ? 1 : 0)),
                 folderId: rest[at(target.id)]?.folderId ?? null,
               };
-    setNoteRow(manuscriptOwner, id, next);
+    setNoteRow(viewAs, id, next);
   }
 
   function handleNewPart(chapterId: string) {
     const count = manuscript?.parts.size ?? 0;
     const id = crypto.randomUUID();
-    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+    handleMetaChangeFor(viewAs, (prev) => ({
       ...prev,
       folders: [...prev.folders, { id, name: `Part ${count + 1}`, parentId: null }],
     }));
     /* The chapter stays where it is in the order; the part begins at it. */
-    setNoteRow(manuscriptOwner, chapterId, { folderId: id });
+    setNoteRow(viewAs, chapterId, { folderId: id });
   }
 
   function handleRenamePart(id: string, name: string) {
-    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+    handleMetaChangeFor(viewAs, (prev) => ({
       ...prev,
       folders: prev.folders.map((folder) => (folder.id === id ? { ...folder, name } : folder)),
     }));
@@ -2241,7 +2268,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /** The part goes and its chapters stay where they are in the order. */
   function handleDeletePart(id: string) {
-    handleMetaChangeFor(manuscriptOwner, (prev) => ({
+    handleMetaChangeFor(viewAs, (prev) => ({
       ...prev,
       folders: prev.folders.filter((folder) => folder.id !== id),
       notes: prev.notes.map((note) => (note.folderId === id ? { ...note, folderId: null } : note)),
@@ -2309,9 +2336,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     setScopeDirection(place(v) > place(viewAs) ? "next" : "previous");
     saveNow();
     setViewAs(v);
-    /* In a shared manuscript the switch changes whose notebook is open, not
-       which document — the chapter in front of you is still the one. */
-    if (!(docMode && docFeatures.manuscript === "shared")) setSelectedId(null);
+    setSelectedId(null);
     setSelectedFolderId(ALL);
     setQuery("");
     setMobileScreen("collection");
@@ -4306,7 +4331,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onRenamePart={handleRenamePart}
         onDeletePart={handleDeletePart}
         onMove={handleMoveChapter}
-        onChapter={(id, chapter) => setNoteRow(manuscriptOwner, id, { chapter })}
+        onChapter={(id, chapter) => setNoteRow(viewAs, id, { chapter })}
         onTrash={handleTrashDocNote}
         onTrashAll={handleTrashDocNotes}
         onInfo={(id) => openSheet({ kind: "note", noteId: id })}
@@ -4359,7 +4384,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         canWrite={canWriteArchive}
         onOpen={openFromStructure}
         onMove={handleMoveChapter}
-        onChapter={(id, chapter) => setNoteRow(manuscriptOwner, id, { chapter })}
+        onChapter={(id, chapter) => setNoteRow(viewAs, id, { chapter })}
       />
     );
 
@@ -4380,21 +4405,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             </button>
           )}
         </div>
-        <div className="manuscript-desk manuscript-empty min-h-0 flex-1">
-          {canWriteArchive && manuscript.chapters.length === 0 && (
-            <button
-              type="button"
-              className="manuscript-continue press"
-              onClick={() => handleNewChapter(null)}
-            >
-              Begin the first chapter
-            </button>
-          )}
-        </div>
+        <div className="manuscript-desk manuscript-empty min-h-0 flex-1" />
       </section>
     );
 
-    const chapterEditor = selected ? (
+    const pageEditor = selected ? (
       <Suspense fallback={<div className="manuscript-shell min-w-0 flex-1" />}>
         <NoteEditor
           ref={noteEditorRef}
@@ -4497,6 +4512,17 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     ) : (
       titlePage
     );
+    /* A page that is not a chapter — research — opens as a note, which has no
+       titlebar of its own. Without this one the book could not be left. */
+    const chapterEditor =
+      selected && chapterAt < 0 && titlebar ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {titlebar}
+          {pageEditor}
+        </div>
+      ) : (
+        pageEditor
+      );
 
     if (compact)
       return (

@@ -961,11 +961,16 @@ export function NoteComments({
 
     /* A lone dressed message: its name sits in the animal's band rather than
        above it, so it stays with its bubble. Only when the animal stands at
-       the other edge, and with the bubble made wide enough for both.
-       ponytail: the name's width is estimated from its length (11px text). */
+       the other edge, and only when the words already make the bubble wide
+       enough for both: widening a short one left it mostly empty.
+       ponytail: both widths are estimated from length (11px name, 14px text). */
     const band = first && last && !(jumbo && !answered) ? dressBand(m.bubble) : null;
     const nameWidth = (mine ? 0 : name.length * 6.6 + 6) + 30;
-    const nested = band?.far ? { gap: 4 - band.top, width: nameWidth + 12 + band.reach } : null;
+    const bandWidth = band ? nameWidth + 12 + band.reach : 0;
+    const nested =
+      band?.far && (answered || m.body.trim().length * 7.4 + 24 >= bandWidth)
+        ? { gap: 4 - band.top, width: bandWidth }
+        : null;
 
     return (
       <div key={key} className="chat-row-wrap">

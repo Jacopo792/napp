@@ -20,10 +20,12 @@ export type ArchiveKind = "notes" | "document";
 
 /** How a document is written. Kept in `archives.settings.features`, written
  *  only through `merge_archive_settings`, never over the whole column.
- *  `manuscript` is what You / Partner means here: `own` is a manuscript each,
- *  `shared` is one manuscript and a drawer of notes each. */
+ *  Every member writes a manuscript of their own, which is what You / Partner
+ *  switches between. A shared manuscript was retired: a note belongs to
+ *  whoever wrote it (`keep_note_author`) and sits in that author's parts, so
+ *  one member's book could never hold another member's chapter. An old
+ *  `manuscript` value in the column is ignored. */
 export interface DocumentFeatures {
-  manuscript: "own" | "shared";
   numbering: boolean;
   footnotes: boolean;
   citations: boolean;
@@ -40,7 +42,6 @@ export const ARCHIVE_PRESETS = [
     name: "Notes",
     kind: "notes",
     features: {
-      manuscript: "shared",
       numbering: false,
       footnotes: false,
       citations: false,
@@ -51,12 +52,7 @@ export const ARCHIVE_PRESETS = [
     id: "book",
     name: "Book",
     kind: "document",
-    /* A book each, like the notes archive's You / Partner: in a book that
-       was one manuscript for everybody the switch changed nothing above the
-       fold, and two people read that as no difference between them. One
-       shared manuscript is a switch in Settings → Document. */
     features: {
-      manuscript: "own",
       numbering: true,
       footnotes: true,
       citations: true,
@@ -84,10 +80,7 @@ const SWITCHES = ["numbering", "footnotes", "citations", "review"] as const;
 
 export function documentFeatures(settings: unknown): DocumentFeatures {
   const raw = (settings as { features?: Record<string, unknown> } | null)?.features ?? {};
-  const features: DocumentFeatures = {
-    ...DEFAULT_FEATURES,
-    manuscript: raw.manuscript === "own" ? "own" : "shared",
-  };
+  const features: DocumentFeatures = { ...DEFAULT_FEATURES };
   for (const key of SWITCHES) if (typeof raw[key] === "boolean") features[key] = raw[key];
   const goal = Number(raw.wordGoal);
   if (Number.isInteger(goal) && goal > 0 && goal <= 10_000_000) features.wordGoal = goal;
