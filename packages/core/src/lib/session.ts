@@ -225,8 +225,25 @@ export async function registerAccount(
   return { session: null, confirmationRequired: true };
 }
 
+/** A saved archive the account can no longer read (left, removed, or one that
+ *  belongs to another account on this device) opens the account's first
+ *  archive instead of an empty list. Offline, the saved one stands. */
 export async function restoreSession(): Promise<AppSession | null> {
-  return restoreArchiveSession(localStorage, supabase.auth);
+  const stored = await restoreArchiveSession(localStorage, supabase.auth);
+  if (!stored) return null;
+  let archives: ArchiveOption[];
+  try {
+    archives = await loadArchiveOptions(stored.userId);
+  } catch {
+    return stored;
+  }
+  if (archives.some((archive) => archive.archiveId === stored.archiveId)) return stored;
+  if (archives.length === 0) {
+    localStorage.removeItem(SESSION_KEY);
+    resetArchiveCache();
+    return null;
+  }
+  return storeSession(stored.userId, stored.email, archives[0].archiveId);
 }
 
 /* Other accounts on this device, kept so switching is a click instead of a

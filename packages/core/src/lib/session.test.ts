@@ -106,7 +106,11 @@ function accountFlow(
             if (options.contentCleanupFails) throw new Error("Local removal blocked");
           },
         };
-      if (name === "./sessionRestore") return { SESSION_KEY: "session" };
+      if (name === "./sessionRestore")
+        return {
+          SESSION_KEY: "session",
+          restoreArchiveSession: async () => JSON.parse(storage.get("session") ?? "null"),
+        };
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
@@ -229,4 +233,16 @@ test("a transient saved-account switch failure does not discard its credentials"
       (account: { userId: string }) => account.userId === "second",
     ),
   );
+});
+
+test("a saved archive the account cannot read opens one of its own", async () => {
+  const flow = accountFlow();
+  const saved = { userId: user.id, email: user.email, archiveId: "other-account" };
+  flow.storage.set("session", JSON.stringify(saved));
+  const restored = await flow.api.restoreSession();
+  assert.equal(restored?.archiveId, "personal");
+  assert.equal(JSON.parse(flow.storage.get("session")!).archiveId, "personal");
+
+  flow.storage.set("session", JSON.stringify({ ...saved, archiveId: "personal" }));
+  assert.equal((await flow.api.restoreSession())?.archiveId, "personal");
 });

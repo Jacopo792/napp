@@ -3,6 +3,17 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.75 – 2026-11-18
+
+### Fixed
+
+- Restoring a saved session now checks that the account is still a member of
+  the saved archive. A device with two accounts could keep the other account's
+  archive, so every read returned nothing and the list showed "Cannot coerce
+  the result to a single JSON object". It now opens the account's first
+  archive, or returns to sign-in when it has none; a missing archive during
+  loading says so plainly.
+
 ## 0.9.74 – 2026-11-18
 
 ### Added

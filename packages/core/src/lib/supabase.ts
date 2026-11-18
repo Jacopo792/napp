@@ -123,7 +123,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       .eq("archive_id", archiveId)
       .order("created_at"),
     supabase.from("profiles").select("user_id, nickname, avatar_object"),
-    supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).single(),
+    supabase.from("archives").select("settings, seat_limit").eq("id", archiveId).maybeSingle(),
     noteCache.size === 0 ? readCachedNotes(archiveId) : Promise.resolve(null),
   ]);
 
@@ -134,6 +134,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   for (const result of [membersResult, archiveResult]) {
     fail(result.error);
   }
+  if (!archiveResult.data) throw new Error("This archive is no longer available. Sign in again.");
 
   // A profile may not exist yet, and a missing name is never a reason to fail
   // to open the archive.
