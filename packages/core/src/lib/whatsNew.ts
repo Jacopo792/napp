@@ -45,6 +45,28 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.72",
+    date: "2026-11-18",
+    headline: "Fixes for books and chat bubbles",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          {
+            title: "Books no longer get stuck",
+            text: "Switching a book to a shared manuscript could hide your chapters and leave you on a page with no way back. That option is gone: everyone writes their own book, and your chapters are back. A book now opens straight on its first chapter.",
+            image: "0.9.72-book.jpg",
+          },
+          {
+            title: "Chat bubbles fit their words",
+            text: "Short messages no longer sit in a bubble with empty space around them.",
+            image: "0.9.72-chat-bubbles.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.71",
     date: "2026-11-18",
     headline: "Photos and videos in the general chat",
