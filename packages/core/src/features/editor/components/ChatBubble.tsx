@@ -32,11 +32,12 @@ export interface Dress {
   room: { top: number; bottom: number };
 }
 
+/* Grouped so the typing bubble can blink them (chat.css, `.chat-typing`). */
 const eye = (x: number, y: number, r = 1.5) => (
-  <>
+  <g className="chat-eye">
     <circle cx={x} cy={y} r={r} fill={EYE} />
     <circle cx={x + r * 0.35} cy={y - r * 0.4} r={r * 0.36} fill="#fff" />
-  </>
+  </g>
 );
 const blush = (x: number, y: number) => (
   <ellipse cx={x} cy={y} rx={1.7} ry={1} fill={BLUSH} opacity={0.55} />

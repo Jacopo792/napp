@@ -206,6 +206,16 @@ pnpm --filter @notes-app/collab-server start
 The service-role key belongs only to server processes. Never place it in a
 `VITE_*` variable or a client bundle.
 
+### Google Drive import on the web and desktop
+
+In a Notes archive, open the menu at the top of the note list and choose **Import from Google Drive**. Choose files, then review the destination and its members before importing. Google Docs become editable notes. Sheets, Slides and PDFs become private PDF attachments, each in its own note. Google Workspace exports through this integration have a [10 MB limit](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/export).
+
+Set up a Google Cloud project with the Drive and Picker APIs enabled, an OAuth Web application client with the Napp origin under **Authorized JavaScript origins**, and a browser API key restricted to that origin and the Picker API. Use the same project for all three values and configure the consent screen for the per-file scope `https://www.googleapis.com/auth/drive.file`. In testing mode, add the Google account you’ll use to test. [Google Picker setup](https://developers.google.com/workspace/drive/picker/guides/web-picker)
+
+Set `VITE_GOOGLE_DRIVE_CLIENT_ID`, `VITE_GOOGLE_DRIVE_API_KEY` and `VITE_GOOGLE_DRIVE_PROJECT_NUMBER` in the root `.env.local` for development and as GitHub Actions variables for GitHub Pages. The project number is numeric. Authorize origins without paths, such as `http://localhost:5173` and `https://jacopo792.github.io`. The browser build exposes these identifiers, so keep any OAuth client secret out of the build. The import action appears when all three values are set.
+
+For Electron, create a dedicated **Desktop app** OAuth client in the same project. Set `VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID` and `GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET` in the root `.env.local`. For releases, set the ID as a GitHub Actions variable and the installed-app client secret as a GitHub Actions secret. The native client credential ships as an Electron resource and is used by the main process for the token exchange. Use the credential from the dedicated Desktop client. Napp opens Google Picker in the system browser and receives the selection on a temporary loopback callback protected by PKCE. [Google Picker for desktop](https://developers.google.com/workspace/drive/picker/guides/desktop-mobile-picker)
+
 ### Interface preview without a backend
 
 ```bash

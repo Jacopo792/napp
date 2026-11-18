@@ -2,6 +2,7 @@
    because a renderer with `sandbox: true` holds no Node and cannot write a
    byte on its own. */
 import type { Platform, SavedAs, SystemMenuItem } from "@notes-app/core/platform";
+import { readDriveSelection } from "@notes-app/core/google-drive";
 
 interface Bridge {
   save(
@@ -18,9 +19,15 @@ interface Bridge {
     imageType: string;
   }>;
   popUpMenu(items: SystemMenuItem[]): Promise<string | null>;
+  pickDriveFiles(
+    requestId: string,
+    clientId: string,
+  ): Promise<{ ids: string[]; accessToken: string } | null>;
+  cancelDrivePick(requestId: string): Promise<void>;
 }
 
 const bridge = (window as unknown as { napp: Bridge }).napp;
+const driveClientId = import.meta.env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID?.trim();
 
 async function bytes(data: Blob | string): Promise<Uint8Array> {
   if (typeof data === "string") return new TextEncoder().encode(data);
@@ -29,6 +36,31 @@ async function bytes(data: Blob | string): Promise<Uint8Array> {
 
 export const desktopPlatform: Platform = {
   kind: "desktop",
+  prepareDriveImport:
+    driveClientId && bridge?.pickDriveFiles
+      ? async () => async (signal) => {
+          signal.throwIfAborted();
+          const id = crypto.randomUUID();
+          const cancel = () => void bridge.cancelDrivePick(id).catch(() => undefined);
+          signal.addEventListener("abort", cancel, { once: true });
+          try {
+            const picked = await bridge
+              .pickDriveFiles(id, driveClientId)
+              .catch((error: unknown) => {
+                if (!(error instanceof Error)) throw new Error("Could not open Google Drive.");
+                const message = error.message.replace(
+                  /^Error invoking remote method 'napp:drive-pick': (?:Error: )?/,
+                  "",
+                );
+                throw new Error(message || "Could not open Google Drive.");
+              });
+            signal.throwIfAborted();
+            return picked ? readDriveSelection(picked.ids, picked.accessToken, signal) : [];
+          } finally {
+            signal.removeEventListener("abort", cancel);
+          }
+        }
+      : undefined,
 
   /* The published site, never this window. An invitation is a link somebody
      else opens, on a machine that has a browser and very likely not this app —

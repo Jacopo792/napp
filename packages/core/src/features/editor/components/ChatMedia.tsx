@@ -128,7 +128,6 @@ export function ChatStickerView({ sticker, mine }: { sticker: Sticker; mine: boo
       >
         {url && <img src={url} alt={sticker.title || "GIF"} draggable={false} />}
       </span>
-      <span className="chat-giphy-source">via GIPHY</span>
     </span>
   );
 }

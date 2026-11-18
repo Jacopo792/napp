@@ -29,6 +29,7 @@ export {
   loadPendingInvites,
   loadProfile,
   leaveArchive,
+  removeObject,
   revokeArchiveInvite,
   saveProfile,
   uploadAvatar,

@@ -136,7 +136,18 @@ archiveOf.set(null, PREVIEW_ARCHIVE);
 export const chatListeners = new Set<() => void>();
 const ANSWERS = ["Ok!", "Ci penso io 🙌", "Sì, mi piace.", "Ne parliamo stasera?", "👀"];
 let answered = 0;
+/** Readers of `joinTyping` in the preview's sync stand-in. */
+export const typingListeners = new Set<
+  (event: { userId: string; noteId: string | null; typing: boolean; bubble: string | null }) => void
+>();
+
 function answerLater(noteId: string | null, threadId: string): void {
+  /* The partner writes for a couple of seconds before answering. */
+  window.setTimeout(() => {
+    typingListeners.forEach((listener) =>
+      listener({ userId: PREVIEW_U2, noteId, typing: true, bubble: "frog" }),
+    );
+  }, 500);
   window.setTimeout(() => {
     store.set(noteId, [
       ...(store.get(noteId) ?? []),
@@ -153,7 +164,7 @@ function answerLater(noteId: string | null, threadId: string): void {
       },
     ]);
     chatListeners.forEach((listener) => listener());
-  }, 2600);
+  }, 2800);
 }
 
 export async function loadComments(

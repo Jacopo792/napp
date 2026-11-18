@@ -18,6 +18,13 @@ export async function uploadObject(
   fail(result.error);
 }
 
+export async function removeObject(session: AppSession, objectId: string): Promise<void> {
+  const result = await supabase.storage
+    .from(OBJECT_BUCKET)
+    .remove([`${session.archiveId}/${objectId}`]);
+  fail(result.error);
+}
+
 /**
  * Storage is asked for these bytes the moment a note opens — which, on a page
  * refresh, is the same moment the auth token is still being restored from

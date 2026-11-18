@@ -418,6 +418,65 @@ export function sendNotes(moves: { id: string; to: string | null; leaves: boolea
   });
 }
 
+/* ── A file arriving ────────────────────────────────────────────────────────
+   An imported file's row leaves the sheet for the note it became: a copy
+   travels from the sheet into that note's row in the list, the row appears
+   as the copy reaches it, and the rows left in the sheet close the gap. A
+   note whose row is not on screen has nowhere to be seen arriving, so its
+   copy lets go where it stands. Resolves once the copy is gone. */
+export async function landInList(source: HTMLElement, noteId: string): Promise<void> {
+  if (typeof document === "undefined" || reduced()) return;
+  // The list renders the new note in the next commit.
+  await new Promise((done) => requestAnimationFrame(done));
+  const from = source.getBoundingClientRect();
+  if (!from.width) return;
+  const target = document.querySelector<HTMLElement>(`[data-note-row="${CSS.escape(noteId)}"]`);
+  const to = target?.getBoundingClientRect();
+
+  const { outer, card } = ghost(source, from);
+  outer.style.zIndex = "96"; // above `.sheet-backdrop`
+  card.style.transformOrigin = "0 0";
+  source.style.overflow = "hidden";
+  const timing = { duration: SHAPE, easing: EASE, fill: "both" as const };
+  source.animate(
+    [
+      { height: `${from.height}px`, opacity: 0 },
+      { height: "0px", paddingTop: "0px", paddingBottom: "0px", opacity: 0 },
+    ],
+    { ...timing, fill: "forwards" },
+  );
+
+  let flight: Animation;
+  if (target && to?.width) {
+    target.animate([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], timing);
+    outer.animate(
+      [
+        { transform: "none" },
+        { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px)` },
+      ],
+      timing,
+    );
+    flight = card.animate(
+      [
+        { transform: "none", opacity: 1 },
+        { opacity: 1, offset: 0.6 },
+        { transform: `scale(${to.width / from.width}, ${to.height / from.height})`, opacity: 0 },
+      ],
+      timing,
+    );
+  } else {
+    flight = card.animate(
+      [
+        { transform: "none", opacity: 1 },
+        { transform: "scale(0.94)", opacity: 0 },
+      ],
+      { duration: 280, easing: EASE_OUT, fill: "both" },
+    );
+  }
+  await flight.finished.catch(() => undefined);
+  outer.remove();
+}
+
 /* ── Two views of one window ─────────────────────────────────────────────────
    A book's sheet and its board, the sheet and its pages: the same window
    turned over, so the one being left fades out and then the other fades in,

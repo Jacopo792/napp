@@ -1,6 +1,6 @@
 {
   "name": "@notes-app/web",
-  "version": "0.9.76",
+  "version": "0.9.77",
   "private": true,
   "license": "GPL-3.0-or-later",
   "type": "module",

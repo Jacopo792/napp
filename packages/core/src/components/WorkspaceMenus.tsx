@@ -104,6 +104,7 @@ export function CollectionMenu({
   preferences,
   onChange,
   onExportAll,
+  onImportDrive,
   onIndexMedia,
   indexingMedia,
   onOpenPalette,
@@ -116,6 +117,7 @@ export function CollectionMenu({
   preferences: ListPreferences;
   onChange: (next: ListPreferences) => void;
   onExportAll: () => void;
+  onImportDrive?: () => void;
   onIndexMedia?: () => void;
   indexingMedia?: boolean;
   /** The two keyboard surfaces, offered by name. A shortcut nobody is told
@@ -230,6 +232,17 @@ export function CollectionMenu({
           Group by date
         </MenuButton>
         <div className="menu-separator" />
+        {onImportDrive && (
+          <MenuButton
+            onClick={() => {
+              close();
+              onImportDrive();
+            }}
+          >
+            <FolderInput size={16} />
+            Import from Google Drive
+          </MenuButton>
+        )}
         <MenuButton
           onClick={() => {
             onExportAll();

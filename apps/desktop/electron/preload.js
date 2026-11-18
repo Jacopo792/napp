@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld("napp", {
   /* A menu the system draws, and the id of what was chosen in it. The page
    * describes the menu and hears the answer; it never holds a `Menu`. */
   popUpMenu: (items) => ipcRenderer.invoke("napp:menu", items),
+  pickDriveFiles: (requestId, clientId) =>
+    ipcRenderer.invoke("napp:drive-pick", requestId, clientId),
+  cancelDrivePick: (requestId) => ipcRenderer.invoke("napp:drive-cancel", requestId),
 });
 
 /* The menu presses the key. Nothing here decides what a command does — the

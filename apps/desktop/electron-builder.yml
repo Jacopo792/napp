@@ -45,7 +45,7 @@ files:
 # the ordinary unverified-developer refusal, which has a way through it:
 # Privacy & Security → Open Anyway, or right-click → Open on macOS 14 and
 # earlier. Only notarization removes the step, and that needs the paid ID.
-afterPack: build/adhoc-sign.cjs
+afterPack: build/afterPack.cjs
 
 mac:
   icon: build/icon-mac.png

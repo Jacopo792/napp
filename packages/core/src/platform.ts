@@ -24,6 +24,12 @@
  *  it where no folder can be. */
 export type SavedAs = "file" | "folder";
 
+export interface DriveImportFile {
+  name: string;
+  format: "markdown" | "pdf";
+  download: (signal: AbortSignal) => Promise<Blob>;
+}
+
 export interface Platform {
   /** For the rare case where the difference has to be said out loud, rather
    *  than done differently. Prefer a member over a branch on this. */
@@ -59,6 +65,8 @@ export interface Platform {
   savePdf?(name: string): Promise<void>;
   /** Native rich clipboard fallback, read only in response to Paste. */
   readClipboard?(): Promise<{ html: string; text: string; image?: File }>;
+  /** Prepare the web picker before the click that opens the Google account popup. */
+  prepareDriveImport?(): Promise<(signal: AbortSignal) => Promise<DriveImportFile[]>>;
 
   /** Hand a menu to the window manager, at the pointer, and answer with the
    *  `id` chosen — or null if the reader dismissed it.

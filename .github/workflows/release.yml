@@ -53,6 +53,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_COLLAB_URL: ${{ vars.VITE_COLLAB_URL }}
+          VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET }}
           VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://jacopo792.github.io/napp/' }}
         run: pnpm run ${{ matrix.script }}
 

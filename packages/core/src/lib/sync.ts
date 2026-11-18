@@ -88,6 +88,73 @@ export function subscribeToArchiveChat(archiveId: string, onChange: () => void):
     .subscribe();
 }
 
+/** Somebody is writing in a chat: `noteId` null is the general chat. */
+export interface TypingEvent {
+  userId: string;
+  noteId: string | null;
+  typing: boolean;
+  bubble: string | null;
+}
+type TypingReader = (event: TypingEvent) => void;
+
+/* Who is typing is said and forgotten: a broadcast, never a row, so it can
+ * neither be stored nor read back as when somebody was last here. One
+ * private topic per archive, which `realtime.messages` lets only its members
+ * join (migration `chat_typing_channel`). Every open chat shares it: Supabase
+ * hands back the same channel for the same topic, and one still closing
+ * cannot be joined again, so it is counted here and left a moment before it
+ * is closed. */
+const typingRooms = new Map<
+  string,
+  { channel: RealtimeChannel; readers: Set<TypingReader>; joined: boolean; closing: number }
+>();
+
+export function joinTyping(
+  archiveId: string,
+  read: TypingReader,
+): { say: (event: TypingEvent) => void; leave: () => void } {
+  let room = typingRooms.get(archiveId);
+  if (!room) {
+    const channel = supabase.channel(`typing:${archiveId}`, { config: { private: true } });
+    const made = { channel, readers: new Set<TypingReader>(), joined: false, closing: 0 };
+    channel.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const event = payload as Partial<TypingEvent>;
+      if (typeof event.userId !== "string") return;
+      const said: TypingEvent = {
+        userId: event.userId,
+        noteId: typeof event.noteId === "string" ? event.noteId : null,
+        typing: event.typing === true,
+        bubble: typeof event.bubble === "string" ? event.bubble : null,
+      };
+      made.readers.forEach((reader) => reader(said));
+    });
+    channel.subscribe((status) => {
+      made.joined = status === "SUBSCRIBED";
+    });
+    typingRooms.set(archiveId, (room = made));
+  }
+  const here = room;
+  window.clearTimeout(here.closing);
+  here.readers.add(read);
+  return {
+    /* Not before the join: an unjoined channel falls back to a REST post. */
+    say: (event) => {
+      if (here.joined)
+        void here.channel.send({ type: "broadcast", event: "typing", payload: event });
+    },
+    leave: () => {
+      here.readers.delete(read);
+      if (here.readers.size) return;
+      window.clearTimeout(here.closing);
+      here.closing = window.setTimeout(() => {
+        if (here.readers.size || typingRooms.get(archiveId) !== here) return;
+        typingRooms.delete(archiveId);
+        void supabase.removeChannel(here.channel);
+      }, 5000);
+    },
+  };
+}
+
 export async function unsubscribeFromArchive(channel: RealtimeChannel): Promise<void> {
   await supabase.removeChannel(channel);
 }

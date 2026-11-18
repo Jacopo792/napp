@@ -2,6 +2,7 @@ import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
 import { ChapterBoard } from "@/components/ChapterBoard";
 import { CommandPalette, ShortcutSheet } from "@/components/CommandPalette";
 import { FolderSheet } from "@/components/FolderSheet";
+import { GoogleDriveImport } from "@/components/GoogleDriveImport";
 import {
   Board,
   ChevronDown,
@@ -317,6 +318,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string>(ALL);
   const [query, setQuery] = useState("");
+  const [driveDestination, setDriveDestination] = useState<string | null>(null);
 
   /** One scope of folders and note placement per member. */
   const [metas, setMetas] = useState<Record<string, Meta>>({});
@@ -1537,25 +1539,44 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           : entry.note.content,
     });
 
-  const { handleCopyMarkdown, handleExportMarkdown, handleExportAll, handleImportFiles } =
-    useNoteExchange({
-      selectedId,
-      collaborative,
-      orderedVisible,
-      folderLabel,
-      sessionRef,
-      entriesRef,
-      metasRef,
-      viewAs,
-      selectedFolderId,
-      canWriteArchive,
-      setEntries,
-      setMetas,
-      setSaving,
-      setError,
-      setStatusFlash,
-      setSelectedFolderId,
-    });
+  async function flushPendingFolder(s: AppSession, folderId: string) {
+    // A locally created folder may not have reached Postgres yet.
+    const pending = pendingMetaRef.current.get(viewAs);
+    if (!pending?.after.folders.some((folder) => folder.id === folderId)) return;
+    window.clearTimeout(timerRef.current);
+    window.clearTimeout(retryRef.current);
+    await waitUntilIdle(() => inFlightRef.current);
+    await pendingMetaRef.current.flush(viewAs, (before, after) =>
+      persistMetaDiff(s, viewAs, before, after),
+    );
+    setDirty(writesWaiting(pendingMetaRef.current));
+  }
+
+  const {
+    handleCopyMarkdown,
+    handleExportMarkdown,
+    handleExportAll,
+    handleImportFiles,
+    importDriveFile,
+  } = useNoteExchange({
+    selectedId,
+    collaborative,
+    orderedVisible,
+    folderLabel,
+    sessionRef,
+    entriesRef,
+    metasRef,
+    viewAs,
+    selectedFolderId,
+    canWriteArchive,
+    flushPendingFolder,
+    setEntries,
+    setMetas,
+    setSaving,
+    setError,
+    setStatusFlash,
+    setSelectedFolderId,
+  });
 
   /** A new note, empty or started from a template or the day. */
   const handleNewFrom = useCallback(
@@ -1591,24 +1612,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       setSaving(true);
       setError("");
       try {
-        // A note filed in a folder that has just been created still lives only
-        // in the pending Meta: Postgres has not seen the folder row yet, so
-        // inserting the note with that folder_id would violate the
-        // notes_folder_owner_id_fkey. Flush the pending folder first.
-        if (folderId !== null) {
-          const pending = pendingMetaRef.current.get(viewAs);
-          const needsFlush =
-            pending?.after.folders.some((folder) => folder.id === folderId) ?? false;
-          if (needsFlush) {
-            window.clearTimeout(timerRef.current);
-            window.clearTimeout(retryRef.current);
-            await waitUntilIdle(() => inFlightRef.current);
-            await pendingMetaRef.current.flush(viewAs, (before, after) =>
-              persistMetaDiff(s, viewAs, before, after),
-            );
-            setDirty(writesWaiting(pendingMetaRef.current));
-          }
-        }
+        if (folderId !== null) await flushPendingFolder(s, folderId);
 
         const metadata: NoteMeta = { id: note.id, folderId };
         const entry = await createNote(s, note, metadata);
@@ -3016,6 +3020,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     </button>
   );
 
+  const prepareDriveImport = platform().prepareDriveImport;
+  const driveDestinationKey = [session.userId, session.archiveId, viewAs, selectedFolderId].join(
+    ":",
+  );
+  const canImportDrive =
+    prepareDriveImport &&
+    canWriteArchive &&
+    viewAs &&
+    ![TRASH, ARCHIVE, REMARKS].includes(selectedFolderId);
   const collectionMenu = (title?: React.ReactNode) => (
     <>
       <CollectionMenu
@@ -3025,6 +3038,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onIndexMedia={canWriteArchive ? () => void indexMedia() : undefined}
         indexingMedia={indexingMedia}
         onExportAll={() => void handleExportAll()}
+        onImportDrive={canImportDrive ? () => setDriveDestination(driveDestinationKey) : undefined}
         onOpenPalette={() => {
           setPaletteQuery("");
           setPaletteOpen(true);
@@ -3074,6 +3088,24 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       : member.nickname || "Member";
   const notesOf = (member: ArchiveMember) =>
     member.isSelf ? "Your notes" : `${member.nickname || "Another member"}'s notes`;
+
+  const viewedMember = members.find((member) => member.userId === viewAs);
+  const driveImportDialog =
+    prepareDriveImport && canImportDrive && driveDestination === driveDestinationKey ? (
+      <GoogleDriveImport
+        key={driveDestinationKey}
+        destination={[
+          spacesView.find((space) => space.archiveId === session.archiveId)?.name ??
+            "Current archive",
+          viewedMember ? notesOf(viewedMember) : "Notes",
+          selectedFolderId.startsWith("__") ? "Unfiled" : folderLabel,
+        ].join(" / ")}
+        members={roster.filter((member) => !member.isSelf).map(nameOf)}
+        prepare={prepareDriveImport}
+        importFile={importDriveFile}
+        onClose={() => setDriveDestination(null)}
+      />
+    ) : null;
 
   /* Opening what was found. In a document the structure's own path — the
      notes list's scope and filter are not on screen there — and then, if a
@@ -3630,7 +3662,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     />
   );
 
-  const viewedMember = members.find((member) => member.userId === viewAs);
   const sidebar = (
     <Sidebar
       scopes={scopes}
@@ -4741,6 +4772,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         {settingsPanel}
         {keyboardSheets}
         {sheetStack}
+        {driveImportDialog}
       </div>
     );
   }
@@ -5053,6 +5085,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       {keyboardSheets}
       {editorMenu}
       {sheetStack}
+      {driveImportDialog}
       {/* The editor's attachment menu opens this; a file input is the only way
           a browser lets a page read a file the reader chose. */}
       <input

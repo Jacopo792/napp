@@ -72,7 +72,13 @@ import {
 import { mentionQuery, mentionedIn, noteQuery, tally, type NoteRef } from "@/lib/commentThreads";
 import { EASE, EASE_OUT, OVERLAY_OUT, SHAPE } from "@/lib/motion";
 import type { AppSession } from "@/lib/session";
-import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } from "@/lib/sync";
+import {
+  joinTyping,
+  subscribeToArchiveChat,
+  subscribeToComments,
+  unsubscribeFromArchive,
+  type TypingEvent,
+} from "@/lib/sync";
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
@@ -171,6 +177,10 @@ const MEDIA_TYPES: Record<string, string> = {
   "video/webm": "webm",
 };
 const MAX_FILES = 10;
+/** How often a composer being written in says so, and how long a reader
+ *  believes it without hearing again. */
+const TYPING_EVERY = 3000;
+const TYPING_EXPIRES = 6000;
 const MAX_BYTES = 100 * 1024 * 1024;
 
 /** A chosen file, with the size it was taken at so its tile keeps its place. */
@@ -323,6 +333,33 @@ export function NoteComments({
   /** Messages that arrived while this was open, to be seen arriving. */
   const [arrived, setArrived] = useState<ReadonlySet<string>>(() => new Set());
   const [unseen, setUnseen] = useState(0);
+  /** Who is writing here now, in their bubble; `leaving` while it fades. */
+  const [typers, setTypers] = useState<
+    ReadonlyMap<string, { bubble: string | null; leaving: boolean }>
+  >(() => new Map());
+  const typerTimers = useRef(new Map<string, number>());
+  /** Gone at once when their message lands, which takes its place; faded
+   *  when they only stopped. */
+  const dropTyper = useCallback((userId: string, fade: boolean) => {
+    window.clearTimeout(typerTimers.current.get(userId));
+    typerTimers.current.delete(userId);
+    if (fade)
+      typerTimers.current.set(
+        userId,
+        window.setTimeout(() => dropTyper(userId, false), OVERLAY_OUT.duration),
+      );
+    setTypers((current) => {
+      const typer = current.get(userId);
+      if (!typer || (fade && typer.leaving)) return current;
+      const next = new Map(current);
+      if (fade) next.set(userId, { ...typer, leaving: true });
+      else next.delete(userId);
+      return next;
+    });
+  }, []);
+  const typingRoom = useRef<ReturnType<typeof joinTyping> | null>(null);
+  /** When this composer last said it was being written in; 0 when it isn't. */
+  const saidTyping = useRef(0);
 
   const members = useMemo(() => [...authors.values()], [authors]);
   const closeReact = useCallback(() => setReacting(null), []);
@@ -372,6 +409,7 @@ export function NoteComments({
     const first = known.current === null;
     known.current = new Set(rows.map((row) => row.id));
     if (first) rows.forEach((row) => settled.current.add(row.id));
+    fresh.forEach((row) => dropTyper(row.authorId, false));
     if (fresh.length > 0) {
       setArrived((current) => new Set([...current, ...fresh.map((r) => r.id)]));
     }
@@ -397,7 +435,7 @@ export function NoteComments({
       const placed = new Set(rows.map((row) => keys.current.get(row.id)));
       return [...rows, ...waiting.filter((m) => !placed.has(m.id))];
     });
-  }, [session, source]);
+  }, [session, source, dropTyper]);
 
   useEffect(() => {
     let live = true;
@@ -423,6 +461,53 @@ export function NoteComments({
       void unsubscribeFromArchive(channel);
     };
   }, [session, read, isGeneral]);
+
+  /* ── Who is writing ────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    const timers = typerTimers.current;
+    const room = joinTyping(session.archiveId, (event: TypingEvent) => {
+      if (event.userId === session.userId || event.noteId !== source) return;
+      if (!event.typing) return dropTyper(event.userId, true);
+      window.clearTimeout(timers.get(event.userId));
+      /* A refresh comes every few seconds while they write; none for six
+         means they went without saying so. */
+      timers.set(
+        event.userId,
+        window.setTimeout(() => dropTyper(event.userId, true), TYPING_EXPIRES),
+      );
+      setTypers((current) =>
+        new Map(current).set(event.userId, { bubble: event.bubble, leaving: false }),
+      );
+    });
+    typingRoom.current = room;
+    return () => {
+      if (saidTyping.current) {
+        room.say({ userId: session.userId, noteId: source, typing: false, bubble: null });
+        saidTyping.current = 0;
+      }
+      room.leave();
+      typingRoom.current = null;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+      setTypers(new Map());
+    };
+  }, [session, source, dropTyper]);
+
+  const sayTyping = (typing: boolean) => {
+    if (typing ? Date.now() - saidTyping.current < TYPING_EVERY : !saidTyping.current) return;
+    saidTyping.current = typing ? Date.now() : 0;
+    typingRoom.current?.say({
+      userId: session.userId,
+      noteId: source,
+      typing,
+      bubble: typing ? myBubble : null,
+    });
+  };
+  useEffect(() => {
+    if (!draft.trim()) sayTyping(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only an emptied field stops it
+  }, [draft]);
 
   /* ── Where the next message is about ───────────────────────────────── */
 
@@ -1479,7 +1564,38 @@ export function NoteComments({
             </ChatBubble>
           </div>
         ) : (
-          <div className="chat-stream">{messages.map(message)}</div>
+          <div className="chat-stream">
+            {messages.map(message)}
+            {[...typers].map(([userId, typer]) => {
+              const author = authors.get(userId);
+              const name = author?.name || "Someone";
+              return (
+                <div
+                  key={`typing-${userId}`}
+                  role="status"
+                  aria-label={`${name} is typing`}
+                  className={`chat-row is-theirs is-first is-last chat-typing ${
+                    typer.leaving ? "is-leaving" : ""
+                  }`}
+                >
+                  <div className="chat-line">
+                    <span className="chat-face">
+                      <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
+                    </span>
+                    <div className="chat-stack">
+                      <ChatBubble bubble={typer.bubble} mine={false}>
+                        <span className="chat-typing-dots" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      </ChatBubble>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -1680,8 +1796,10 @@ export function NoteComments({
                   event.preventDefault();
                   void stage(event.clipboardData.files);
                 }}
+                onBlur={() => sayTyping(false)}
                 onChange={(event) => {
                   setDraft(event.target.value);
+                  if (event.target.value.trim() && document.hasFocus()) sayTyping(true);
                   const caret = event.target.selectionStart ?? 0;
                   setSuggesting(mentionQuery(event.target.value, caret));
                   if (notes) setFindingNote(noteQuery(event.target.value, caret));

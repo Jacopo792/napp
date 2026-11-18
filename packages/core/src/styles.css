@@ -10789,7 +10789,7 @@ button.sheet-chip:hover,
   color: var(--ink);
 }
 
-.new-archive-create {
+.sheet-primary-action {
   min-height: 40px;
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -10798,11 +10798,11 @@ button.sheet-chip:hover,
   font-weight: var(--weight-semibold);
 }
 
-.new-archive-create:hover:not(:disabled) {
+.sheet-primary-action:hover:not(:disabled) {
   background: var(--accent-strong);
 }
 
-.new-archive-create:disabled {
+.sheet-primary-action:disabled {
   opacity: 0.4;
 }
 
@@ -15915,7 +15915,7 @@ button.sheet-chip:hover,
     .menu-segments button,
     .menu-small-button,
     .menu-swatch,
-    .new-archive-create,
+    .sheet-primary-action,
     .new-note-button,
     .note-backlink,
     .note-comment-action,

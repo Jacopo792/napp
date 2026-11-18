@@ -28,6 +28,7 @@ const {
   shell,
 } = require("electron");
 const { installMenu } = require("./menu");
+const { pickDriveFiles, readLocalDriveCredentials } = require("./googleDrive");
 const {
   trustedRendererUrl,
   trustedSender,
@@ -456,6 +457,55 @@ handle("napp:open", async (_event, name, data) => {
   }
   const failure = await shell.openPath(file);
   return failure || null;
+});
+
+const driveRequests = new Map();
+
+async function driveCredentials() {
+  if (isDev) return readLocalDriveCredentials();
+  return fs
+    .readFile(path.join(process.resourcesPath, "google-drive-oauth.json"), "utf8")
+    .then(JSON.parse, () => ({}));
+}
+
+handle("napp:drive-pick", async (event, requestId, clientId) => {
+  const sender = event.sender;
+  const senderId = sender.id;
+  if (
+    typeof requestId !== "string" ||
+    !/^[a-f0-9-]{36}$/.test(requestId) ||
+    driveRequests.has(senderId)
+  )
+    throw new Error("A Google Drive selection is already open.");
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  driveRequests.set(senderId, { requestId, abort });
+  sender.once("destroyed", abort);
+  try {
+    const credentials = await driveCredentials();
+    if (credentials.clientId !== clientId)
+      throw new Error("Google Drive is not configured for this app.");
+    const result = await pickDriveFiles(
+      credentials,
+      (url) => shell.openExternal(url),
+      controller.signal,
+    );
+    if (result && !sender.isDestroyed()) BrowserWindow.fromWebContents(sender)?.focus();
+    return result;
+  } catch (err) {
+    if (controller.signal.aborted) return null;
+    if (err.name === "TimeoutError")
+      throw new Error("Google Drive selection timed out. Try again.");
+    throw err;
+  } finally {
+    driveRequests.delete(senderId);
+    sender.removeListener("destroyed", abort);
+  }
+});
+
+handle("napp:drive-cancel", (event, requestId) => {
+  const request = driveRequests.get(event.sender.id);
+  if (request?.requestId === requestId) request.abort();
 });
 
 handle("napp:print", (event) => {

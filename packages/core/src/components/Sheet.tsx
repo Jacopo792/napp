@@ -114,10 +114,15 @@ export function SheetStack({
 export function Sheet({
   label,
   className = "",
+  dismissible = true,
+  closing = false,
   children,
 }: {
   label: string;
   className?: string;
+  dismissible?: boolean;
+  /** Leaves on its own, the way Close would: a task that has finished. */
+  closing?: boolean;
   children: ReactNode;
 }) {
   const place = useContext(Place)!;
@@ -189,10 +194,14 @@ export function Sheet({
     [place, backdrop, index],
   );
 
+  useEffect(() => {
+    if (closing) leave(true);
+  }, [closing, leave]);
+
   /* Only the sheet on top answers Escape and a press outside. */
   useEffect(() => {
     const ground = backdrop.current;
-    if (!onTop || !ground) return;
+    if (!onTop || !ground || !dismissible) return;
     const escape = (event: KeyboardEvent) => event.key === "Escape" && leave(true);
     const outside = (event: MouseEvent) => event.target === ground && leave(true);
     document.addEventListener("keydown", escape);
@@ -201,7 +210,7 @@ export function Sheet({
       document.removeEventListener("keydown", escape);
       ground.removeEventListener("mousedown", outside);
     };
-  }, [onTop, leave, backdrop]);
+  }, [onTop, leave, backdrop, dismissible]);
 
   return (
     <section
@@ -217,6 +226,7 @@ export function Sheet({
           type="button"
           className="sheet-back toolbar-button press"
           aria-label="Back"
+          disabled={!dismissible}
           onClick={() => leave(false)}
         >
           <ChevronLeft size={16} />
@@ -226,6 +236,7 @@ export function Sheet({
         type="button"
         className="sheet-close toolbar-button press"
         aria-label="Close"
+        disabled={!dismissible}
         autoFocus
         onClick={() => leave(true)}
       >

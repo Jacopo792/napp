@@ -171,13 +171,21 @@ export const createdNotes = new Map<string, Note>();
 export async function createNote(
   session: AppSession,
   note: Note,
-  _metadata: NoteMeta,
+  metadata: NoteMeta,
 ): Promise<NoteEntry> {
   await sleep(260);
+  const { notes, metas } = storeOf(session);
   const entry: NoteEntry = { note: { ...note }, version: 1 };
-  storeOf(session).notes.set(note.id, entry);
+  notes.set(note.id, entry);
+  const owner = note.ownerId ?? session.userId;
+  metas[owner] ??= { v: 1, folders: [], notes: [] };
+  metas[owner].notes.push(metadata);
   createdNotes.set(note.id, note);
   return { note: { ...note }, version: 1 };
+}
+
+export async function loadNote(session: AppSession, noteId: string): Promise<NoteEntry | null> {
+  return structuredClone(storeOf(session).notes.get(noteId) ?? null);
 }
 
 export async function updateNoteProperties(
@@ -232,6 +240,10 @@ export async function persistMetaDiff(
 /* Storage, in memory. The preview never encrypts, so an object is stored as the
    blob it arrived as and handed straight back. */
 const objects = new Map<string, Blob>();
+
+export async function removeObject(_session: AppSession, objectId: string): Promise<void> {
+  objects.delete(objectId);
+}
 
 export async function uploadObject(
   _session: AppSession,

@@ -21,7 +21,13 @@ const control = createServer((request, response) => {
     !server.unloadingDocuments.size;
   response.writeHead(idle ? 204 : 503).end();
 });
-const env = { ...process.env, VITE_BASE_PATH: "/" };
+const env = {
+  ...process.env,
+  VITE_BASE_PATH: "/",
+  VITE_GOOGLE_DRIVE_CLIENT_ID: "picker-e2e.apps.googleusercontent.com",
+  VITE_GOOGLE_DRIVE_API_KEY: "picker-e2e-key",
+  VITE_GOOGLE_DRIVE_PROJECT_NUMBER: "123456789",
+};
 if (full) {
   const stack = localStack();
   Object.assign(env, {

@@ -379,7 +379,7 @@ export function NewArchiveSheet({
           )}
           <button
             type="submit"
-            className="new-archive-create press"
+            className="sheet-primary-action press"
             disabled={busy || !name.trim()}
           >
             {busy ? "Creating…" : "Create"}

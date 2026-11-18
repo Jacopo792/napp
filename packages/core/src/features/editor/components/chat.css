@@ -681,6 +681,81 @@
   }
 }
 
+/* ── Writing ───────────────────────────────────────────────────────────────
+   Somebody typing: their bubble, empty but for three dots breathing in turn,
+   with their animal peeking over it and blinking. It comes in as their
+   messages do and fades when they stop; their message takes its place. */
+
+.chat-typing .chat-bubble {
+  transform-origin: 0 100%;
+  animation: chat-received var(--motion-shape) var(--ease-spring) backwards;
+}
+
+.chat-typing .chat-bubble-piece {
+  animation: chat-piece var(--motion-content) var(--ease-spring) backwards;
+  animation-delay: calc(var(--motion-wait) + 60ms);
+}
+
+.chat-typing.is-leaving {
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out);
+}
+
+.chat-typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 1.4em;
+  padding: 0 2px;
+}
+
+.chat-typing-dots > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  animation: chat-typing-breathe 1.4s var(--ease) infinite;
+}
+
+.chat-typing-dots > i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.chat-typing-dots > i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes chat-typing-breathe {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: none;
+  }
+  30% {
+    opacity: 0.9;
+    transform: translateY(-2px) scale(1.12);
+  }
+}
+
+.chat-typing .chat-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chat-typing-blink 3.6s linear infinite;
+}
+
+@keyframes chat-typing-blink {
+  0%,
+  92%,
+  100% {
+    transform: none;
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
 .chat-row.is-sending .chat-bubble-body {
   opacity: 0.72;
 }
@@ -1153,8 +1228,14 @@
   .chat-reaction,
   .chat-unseen,
   .chat-about,
-  .chat-row.is-arrived .chat-bubble-body {
+  .chat-row.is-arrived .chat-bubble-body,
+  .chat-typing-dots > i,
+  .chat-typing .chat-eye {
     animation: none;
+  }
+
+  .chat-typing.is-leaving {
+    transition: none;
   }
 }
 
@@ -1723,12 +1804,6 @@
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.chat-giphy-source {
-  padding: 0 6px;
-  font-size: 10px;
-  color: var(--ink-4);
 }
 
 /* A sticker lands the way an animal does on a bubble: up from its corner. */

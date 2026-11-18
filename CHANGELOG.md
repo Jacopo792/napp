@@ -3,7 +3,24 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
-## 0.9.76 – 2026-11-18
+## 0.9.77 – 2026-11-18
+
+### Added
+
+- Google Drive import on the web and desktop: Google Docs become editable
+  notes, Sheets, Slides and PDFs private PDF attachments (Picker on the web,
+  system browser with a PKCE loopback on desktop; per-file `drive.file` scope).
+  The action appears only when the `VITE_GOOGLE_DRIVE_*` identifiers are set.
+- A typing indicator in every chat: the writer's bubble with three dots and
+  their animal peeking over it, sent as an ephemeral Realtime broadcast and
+  never stored. Migration `20261118060000_chat_typing_channel`.
+
+### Changed
+
+- GIPHY pictures in a conversation no longer carry a "via GIPHY" caption; the
+  picker keeps "Powered by GIPHY".
+
+## 0.9.76 – 2026-11-18 (tagged, not released)
 
 ### Added
 

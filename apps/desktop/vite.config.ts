@@ -101,7 +101,7 @@ function contentSecurityPolicy(env: Record<string, string | undefined>): Plugin 
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${remote}`,
     "font-src 'self' data:",
-    `connect-src 'self' data: blob: ${remote}`,
+    `connect-src 'self' data: blob: ${remote}${env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID?.trim() ? " https://www.googleapis.com" : ""}`,
     `media-src 'self' data: blob: ${remote}`,
     "worker-src 'self' blob:",
     "object-src 'none'",

@@ -1,6 +1,7 @@
 /* The browser's answers. Every one of these is the code that used to sit
    inside the core, moved rather than rewritten. */
 import type { Platform, SavedAs } from "@notes-app/core/platform";
+import { prepareDriveImport } from "./googleDrive";
 
 /* A folder of `.md` files is what Obsidian calls a vault, so where the browser
    can write one the export writes exactly that. `showDirectoryPicker` is
@@ -27,6 +28,7 @@ function handOver(name: string, url: string, keepFor: number): void {
 
 export const webPlatform: Platform = {
   kind: "web",
+  prepareDriveImport,
 
   webOrigin: () => new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
 

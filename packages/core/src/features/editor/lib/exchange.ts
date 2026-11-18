@@ -2,8 +2,6 @@ import type { JSONContent } from "@tiptap/core";
 import { legacyMarkdownToRichText, richTextToMarkdown } from "./content.ts";
 
 /* ── Markdown in and out ─────────────────────────────────────────────────────
-   The whole of this app's interoperability, and deliberately the whole of it.
-
    Obsidian *is* a folder of Markdown files, so import and export of `.md` is
    not an approximation of an Obsidian integration — it is the integration.
    Notion and Google Docs both accept pasted Markdown, which is what "Copy as

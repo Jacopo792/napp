@@ -26,6 +26,10 @@ export const PRIVACY_SECTIONS = [
     text: "Napp processes your account email and authentication records; your display name and profile image; notes, documents, attachments and version history; comments and reactions; archive membership and invitations; preferences and the online presence you choose to share. Service infrastructure also processes network and technical information, such as IP addresses and operational logs, to deliver and secure the service.",
   },
   {
+    title: "Google Drive imports",
+    text: "When you choose to import from Google Drive, Napp reads the selected files’ names, download permissions and contents to create the copies you confirm. The browser holds a temporary Google access token during the import. Napp does not store the token or request access to your entire Drive. Copies are stored in your chosen Napp archive and are available according to its membership and permissions. You can delete imported copies in Napp and revoke Google access from your Google Account. Napp’s use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.",
+  },
+  {
     title: "Why data is used",
     text: "Account and content data is used to provide the service you request: storing, synchronising and sharing your writing with the people you choose. The legal basis for account and content processing is performing the service contract. Security and diagnostic information is used on the basis of legitimate interests in protecting accounts, preventing abuse and investigating failures. Optional presence and appearance settings are controlled in the app. Napp does not include advertising or third-party advertising trackers.",
   },
