@@ -45,7 +45,7 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
-    version: "0.9.77",
+    version: "0.9.78",
     date: "2026-11-18",
     headline: "Stickers, GIFs and Google Drive",
     sections: [
@@ -55,12 +55,12 @@ export const RELEASES: Release[] = [
           {
             title: "Stickers and GIFs in every chat",
             text: "The new button beside the emoji opens our own stickers, drawn with the animals from the chat bubbles, plus GIFs and stickers from GIPHY. Nobody's address reaches GIPHY, and what you send stays with the message.",
-            image: "0.9.77-stickers.jpg",
+            image: "0.9.78-stickers.jpg",
           },
           {
             title: "See when someone is writing",
             text: "While somebody writes to you, their bubble appears with three dots and their animal peeking over the edge. Nothing about it is saved.",
-            image: "0.9.77-typing.jpg",
+            image: "0.9.78-typing.jpg",
           },
         ],
       },

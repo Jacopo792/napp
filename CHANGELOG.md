@@ -3,6 +3,13 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.78 – 2026-11-18
+
+### Changed
+
+- What's New shows stickers and the typing indicator in the general chat; the
+  0.9.77 entry moves here with its new pictures.
+
 ## 0.9.77 – 2026-11-18
 
 ### Added
