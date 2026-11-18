@@ -45,6 +45,23 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.73",
+    date: "2026-11-18",
+    headline: "Send photos and videos in any chat",
+    sections: [
+      {
+        heading: "On your computer",
+        items: [
+          {
+            title: "Photos and videos in every chat",
+            text: "Send pictures and videos from your computer, in the general chat and in the chat of any note. Use the photo button beside the message field, or paste or drop them in.",
+            image: "0.9.73-chat-photos.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.72",
     date: "2026-11-18",
     headline: "Fixes for books and chat bubbles",

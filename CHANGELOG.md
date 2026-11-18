@@ -3,6 +3,16 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.73 – 2026-11-18
+
+### Added
+
+- The web and desktop chat can send photos and videos: a photo button beside
+  the message field, paste and drop. Up to ten files of up to 100 MB each.
+- Note chats carry photos and videos like the general chat, in the same private
+  `chat-media` bucket, readable exactly when the comment is. Migration
+  `20261118030000_note_chat_media`.
+
 ## 0.9.72 – 2026-11-18
 
 ### Fixed
