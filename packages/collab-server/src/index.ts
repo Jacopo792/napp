@@ -31,6 +31,7 @@ const server = createCollaborationServer({
   instanceName: process.env.RENDER_INSTANCE_ID?.trim() || undefined,
   authorizationTtl: optionalNumber("AUTHORIZATION_TTL_MS", 5000),
   tokenRefresh: optionalNumber("TOKEN_REFRESH_MS", 60_000),
+  giphyKey: process.env.GIPHY_API_KEY?.trim() || undefined,
 });
 
 await server.listen();

@@ -26,7 +26,24 @@ export interface NoteComment {
   attachments?: ChatMedia[];
   /** The card of the first link in its words, as it was when sent. */
   link?: ChatLink | null;
+  /** A sticker or GIF sent as the message itself. */
+  sticker?: ChatSticker | null;
 }
+
+/** One of the app's own drawings, named and drawn by the client, or a GIPHY
+ *  GIF or sticker copied into `chat-media` as `<archive>/<message>.giphy.webp`
+ *  when it was sent. */
+export type ChatSticker =
+  | { pack: "napp"; id: string }
+  | {
+      pack: "giphy";
+      type: "gif" | "sticker";
+      path: string;
+      giphy: string;
+      title: string;
+      width: number;
+      height: number;
+    };
 
 /** A link's card: the page's own title, description and site name, and its
  *  picture copied into `chat-media` as `<archive>/<message>.link.<ext>`. */
@@ -110,6 +127,7 @@ export interface CommentRow {
   refs?: NoteRef[] | null;
   attachments?: ChatMedia[] | null;
   link?: ChatLink | null;
+  sticker?: ChatSticker | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -126,6 +144,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   refs: row.refs ?? [],
   attachments: row.attachments ?? [],
   link: row.link ?? null,
+  sticker: row.sticker ?? null,
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening

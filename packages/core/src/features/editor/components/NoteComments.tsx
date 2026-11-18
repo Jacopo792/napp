@@ -30,6 +30,7 @@ import {
   Quote,
   Reply,
   Smile,
+  Sticker,
   Trash2,
   X,
 } from "@/components/icons";
@@ -52,6 +53,7 @@ import { Avatar } from "@/components/WorkspaceMenus";
 import { useDismiss } from "@/components/useDismiss";
 import {
   addComment,
+  chatGiphyPath,
   chatLinkPath,
   chatMediaPath,
   deleteComment,
@@ -59,6 +61,7 @@ import {
   firstLink,
   uploadChatMedia,
   type ChatLink,
+  type ChatSticker,
   loadComments,
   loadReactions,
   setReaction,
@@ -73,7 +76,8 @@ import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } f
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
-import { ChatLinkCard, ChatMedia, localChatMedia } from "./ChatMedia";
+import { ChatLinkCard, ChatMedia, ChatStickerView, localChatMedia } from "./ChatMedia";
+import { StickerPicker, type StickerPick } from "./StickerPicker";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -277,7 +281,9 @@ export function NoteComments({
   const fileRef = useRef<HTMLInputElement>(null);
   /** The files of each message on its way, and which are already up, so a
    *  retry sends only what is missing. */
-  const outbox = useRef(new Map<string, { files: Staged[]; up: Set<number>; card: Card | null }>());
+  const outbox = useRef(
+    new Map<string, { files: Staged[]; up: Set<number>; card: Card | null; gif?: Blob }>(),
+  );
   /** The card of the first link being written, read as it is typed. */
   const [card, setCard] = useState<Card | null>(null);
   /** Links whose card the writer closed: not offered again in this draft. */
@@ -325,6 +331,9 @@ export function NoteComments({
   const reactRef = useDismiss<HTMLDivElement>(reacting !== null, closeReact);
   const closePicker = useCallback(() => setPicking(false), []);
   const pickerRef = useDismiss<HTMLDivElement>(picking, closePicker);
+  const [stickering, setStickering] = useState(false);
+  const closeStickers = useCallback(() => setStickering(false), []);
+  const stickersRef = useDismiss<HTMLSpanElement>(stickering, closeStickers);
   const reportRef = useDismiss<HTMLDivElement>(reporting !== null, closeReport);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -571,14 +580,35 @@ export function NoteComments({
     composerRef.current?.focus();
   }
 
-  async function send(retry?: ChatMessage) {
-    const body = (retry?.body ?? draft).trim();
+  async function send(retry?: ChatMessage, pick?: StickerPick) {
+    const body = pick ? "" : (retry?.body ?? draft).trim();
     const id = retry ? retry.id.slice("local-".length) : crypto.randomUUID();
     const outgoing = retry
       ? outbox.current.get(retry.id)
-      : { files: staged, up: new Set<number>(), card: card?.url === firstLink(body) ? card : null };
+      : pick
+        ? {
+            files: [],
+            up: new Set<number>(),
+            card: null,
+            gif: pick.pack === "giphy" ? pick.picture : undefined,
+          }
+        : {
+            files: staged,
+            up: new Set<number>(),
+            card: card?.url === firstLink(body) ? card : null,
+          };
     const files = outgoing?.files ?? [];
-    if (!body && !files.length) return;
+    /* A sticker is the whole message: its words stay in the field. */
+    const sticker: ChatSticker | null = retry
+      ? (retry.sticker ?? null)
+      : !pick
+        ? null
+        : pick.pack === "napp"
+          ? { pack: "napp", id: pick.id }
+          : { ...pick.item, pack: "giphy", path: chatGiphyPath(session, id) };
+    if (sticker?.pack === "giphy" && pick?.pack === "giphy")
+      localChatMedia.set(sticker.path, URL.createObjectURL(pick.picture));
+    if (!body && !files.length && !sticker) return;
     const sent = outgoing?.card ?? null;
     const imagePath = sent?.image ? chatLinkPath(session, id, sent.image.type) : undefined;
     const link: ChatLink | null = sent
@@ -597,6 +627,7 @@ export function NoteComments({
       id: `local-${id}`,
       attachments,
       link,
+      sticker,
       threadId,
       authorId: session.userId,
       body,
@@ -609,7 +640,7 @@ export function NoteComments({
       /* Only the notes still named in the words: a chip deleted while
          writing is not something the message is about. */
       refs: [
-        ...(quoted ? [quoted] : []),
+        ...(quoted && !sticker ? [quoted] : []),
         ...noteChips.filter(
           (ref, at, all) =>
             body.includes(`#${ref.title}`) && all.findIndex((one) => one.note === ref.note) === at,
@@ -621,7 +652,10 @@ export function NoteComments({
         ? current.map((m) => (m.id === local.id ? { ...m, sending: true, failed: false } : m))
         : [...current, { ...local, sending: true }],
     );
-    if (!retry) {
+    if (!retry && pick) {
+      if (sticker?.pack === "giphy") outbox.current.set(local.id, outgoing!);
+      setReplyTo(null);
+    } else if (!retry) {
       if (files.length || sent) outbox.current.set(local.id, outgoing!);
       setStaged([]);
       setCard(null);
@@ -646,6 +680,10 @@ export function NoteComments({
         await uploadChatMedia(imagePath, sent.image, sent.image.type);
         outgoing!.up.add(-1);
       }
+      if (sticker?.pack === "giphy" && outgoing?.gif && !outgoing.up.has(-2)) {
+        await uploadChatMedia(sticker.path, outgoing.gif, "image/webp");
+        outgoing.up.add(-2);
+      }
       const saved = await addComment(
         session,
         source,
@@ -656,7 +694,7 @@ export function NoteComments({
         local.bubble ?? null,
         local.replyTo ?? null,
         local.refs ?? [],
-        files.length || link ? { id, attachments, link } : undefined,
+        files.length || link || sticker ? { id, attachments, link, sticker } : undefined,
       );
       outbox.current.delete(local.id);
       /* Realtime may have put it in place already, under this same key. */
@@ -706,6 +744,7 @@ export function NoteComments({
         isGeneral,
         message.attachments ?? [],
         message.link?.image,
+        message.sticker?.pack === "giphy" ? message.sticker.path : undefined,
       );
       const rest = messages.filter((m) => m.id !== message.id);
       setMessages(rest);
@@ -1023,16 +1062,20 @@ export function NoteComments({
     if (mine) {
       items.push(
         { kind: "separator" },
-        {
-          kind: "item",
-          id: "chat-edit",
-          label: "Edit",
-          icon: <Pencil size={16} />,
-          run: () => {
-            setEditing(m.id);
-            setEditDraft(m.body);
-          },
-        },
+        ...(m.body.trim()
+          ? [
+              {
+                kind: "item" as const,
+                id: "chat-edit",
+                label: "Edit",
+                icon: <Pencil size={16} />,
+                run: () => {
+                  setEditing(m.id);
+                  setEditDraft(m.body);
+                },
+              },
+            ]
+          : []),
         {
           kind: "item",
           id: "chat-delete",
@@ -1166,6 +1209,7 @@ export function NoteComments({
               </span>
             )}
             <div className="chat-stack">
+              {m.sticker && <ChatStickerView sticker={m.sticker} mine={mine} />}
               {media.length > 0 && <ChatMedia media={media} />}
               {!worded ? null : jumbo && !answered ? (
                 <span className="chat-jumbo">{m.body.trim()}</span>
@@ -1191,7 +1235,9 @@ export function NoteComments({
                       }}
                     >
                       <span className="chat-replied-name">{answeredName}</span>
-                      <span className="chat-replied-words">{answered.body}</span>
+                      <span className="chat-replied-words">
+                        {answered.body || (answered.sticker ? "Sticker" : "")}
+                      </span>
                     </button>
                   )}
                   {m.refs
@@ -1680,6 +1726,39 @@ export function NoteComments({
                 <ArrowUp size={16} stroke={2.4} />
               </button>
             </div>
+            {/* Beside the emoji, as WhatsApp keeps them: one is a word,
+                the other the whole message. */}
+            <span className="chat-emoji-slot" ref={stickersRef}>
+              <button
+                type="button"
+                className={`chat-tool chat-emoji-button press ${stickering ? "is-open" : ""}`}
+                aria-label="Stickers and GIFs"
+                title="Stickers and GIFs"
+                aria-expanded={stickering}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setPicking(false);
+                  setStickering((open) => !open);
+                }}
+              >
+                <Sticker size={19} />
+              </button>
+              {stickering && (
+                <div
+                  className="emoji-picker sticker-picker popover is-above"
+                  role="dialog"
+                  aria-label="Stickers and GIFs"
+                >
+                  <StickerPicker
+                    session={session}
+                    onPick={(pick) => {
+                      setStickering(false);
+                      void send(undefined, pick);
+                    }}
+                  />
+                </div>
+              )}
+            </span>
             {/* iMessage's place for it: beside the field, outside it. */}
             <span className="chat-emoji-slot">
               <button
@@ -1689,7 +1768,10 @@ export function NoteComments({
                 title="Emoji"
                 aria-expanded={picking}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => setPicking((open) => !open)}
+                onClick={() => {
+                  setStickering(false);
+                  setPicking((open) => !open);
+                }}
               >
                 <Smile size={19} />
               </button>

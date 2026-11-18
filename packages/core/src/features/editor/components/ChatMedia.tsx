@@ -4,7 +4,13 @@
  * Storage refuses (a block, a report) is left as an empty tile. A photo opens
  * whole in a new window; a video plays in place with the browser's controls. */
 import { useEffect, useState } from "react";
-import { chatMediaUrls, type ChatLink, type ChatMedia as Media } from "@/lib/comments";
+import {
+  chatMediaUrls,
+  type ChatLink,
+  type ChatMedia as Media,
+  type ChatSticker as Sticker,
+} from "@/lib/comments";
+import { stickerName, stickerUrl } from "@/lib/stickers";
 
 const WIDTH = 240;
 
@@ -90,5 +96,39 @@ export function ChatLinkCard({ link }: { link: ChatLink }) {
         {link.description && <span className="chat-link-description">{link.description}</span>}
       </span>
     </a>
+  );
+}
+
+/** A sticker or GIF sent as the message: the app's own drawn here, a GIPHY
+ *  one from its copy in `chat-media`. No bubble; a GIF keeps rounded corners
+ *  like a photo, a sticker stands free like ours. */
+export function ChatStickerView({ sticker, mine }: { sticker: Sticker; mine: boolean }) {
+  const urls = useChatUrls(sticker.pack === "giphy" ? [sticker.path] : []);
+  if (sticker.pack === "napp") {
+    const url = stickerUrl(sticker.id);
+    if (!url) return null;
+    return (
+      <img
+        className="chat-sticker"
+        src={url}
+        alt={stickerName(sticker.id) ?? "Sticker"}
+        draggable={false}
+      />
+    );
+  }
+  const url = localChatMedia.get(sticker.path) ?? urls.get(sticker.path);
+  const width = Math.min(200, sticker.width);
+  return (
+    <span
+      className={`chat-giphy ${sticker.type === "gif" ? "is-gif" : ""} ${mine ? "is-mine" : ""}`}
+    >
+      <span
+        className="chat-giphy-picture"
+        style={{ width, aspectRatio: `${sticker.width} / ${sticker.height}` }}
+      >
+        {url && <img src={url} alt={sticker.title || "GIF"} draggable={false} />}
+      </span>
+      <span className="chat-giphy-source">via GIPHY</span>
+    </span>
   );
 }

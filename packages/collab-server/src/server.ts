@@ -21,11 +21,13 @@ import { Redis } from "@hocuspocus/extension-redis";
 import { Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
 import IORedis from "ioredis";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { setTimeout, clearTimeout } from "node:timers";
 import * as Y from "yjs";
 import { revertIfBroken } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
 import { linkPreview } from "./linkPreview.ts";
+import { giphyMedia, giphySearch } from "./giphy.ts";
 import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
@@ -55,6 +57,8 @@ export interface CollaborationConfig {
   instanceName?: string;
   /** The longest stretch of writing one version covers. Ten minutes. */
   versionStretch?: number;
+  /** GIPHY's API key. Absent, the chat offers no GIFs. */
+  giphyKey?: string;
 }
 
 /** Answer a probe and stop Hocuspocus from handling the request itself. A
@@ -201,6 +205,43 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
   } | null = null;
   let importing = 0;
   let previewing = 0;
+  let giphying = 0;
+
+  /** CORS for the app's own origins, then: is the bearer a member of the
+   *  archive named in `?archive=`? Answers and stops the request when not.
+   *  Row level security decides: a caller sees a membership row only of an
+   *  archive they belong to. */
+  async function memberOfArchive(
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+    signIn: string,
+  ): Promise<void> {
+    const origin = request.headers.origin;
+    if (!originAllowed(origin, config.allowedOrigins))
+      return respond(response, 403, { error: "Origin refused" });
+    response.setHeader("Access-Control-Allow-Origin", origin!);
+    response.setHeader("Vary", "Origin");
+    response.setHeader("Access-Control-Allow-Headers", "authorization");
+    response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    if (request.method === "OPTIONS") {
+      response.writeHead(204);
+      response.end();
+      throw null;
+    }
+    if (request.method !== "GET") return respond(response, 405, { error: "Method refused" });
+    const archiveId = url.searchParams.get("archive") ?? "";
+    const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
+    if (!/^[0-9a-f-]{36}$/i.test(archiveId) || !token || token.length > MAX_TOKEN)
+      return respond(response, 401, { error: signIn });
+    const member = await asCaller(token)
+      .from("archive_members")
+      .select("archive_id")
+      .eq("archive_id", archiveId)
+      .limit(1);
+    if (member.error || !member.data?.length)
+      return respond(response, 403, { error: "Not a member of this archive" });
+  }
 
   return new Server<Context>({
     port: config.port,
@@ -454,32 +495,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       /* A link's card, for a member about to send it in their archive's
          chat. Read here so no reader's address reaches the site. */
       if (url.pathname === "/link-preview") {
-        const origin = request.headers.origin;
-        if (!originAllowed(origin, config.allowedOrigins))
-          return respond(response, 403, { error: "Origin refused" });
-        response.setHeader("Access-Control-Allow-Origin", origin!);
-        response.setHeader("Vary", "Origin");
-        response.setHeader("Access-Control-Allow-Headers", "authorization");
-        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-        if (request.method === "OPTIONS") {
-          response.writeHead(204);
-          response.end();
-          throw null;
-        }
-        if (request.method !== "GET") return respond(response, 405, { error: "Method refused" });
-        const archiveId = url.searchParams.get("archive") ?? "";
-        const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
-        if (!/^[0-9a-f-]{36}$/i.test(archiveId) || !token || token.length > MAX_TOKEN)
-          return respond(response, 401, { error: "Sign in to preview links" });
-        /* Row level security answers: a caller sees a membership row only of
-           an archive they belong to. */
-        const member = await asCaller(token)
-          .from("archive_members")
-          .select("archive_id")
-          .eq("archive_id", archiveId)
-          .limit(1);
-        if (member.error || !member.data?.length)
-          return respond(response, 403, { error: "Not a member of this archive" });
+        await memberOfArchive(request, response, url, "Sign in to preview links");
         if (previewing >= 6) return respond(response, 429, { error: "Try again in a moment" });
         previewing++;
         const preview = await linkPreview(url.searchParams.get("url") ?? "")
@@ -489,6 +505,38 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
           return respond(response, 422, { error: "Could not read this page" });
         if (!preview) return respond(response, 404, { error: "This page has no preview" });
         return respond(response, 200, { ...preview });
+      }
+      /* GIFs and stickers for a member's chat: search and trending, then the
+         pictures themselves, so neither the key nor a reader's address
+         reaches GIPHY from a client. */
+      if (url.pathname === "/giphy" || url.pathname === "/giphy/media") {
+        await memberOfArchive(request, response, url, "Sign in to find GIFs");
+        if (!config.giphyKey) return respond(response, 503, { error: "GIFs are not set up" });
+        if (giphying >= 12) return respond(response, 429, { error: "Try again in a moment" });
+        giphying++;
+        try {
+          if (url.pathname === "/giphy") {
+            const found = await giphySearch(config.giphyKey, {
+              type: url.searchParams.get("type") === "sticker" ? "sticker" : "gif",
+              query: url.searchParams.get("q") ?? "",
+              offset: Number(url.searchParams.get("offset")) || 0,
+            });
+            return respond(response, 200, { ...found });
+          }
+          const media = await giphyMedia(url.searchParams.get("id") ?? "");
+          response.writeHead(200, {
+            "content-type": media.type,
+            "cache-control": "private, max-age=86400",
+            "x-content-type-options": "nosniff",
+          });
+          response.end(media.bytes);
+          throw null;
+        } catch (reason) {
+          if (reason === null) throw reason;
+          return respond(response, 502, { error: "GIPHY is not answering" });
+        } finally {
+          giphying--;
+        }
       }
       if (request.url === "/healthz") {
         return respond(response, 200, { status: "ok" });

@@ -18,6 +18,7 @@ import {
   type CommentRow,
   type ChatLink,
   type ChatMedia,
+  type ChatSticker,
   type NoteComment,
   type NoteRef,
 } from "./commentThreads";
@@ -27,6 +28,7 @@ export type {
   ArchiveComment,
   ChatLink,
   ChatMedia,
+  ChatSticker,
   NoteComment,
   NoteRef,
   CommentThread,
@@ -35,13 +37,13 @@ export type {
 } from "./commentThreads";
 
 const COLUMNS =
-  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to, attachments, link";
+  "id, thread_id, author_id, body, created_at, resolved_at, mentions, assignee_id, bubble, reply_to, attachments, link, sticker";
 
 /* The archive's general chat is the same conversation with no note under it:
    its own tables (`archive_messages`), read here through the same calls with
    `noteId` null, and shaped into the same rows. Its thread is the archive. */
 const GENERAL_COLUMNS =
-  "id, author_id, body, created_at, mentions, bubble, reply_to, refs, attachments, link";
+  "id, author_id, body, created_at, mentions, bubble, reply_to, refs, attachments, link, sticker";
 
 const MEDIA_BUCKET = "chat-media";
 
@@ -98,6 +100,66 @@ export async function fetchLinkPreview(
     link: { ...link, width: image.width, height: image.height },
     image: new Blob([bytes], { type: image.type }),
   };
+}
+
+/** Where a message's GIPHY copy lives. The database checks the same name. */
+export const chatGiphyPath = (session: AppSession, messageId: string): string =>
+  `${session.archiveId}/${messageId}.giphy.webp`;
+
+export interface GiphyItem {
+  id: string;
+  title: string;
+  width: number;
+  height: number;
+}
+
+/** The collaboration server's GIPHY proxy, for a member of this archive. */
+async function giphyRequest(
+  session: AppSession,
+  path: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new Error("Sign in again to find GIFs");
+  const endpoint = new URL(import.meta.env.VITE_COLLAB_URL as string);
+  endpoint.protocol = endpoint.protocol === "wss:" ? "https:" : "http:";
+  endpoint.pathname = path;
+  endpoint.search = new URLSearchParams({ ...params, archive: session.archiveId }).toString();
+  const response = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${data.session.access_token}` },
+    signal,
+  });
+  if (!response.ok) throw new Error("GIPHY is not answering. Try again in a moment.");
+  return response;
+}
+
+/** Trending with no words, search with some. */
+export async function searchGiphy(
+  session: AppSession,
+  type: "gif" | "sticker",
+  query: string,
+  offset = 0,
+  signal?: AbortSignal,
+): Promise<{ items: GiphyItem[]; next: number | null }> {
+  const response = await giphyRequest(
+    session,
+    "/giphy",
+    { type, q: query, offset: String(offset) },
+    signal,
+  );
+  return (await response.json()) as { items: GiphyItem[]; next: number | null };
+}
+
+/** One GIF or sticker's 200px animated WebP, through the same proxy: what
+ *  the picker shows is the very file that is sent. */
+export async function giphyPicture(
+  session: AppSession,
+  id: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await giphyRequest(session, "/giphy/media", { id }, signal);
+  return response.blob();
 }
 
 /** Where a message's link picture lives, by its type. */
@@ -212,17 +274,29 @@ export async function addComment(
   refs: NoteRef[] = [],
   /** The message's own id, chosen before its files were uploaded under it,
    *  and those files. */
-  media?: { id: string; attachments: ChatMedia[]; link?: ChatLink | null },
+  media?: {
+    id: string;
+    attachments: ChatMedia[];
+    link?: ChatLink | null;
+    sticker?: ChatSticker | null;
+  },
 ): Promise<NoteComment> {
   const trimmed = body.trim();
-  if (!trimmed && !media?.attachments.length) throw new Error("A comment needs something in it");
+  if (!trimmed && !media?.attachments.length && !media?.sticker)
+    throw new Error("A comment needs something in it");
+  const extra = media
+    ? {
+        id: media.id,
+        attachments: media.attachments,
+        link: media.link ?? null,
+        sticker: media.sticker ?? null,
+      }
+    : {};
   if (noteId === null) {
     const general = await supabase
       .from("archive_messages")
       .insert({
-        ...(media
-          ? { id: media.id, attachments: media.attachments, link: media.link ?? null }
-          : {}),
+        ...extra,
         archive_id: session.archiveId,
         author_id: session.userId,
         body: trimmed,
@@ -239,7 +313,7 @@ export async function addComment(
   const result = await supabase
     .from("note_comments")
     .insert({
-      ...(media ? { id: media.id, attachments: media.attachments, link: media.link ?? null } : {}),
+      ...extra,
       bubble,
       reply_to: replyTo,
       archive_id: session.archiveId,
@@ -372,8 +446,9 @@ export async function deleteComment(
   general = false,
   /** Its photos and videos, removed once the message is gone. */
   attachments: ChatMedia[] = [],
-  /** Its link card's picture, removed with them. */
+  /** Its link card's picture and its GIF, removed with them. */
   linkImage?: string,
+  stickerFile?: string,
 ): Promise<void> {
   const result = await supabase
     .from(general ? "archive_messages" : "note_comments")
@@ -381,7 +456,11 @@ export async function deleteComment(
     .eq("archive_id", session.archiveId)
     .eq("id", commentId);
   fail(result.error);
-  const files = [...attachments.map((item) => item.path), ...(linkImage ? [linkImage] : [])];
+  const files = [
+    ...attachments.map((item) => item.path),
+    ...(linkImage ? [linkImage] : []),
+    ...(stickerFile ? [stickerFile] : []),
+  ];
   if (files.length) {
     const removed = await supabase.storage.from(MEDIA_BUCKET).remove(files);
     fail(removed.error);

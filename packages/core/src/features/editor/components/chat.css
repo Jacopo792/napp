@@ -1568,3 +1568,188 @@
 .is-theirs .chat-menu.is-above {
   transform-origin: 0 100%;
 }
+
+/* ── Stickers and GIFs ─────────────────────────────────────────────────── */
+
+.sticker-picker {
+  width: 340px;
+  height: 392px;
+  padding: 8px 8px 0;
+}
+
+.sticker-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.sticker-tab {
+  flex: 1;
+  padding: 4px 0;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.sticker-tab.is-on {
+  background: var(--paper, var(--background));
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.sticker-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: start;
+  gap: 4px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding-bottom: 8px;
+}
+
+.sticker-cell {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 6px;
+  border-radius: var(--radius-tile);
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.sticker-cell img {
+  width: 100%;
+  height: 100%;
+}
+
+.sticker-cell:hover,
+.sticker-cell:focus-visible,
+.giphy-tile:hover,
+.giphy-tile:focus-visible {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  transform: scale(1.05);
+}
+
+/* Two columns that keep each picture's own shape. */
+.giphy-grid {
+  min-height: 0;
+  flex: 1;
+  columns: 2;
+  column-gap: 4px;
+  margin-top: 6px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+.giphy-tile {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  overflow: hidden;
+  break-inside: avoid;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.giphy-tile.is-sticker {
+  background: transparent;
+}
+
+.giphy-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.giphy-grid .emoji-none {
+  column-span: all;
+}
+
+.giphy-attribution {
+  margin: 0 -8px;
+  padding: 6px 0 7px;
+  border-top: 1px solid var(--line, color-mix(in srgb, var(--ink) 10%, transparent));
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+/* In the conversation: no bubble, the drawing is the message. */
+.chat-sticker {
+  display: block;
+  width: 132px;
+  height: auto;
+  aspect-ratio: 108 / 110;
+}
+
+.chat-giphy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.chat-giphy.is-mine {
+  align-items: flex-end;
+}
+
+.chat-giphy-picture {
+  display: block;
+  max-width: 100%;
+}
+
+.chat-giphy.is-gif .chat-giphy-picture {
+  overflow: hidden;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.chat-giphy-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-giphy-source {
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+/* A sticker lands the way an animal does on a bubble: up from its corner. */
+.chat-row.is-sent :is(.chat-sticker, .chat-giphy) {
+  transform-origin: 100% 100%;
+  animation: chat-piece var(--motion-shape) var(--ease-spring) backwards;
+}
+
+.chat-row.is-received :is(.chat-sticker, .chat-giphy) {
+  transform-origin: 0 100%;
+  animation: chat-piece var(--motion-shape) var(--ease-spring) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-row:is(.is-sent, .is-received) :is(.chat-sticker, .chat-giphy) {
+    animation: none;
+  }
+
+  .sticker-cell,
+  .giphy-tile,
+  .sticker-tab {
+    transition: none;
+  }
+}

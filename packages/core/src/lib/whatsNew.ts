@@ -45,6 +45,23 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.76",
+    date: "2026-11-18",
+    headline: "Stickers and GIFs",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Stickers and GIFs in every chat",
+            text: "The new button beside the emoji opens our own stickers, drawn with the animals from the chat bubbles, plus GIFs and stickers from GIPHY. Nobody's address reaches GIPHY, and what you send stays with the message.",
+            image: "0.9.76-stickers.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.74",
     date: "2026-11-18",
     headline: "Links show what they are",

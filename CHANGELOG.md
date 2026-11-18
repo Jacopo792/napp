@@ -3,6 +3,18 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.76 – 2026-11-18
+
+### Added
+
+- Stickers and GIFs in every chat, sent as a message of their own. Eighteen
+  die-cut stickers of the bubble animals are drawn by the client
+  (`lib/stickers.ts`, shared with the phone); GIPHY GIFs and stickers come
+  through the collaboration server (`/giphy`, `/giphy/media`, archive members
+  only, key in `GIPHY_API_KEY` on the server alone) and are copied into
+  `chat-media` as `<archive>/<message>.giphy.webp` when sent. Migration
+  `20261118050000_chat_stickers` adds the `sticker` column.
+
 ## 0.9.75 – 2026-11-18
 
 ### Fixed

@@ -142,6 +142,7 @@ export {
   IconLineHeight as LineSpacing,
   IconRuler as Ruler,
   IconMoodSmile as Smile,
+  IconSticker2 as Sticker,
   IconFileExport as Export,
   IconLayoutSidebarRight as PanelRight,
   IconHierarchy as Structure,

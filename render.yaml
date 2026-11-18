@@ -64,6 +64,11 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # GIPHY's API key for the chat's GIFs and stickers (`/giphy`). Set in the
+      # dashboard like the keys above: it lives only here, never in a client
+      # bundle or a `VITE_*` variable. Absent, the chat offers no GIFs.
+      - key: GIPHY_API_KEY
+        sync: false
 
   # Strictly a bus between instances: which document changed, and how. Nothing
   # here is the record — every document lives in `note_documents`, and losing

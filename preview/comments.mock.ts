@@ -8,10 +8,12 @@ import type {
   ArchiveComment,
   ChatLink,
   ChatMedia,
+  ChatSticker,
   NoteComment,
   NoteRef,
   Reaction,
 } from "@/lib/commentThreads";
+import { STICKERS, stickerSvg } from "@/lib/stickers";
 
 export {
   firstLink,
@@ -23,6 +25,7 @@ export type {
   ArchiveComment,
   ChatLink,
   ChatMedia,
+  ChatSticker,
   NoteComment,
   NoteRef,
   CommentThread,
@@ -112,6 +115,18 @@ store.set(null, [
       { path: `${PREVIEW_ARCHIVE}/general-3.1.jpg`, kind: "image", width: 480, height: 640 },
     ],
   },
+  {
+    id: "general-4",
+    threadId: PREVIEW_ARCHIVE,
+    authorId: PREVIEW_U2,
+    body: "",
+    createdAt: new Date(Date.now() - 5_100_000).toISOString(),
+    resolvedAt: null,
+    mentions: [],
+    assigneeId: null,
+    bubble: "frog",
+    sticker: { pack: "napp", id: "frog.yay" },
+  },
 ]);
 archiveOf.set(null, PREVIEW_ARCHIVE);
 
@@ -164,13 +179,19 @@ export async function addComment(
   bubble: string | null = null,
   replyTo: string | null = null,
   refs: NoteRef[] = [],
-  media?: { id: string; attachments: ChatMedia[]; link?: ChatLink | null },
+  media?: {
+    id: string;
+    attachments: ChatMedia[];
+    link?: ChatLink | null;
+    sticker?: ChatSticker | null;
+  },
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
     id: media?.id ?? crypto.randomUUID(),
     attachments: media?.attachments ?? [],
     link: media?.link ?? null,
+    sticker: media?.sticker ?? null,
     threadId,
     authorId: session.userId,
     body: body.trim(),
@@ -343,3 +364,47 @@ export async function fetchLinkPreview(
 
 export const chatLinkPath = (session: AppSession, messageId: string, type: string): string =>
   `${session.archiveId}/${messageId}.link.${type === "image/png" ? "png" : "jpg"}`;
+
+export const chatGiphyPath = (session: AppSession, messageId: string): string =>
+  `${session.archiveId}/${messageId}.giphy.webp`;
+
+export interface GiphyItem {
+  id: string;
+  title: string;
+  width: number;
+  height: number;
+}
+
+/* GIPHY stands in with the fixture's own pictures: its drawings as GIFs and
+   the app's stickers as GIPHY stickers, so the picker can be tried offline. */
+export async function searchGiphy(
+  _session: AppSession,
+  type: "gif" | "sticker",
+  query: string,
+  offset = 0,
+): Promise<{ items: GiphyItem[]; next: number | null }> {
+  await sleep(250);
+  const words = query.trim().toLowerCase();
+  const items =
+    type === "gif"
+      ? Array.from({ length: 12 }, (_, at) => ({
+          id: `gif${offset + at}`,
+          title: at % 2 ? "Portrait" : "Landscape",
+          width: at % 2 ? 200 : 200,
+          height: at % 2 ? 267 : 150,
+        }))
+      : STICKERS.filter((one) => !words || one.name.toLowerCase().includes(words)).map((one) => ({
+          id: `s${STICKERS.indexOf(one)}`,
+          title: one.name,
+          width: 200,
+          height: 204,
+        }));
+  return { items, next: type === "gif" && offset < 24 ? offset + 12 : null };
+}
+
+export async function giphyPicture(_session: AppSession, id: string): Promise<Blob> {
+  await sleep(150);
+  if (id.startsWith("gif"))
+    return (await fetch(Number(id.slice(3)) % 2 ? PREVIEW_PORTRAIT : PREVIEW_LANDSCAPE)).blob();
+  return new Blob([stickerSvg(STICKERS[Number(id.slice(1))]!.id)!], { type: "image/svg+xml" });
+}
