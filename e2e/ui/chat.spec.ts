@@ -118,13 +118,18 @@ test("the rail's chat offers the general chat, kept apart from the notes' chats"
     .getByRole("button", { name: "Close settings", exact: true })
     .click({ position: { x: 4, y: 4 } });
   await page.locator(".sidebar-rail-places button[aria-haspopup=menu]").click();
-  await page.getByRole("menuitem", { name: "General chat", exact: true }).click();
+  /* The preview's general chat starts with an unread message: "(1)". */
+  await page.getByRole("menuitem", { name: "General chat (1)", exact: true }).click();
   const general = page.getByRole("dialog", { name: "General chat", exact: true });
   await general.getByRole("textbox", { name: "Message", exact: true }).fill("Hello, everyone");
   await general.getByRole("button", { name: "Send", exact: true }).click();
   await expect(general.locator(".chat-words", { hasText: "Hello, everyone" })).toBeVisible();
   await general.getByRole("button", { name: "Close chat", exact: true }).click();
   await expect(general).toBeHidden();
+  /* Read: the count is gone from the menu. */
+  await page.locator(".sidebar-rail-places button[aria-haspopup=menu]").click();
+  await expect(page.getByRole("menuitem", { name: "General chat", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.locator("button[aria-label=Chat]").click();
   const noteChat = page.getByRole("complementary", { name: "Chat about this note" });
   await expect(noteChat.locator(".chat-row").first()).toBeVisible();
