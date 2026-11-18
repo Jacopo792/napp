@@ -45,6 +45,42 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.71",
+    date: "2026-11-18",
+    headline: "Photos and videos in the general chat",
+    sections: [
+      {
+        heading: "On your computer",
+        items: [
+          {
+            title: "Photos and videos in the chat",
+            text: "Pictures and videos shared in the general chat show beside their message. Click one to see it full size.",
+            image: "0.9.71-chat-photos.jpg",
+          },
+          {
+            title: "A clear Settings window",
+            text: "With a translucent sidebar, Settings no longer shows a dark smudge behind its sections.",
+          },
+        ],
+      },
+      {
+        heading: "On iPhone (coming soon)",
+        items: [
+          {
+            title: "The general chat on your phone",
+            text: "The same messages as on your computer, with each person's animal bubble, photos and videos.",
+            image: "0.9.71-phone-chat.jpg",
+          },
+          {
+            title: "Chat info",
+            text: "Tap the chat's name to see who is in it, open a profile, and choose your bubble and quick reactions.",
+            image: "0.9.71-phone-chat-info.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.70",
     date: "2026-11-18",
     headline: "A tidier chat and a badge that tells the truth",

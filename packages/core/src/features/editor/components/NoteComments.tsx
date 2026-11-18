@@ -66,6 +66,7 @@ import { subscribeToArchiveChat, subscribeToComments, unsubscribeFromArchive } f
 import { useWritingPreferences } from "@/lib/writingPreferences";
 import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
+import { ChatMedia } from "./ChatMedia";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -549,7 +550,7 @@ export function NoteComments({
       return;
     }
     try {
-      await deleteComment(session, message.id, isGeneral);
+      await deleteComment(session, message.id, isGeneral, message.attachments ?? []);
       const rest = messages.filter((m) => m.id !== message.id);
       setMessages(rest);
       onChanged?.();
@@ -931,8 +932,18 @@ export function NoteComments({
     const name = author?.name || "Someone";
     const quote = m.threadId !== noteId ? quotes.get(m.threadId) : undefined;
     const showQuote = quote && (first || previous?.threadId !== m.threadId);
+    const answered = m.replyTo ? messages.find((one) => one.id === m.replyTo) : undefined;
     /* A few emoji and nothing else are said large and without a bubble. */
     const jumbo = !showQuote && editing !== m.id && JUMBO.test(m.body.trim());
+    const media = m.attachments ?? [];
+    /* A photo or video sent alone has no bubble under it. */
+    const worded = Boolean(
+      m.body.trim() ||
+      answered ||
+      showQuote ||
+      m.refs?.some((ref) => ref.quote) ||
+      editing === m.id,
+    );
     const counted = tally(reactions, m.id, session.userId);
     const key = keys.current.get(m.id) ?? m.id;
     const motion = settled.current.has(key)
@@ -942,7 +953,6 @@ export function NoteComments({
         : arrived.has(m.id)
           ? "is-received"
           : "";
-    const answered = m.replyTo ? messages.find((one) => one.id === m.replyTo) : undefined;
     const answeredName = answered
       ? answered.authorId === session.userId
         ? "You"
@@ -994,89 +1004,92 @@ export function NoteComments({
                 {last && <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />}
               </span>
             )}
-            {jumbo && !answered ? (
-              <span className="chat-jumbo">{m.body.trim()}</span>
-            ) : (
-              <ChatBubble bubble={m.bubble} mine={mine} bare={!last} minWidth={nested?.width}>
-                {answered && (
-                  <button
-                    type="button"
-                    className="chat-replied"
-                    title="Show the message this answers"
-                    onClick={() => {
-                      const node = scrollRef.current?.querySelector<HTMLElement>(
-                        `[data-message="${answered.id}"]`,
-                      );
-                      if (!node) return;
-                      node.scrollIntoView({
-                        block: "center",
-                        behavior: reduced() ? "auto" : "smooth",
-                      });
-                      node.classList.remove("is-arrived");
-                      void node.offsetWidth;
-                      node.classList.add("is-arrived");
-                    }}
-                  >
-                    <span className="chat-replied-name">{answeredName}</span>
-                    <span className="chat-replied-words">{answered.body}</span>
-                  </button>
-                )}
-                {m.refs
-                  ?.filter((ref) => ref.quote)
-                  .map((ref) => (
+            <div className="chat-stack">
+              {media.length > 0 && <ChatMedia media={media} />}
+              {!worded ? null : jumbo && !answered ? (
+                <span className="chat-jumbo">{m.body.trim()}</span>
+              ) : (
+                <ChatBubble bubble={m.bubble} mine={mine} bare={!last} minWidth={nested?.width}>
+                  {answered && (
                     <button
-                      key={`${ref.note}:${ref.quote}`}
                       type="button"
-                      className="chat-note-quote"
-                      title={`Show in ${titled(ref.title)}`}
-                      onClick={() => openNote(ref)}
-                      aria-disabled={!reachable(ref) || undefined}
+                      className="chat-replied"
+                      title="Show the message this answers"
+                      onClick={() => {
+                        const node = scrollRef.current?.querySelector<HTMLElement>(
+                          `[data-message="${answered.id}"]`,
+                        );
+                        if (!node) return;
+                        node.scrollIntoView({
+                          block: "center",
+                          behavior: reduced() ? "auto" : "smooth",
+                        });
+                        node.classList.remove("is-arrived");
+                        void node.offsetWidth;
+                        node.classList.add("is-arrived");
+                      }}
                     >
-                      <span className="chat-note-quote-title">
-                        <NotebookText size={12} />
-                        {titled(ref.title)}
-                      </span>
-                      <span className="chat-note-quote-words">{ref.quote}</span>
+                      <span className="chat-replied-name">{answeredName}</span>
+                      <span className="chat-replied-words">{answered.body}</span>
                     </button>
-                  ))}
-                {showQuote && (
-                  <button
-                    type="button"
-                    className="chat-quote"
-                    onClick={() => onReveal(m.threadId)}
-                    title="Show in the note"
-                  >
-                    {quote}
-                  </button>
-                )}
-                {editing === m.id ? (
-                  <textarea
-                    className="chat-edit"
-                    value={editDraft}
-                    autoFocus
-                    rows={Math.min(6, editDraft.split("\n").length)}
-                    aria-label="Edit message"
-                    onChange={(event) => setEditDraft(event.target.value)}
-                    onBlur={() => void saveEdit(m)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        event.stopPropagation();
-                        setEditing(null);
-                      } else if (
-                        event.key === "Enter" &&
-                        !event.shiftKey &&
-                        !event.nativeEvent.isComposing
-                      ) {
-                        event.preventDefault();
-                        void saveEdit(m);
-                      }
-                    }}
-                  />
-                ) : (
-                  <span className="chat-words">{words(m)}</span>
-                )}
-              </ChatBubble>
-            )}
+                  )}
+                  {m.refs
+                    ?.filter((ref) => ref.quote)
+                    .map((ref) => (
+                      <button
+                        key={`${ref.note}:${ref.quote}`}
+                        type="button"
+                        className="chat-note-quote"
+                        title={`Show in ${titled(ref.title)}`}
+                        onClick={() => openNote(ref)}
+                        aria-disabled={!reachable(ref) || undefined}
+                      >
+                        <span className="chat-note-quote-title">
+                          <NotebookText size={12} />
+                          {titled(ref.title)}
+                        </span>
+                        <span className="chat-note-quote-words">{ref.quote}</span>
+                      </button>
+                    ))}
+                  {showQuote && (
+                    <button
+                      type="button"
+                      className="chat-quote"
+                      onClick={() => onReveal(m.threadId)}
+                      title="Show in the note"
+                    >
+                      {quote}
+                    </button>
+                  )}
+                  {editing === m.id ? (
+                    <textarea
+                      className="chat-edit"
+                      value={editDraft}
+                      autoFocus
+                      rows={Math.min(6, editDraft.split("\n").length)}
+                      aria-label="Edit message"
+                      onChange={(event) => setEditDraft(event.target.value)}
+                      onBlur={() => void saveEdit(m)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.stopPropagation();
+                          setEditing(null);
+                        } else if (
+                          event.key === "Enter" &&
+                          !event.shiftKey &&
+                          !event.nativeEvent.isComposing
+                        ) {
+                          event.preventDefault();
+                          void saveEdit(m);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="chat-words">{words(m)}</span>
+                  )}
+                </ChatBubble>
+              )}
+            </div>
             {!m.sending && !m.failed && editing !== m.id && (
               <>
                 <div

@@ -3,6 +3,19 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.71 – 2026-11-18
+
+### Added
+
+- Photos and videos attached to general-chat messages are shown in the chat.
+  They live in a private `chat-media` bucket readable only by people who can
+  read the message. Migration `20261118020000_archive_chat_media`.
+
+### Fixed
+
+- Settings keeps an opaque sheet when the sidebar is translucent, instead of
+  blurring the darkened window behind its sections.
+
 ## 0.9.70 – 2026-11-18
 
 ### Changed

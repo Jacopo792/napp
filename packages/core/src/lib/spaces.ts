@@ -9,6 +9,7 @@
  * membership again before it stores anything. */
 import { readSource, type Source } from "./citations";
 import type { AppSession } from "./sessionRestore";
+import { emptyChatMedia } from "./comments";
 import { fail, supabase } from "./supabaseClient";
 import {
   archiveKind,
@@ -241,6 +242,8 @@ export async function deleteSpace(archiveId: string): Promise<void> {
     const removed = await bucket.remove(names);
     fail(removed.error);
   }
+
+  await emptyChatMedia(archiveId);
 
   const result = await supabase.rpc("delete_archive", { target_archive_id: archiveId });
   fail(result.error);

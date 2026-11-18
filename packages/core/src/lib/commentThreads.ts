@@ -22,6 +22,20 @@ export interface NoteComment {
   replyTo?: string | null;
   /** The notes a general-chat message is about: quoted from, or named with #. */
   refs?: NoteRef[];
+  /** The photos and videos a general-chat message carries, in order. */
+  attachments?: ChatMedia[];
+}
+
+/** A photo or video in the general chat: a file of the private `chat-media`
+ *  bucket, named `<archive>/<message>.<n>.<ext>`, and the size it was taken
+ *  at so its place can be kept before it has loaded. */
+export interface ChatMedia {
+  path: string;
+  kind: "image" | "video";
+  width?: number;
+  height?: number;
+  /** Seconds, for a video. */
+  duration?: number;
 }
 
 /** A note a general-chat message talks about, as it was when sent: its title,
@@ -66,6 +80,7 @@ export interface CommentRow {
   bubble?: string | null;
   reply_to?: string | null;
   refs?: NoteRef[] | null;
+  attachments?: ChatMedia[] | null;
 }
 
 export const toComment = (row: CommentRow): NoteComment => ({
@@ -80,6 +95,7 @@ export const toComment = (row: CommentRow): NoteComment => ({
   bubble: row.bubble ?? null,
   replyTo: row.reply_to ?? null,
   refs: row.refs ?? [],
+  attachments: row.attachments ?? [],
 });
 
 /** Group the rows into conversations. A thread is resolved when its opening

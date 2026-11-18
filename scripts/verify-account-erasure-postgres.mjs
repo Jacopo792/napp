@@ -76,6 +76,7 @@ try {
       ('note-images','${shared}/${file}','${one}','${one}'),
       ('note-images','${shared}/${keptFile}','${one}','${one}'),
       ('note-images','${solo}/${crypto.randomUUID()}','${one}','${one}'),
+      ('chat-media','${solo}/${crypto.randomUUID()}.0.jpg','${two}','${two}'),
       ('avatars','${one}/${crypto.randomUUID()}','${one}','${one}');
     insert into public.media_text(archive_id,object_id,text) values ('${shared}','${file}','Erase OCR'),('${shared}','${keptFile}','Keep OCR');
   `);
@@ -136,7 +137,11 @@ try {
   await db.query("select set_config('request.jwt.claims','{}',false)");
   stage = "acknowledge simulated Storage API confirmations";
   const paths = (await db.query("select * from public.account_erasure_objects($1)", [one])).rows;
-  assert.equal(paths.length, 3, "Retained attachment must not be queued");
+  assert.equal(
+    paths.length,
+    4,
+    "Retained attachment must not be queued; an emptied archive's chat files are",
+  );
   for (const object of paths) {
     // Only the local Storage stub is deleted here, simulating an API success.
     // Production code always uses Storage.remove(), never a SQL object delete.
@@ -448,9 +453,108 @@ try {
     ]),
     /cannot mention a blocked account/,
   );
+  stage = "general-chat photos follow their message";
+  await asUser(null);
+  // Hosted Storage grants its table to signed-in users; RLS decides the rest.
+  await db.exec("grant select, insert, delete on storage.objects to authenticated");
+  const four = crypto.randomUUID();
+  await db.query(
+    "insert into auth.users(id,email,email_confirmed_at) values ($1,'four@example.test',now())",
+    [four],
+  );
+  await db.query("insert into public.archive_members(archive_id,user_id) values ($1,$2)", [
+    safetyArchive,
+    four,
+  ]);
+  const photoMessage = crypto.randomUUID();
+  const photo = `${safetyArchive}/${photoMessage}.0.jpg`;
+  await asUser(three);
+  await db.query(
+    "insert into storage.objects(bucket_id,name,owner,owner_id) values ('chat-media',$1,$2,$3)",
+    [photo, three, three],
+  );
+  await db.query(
+    "insert into public.archive_messages(id,archive_id,author_id,body,attachments) values ($1,$2,$3,'',$4)",
+    [
+      photoMessage,
+      safetyArchive,
+      three,
+      JSON.stringify([{ kind: "image", path: photo, width: 4, height: 3 }]),
+    ],
+  );
+  await assert.rejects(
+    db.query("insert into public.archive_messages(archive_id,author_id,body) values ($1,$2,'')", [
+      safetyArchive,
+      three,
+    ]),
+    /said_something/,
+    "A message says something or shows something",
+  );
+  await assert.rejects(
+    db.query(
+      "insert into public.archive_messages(id,archive_id,author_id,body,attachments) values ($1,$2,$3,'x',$4)",
+      [
+        crypto.randomUUID(),
+        safetyArchive,
+        three,
+        JSON.stringify([{ kind: "image", path: `${shared}/${photoMessage}.0.jpg` }]),
+      ],
+    ),
+    /own photos/,
+    "A message cannot point at another archive's file",
+  );
+  await db.query("update public.archive_messages set attachments='[]' where id=$1", [photoMessage]);
+  assert.equal(
+    await scalar(
+      "select jsonb_array_length(attachments) from public.archive_messages where id=$1",
+      [photoMessage],
+    ),
+    1,
+    "The pictures stay as sent",
+  );
+  await asUser(four);
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where name=$1", [photo]),
+    1,
+    "A member sees a photo in the chat",
+  );
+  await assert.rejects(
+    db.query(
+      "insert into storage.objects(bucket_id,name,owner,owner_id) values ('chat-media',$1,$2,$3)",
+      [`${safetyArchive}/${photoMessage}.1.jpg`, four, four],
+    ),
+    /row-level security/,
+    "Nobody adds files to somebody else's message",
+  );
+  await db.query("delete from storage.objects where name=$1", [photo]);
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where name=$1", [photo]),
+    1,
+    "Only the uploader removes a chat file",
+  );
+  await asUser(two);
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where name=$1", [photo]),
+    0,
+    "A block hides the blocked person's photos",
+  );
   await asUser(null);
   stage = "erasure scrubs legacy blocked mentions in retained comments";
   await db.query("select public.begin_account_erasure($1,$2)", [three, crypto.randomUUID()]);
+  {
+    const queued = (await db.query("select * from public.account_erasure_objects($1)", [three]))
+      .rows;
+    assert.deepEqual(
+      queued.map((object) => object.object_name),
+      [photo],
+      "An erased account's chat photos are queued for removal",
+    );
+    await db.query("delete from storage.objects where name=$1", [photo]);
+    await db.query("select public.ack_account_erasure_objects($1,'chat-media',$2)", [
+      three,
+      [photo],
+    ]);
+  }
   assert.deepEqual(
     (
       await db.query("select mentions from public.note_comments where id=$1", [

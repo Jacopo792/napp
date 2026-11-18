@@ -15,7 +15,7 @@ import { chatBubble } from "@/lib/chatBubbles";
 const EYE = "#2b2420";
 const BLUSH = "#f2897a";
 
-interface Piece {
+export interface Piece {
   /** Offsets from the body's edges, in px; negative reaches outside. */
   at: { top?: number; bottom?: number; left?: number; right?: number };
   w: number;
@@ -25,7 +25,7 @@ interface Piece {
   art: ReactNode;
 }
 
-interface Dress {
+export interface Dress {
   pieces: Piece[];
   /** Room the pieces need above and below, so they never touch the line
    *  above or the name over the next message. */
@@ -42,7 +42,7 @@ const blush = (x: number, y: number) => (
   <ellipse cx={x} cy={y} rx={1.7} ry={1} fill={BLUSH} opacity={0.55} />
 );
 
-const DRESSES: Record<string, Dress> = {
+export const DRESSES: Record<string, Dress> = {
   cat: {
     room: { top: 14, bottom: 6 },
     pieces: [

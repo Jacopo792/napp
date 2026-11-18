@@ -16,6 +16,7 @@ import {
   type ArchiveComment,
   type Reaction,
   type CommentRow,
+  type ChatMedia,
   type NoteComment,
   type NoteRef,
 } from "./commentThreads";
@@ -23,6 +24,7 @@ import {
 export { notesWithOpenRemarks, threadsOf, unreadRemarks } from "./commentThreads";
 export type {
   ArchiveComment,
+  ChatMedia,
   NoteComment,
   NoteRef,
   CommentThread,
@@ -36,7 +38,73 @@ const COLUMNS =
 /* The archive's general chat is the same conversation with no note under it:
    its own tables (`archive_messages`), read here through the same calls with
    `noteId` null, and shaped into the same rows. Its thread is the archive. */
-const GENERAL_COLUMNS = "id, author_id, body, created_at, mentions, bubble, reply_to, refs";
+const GENERAL_COLUMNS =
+  "id, author_id, body, created_at, mentions, bubble, reply_to, refs, attachments";
+
+const MEDIA_BUCKET = "chat-media";
+
+/** Where the `index`th file of a message lives. The database checks the same
+ *  shape, so a message can only list files of its own archive and its own id. */
+export const chatMediaPath = (
+  session: AppSession,
+  messageId: string,
+  index: number,
+  extension: string,
+): string => `${session.archiveId}/${messageId}.${index}.${extension.toLowerCase()}`;
+
+/** Put one photo or video in place before its message is sent. The phone
+ *  hands bytes, the browser a Blob; Storage takes either. */
+export async function uploadChatMedia(
+  path: string,
+  data: Blob | ArrayBuffer,
+  contentType: string,
+): Promise<void> {
+  const result = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .upload(path, data, { contentType, upsert: false });
+  fail(result.error);
+}
+
+/* Signed addresses, kept until shortly before they lapse: a chat redraws
+   often and every picture in it would otherwise ask again. */
+const SIGNED_FOR = 3600;
+const signed = new Map<string, { url: string; until: number }>();
+
+/** Addresses a viewer or player can load, for the files the caller may read.
+ *  One that Storage refuses (a block, a report) is simply absent. */
+export async function chatMediaUrls(paths: string[]): Promise<Map<string, string>> {
+  const now = Date.now();
+  const urls = new Map<string, string>();
+  const missing: string[] = [];
+  for (const path of new Set(paths)) {
+    const known = signed.get(path);
+    if (known && known.until > now) urls.set(path, known.url);
+    else missing.push(path);
+  }
+  if (missing.length) {
+    const result = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(missing, SIGNED_FOR);
+    fail(result.error);
+    for (const entry of result.data ?? []) {
+      if (!entry.signedUrl || !entry.path) continue;
+      signed.set(entry.path, { url: entry.signedUrl, until: now + (SIGNED_FOR - 300) * 1000 });
+      urls.set(entry.path, entry.signedUrl);
+    }
+  }
+  return urls;
+}
+
+/** Every chat file of an archive, removed before the archive itself goes. */
+export async function emptyChatMedia(archiveId: string): Promise<void> {
+  const bucket = supabase.storage.from(MEDIA_BUCKET);
+  for (;;) {
+    const listed = await bucket.list(archiveId, { limit: 1000 });
+    fail(listed.error);
+    const names = (listed.data ?? []).map((object) => `${archiveId}/${object.name}`);
+    if (names.length === 0) return;
+    const removed = await bucket.remove(names);
+    fail(removed.error);
+  }
+}
 
 type GeneralRow = Omit<CommentRow, "thread_id" | "resolved_at" | "assignee_id">;
 
@@ -103,13 +171,17 @@ export async function addComment(
   replyTo: string | null = null,
   /** For the general chat only: the notes the message is about. */
   refs: NoteRef[] = [],
+  /** For the general chat only: the message's own id, chosen before its
+   *  files were uploaded under it, and those files. */
+  media?: { id: string; attachments: ChatMedia[] },
 ): Promise<NoteComment> {
   const trimmed = body.trim();
-  if (!trimmed) throw new Error("A comment needs something in it");
+  if (!trimmed && !media?.attachments.length) throw new Error("A comment needs something in it");
   if (noteId === null) {
     const general = await supabase
       .from("archive_messages")
       .insert({
+        ...(media ? { id: media.id, attachments: media.attachments } : {}),
         archive_id: session.archiveId,
         author_id: session.userId,
         body: trimmed,
@@ -256,6 +328,8 @@ export async function deleteComment(
   commentId: string,
   /** Set for a message in the archive's general chat. */
   general = false,
+  /** Its photos and videos, removed once the message is gone. */
+  attachments: ChatMedia[] = [],
 ): Promise<void> {
   const result = await supabase
     .from(general ? "archive_messages" : "note_comments")
@@ -263,6 +337,12 @@ export async function deleteComment(
     .eq("archive_id", session.archiveId)
     .eq("id", commentId);
   fail(result.error);
+  if (attachments.length) {
+    const removed = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .remove(attachments.map((item) => item.path));
+    fail(removed.error);
+  }
 }
 
 /** Only the author may change the words. RLS admits editors because the same

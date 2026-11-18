@@ -2588,6 +2588,14 @@
   backdrop-filter: blur(30px) saturate(1.7);
 }
 
+/* Settings sits over the scrim, so glass there only blurred the darkened
+   window into a smudge behind its sections. Its nav is already paper. */
+:is(.settings-panel, .has-translucent-sidebar .settings-panel).glass-sheet {
+  background: var(--paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* A toolbar pill holds the menus it opens, so its glass is a layer behind it
    rather than a filter on it — see the columns above for why. The menus also
    keep a floor of their own (`--glass-tint-menu`): a bar may go nearly clear,

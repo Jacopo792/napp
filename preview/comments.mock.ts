@@ -1,9 +1,16 @@
 /* Comments against an in-memory archive, so the panel can be opened, written
    in and resolved with no credentials and no network. Threads live for as long
    as the tab, like everything else in the preview. */
+import { PREVIEW_LANDSCAPE, PREVIEW_PORTRAIT } from "./chatMedia.fixture";
 import type { AppSession } from "./session.mock";
 import { FIXTURE_NOTES, PREVIEW_ARCHIVE, PREVIEW_U1, PREVIEW_U2 } from "./fixture";
-import type { ArchiveComment, NoteComment, NoteRef, Reaction } from "@/lib/commentThreads";
+import type {
+  ArchiveComment,
+  ChatMedia,
+  NoteComment,
+  NoteRef,
+  Reaction,
+} from "@/lib/commentThreads";
 
 export {
   notesWithOpenRemarks,
@@ -12,6 +19,7 @@ export {
 } from "@/lib/commentThreads";
 export type {
   ArchiveComment,
+  ChatMedia,
   NoteComment,
   NoteRef,
   CommentThread,
@@ -72,6 +80,35 @@ store.set(null, [
     assigneeId: null,
     bubble: "frog",
   },
+  {
+    id: "general-2",
+    threadId: PREVIEW_ARCHIVE,
+    authorId: PREVIEW_U2,
+    body: "",
+    createdAt: new Date(Date.now() - 5_300_000).toISOString(),
+    resolvedAt: null,
+    mentions: [],
+    assigneeId: null,
+    bubble: "frog",
+    attachments: [
+      { path: `${PREVIEW_ARCHIVE}/general-2.0.jpg`, kind: "image", width: 640, height: 480 },
+    ],
+  },
+  {
+    id: "general-3",
+    threadId: PREVIEW_ARCHIVE,
+    authorId: PREVIEW_U2,
+    body: "Il posto per sabato, e gli appunti 📒",
+    createdAt: new Date(Date.now() - 5_200_000).toISOString(),
+    resolvedAt: null,
+    mentions: [],
+    assigneeId: null,
+    bubble: "frog",
+    attachments: [
+      { path: `${PREVIEW_ARCHIVE}/general-3.0.jpg`, kind: "image", width: 640, height: 480 },
+      { path: `${PREVIEW_ARCHIVE}/general-3.1.jpg`, kind: "image", width: 480, height: 640 },
+    ],
+  },
 ]);
 archiveOf.set(null, PREVIEW_ARCHIVE);
 
@@ -124,10 +161,12 @@ export async function addComment(
   bubble: string | null = null,
   replyTo: string | null = null,
   refs: NoteRef[] = [],
+  media?: { id: string; attachments: ChatMedia[] },
 ): Promise<NoteComment> {
   await sleep(140);
   const saved: NoteComment = {
-    id: crypto.randomUUID(),
+    id: media?.id ?? crypto.randomUUID(),
+    attachments: media?.attachments ?? [],
     threadId,
     authorId: session.userId,
     body: body.trim(),
@@ -242,3 +281,36 @@ export async function loadRecentGeneral(session: AppSession): Promise<ArchiveCom
   if (session.archiveId !== PREVIEW_ARCHIVE) return [];
   return (store.get(null) ?? []).map((row) => ({ ...row, noteId: session.archiveId }));
 }
+
+/* Chat files, held for as long as the tab: a browser's picture by an object
+   address; the phone shows what it sent from its own files. */
+const mediaUrls = new Map<string, string>([
+  [`${PREVIEW_ARCHIVE}/general-2.0.jpg`, PREVIEW_LANDSCAPE],
+  [`${PREVIEW_ARCHIVE}/general-3.0.jpg`, PREVIEW_LANDSCAPE],
+  [`${PREVIEW_ARCHIVE}/general-3.1.jpg`, PREVIEW_PORTRAIT],
+]);
+
+export const chatMediaPath = (
+  session: AppSession,
+  messageId: string,
+  index: number,
+  extension: string,
+): string => `${session.archiveId}/${messageId}.${index}.${extension.toLowerCase()}`;
+
+export async function uploadChatMedia(
+  path: string,
+  data: Blob | ArrayBuffer,
+  _contentType: string,
+): Promise<void> {
+  await sleep(300);
+  /* The phone sends bytes and shows what it sent from its own file. */
+  if (data instanceof Blob && typeof URL.createObjectURL === "function")
+    mediaUrls.set(path, URL.createObjectURL(data));
+}
+
+export async function chatMediaUrls(paths: string[]): Promise<Map<string, string>> {
+  await sleep(60);
+  return new Map(paths.filter((path) => mediaUrls.has(path)).map((path) => [path, mediaUrls.get(path)!]));
+}
+
+export async function emptyChatMedia(_archiveId: string): Promise<void> {}
