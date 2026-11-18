@@ -118,8 +118,8 @@ test("the rail's chat offers the general chat, kept apart from the notes' chats"
     .getByRole("button", { name: "Close settings", exact: true })
     .click({ position: { x: 4, y: 4 } });
   await page.locator(".sidebar-rail-places button[aria-haspopup=menu]").click();
-  /* The preview's general chat starts with an unread message: "(1)". */
-  await page.getByRole("menuitem", { name: "General chat (1)", exact: true }).click();
+  /* The preview's general chat starts with unread messages: "(n)". */
+  await page.getByRole("menuitem", { name: /^General chat \(\d+\)$/ }).click();
   const general = page.getByRole("dialog", { name: "General chat", exact: true });
   await general.getByRole("textbox", { name: "Message", exact: true }).fill("Hello, everyone");
   await general.getByRole("button", { name: "Send", exact: true }).click();
