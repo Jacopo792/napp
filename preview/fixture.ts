@@ -244,7 +244,9 @@ export const FIXTURE_NOTES: Note[] = SEEDS.map((seed, index) => {
     cover: index === 0 ? { kind: "preset", id: "museum", position: 0.5 } : null,
     ownerId: PREVIEW_U1,
     createdAt: iso(seed.days + 30),
-    updatedAt: iso(seed.days),
+    /* A second apart, so two notes from today keep their order even before
+       11:24, when both are clamped to the same minute. */
+    updatedAt: new Date(Date.parse(iso(seed.days)) - index * 1000).toISOString(),
   };
 });
 
