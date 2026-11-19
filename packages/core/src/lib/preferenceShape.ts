@@ -43,6 +43,55 @@ export interface AccountFlags {
   /** The Spotlight's shortcut has been pressed once, which is the only way
    *  the first-launch prompt goes. Merged with OR: once learned, learned. */
   spotlightLearned: boolean;
+  /** A soft sound when a chat message leaves and when one arrives. */
+  chatSounds: boolean;
+  /** Stickers and GIFs starred in the chat picker, newest first. Last write
+   *  wins, like any list a person edits by hand. */
+  chatFavorites: ChatFavorite[];
+}
+
+/** A starred sticker or GIF: enough to draw it and send it again. A pack
+ *  sticker is named by its row, so one from another archive is just absent. */
+export type ChatFavorite =
+  | { pack: "napp"; id: string }
+  | {
+      pack: "giphy";
+      type: "gif" | "sticker";
+      giphy: string;
+      title: string;
+      width: number;
+      height: number;
+    }
+  | { pack: "own"; sticker: string };
+
+export const FAVORITES_MAX = 60;
+
+/** The same favourite, whatever else it carries. */
+export const favoriteKey = (favorite: ChatFavorite): string =>
+  favorite.pack === "napp"
+    ? `napp:${favorite.id}`
+    : favorite.pack === "giphy"
+      ? `giphy:${favorite.giphy}`
+      : `own:${favorite.sticker}`;
+
+function asFavorites(value: unknown): ChatFavorite[] | null {
+  if (!Array.isArray(value)) return null;
+  return value
+    .filter((item): item is ChatFavorite => {
+      if (!item || typeof item !== "object") return false;
+      const f = item as Record<string, unknown>;
+      if (f.pack === "napp") return typeof f.id === "string";
+      if (f.pack === "own") return typeof f.sticker === "string";
+      return (
+        f.pack === "giphy" &&
+        (f.type === "gif" || f.type === "sticker") &&
+        typeof f.giphy === "string" &&
+        typeof f.title === "string" &&
+        typeof f.width === "number" &&
+        typeof f.height === "number"
+      );
+    })
+    .slice(0, FAVORITES_MAX);
 }
 
 export interface AccountPreferences extends AccountFlags {
@@ -89,6 +138,8 @@ export const DEFAULT_FLAGS: AccountFlags = {
   spaceSwitch: false,
   whatsNewSeen: "",
   spotlightLearned: false,
+  chatSounds: true,
+  chatFavorites: [],
 };
 
 /**
@@ -111,6 +162,8 @@ export function flagsOf(preferences: AccountFlags): AccountFlags {
     spaceSwitch: preferences.spaceSwitch,
     whatsNewSeen: preferences.whatsNewSeen,
     spotlightLearned: preferences.spotlightLearned,
+    chatSounds: preferences.chatSounds ?? true,
+    chatFavorites: preferences.chatFavorites ?? [],
   };
 }
 
@@ -173,6 +226,8 @@ export function mergeAccountPreferences(
         typeof row.whatsNewSeen === "string" ? row.whatsNewSeen : "",
       ),
       spotlightLearned: Boolean(local.spotlightLearned) || row.spotlightLearned === true,
+      chatSounds: typeof row.chatSounds === "boolean" ? row.chatSounds : (local.chatSounds ?? true),
+      chatFavorites: asFavorites(row.chatFavorites) ?? local.chatFavorites ?? [],
     },
     mergeRemarksSeen(local.remarksSeen, asSeen(row.remarksSeen)),
   );

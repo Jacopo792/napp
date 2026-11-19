@@ -27,7 +27,7 @@ import * as Y from "yjs";
 import { revertIfBroken } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
 import { linkPreview } from "./linkPreview.ts";
-import { giphyMedia, giphySearch } from "./giphy.ts";
+import { giphyCategories, giphyMedia, giphySearch } from "./giphy.ts";
 import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
@@ -509,12 +509,19 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       /* GIFs and stickers for a member's chat: search and trending, then the
          pictures themselves, so neither the key nor a reader's address
          reaches GIPHY from a client. */
-      if (url.pathname === "/giphy" || url.pathname === "/giphy/media") {
+      if (
+        url.pathname === "/giphy" ||
+        url.pathname === "/giphy/media" ||
+        url.pathname === "/giphy/categories"
+      ) {
         await memberOfArchive(request, response, url, "Sign in to find GIFs");
         if (!config.giphyKey) return respond(response, 503, { error: "GIFs are not set up" });
         if (giphying >= 12) return respond(response, 429, { error: "Try again in a moment" });
         giphying++;
         try {
+          if (url.pathname === "/giphy/categories") {
+            return respond(response, 200, { categories: await giphyCategories(config.giphyKey) });
+          }
           if (url.pathname === "/giphy") {
             const found = await giphySearch(config.giphyKey, {
               type: url.searchParams.get("type") === "sticker" ? "sticker" : "gif",

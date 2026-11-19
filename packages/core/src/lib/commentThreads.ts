@@ -32,7 +32,7 @@ export interface NoteComment {
 
 /** One of the app's own drawings, named and drawn by the client, or a GIPHY
  *  GIF or sticker copied into `chat-media` as `<archive>/<message>.giphy.webp`
- *  when it was sent. */
+ *  when it was sent, or a copy of one of the archive's own stickers. */
 export type ChatSticker =
   | { pack: "napp"; id: string }
   | {
@@ -41,6 +41,15 @@ export type ChatSticker =
       path: string;
       giphy: string;
       title: string;
+      width: number;
+      height: number;
+    }
+  | {
+      /* A copy of one of the archive's own stickers (`archive_stickers`),
+         made beside the message as `<archive>/<message>.sticker.<ext>`. */
+      pack: "own";
+      sticker: string;
+      path: string;
       width: number;
       height: number;
     };

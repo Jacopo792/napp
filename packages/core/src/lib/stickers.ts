@@ -146,9 +146,10 @@ export function stickerSvg(id: string): string | null {
   const art = creature(animal, mood);
   const shape = silhouette(art);
   /* Lift, rim, art: the shadow and the white edge are the creature itself,
-     drawn 9 units fat, so they follow every ear and paw. */
+     drawn 9 units fat, so they follow every ear and paw. The square frame
+     leaves room for the bunny's tallest ear and the axolotl's widest gill. */
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 108 110">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -10 116 116">` +
     `<g transform="translate(0 2.6)" fill="#6b3640" stroke="#6b3640" stroke-width="10" stroke-linejoin="round" opacity=".14">${shape}</g>` +
     `<g fill="#fff" stroke="#fff" stroke-width="9" stroke-linejoin="round">${shape}</g>` +
     art +

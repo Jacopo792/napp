@@ -103,7 +103,7 @@ export function ChatLinkCard({ link }: { link: ChatLink }) {
  *  one from its copy in `chat-media`. No bubble; a GIF keeps rounded corners
  *  like a photo, a sticker stands free like ours. */
 export function ChatStickerView({ sticker, mine }: { sticker: Sticker; mine: boolean }) {
-  const urls = useChatUrls(sticker.pack === "giphy" ? [sticker.path] : []);
+  const urls = useChatUrls(sticker.pack === "napp" ? [] : [sticker.path]);
   if (sticker.pack === "napp") {
     const url = stickerUrl(sticker.id);
     if (!url) return null;
@@ -117,16 +117,21 @@ export function ChatStickerView({ sticker, mine }: { sticker: Sticker; mine: boo
     );
   }
   const url = localChatMedia.get(sticker.path) ?? urls.get(sticker.path);
-  const width = Math.min(200, sticker.width);
+  const width = Math.min(sticker.pack === "own" ? 160 : 200, sticker.width);
+  const gif = sticker.pack === "giphy" && sticker.type === "gif";
   return (
-    <span
-      className={`chat-giphy ${sticker.type === "gif" ? "is-gif" : ""} ${mine ? "is-mine" : ""}`}
-    >
+    <span className={`chat-giphy ${gif ? "is-gif" : ""} ${mine ? "is-mine" : ""}`}>
       <span
         className="chat-giphy-picture"
         style={{ width, aspectRatio: `${sticker.width} / ${sticker.height}` }}
       >
-        {url && <img src={url} alt={sticker.title || "GIF"} draggable={false} />}
+        {url && (
+          <img
+            src={url}
+            alt={sticker.pack === "giphy" ? sticker.title || "GIF" : "Sticker"}
+            draggable={false}
+          />
+        )}
       </span>
     </span>
   );

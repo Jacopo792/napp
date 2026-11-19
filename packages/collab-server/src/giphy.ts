@@ -67,3 +67,43 @@ export async function giphyMedia(
   if (found.type !== "image/webp") throw new Error("Not a WebP");
   return { bytes: found.bytes, type: found.type };
 }
+
+/** The picker's shelves before anything is typed, as Discord lays them out:
+ *  a word, and the first GIF that word finds as its cover. */
+export const GIF_CATEGORIES = [
+  "hello",
+  "lol",
+  "love",
+  "happy birthday",
+  "yes",
+  "no",
+  "sorry",
+  "happy",
+  "sad",
+  "thumbs up",
+  "thank you",
+  "good night",
+] as const;
+
+const SHELF_FOR = 6 * 3600_000;
+let shelves: { at: number; items: Promise<{ term: string; cover: GiphyItem | null }[]> } | null =
+  null;
+
+/** Every category with its cover, asked of GIPHY at most once in six hours
+ *  for the whole server: the covers barely change and the key has a quota. */
+export function giphyCategories(
+  key: string,
+  get: typeof fetch = fetch,
+  now = Date.now(),
+): Promise<{ term: string; cover: GiphyItem | null }[]> {
+  if (shelves && now - shelves.at < SHELF_FOR) return shelves.items;
+  const items = Promise.all(
+    GIF_CATEGORIES.map(async (term) => {
+      const found = await giphySearch(key, { type: "gif", query: term, offset: 0 }, get);
+      return { term, cover: found.items[0] ?? null };
+    }),
+  );
+  shelves = { at: now, items };
+  items.catch(() => (shelves = null));
+  return items;
+}

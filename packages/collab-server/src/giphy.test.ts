@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { giphyMedia, giphySearch } from "./giphy.ts";
+import { GIF_CATEGORIES, giphyCategories, giphyMedia, giphySearch } from "./giphy.ts";
 
 test("GIPHY search keeps only well-formed items and pages on", async () => {
   let asked: URL | undefined;
@@ -37,4 +37,24 @@ test("GIPHY media fetches only GIPHY's own address for a valid id", async () => 
   assert.deepEqual(asked, ["https://media.giphy.com/media/abc123/200w.webp"]);
   await assert.rejects(giphyMedia("a/../b", fetcher));
   await assert.rejects(giphyMedia("evil.com#", fetcher));
+});
+
+test("GIF categories ask GIPHY once per term, then serve the cached shelves", async () => {
+  let asked = 0;
+  const get = (async () => {
+    asked++;
+    return new Response(
+      JSON.stringify({
+        data: [
+          { id: `g${asked}`, title: "t", images: { fixed_width: { width: "200", height: "150" } } },
+        ],
+        pagination: { offset: 0, count: 1, total_count: 1 },
+      }),
+    );
+  }) as typeof fetch;
+  const first = await giphyCategories("key", get, 1_000_000_000);
+  assert.equal(first.length, GIF_CATEGORIES.length);
+  assert.ok(first.every((shelf) => shelf.cover?.width === 200));
+  await giphyCategories("key", get, 1_000_000_000 + 60_000);
+  assert.equal(asked, GIF_CATEGORIES.length);
 });

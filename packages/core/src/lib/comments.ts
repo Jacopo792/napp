@@ -151,6 +151,16 @@ export async function searchGiphy(
   return (await response.json()) as { items: GiphyItem[]; next: number | null };
 }
 
+/** The GIF shelves shown before anything is typed: a word and its cover. */
+export async function giphyCategories(
+  session: AppSession,
+  signal?: AbortSignal,
+): Promise<{ term: string; cover: GiphyItem | null }[]> {
+  const response = await giphyRequest(session, "/giphy/categories", {}, signal);
+  return ((await response.json()) as { categories: { term: string; cover: GiphyItem | null }[] })
+    .categories;
+}
+
 /** One GIF or sticker's 200px animated WebP, through the same proxy: what
  *  the picker shows is the very file that is sent. */
 export async function giphyPicture(

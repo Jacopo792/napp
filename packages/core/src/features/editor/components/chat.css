@@ -1773,9 +1773,9 @@
 /* In the conversation: no bubble, the drawing is the message. */
 .chat-sticker {
   display: block;
-  width: 132px;
+  width: 142px;
   height: auto;
-  aspect-ratio: 108 / 110;
+  aspect-ratio: 1;
 }
 
 .chat-giphy {
