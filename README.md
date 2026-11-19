@@ -2,45 +2,52 @@
 
 # Napp
 
-A place for notes, shared writing and longer work – in your browser and on your
-desktop.
+Notes you write together, with a chat beside them – in your browser and on your
+desktop. **Coming soon to your phone.**
 
-**Coming soon to your phone.** [A first look at the native app ↓](#coming-soon-to-your-phone)
+![A note open in Napp](docs/app-preview.jpg)
 
-![Napp workspace](docs/app-preview.png)
+## Notes and the editor
 
-## Why I built it
+Rich text, checklists, tables, links, images and attachments, organised in
+folders with pins, search, Archive and Trash. The people in your archive edit
+the same note live; lock a note or a passage to keep control of its writing.
 
-Writing is lonely work. For years I wrote on my own, in a diary nobody else would
-ever open, and I kept wondering how good it would be if someone could look over my
-shoulder – read what I had just written, stop on a sentence, tell me what they
-thought of it.
+## An archive shared with its people
 
-Napp began there. It has grown into a workspace for everything from a quick note
-to a thesis or a book, while keeping that original idea: the people you choose can
-write beside you, see the words arrive and leave a remark where it belongs.
+![An archive and its members](docs/spaces-preview.jpg)
 
-## What you can do
+Each archive has its own members, folders and notes – personal notes, a study
+group, shared writing. One account can belong to several archives, and an
+archive holds up to eight members. Invitations expire after seven days.
 
-- **Write and organise.** Rich text, checklists, tables, links, drawings, images
-  and attachments, with folders, pins, search, Archive and Trash.
-- **Share a space.** Create several archives, invite people to the ones you want
-  to share, and edit the same note live. An archive can hold up to eight members.
-  Lock a note or a passage when you want to keep control of its writing.
-- **Have a conversation beside the words.** Comment on a passage, reply, react,
-  assign a thread and resolve it. Unread remarks lead back to the relevant note.
-- **Keep the history.** Compare earlier versions, name a moment worth keeping and
-  restore it while preserving the current version first.
-- **Make room for longer work.** Book archives on web and desktop add chapters,
-  parts, an organising board, word goals, footnotes, captions, cross-references
-  and a printable page. Themes, covers and reading settings make the workspace
-  your own; Markdown import/export and PDF tools help move work in and out.
+## The chat
 
-Already-open collaborative notes remain editable during a disconnect and merge
-with the archive after reconnecting. This is recovery for work in progress;
-opening an archive still depends on its account and access checks.
+![The general chat with GIF shelves](docs/chat-preview.jpg)
 
-## Use Napp
+Every archive has a general chat, and every note its own. Send photos, which
+open full size, animal stickers and GIFs from shelves by mood. Star the ones you
+use most to keep them in Favorites.
+
+![The archive's own sticker pack](docs/stickers-preview.jpg)
+
+Add your own pictures, still or animated, to the archive's sticker pack. Only
+the people in that archive see them.
+
+## Drawing
+
+![Drawing on a board](docs/drawing-preview.jpg)
+
+Draw on the page or on a board with pencil, marker and eraser.
+
+## History
+
+![Note history](docs/history-preview.jpg)
+
+Earlier versions of a note, by author and time, plus the versions you name
+yourself. Restoring one keeps the present as a named version first.
+
+## Download
 
 | Client      | Availability                                                                                                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,16 +55,14 @@ opening an archive still depends on its account and access checks.
 | **macOS**   | [Apple Silicon](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-arm64.dmg) · [Intel](https://github.com/Jacopo792/napp/releases/latest/download/Napp-mac-x64.dmg) |
 | **Windows** | [Download the installer](https://github.com/Jacopo792/napp/releases/latest/download/Napp-windows-setup.exe)                                                                           |
 
-The desktop clients share the web application's interface, with native menus,
-file actions, keyboard shortcuts and an unread-comment badge. Installers are
-currently unsigned; [the desktop guide](DESKTOP.md) covers installation and
-troubleshooting.
+Installers are currently unsigned; [the desktop guide](DESKTOP.md) covers
+installation. Release history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Coming soon to your phone
 
-Napp for iPhone and Android is on the way: the same shared notes and conversations,
-with a native interface built around touch. Pick up your writing, move between
-notebooks, discuss a passage and make the space your own.
+Napp for iPhone and Android is on the way, with a native interface built around
+touch. Mobile downloads are not available yet; news will appear in
+[GitHub Releases](https://github.com/Jacopo792/napp/releases).
 
 <table>
   <tr>
@@ -65,81 +70,17 @@ notebooks, discuss a passage and make the space your own.
     <td width="33%" align="center"><img src="docs/mobile/iphone-comments.png" width="245" alt="Napp on iPhone: a conversation attached to a passage in a note" /></td>
     <td width="33%" align="center"><img src="docs/mobile/iphone-appearance.png" width="245" alt="Napp on iPhone: light and dark themes, palettes and wallpaper settings" /></td>
   </tr>
-  <tr>
-    <td width="33%" align="center">Your notebooks</td>
-    <td width="33%" align="center">Conversations in context</td>
-    <td width="33%" align="center">Your own look</td>
-  </tr>
 </table>
 
-Screenshots captured on an iPhone 15 from the app in development. Mobile downloads
-are not available yet; release news will appear here and in
-[GitHub Releases](https://github.com/Jacopo792/napp/releases).
+Captured on an iPhone from the app in development. The mobile client is
+developed separately; its source is not in this repository.
 
-The mobile client is developed separately. This repository's `main` branch
-contains the web and desktop clients, shared core and collaboration server;
-mobile source is not included.
+## Privacy and access
 
-## A workspace for longer writing
-
-![A chapter with a comment in the margin](docs/book-preview.png)
-
-A Book archive is laid out like the page it will be printed on. The book and
-chapter stay in view, with word counts and goals close to the writing. Chapters
-and parts also have a board: arrange cards, describe what happens in each one and
-change its status without opening the page.
-
-![The chapter board](docs/book-board-preview.png)
-
-## Conversations and versions
-
-![Comments beside the note](docs/comments-preview.png)
-
-Select a passage and leave a remark. Comments open as a column of the window
-beside the note. Replies, reactions and resolved threads stay attached to the
-words they are about.
-
-![Note history](docs/history-preview.png)
-
-History keeps earlier stretches of writing and the versions you name yourself.
-Restoring an earlier version keeps the present as a named version first.
-
-## Your spaces, your settings
-
-![Archives in Settings](docs/spaces-preview.png)
-
-One account can belong to several archives: personal notes, a study group, shared
-writing or a book. Each archive has its own members, folders and organisation.
-Invitations come from the archive's sheet (**Settings → Profile**, then its
-members) and expire after seven days.
-
-![Appearance settings](docs/appearance-settings-preview.png)
-
-Choose a palette, colours, wallpaper and reading settings. Preferences follow the
-account across browsers and desktop clients. A note, folder or person's sheet
-brings related details and activity together.
-
-![Note information sheet](docs/note-sheet-preview.png)
-
-## Accounts, access and local data
-
-Supabase Auth identifies accounts; Postgres Row Level Security enforces archive
-membership. The collaboration server checks access when a note is opened and
-while its connection remains active. Note and passage locks protect writing,
-not secrecy from other members who can already read the note.
-
-The app includes password recovery, account deletion, content reporting and user
-blocking. Deletion removes the account's own data while preserving work belonging
-to other members. Abuse reports have a separate moderation workflow.
-
-Explicit sign-out asks before removing local copies, including unsynced edits.
-Automatic locking and account switching retain collaborative document stores for
-recovery. Stored documents are **not end-to-end encrypted**. Production email
-configuration and moderation operations still require operational setup; the
-[security guide](SECURITY.md) records those limits.
-
-See [SECURITY.md](SECURITY.md) for the access model, cache policy, current limits
-and private vulnerability reporting.
+Archive membership is enforced by Postgres Row Level Security and by the
+collaboration server. Notes are access-controlled, **not end-to-end encrypted**.
+See [SECURITY.md](SECURITY.md) for the access model, local data and
+vulnerability reporting.
 
 ## How the project is structured
 
@@ -250,20 +191,6 @@ guarantee about every environment or future deployment.
 
 The [quality guide](docs/quality-hardening.md) records the verified scope and
 remaining release checks.
-
-## Releases and deployment
-
-Web changes on `main` pass the CI gates before GitHub Pages is updated. The
-collaboration service is deployed separately; its commit, readiness and accepted
-origins are checked before the new web artifact is published when a server deploy
-is requested. `render.yaml` documents the service configuration but does not apply
-changes to the existing live service by itself.
-
-Desktop release tags trigger macOS and Windows builds and publish the installers
-to [GitHub Releases](https://github.com/Jacopo792/napp/releases). Version changes
-also update the in-app What's New and [CHANGELOG.md](CHANGELOG.md). Database
-migrations must precede clients that require them; destructive schema changes
-must wait until older clients no longer depend on the removed fields.
 
 ## Documentation
 
