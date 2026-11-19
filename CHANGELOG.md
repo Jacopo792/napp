@@ -3,6 +3,28 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.79 – 2026-11-19
+
+### Added
+
+- The archive's own sticker pack: members import still or animated pictures
+  (PNG, WebP, GIF, JPEG, up to 4 MB) that only that archive's members see;
+  only the member who added one removes it. Sending copies the picture beside
+  the message. Migration `20261119010000_chat_sticker_pack`.
+- GIF shelves before a search (Favorites, Trending and a word per mood), served
+  by the collaboration server's cached `/giphy/categories`; GIPHY stickers move
+  into the GIFs tab. Favourite stickers and GIFs, kept with the account.
+- Send and receive sounds in the chat, with a switch in Settings › Chat.
+- A face in a chat opens that person's profile.
+
+### Changed
+
+- Photos in a chat open full size over the app instead of in a new window.
+
+### Fixed
+
+- The app's animal stickers are no longer clipped at the top or sides.
+
 ## 0.9.78 – 2026-11-18
 
 ### Changed

@@ -45,6 +45,44 @@ export const DOWNLOADS = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.79",
+    date: "2026-11-19",
+    headline: "Your own stickers, GIF shelves and favourites",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "GIFs on shelves, and favourites",
+            text: "With nothing typed, GIFs open on shelves: your favourites, what's trending, and a word for every mood. GIPHY's stickers are here too, one switch away. Star any animal, GIF or sticker to keep it at hand on every device.",
+            image: "0.9.79-gif-shelves.jpg",
+          },
+          {
+            title: "Stickers of your own",
+            text: "The Stickers tab is now your archive's own pack: add pictures, still or moving, and everyone in the archive can send them. Only whoever added a sticker can take it out, and messages keep what was sent.",
+            image: "0.9.79-sticker-pack.jpg",
+          },
+          {
+            title: "Photos open whole",
+            text: "Click a photo in a chat to see it full size over everything; click again or press Escape to go back.",
+          },
+          {
+            title: "Faces open profiles",
+            text: "Click someone's face beside their messages to open their profile.",
+          },
+          {
+            title: "Chat sounds",
+            text: "A soft sound when your message leaves and when someone else's arrives. Turn them off in Settings › Chat.",
+          },
+          {
+            title: "Whole animals",
+            text: "The bunny's ears and the axolotl's gills are no longer cut off at the edge of their stickers.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.78",
     date: "2026-11-18",
     headline: "Stickers, GIFs and Google Drive",
