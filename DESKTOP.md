@@ -1,6 +1,6 @@
 # The desktop app
 
-Napp runs in a browser at <https://jacopo792.github.io/napp/> and as
+Napp runs in a browser at <https://nappnote.com/> and as
 a window on your own machine. This file is about the window: how to get it, what
 it adds, what it keeps on the disk, and what to check when it misbehaves.
 
