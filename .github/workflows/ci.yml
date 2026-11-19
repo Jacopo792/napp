@@ -272,7 +272,6 @@ jobs:
       pages: write
       id-token: write
     env:
-      VITE_BASE_PATH: /napp/
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       # The collaboration server on Render. Public, like the two above.
@@ -299,10 +298,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The checks job built with placeholders to prove the code compiles.
-      # This is the same build against the real values and the deployed base
-      # path, which is the artifact itself.
+      - uses: actions/configure-pages@v5
+        id: pages
+
       - name: Build
+        env:
+          VITE_BASE_PATH: ${{ format('{0}/', steps.pages.outputs.base_path) }}
         run: pnpm run build
 
       # The collaboration server, from the run that has just proved it. Render's
@@ -334,8 +335,6 @@ jobs:
           EXPECTED_REVISION: ${{ github.sha }}
           DEPLOY_WAIT_MS: "600000"
         run: pnpm verify:deployment
-
-      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
