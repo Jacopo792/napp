@@ -9089,6 +9089,29 @@ body:has(.sidebar-row.is-over) .drag-chip {
   height: 100vh;
   min-height: 100vh;
   padding-top: 40px;
+  /* The caption strip is the page's ground, the colour Windows paints its own
+     buttons on (`--page`, sent through `napp:frame-theme`). Over a wallpaper
+     the shell is transparent, so the strip showed a slice of the picture with
+     a solid block of buttons cut into its right end. */
+  background-image: linear-gradient(var(--page), var(--page));
+  background-size: 100% 40px;
+  background-repeat: no-repeat;
+}
+
+/* Windows draws no native material, so every backdrop filter is Chromium's,
+   often on the CPU: the full-height column layers over a wallpaper made the
+   whole window lag. Plain tint instead, dense enough to read without a blur.
+   The wallpaper layer is absolute, not fixed — the shell never scrolls — so it
+   does not lift the app into a transparent layer that loses ClearType. */
+[data-shell="windows"] #root::before {
+  position: absolute;
+}
+
+[data-shell="windows"].has-translucent-sidebar .pane-glass,
+[data-shell="windows"].has-wallpaper :is(.sidebar-column, .collection-column)::before {
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 [data-shell] .sidebar-topbar,
