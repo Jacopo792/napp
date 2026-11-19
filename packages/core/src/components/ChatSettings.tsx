@@ -2,7 +2,7 @@
  * offered first when you react. Both are the account's (`WritingPreferences`),
  * and the bubble is seen by everyone: it is stamped on each message you send. */
 import { useCallback, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Search } from "@/components/icons";
+import { Search, Volume } from "@/components/icons";
 import { ChatBubble } from "@/features/editor/components/ChatBubble";
 import "@/features/editor/components/chat.css";
 import { CHAT_BUBBLES, type ChatBubble as BubbleId } from "@/lib/chatBubbles";
@@ -158,6 +158,21 @@ export function ChatSettings({
           </div>
         </div>
       </div>
+
+      <label className="appearance-row chat-sounds-row">
+        <span className="settings-lead" aria-hidden="true">
+          <Volume size={16} />
+        </span>
+        <span className="settings-label">
+          <b>Chat sounds</b>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={preferences.chatSounds}
+          onChange={(event) => onChange({ chatSounds: event.target.checked })}
+        />
+      </label>
     </section>
   );
 }

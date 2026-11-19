@@ -153,4 +153,8 @@ export {
   IconWand as Wand2,
   IconX as X,
   IconZoomIn as ZoomIn,
+  IconStar as Star,
+  IconStarFilled as StarFilled,
+  IconTrendingUp as TrendingUp,
+  IconVolume as Volume,
 } from "@tabler/icons-react";

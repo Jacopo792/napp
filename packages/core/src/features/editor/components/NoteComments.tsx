@@ -84,6 +84,8 @@ import { EmojiPicker } from "@/components/ChatSettings";
 import { ChatBubble, dressBand } from "./ChatBubble";
 import { ChatLinkCard, ChatMedia, ChatStickerView, localChatMedia } from "./ChatMedia";
 import { StickerPicker, type StickerPick } from "./StickerPicker";
+import { playChatSound } from "./chatSounds";
+import { packCopyPath, packStickerForMessage, type PackSticker } from "@/lib/stickerPack";
 import "./chat.css";
 
 /** The clip that shows only `rect` of `box`. A rectangle outside the sheet —
@@ -135,6 +137,8 @@ interface Props {
   quoteDraft?: NoteRef | null;
   /** General chat: go to a note a message talks about. */
   onOpenNote?: (ref: NoteRef) => void;
+  /** A face in the chat opens that person's profile. */
+  onOpenPerson?: (userId: string) => void;
 }
 
 const titled = (title: string) => title.trim() || "Untitled";
@@ -258,8 +262,11 @@ export function NoteComments({
   notes,
   quoteDraft,
   onOpenNote,
+  onOpenPerson,
 }: Props) {
-  const { chatBubble: myBubble, quickReactions } = useWritingPreferences();
+  const { chatBubble: myBubble, quickReactions, chatSounds } = useWritingPreferences();
+  const soundsRef = useRef(chatSounds);
+  soundsRef.current = chatSounds;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -292,7 +299,10 @@ export function NoteComments({
   /** The files of each message on its way, and which are already up, so a
    *  retry sends only what is missing. */
   const outbox = useRef(
-    new Map<string, { files: Staged[]; up: Set<number>; card: Card | null; gif?: Blob }>(),
+    new Map<
+      string,
+      { files: Staged[]; up: Set<number>; card: Card | null; gif?: Blob; pack?: PackSticker }
+    >(),
   );
   /** The card of the first link being written, read as it is typed. */
   const [card, setCard] = useState<Card | null>(null);
@@ -412,6 +422,7 @@ export function NoteComments({
     fresh.forEach((row) => dropTyper(row.authorId, false));
     if (fresh.length > 0) {
       setArrived((current) => new Set([...current, ...fresh.map((r) => r.id)]));
+      if (soundsRef.current) playChatSound("received");
     }
     /* Opening the chat is reading it, not only a message arriving while it
        is open: a note already selected never passes through the list again. */
@@ -676,6 +687,7 @@ export function NoteComments({
             up: new Set<number>(),
             card: null,
             gif: pick.pack === "giphy" ? pick.picture : undefined,
+            pack: pick.pack === "own" ? pick.sticker : undefined,
           }
         : {
             files: staged,
@@ -690,9 +702,18 @@ export function NoteComments({
         ? null
         : pick.pack === "napp"
           ? { pack: "napp", id: pick.id }
-          : { ...pick.item, pack: "giphy", path: chatGiphyPath(session, id) };
+          : pick.pack === "own"
+            ? {
+                pack: "own",
+                sticker: pick.sticker.id,
+                path: packCopyPath(session, id, pick.sticker),
+                width: pick.sticker.width,
+                height: pick.sticker.height,
+              }
+            : { ...pick.item, pack: "giphy", path: chatGiphyPath(session, id) };
     if (sticker?.pack === "giphy" && pick?.pack === "giphy")
       localChatMedia.set(sticker.path, URL.createObjectURL(pick.picture));
+    if (sticker?.pack === "own" && pick?.pack === "own") localChatMedia.set(sticker.path, pick.url);
     if (!body && !files.length && !sticker) return;
     const sent = outgoing?.card ?? null;
     const imagePath = sent?.image ? chatLinkPath(session, id, sent.image.type) : undefined;
@@ -738,7 +759,8 @@ export function NoteComments({
         : [...current, { ...local, sending: true }],
     );
     if (!retry && pick) {
-      if (sticker?.pack === "giphy") outbox.current.set(local.id, outgoing!);
+      if (sticker?.pack === "giphy" || sticker?.pack === "own")
+        outbox.current.set(local.id, outgoing!);
       setReplyTo(null);
     } else if (!retry) {
       if (files.length || sent) outbox.current.set(local.id, outgoing!);
@@ -769,6 +791,10 @@ export function NoteComments({
         await uploadChatMedia(sticker.path, outgoing.gif, "image/webp");
         outgoing.up.add(-2);
       }
+      if (sticker?.pack === "own" && outgoing?.pack && !outgoing.up.has(-3)) {
+        await packStickerForMessage(session, id, outgoing.pack);
+        outgoing.up.add(-3);
+      }
       const saved = await addComment(
         session,
         source,
@@ -790,6 +816,7 @@ export function NoteComments({
         return [...rest, saved].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       });
       setFailure("");
+      if (soundsRef.current) playChatSound("sent");
       onChanged?.();
     } catch {
       setMessages((current) =>
@@ -1290,7 +1317,20 @@ export function NoteComments({
           <div className="chat-line">
             {!mine && (
               <span className="chat-face">
-                {last && <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />}
+                {last &&
+                  (onOpenPerson ? (
+                    <button
+                      type="button"
+                      className="chat-face-button press"
+                      aria-label={`${name}'s profile`}
+                      title={name}
+                      onClick={() => onOpenPerson(m.authorId)}
+                    >
+                      <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
+                    </button>
+                  ) : (
+                    <Avatar url={author?.avatarUrl ?? null} name={name} email="" compact />
+                  ))}
               </span>
             )}
             <div className="chat-stack">

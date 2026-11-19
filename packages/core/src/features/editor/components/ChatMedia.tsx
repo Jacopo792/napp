@@ -2,8 +2,8 @@
  * one at the shape it was taken, several in a two-column grid. Their files
  * are private; each is shown through a short-lived signed address, and one
  * Storage refuses (a block, a report) is left as an empty tile. A photo opens
- * whole in a new window; a video plays in place with the browser's controls. */
-import { useEffect, useState } from "react";
+ * whole over the app; a video plays in place with the browser's controls. */
+import { useEffect, useRef, useState } from "react";
 import {
   chatMediaUrls,
   type ChatLink,
@@ -38,11 +38,24 @@ function useChatUrls(paths: string[]): Map<string, string> {
   return urls;
 }
 
+/** One photo, whole, over everything; a click or Escape puts it back. */
+function PhotoViewer({ url, onClose }: { url: string; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog ref={ref} className="chat-photo-viewer" onClose={onClose} onClick={onClose}>
+      <img src={url} alt="" draggable={false} />
+    </dialog>
+  );
+}
+
 export function ChatMedia({ media }: { media: Media[] }) {
   const urls = useChatUrls(media.map((item) => item.path));
+  const [open, setOpen] = useState<string | null>(null);
   const single = media.length === 1;
   return (
     <div className={`chat-media ${single ? "is-single" : ""}`}>
+      {open && <PhotoViewer url={open} onClose={() => setOpen(null)} />}
       {media.map((item) => {
         const url = localChatMedia.get(item.path) ?? urls.get(item.path);
         const ratio = Math.min(1.5, Math.max(0.6, (item.width || 4) / (item.height || 3)));
@@ -60,17 +73,17 @@ export function ChatMedia({ media }: { media: Media[] }) {
             />
           );
         return (
-          <a
+          <button
             key={item.path}
+            type="button"
             className="chat-media-item"
             style={style}
-            href={url}
-            target="_blank"
-            rel="noreferrer"
             aria-label="Open photo"
+            disabled={!url}
+            onClick={() => url && setOpen(url)}
           >
             {url && <img src={url} alt="" loading="lazy" draggable={false} />}
-          </a>
+          </button>
         );
       })}
     </div>

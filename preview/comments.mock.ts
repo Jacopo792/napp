@@ -320,7 +320,7 @@ export async function loadRecentGeneral(session: AppSession): Promise<ArchiveCom
 
 /* Chat files, held for as long as the tab: a browser's picture by an object
    address; the phone shows what it sent from its own files. */
-const mediaUrls = new Map<string, string>([
+export const mediaUrls = new Map<string, string>([
   [`${PREVIEW_ARCHIVE}/general-2.0.jpg`, PREVIEW_LANDSCAPE],
   [`${PREVIEW_ARCHIVE}/general-3.0.jpg`, PREVIEW_LANDSCAPE],
   [`${PREVIEW_ARCHIVE}/general-3.1.jpg`, PREVIEW_PORTRAIT],
@@ -418,4 +418,14 @@ export async function giphyPicture(_session: AppSession, id: string): Promise<Bl
   if (id.startsWith("gif"))
     return (await fetch(Number(id.slice(3)) % 2 ? PREVIEW_PORTRAIT : PREVIEW_LANDSCAPE)).blob();
   return new Blob([stickerSvg(STICKERS[Number(id.slice(1))]!.id)!], { type: "image/svg+xml" });
+}
+
+/* The shelves, with the fixture's drawings as covers. */
+export async function giphyCategories(
+  _session: AppSession,
+): Promise<{ term: string; cover: GiphyItem | null }[]> {
+  await sleep(200);
+  return ["hello", "lol", "love", "happy birthday", "yes", "no", "sorry", "happy", "sad", "thumbs up"].map(
+    (term, at) => ({ term, cover: { id: `gif${at}`, title: term, width: 200, height: 150 } }),
+  );
 }

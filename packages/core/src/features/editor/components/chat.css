@@ -221,6 +221,55 @@
   border-radius: 18px;
 }
 
+button.chat-media-item {
+  padding: 0;
+  cursor: zoom-in;
+}
+
+/* A photo opened whole: the app dims behind it and it grows into place. */
+.chat-photo-viewer {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+
+.chat-photo-viewer[open] {
+  display: grid;
+  place-items: center;
+}
+
+.chat-photo-viewer::backdrop {
+  background: rgb(0 0 0 / 0.78);
+  animation: fade-in var(--motion-content) var(--ease-out);
+}
+
+.chat-photo-viewer img {
+  max-width: 92vw;
+  max-height: 90vh;
+  border-radius: 12px;
+  object-fit: contain;
+  animation: chat-photo-in var(--motion-shape) var(--ease-spring);
+}
+
+@keyframes chat-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-photo-viewer img,
+  .chat-photo-viewer::backdrop {
+    animation: none;
+  }
+}
+
 /* A link's card, as wide as a single photo: picture, then the page's words. */
 .chat-link-card {
   display: flex;
@@ -316,7 +365,18 @@
   align-self: flex-end;
 }
 
-.chat-face > .avatar.is-compact {
+.chat-face-button {
+  display: block;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.chat-face-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:is(.chat-face, .chat-face-button) > .avatar.is-compact {
   width: 24px;
   height: 24px;
   font-size: 10px;
@@ -1759,6 +1819,182 @@
   column-span: all;
 }
 
+/* A tile and its star: the star waits in the corner until the tile is
+   hovered, and stays once something is starred. */
+.pick-slot {
+  position: relative;
+}
+
+.pick-slot.is-tile {
+  margin-bottom: 4px;
+  break-inside: avoid;
+}
+
+.pick-slot.is-tile > .giphy-tile {
+  margin-bottom: 0;
+}
+
+.pick-slot > .sticker-cell {
+  width: 100%;
+}
+
+.pick-star,
+.pick-remove {
+  position: absolute;
+  top: 4px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--paper, var(--background)) 88%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.16);
+  color: var(--ink-3);
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease-spring);
+}
+
+.pick-star {
+  right: 4px;
+}
+
+.pick-remove {
+  left: 4px;
+}
+
+.pick-slot:is(:hover, :focus-within) > :is(.pick-star, .pick-remove),
+.pick-slot.is-starred > .pick-star {
+  opacity: 1;
+  transform: none;
+}
+
+.pick-slot.is-starred > .pick-star {
+  color: #e9a93a;
+}
+
+.pick-star:hover {
+  color: #e9a93a;
+}
+
+.pick-remove:hover {
+  color: var(--danger);
+}
+
+.pack-add {
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent);
+  color: var(--ink-3);
+}
+
+.pick-failure,
+.pick-empty {
+  grid-column: 1 / -1;
+  column-span: all;
+}
+
+/* The search, and which of GIPHY's two kinds it looks through. */
+.gif-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gif-search-row .emoji-search {
+  min-width: 0;
+  flex: 1;
+}
+
+.gif-back {
+  display: grid;
+  margin: -2px;
+  padding: 2px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-3);
+}
+
+.gif-back:hover {
+  color: var(--ink);
+}
+
+.gif-kind {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.gif-kind-option {
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.gif-kind-option.is-on {
+  background: var(--paper, var(--background));
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* Discord's shelves: a cover, dimmed, the word on it. */
+.gif-shelves {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 4px;
+  margin-top: 6px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding-bottom: 6px;
+}
+
+.gif-shelf {
+  position: relative;
+  display: grid;
+  height: 72px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.gif-shelf img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.55);
+  transition: filter var(--dur-fast) var(--ease);
+}
+
+.gif-shelf:hover {
+  transform: scale(1.03);
+}
+
+.gif-shelf:hover img {
+  filter: brightness(0.7);
+}
+
+.gif-shelf-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
 .giphy-attribution {
   margin: 0 -8px;
   padding: 6px 0 7px;
@@ -1824,7 +2060,10 @@
 
   .sticker-cell,
   .giphy-tile,
-  .sticker-tab {
+  .sticker-tab,
+  .gif-shelf,
+  .pick-star,
+  .pick-remove {
     transition: none;
   }
 }

@@ -262,6 +262,8 @@ interface Props {
   onRemarksChanged?: () => void;
   /** Messages on this note were read as they arrived, with the chat open. */
   onRemarksRead?: (noteId: string) => void;
+  /** A face in the note's chat opens that person's profile. */
+  onOpenPerson?: (userId: string) => void;
   /** Every thread in the archive somebody has written in, kept live by the
    *  archive's remarks channel. Absent, every anchored passage is drawn. */
   saidThreads?: ReadonlySet<string>;
@@ -379,6 +381,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     onOpenNote,
     onRemarksChanged,
     onRemarksRead,
+    onOpenPerson,
     saidThreads,
     onContinueAsNote,
     onDiscussInChat,
@@ -1350,6 +1353,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       }}
       onChanged={onRemarksChanged}
       onRead={() => onRemarksRead?.(entry.note.id)}
+      onOpenPerson={onOpenPerson}
     />
   );
   const sidePanels = (

@@ -3820,6 +3820,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             notes={linkableNotes}
             quoteDraft={generalChat.quote ?? null}
             onOpenNote={(ref) => handleOpenRecent(ref.note, ref.quote)}
+            onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
           />
         </Suspense>
       )}
@@ -4498,6 +4499,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           onOpenNote={handleOpenRecent}
           onRemarksChanged={refreshRemarks}
           onRemarksRead={markRemarksSeen}
+          onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
           onDiscussInChat={canWriteArchive ? discussInChat : undefined}
           saidThreads={saidThreads}
           onContinueAsNote={
@@ -4750,6 +4752,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                     onOpenNote={handleOpenRecent}
                     onRemarksChanged={refreshRemarks}
                     onRemarksRead={markRemarksSeen}
+                    onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
                     onDiscussInChat={canWriteArchive ? discussInChat : undefined}
                     saidThreads={saidThreads}
                   />
@@ -5007,6 +5010,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               onOpenNote={handleOpenRecent}
               onRemarksChanged={refreshRemarks}
               onRemarksRead={markRemarksSeen}
+              onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
               onDiscussInChat={canWriteArchive ? discussInChat : undefined}
               saidThreads={saidThreads}
             />
@@ -5052,6 +5056,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
                   onOpenNote={handleOpenRecent}
                   onRemarksChanged={refreshRemarks}
                   onRemarksRead={markRemarksSeen}
+                  onOpenPerson={(userId) => pushSheet({ kind: "person", userId })}
                   onDiscussInChat={canWriteArchive ? discussInChat : undefined}
                   saidThreads={saidThreads}
                   headerActions={

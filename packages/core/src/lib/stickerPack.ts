@@ -56,12 +56,12 @@ export async function addPackSticker(
   type: string,
   width: number,
   height: number,
+  id: string = crypto.randomUUID(),
 ): Promise<PackSticker> {
   const extension = STICKER_TYPES[type];
   if (!extension) throw new Error("Stickers are PNG, WebP, GIF or JPEG pictures");
   const size = data instanceof Blob ? data.size : data.byteLength;
   if (size > STICKER_MAX_BYTES) throw new Error("A sticker can be up to 4 MB");
-  const id = crypto.randomUUID();
   const path = `${session.archiveId}/${id}.pack.${extension}`;
   const bucket = supabase.storage.from(BUCKET);
   fail((await bucket.upload(path, data, { contentType: type, upsert: false })).error);
@@ -82,6 +82,10 @@ export async function removePackSticker(sticker: PackSticker): Promise<void> {
   await supabase.storage.from(BUCKET).remove([sticker.path]);
 }
 
+/** Where a message's copy of a pack sticker lives. The database checks it. */
+export const packCopyPath = (session: AppSession, messageId: string, sticker: PackSticker) =>
+  `${session.archiveId}/${messageId}.sticker.${extensionOf(sticker.path)}`;
+
 /** Copy a pack sticker beside the message about to be sent, and the
  *  `sticker` that message carries. */
 export async function packStickerForMessage(
@@ -89,7 +93,7 @@ export async function packStickerForMessage(
   messageId: string,
   sticker: PackSticker,
 ): Promise<ChatSticker> {
-  const path = `${session.archiveId}/${messageId}.sticker.${extensionOf(sticker.path)}`;
+  const path = packCopyPath(session, messageId, sticker);
   fail((await supabase.storage.from(BUCKET).copy(sticker.path, path)).error);
   return { pack: "own", sticker: sticker.id, path, width: sticker.width, height: sticker.height };
 }
