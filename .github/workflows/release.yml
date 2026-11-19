@@ -55,7 +55,7 @@ jobs:
           VITE_COLLAB_URL: ${{ vars.VITE_COLLAB_URL }}
           VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID }}
           GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_DESKTOP_CLIENT_SECRET }}
-          VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://jacopo792.github.io/napp/' }}
+          VITE_WEB_ORIGIN: ${{ vars.VITE_WEB_ORIGIN || 'https://nappnote.com/' }}
         run: pnpm run ${{ matrix.script }}
 
       - uses: actions/upload-artifact@v4
