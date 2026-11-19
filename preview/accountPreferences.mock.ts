@@ -29,8 +29,6 @@ export const DEFAULT_FLAGS: AccountFlags = {
   spaceSwitch: false,
   whatsNewSeen: "",
   spotlightLearned: false,
-  chatSounds: true,
-  chatFavorites: [],
 };
 
 export function preferencesWith(flags: AccountFlags, seen: RemarksSeen = {}) {

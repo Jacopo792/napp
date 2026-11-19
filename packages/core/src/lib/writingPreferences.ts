@@ -36,6 +36,61 @@ export interface WritingPreferences {
   chatBubble: ChatBubble;
   /** The emoji offered first when reacting to a message, in order. */
   quickReactions: string[];
+  /** A soft sound when a chat message leaves and when one arrives. */
+  chatSounds: boolean;
+  /** Stickers and GIFs starred in the chat picker, newest first. */
+  chatFavorites: ChatFavorite[];
+}
+
+/** A starred sticker or GIF: enough to draw it and send it again. A pack
+ *  sticker is named by its row, so one from another archive is just absent. */
+export type ChatFavorite =
+  | { pack: "napp"; id: string }
+  | {
+      pack: "giphy";
+      type: "gif" | "sticker";
+      giphy: string;
+      title: string;
+      width: number;
+      height: number;
+    }
+  | { pack: "own"; sticker: string };
+
+export const FAVORITES_MAX = 60;
+
+/** The same favourite, whatever else it carries. */
+export const favoriteKey = (favorite: ChatFavorite): string =>
+  favorite.pack === "napp"
+    ? `napp:${favorite.id}`
+    : favorite.pack === "giphy"
+      ? `giphy:${favorite.giphy}`
+      : `own:${favorite.sticker}`;
+
+/** Starred now if it was not, unstarred if it was; newest first. */
+export function toggleFavorite(list: ChatFavorite[], favorite: ChatFavorite): ChatFavorite[] {
+  const key = favoriteKey(favorite);
+  const rest = list.filter((one) => favoriteKey(one) !== key);
+  return rest.length < list.length ? rest : [favorite, ...rest].slice(0, FAVORITES_MAX);
+}
+
+function favoritesFrom(value: unknown): ChatFavorite[] | null {
+  if (!Array.isArray(value)) return null;
+  return value
+    .filter((item): item is ChatFavorite => {
+      if (!item || typeof item !== "object") return false;
+      const f = item as Record<string, unknown>;
+      if (f.pack === "napp") return typeof f.id === "string";
+      if (f.pack === "own") return typeof f.sticker === "string";
+      return (
+        f.pack === "giphy" &&
+        (f.type === "gif" || f.type === "sticker") &&
+        typeof f.giphy === "string" &&
+        typeof f.title === "string" &&
+        typeof f.width === "number" &&
+        typeof f.height === "number"
+      );
+    })
+    .slice(0, FAVORITES_MAX);
 }
 
 export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
@@ -47,6 +102,8 @@ export const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   adaptInk: true,
   chatBubble: "ink",
   quickReactions: [...DEFAULT_REACTIONS],
+  chatSounds: true,
+  chatFavorites: [],
 };
 
 /** Whatever was stored, read field by field: a field that is missing or
@@ -77,6 +134,8 @@ export function writingPreferencesFrom(
       fallback.chatBubble,
     ),
     quickReactions: reactionsFrom(value?.quickReactions) ?? fallback.quickReactions,
+    chatSounds: flag(value?.chatSounds, fallback.chatSounds),
+    chatFavorites: favoritesFrom(value?.chatFavorites) ?? fallback.chatFavorites,
   };
 }
 
