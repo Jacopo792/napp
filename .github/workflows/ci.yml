@@ -279,6 +279,7 @@ jobs:
       VITE_GOOGLE_DRIVE_CLIENT_ID: ${{ vars.VITE_GOOGLE_DRIVE_CLIENT_ID }}
       VITE_GOOGLE_DRIVE_API_KEY: ${{ vars.VITE_GOOGLE_DRIVE_API_KEY }}
       VITE_GOOGLE_DRIVE_PROJECT_NUMBER: ${{ vars.VITE_GOOGLE_DRIVE_PROJECT_NUMBER }}
+      VITE_WEB_ORIGIN: https://nappnote.com/
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -342,3 +343,16 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deploy
+
+      - name: Deploy the Cloudflare Pages mirror
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Cloudflare mirror skipped. Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
+            exit 0
+          fi
+          # Cloudflare serves index.html for SPA routes only without a root 404.html.
+          rm apps/web/dist/404.html
+          pnpm dlx wrangler@4.165.0 pages deploy apps/web/dist --project-name=nappnote --branch=main

@@ -30,7 +30,9 @@ export const webPlatform: Platform = {
   kind: "web",
   prepareDriveImport,
 
-  webOrigin: () => new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
+  webOrigin: () =>
+    import.meta.env.VITE_WEB_ORIGIN ||
+    new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
 
   inviteToken: () => new URL(window.location.href).searchParams.get("invite") ?? undefined,
 
