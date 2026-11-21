@@ -56,16 +56,13 @@ export interface Appearance {
   frosted: boolean;
 }
 
-/* A new account opens on Graphite: the grey a Mac window is, and the system's
-   own blue for the one thing that can be acted on. Ink — near-black with a
-   grey accent — was the default once and is gone from the presets: a toggle
-   drawn grey on grey is a toggle nobody can read the state of. */
+/* A new reader opens on Blush, Rosewood's light side. */
 export const DEFAULT_APPEARANCE: Appearance = {
-  theme: "dark",
-  /* Fjord: the palette a first opening and Reset appearance land on. */
-  accent: "#88c0d0",
-  background: "#2e3440",
-  foreground: "#eceff4",
+  theme: "light",
+  /* Blush: the palette a first opening and Reset appearance land on. */
+  accent: "#b4606d",
+  background: "#f6eeee",
+  foreground: "#2c2325",
   contrast: 50,
   translucentSidebar: false,
   wallpaper: false,
