@@ -126,9 +126,8 @@ export function AccountDeletionForm({
     );
 
   return (
-    <form className="account-deletion" onSubmit={(event) => void submit(event)}>
-      <p>{ACCOUNT_DELETION_CONSEQUENCES}</p>
-      <PolicyLinks />
+    <form className="account-deletion is-erase" onSubmit={(event) => void submit(event)}>
+      <p className="account-deletion-warning">{ACCOUNT_DELETION_CONSEQUENCES}</p>
       <label>
         Email
         <input
@@ -169,6 +168,7 @@ export function AccountDeletionForm({
       <button type="submit" disabled={busy || !confirmed || !password || !email.trim()}>
         {busy ? "Deleting…" : "Delete account permanently"}
       </button>
+      <PolicyLinks />
     </form>
   );
 }

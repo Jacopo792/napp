@@ -40,7 +40,15 @@
 .account-deletion button:disabled {
   opacity: 0.45;
 }
+/* The public pages reached from a link (deletion, password reset, the policy
+   gate) are not the workspace: they stand on their own opaque ground, so a
+   wallpaper or palette chosen inside the app never shows through behind a
+   form that has to be read carefully. */
 .account-deletion-page {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  color: var(--ink);
   height: 100dvh;
   overflow-y: auto;
   box-sizing: border-box;
@@ -53,4 +61,89 @@
 .account-deletion-page h1 {
   font-size: 2rem;
   font-weight: 600;
+}
+
+/* The deletion page itself: one narrow column, the consequences set apart in
+   the danger tone, fields on paper, and a single filled danger action. */
+.account-deletion-page:has(> .is-erase) {
+  justify-items: center;
+}
+.account-deletion-page:has(> .is-erase) > * {
+  width: min(100%, 27rem);
+}
+.account-deletion-page:has(> .is-erase) h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.is-erase {
+  gap: 1rem;
+}
+.is-erase .account-deletion-warning {
+  margin: 0 0 0.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--danger-fill) 12%, transparent);
+  color: var(--ink-2);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.is-erase label:not(.account-deletion-confirm) {
+  gap: 0.4rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-3);
+}
+.is-erase input:not([type="checkbox"]) {
+  min-height: 48px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.is-erase input:not([type="checkbox"]):focus {
+  outline: none;
+  border-color: var(--ink-3);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.is-erase .account-deletion-confirm {
+  margin-top: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.is-erase .account-deletion-confirm input {
+  accent-color: var(--danger-fill);
+  margin-top: 0.2rem;
+}
+.is-erase button[type="submit"] {
+  min-height: 50px;
+  margin-top: 0.5rem;
+  border: 0;
+  background: var(--danger-fill);
+  color: var(--on-danger);
+  transition: opacity var(--dur-fast), transform var(--dur-press) var(--ease-press);
+}
+.is-erase button[type="submit"]:not(:disabled):active {
+  transform: scale(0.98);
+}
+.is-erase button[type="submit"]:disabled {
+  opacity: 0.35;
+}
+.is-erase .policy-links {
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+.is-erase .policy-links a {
+  color: var(--ink-4);
+  text-decoration: none;
 }
