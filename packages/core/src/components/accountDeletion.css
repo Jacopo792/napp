@@ -105,7 +105,9 @@
   font-size: var(--text-lg);
   font-weight: var(--weight-regular);
   color: var(--ink);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  transition:
+    border-color var(--dur-fast),
+    box-shadow var(--dur-fast);
 }
 .is-erase input:not([type="checkbox"]):focus {
   outline: none;
@@ -131,7 +133,9 @@
   border: 0;
   background: var(--danger-fill);
   color: var(--on-danger);
-  transition: opacity var(--dur-fast), transform var(--dur-press) var(--ease-press);
+  transition:
+    opacity var(--dur-fast),
+    transform var(--dur-press) var(--ease-press);
 }
 .is-erase button[type="submit"]:not(:disabled):active {
   transform: scale(0.98);
