@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.80 – 2026-11-21
+
+### Changed
+
+- A first opening and Reset appearance land on Blush (light) instead of Fjord;
+  a stored appearance is kept.
+- The public account deletion, password-reset and policy pages stand on an
+  opaque surface instead of the workspace wallpaper; the deletion form is a
+  single column with a filled danger action.
+
+### Fixed
+
+- Windows: the caption strip is solid, with no backdrop blur over the wallpaper.
+
 ## 0.9.79 – 2026-11-19
 
 ### Added
