@@ -26,9 +26,11 @@ const desktop = process.env.NAPP_SHELL === "desktop";
 export default defineConfig(({ mode }) => ({
   root: here(desktop ? "./apps/desktop" : "./apps/web"),
   envDir: here("."),
-  /* The desktop port is not a preference: it is the one the Electron window
-     loads in development, so it has to be that port or nothing. */
-  server: desktop ? { port: 5174, strictPort: true } : { port: Number(process.env.PORT) || 5199 },
+  /* The desktop port is the one the Electron window loads in development:
+     5174, or `NAPP_DEV_PORT` when a second checkout runs its own window. */
+  server: desktop
+    ? { port: Number(process.env.NAPP_DEV_PORT) || 5174, strictPort: true }
+    : { port: Number(process.env.PORT) || 5199 },
   /* Only the preview: the desktop renderer requires the published web origin
      (invitation and policy links), and the released build keeps requiring it.
      The fixture gets a placeholder unless one is set in the environment. */
@@ -66,5 +68,22 @@ export default defineConfig(({ mode }) => ({
       { find: /^@\/lib\/drawHandoff$/, replacement: here("./preview/drawHandoff.mock.ts") },
     ],
   },
-  plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root: here(".") })],
+  plugins: [
+    ocrAssets(),
+    react(),
+    tailwindcss(),
+    tsConfigPaths({ root: here(".") }),
+    /* Screenshots are taken in Blush, so a fresh preview opens in it. Only an
+       empty store is seeded: a palette chosen in the preview stays. */
+    {
+      name: "preview-blush",
+      transformIndexHtml: () => [
+        {
+          tag: "script",
+          injectTo: "head-prepend" as const,
+          children: `try{localStorage.getItem("napp:appearance:v1")||localStorage.setItem("napp:appearance:v1",'{"theme":"light","accent":"#b4606d","background":"#f6eeee","foreground":"#2c2325"}')}catch{}`,
+        },
+      ],
+    },
+  ],
 }));

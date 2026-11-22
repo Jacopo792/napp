@@ -1,12 +1,14 @@
 const path = require("node:path");
 
+/* Development only: a second checkout can serve its preview on its own port
+   (`NAPP_DEV_PORT=5175`) so two windows never share one server. */
+const DEV_ORIGIN = `http://localhost:${Number(process.env.NAPP_DEV_PORT) || 5174}`;
+
 function trustedRendererUrl(value, isDev) {
   try {
     const url = new URL(value);
     if (url.username || url.password) return false;
-    return isDev
-      ? url.origin === "http://localhost:5174"
-      : url.protocol === "app:" && url.host === "notes";
+    return isDev ? url.origin === DEV_ORIGIN : url.protocol === "app:" && url.host === "notes";
   } catch {
     return false;
   }
@@ -55,6 +57,7 @@ function safeFileName(value) {
 }
 
 module.exports = {
+  DEV_ORIGIN,
   trustedRendererUrl,
   trustedSender,
   rendererPermission,
