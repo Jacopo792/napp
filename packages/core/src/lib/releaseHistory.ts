@@ -24,6 +24,23 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.81",
+    date: "2026-11-22",
+    headline: "Email confirmation and account settings",
+    sections: [
+      {
+        heading: "Account",
+        items: [
+          {
+            title: "Confirm your sign-in email",
+            text: "When Napp asks you to confirm a new account, enter the eight-digit code from your email. Change your email or password from account settings.",
+            image: "0.9.81-email-confirmation.png",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.79",
     date: "2026-11-19",
     headline: "Your own stickers, GIF shelves and favourites",

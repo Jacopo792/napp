@@ -21,7 +21,7 @@ export const DOWNLOADS = {
   windows: `${LATEST}/download/Napp-windows-setup.exe`,
 };
 
-export const CURRENT_RELEASE = "0.9.79";
+export const CURRENT_RELEASE = "0.9.81";
 
 function parts(version: string): number[] {
   return version.split(".").map((part) => Number.parseInt(part, 10) || 0);

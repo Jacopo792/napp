@@ -84,18 +84,10 @@ either through the clipboard or through their own mail client — the applicatio
 has no mail path, and adding one would put the token on a server it currently
 never reaches.
 
-**Email confirmation is off** (2026-08-30). Supabase's built-in mail service
-only delivers to the project's own team addresses, so the message never reached
-anybody else and no account could be finished; the project is used by its owner
-and a couple of friends, and confirmation was removed at their request. The
-consequence is stated rather than hidden: an address is no longer proof that
-the caller owns that mailbox, so the one-time token is the whole of an
-invitation's secret. It is still 64 hex characters, still stored only as a
-digest, still single-use, and still expires in seven days — the ordinary
-invite-link model, not the stronger one it replaced. Restoring the earlier
-guarantee means configuring `[auth.email.smtp]`, setting
-`enable_confirmations = true`, and putting the `email_confirmed_at` check back
-into `private.redeem_archive_invite()`.
+Production registration requires an eight-digit code delivered to the account's
+email address. Supabase Auth issues a session after the code is verified.
+Previously created accounts retain their existing confirmation status.
+The invitation token remains single-use and expires in seven days.
 
 The desktop window is the same application in an Electron shell, and the shell
 adds no privilege to it. The renderer runs with `contextIsolation`, `sandbox`
