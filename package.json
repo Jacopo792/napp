@@ -1,7 +1,7 @@
 {
   "name": "notes-app",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "FSL-1.1-ALv2",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @notes-app/web dev",

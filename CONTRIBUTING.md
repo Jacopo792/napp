@@ -88,7 +88,8 @@ screenshot with the window size in it is worth more than an adjective.
 
 ## Licence
 
-The project is under the GNU General Public License, version 3 or later. By
-opening a pull request you are offering your contribution under that licence.
-There is no separate contributor agreement and nobody is asked to assign
-copyright: you keep yours, and it stays GPL.
+The project is under the Functional Source License 1.1, Apache 2.0 future
+licence ([LICENSE](LICENSE)). By opening a pull request you keep the copyright
+in your contribution, license it under that licence, and also grant the
+project's owner a perpetual, irrevocable right to distribute it under other
+terms, including the commercial licence of the official Napp builds.

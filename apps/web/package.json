@@ -2,7 +2,7 @@
   "name": "@notes-app/web",
   "version": "0.9.80",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "FSL-1.1-ALv2",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
