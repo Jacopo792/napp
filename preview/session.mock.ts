@@ -40,7 +40,7 @@ export async function authenticate(email: string): Promise<AuthenticationResult>
   signedOut = false;
   const session = await previewSession(email || EMAIL);
   const archives: ArchiveOption[] = [
-    { archiveId: session.archiveId, name: "Preview archive", joinedAt: "2026-05-18" },
+    { archiveId: session.archiveId, name: "Preview group", joinedAt: "2026-05-18" },
   ];
   if (email.startsWith("multi")) {
     archives.push({
@@ -94,4 +94,12 @@ export async function switchAccount(): Promise<void> {
 
 export function signInFailure(): Error {
   return new Error("Email or password is incorrect");
+}
+
+export async function resendRegistrationCode(_email: string) {}
+
+export async function confirmRegistrationAddress(_email: string, _code: string) {}
+
+export async function confirmRegistration(email: string, _code: string) {
+  return authenticate(email);
 }

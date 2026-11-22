@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { acceptPolicies, loadPolicyAcceptance } from "@/lib/policyAcceptance";
+import { acceptPolicies, acceptedHere, loadPolicyAcceptance } from "@/lib/policyAcceptance";
 import { PolicyLinks } from "./PolicyLinks";
-import "./accountDeletion.css";
+import { AccountCard } from "./AccountCard";
 
 /** Existing accounts must accept the same rules before creating more UGC. */
 export function PolicyGate({ children }: { children: ReactNode }) {
@@ -16,15 +16,16 @@ export function PolicyGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let live = true;
     void (async () => {
-      const current = await supabase.auth.getUser();
-      if (current.error) throw new Error("Account unavailable");
-      if (!current.data.user) {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw new Error("Account unavailable");
+      const id = data.session?.user.id;
+      if (!id || acceptedHere(id)) {
         if (live) setAccepted(true);
         return;
       }
-      const result = await loadPolicyAcceptance(current.data.user.id);
+      const result = await loadPolicyAcceptance(id);
       if (live) {
-        setUserId(current.data.user.id);
+        setUserId(id);
         setAccepted(result);
       }
     })()
@@ -46,8 +47,7 @@ export function PolicyGate({ children }: { children: ReactNode }) {
      who agreed long ago reads as being asked again. */
   if (!asked) return null;
   return (
-    <main className="account-deletion-page">
-      <h1>Before you continue</h1>
+    <AccountCard title="Before you continue">
       <div className="account-deletion">
         <p>Read Napp's terms and privacy policy before creating or sharing content.</p>
         <PolicyLinks />
@@ -73,6 +73,7 @@ export function PolicyGate({ children }: { children: ReactNode }) {
           </button>
         ) : (
           <button
+            className="account-card-primary"
             disabled={busy || !checked || !userId}
             onClick={() => {
               setBusy(true);
@@ -87,6 +88,6 @@ export function PolicyGate({ children }: { children: ReactNode }) {
           </button>
         )}
       </div>
-    </main>
+    </AccountCard>
   );
 }

@@ -11,7 +11,7 @@
  * A shell supplies the history and nothing else. The browser gets the real one
  * and a basepath; the desktop window gets a hash history, because there is no
  * server under it to answer a deep path. */
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import {
   createHashHistory,
   createRoute,
@@ -21,6 +21,7 @@ import {
 } from "@tanstack/react-router";
 import { rootRoute } from "./screens/Root";
 import { initAxes } from "./lib/axes";
+import { authLinkResult } from "./lib/authLinkResult";
 import { initAppearance } from "./lib/appearance";
 import { initWritingPreferences } from "./lib/writingPreferences";
 import { keepCapture } from "./lib/capture";
@@ -40,8 +41,37 @@ keepCapture();
 const LoginScreen = lazyRouteComponent(() => import("./screens/Login"));
 const DeletionScreen = lazyRouteComponent(() => import("./screens/AccountDeletion"));
 const RecoveryScreen = lazyRouteComponent(() => import("./screens/PasswordRecovery"));
+const AuthLinkScreen = lazyRouteComponent(() => import("./screens/AuthLinkResult"));
 const PolicyScreen = lazyRouteComponent(() => import("./screens/Policy"));
 const NotesScreen = lazyRouteComponent(() => import("./screens/Notes"));
+function SignInEntry() {
+  const [result, setResult] = useState(() => authLinkResult(window.location.hash));
+  useEffect(() => {
+    function readLink() {
+      const next = authLinkResult(window.location.hash);
+      if (next) setResult(next);
+    }
+    window.addEventListener("hashchange", readLink);
+    return () => window.removeEventListener("hashchange", readLink);
+  }, []);
+  useEffect(() => {
+    if (result && authLinkResult(window.location.hash)) {
+      const { pathname, search } = window.location;
+      window.history.replaceState(window.history.state, "", pathname + search);
+    }
+  }, [result]);
+
+  return result ? (
+    <AuthLinkScreen result={result} />
+  ) : (
+    <LoginScreen
+      confirmAddressOnly={
+        new URLSearchParams(window.location.search).get("action") === "confirm-signup"
+      }
+    />
+  );
+}
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -55,7 +85,7 @@ const loginRoute = createRoute({
     ) : new URLSearchParams(window.location.search).get("action") === "reset-password" ? (
       <RecoveryScreen />
     ) : (
-      <LoginScreen />
+      <SignInEntry />
     ),
 });
 

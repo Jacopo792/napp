@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { passwordRecovery } from "@/lib/passwordRecovery";
 import { PolicyLinks } from "@/components/PolicyLinks";
-import "@/components/accountDeletion.css";
+import { AccountCard } from "@/components/AccountCard";
 
 export default function PasswordRecovery() {
   const [recovery] = useState(passwordRecovery);
@@ -58,8 +58,7 @@ export default function PasswordRecovery() {
     }
   };
   return (
-    <main className="account-deletion-page">
-      <h1>Reset your Napp password</h1>
+    <AccountCard title={ready || done ? "Choose a new password" : "Reset your password"}>
       <form className="account-deletion" onSubmit={(event) => void submit(event)}>
         {ready ? (
           <>
@@ -105,7 +104,7 @@ export default function PasswordRecovery() {
         {message ? <p role="status">{message}</p> : null}
         {!done ? (
           <button
-            style={{ color: "var(--ink)" }}
+            className="account-card-primary"
             disabled={busy || (ready ? !password || !repeat : !email.trim())}
           >
             {busy ? "Please wait…" : ready ? "Save new password" : "Send recovery email"}
@@ -113,6 +112,6 @@ export default function PasswordRecovery() {
         ) : null}
         <PolicyLinks />
       </form>
-    </main>
+    </AccountCard>
   );
 }

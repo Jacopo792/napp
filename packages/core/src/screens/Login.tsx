@@ -1,27 +1,17 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Image,
-  ListChecks,
-  MailCheck,
-  MessageSquare,
-  NotebookPen,
-  NotebookText,
-  Pencil,
-  Table2 as Table,
-} from "@/components/icons";
+import { useEffect, useState } from "react";
+import { ArrowRight, Eye, EyeOff, MailCheck, NotebookPen } from "@/components/icons";
 import {
   authenticate,
   chooseArchive,
+  confirmRegistration,
+  confirmRegistrationAddress,
   registerAccount,
+  resendRegistrationCode,
   restoreSession,
   type ArchiveOption,
 } from "@/lib/session";
-import { BotanicalFlower } from "@/components/BotanicalFlowers";
-import { flowerFor } from "@/lib/botanical";
+import { stickerUrl } from "@/lib/stickers";
 import { platform } from "@/platform";
 import logoUrl from "../assets/napp-logo.png";
 import { PolicyLinks } from "@/components/PolicyLinks";
@@ -37,8 +27,7 @@ type Mode = "sign-in" | "sign-up";
 
    The confirmation screen below is not dead code even though this project has
    email confirmation turned off: whether it appears is decided by whether
-   Supabase hands back a session, which is a server fact. Configure SMTP and
-   turn confirmations back on and it is correct again. */
+   Supabase hands back a session, which is a server fact. */
 const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": {
     title: "Welcome back.",
@@ -46,13 +35,19 @@ const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
     action: "Sign in",
   },
   "sign-up": {
-    title: "Start an archive.",
+    title: "Start a group.",
     lede: "Your notes, shared with whom you choose.",
     action: "Create account",
   },
 };
 
-export default function Login() {
+export default function Login({
+  stayOnPage = false,
+  confirmAddressOnly = false,
+}: {
+  stayOnPage?: boolean;
+  confirmAddressOnly?: boolean;
+}) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
@@ -60,6 +55,10 @@ export default function Login() {
   const [policiesAccepted, setPoliciesAccepted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [code, setCode] = useState("");
+  const [resendAt, setResendAt] = useState(0);
+  const [codeSent, setCodeSent] = useState(false);
   const [archiveChoice, setArchiveChoice] = useState<{
     account: { userId: string; email: string };
     archives: ArchiveOption[];
@@ -68,14 +67,14 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const invited = Boolean(platform().inviteToken());
-  const [restoring, setRestoring] = useState(!invited);
+  const [restoring, setRestoring] = useState(!invited && !confirmAddressOnly);
   const [restoreError, setRestoreError] = useState("");
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const copy = COPY[mode];
 
   useEffect(() => {
     // Invitations must still go through the account flow that claims them.
-    if (invited) return;
+    if (invited || confirmAddressOnly) return;
     let active = true;
     void restoreSession()
       .then((session) => {
@@ -89,7 +88,13 @@ export default function Login() {
     return () => {
       active = false;
     };
-  }, [invited, navigate, restoreAttempt]);
+  }, [confirmAddressOnly, invited, navigate, restoreAttempt, stayOnPage]);
+
+  useEffect(() => {
+    if (!resendAt) return;
+    const timer = setTimeout(() => setResendAt(0), Math.max(0, resendAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [resendAt]);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -109,6 +114,9 @@ export default function Login() {
         result = await registerAccount(email.trim(), password, policiesAccepted);
         if (result.confirmationRequired) {
           setConfirmation(email.trim());
+          setCode("");
+          setCodeSent(false);
+          setResendAt(Date.now() + 60_000);
           setPassword("");
           setLoading(false);
           return;
@@ -131,6 +139,43 @@ export default function Login() {
     }
   }
 
+  async function handleConfirmation() {
+    setLoading(true);
+    setError("");
+    setCodeSent(false);
+    try {
+      if (confirmAddressOnly) {
+        await confirmRegistrationAddress(email.trim(), code);
+        setAddressConfirmed(true);
+        return;
+      }
+      const result = await confirmRegistration(confirmation, code);
+      setConfirmation("");
+      if (result.session) {
+        if (!stayOnPage) void navigate({ to: "/notes", replace: true });
+      } else setArchiveChoice({ account: result.account, archives: result.archives });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not confirm your email");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    setLoading(true);
+    setError("");
+    setCodeSent(false);
+    try {
+      await resendRegistrationCode(confirmAddressOnly ? email.trim() : confirmation);
+      setResendAt(Date.now() + 60_000);
+      setCodeSent(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not send a new code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleArchiveChoice(archiveId: string) {
     if (!archiveChoice) return;
     setLoading(true);
@@ -139,7 +184,7 @@ export default function Login() {
       await chooseArchive(archiveChoice.account, archiveId);
       navigate({ to: "/notes" });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not open that archive");
+      setError(reason instanceof Error ? reason.message : "Could not open that group");
       setLoading(false);
     }
   }
@@ -178,8 +223,8 @@ export default function Login() {
     return (
       <LoginFrame>
         <LoginMark />
-        <h1 className="login-title">Choose an archive</h1>
-        <p className="login-lede">This account belongs to more than one archive.</p>
+        <h1 className="login-title">Choose a group</h1>
+        <p className="login-lede">This account belongs to more than one group.</p>
         <div className="archive-choice-list mt-6">
           {archiveChoice.archives.map((archive) => (
             <button
@@ -209,7 +254,19 @@ export default function Login() {
     );
   }
 
-  if (confirmation) {
+  if (addressConfirmed) {
+    return (
+      <LoginFrame>
+        <h1 className="login-title">Address confirmed</h1>
+        <p className="login-lede">Return to the app and sign in with your email and password.</p>
+        <a className="login-code-action" href={platform().webOrigin()}>
+          Open Napp on the web
+        </a>
+      </LoginFrame>
+    );
+  }
+
+  if (confirmation || confirmAddressOnly) {
     return (
       <LoginFrame>
         <span className="login-mark is-quiet">
@@ -217,33 +274,92 @@ export default function Login() {
         </span>
         <h1 className="login-title">Confirm your address</h1>
         <p className="login-address">{confirmation}</p>
-        <p className="login-lede">
-          A message is on its way. Opening the link in it proves the address is yours and finishes
-          the account.
-        </p>
-        <ol className="login-steps">
-          <li>Open the message and follow its link — it brings you back here.</li>
-          <li>Sign in with the same address and password.</li>
-          <li>
-            {invited
-              ? "The invitation you followed is claimed, and the shared archive opens."
-              : "Your own private archive is created the first time you sign in."}
-          </li>
-        </ol>
-        <p className="login-note">
-          Nothing arrived? Check the spam folder. The link works for 24 hours; after that, create
-          the account again with the same address.
-        </p>
-        <button
-          type="button"
-          className="login-submit label"
-          onClick={() => {
-            setConfirmation("");
-            switchMode("sign-in");
+        <form
+          className="login-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirmation();
           }}
         >
-          Back to sign in
-        </button>
+          {confirmAddressOnly && (
+            <div className="login-field">
+              <label className="label" htmlFor="signup-confirm-email">
+                Email
+              </label>
+              <input
+                id="signup-confirm-email"
+                className="login-input"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
+          <div className="login-field">
+            <label className="label" htmlFor="signup-code">
+              Verification code
+            </label>
+            <input
+              id="signup-code"
+              className="login-input"
+              autoFocus={!confirmAddressOnly}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              disabled={loading}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="readout text-danger">
+              {error}
+            </p>
+          )}
+          {codeSent && (
+            <p role="status" className="login-note">
+              New code requested.
+            </p>
+          )}
+          <button
+            type="submit"
+            className="login-submit label"
+            disabled={
+              loading ||
+              (confirmAddressOnly && !email.trim()) ||
+              !/^\d{8}$/.test(code.replace(/\s/g, ""))
+            }
+          >
+            Verify email
+          </button>
+          <button
+            type="button"
+            className="login-code-action"
+            disabled={loading || Boolean(resendAt) || (confirmAddressOnly && !email.trim())}
+            onClick={() => void handleResend()}
+          >
+            Resend code
+          </button>
+          {confirmAddressOnly ? (
+            <a className="login-code-action" href={platform().webOrigin()}>
+              Back to sign in
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="login-code-action"
+              disabled={loading}
+              onClick={() => {
+                setConfirmation("");
+                switchMode("sign-in");
+              }}
+            >
+              Back to sign in
+            </button>
+          )}
+        </form>
       </LoginFrame>
     );
   }
@@ -257,7 +373,7 @@ export default function Login() {
         <p className="login-invite-note">
           You followed an invitation.{" "}
           {mode === "sign-in"
-            ? "Sign in with the invited address to join that archive."
+            ? "Sign in with the invited address to join that group."
             : "Create the account with the invited address — the invitation is claimed as soon as it exists."}
         </p>
       )}
@@ -393,85 +509,24 @@ export default function Login() {
   );
 }
 
-/* The day, as a string. `toDateString()` and not the clock, so the plate is
-   settled for as long as the reader is looking at it. */
-function plantOfTheDay(): ReturnType<typeof flowerFor> {
-  return flowerFor(new Date().toDateString());
-}
-
-/* What goes in the archive, in the colour its tool takes in the toolbar — the
-   pill on the door and the glyph under the pointer are the same hue for the
-   same thing, so the colour means something before anybody has signed in. */
-const KINDS = [
-  { word: "notes", tone: "var(--tint-yellow)", Icon: NotebookText },
-  { word: "drawings", tone: "var(--tint-pink)", Icon: Pencil },
-  { word: "remarks", tone: "var(--tint-mint)", Icon: MessageSquare },
-  { word: "pictures", tone: "var(--tint-blue)", Icon: Image },
-  { word: "checklists", tone: "var(--tint-orange)", Icon: ListChecks },
-  { word: "tables", tone: "var(--tint-purple)", Icon: Table },
-] as const;
-
-/* Glossa's door, in this app's words: the pitch on the pastel of a word that
-   turns every few seconds, the field behind it following, and a dot per word
-   below that lights in turn. The word swaps with a blur rather than a slide,
-   and the pill it sits in measures what is coming and travels to that width,
-   so the line never jumps. */
+/* about.nappnote.com's line, set as the site sets it: the plain half bold,
+   the other half in the reading serif. Two of the chat's stickers sit on the
+   door as they sit on the site, one on the words and one on the card. */
 function Pitch() {
-  const [at, setAt] = useState(0);
-  const [width, setWidth] = useState<number>();
-  const word = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setAt((i) => (i + 1) % KINDS.length), 2400);
-    return () => window.clearInterval(timer);
-  }, []);
-  useLayoutEffect(() => {
-    const node = word.current;
-    if (!node) return;
-    // The headline is set in `vw`, so the word changes width with the window too.
-    const measure = new ResizeObserver(() => setWidth(node.offsetWidth));
-    measure.observe(node);
-    setWidth(node.offsetWidth);
-    return () => measure.disconnect();
-  }, [at]);
-  const { word: text, tone, Icon } = KINDS[at];
-
   return (
-    <section className="login-pitch" style={{ "--tone": tone } as React.CSSProperties}>
-      <div className="login-garden" aria-hidden="true">
-        <BotanicalFlower flower={plantOfTheDay()} className="is-near" />
-      </div>
+    <section className="login-pitch">
       <span className="login-wordmark">
         <img src={logoUrl} alt="" width={28} height={28} />
         Napp
       </span>
       <p className="login-headline">
-        Two people.
+        Write it down,
         <br />
-        One archive of
-        <br />
-        <span className="login-pill" style={{ width }}>
-          <span key={text} ref={word} className="login-pill-word">
-            <Icon size="0.62em" stroke={2.5} />
-            {text}
-          </span>
-        </span>
+        <em>
+          together.
+          <img className="login-sticker is-bear" src={stickerUrl("bear.hi") ?? ""} alt="" />
+        </em>
       </p>
-      <div className="login-kinds">
-        <span className="login-dots">
-          {KINDS.map((kind, i) => (
-            <button
-              key={kind.word}
-              type="button"
-              aria-label={kind.word}
-              aria-pressed={i === at}
-              onClick={() => setAt(i)}
-              style={{ "--tone": kind.tone } as React.CSSProperties}
-            />
-          ))}
-        </span>
-        <span className="login-eyebrow">Shared notes, written by two</span>
-      </div>
     </section>
   );
 }
@@ -481,7 +536,10 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
     <div className="login-shell">
       <Pitch />
       <main className="login-main">
-        <div className="login-card">{children}</div>
+        <div className="login-card">
+          <img className="login-sticker is-bunny" src={stickerUrl("bunny.love") ?? ""} alt="" />
+          {children}
+        </div>
       </main>
     </div>
   );
