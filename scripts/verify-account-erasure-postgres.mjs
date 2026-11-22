@@ -453,6 +453,24 @@ try {
     ]),
     /cannot mention a blocked account/,
   );
+  stage = "an operator's hide removes a reported general-chat message";
+  await asUser(null);
+  const hiddenMessage = crypto.randomUUID();
+  await db.query(
+    "insert into public.archive_messages(id,archive_id,author_id,body) values ($1,$2,$3,'Reported fixture')",
+    [hiddenMessage, safetyArchive, two],
+  );
+  const messageReport = await scalar(
+    "insert into private.safety_reports(reporter_id,target_user_id,message_id,reason,snapshot) values ($1,$2,$3,'illegal','{}') returning id",
+    [outsider, two, hiddenMessage],
+  );
+  await db.query("select public.review_safety_report($1,true)", [messageReport]);
+  await asUser(two);
+  assert.equal(
+    await scalar("select count(*)::int from public.archive_messages where id=$1", [hiddenMessage]),
+    0,
+    "A hidden message is filtered for its author too",
+  );
   stage = "general-chat photos follow their message";
   await asUser(null);
   // Hosted Storage grants its table to signed-in users; RLS decides the rest.

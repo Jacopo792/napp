@@ -56,6 +56,20 @@ function safeFileName(value) {
   return name;
 }
 
+/* The file is written without the mark a browser download carries, so neither
+   Gatekeeper nor Office's Protected View inspects it. Script-capable kinds stay
+   out: SVG opens in a browser, and legacy Office files carry macros. */
+const OPENS_IN_A_VIEWER = new Set(
+  (
+    "pdf txt md csv rtf png jpg jpeg gif webp heic bmp tiff " +
+    "mp3 m4a wav mp4 mov m4v webm docx xlsx pptx odt ods odp pages numbers key epub"
+  ).split(" "),
+);
+
+function opensInViewer(filename) {
+  return OPENS_IN_A_VIEWER.has(path.extname(filename).slice(1).toLowerCase());
+}
+
 module.exports = {
   DEV_ORIGIN,
   trustedRendererUrl,
@@ -63,4 +77,5 @@ module.exports = {
   rendererPermission,
   rendererFile,
   safeFileName,
+  opensInViewer,
 };

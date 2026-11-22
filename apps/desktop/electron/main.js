@@ -36,6 +36,7 @@ const {
   rendererPermission,
   rendererFile,
   safeFileName,
+  opensInViewer,
 } = require("./security");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -459,18 +460,11 @@ handle("napp:save", (event, files, fallbackName) =>
    whatever the system does for that kind of file. Only kinds that open in a
    viewer are opened; anything else is shown in its folder, where launching it
    is the reader's own decision and not a click inside a note. */
-const OPENS_IN_A_VIEWER = new Set(
-  (
-    "pdf txt md csv rtf png jpg jpeg gif webp heic svg bmp tiff " +
-    "mp3 m4a wav mp4 mov m4v webm doc docx xls xlsx ppt pptx odt ods odp pages numbers key epub"
-  ).split(" "),
-);
-
 handle("napp:open", async (_event, name, data) => {
   const filename = safeFileName(name);
   const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "napp-")), filename);
   await fs.writeFile(file, Buffer.from(data));
-  if (!OPENS_IN_A_VIEWER.has(path.extname(file).slice(1).toLowerCase())) {
+  if (!opensInViewer(filename)) {
     shell.showItemInFolder(file);
     return null;
   }
