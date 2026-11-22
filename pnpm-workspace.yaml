@@ -12,15 +12,29 @@ allowBuilds:
   core-js: false
   tesseract.js: false
 
-# Security fixes for transitive pins not advanced by their parent packages
-# (electron-builder, concurrently, typescript-eslint). Remove an entry once its
-# parent ships the fixed version.
+# Security fixes for versions still selected by parent packages.
+# Remove an entry once its parent resolves a fixed version.
 overrides:
+  "@babel/core@7.29.0": 7.29.6
+  "baseline-browser-mapping@2.10.30": 2.11.0
+  "brace-expansion@1.1.14": 1.1.21
   "brace-expansion@2.1.4": 2.1.7
   "brace-expansion@5.0.6": 5.0.12
+  "browserslist@4.28.2": 4.29.3
+  "dompurify@3.4.14": 3.4.17
+  "esbuild@0.27.7": 0.28.2
   "fast-uri@3.1.7": 3.1.9
+  "follow-redirects@1.16.0": 1.16.2
+  "joi@18.2.6": 18.3.1
   "js-yaml@4.1.1": 4.3.2
+  "nanoid@3.3.12": 3.3.18
+  "node-forge@1.4.0": 1.4.3
+  "postcss@8.5.14": 8.5.23
+  "re2js@2.8.6": 2.8.7
+  "seroval@1.5.4": 1.6.11
   "shell-quote@1.9.0": 1.11.0
+  "source-map-js@1.2.1": 1.2.2
   "undici@6.28.0": 6.29.1
+  "undici@7.29.0": 7.30.1
   "glob@>=9 <14.0.2": 14.0.2
   "minimatch@>=9 <11.0.1": 11.0.1
