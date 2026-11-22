@@ -19,7 +19,7 @@ try {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     create table realtime.messages(extension text);
     create function realtime.topic() returns text language sql stable as $$select ''::text$$;
-    create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
+    create table auth.users(id uuid primary key, email text, email_change text, email_confirmed_at timestamptz);
     create table auth.sessions(id uuid primary key, user_id uuid references auth.users(id) on delete cascade);
     create function auth.uid() returns uuid language sql stable as
       $$select (nullif(current_setting('request.jwt.claims', true),'')::jsonb->>'sub')::uuid$$;
