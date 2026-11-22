@@ -8,6 +8,7 @@ export async function uploadObject(
   session: AppSession,
   objectId: string,
   blob: Blob,
+  noteId?: string,
 ): Promise<void> {
   if (!blob.type) throw new Error("This file has no supported media type");
   const result = await supabase.storage
@@ -15,6 +16,7 @@ export async function uploadObject(
     .upload(`${session.archiveId}/${objectId}`, blob, {
       contentType: blob.type,
       upsert: false,
+      metadata: noteId ? { noteId } : undefined,
     });
   fail(result.error);
 }

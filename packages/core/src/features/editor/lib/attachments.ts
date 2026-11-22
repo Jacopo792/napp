@@ -71,3 +71,14 @@ export function assertAttachable(file: Pick<File, "name" | "size">): void {
     throw new Error(`Attachments must be smaller than ${formatBytes(MAX_ATTACHMENT_BYTES)}`);
   }
 }
+
+export function assertAttachmentBytes(bytes: Uint8Array, type: string): void {
+  const head = String.fromCharCode(...bytes.subarray(0, 16));
+  const valid =
+    (type === "application/pdf" && head.startsWith("%PDF-")) ||
+    (type === "video/webm" && head.startsWith("\x1a\x45\xdf\xa3")) ||
+    (["video/mp4", "video/quicktime"].includes(type) &&
+      bytes.length >= 8 &&
+      /^(ftyp|moov|mdat|wide|free|skip|pnot)$/.test(head.slice(4, 8)));
+  if (!valid) throw new Error("The file does not match its attachment format");
+}

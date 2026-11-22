@@ -224,8 +224,8 @@ interface Props {
   synced?: boolean;
   onNew: () => void;
   onImportMarkdown: () => void;
-  onUploadImage: (file: File) => Promise<string>;
-  onUploadFile: (file: File) => Promise<string>;
+  onUploadImage: (file: File, noteId: string) => Promise<string>;
+  onUploadFile: (file: File, noteId: string) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
@@ -715,7 +715,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     try {
       assertAttachable(file);
       setStatus("Attaching file…");
-      const objectId = await onUploadFile(file);
+      const objectId = await onUploadFile(file, entry.note.id);
       editorRef.current?.insertAttachment(attachmentLabel(file.name), objectId);
       report("File attached");
     } catch (error) {
@@ -749,7 +749,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     setStatus("Preparing image…");
     try {
-      const src = await onUploadImage(file);
+      const src = await onUploadImage(file, entry.note.id);
       editorRef.current?.insertImage(src, imageAltFromFilename(file.name));
       report("Image inserted", 2600);
     } catch (error) {
@@ -765,7 +765,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     setStatus("Preparing pasted image…");
     try {
-      const objectId = await onUploadImage(file);
+      const objectId = await onUploadImage(file, entry.note.id);
       report("Image pasted", 2600);
       return { objectId, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
     } catch (error) {
@@ -1833,7 +1833,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             photo={entry.note.photo}
             canEdit={canEdit}
             resolveImage={resolveImage}
-            uploadImage={onUploadImage}
+            uploadImage={(file) => onUploadImage(file, entry.note.id)}
             onChange={updatePageProperties}
             onError={setFailure}
           />

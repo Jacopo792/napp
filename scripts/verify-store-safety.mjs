@@ -96,11 +96,14 @@ async function archive(owner, members) {
   );
   return id;
 }
-async function upload(account, bucket, prefix) {
+async function upload(account, bucket, prefix, noteId) {
   const id = crypto.randomUUID();
   const path = `${prefix}/${id}`;
   checked(
-    await account.client.storage.from(bucket).upload(path, png, { contentType: "image/png" }),
+    await account.client.storage.from(bucket).upload(path, png, {
+      contentType: "image/png",
+      metadata: noteId ? { noteId } : undefined,
+    }),
     "fixture upload",
   );
   uploads.push({ bucket, path });
@@ -118,7 +121,7 @@ function note(id, archiveId, owner, image) {
       type: "doc",
       content: [
         { type: "paragraph", content: [{ type: "text", text: "Fixture words" }] },
-        { type: "image", attrs: { imageId: image } },
+        { type: "privateImage", attrs: { objectId: image } },
       ],
     },
     created_at: new Date().toISOString(),
@@ -145,8 +148,8 @@ try {
   const two = await fixture("author");
   const outside = await fixture("outsider");
   const shared = await archive(one.id, [one.id, two.id]);
-  const image = await upload(two, "note-images", shared);
   const id = crypto.randomUUID();
+  const image = await upload(two, "note-images", shared, id);
   checked(await two.client.from("notes").insert(note(id, shared, one.id, image)), "create note");
   const read = async (who) =>
     checked(await who.client.from("notes").select("id,owner_id").eq("id", id), "read note");

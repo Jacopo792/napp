@@ -3,6 +3,7 @@ import { request } from "node:https";
 import { isIP } from "node:net";
 
 const LIMIT = 20 * 1024 * 1024;
+const FETCH_TIMEOUT = 15_000;
 export function publicAddress(address: string): boolean {
   if (isIP(address) === 6)
     return (
@@ -26,14 +27,7 @@ export function publicAddress(address: string): boolean {
   );
 }
 
-const IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-  "image/svg+xml",
-  "image/avif",
-];
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif"];
 
 /** Fetch only public HTTPS images. */
 export async function importImage(source: string): Promise<{ bytes: Buffer; type: string }> {
@@ -48,7 +42,9 @@ export async function fetchPublic(
   types: string[],
   limit: number,
   redirects = 0,
+  deadline = Date.now() + FETCH_TIMEOUT,
 ): Promise<{ bytes: Buffer; type: string; url: string }> {
+  if (source.length > 8192) throw new Error("Address is too long");
   const url = new URL(source);
   if (
     url.protocol !== "https:" ||
@@ -58,8 +54,16 @@ export async function fetchPublic(
     redirects > 3
   )
     throw new Error("Address is not supported");
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error("Request timed out");
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  const addresses = await lookup(host, { all: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const addresses = await Promise.race([
+    lookup(host, { all: true }),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("DNS lookup timed out")), remaining);
+    }),
+  ]).finally(() => clearTimeout(timer));
   if (!addresses.length || addresses.some(({ address }) => !publicAddress(address)))
     throw new Error("Address is not public");
   const address = addresses[0];
@@ -67,6 +71,7 @@ export async function fetchPublic(
     const req = request(
       url,
       {
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
         lookup: (_hostname, _options, callback) => callback(null, [address]),
         headers: {
           accept: types.join(","),
@@ -77,21 +82,25 @@ export async function fetchPublic(
         },
       },
       (response) => {
+        response.on("error", reject);
         if (
           [301, 302, 303, 307, 308].includes(response.statusCode ?? 0) &&
           response.headers.location
         ) {
-          response.resume();
-          resolve(
-            fetchPublic(new URL(response.headers.location, url).href, types, limit, redirects + 1),
-          );
+          const destination = URL.parse(response.headers.location, url);
+          response.destroy();
+          if (!destination) {
+            reject(new Error("Invalid redirect address"));
+            return;
+          }
+          resolve(fetchPublic(destination.href, types, limit, redirects + 1, deadline));
           return;
         }
         const rawType = response.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() ?? "";
         // Normalise jpeg aliases; the blob type is what prepareImageForNote checks.
         const type = rawType === "image/jpg" || rawType === "image/pjpeg" ? "image/jpeg" : rawType;
         if (response.statusCode !== 200 || !types.includes(type)) {
-          response.resume();
+          response.destroy();
           reject(new Error("Source did not return what was asked for"));
           return;
         }
@@ -109,7 +118,7 @@ export async function fetchPublic(
           size += chunk.length;
           if (size > limit) {
             if (partial) {
-              chunks.push(chunk);
+              chunks.push(chunk.subarray(0, limit - (size - chunk.length)));
               response.destroy();
               resolve({ bytes: Buffer.concat(chunks), type, url: url.href });
             } else response.destroy(new Error("Response is too large"));
@@ -118,11 +127,8 @@ export async function fetchPublic(
           chunks.push(chunk);
         });
         response.on("end", () => resolve({ bytes: Buffer.concat(chunks), type, url: url.href }));
-        response.on("error", reject);
       },
     );
-    const timer = setTimeout(() => req.destroy(new Error("Request timed out")), 15000);
-    req.on("close", () => clearTimeout(timer));
     req.on("error", reject);
     req.end();
   });

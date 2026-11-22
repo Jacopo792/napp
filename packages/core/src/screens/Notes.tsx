@@ -44,7 +44,7 @@ import { Avatar, CollectionMenu, NoteContextMenu, NoteMenu } from "@/components/
 import { PageSetupButton, MenuButton as WritingMenuButton } from "@/components/WritingMenus";
 import { MemberPresenceCard } from "@/features/editor/components/MemberPresenceCard";
 import type { NoteEditorHandle } from "@/features/editor/components/NoteEditor";
-import { attachmentType } from "@/features/editor/lib/attachments";
+import { assertAttachmentBytes, attachmentType } from "@/features/editor/lib/attachments";
 import {
   EMPTY_RICH_TEXT,
   RICH_TEXT_VERSION,
@@ -1333,13 +1333,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   );
 
   const handleUploadImage = useCallback(
-    async (file: File): Promise<string> => {
+    async (file: File, noteId: string): Promise<string> => {
       if (!canWriteArchive) throw new Error("This group is view only");
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before uploading an image");
       const blob = await prepareImageForNote(file);
       const imageId = crypto.randomUUID();
-      await uploadImage(current, imageId, blob);
+      await uploadImage(current, imageId, blob, noteId);
       return imageId;
     },
     [canWriteArchive],
@@ -1353,21 +1353,15 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Attachments and images share one private, account-protected bucket. */
   const handleUploadFile = useCallback(
-    async (file: File): Promise<string> => {
+    async (file: File, noteId: string): Promise<string> => {
       if (!canWriteArchive) throw new Error("This group is view only");
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before attaching a file");
       const objectId = crypto.randomUUID();
-      const normalizedType =
-        !file.type || file.type === "application/octet-stream"
-          ? attachmentType(file.name)
-          : file.type;
-      // Supabase storage validates against the bucket's allowlist, which is
-      // extension-based; a browser that reports `video/mov` or an empty string
-      // would otherwise be rejected even though the file is a supported MOV.
-      const toUpload =
-        normalizedType !== file.type ? new File([file], file.name, { type: normalizedType }) : file;
-      await uploadObject(current, objectId, toUpload);
+      const normalizedType = attachmentType(file.name);
+      assertAttachmentBytes(new Uint8Array(await file.slice(0, 16).arrayBuffer()), normalizedType);
+      const toUpload = file.slice(0, file.size, normalizedType);
+      await uploadObject(current, objectId, toUpload, noteId);
       fileTypes.current.set(objectId, normalizedType);
       return objectId;
     },
@@ -1418,7 +1412,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         let photo: Note["photo"] = null;
         if (file) {
           const objectId = crypto.randomUUID();
-          await uploadImage(current, objectId, await prepareAvatar(file, crop));
+          await uploadImage(current, objectId, await prepareAvatar(file, crop), noteId);
           photo = { kind: "photo", objectId };
         }
         await handleUpdatePageProperties({ photo, cover: entry.note.cover }, noteId);

@@ -255,7 +255,12 @@ export function useNoteExchange({
     checkDestination();
     try {
       if (objectId)
-        await uploadObject(session, objectId, new Blob([blob], { type: "application/pdf" }));
+        await uploadObject(
+          session,
+          objectId,
+          new Blob([blob], { type: "application/pdf" }),
+          note.id,
+        );
       checkDestination();
       entry = await createNote(session, note, metadata);
     } catch (error) {

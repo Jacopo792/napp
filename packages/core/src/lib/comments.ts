@@ -176,30 +176,18 @@ export async function giphyPicture(
 export const chatLinkPath = (session: AppSession, messageId: string, type: string): string =>
   `${session.archiveId}/${messageId}.link.${{ "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[type] ?? "jpg"}`;
 
-/* Signed addresses, kept until shortly before they lapse: a chat redraws
-   often and every picture in it would otherwise ask again. */
-const SIGNED_FOR = 3600;
-const signed = new Map<string, { url: string; until: number }>();
+const SIGNED_FOR = 900;
 
 /** Addresses a viewer or player can load, for the files the caller may read.
  *  One that Storage refuses (a block, a report) is simply absent. */
 export async function chatMediaUrls(paths: string[]): Promise<Map<string, string>> {
-  const now = Date.now();
+  const requested = [...new Set(paths)];
   const urls = new Map<string, string>();
-  const missing: string[] = [];
-  for (const path of new Set(paths)) {
-    const known = signed.get(path);
-    if (known && known.until > now) urls.set(path, known.url);
-    else missing.push(path);
-  }
-  if (missing.length) {
-    const result = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(missing, SIGNED_FOR);
-    fail(result.error);
-    for (const entry of result.data ?? []) {
-      if (!entry.signedUrl || !entry.path) continue;
-      signed.set(entry.path, { url: entry.signedUrl, until: now + (SIGNED_FOR - 300) * 1000 });
-      urls.set(entry.path, entry.signedUrl);
-    }
+  if (!requested.length) return urls;
+  const result = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(requested, SIGNED_FOR);
+  fail(result.error);
+  for (const entry of result.data ?? []) {
+    if (entry.signedUrl && entry.path) urls.set(entry.path, entry.signedUrl);
   }
   return urls;
 }

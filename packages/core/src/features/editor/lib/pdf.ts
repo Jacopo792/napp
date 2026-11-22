@@ -1,4 +1,5 @@
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { assertAttachmentBytes } from "./attachments";
 
 const MAX_PDF_BYTES = 30 * 1024 * 1024;
 const MAX_PAGES = 200;
@@ -52,17 +53,19 @@ export async function extractPdfText(
     throw new Error("Choose a PDF file");
   }
   if (file.size > MAX_PDF_BYTES) throw new Error("PDF is larger than 30 MB");
+  const data = new Uint8Array(await file.arrayBuffer());
+  assertAttachmentBytes(data, "application/pdf");
 
   allowStreamIteration();
 
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
-  const pdf = await loadingTask.promise;
+  const loadingTask = pdfjs.getDocument({ data });
 
   let recognizer: Awaited<ReturnType<typeof import("./ocr").textRecognizer>> | undefined;
   try {
+    const pdf = await loadingTask.promise;
     if (pdf.numPages > MAX_PAGES) throw new Error(`PDF has more than ${MAX_PAGES} pages`);
 
     const pages: string[] = [];

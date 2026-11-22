@@ -2,11 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   assertAttachable,
+  assertAttachmentBytes,
   attachmentLabel,
   attachmentObjectId,
   attachmentReference,
   MAX_ATTACHMENT_BYTES,
 } from "./attachments.ts";
+
+test("attachment bytes must agree with the selected format", () => {
+  const encode = (header: string) => new TextEncoder().encode(header);
+  assert.doesNotThrow(() => assertAttachmentBytes(encode("%PDF-1.7"), "application/pdf"));
+  assert.doesNotThrow(() => assertAttachmentBytes(encode("0000ftyp"), "video/mp4"));
+  assert.throws(() => assertAttachmentBytes(encode("plain text"), "application/pdf"));
+  assert.throws(() => assertAttachmentBytes(encode("%PDF-1.7"), "video/webm"));
+});
 
 test("attachment references round-trip without exposing a public URL", () => {
   const id = "00000000-0000-4000-8000-000000000001";

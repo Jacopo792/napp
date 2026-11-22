@@ -28,7 +28,7 @@ try {
     create function auth.jwt() returns jsonb language sql stable as
       $$select coalesce(nullif(current_setting('request.jwt.claims', true),'')::jsonb,'{}')$$;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,version text,created_at timestamptz default now(),unique(bucket_id,name));
+    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,user_metadata jsonb,version text,created_at timestamptz default now(),unique(bucket_id,name));
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
     grant usage on schema public, auth, storage to anon, authenticated, service_role;
@@ -351,6 +351,60 @@ try {
     /cannot mention a blocked account/,
   );
   await db.query("select public.unblock_user($1)", [three]);
+
+  stage = "note attachment access follows its original note";
+  await asUser(null);
+  await db.exec("grant select, insert on storage.objects to authenticated");
+  const boundAsset = crypto.randomUUID();
+  const boundPath = `${safetyArchive}/${boundAsset}`;
+  await asUser(three);
+  await db.query(
+    "insert into storage.objects(bucket_id,name,owner,owner_id,user_metadata) values ('note-images',$1,$2,$3,$4)",
+    [boundPath, three, three, JSON.stringify({ noteId: safetyNote })],
+  );
+  await db.query("update public.notes set content=$1, content_version=1 where id=$2", [
+    JSON.stringify({
+      type: "doc",
+      content: [{ type: "privateFile", attrs: { objectId: boundAsset } }],
+    }),
+    safetyNote,
+  ]);
+  await asUser(two);
+  const visibleAsset = () =>
+    scalar("select count(*)::int from storage.objects where name=$1", [boundPath]);
+  assert.equal(await visibleAsset(), 1, "The shared note grants access to its bound attachment");
+  await db.query(
+    "insert into public.media_text(archive_id,object_id,text) values ($1,$2,'Extracted text')",
+    [safetyArchive, boundAsset],
+  );
+  const visibleText = () =>
+    scalar("select count(*)::int from public.media_text where object_id=$1", [boundAsset]);
+  assert.equal(await visibleText(), 1);
+  await asUser(three);
+  await db.query("update public.profiles set hide_archived=true where user_id=$1", [three]);
+  await db.query("update public.notes set archived_at=now() where id=$1", [safetyNote]);
+  await asUser(two);
+  assert.equal(await visibleAsset(), 0, "A private archived note withholds its attachment");
+  await db.query(
+    "insert into public.profile_preferences(user_id,preferences) values ($1,$2) on conflict(user_id) do update set preferences=excluded.preferences",
+    [two, JSON.stringify({ appearance: { wallpaperObject: boundAsset } })],
+  );
+  assert.equal(await visibleAsset(), 0, "Preferences cannot authorize a download");
+  assert.equal(await visibleText(), 0, "Extracted text follows the hidden attachment");
+  assert.equal(
+    await scalar(
+      "select count(*)::int from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='preferences'",
+    ),
+    0,
+  );
+  await asUser(three);
+  await db.query("update public.notes set archived_at=null where id=$1", [safetyNote]);
+  await db.query("update public.profiles set hide_archived=false where user_id=$1", [three]);
+  await asUser(two);
+  assert.equal(await visibleAsset(), 1, "Unarchiving restores the normal shared read");
+  await asUser(null);
+  await db.query("delete from storage.objects where name=$1", [boundPath]);
+
   stage = "safety reporting and blocking with actual RLS roles";
   await asUser(outsider);
   await assert.rejects(
@@ -646,6 +700,21 @@ try {
     0,
     "A block hides the blocked person's photos",
   );
+  const alias = crypto.randomUUID();
+  await db.query(
+    "insert into public.notes(id,archive_id,owner_id,title,created_at,updated_at) values ($1,$2,$3,'Photo alias fixture',now(),now())",
+    [alias, safetyArchive, two],
+  );
+  await db.query(
+    "insert into public.note_comments(id,archive_id,note_id,thread_id,author_id,body,attachments) values ($1,$2,$3,$1,$4,'Alias',$5)",
+    [photoMessage, safetyArchive, alias, two, JSON.stringify([{ kind: "image", path: photo }])],
+  );
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where name=$1", [photo]),
+    0,
+    "A matching comment by another author cannot expose a blocked message's photo",
+  );
+  await db.query("delete from public.notes where id=$1", [alias]);
   await asUser(null);
   stage = "erasure scrubs legacy blocked mentions in retained comments";
   await db.query("select public.begin_account_erasure($1,$2)", [three, crypto.randomUUID()]);
