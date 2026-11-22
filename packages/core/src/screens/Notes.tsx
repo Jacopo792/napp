@@ -30,6 +30,7 @@ import { NoteList, type ActiveFilter, type PeerFace } from "@/components/NoteLis
 import { NoteSheet } from "@/components/NoteSheet";
 import { PaneResizer } from "@/components/PaneResizer";
 import { PersonSheet } from "@/components/PersonSheet";
+import { removeBlockedMember } from "@/lib/storeSafety";
 import type { SettingsSection } from "@/components/settingsSections";
 import { SheetStack } from "@/components/Sheet";
 import { Sidebar, type Scope } from "@/components/Sidebar";
@@ -2665,6 +2666,35 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [archiveExit]);
 
   /* Its last member only; `deleteSpace` asks Postgres first and refuses
+  /* Blocking someone still in this archive
+     offers to remove them (its creator only, enforced by the RPC) or to leave. */
+  useEffect(() => {
+    const afterBlock = (event: Event) => {
+      const blocked = (event as CustomEvent<{ blocked?: string }>).detail?.blocked;
+      const member = members.find((one) => one.userId === blocked && !one.isSelf);
+      if (!member || !session || !currentSpace) return;
+      const name = member.nickname || "this member";
+      const archive = currentSpace.name || "this archive";
+      void (async () => {
+        try {
+          if (
+            currentSpace.createdBy === session.userId &&
+            window.confirm(`You still share ${archive}. Remove ${name} from it?`)
+          ) {
+            await removeBlockedMember(session.archiveId, member.userId);
+            refreshRemote();
+          } else if (window.confirm(`You still share ${archive}. Leave it?`)) {
+            await handleLeaveArchive();
+          }
+        } catch (reason) {
+          window.alert(reason instanceof Error ? reason.message : "Could not complete");
+        }
+      })();
+    };
+    window.addEventListener("napp:safety-change", afterBlock);
+    return () => window.removeEventListener("napp:safety-change", afterBlock);
+  }, [members, session, currentSpace, handleLeaveArchive, refreshRemote]);
+
      before anything is removed. Another archive than this one goes without
      the window moving. */
   const handleDeleteArchive = useCallback(

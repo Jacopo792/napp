@@ -11,7 +11,7 @@ export const REPORT_REASONS = [
 ] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number]["value"];
 export const BLOCK_CONSEQUENCES =
-  "Blocking stops direct invitations and hides notes and comments between you. Documents owned by other members and existing shared-archive memberships remain. Report abuse in those documents so it can be reviewed.";
+  "You'll stop seeing each other's notes, comments, messages and presence, and they can't invite you. Notes by other members stay visible to both of you while you share an archive.";
 
 export async function reportSafetyIssue(input: {
   reason: ReportReason;
@@ -52,8 +52,27 @@ export async function loadBlockedUsers(): Promise<BlockedUser[]> {
 export async function blockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc("block_user", { target_user_id: userId });
   if (error) throw new Error("Could not block this account. Please try again.");
+  hidden.add(userId);
 }
 export async function unblockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc("unblock_user", { target_user_id: userId });
   if (error) throw new Error("Could not unblock this account. Please try again.");
+  hidden.delete(userId);
+}
+
+/* People on the other side of a block, either way. Presence and carets in
+   notes other members wrote drop them. Ids only, refreshed on each note open. */
+let hidden = new Set<string>();
+export const isHiddenPerson = (userId: string) => hidden.has(userId);
+export async function refreshHiddenPeople(): Promise<void> {
+  const { data, error } = await supabase.rpc("hidden_people");
+  if (!error && Array.isArray(data)) hidden = new Set(data as string[]);
+}
+/** Only for an archive the caller created, and only someone they blocked. */
+export async function removeBlockedMember(archiveId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc("remove_blocked_member", {
+    target_archive_id: archiveId,
+    target_user_id: userId,
+  });
+  if (error) throw new Error("Could not remove them from this archive. Please try again.");
 }
