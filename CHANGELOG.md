@@ -3,6 +3,33 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 1.0.0 – 2026-11-22
+
+### Added
+
+- Settings › Account brings together plan and trial status, sign-in details,
+  policy links and account deletion.
+- Free and Plus entitlements for group size, books, version history and Storage.
+  The release adds Stripe checkout, billing portal and webhook support.
+- New personal groups begin with an editable welcome note.
+- Public illegal-content notices and an operator contact page. Reporting and
+  blocking now reach shared notes, conversations and live presence.
+
+### Changed
+
+- Narrow editor panes keep the writing controls on one row at smaller widths.
+  Notes switch with a short fade and detail sheets follow the window appearance.
+- Newly uploaded attachments carry their source note. Shared file access and
+  extracted PDF text follow the source note's permissions. Browser file
+  previews are limited to PDFs.
+- Future releases of the public code use FSL-1.1-ALv2. Earlier releases retain
+  their original licenses.
+
+### Fixed
+
+- Undo and redo work after reopening a drawing on a note page. Removing the last
+  stroke also clears its thumbnail in the note list.
+
 ## 0.9.81 – 2026-11-22
 
 ### Added
