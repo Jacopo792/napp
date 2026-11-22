@@ -1,6 +1,8 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await dismissWorkspaceHints(page);
   await page.addInitScript(() => {
     localStorage.setItem(
       "napp:appearance:v1",
@@ -12,7 +14,6 @@ test.beforeEach(async ({ page }) => {
         wallpaper: false,
       }),
     );
-    localStorage.setItem("napp:spotlight-learned", "1");
   });
 });
 
@@ -20,9 +21,6 @@ test("chat keeps sent messages, receives replies, and edits without losing the c
   page,
 }, testInfo) => {
   await page.goto("/notes");
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
   await page.locator("button[aria-label=Chat]").click();
   const chat = page.getByRole("complementary", { name: "Chat about this note" });
   await chat
@@ -77,6 +75,7 @@ test("chat keeps sent messages, receives replies, and edits without losing the c
 
 test("chat settings keep animal bubbles and quick reactions usable", async ({ page }, testInfo) => {
   await page.goto("/notes");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   const settings = page.locator(".settings-panel");
   await settings.getByRole("button", { name: "Chat", exact: true }).click();
   for (const name of ["Bunny", "Bear"]) {
@@ -98,9 +97,6 @@ test("chat settings keep animal bubbles and quick reactions usable", async ({ pa
 
 test("note details open from the row and return to the workspace", async ({ page }, testInfo) => {
   await page.goto("/notes");
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
   await page.locator("[data-note-row]").first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Note info", exact: true }).click();
   const sheet = page.locator(".sheet");
@@ -114,10 +110,9 @@ test("the rail's chat offers the general chat, kept apart from the notes' chats"
   page,
 }) => {
   await page.goto("/notes");
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
-  await page.locator(".sidebar-rail-places button[aria-haspopup=menu]").click();
+  const rail = page.locator(".sidebar-rail-places button[aria-haspopup=menu]");
+  await expect(rail).toHaveAccessibleName(/unread/);
+  await rail.click();
   /* The preview's general chat starts with unread messages: "(n)". */
   await page.getByRole("menuitem", { name: /^General chat \(\d+\)$/ }).click();
   const general = page.getByRole("dialog", { name: "General chat", exact: true });

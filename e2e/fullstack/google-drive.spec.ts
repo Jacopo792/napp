@@ -48,6 +48,7 @@ test("Drive imports into the chosen folder and shares collaborative notes and pr
       .from("notes")
       .select("id, title, folder_id, content")
       .eq("archive_id", owner.archiveId)
+      .neq("id", owner.archiveId) // the welcome note
       .order("title");
     expect(saved.error).toBeNull();
     expect(saved.data?.map(({ title, folder_id }) => [title, folder_id])).toEqual([

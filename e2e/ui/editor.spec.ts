@@ -1,11 +1,9 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
+  await dismissWorkspaceHints(page);
   await page.goto("/notes");
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
   await page.getByRole("button", { name: "New note", exact: true }).first().click();
   await expect(page.getByRole("textbox", { name: "Note title", exact: true })).toBeFocused();
 });

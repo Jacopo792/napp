@@ -1,3 +1,4 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { test, expect, seedNote, invite, showMemberNotes, type Account } from "./fixture.ts";
 
 async function exists(admin: { from: Account["client"]["from"] }, archiveId: string) {
@@ -16,8 +17,7 @@ test("signing in through an invitation opens the shared archive and drops the em
   const token = await invite(owner, member);
   const memberDefault = member.archiveId;
 
-  // As in `login()`: the first-launch ⌘K lesson is not what this tests.
-  await page.context().addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
+  await dismissWorkspaceHints(page);
   await page.goto(`/?invite=${encodeURIComponent(token)}`);
   await page.getByLabel("Email", { exact: true }).fill(member.email);
   await page.getByLabel("Password", { exact: true }).fill(member.password);
@@ -30,12 +30,9 @@ test("signing in through an invitation opens the shared archive and drops the em
     await page.getByRole("button", { name: "Agree and continue" }).click();
   }
   await expect(opened).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Choose an archive" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Choose a group" })).toHaveCount(0);
   const session = await page.evaluate(() => localStorage.getItem("napp:archive-session"));
   expect(JSON.parse(session!).archiveId).toBe(owner.archiveId);
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
   await showMemberNotes(page, owner);
   await expect(page.locator(`[data-note-row="${id}"]`)).toHaveCount(1);
 
@@ -73,4 +70,30 @@ test("redeeming keeps every default archive that holds anything, or is the share
   expect(joined.error).toBeNull();
   expect(await exists(accounts.admin, sharedDefault.archiveId)).toBe(true);
   expect(await exists(accounts.admin, third.archiveId)).toBe(false);
+});
+
+test("a new archive opens with its welcome note, which only an edit makes worth keeping", async ({
+  accounts,
+}) => {
+  const owner = await accounts.create("welcome-owner");
+  const member = await accounts.create("welcome-editor");
+  const welcome = await member.client
+    .from("notes")
+    .select("title, version")
+    .eq("id", member.archiveId)
+    .single();
+  expect(welcome.error).toBeNull();
+  expect(welcome.data).toEqual({ title: "Welcome to Napp", version: 1 });
+
+  // Written once, as the document server does on the first real edit.
+  const edited = await accounts.admin
+    .from("notes")
+    .update({ version: 2 })
+    .eq("id", member.archiveId);
+  expect(edited.error).toBeNull();
+
+  const token = await invite(owner, member);
+  const claimed = await member.client.rpc("claim_archive_invite", { token });
+  expect(claimed.error).toBeNull();
+  expect(await exists(accounts.admin, member.archiveId)).toBe(true);
 });

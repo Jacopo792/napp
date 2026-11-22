@@ -1,3 +1,4 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { expect, test } from "@playwright/test";
 import { mockGoogleDrive } from "../googleDriveFixture.ts";
 
@@ -6,11 +7,8 @@ test("Drive imports editable notes and PDF attachments, and reports skipped file
 }) => {
   const downloads = await mockGoogleDrive(page);
 
-  await page.addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
+  await dismissWorkspaceHints(page);
   await page.goto("/notes");
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
   await page
     .getByRole("navigation", { name: "Folders" })
     .getByRole("button", { name: /^Studio / })
@@ -22,7 +20,7 @@ test("Drive imports editable notes and PDF attachments, and reports skipped file
   await page.getByText("Import from Google Drive", { exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Import from Google Drive" });
-  await expect(dialog.getByText("Preview archive / Your notes / Studio")).toBeVisible();
+  await expect(dialog.getByText("Preview group / Your notes / Studio")).toBeVisible();
   await dialog.getByRole("button", { name: "Choose files" }).click();
   await expect(
     dialog.getByText("Members with access to these copies: you, Partner."),
