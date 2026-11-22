@@ -1,3 +1,4 @@
+import { contentSecurityPolicy } from "../../scripts/contentSecurityPolicy";
 import { ocrAssets } from "../../scripts/ocrAssets";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
@@ -25,6 +26,12 @@ export default defineConfig(({ mode }) => {
     base: env.VITE_BASE_PATH ?? "/",
     envDir: root,
     build: { chunkSizeWarningLimit: 1400 },
-    plugins: [ocrAssets(), react(), tailwindcss(), tsConfigPaths({ root })],
+    plugins: [
+      ocrAssets(),
+      react(),
+      tailwindcss(),
+      tsConfigPaths({ root }),
+      contentSecurityPolicy(env, true),
+    ],
   };
 });

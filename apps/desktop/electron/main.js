@@ -39,6 +39,9 @@ const {
   opensInViewer,
 } = require("./security");
 const path = require("node:path");
+const { execFile } = require("node:child_process");
+const { promisify } = require("node:util");
+const exec = promisify(execFile);
 const { pathToFileURL } = require("node:url");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
@@ -467,6 +470,23 @@ handle("napp:open", async (_event, name, data) => {
   if (!opensInViewer(filename)) {
     shell.showItemInFolder(file);
     return null;
+  }
+  if (/\.(docx|xlsx|pptx)$/i.test(filename)) {
+    try {
+      if (process.platform === "darwin") {
+        const downloadedAt = Math.floor(Date.now() / 1000).toString(16);
+        await exec("/usr/bin/xattr", [
+          "-w",
+          "com.apple.quarantine",
+          `0081;${downloadedAt};Napp;`,
+          file,
+        ]);
+      } else if (process.platform === "win32") {
+        await fs.writeFile(`${file}:Zone.Identifier`, "[ZoneTransfer]\r\nZoneId=3\r\n");
+      }
+    } catch {
+      return "Napp could not mark this document as downloaded.";
+    }
   }
   const failure = await shell.openPath(file);
   return failure || null;

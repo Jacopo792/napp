@@ -56,9 +56,8 @@ function safeFileName(value) {
   return name;
 }
 
-/* The file is written without the mark a browser download carries, so neither
-   Gatekeeper nor Office's Protected View inspects it. Script-capable kinds stay
-   out: SVG opens in a browser, and legacy Office files carry macros. */
+/* The IPC handler marks modern Office documents before opening them.
+   SVG opens in a browser, and legacy Office files can carry macros. */
 const OPENS_IN_A_VIEWER = new Set(
   (
     "pdf txt md csv rtf png jpg jpeg gif webp heic bmp tiff " +
