@@ -504,27 +504,6 @@ export function turnView(apply: () => void) {
   });
 }
 
-/* ── Which way a note came from ─────────────────────────────────────────────
-   Opening the next note down the list is moving down a long page, so the new
-   note rises into place and the old one leaves upward; the note above comes
-   the other way. Set on the root, where the page's entrance and the view
-   transition's exit both read it. Opened from anything that is not a row —
-   a link, ⌘K, a reload — there is no direction and the note only fades. */
-export function aimNote(fromId: string | null, toId: string) {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  const row = (id: string | null) =>
-    id ? document.querySelector(`[data-note-row="${CSS.escape(id)}"]`) : null;
-  const from = row(fromId);
-  const to = row(toId);
-  if (!from || !to || from === to) {
-    delete root.dataset.noteDirection;
-    return;
-  }
-  root.dataset.noteDirection =
-    to.getBoundingClientRect().top > from.getBoundingClientRect().top ? "down" : "up";
-}
-
 /* ── A wheel that rolls ─────────────────────────────────────────────────────
    A mouse wheel moves the page in notches, and a notch delivered as one jump
    of a hundred pixels is a page that teleports: the eye loses the line it was

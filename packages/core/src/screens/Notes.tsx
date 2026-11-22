@@ -102,7 +102,7 @@ import { forgetStoredImage, useIsCompact, useWindowWidth } from "@/lib/media";
 import { readableMedia } from "@/lib/mediaTextShape";
 import type { MenuItem } from "@/lib/menuShape";
 import { MetaQueue, keepLockedNotes, noteMoves } from "@/lib/metaQueue";
-import { aimNote, captureRows, markPinned, sendNotes, settleBack, turnView } from "@/lib/motion";
+import { captureRows, markPinned, sendNotes, settleBack, turnView } from "@/lib/motion";
 import { COVER_PRESETS } from "@/lib/pageProperties";
 import { LIST_DEFAULT, LIST_MIN, SIDEBAR_DEFAULT, SIDEBAR_MIN } from "@/lib/paneLayout";
 import { ALL, ARCHIVE, REMARKS, TRASH, UNFILED } from "@/lib/scopes";
@@ -2368,19 +2368,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         !root.classList.contains("is-sliding-navigation")
       ) {
         root.classList.add("is-opening-note");
-        const from = selectedIdRef.current;
-        /* Aimed inside the callback: by then the old page is already a
-           picture, so the direction never restarts its entrance. */
         document
-          .startViewTransition(() =>
-            flushSync(() => {
-              aimNote(from, id);
-              setSelectedId(id);
-            }),
-          )
+          .startViewTransition(() => flushSync(() => setSelectedId(id)))
           .finished.finally(() => root.classList.remove("is-opening-note"));
       } else {
-        aimNote(selectedIdRef.current, id);
         setSelectedId(id);
       }
       /* Opening the note *is* having read what was said on it — a remark

@@ -82,7 +82,13 @@ export function SheetStack({
 
   useLayoutEffect(() => {
     if (still()) return;
-    const fade = backdrop.current?.animate([{ opacity: 0 }, { opacity: 1 }], OPEN);
+    /* The scrim fades, not the backdrop: an ancestor below full opacity is a
+       backdrop root, and the sheet's glass would blur nothing until the fade
+       ended, then snap on. */
+    const fade = backdrop.current?.animate([{ opacity: 0 }, { opacity: 1 }], {
+      ...OPEN,
+      pseudoElement: "::before",
+    });
     return () => fade?.cancel();
   }, []);
 
@@ -180,7 +186,12 @@ export function Sheet({
       if (!sheet || !flight.current || still()) return done();
       const options = { ...CLOSE, fill: "forwards" as const };
       const finished = [
-        whole ? backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], options) : undefined,
+        whole
+          ? backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
+              ...options,
+              pseudoElement: "::before",
+            })
+          : undefined,
         sheet.animate([...flight.current].reverse(), options),
       ].map((animation) => animation?.finished);
       /* A hidden window runs no animations and so finishes none; the sheet
