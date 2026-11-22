@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 
 export const REPORT_REASONS = [
+  { value: "child_safety", label: "Child sexual abuse or exploitation" },
   { value: "harassment", label: "Harassment or bullying" },
   { value: "sexual_content", label: "Sexual or exploitative content" },
   { value: "hate", label: "Hateful content" },
@@ -20,6 +21,7 @@ export async function reportSafetyIssue(input: {
   commentId?: string;
   /** A message in the archive's general chat. */
   messageId?: string;
+  stickerId?: string;
   details?: string;
 }): Promise<string> {
   const { data, error } = await supabase.rpc("report_safety_issue", {
@@ -31,6 +33,7 @@ export async function reportSafetyIssue(input: {
     /* Sent only when set, so a report still reaches a database that has not
        had the general chat's safety migration. */
     ...(input.messageId ? { target_message_id: input.messageId } : {}),
+    ...(input.stickerId ? { target_sticker_id: input.stickerId } : {}),
   });
   if (error || typeof data !== "string")
     throw new Error("Could not submit this report. Please try again or contact support.");

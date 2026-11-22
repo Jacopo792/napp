@@ -1,8 +1,10 @@
+import { PublicSafetyNotice } from "@/components/PublicSafetyNotice";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import {
   deletionUrl,
   NAPP_CONTROLLER,
   NAPP_SUPPORT_EMAIL,
+  NAPP_SAFETY_EMAIL,
   POLICY_VERSION,
   PRIVACY_SECTIONS,
   TERMS_SECTIONS,
@@ -11,6 +13,34 @@ import "@/components/accountDeletion.css";
 
 export default function Policy() {
   const kind = new URLSearchParams(window.location.search).get("page");
+  if (kind === "notice" || kind === "contact") {
+    return (
+      <main className="account-deletion-page" style={{ alignContent: "start" }}>
+        <article style={{ maxWidth: "42rem", display: "grid", gap: "1.5rem" }}>
+          {kind === "notice" ? (
+            <>
+              <h1>Report illegal content</h1>
+              <PublicSafetyNotice />
+            </>
+          ) : (
+            <>
+              <h1>Digital Services Act contact</h1>
+              <p>
+                Contact {NAPP_CONTROLLER} at{" "}
+                <a href={`mailto:${NAPP_SUPPORT_EMAIL}`}>{NAPP_SUPPORT_EMAIL}</a>.
+              </p>
+              <p>Users and authorities can write in English or Italian.</p>
+              <p>
+                For safety reports, use{" "}
+                <a href={`mailto:${NAPP_SAFETY_EMAIL}`}>{NAPP_SAFETY_EMAIL}</a>.
+              </p>
+            </>
+          )}
+          <PolicyLinks />
+        </article>
+      </main>
+    );
+  }
   const sections = kind === "privacy" ? PRIVACY_SECTIONS : kind === "terms" ? TERMS_SECTIONS : [];
   return (
     <main className="account-deletion-page" style={{ alignContent: "start" }}>

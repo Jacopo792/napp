@@ -22,12 +22,16 @@ export function SafetyActions({
   userId,
   commentId,
   messageId,
+  stickerId,
+  onReported,
   compact = false,
 }: {
   noteId?: string;
   userId?: string;
   commentId?: string;
   messageId?: string;
+  stickerId?: string;
+  onReported?: () => void;
   compact?: boolean;
 }) {
   const [reason, setReason] = useState<ReportReason>("harassment");
@@ -40,9 +44,10 @@ export function SafetyActions({
     setBusy(true);
     setError("");
     try {
-      await reportSafetyIssue({ noteId, userId, commentId, messageId, reason, details });
+      await reportSafetyIssue({ noteId, userId, commentId, messageId, stickerId, reason, details });
       setStatus("Report submitted for review.");
       changed();
+      onReported?.();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not submit report");
     } finally {
@@ -54,7 +59,16 @@ export function SafetyActions({
       {!compact && <h3>Safety</h3>}
       <details>
         <summary className="sheet-row press">
-          Report {messageId ? "message" : commentId ? "comment" : noteId ? "note" : "user"}
+          Report{" "}
+          {stickerId
+            ? "sticker"
+            : messageId
+              ? "message"
+              : commentId
+                ? "comment"
+                : noteId
+                  ? "note"
+                  : "user"}
         </summary>
         <form className="account-deletion" onSubmit={(event) => void report(event)}>
           <label>
@@ -82,7 +96,7 @@ export function SafetyActions({
           </label>
           <p>
             The developer can review the reported content.{" "}
-            {noteId ? "The note is hidden from you while the report is pending." : ""}
+            {noteId && !commentId ? "The note is hidden from you while the report is pending." : ""}
           </p>
           <button type="submit" disabled={busy}>
             {busy ? "Sending…" : "Submit report"}

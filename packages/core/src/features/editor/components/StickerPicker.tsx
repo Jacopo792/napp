@@ -8,7 +8,16 @@
  * out: Favorites, Trending, then a word per mood with its first GIF as the
  * cover. Anything can be starred; the stars are the account's. */
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ChevronLeft, Plus, Search, Star, StarFilled, TrendingUp, X } from "@/components/icons";
+import {
+  ChevronLeft,
+  Flag,
+  Plus,
+  Search,
+  Star,
+  StarFilled,
+  TrendingUp,
+  X,
+} from "@/components/icons";
 import {
   chatMediaUrls,
   giphyCategories,
@@ -16,6 +25,7 @@ import {
   searchGiphy,
   type GiphyItem,
 } from "@/lib/comments";
+import { SafetyActions } from "@/components/SafetyActions";
 import type { AppSession } from "@/lib/session";
 import {
   addPackSticker,
@@ -124,11 +134,13 @@ function Slot({
   className,
   children,
   onRemove,
+  onReport,
 }: {
   favorite: ChatFavorite;
   className: string;
   children: ReactNode;
   onRemove?: () => void;
+  onReport?: () => void;
 }) {
   const [starred, toggle] = useStar(favorite);
   return (
@@ -144,6 +156,17 @@ function Slot({
       >
         {starred ? <StarFilled size={13} /> : <Star size={13} />}
       </button>
+      {onReport && (
+        <button
+          type="button"
+          className="pick-remove press"
+          aria-label="Report sticker"
+          title="Report sticker"
+          onClick={onReport}
+        >
+          <Flag size={12} />
+        </button>
+      )}
       {onRemove && (
         <button
           type="button"
@@ -216,18 +239,21 @@ function PackCell({
   mine,
   onPick,
   onRemove,
+  onReport,
 }: {
   sticker: PackSticker;
   url: string | undefined;
   mine: boolean;
   onPick: (pick: StickerPick) => void;
   onRemove?: () => void;
+  onReport?: () => void;
 }) {
   return (
     <Slot
       favorite={{ pack: "own", sticker: sticker.id }}
       className="is-cell"
       onRemove={mine ? onRemove : undefined}
+      onReport={mine ? undefined : onReport}
     >
       <button
         type="button"
@@ -525,6 +551,7 @@ function PackGrid({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
+  const [reporting, setReporting] = useState<string>();
 
   async function add(files: FileList | null) {
     if (!files?.length) return;
@@ -547,6 +574,11 @@ function PackGrid({
 
   return (
     <div className="sticker-grid">
+      {reporting && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <SafetyActions key={reporting} stickerId={reporting} compact onReported={onChanged} />
+        </div>
+      )}
       <button
         type="button"
         className="sticker-cell pack-add press"
@@ -576,6 +608,7 @@ function PackGrid({
           mine={sticker.ownerId === session.userId}
           onPick={onPick}
           onRemove={() => void removePackSticker(sticker).then(onChanged, onChanged)}
+          onReport={() => setReporting(sticker.id)}
         />
       ))}
       {failure && <p className="emoji-none pick-failure">{failure}</p>}

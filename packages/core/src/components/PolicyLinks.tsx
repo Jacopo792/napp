@@ -12,6 +12,12 @@ export function PolicyLinks() {
       <a href={policyUrl("support")} target="_blank" rel="noopener noreferrer">
         Support
       </a>
+      <a href={policyUrl("notice")} target="_blank" rel="noopener noreferrer">
+        Report illegal content
+      </a>
+      <a href={policyUrl("contact")} target="_blank" rel="noopener noreferrer">
+        DSA contact
+      </a>
     </nav>
   );
 }

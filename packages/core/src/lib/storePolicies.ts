@@ -2,12 +2,18 @@ import { platform } from "@/platform";
 
 export const POLICY_VERSION = "2026-11-16";
 export const NAPP_CONTROLLER = "Jacopo Vincenzo Ansalone";
+export const NAPP_SAFETY_EMAIL = "safety@nappnote.com";
 export const NAPP_SUPPORT_EMAIL = "support@nappnote.com";
 /** Data-protection requests, as on the landing site; an alias of support@. */
 export const NAPP_PRIVACY_EMAIL = "privacy@nappnote.com";
 
-export type PolicyKind = "privacy" | "terms" | "support";
+export type PolicyKind = "privacy" | "terms" | "support" | "notice" | "contact";
 export function policyUrl(kind: PolicyKind): string {
+  if (kind === "notice" || kind === "contact") {
+    const url = new URL(platform().webOrigin());
+    url.searchParams.set("page", kind);
+    return url.toString();
+  }
   return `https://about.nappnote.com/${kind}/`;
 }
 export function deletionUrl(): string {
@@ -43,7 +49,7 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: "Reports and safety",
-    text: "When you report content, Napp records the reason, any details you supply and a copy of the reported note or comment so the developer can review it. Reports are private and are processed to protect users and address misuse. Pending reports are kept until review; reviewed reports expire after ninety days, or earlier if the linked account or content is deleted. A confirmed content restriction may remain after its report expires. Blocking records the blocked account and display name until you unblock it or either account is deleted.",
+    text: "When you report content, Napp records the reason, any details you supply and a copy of the reported content and any referenced files so the safety team can review it. Reports are private and are processed to protect users and address misuse. Pending reports are kept until review. Reviewed reports are normally retained for 90 days or one year for child safety reports. A legal hold can extend retention. Reports and preserved evidence can survive deletion of the linked account or content. A confirmed content restriction may remain after its report expires. Blocking records the blocked account and display name until you unblock it or either account is deleted.",
   },
   {
     title: "How long it is kept",

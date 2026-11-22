@@ -77,7 +77,7 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: () =>
-    ["privacy", "terms", "support"].includes(
+    ["privacy", "terms", "support", "notice", "contact"].includes(
       new URLSearchParams(window.location.search).get("page") ?? "",
     ) ? (
       <PolicyScreen />
