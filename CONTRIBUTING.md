@@ -26,17 +26,16 @@ in the README.
 ## The loop
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:server
-pnpm build
+pnpm healthcheck
+pnpm exec playwright install chromium
+pnpm healthcheck:full
 ```
 
-The CI also runs the server against a fresh local Supabase, exercises two
-instances through Redis, and builds the Docker image. Run `pnpm healthcheck`
-before opening a pull request. Formatting is checked with Prettier;
-`pnpm format` applies it and `pnpm lint --fix` applies safe lint fixes.
+Run `pnpm healthcheck` before opening a pull request. Start a disposable Supabase
+stack and Valkey for `pnpm healthcheck:full`. CI also builds the collaboration
+image. See the
+[quality guide](docs/quality-hardening.md) for fixture setup and coverage.
+`pnpm format` applies Prettier and `pnpm lint --fix` applies lint fixes.
 
 ## Branches
 

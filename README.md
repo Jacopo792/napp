@@ -93,7 +93,7 @@ core; each client supplies the platform integration it needs.
 | `apps/web/`               | Vite browser entry point, published to GitHub Pages.                                                               |
 | `apps/desktop/`           | Electron shell, operating-system integration and macOS/Windows packaging.                                          |
 | `packages/collab-server/` | Hocuspocus server, live-document authorisation, persistence, version history and health checks.                    |
-| `supabase/`               | Database migrations, RLS policies, Storage rules and account-deletion functions.                                   |
+| `supabase/`               | Migrations, RLS policies, Storage rules, Auth email templates and Edge Functions for erasure and billing.          |
 | `e2e/`                    | Browser smoke tests and full-stack tests against disposable local data.                                            |
 | `ops/`                    | Expected collaboration-server origins checked against deployment configuration.                                    |
 
@@ -117,8 +117,6 @@ Use Node.js from [`.nvmrc`](.nvmrc) and pnpm 11 or later.
 ```bash
 cp .env.example .env.local
 pnpm install
-pnpm dev            # web
-pnpm dev:desktop    # Electron
 ```
 
 Set the public client configuration in `.env.local`:
@@ -129,6 +127,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_COLLAB_URL=ws://127.0.0.1:8080
 VITE_WEB_ORIGIN=http://localhost:5173/
 ```
+
+Run `pnpm dev` for web or `pnpm dev:desktop` for Electron. The
 
 Use a Supabase project with the repository's migrations applied, or start a local
 stack with the Supabase CLI and Docker. Run the collaboration server separately;
@@ -171,11 +171,12 @@ or persistence.
 ## Checks and tests
 
 ```bash
-pnpm healthcheck                 # format, lint, types, core/SQL tests and web build
+pnpm healthcheck                 # format, lint, types, core/SQL tests and web bundle budgets
 pnpm exec playwright install chromium
 pnpm test:e2e                    # UI smoke tests with preview data
 supabase start
 pnpm test:e2e:full               # real Auth, RLS and collaboration on local fixtures
+pnpm test:e2e:production         # workspace smoke tests against the built web bundle
 ```
 
 `pnpm test:server` runs the collaboration-server suite. Start local Supabase and
@@ -183,7 +184,7 @@ Valkey for integration coverage; `REQUIRE_INTEGRATION=1` makes missing dependenc
 fail instead of skipping those tests. The CI backend job supplies both services.
 
 CI checks formatting, types, unit and database logic, collaboration behavior,
-full-stack browser flows and web/desktop builds.
+full-stack browser flows and web and desktop builds.
 The browser suite covers persistence, access denial, invitations, offline
 reconnection, version restore, deletion and cache removal. Failures retain traces
 and screenshots. These checks establish their tested scope, rather than a
@@ -192,17 +193,33 @@ guarantee about every environment or future deployment.
 The [quality guide](docs/quality-hardening.md) records the verified scope and
 remaining release checks.
 
+## Releases and deployment
+
+Passing checks on `main` deploy that revision to Render, verify its readiness and
+WebSocket origins, then publish GitHub Pages for `nappnote.com` and the Cloudflare
+Pages mirror when its credentials are configured. Manage the existing Render
+service in its dashboard and keep `render.yaml` in sync.
+
+Desktop release tags trigger macOS and Windows builds and publish the installers
+to [GitHub Releases](https://github.com/Jacopo792/napp/releases). Version changes
+also update the in-app What's New and [CHANGELOG.md](CHANGELOG.md). Database
+migrations must precede clients that require them; destructive schema changes
+must wait until older clients no longer depend on the removed fields.
+Update the announcement version in `whatsNew.ts` and the announcement text in
+`releaseHistory.ts` when publishing a new What's New entry.
+
 ## Documentation
 
-| Guide                                | Contents                                                   |
-| ------------------------------------ | ---------------------------------------------------------- |
-| [Product](PRODUCT.md)                | Scope and behaviour.                                       |
-| [Design](DESIGN.md)                  | Interface rules and design decisions.                      |
-| [Desktop](DESKTOP.md)                | Installation and troubleshooting.                          |
-| [Repository guide](CLAUDE.md)        | Architecture, development and release conventions.         |
-| [Security](SECURITY.md)              | Access boundaries, local data and vulnerability reporting. |
-| [Quality](docs/quality-hardening.md) | Automated coverage and validation limits.                  |
-| [Changelog](CHANGELOG.md)            | Release history.                                           |
+| Guide                                    | Contents                                                   |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| [Product](PRODUCT.md)                    | Scope and behaviour.                                       |
+| [Design](DESIGN.md)                      | Interface rules and design decisions.                      |
+| [Desktop](DESKTOP.md)                    | Installation and troubleshooting.                          |
+| [Repository guide](CLAUDE.md)            | Architecture, development and release conventions.         |
+| [Security](SECURITY.md)                  | Access boundaries, local data and vulnerability reporting. |
+| [Quality](docs/quality-hardening.md)     | Automated coverage and validation limits.                  |
+| [Operations](docs/backend-operations.md) | Backend rollout, readiness and capacity checks.            |
+| [Changelog](CHANGELOG.md)                | Release history.                                           |
 
 ## Licence
 
