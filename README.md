@@ -206,5 +206,11 @@ remaining release checks.
 
 ## Licence
 
-Napp is licensed under the GNU General Public License, version 3 or later.
-See [LICENSE](LICENSE).
+Napp's source is available under the Functional Source License 1.1 with an
+Apache 2.0 future licence ([FSL-1.1-ALv2](LICENSE)): you may read, run, modify
+and share it for any purpose except offering a competing product or service.
+Each version becomes Apache 2.0 two years after its release. Versions released
+before this change remain under the GPL, version 3 or later.
+
+The Napp name and logo are not licensed with the code; see
+[TRADEMARK.md](TRADEMARK.md).
