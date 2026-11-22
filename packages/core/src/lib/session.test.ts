@@ -331,3 +331,14 @@ test("a spent signup code that cannot open the account sends the person to sign 
   assert.ok(flow.calls.some((call) => call.name === "sign-out"));
   assert.equal(flow.storage.has("session"), false);
 });
+
+test("an invitation refused after the code is spent still says the email is confirmed", async () => {
+  const flow = accountFlow({ invited: true, claimError: "Invitation is invalid or expired" });
+  await assert.rejects(
+    flow.api.confirmRegistration(user.email, "0123 4567"),
+    (error: Error) =>
+      error instanceof flow.api.ConfirmedAddressError &&
+      /^Invitation is invalid or expired\. Your email is confirmed\. Sign in/.test(error.message),
+  );
+  assert.equal(flow.storage.has("session"), false);
+});

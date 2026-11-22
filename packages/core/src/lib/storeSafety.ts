@@ -60,9 +60,8 @@ export async function blockUser(userId: string): Promise<void> {
 export async function unblockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc("unblock_user", { target_user_id: userId });
   if (error) throw new Error("Could not unblock this account. Please try again.");
-  const next = new Set(hidden);
-  next.delete(userId);
-  publishHidden(next);
+  // They may have blocked back: only the server knows whether they stay hidden.
+  await refreshHiddenPeople();
 }
 
 /* People on the other side of a block, either way. Presence and carets in

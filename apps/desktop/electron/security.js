@@ -56,7 +56,8 @@ function safeFileName(value) {
   return name;
 }
 
-/* The IPC handler marks modern Office documents before opening them.
+/* The IPC handler marks modern Office and OpenDocument files (both can hold
+   macros) as downloaded before opening them.
    SVG opens in a browser, and legacy Office files can carry macros. */
 const OPENS_IN_A_VIEWER = new Set(
   (

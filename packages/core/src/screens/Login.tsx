@@ -6,6 +6,7 @@ import {
   chooseArchive,
   confirmRegistration,
   confirmRegistrationAddress,
+  ConfirmedAddressError,
   registerAccount,
   resendRegistrationCode,
   restoreSession,
@@ -164,6 +165,10 @@ export default function Login({
       setConfirmation("");
       finishSignIn(result);
     } catch (reason) {
+      if (reason instanceof ConfirmedAddressError) {
+        setConfirmation("");
+        switchMode("sign-in");
+      }
       setError(reason instanceof Error ? reason.message : "Could not confirm your email");
     } finally {
       setLoading(false);

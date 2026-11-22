@@ -2237,6 +2237,12 @@
   pointer-events: none;
 }
 
+/* Someone on the other side of a block: `display: inline` above would
+   otherwise beat the browser's own rule for `hidden`. */
+.collaboration-carets__caret[hidden] {
+  display: none;
+}
+
 /* Out of the flow, and resting exactly on top of the caret it names.
    `bottom: 100%` against the caret's own inline box needs no measurement and no
    em arithmetic — `top: -1.35em` would resolve that em against the *label's*

@@ -471,7 +471,7 @@ handle("napp:open", async (_event, name, data) => {
     shell.showItemInFolder(file);
     return null;
   }
-  if (/\.(docx|xlsx|pptx)$/i.test(filename)) {
+  if (/\.(docx|xlsx|pptx|odt|ods|odp)$/i.test(filename)) {
     try {
       if (process.platform === "darwin") {
         const downloadedAt = Math.floor(Date.now() / 1000).toString(16);

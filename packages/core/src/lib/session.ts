@@ -382,6 +382,10 @@ export async function confirmRegistration(
 /** The code is single-use: once it is spent, a failure to open the account
  *  must not leave the person retrying it. The address is confirmed, so they
  *  sign in instead, from a clean local session. */
+/** The signup code is spent and the address confirmed, but the account did
+    not open here: the person continues from sign-in, not from the code form. */
+export class ConfirmedAddressError extends Error {}
+
 async function openConfirmedAccount(
   open: () => Promise<AuthenticationResult>,
 ): Promise<AuthenticationResult> {
@@ -391,9 +395,11 @@ async function openConfirmedAccount(
     localStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
     await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-    if (reason instanceof Error && reason.message.toLowerCase().includes("invitation"))
-      throw reason;
-    throw new Error("Your email is confirmed. Sign in to continue.");
+    const invitation =
+      reason instanceof Error && reason.message.toLowerCase().includes("invitation")
+        ? `${reason.message.replace(/\.?$/, ".")} `
+        : "";
+    throw new ConfirmedAddressError(`${invitation}Your email is confirmed. Sign in to continue.`);
   }
 }
 
