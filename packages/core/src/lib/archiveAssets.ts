@@ -9,10 +9,11 @@ export async function uploadObject(
   objectId: string,
   blob: Blob,
 ): Promise<void> {
+  if (!blob.type) throw new Error("This file has no supported media type");
   const result = await supabase.storage
     .from(OBJECT_BUCKET)
     .upload(`${session.archiveId}/${objectId}`, blob, {
-      contentType: blob.type || "application/octet-stream",
+      contentType: blob.type,
       upsert: false,
     });
   fail(result.error);

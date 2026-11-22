@@ -1118,7 +1118,7 @@ describe("the collaboration server", { skip }, () => {
     const images = owner.client.storage.from("note-images");
     const media = owner.client.storage.from("chat-media");
     const retained = await images.upload(source, original, {
-      contentType: "application/octet-stream",
+      contentType: "image/png",
     });
     assert.equal(retained.error, null, retained.error?.message);
 

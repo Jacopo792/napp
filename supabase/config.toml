@@ -450,3 +450,7 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Invoked by pg_net. The function accepts only the service-role bearer.
+[functions.safety-worker]
+verify_jwt = false

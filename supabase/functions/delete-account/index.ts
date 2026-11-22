@@ -28,10 +28,13 @@ function checked<T>(result: { data: T; error: unknown }): T {
   return result.data;
 }
 const backend: ErasureBackend = {
-  listObjects: async (userId) =>
-    checked(
+  listObjects: async (userId) => {
+    if (checked(await admin.rpc("account_erasure_held", { target_user_id: userId })))
+      throw new Error("Account erasure is on hold");
+    return checked(
       await admin.rpc("account_erasure_objects", { target_user_id: userId }),
-    ) as ErasureObject[],
+    ) as ErasureObject[];
+  },
   remove: async (bucket, paths) => {
     checked(await admin.storage.from(bucket).remove(paths));
   },
@@ -41,6 +44,7 @@ const backend: ErasureBackend = {
     );
   },
   finish: async (userId) => {
+    if (checked(await admin.rpc("account_erasure_held", { target_user_id: userId }))) return false;
     const account = checked(
       await admin
         .from("stripe_billing_accounts")
@@ -132,6 +136,9 @@ Deno.serve(async (request) => {
     const signed = await reauth.auth.signInWithPassword({
       email: verified.data.user.email,
       password: body.password as string,
+      options: {
+        captchaToken: typeof body.captcha_token === "string" ? body.captcha_token : undefined,
+      },
     });
     if (signed.error || signed.data.user?.id !== verified.data.user.id)
       return response(403, { error: "The password is incorrect" });
@@ -142,18 +149,25 @@ Deno.serve(async (request) => {
 
   let token: string;
   try {
+    if (
+      checked(await admin.rpc("account_erasure_held", { target_user_id: verified.data.user.id }))
+    ) {
+      return response(423, { error: "Account deletion is on hold. Contact support." });
+    }
     checked(
       await admin.rpc("configure_account_erasure_worker", {
         endpoint: `${url}/functions/v1/delete-account`,
         worker_key: serviceKey,
       }),
     );
-    token = checked(
-      await admin.rpc("begin_account_erasure", {
-        target_user_id: verified.data.user.id,
-        request_token: body.request_token,
-      }),
-    ) as string;
+    const started = await admin.rpc("begin_account_erasure", {
+      target_user_id: verified.data.user.id,
+      request_token: body.request_token,
+    });
+    if (started.error?.code === "PT423") {
+      return response(423, { error: "Account deletion is on hold. Contact support." });
+    }
+    token = checked(started) as string;
   } catch {
     return response(503, { error: "Could not start deletion. Please try again." });
   }

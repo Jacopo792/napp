@@ -1358,7 +1358,10 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before attaching a file");
       const objectId = crypto.randomUUID();
-      const normalizedType = file.type || attachmentType(file.name);
+      const normalizedType =
+        !file.type || file.type === "application/octet-stream"
+          ? attachmentType(file.name)
+          : file.type;
       // Supabase storage validates against the bucket's allowlist, which is
       // extension-based; a browser that reports `video/mov` or an empty string
       // would otherwise be rejected even though the file is a supported MOV.
