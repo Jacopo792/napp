@@ -7,6 +7,7 @@
     "dev": "pnpm --filter @notes-app/web dev",
     "dev:desktop": "pnpm --filter @notes-app/desktop dev",
     "build": "pnpm --filter @notes-app/web build",
+    "build:check": "pnpm --filter @notes-app/web exec vite build --manifest && node scripts/verify-web-bundle.mjs",
     "build:desktop": "pnpm --filter @notes-app/desktop build",
     "build:desktop:mac": "pnpm --filter @notes-app/desktop build:mac",
     "build:desktop:win": "pnpm --filter @notes-app/desktop build:win",
@@ -27,10 +28,11 @@
     "add:member": "node --experimental-strip-types scripts/add-archive-member.mjs",
     "verify:supabase": "node --experimental-strip-types scripts/verify-supabase.mjs",
     "verify:supabase:local": "node --experimental-strip-types scripts/verify-supabase-local.mjs",
-    "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/napp/ pnpm build && git diff --check",
-    "healthcheck:full": "pnpm healthcheck && REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server && pnpm verify:supabase:local",
+    "healthcheck": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && VITE_BASE_PATH=/napp/ pnpm build:check && git diff --check",
+    "healthcheck:full": "pnpm healthcheck && REQUIRE_INTEGRATION=1 REDIS_URL=redis://127.0.0.1:6380 pnpm test:server && pnpm verify:supabase:local && pnpm test:e2e && pnpm test:e2e:full && pnpm test:e2e:production",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:full": "NAPP_E2E_FULLSTACK=1 playwright test -c e2e/playwright.config.ts",
+    "test:e2e:production": "NAPP_E2E_PRODUCTION=1 playwright test -c e2e/playwright.config.ts",
     "verify:deployment": "node packages/collab-server/check-deployment.ts"
   },
   "devDependencies": {

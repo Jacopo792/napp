@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
-const { stdout } = await exec("supabase", ["status", "-o", "env"], { cwd: process.cwd() });
+const { stdout } = await exec("supabase", ["status", "-o", "env"], { timeout: 20_000 });
 const values = Object.fromEntries(
   stdout
     .split(/\r?\n/)
@@ -19,8 +19,11 @@ const url = values.API_URL;
 const key = values.PUBLISHABLE_KEY ?? values.ANON_KEY;
 const service = values.SERVICE_ROLE_KEY;
 if (!url || !key || !service) throw new Error("Local Supabase is not running");
-const host = new URL(url).hostname;
-if (!["localhost", "127.0.0.1", "::1"].includes(host)) {
+const endpoint = new URL(url);
+if (
+  endpoint.protocol !== "http:" ||
+  !["localhost", "127.0.0.1", "[::1]"].includes(endpoint.hostname)
+) {
   throw new Error("verify:supabase:local only accepts a localhost Supabase stack");
 }
 
@@ -40,15 +43,17 @@ async function asMember(account) {
   const client = createClient(url, key, { auth: { persistSession: false } });
   const signedIn = await client.auth.signInWithPassword(account);
   if (signedIn.error) throw new Error(`${account.email}: ${signedIn.error.message}`);
-  await client.from("profiles").insert({
+  const profile = await client.from("profiles").insert({
     user_id: signedIn.data.user.id,
     nickname: account.email.split("@")[0],
   });
+  if (profile.error) throw new Error(`fixture profile: ${profile.error.message}`);
   return client;
 }
 
 const one = await member("one");
 const two = await member("two");
+const outsider = await member("outsider");
 const firstClient = await asMember(one);
 const secondClient = await asMember(two);
 const bootstrapped = await firstClient.rpc("ensure_personal_archive");
@@ -91,5 +96,7 @@ process.env.USER_ONE_EMAIL = one.email;
 process.env.USER_ONE_PASSWORD = one.password;
 process.env.USER_TWO_EMAIL = two.email;
 process.env.USER_TWO_PASSWORD = two.password;
+process.env.USER_OUTSIDER_EMAIL = outsider.email;
+process.env.USER_OUTSIDER_PASSWORD = outsider.password;
 process.env.VERIFY_SUPABASE_LOCAL = "1";
 await import("./verify-supabase.mjs");

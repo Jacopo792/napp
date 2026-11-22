@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check for critical dependency advisories
+        run: pnpm audit --audit-level critical
+
       - name: Lint
         run: pnpm lint
 
@@ -73,19 +76,19 @@ jobs:
       # without these two, by design — a bundle that silently shipped with no
       # backend would be worse than a failed build. What this step proves is
       # that the code compiles, and it has to do that for a pull request from a
-      # fork, which cannot read repository variables. The real values are set
-      # in deploy.yml, and neither of them is secret in the first place.
+      # fork, which cannot read repository variables. The deploy job sets
+      # the real values.
       # Both shells, not only the one that deploys. They share a core, and a
       # change to it that breaks the desktop renderer has to fail here rather
       # than at the next release, when nobody is looking at this change any
       # more. Electron itself is not packaged — that needs a macOS and a
       # Windows runner, and it is release.yml's job.
-      - name: Build the web app
+      - name: Build the web app and check startup bundle sizes
         env:
           VITE_SUPABASE_URL: https://checks.example.invalid
           VITE_SUPABASE_PUBLISHABLE_KEY: not-a-real-key
           VITE_COLLAB_URL: wss://checks.example.invalid
-        run: pnpm run build
+        run: pnpm build:check
 
       - name: Build the desktop renderer
         env:
@@ -200,11 +203,17 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6380
         run: pnpm test:server
 
+      - name: Verify Supabase access and Realtime
+        run: pnpm verify:supabase:local
+
       - name: Install the browser for full-stack tests
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Test real writing, invitations, permissions and reconnect
         run: pnpm test:e2e:full
+
+      - name: Smoke test the production web bundle
+        run: pnpm test:e2e:production
 
       - name: Upload full-stack failure diagnostics
         if: failure()
@@ -349,6 +358,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_BASE_PATH: /
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::warning::Cloudflare mirror skipped. Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
@@ -360,5 +371,3 @@ jobs:
           # A root 404.html disables Cloudflare Pages' SPA fallback.
           rm apps/web/dist/404.html
           pnpm dlx wrangler@4.165.0 pages deploy apps/web/dist --project-name=nappnote --branch=main
-          VITE_BASE_PATH: /
-          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}

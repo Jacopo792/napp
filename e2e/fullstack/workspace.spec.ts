@@ -9,6 +9,17 @@ import {
   showMemberNotes,
 } from "./fixture.ts";
 
+test(
+  "a signed-out visit to the workspace opens sign-in",
+  { tag: "@production-smoke" },
+  async ({ page }) => {
+    await page.goto("/notes");
+    await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+    await expect(page.getByText("Could not load your account.")).toHaveCount(0);
+  },
+);
+
 test("a slow new-note insert is committed before collaboration opens it", async ({
   page,
   accounts,
@@ -78,7 +89,7 @@ test("a slow new-note insert is committed before collaboration opens it", async 
   await expect(page.getByRole("button", { name: "Save failed", exact: true })).toHaveCount(0);
 });
 
-test("typing survives a reload and is persisted by the collaboration server", async ({
+test("typing survives a reload and is persisted by the collaboration server @production-smoke", async ({
   page,
   accounts,
 }) => {
@@ -110,7 +121,7 @@ test("typing survives a reload and is persisted by the collaboration server", as
   await expect(page.locator(".tiptap")).toContainText("Words that must survive");
 });
 
-test("an outsider cannot read another archive through UI or PostgREST", async ({
+test("an outsider cannot read another archive through UI or PostgREST @production-smoke", async ({
   page,
   accounts,
 }) => {
