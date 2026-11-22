@@ -8959,7 +8959,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
 /* Inside the glide the inset is already where it ends, so the picture taken of
    it is the finished one and nothing slides on after the panes have stopped. */
 .is-sliding-navigation[data-shell="mac"] :is(.collection-toolbar, .editor-toolbar) {
-  transition: none;
+  transition: none !important;
 }
 
 /* The compact layout is not only a phone's: a desktop window narrower than

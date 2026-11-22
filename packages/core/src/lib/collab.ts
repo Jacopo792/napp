@@ -24,11 +24,12 @@ import {
   WebSocketStatus,
   type onMessageParameters,
 } from "@hocuspocus/provider";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { BODY_FRAGMENT, collaborationColor, TITLE_TEXT } from "@/features/editor/lib/ydoc";
 import { supabase } from "./supabaseClient";
+import { hiddenPeople, refreshHiddenPeople, subscribeHiddenPeople } from "./storeSafety";
 import { accountContentRemovalInProgress, registerAccountContentCleanup } from "./accountContent";
 
 const COLLAB_URL = import.meta.env.VITE_COLLAB_URL as string;
@@ -446,6 +447,11 @@ export function useCollaborationPeers(
 ): Peer[] {
   const [peers, setPeers] = useState<Peer[]>([]);
   const joinedAt = useRef(new Map<string, string>());
+  // People on the other side of a block never appear, so wait for that list.
+  const hidden = useSyncExternalStore(subscribeHiddenPeople, hiddenPeople);
+  useEffect(() => {
+    if (provider) void refreshHiddenPeople();
+  }, [provider]);
 
   useEffect(() => {
     const awareness = provider?.awareness;
@@ -484,7 +490,10 @@ export function useCollaborationPeers(
     };
   }, [provider, selfId]);
 
-  return peers;
+  return useMemo(
+    () => (hidden ? peers.filter((peer) => !hidden.has(peer.userId)) : []),
+    [peers, hidden],
+  );
 }
 
 /** Raise and lower the writing flag on the note's own document.

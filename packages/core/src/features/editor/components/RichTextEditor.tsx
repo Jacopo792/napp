@@ -35,6 +35,7 @@ import { targetsOf } from "@/lib/references";
 import { type FocusPosition, type JSONContent } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import { isHiddenPerson } from "@/lib/storeSafety";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import { FindAndReplace } from "@tiptap/extension-find-and-replace";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -248,6 +249,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                           caret.classList.add("collaboration-carets__caret");
                           caret.style.borderColor = user.color ?? "";
                           caret.dataset.caretUser = user.userId ?? "";
+                          caret.hidden = isHiddenPerson(user.userId);
                           const label = document.createElement("div");
                           label.classList.add("collaboration-carets__label");
                           label.style.backgroundColor = user.color ?? "";
@@ -255,6 +257,13 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                           caret.append(label);
                           return caret;
                         },
+                        selectionRender: (user: { color?: string; userId?: string }) =>
+                          isHiddenPerson(user.userId)
+                            ? {}
+                            : {
+                                style: `background-color: ${user.color}70`,
+                                class: "ProseMirror-yjs-selection",
+                              },
                       }),
                     ]
                   : []),

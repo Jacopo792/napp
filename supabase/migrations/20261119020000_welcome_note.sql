@@ -115,6 +115,8 @@ begin
   if candidate is null then
     return null;
   end if;
+  -- An edit in flight waits here; one that committed first is seen below.
+  perform 1 from public.notes where archive_id = candidate for update;
 
   if exists (select 1 from public.archive_members
               where archive_id = candidate and user_id <> member_id)
@@ -126,6 +128,9 @@ begin
      or exists (select 1 from public.notes
                  where archive_id = candidate
                    and not (id = candidate and version = 1
+                            and content_version = 0
+                            and title is not distinct from 'Welcome to Napp'
+                            and body is not distinct from private.welcome_note_body()
                             and trashed_at is null and archived_at is null))
      or exists (select 1 from public.folders where archive_id = candidate)
      or exists (select 1 from public.tags where archive_id = candidate)

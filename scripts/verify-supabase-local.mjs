@@ -99,4 +99,5 @@ process.env.USER_TWO_PASSWORD = two.password;
 process.env.USER_OUTSIDER_EMAIL = outsider.email;
 process.env.USER_OUTSIDER_PASSWORD = outsider.password;
 process.env.VERIFY_SUPABASE_LOCAL = "1";
+process.env.SUPABASE_SERVICE_ROLE_KEY = service;
 await import("./verify-supabase.mjs");

@@ -20,7 +20,10 @@ stable
 set search_path = ''
 as $is_disposable$
   with host as (
-    select lower(pg_catalog.split_part(pg_catalog.btrim(address), '@', 2)) as name
+    -- `Name <box@host>` counts by its mailbox: keep the part after the last @, up to any `>`.
+    select lower(pg_catalog.btrim(pg_catalog.split_part(
+      pg_catalog.regexp_replace(address, '^.*@', ''), '>', 1))) as name
+    where pg_catalog.strpos(address, '@') > 0
   )
   select exists (
     select 1
@@ -39,8 +42,12 @@ security definer
 set search_path = ''
 as $refuse$
 begin
-  if private.is_disposable_email(coalesce(new.email, ''))
-     or private.is_disposable_email(coalesce(new.email_change, '')) then
+  -- On update only a changed address is judged, so an account on a listed
+  -- provider can still move to a permanent mailbox.
+  if (tg_op = 'INSERT' or new.email is distinct from old.email)
+       and private.is_disposable_email(coalesce(new.email, ''))
+     or (tg_op = 'INSERT' or new.email_change is distinct from old.email_change)
+       and private.is_disposable_email(coalesce(new.email_change, '')) then
     raise check_violation using message = 'Disposable email addresses are not accepted';
   end if;
   return new;

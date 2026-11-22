@@ -113,6 +113,9 @@
   border-color: var(--rule);
   background: var(--surface);
 }
+.account-card .account-deletion input:not([type="checkbox"]):focus-visible {
+  border-color: var(--ink-4);
+}
 .account-card .account-deletion button.account-card-primary {
   border-color: var(--accent);
   background: var(--accent);
@@ -121,13 +124,13 @@
 
 /* The deletion page itself: one narrow column, the consequences set apart in
    the danger tone, fields on paper, and a single filled danger action. */
-.account-deletion-page:has(> .is-erase) {
+.account-deletion-page:has(.is-erase) {
   justify-items: center;
 }
-.account-deletion-page:has(> .is-erase) > * {
+.account-deletion-page:has(.is-erase) > * {
   width: min(100%, 27rem);
 }
-.account-deletion-page:has(> .is-erase) h1 {
+.account-deletion-page:has(.is-erase) h1 {
   margin: 0;
   font-size: clamp(1.75rem, 4vw, 2.25rem);
   font-weight: var(--weight-bold);

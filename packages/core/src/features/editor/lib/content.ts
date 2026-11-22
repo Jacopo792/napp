@@ -382,6 +382,9 @@ export function strokePoints(d: string): { x: number; y: number }[] {
  *  line stayed, and went on standing as the note's thumbnail after everything
  *  around it was rubbed out. */
 export function strokeDistance(d: string, point: { x: number; y: number }): number {
+  // Each `M` starts a subpath: the gap between two is never drawn.
+  const subpaths = d.split(/(?=M)/).filter(Boolean);
+  if (subpaths.length > 1) return Math.min(...subpaths.map((part) => strokeDistance(part, point)));
   const points = strokePoints(d);
   let nearest = Infinity;
   points.forEach((a, index) => {

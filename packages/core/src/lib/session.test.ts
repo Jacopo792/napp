@@ -322,3 +322,11 @@ test("a disposable address is refused before an account is created", async () =>
   );
   assert.equal(flow.signUpCalls.length, 0);
 });
+
+test("a spent signup code that cannot open the account sends the person to sign in", async () => {
+  const flow = accountFlow({ switchStatus: 503 });
+  const activate = await flow.api.prepareRegistrationConfirmation(user.email, "0123 4567");
+  await assert.rejects(activate(), /email is confirmed\. Sign in/);
+  assert.ok(flow.calls.some((call) => call.name === "sign-out"));
+  assert.equal(flow.storage.has("session"), false);
+});

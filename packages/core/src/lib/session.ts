@@ -218,7 +218,7 @@ export async function requestEmailChange(current: string, next: string): Promise
 export async function checkCredentials(email: string, password: string): Promise<void> {
   const client = createEphemeralClient();
   const { error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error("Email or password is incorrect");
+  if (error) throw signInFailure(error);
   await client.auth.signOut({ scope: "local" });
 }
 
@@ -232,8 +232,10 @@ export async function changePassword(email: string, current: string, next: strin
     throw new Error("Sign in to change your password");
   try {
     await checkCredentials(email, current);
-  } catch {
-    throw new Error("Your current password is incorrect");
+  } catch (reason) {
+    if (reason instanceof Error && reason.message === "Email or password is incorrect")
+      throw new Error("Your current password is incorrect");
+    throw reason;
   }
   const {
     data: { session: active },
@@ -320,7 +322,27 @@ export async function confirmRegistration(
   code: string,
 ): Promise<AuthenticationResult> {
   const { user } = await verifyRegistrationCode(supabase.auth, email, code);
-  return openAccount(user.id, user.email ?? email, platform().inviteToken());
+  return openConfirmedAccount(() =>
+    openAccount(user.id, user.email ?? email, platform().inviteToken()),
+  );
+}
+
+/** The code is single-use: once it is spent, a failure to open the account
+ *  must not leave the person retrying it. The address is confirmed, so they
+ *  sign in instead, from a clean local session. */
+async function openConfirmedAccount(
+  open: () => Promise<AuthenticationResult>,
+): Promise<AuthenticationResult> {
+  try {
+    return await open();
+  } catch (reason) {
+    localStorage.removeItem(SESSION_KEY);
+    resetArchiveCache();
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+    if (reason instanceof Error && reason.message.toLowerCase().includes("invitation"))
+      throw reason;
+    throw new Error("Your email is confirmed. Sign in to continue.");
+  }
 }
 
 /** The fallback page verifies an address without replacing this browser's session. */
@@ -336,14 +358,15 @@ export async function prepareRegistrationConfirmation(
   code: string,
 ): Promise<() => Promise<AuthenticationResult>> {
   const { user, session } = await verifyRegistrationCode(createEphemeralClient().auth, email, code);
-  return async () => {
-    const { error } = await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
+  return () =>
+    openConfirmedAccount(async () => {
+      const { error } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      if (error) throw registrationFailure(error);
+      return openAccount(user.id, user.email ?? email);
     });
-    if (error) throw registrationFailure(error);
-    return openAccount(user.id, user.email ?? email);
-  };
 }
 
 async function verifyRegistrationCode(auth: typeof supabase.auth, email: string, code: string) {

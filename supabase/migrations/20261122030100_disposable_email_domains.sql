@@ -1,6 +1,8 @@
 -- The disposable-email-domains blocklist (CC0), fetched 2026-11-22 from
 -- github.com/disposable-email-domains/disposable-email-domains.
--- ponytail: a snapshot; refresh with a later migration that inserts the new list.
+-- ponytail: a snapshot. Refresh with a later migration that deletes domains
+-- upstream removed as well as inserting new ones, and keeps the exclusions below.
+-- Excluded: 21cn.com (China Telecom's permanent, phone-bound mailbox).
 insert into private.disposable_email_domains (domain)
 select distinct pg_catalog.btrim(line)
 from pg_catalog.unnest(pg_catalog.string_to_array($domains$
@@ -181,7 +183,6 @@ from pg_catalog.unnest(pg_catalog.string_to_array($domains$
 20mm.eu
 2120001.net
 216222.xyz
-21cn.com
 21mail.top
 2200freefonts.com
 22345377.xyz

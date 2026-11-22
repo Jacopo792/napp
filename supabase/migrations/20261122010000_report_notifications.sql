@@ -22,6 +22,8 @@ begin
   if to_regclass('vault.decrypted_secrets') is null or to_regprocedure('net.http_post(text,jsonb,jsonb,jsonb,integer)') is null then
     return new;
   end if;
+  -- An enqueue failure must never roll back the report it announces.
+  begin
   select decrypted_secret into mail_key from vault.decrypted_secrets where name = 'napp_report_mail_key';
   select decrypted_secret into mail_to from vault.decrypted_secrets where name = 'napp_report_mail_to';
   select decrypted_secret into mail_from from vault.decrypted_secrets where name = 'napp_report_mail_from';
@@ -43,6 +45,9 @@ begin
         || 'node scripts/moderate-reports.mjs --show ' || new.id
     )
   );
+  exception when others then
+    raise warning 'safety report % notification not queued (%)', new.id, sqlstate;
+  end;
   return new;
 end;
 $notify$;

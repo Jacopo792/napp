@@ -52,21 +52,37 @@ export async function loadBlockedUsers(): Promise<BlockedUser[]> {
 export async function blockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc("block_user", { target_user_id: userId });
   if (error) throw new Error("Could not block this account. Please try again.");
-  hidden.add(userId);
+  publishHidden(new Set(hidden).add(userId));
 }
 export async function unblockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc("unblock_user", { target_user_id: userId });
   if (error) throw new Error("Could not unblock this account. Please try again.");
-  hidden.delete(userId);
+  const next = new Set(hidden);
+  next.delete(userId);
+  publishHidden(next);
 }
 
 /* People on the other side of a block, either way. Presence and carets in
-   notes other members wrote drop them. Ids only, refreshed on each note open. */
-let hidden = new Set<string>();
-export const isHiddenPerson = (userId: string) => hidden.has(userId);
+   notes other members wrote drop them. Ids only, refreshed on each note open;
+   `null` until the first answer, so nobody is shown before it arrives. */
+let hidden: ReadonlySet<string> = new Set<string>();
+let hiddenLoaded = false;
+const hiddenListeners = new Set<() => void>();
+function publishHidden(next: ReadonlySet<string>) {
+  hidden = next;
+  hiddenLoaded = true;
+  for (const listener of hiddenListeners) listener();
+}
+export const isHiddenPerson = (userId: string | undefined) => !!userId && hidden.has(userId);
+export const hiddenPeople = (): ReadonlySet<string> | null => (hiddenLoaded ? hidden : null);
+export function subscribeHiddenPeople(listener: () => void): () => void {
+  hiddenListeners.add(listener);
+  return () => hiddenListeners.delete(listener);
+}
 export async function refreshHiddenPeople(): Promise<void> {
   const { data, error } = await supabase.rpc("hidden_people");
-  if (!error && Array.isArray(data)) hidden = new Set(data as string[]);
+  // A failed question shows people rather than leaving presence empty for good.
+  publishHidden(!error && Array.isArray(data) ? new Set(data as string[]) : hidden);
 }
 /** Only for an archive the caller created, and only someone they blocked. */
 export async function removeBlockedMember(archiveId: string, userId: string): Promise<void> {
