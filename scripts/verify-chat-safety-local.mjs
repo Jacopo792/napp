@@ -155,9 +155,11 @@ assert(
 /** Gone only when Auth says so: any other lookup error is not a deletion. */
 async function authUserGone(id) {
   const { data, error } = await admin.auth.admin.getUserById(id);
-  if (error && (error.status === 404 || error.code === "user_not_found")) return true;
-  if (error) throw new Error(`auth lookup: ${error.status} ${error.message}`);
-  return !data.user;
+  // A bare 404 could be a proxy or a missing route; only Auth's own code counts.
+  if (error?.code === "user_not_found") return true;
+  if (error) throw new Error(`auth lookup: ${error.status} ${error.code} ${error.message}`);
+  if (!data.user) throw new Error("auth lookup: no error and no user");
+  return false;
 }
 for (let i = 0; i < 30 && !(await authUserGone(a.id)); i++)
   await new Promise((r) => setTimeout(r, 2000));
