@@ -63,26 +63,35 @@ export async function unblockUser(userId: string): Promise<void> {
 }
 
 /* People on the other side of a block, either way. Presence and carets in
-   notes other members wrote drop them. Ids only, refreshed on each note open;
-   `null` until the first answer, so nobody is shown before it arrives. */
+   notes other members wrote drop them. Ids only, refreshed on each note open.
+   Until a lookup succeeds nobody is shown, and a failed one is retried. */
 let hidden: ReadonlySet<string> = new Set<string>();
 let hiddenLoaded = false;
+let hiddenRetry: ReturnType<typeof setTimeout> | undefined;
 const hiddenListeners = new Set<() => void>();
-function publishHidden(next: ReadonlySet<string>) {
+function publishHidden(next: ReadonlySet<string>, loaded = hiddenLoaded) {
   hidden = next;
-  hiddenLoaded = true;
+  hiddenLoaded = loaded;
   for (const listener of hiddenListeners) listener();
 }
-export const isHiddenPerson = (userId: string | undefined) => !!userId && hidden.has(userId);
+export const isHiddenPerson = (userId: string | undefined) =>
+  !!userId && (!hiddenLoaded || hidden.has(userId));
 export const hiddenPeople = (): ReadonlySet<string> | null => (hiddenLoaded ? hidden : null);
 export function subscribeHiddenPeople(listener: () => void): () => void {
   hiddenListeners.add(listener);
   return () => hiddenListeners.delete(listener);
 }
-export async function refreshHiddenPeople(): Promise<void> {
+export async function refreshHiddenPeople(attempt = 0): Promise<void> {
+  clearTimeout(hiddenRetry);
   const { data, error } = await supabase.rpc("hidden_people");
-  // A failed question shows people rather than leaving presence empty for good.
-  publishHidden(!error && Array.isArray(data) ? new Set(data as string[]) : hidden);
+  if (!error && Array.isArray(data)) return publishHidden(new Set(data as string[]), true);
+  // An unverified list shows nobody rather than someone who may be blocked.
+  // ponytail: retries while the app is open, capped at 30 s apart.
+  publishHidden(hidden, false);
+  hiddenRetry = setTimeout(
+    () => void refreshHiddenPeople(attempt + 1),
+    Math.min(30_000, 1_000 * 2 ** attempt),
+  );
 }
 /** Only for an archive the caller created, and only someone they blocked. */
 export async function removeBlockedMember(archiveId: string, userId: string): Promise<void> {
