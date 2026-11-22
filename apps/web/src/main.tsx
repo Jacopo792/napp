@@ -12,3 +12,7 @@ import "@notes-app/core/styles.css";
 setPlatform(webPlatform);
 
 createRoot(document.getElementById("root")!).render(<App basepath={import.meta.env.BASE_URL} />);
+
+// Keep shared text in the browser. See public/sw.js.
+if ("serviceWorker" in navigator)
+  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});

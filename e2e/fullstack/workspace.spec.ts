@@ -26,11 +26,18 @@ test("the built web policy permits the API and collaboration origins @production
   test.skip(process.env.NAPP_E2E_PRODUCTION !== "1", "The development server omits CSP for HMR");
   await page.goto("/");
   const policy = await page
-    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .locator('meta[http-equiv="Content-Security-Policy" i]')
     .getAttribute("content");
   expect(policy).toContain("object-src 'none'");
   expect(policy).toContain("ws://127.0.0.1:1235");
   expect(policy).toContain("https://api.stripe.com");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL,
+      ),
+    )
+    .toBe(new URL("/sw.js", page.url()).href);
 });
 
 test("a slow new-note insert is committed before collaboration opens it", async ({
