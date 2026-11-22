@@ -8,6 +8,10 @@ test("readiness tolerates a slow database without requesting an exact count", as
   const server = createServer((request, response) => {
     assert.equal(request.method, "HEAD");
     assert.equal(request.headers.prefer?.includes("count=exact") ?? false, false);
+    assert.equal(
+      new URL(request.url!, "http://localhost").pathname,
+      "/rest/v1/account_entitlements",
+    );
     assert.equal(new URL(request.url!, "http://localhost").searchParams.get("limit"), "1");
     setTimeout(() => response.writeHead(200).end(), 1350);
   });
