@@ -10,10 +10,13 @@ import {
   resendRegistrationCode,
   restoreSession,
   type ArchiveOption,
+  type AuthenticationResult,
 } from "@/lib/session";
 import { stickerUrl } from "@/lib/stickers";
 import { platform } from "@/platform";
 import logoUrl from "../assets/napp-logo.png";
+import { useAuthCaptcha } from "@/lib/useAuthCaptcha";
+import { PolicyGate } from "@/components/PolicyGate";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import { passwordRecoveryUrl } from "@/lib/passwordRecovery";
 
@@ -49,6 +52,7 @@ export default function Login({
   confirmAddressOnly?: boolean;
 }) {
   const navigate = useNavigate();
+  const captcha = useAuthCaptcha();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +67,7 @@ export default function Login({
     account: { userId: string; email: string };
     archives: ArchiveOption[];
   } | null>(null);
+  const [pendingPolicies, setPendingPolicies] = useState<AuthenticationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -103,15 +108,26 @@ export default function Login({
     setRevealed(false);
   }
 
+  function finishSignIn(result: AuthenticationResult) {
+    setPassword("");
+    setLoading(false);
+    if (result.continueAfterPolicies) setPendingPolicies(result);
+    else if (!result.session) {
+      setArchiveChoice({ account: result.account, archives: result.archives });
+    } else if (!stayOnPage) {
+      void navigate({ to: "/notes", replace: true });
+    }
+  }
+
   async function handleSubmit() {
-    if (!email.trim() || !password) return;
+    if (!email.trim() || !password || !captcha.ready) return;
     setLoading(true);
     setError("");
     try {
       let result;
       if (mode === "sign-up") {
         if (password.length < 8) throw new Error("Use at least 8 characters");
-        result = await registerAccount(email.trim(), password, policiesAccepted);
+        result = await registerAccount(email.trim(), password, policiesAccepted, captcha.token);
         if (result.confirmationRequired) {
           setConfirmation(email.trim());
           setCode("");
@@ -123,19 +139,14 @@ export default function Login({
         }
       } else {
         const inviteToken = platform().inviteToken();
-        result = await authenticate(email.trim(), password, inviteToken);
+        result = await authenticate(email.trim(), password, inviteToken, captcha.token);
       }
-      if (!result.session) {
-        setArchiveChoice({ account: result.account, archives: result.archives });
-        setPassword("");
-        setLoading(false);
-        return;
-      }
-      setPassword("");
-      if (!stayOnPage) void navigate({ to: "/notes" });
+      finishSignIn(result);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign in failed");
       setLoading(false);
+    } finally {
+      captcha.reset();
     }
   }
 
@@ -151,9 +162,7 @@ export default function Login({
       }
       const result = await confirmRegistration(confirmation, code);
       setConfirmation("");
-      if (result.session) {
-        if (!stayOnPage) void navigate({ to: "/notes", replace: true });
-      } else setArchiveChoice({ account: result.account, archives: result.archives });
+      finishSignIn(result);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not confirm your email");
     } finally {
@@ -162,16 +171,18 @@ export default function Login({
   }
 
   async function handleResend() {
+    if (!captcha.ready) return;
     setLoading(true);
     setError("");
     setCodeSent(false);
     try {
-      await resendRegistrationCode(confirmAddressOnly ? email.trim() : confirmation);
+      await resendRegistrationCode(confirmAddressOnly ? email.trim() : confirmation, captcha.token);
       setResendAt(Date.now() + 60_000);
       setCodeSent(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not send a new code");
     } finally {
+      captcha.reset();
       setLoading(false);
     }
   }
@@ -187,6 +198,20 @@ export default function Login({
       setError(reason instanceof Error ? reason.message : "Could not open that group");
       setLoading(false);
     }
+  }
+
+  if (pendingPolicies?.continueAfterPolicies) {
+    const resume = pendingPolicies.continueAfterPolicies;
+    return (
+      <PolicyGate
+        pendingUserId={pendingPolicies.account.userId}
+        onAccepted={async () => {
+          const result = await resume();
+          setPendingPolicies(null);
+          finishSignIn(result);
+        }}
+      />
+    );
   }
 
   if (restoring) {
@@ -334,10 +359,16 @@ export default function Login({
           >
             Verify email
           </button>
+          {captcha.widget}
           <button
             type="button"
             className="login-code-action"
-            disabled={loading || Boolean(resendAt) || (confirmAddressOnly && !email.trim())}
+            disabled={
+              loading ||
+              !captcha.ready ||
+              Boolean(resendAt) ||
+              (confirmAddressOnly && !email.trim())
+            }
             onClick={() => void handleResend()}
           >
             Resend code
@@ -478,10 +509,15 @@ export default function Login({
             </a>
           ) : null}
           <PolicyLinks />
+          {captcha.widget}
           <button
             type="submit"
             disabled={
-              loading || !email.trim() || !password || (mode === "sign-up" && !policiesAccepted)
+              loading ||
+              !captcha.ready ||
+              !email.trim() ||
+              !password ||
+              (mode === "sign-up" && !policiesAccepted)
             }
             className="login-submit label"
           >

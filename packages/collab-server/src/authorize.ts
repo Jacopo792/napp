@@ -174,6 +174,8 @@ export function supabaseLookup(asCaller: (token: string) => SupabaseClient): Loo
         ? claimedProfile
         : await caller.from("profiles").select("nickname").eq("user_id", userId).maybeSingle();
 
+    // The caller's archive plan RPC checks the live suspension, Auth ban and
+    // session before returning any membership, even for an unexpired JWT.
     const archive = row
       ? await caller.rpc("archive_plan", { target_archive_id: row.archive_id })
       : { data: null, error: null };

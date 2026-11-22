@@ -22,7 +22,12 @@ async function person(label) {
   const email = `chat-${label}-${stamp}@example.test`;
   const password = `chat-${crypto.randomUUID()}`;
   const { user } = ok(
-    await admin.auth.admin.createUser({ email, password, email_confirm: true }),
+    await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
+    }),
     "user",
   );
   const client = createClient(url, anon, options);

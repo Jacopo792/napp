@@ -33,6 +33,7 @@ export const test = base.extend<{
             email,
             password,
             email_confirm: true,
+            user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
           });
           if (created.error || !created.data.user)
             throw new Error("Could not create local E2E account");

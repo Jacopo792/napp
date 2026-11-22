@@ -61,7 +61,12 @@ async function fixture(label) {
   const email = `erasure-${label}-${stamp}@example.test`;
   const password = `erasure-${crypto.randomUUID()}`;
   const { user } = checked(
-    await admin.auth.admin.createUser({ email, password, email_confirm: true }),
+    await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
+    }),
     "create fixture",
   );
   assert(user);

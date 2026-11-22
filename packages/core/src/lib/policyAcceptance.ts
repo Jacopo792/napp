@@ -5,7 +5,7 @@ import { POLICY_VERSION } from "./storePolicies";
    device remembers it: a launch then opens the archive at once, offline too,
    instead of waiting on Auth — and a slow answer never flashes the form at
    somebody who agreed long ago. */
-const acceptedKey = (userId: string) => `napp:policies-accepted:${userId}`;
+const acceptedKey = (userId: string) => `napp:server-policy-accepted:${userId}`;
 
 export function acceptedHere(userId: string): boolean {
   try {
@@ -19,29 +19,24 @@ function remember(userId: string): void {
   try {
     localStorage.setItem(acceptedKey(userId), POLICY_VERSION);
   } catch {
-    /* Without storage the next launch asks Auth again, as before. */
+    /* Without storage the next launch checks the server again. */
   }
 }
 
 export async function loadPolicyAcceptance(userId: string): Promise<boolean> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || data.user?.id !== userId)
-    throw new Error("Could not verify this account. Please try again.");
-  const accepted = data.user.user_metadata?.napp_terms_version === POLICY_VERSION;
-  if (accepted) remember(userId);
-  return accepted;
+  const { data, error } = await supabase.rpc("has_accepted_policies");
+  if (error) throw new Error("Could not verify policy acceptance. Please try again.");
+  if (data === true) remember(userId);
+  return data === true;
 }
 
 export async function acceptPolicies(userId: string): Promise<void> {
   const current = await supabase.auth.getUser();
   if (current.error || current.data.user?.id !== userId)
     throw new Error("Sign in to this account again");
-  const { error } = await supabase.auth.updateUser({
-    data: {
-      napp_terms_version: POLICY_VERSION,
-      napp_privacy_version: POLICY_VERSION,
-      napp_policies_accepted_at: new Date().toISOString(),
-    },
+  const { error } = await supabase.rpc("accept_policies", {
+    terms_version: POLICY_VERSION,
+    privacy_version: POLICY_VERSION,
   });
   if (error) throw new Error("Could not save your acceptance. Please try again.");
   remember(userId);

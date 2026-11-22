@@ -128,6 +128,7 @@ function accountFlow(
         };
       if (name === "./noteStore")
         return { resetArchiveCache: () => {}, clearNoteStore: async () => {} };
+      if (name === "./policyAcceptance") return { loadPolicyAcceptance: async () => true };
       if (name === "./storePolicies") return { POLICY_VERSION: "2026-10-24" };
       if (name === "./accountContent")
         return {

@@ -1,3 +1,4 @@
+import { useAuthCaptcha } from "@/lib/useAuthCaptcha";
 import {
   useCallback,
   useEffect,
@@ -103,6 +104,7 @@ function AccountDialog({
 }
 
 function PasswordForm({ email, close }: { email: string; close: () => void }) {
+  const captcha = useAuthCaptcha();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,7 +112,7 @@ function PasswordForm({ email, close }: { email: string; close: () => void }) {
   const [done, setDone] = useState("");
 
   const run = async (task: () => Promise<void>, success: string) => {
-    if (busy) return;
+    if (busy || !captcha.ready) return;
     setBusy(true);
     setError("");
     try {
@@ -119,6 +121,7 @@ function PasswordForm({ email, close }: { email: string; close: () => void }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Something went wrong. Try again");
     } finally {
+      captcha.reset();
       setBusy(false);
     }
   };
@@ -141,7 +144,10 @@ function PasswordForm({ email, close }: { email: string; close: () => void }) {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        void run(() => changePassword(email, current, next), "Your password is changed.");
+        void run(
+          () => changePassword(email, current, next, captcha.token),
+          "Your password is changed.",
+        );
       }}
     >
       <AccountField
@@ -165,12 +171,16 @@ function PasswordForm({ email, close }: { email: string; close: () => void }) {
         value={next}
         onChange={(event) => setNext(event.target.value)}
       />
+      {captcha.widget}
       <button
         type="button"
         className="account-dialog-link press"
-        disabled={busy}
+        disabled={busy || !captcha.ready}
         onClick={() =>
-          void run(() => passwordRecovery().request(email), `Open the link sent to ${email}.`)
+          void run(
+            () => passwordRecovery().request(email, captcha.token),
+            `Open the link sent to ${email}.`,
+          )
         }
       >
         Forgot it? Email me a link
@@ -184,7 +194,7 @@ function PasswordForm({ email, close }: { email: string; close: () => void }) {
         <button type="button" className="press" disabled={busy} onClick={close}>
           Cancel
         </button>
-        <button type="submit" className="is-primary press" disabled={busy}>
+        <button type="submit" className="is-primary press" disabled={busy || !captcha.ready}>
           {busy ? "Saving…" : "Change password"}
         </button>
       </div>

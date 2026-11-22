@@ -5,15 +5,24 @@ import { PolicyLinks } from "./PolicyLinks";
 import { AccountCard } from "./AccountCard";
 
 /** Existing accounts must accept the same rules before creating more UGC. */
-export function PolicyGate({ children }: { children: ReactNode }) {
+export function PolicyGate({
+  children,
+  pendingUserId,
+  onAccepted,
+}: {
+  children?: ReactNode;
+  pendingUserId?: string;
+  onAccepted?: () => Promise<void>;
+}) {
   const [accepted, setAccepted] = useState(false);
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState(pendingUserId ?? "");
   const [checked, setChecked] = useState(false);
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(!pendingUserId);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [asked, setAsked] = useState(false);
+  const [asked, setAsked] = useState(Boolean(pendingUserId));
   useEffect(() => {
+    if (pendingUserId) return;
     let live = true;
     void (async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -41,7 +50,7 @@ export function PolicyGate({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [attempt]);
+  }, [attempt, pendingUserId]);
   if (accepted) return children;
   /* Nothing until Auth has answered: a form flashed on every load at somebody
      who agreed long ago reads as being asked again. */
@@ -79,7 +88,10 @@ export function PolicyGate({ children }: { children: ReactNode }) {
               setBusy(true);
               setError("");
               void acceptPolicies(userId)
-                .then(() => setAccepted(true))
+                .then(async () => {
+                  await onAccepted?.();
+                  setAccepted(true);
+                })
                 .catch((reason: Error) => setError(reason.message))
                 .finally(() => setBusy(false));
             }}

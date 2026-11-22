@@ -38,7 +38,11 @@ export const supabase = {
     },
   },
   rpc: async (name: string) =>
-    name === "is_usage_administrator"
+    name === "report_safety_issue" || name === "submit_safety_notice"
+      ? { data: "8c487023-b897-4032-972b-037956b0df2c", error: null }
+      : name === "accept_policies"
+      ? { data: null, error: null }
+      : name === "has_accepted_policies" || name === "is_usage_administrator"
       ? { data: true, error: null }
       : name === "list_usage_activity"
         ? { data: USAGE, error: null }

@@ -6,6 +6,7 @@
 import { createEphemeralClient, supabase } from "./supabaseClient";
 import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
+import { loadPolicyAcceptance } from "./policyAcceptance";
 import { POLICY_VERSION } from "./storePolicies";
 import { restoreArchiveSession, SESSION_KEY, type AppSession } from "./sessionRestore";
 export type { AppSession } from "./sessionRestore";
@@ -33,6 +34,7 @@ export interface AuthenticationResult {
   session: AppSession | null;
   account: { userId: string; email: string };
   archives: ArchiveOption[];
+  continueAfterPolicies?: () => Promise<AuthenticationResult>;
 }
 
 /** A member with no profile gets one on first sign-in, named after the local
@@ -103,6 +105,14 @@ async function openAccount(
   email: string,
   inviteToken?: string,
 ): Promise<AuthenticationResult> {
+  if (!(await loadPolicyAcceptance(userId))) {
+    return {
+      session: null,
+      account: { userId, email },
+      archives: [],
+      continueAfterPolicies: () => openAccount(userId, email, inviteToken),
+    };
+  }
   const bootstrap = await supabase.rpc("ensure_personal_archive");
   if (bootstrap.error || !bootstrap.data) {
     throw new Error(bootstrap.error?.message ?? "Could not create a group for this account");
@@ -135,7 +145,9 @@ async function openAccount(
 
 /** What a refused sign-in is called. Being rate limited or offline is not a
  *  wrong password, and saying so sends people to reset one that was right. */
-export function signInFailure(error: { status?: number }): Error {
+export function signInFailure(error: { status?: number; code?: string }): Error {
+  if (error.code === "captcha_failed")
+    return new Error("Complete the security check and try again.");
   if (error.status === 429) return new Error("Too many sign-in attempts. Try again shortly.");
   if (!error.status || error.status >= 500)
     return new Error("Could not reach the sign-in service. Check your connection and try again.");
@@ -149,6 +161,8 @@ function registrationFailure(error: { status?: number; code?: string; message: s
   if (error.status === 429) return new Error("Too many attempts. Try again shortly.");
   if (!error.status || error.status >= 500)
     return new Error("Could not reach the sign-in service. Check your connection and try again.");
+  if (error.code === "captcha_failed")
+    return new Error("Complete the security check and try again.");
   if (error.code === "weak_password") return new Error(error.message);
   return new Error("Could not create this account. Sign in instead, or use another address");
 }
@@ -157,8 +171,13 @@ export async function authenticate(
   email: string,
   password: string,
   inviteToken?: string,
+  captchaToken?: string,
 ): Promise<AuthenticationResult> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  });
   if (error) throw signInFailure(error);
   if (!data.user) throw new Error("Email or password is incorrect");
   try {
@@ -215,14 +234,27 @@ export async function requestEmailChange(current: string, next: string): Promise
 
 /** Whether an address and password open an account, asked on a client of
  *  its own: the account in front is left alone until they do. */
-export async function checkCredentials(email: string, password: string): Promise<void> {
+export async function checkCredentials(
+  email: string,
+  password: string,
+  captchaToken?: string,
+): Promise<void> {
   const client = createEphemeralClient();
-  const { error } = await client.auth.signInWithPassword({ email, password });
+  const { error } = await client.auth.signInWithPassword({
+    email,
+    password,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  });
   if (error) throw signInFailure(error);
   await client.auth.signOut({ scope: "local" });
 }
 
-export async function changePassword(email: string, current: string, next: string): Promise<void> {
+export async function changePassword(
+  email: string,
+  current: string,
+  next: string,
+  captchaToken?: string,
+): Promise<void> {
   if (next.length < 8) throw new Error("Use at least 8 characters");
   if (next === current) throw new Error("Choose a different password");
   const {
@@ -231,7 +263,7 @@ export async function changePassword(email: string, current: string, next: strin
   if (session?.user.email?.toLowerCase() !== email.toLowerCase())
     throw new Error("Sign in to change your password");
   try {
-    await checkCredentials(email, current);
+    await checkCredentials(email, current, captchaToken);
   } catch (reason) {
     if (reason instanceof Error && reason.message === "Email or password is incorrect")
       throw new Error("Your current password is incorrect");
@@ -253,9 +285,17 @@ export async function registerAccount(
   email: string,
   password: string,
   acceptedPolicies = false,
+  captchaToken?: string,
 ): Promise<RegistrationResult> {
   const inviteToken = platform().inviteToken();
-  const data = await signUp(supabase.auth, email, password, acceptedPolicies, inviteToken);
+  const data = await signUp(
+    supabase.auth,
+    email,
+    password,
+    acceptedPolicies,
+    inviteToken,
+    captchaToken,
+  );
 
   if (data.session && data.user) {
     const result = await openAccount(data.user.id, data.user.email ?? email, inviteToken);
@@ -272,6 +312,7 @@ async function signUp(
   password: string,
   acceptedPolicies: boolean,
   inviteToken?: string,
+  captchaToken?: string,
 ) {
   if (!acceptedPolicies)
     throw new Error("Accept the Terms of Use and read the Privacy Policy first");
@@ -281,10 +322,10 @@ async function signUp(
     password,
     options: {
       emailRedirectTo: signupRedirect(inviteToken),
+      ...(captchaToken ? { captchaToken } : {}),
       data: {
         napp_terms_version: POLICY_VERSION,
         napp_privacy_version: POLICY_VERSION,
-        napp_policies_accepted_at: new Date().toISOString(),
       },
     },
   });
@@ -297,8 +338,16 @@ export async function prepareRegistration(
   email: string,
   password: string,
   acceptedPolicies: boolean,
+  captchaToken?: string,
 ): Promise<boolean> {
-  const data = await signUp(createEphemeralClient().auth, email, password, acceptedPolicies);
+  const data = await signUp(
+    createEphemeralClient().auth,
+    email,
+    password,
+    acceptedPolicies,
+    undefined,
+    captchaToken,
+  );
   return !data.session;
 }
 
@@ -308,11 +357,14 @@ function signupRedirect(inviteToken?: string): string {
   return redirect.toString();
 }
 
-export async function resendRegistrationCode(email: string): Promise<void> {
+export async function resendRegistrationCode(email: string, captchaToken?: string): Promise<void> {
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,
-    options: { emailRedirectTo: signupRedirect(platform().inviteToken()) },
+    options: {
+      emailRedirectTo: signupRedirect(platform().inviteToken()),
+      ...(captchaToken ? { captchaToken } : {}),
+    },
   });
   if (error) throw registrationFailure(error);
 }
