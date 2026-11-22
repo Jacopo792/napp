@@ -98,6 +98,8 @@ export function signInFailure(): Error {
 
 export async function resendRegistrationCode(_email: string) {}
 
+export class ConfirmedAddressError extends Error {}
+
 export async function confirmRegistrationAddress(_email: string, _code: string) {}
 
 export async function confirmRegistration(email: string, _code: string) {
