@@ -89,6 +89,12 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
 
+  /* The controls' one system (see "Controls" at the end of this file): a field
+     is a filled, rounded well of the ink; the main action is an ink pill. */
+  --field-fill: color-mix(in srgb, var(--ink) 6%, transparent);
+  --field-fill-hover: color-mix(in srgb, var(--ink) 9%, transparent);
+  --field-h: 44px;
+
   /* ── The type ramp ─────────────────────────────────────────────────────────
      Six sizes for every piece of chrome in the app, down from twenty — nine of
      which lived inside four pixels of each other: 10, 10.5, 11, 11.5, 12,
@@ -701,20 +707,17 @@
    The only screen in the app with nothing of the reader's on it yet, which is
    the one place it may say what kind of place this is. It says it with a drawn
    plate and a ruled form, not with a floating grey box. ────────────────────── */
-/* Glossa's shape: the pitch on the left on a field of colour, the form on
-   the right on the plain ground, with nothing framing it. Stacked on a narrow
-   window, the pitch first and shorter. */
+/* about.nappnote.com's door: one ground, the line large on the left, the form
+   on a white card on the right. Stacked on a narrow window, the line first. */
 .login-shell {
   position: relative;
   display: flex;
   min-height: 100vh;
   flex-direction: column;
-  /* Clipped sideways so the plate may bleed off both edges, but never
-     vertically: on a short laptop window the sign-up card is taller than the
-     viewport, and `overflow: hidden` would have cut its head and feet off with
-     no way to reach either. */
+  /* Never clipped vertically: on a short window the sign-up card is taller
+     than the viewport and has to stay reachable. */
   overflow-x: clip;
-  background: var(--surface);
+  background: var(--page);
 }
 
 @media (min-width: 1024px) {
@@ -724,31 +727,18 @@
   }
 }
 
-/* The field takes the colour of the word in the pill, at a seventh of its
-   strength, and follows it when the word turns. */
 .login-pitch {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 3rem;
-  overflow: clip;
-  background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  gap: 2.5rem;
   padding: clamp(1.5rem, 4vw, 3.5rem);
   color: var(--ink);
-  transition: background-color 700ms var(--ease-in-out);
 }
 
 [data-shell="mac"]:not([data-fullscreen]) .login-pitch {
   padding-top: calc(52px + 1rem);
-}
-
-.login-pitch .botanical-plate.is-near {
-  opacity: 0.09;
-}
-
-.login-pitch > :not(.login-garden) {
-  position: relative;
 }
 
 .login-wordmark {
@@ -769,114 +759,64 @@
 }
 
 .login-headline {
+  margin-bottom: auto;
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 5.4vw, 5rem);
+  font-size: clamp(3rem, 6.4vw, 6rem);
   font-weight: var(--weight-bold);
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.05em;
 }
 
-/* The one inverted surface on the door, as Glossa's white pill is: ink for a
-   ground, the page for letters, whatever the palette. Its width travels to the
-   word arriving rather than snapping to it. */
-.login-pill {
-  display: inline-flex;
-  box-sizing: content-box;
-  overflow: hidden;
-  margin-top: 0.08em;
-  border-radius: 0.2em;
-  background: var(--ink);
-  padding: 0.02em 0.3em 0.14em;
-  color: var(--surface);
-  line-height: 1.1;
-  white-space: nowrap;
-  box-shadow: 0 8px 30px -12px rgb(0 0 0 / 0.45);
-  transition: width 300ms var(--ease-out);
+.login-headline em {
+  color: var(--accent);
+  font-family: "Literata Variable", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
-.login-pill-word {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.22em;
-  animation: login-word var(--dur-base) var(--ease-out) backwards;
-}
-
-.login-pill-word svg {
-  translate: 0 0.04em;
-  color: color-mix(in oklab, var(--tone) 70%, var(--surface));
-}
-
-@keyframes login-word {
-  from {
-    opacity: 0;
-    transform: translateY(0.6em);
-    filter: blur(6px);
+@media (min-width: 1024px) {
+  .login-headline {
+    margin-block: auto;
   }
-}
-
-.login-kinds {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-
-.login-dots {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.login-dots button {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--tone);
-  opacity: 0.35;
-  filter: grayscale(1);
-  transition:
-    opacity var(--dur-base) var(--ease),
-    filter var(--dur-base) var(--ease),
-    transform var(--dur-base) var(--ease-spring);
-}
-
-.login-dots button:hover {
-  opacity: 0.9;
-  filter: none;
-}
-
-.login-dots button[aria-pressed="true"] {
-  opacity: 1;
-  filter: none;
-  transform: scale(1.3);
-}
-
-.login-eyebrow {
-  color: color-mix(in srgb, var(--ink) 60%, transparent);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 @media (max-width: 1023px) {
   .login-headline {
-    font-size: clamp(2.1rem, 9vw, 3.4rem);
+    font-size: clamp(2.4rem, 11vw, 3.6rem);
   }
 }
 
-/* Clipped to the shell it decorates. The plates are drawn past their own box
-   on purpose — that is what makes them bleed off the edges — but a stem
-   hanging below the fold made the door scrollable, and what was under it was
-   the wallpaper of an app nobody has signed into yet. Clipping the garden
-   rather than the shell leaves the shell free to grow past the window when the
-   card is taller than it, which is the one thing it must still do. */
-.login-garden {
+/* The chat's die-cut stickers, tilted as if pressed on by hand. */
+.login-sticker {
   position: absolute;
-  inset: 0;
-  overflow: clip;
   pointer-events: none;
+  user-select: none;
+}
+
+.login-headline em {
+  position: relative;
+  display: inline-block;
+}
+
+/* On the end of the line, as if pressed on after it was written. */
+.login-sticker.is-bear {
+  top: -0.1em;
+  left: calc(100% + 0.12em);
+  width: 0.9em;
+  rotate: 10deg;
+}
+
+.login-sticker.is-bunny {
+  top: -46px;
+  right: -22px;
+  width: 78px;
+  rotate: 12deg;
+}
+
+@media (max-width: 1023px) {
+  .login-sticker.is-bunny {
+    display: none;
+  }
 }
 
 .botanical-plate {
@@ -1227,15 +1167,20 @@
   padding: 3rem 1.5rem;
 }
 
-/* No drop shadow. A 90px black blur over a near-black ground did not read as
-   lift, it read as a smudge ringing the card. The hairline and the paper step
-   already separate it; the inset highlight catches the top edge. */
-/* No frame: the form stands on the ground, as Glossa's does. The column is
-   the frame. */
+/* The site's white card: no outline and no drop shadow, the step from the
+   ground to the card is the edge. In a dark palette it is the paper. */
 .login-card {
+  position: relative;
   width: 100%;
-  max-width: 24rem;
+  max-width: 25rem;
+  border-radius: 24px;
+  background: var(--paper);
+  padding: 2rem 1.75rem 1.75rem;
   animation: login-settle var(--dur-slow) var(--ease-out) backwards;
+}
+
+:root[data-theme="light"] .login-card {
+  background: white;
 }
 
 @keyframes login-settle {
@@ -1245,17 +1190,9 @@
   }
 }
 
-/* The phone's card: the choice, the fields and the button stand together on
-   the same soft ground as Settings' cards, with no outline. */
+/* The choice, the fields and the button, straight on the card. */
 .login-panel {
-  margin-top: 1.75rem;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  padding: 14px;
-}
-
-:root[data-theme="light"] .login-panel {
-  background: color-mix(in srgb, white 70%, transparent);
+  margin-top: 1.5rem;
 }
 
 /* Which of the two things you are doing is a choice, so it is a control at the
@@ -1266,7 +1203,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: var(--field-fill);
   padding: 4px;
 }
 
@@ -1311,7 +1248,7 @@
 .login-title {
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: var(--weight-bold);
   line-height: 1.12;
   letter-spacing: -0.035em;
@@ -1361,32 +1298,6 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  color: var(--ink-3);
-}
-
-/* Boxed now, as Glossa's are: with the card's frame gone, a ruled line was
-   a field with nothing round it. */
-.login-input {
-  width: 100%;
-  height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  padding: 0 0.85rem;
-  color: var(--ink);
-  font-size: 0.95rem;
-  outline: none;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
-}
-
-.login-input:hover {
-  border-color: var(--rule);
-}
-
-.login-input:focus {
-  border-color: var(--ink-4);
 }
 
 .login-secret .login-input {
@@ -1421,36 +1332,9 @@
 }
 
 .login-submit {
-  display: flex;
   width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
   margin-top: 0.75rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink);
   height: 48px;
-  color: var(--paper);
-  font-size: var(--text-sm);
-  letter-spacing: 0;
-  text-transform: none;
-  transition:
-    opacity var(--dur-fast) var(--ease-out),
-    transform var(--dur-press) var(--ease-press);
-}
-
-.login-submit:hover:not(:disabled) {
-  opacity: 0.88;
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.login-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
 }
 
 .login-submit svg {
@@ -1478,19 +1362,14 @@
   color: var(--ink-2);
 }
 
-.login-steps {
-  display: grid;
-  gap: 12px;
-  margin-top: 1.25rem;
-  padding-left: 1.15rem;
-  list-style: decimal;
+.login-code-action {
+  justify-self: start;
+  min-height: 44px;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 1.5;
 }
 
-.login-steps::marker,
-.login-steps li::marker {
+.login-code-action:disabled {
   color: var(--ink-4);
 }
 
@@ -1498,10 +1377,6 @@
   color: var(--ink-4);
   font-size: var(--text-xs);
   line-height: 1.6;
-}
-
-.login-steps + .login-note {
-  margin-top: 1.25rem;
 }
 
 /* Said, and shaken once, as Glossa's is: the line arrives from the side it
@@ -1540,7 +1415,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .login-card,
-  .login-pill-word,
   .login-error {
     animation: none;
   }
@@ -4777,13 +4651,6 @@
   border-radius: var(--radius-md);
   padding-inline: 12px;
   color: var(--ink-2);
-}
-
-.invite-form > button:hover:not(:disabled),
-.invite-link-row button:hover {
-  border-color: var(--accent);
-  background: var(--accent-wash);
-  color: var(--ink);
 }
 
 .invite-form > button:disabled {
@@ -10821,14 +10688,6 @@ button.sheet-chip:hover,
   font-weight: var(--weight-semibold);
 }
 
-.sheet-primary-action:hover:not(:disabled) {
-  background: var(--accent-strong);
-}
-
-.sheet-primary-action:disabled {
-  opacity: 0.4;
-}
-
 .settings-segment.is-inline {
   grid-auto-columns: auto;
   padding: 2px;
@@ -14189,6 +14048,7 @@ button.sheet-chip:hover,
 /* Delete account, in Settings' own rows: a small danger button that opens a
    password row, a confirmation and the two actions in place. */
 .account-delete-open,
+.email-change-open,
 .account-deletion-actions button {
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--rule));
@@ -14219,6 +14079,7 @@ button.sheet-chip:hover,
   gap: 8px;
 }
 
+.email-change-open,
 .account-deletion-actions button:not(.is-danger) {
   border-color: var(--rule);
   color: var(--ink-2);
@@ -16043,4 +15904,111 @@ button.sheet-chip:hover,
   ) {
     corner-shape: squircle;
   }
+}
+
+/* ══ Controls ════════════════════════════════════════════════════════════════
+   One system for every form the app shows — sign-in, reset password, Settings,
+   sheets and dialogs: a label in small ink above, a filled rounded field, an
+   ink pill for the one main action, a soft pill for the others, and quiet
+   links at the foot. Last in the file, so each surface's older rule yields to
+   it. ─────────────────────────────────────────────────────────────────────── */
+:is(.login-field .label, .invite-form label) {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input) {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--field-fill);
+  color: var(--ink);
+  outline: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+:is(.login-input, .invite-form input, .invite-link-row input) {
+  width: 100%;
+  height: var(--field-h);
+  padding: 0 0.9rem;
+  font-size: 0.95rem;
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input):hover {
+  background: var(--field-fill-hover);
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input):focus-visible {
+  border-color: var(--ink-4);
+}
+
+:is(.login-submit, .sheet-primary-action) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  padding-inline: 1.25rem;
+  color: var(--page);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  text-transform: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
+}
+
+:is(.login-submit, .sheet-primary-action):hover:not(:disabled) {
+  background: var(--ink);
+  opacity: 0.88;
+}
+
+:is(.login-submit, .sheet-primary-action):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:is(.login-submit, .sheet-primary-action):disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+:is(.invite-form > button, .invite-link-row button, .settings-row-button) {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--field-fill);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+:is(.invite-form > button, .invite-link-row button) {
+  min-height: var(--field-h);
+  padding-inline: 1.1rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+:is(.invite-form > button, .invite-link-row button, .settings-row-button):hover:not(:disabled) {
+  background: var(--field-fill-hover);
+  color: var(--ink);
+}
+
+:is(.policy-links, .login-note) {
+  font-size: var(--text-xs);
+}
+
+:is(.policy-links a, a.login-note) {
+  color: var(--ink-3);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+:is(.policy-links a, a.login-note):hover {
+  color: var(--ink);
 }
