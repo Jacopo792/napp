@@ -105,7 +105,6 @@ export async function login(page: Page, account: Account, path = "/") {
   const acceptance = page.getByRole("heading", { name: "Before you continue" });
   await expect(
     acceptance
-      .or(page.locator("[data-note-row]").first())
       .or(page.getByRole("button", { name: "New note", exact: true }).first())
       .or(page.getByRole("heading", { name: "Choose a group" })),
   ).toBeVisible();
