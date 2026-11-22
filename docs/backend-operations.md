@@ -68,6 +68,25 @@ Review Render bandwidth and build usage alongside compute, and measure Supabase
 queries/storage separately. A paid collaboration process does not increase
 Supabase or Valkey quotas. Keep backup and restore planning with those services.
 
+## Schema rollout and recovery
+
+1. Replay migrations and run the backend checks against a disposable Supabase
+   instance. Before production schema changes, check the latest usable backup
+   and rehearse recovery in a separate project, including private Storage
+   objects alongside database rows.
+2. Apply required migrations before publishing clients or services that depend
+   on them.
+3. Deploy the compatible Edge Functions and validate Auth templates and redirects
+   in staging. Keep staging and production SMTP credentials separate.
+4. Verify the Render revision and browser/native origins before publishing the
+   website. On a failed release, restore the last compatible frontend and server
+   revisions, and verify their behavior against the current database schema.
+   Reverting application code leaves the applied migrations in place. Use a
+   forward repair for a shared schema unless a restoration has been rehearsed.
+
+The CI deploy hook sends the tested Git SHA as the Render `ref` parameter.
+[Render deploy hooks](https://render.com/docs/deploy-hooks#deploying-a-specific-git-commit)
+
 ## Provider references
 
 - [Compute prices](https://render.com/pricing#compute)
