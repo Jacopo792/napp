@@ -63,11 +63,8 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
-# Specifies an ordered list of seed files to load during db reset.
-# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Integration checks provision fixtures through Auth and the application API.
+enabled = false
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -233,7 +230,8 @@ double_confirm_changes = true
 # [auth.email.smtp] first, and restoring the `email_confirmed_at` check that
 # `20260830040000_invites_without_email_confirmation.sql` removed from
 # `private.redeem_archive_invite()`.
-enable_confirmations = false
+# Local confirmations use Mailpit. Configure production SMTP before enabling them there.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -245,26 +243,43 @@ otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Enable only for an explicit IONOS test. The local stack uses Mailpit.
+[auth.email.smtp]
+enabled = false
+host = "smtp.ionos.it"
+port = 465
+user = "support@nappnote.com"
+pass = "env(IONOS_SMTP_PASSWORD)"
+admin_email = "support@nappnote.com"
+sender_name = "Napp"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# The Auth emails share one look (version A, Blush). Production reads them from
+# the dashboard: paste each file into Authentication -> Email Templates.
+[auth.email.template.confirmation]
+subject = "Confirm your Napp account"
+content_path = "./supabase/templates/confirmation.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./supabase/templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your Napp password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Napp email"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "Your Napp code: {{ .Token }}"
+content_path = "./supabase/templates/reauthentication.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Your Napp email was changed"
+content_path = "./supabase/templates/email_changed_notification.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your Napp password was changed"
+content_path = "./supabase/templates/password_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
