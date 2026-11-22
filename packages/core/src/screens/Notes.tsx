@@ -1329,7 +1329,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleUploadImage = useCallback(
     async (file: File): Promise<string> => {
-      if (!canWriteArchive) throw new Error("This archive is view only");
+      if (!canWriteArchive) throw new Error("This group is view only");
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before uploading an image");
       const blob = await prepareImageForNote(file);
@@ -1349,7 +1349,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Attachments and images share one private, account-protected bucket. */
   const handleUploadFile = useCallback(
     async (file: File): Promise<string> => {
-      if (!canWriteArchive) throw new Error("This archive is view only");
+      if (!canWriteArchive) throw new Error("This group is view only");
       const current = sessionRef.current;
       if (!current) throw new Error("Sign in again before attaching a file");
       const objectId = crypto.randomUUID();
@@ -1376,7 +1376,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     async (values: Pick<Note, "photo" | "cover">, forNoteId?: string) => {
       const current = sessionRef.current;
       const noteId = forNoteId ?? selectedIdRef.current;
-      if (!current || !noteId || !canWriteArchive) throw new Error("This archive is view only");
+      if (!current || !noteId || !canWriteArchive) throw new Error("This group is view only");
       const previous = entriesRef.current.find((entry) => entry.note.id === noteId);
       if (!previous) return;
       const changed = { ...previous, note: { ...previous.note, ...values } };
@@ -2662,7 +2662,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   const handleLeaveArchive = useCallback(async () => {
     const current = sessionRef.current;
-    if (!current) throw new Error("Sign in again before leaving this archive");
+    if (!current) throw new Error("Sign in again before leaving this group");
     await departArchive(current.archiveId, () => leaveArchive(current), archiveExit(current));
   }, [archiveExit]);
 
@@ -2701,7 +2701,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const handleDeleteArchive = useCallback(
     async (archiveId: string) => {
       const current = sessionRef.current;
-      if (!current) throw new Error("Sign in again before deleting this archive");
+      if (!current) throw new Error("Sign in again before deleting this group");
       if (archiveId !== current.archiveId) {
         await deleteSpace(archiveId);
         await refreshSpaces();
@@ -3127,7 +3127,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         key={driveDestinationKey}
         destination={[
           spacesView.find((space) => space.archiveId === session.archiveId)?.name ??
-            "Current archive",
+            "Current group",
           viewedMember ? notesOf(viewedMember) : "Notes",
           selectedFolderId.startsWith("__") ? "Unfiled" : folderLabel,
         ].join(" / ")}
@@ -3687,7 +3687,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
       onCreate={() => openSheet({ kind: "new-archive" })}
       onDelete={(archiveId) =>
         void handleDeleteArchive(archiveId).catch((reason) =>
-          setError(reason instanceof Error ? reason.message : "The archive could not be deleted"),
+          setError(reason instanceof Error ? reason.message : "The group could not be deleted"),
         )
       }
     />
@@ -3767,7 +3767,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Whose notes the window is pointed at, said in the roster's own words. It
      used to read "Jacopo's notes" or the partner's, which was the last place
      in the interface still assuming an archive holds exactly two people. */
-  const readingLabel = viewedMember ? notesOf(viewedMember) : "This archive";
+  const readingLabel = viewedMember ? notesOf(viewedMember) : "This group";
   /* Only when it is somebody else's. Your own name under your own notes is the
      possessive the switch just stopped saying. */
   const scopeTag = viewedMember && !viewedMember.isSelf ? nameOf(viewedMember) : undefined;

@@ -757,7 +757,7 @@ export function SettingsPanel({
                     </div>
 
                     <div className="appearance-row profile-row">
-                      <RowLead icon={<Users size={16} />} label="Archive" />
+                      <RowLead icon={<Users size={16} />} label="Group" />
                       <button
                         type="button"
                         className="space-list-button press"
@@ -1480,7 +1480,7 @@ export function SettingsPanel({
                           }}
                         >
                           <LogOut size={16} />
-                          {leaving ? "Leave — press again" : "Leave this archive"}
+                          {leaving ? "Leave — press again" : "Leave this group"}
                         </button>
                       )}
                       {spaceStatus && (
@@ -1494,7 +1494,7 @@ export function SettingsPanel({
 
               {section === "spaces" && (
                 <section>
-                  <h3>Your archives</h3>
+                  <h3>Your groups</h3>
                   <div className="appearance-controls space-list">
                     {spaces.map((space) => {
                       const here = space.archiveId === currentArchiveId;
@@ -1564,7 +1564,7 @@ export function SettingsPanel({
                     onClick={onNewArchive}
                   >
                     <Plus size={16} />
-                    New archive…
+                    New group…
                   </button>
                   {spaceStatus && (
                     <p className="profile-note text-danger" role="alert">

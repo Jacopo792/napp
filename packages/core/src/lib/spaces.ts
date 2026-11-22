@@ -131,7 +131,7 @@ export async function createSpace(
 ): Promise<string> {
   const result = await supabase.rpc("create_archive", { archive_name: name, archive_kind: kind });
   fail(result.error);
-  if (typeof result.data !== "string") throw new Error("The archive could not be made");
+  if (typeof result.data !== "string") throw new Error("The group could not be made");
   if (features) {
     const merged = await supabase.rpc("merge_archive_settings", {
       target_archive_id: result.data,
@@ -144,7 +144,7 @@ export async function createSpace(
 
 export async function renameSpace(session: AppSession, name: string): Promise<void> {
   const trimmed = name.trim().slice(0, 80);
-  if (!trimmed) throw new Error("An archive needs a name");
+  if (!trimmed) throw new Error("A group needs a name");
   const result = await supabase
     .from("archives")
     .update({ name: trimmed })

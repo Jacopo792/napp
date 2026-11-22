@@ -150,7 +150,7 @@ export function ArchiveSheet({
           <input
             ref={nameField}
             className="sheet-title-field"
-            aria-label="Archive name"
+            aria-label="Group name"
             value={name}
             maxLength={80}
             disabled={busy}
@@ -290,7 +290,7 @@ export function ArchiveSheet({
               }}
             >
               <LogOut size={14} />
-              {leaving ? "Leave — press again" : "Leave this archive"}
+              {leaving ? "Leave — press again" : "Leave this group"}
             </button>
           )}
 
@@ -313,7 +313,7 @@ export function ArchiveSheet({
                   ? "Delete every note in it — press again"
                   : "Delete it for everyone in it — press again"
                 : alone
-                  ? "Delete this archive"
+                  ? "Delete this group"
                   : "Delete for everyone"}
             </button>
           )}
@@ -343,13 +343,13 @@ export function NewArchiveSheet({
     try {
       await onCreate(name.trim(), kind, { ...chosen.features });
     } catch (reason) {
-      setStatus(reason instanceof Error ? reason.message : "The archive could not be made");
+      setStatus(reason instanceof Error ? reason.message : "The group could not be made");
       setBusy(false);
     }
   }
 
   return (
-    <Sheet label="New archive" className="is-short">
+    <Sheet label="New group" className="is-short">
       <form
         className="sheet-body is-plain new-archive"
         onSubmit={(event) => {
@@ -364,7 +364,7 @@ export function NewArchiveSheet({
             aria-label="Name"
             value={name}
             maxLength={80}
-            placeholder="New archive"
+            placeholder="New group"
             disabled={busy}
             autoFocus
             onChange={(event) => setName(event.target.value)}

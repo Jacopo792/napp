@@ -55,7 +55,7 @@ async function downloadWithRetries(path: string, attempts = 3): Promise<Blob> {
     await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
   }
   fail(refusal);
-  throw new Error("The archive did not return this file");
+  throw new Error("The group did not return this file");
 }
 
 export async function downloadObject(

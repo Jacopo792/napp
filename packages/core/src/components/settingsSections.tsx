@@ -42,9 +42,9 @@ export const SETTINGS_SECTIONS = [
       {
         id: "spaces",
         tone: "indigo",
-        name: "Archives",
+        name: "Groups",
         icon: <Layers size={16} />,
-        keywords: "spaces archive switch new archive open delete",
+        keywords: "groups spaces archive switch new group open delete",
       },
       {
         id: "security",
@@ -141,9 +141,9 @@ export const SETTINGS_SECTIONS = [
       {
         id: "usage",
         tone: "gray",
-        name: "Usage",
+        name: "Statistics",
         icon: <ChartBar size={16} />,
-        keywords: "usage activity users devices",
+        keywords: "statistics usage activity users devices",
         adminOnly: true,
       },
     ],

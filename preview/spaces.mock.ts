@@ -38,7 +38,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const spaces: Space[] = [
   {
     archiveId: PREVIEW_ARCHIVE,
-    name: "Preview archive",
+    name: "Preview group",
     createdBy: PREVIEW_U1,
     seatLimit: 2,
     kind: "notes",

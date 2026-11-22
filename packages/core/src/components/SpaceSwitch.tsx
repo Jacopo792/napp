@@ -123,7 +123,7 @@ export function SpaceSwitch({
           {
             kind: "item",
             id: "space-info",
-            label: "Archive info",
+            label: "Group info",
             icon: <Info size={16} />,
             run: onInfo,
           },
@@ -142,7 +142,7 @@ export function SpaceSwitch({
         {
           kind: "item",
           id: "space-delete",
-          label: "Delete archive",
+          label: "Delete group",
           danger: true,
           icon: <Trash2 size={16} />,
           submenu: [
@@ -242,7 +242,7 @@ export function SpaceSwitch({
             {
               kind: "item",
               id: "space-new",
-              label: "New archive…",
+              label: "New group…",
               icon: <Plus size={16} />,
               run: onCreate,
             },

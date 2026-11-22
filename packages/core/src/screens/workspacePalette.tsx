@@ -296,10 +296,10 @@ export function workspacePalette(data: PaletteData, actions: PaletteActions) {
         .filter((space) => space.archiveId !== archiveId)
         .map((space) => ({
           id: `archive:${space.archiveId}`,
-          group: "Archives",
+          group: "Groups",
           searchOnly: true,
           name: space.name,
-          keywords: "archive space switch",
+          keywords: "group archive space switch",
           icon: <Layers size={16} />,
           run: () => switchArchive(space.archiveId),
         })),
@@ -515,7 +515,7 @@ export function workspacePalette(data: PaletteData, actions: PaletteActions) {
       const match = nameMatch(note.title, folded);
       return {
         id: `far:${note.noteId}`,
-        group: "Other archives",
+        group: "Other groups",
         name: note.title || "Untitled",
         hint: others.find((space) => space.archiveId === note.archiveId)?.name,
         rank: match < 0 ? 2 : match,
