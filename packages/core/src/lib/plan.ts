@@ -6,6 +6,7 @@ export interface AccountPlan {
   days_left: number | null;
   access_ends_at: string | null;
   stripe_billing?: boolean;
+  apple_billing?: boolean;
 }
 
 export interface ArchivePlan {

@@ -44,6 +44,31 @@ Deno.serve(async (request) => {
     return new Response(null, { status: 400 });
   }
 
+  if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
+    try {
+      const object = event.data.object;
+      const charge =
+        object.object === "charge"
+          ? object
+          : await stripe.charges.retrieve(
+              typeof object.charge === "string" ? object.charge : object.charge.id,
+            );
+      // A partial refund is a goodwill credit; access ends on a full refund.
+      if (
+        (event.type === "charge.dispute.created" || charge.refunded) &&
+        typeof charge.customer === "string"
+      ) {
+        const { error } = await admin.rpc("end_stripe_period", {
+          stripe_customer_id: charge.customer,
+        });
+        if (error) throw error;
+      }
+      return new Response(null, { status: 204 });
+    } catch {
+      console.error("Stripe refund reconciliation failed", event.id);
+      return new Response(null, { status: 500 });
+    }
+  }
   if (event.type !== "invoice.paid") return new Response(null, { status: 204 });
   try {
     // Retrieve using the SDK's pinned API version so invoice fields don't

@@ -454,3 +454,7 @@ verify_jwt = false
 # Invoked by pg_net. The function accepts only the service-role bearer.
 [functions.safety-worker]
 verify_jwt = false
+
+# Phone purchases verify Apple signatures; the app call also verifies the account.
+[functions.apple-iap]
+verify_jwt = false
