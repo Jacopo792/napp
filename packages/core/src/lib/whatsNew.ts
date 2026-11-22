@@ -59,14 +59,6 @@ export function localSpotlightLearned(): boolean {
   }
 }
 
-export function rememberSpotlightLearned(): void {
-  try {
-    localStorage.setItem(SPOTLIGHT_KEY, "1");
-  } catch {
-    /* Private window: the account row still carries it. */
-  }
-}
-
 export function compareVersions(a: string, b: string): number {
   if (!a || !b) return a ? 1 : b ? -1 : 0;
   const left = parts(a);

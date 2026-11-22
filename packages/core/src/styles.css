@@ -15507,72 +15507,6 @@ button.sheet-chip:hover,
   white-space: normal;
 }
 
-/* The first-launch lesson is the Spotlight's own field, with the shortcut
-   where the words go. Its keys arrive one after the other and keep being
-   pressed until the person presses them. Reduced motion keeps only the fade
-   (`.liquid *` drops the rest). */
-.spotlight-lesson {
-  animation: spotlight-lesson-fade var(--dur-base) var(--ease-out) backwards;
-}
-
-.spotlight-lesson .palette-search {
-  gap: 12px;
-}
-
-.spotlight-lesson-word {
-  flex: 1;
-  color: var(--ink-3);
-  font-size: var(--text-md);
-}
-
-.spotlight-lesson-keys {
-  display: flex;
-  gap: 6px;
-}
-
-.spotlight-lesson .palette-search kbd {
-  min-width: 34px;
-  border: 0.5px solid var(--rule);
-  border-bottom-width: 2px;
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  padding: 4px 10px;
-  font-family: var(--font-sans);
-  font-weight: var(--weight-semibold);
-  border-radius: var(--radius-tile);
-  color: var(--ink);
-  font-size: var(--text-lg);
-  text-align: center;
-  animation:
-    spotlight-lesson-key 420ms var(--ease-spring) calc(320ms + var(--key) * 90ms) backwards,
-    spotlight-lesson-press 2400ms var(--ease-press) calc(1400ms + var(--key) * 90ms) infinite;
-}
-
-@keyframes spotlight-lesson-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes spotlight-lesson-key {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-@keyframes spotlight-lesson-press {
-  0%,
-  12%,
-  100% {
-    transform: none;
-  }
-  6% {
-    transform: translateY(1px) scale(0.94);
-    border-bottom-width: 1px;
-    background: var(--accent-wash);
-  }
-}
-
 /* ── A centred sheet: archive, person, note, folder ──────────────────────────
    The portrait, the name, what it holds in one line, and a row of what is
    done to it. What happened is rows below. */
@@ -15887,7 +15821,6 @@ button.sheet-chip:hover,
     .space-list-current,
     .space-list-new,
     .space-switch,
-    .spotlight-lesson .palette-search kbd,
     .structure-end,
     .structure-field,
     .structure-headings button,

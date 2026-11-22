@@ -35,7 +35,6 @@ import type { SettingsSection } from "@/components/settingsSections";
 import { SheetStack } from "@/components/Sheet";
 import { Sidebar, type Scope } from "@/components/Sidebar";
 import { SpaceSwitch } from "@/components/SpaceSwitch";
-import { SpotlightLesson } from "@/components/SpotlightLesson";
 import { StructurePane, type ChapterItem, type StructureTarget } from "@/components/StructurePane";
 import { TrashSheet } from "@/components/TrashSheet";
 import { UpdateNotice } from "@/components/UpdateNotice";
@@ -164,7 +163,6 @@ import {
   CURRENT_RELEASE,
   compareVersions,
   laterVersion,
-  rememberSpotlightLearned,
   rememberWhatsNewSeen,
 } from "@/lib/whatsNew";
 import { RETRY_MIN_MS, waitUntilIdle } from "@/lib/writeDrain";
@@ -413,6 +411,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [session]);
   const writingPreferences = useWritingPreferences();
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const neverReadWhatsNew = useRef(false);
   const [scopeDirection, setScopeDirection] = useState<"next" | "previous" | null>(null);
   /** Where a right-click landed on the note page, if one has. */
   const [editorMenuPoint, setEditorMenuPoint] = useState<MenuPoint | null>(null);
@@ -912,9 +911,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     if (!session) return;
     let live = true;
     void pullAccountPreferences(session)
-      .catch(() => localPreferences({}, session.userId))
-      .then((preferences) => {
+      .then(
+        (preferences) => ({ preferences, pulled: true }),
+        () => ({ preferences: localPreferences({}, session.userId), pulled: false }),
+      )
+      .then(({ preferences, pulled }) => {
         if (!live) return;
+        /* Only the row can say no release was ever read on any device. */
+        neverReadWhatsNew.current = pulled && !preferences.whatsNewSeen;
         setFlags(flagsOf(preferences));
         setRemarksSeen((current) => mergeRemarksSeen(current, preferences.remarksSeen));
         setPreferencesReady(true);
@@ -1910,12 +1914,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         case "link":
           return noteEditorRef.current?.openLink();
         case "palette":
-          /* Pressing it is the one thing that ends the first-launch lesson. */
-          setFlags((current) => {
-            if (current.spotlightLearned) return current;
-            rememberSpotlightLearned();
-            return { ...current, spotlightLearned: true };
-          });
           setPaletteQuery("");
           return setPaletteOpen(true);
         case "draw":
@@ -2592,8 +2590,11 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   useEffect(() => {
     if (!whatsNewUnseen || loading || whatsNewShown) return;
     whatsNewShown = true;
-    openWhatsNew();
-  }, [whatsNewUnseen, loading, openWhatsNew]);
+    /* A new account starts on its welcome note: there is nothing it has
+       missed, so the current release counts as read rather than covering it. */
+    if (neverReadWhatsNew.current) markWhatsNewRead();
+    else openWhatsNew();
+  }, [whatsNewUnseen, loading, openWhatsNew, markWhatsNewRead]);
 
   async function handleLock(removeLocalContent = true) {
     if (
@@ -2665,7 +2666,6 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     await departArchive(current.archiveId, () => leaveArchive(current), archiveExit(current));
   }, [archiveExit]);
 
-  /* Its last member only; `deleteSpace` asks Postgres first and refuses
   /* Blocking someone still in this archive
      offers to remove them (its creator only, enforced by the RPC) or to leave. */
   useEffect(() => {
@@ -2695,6 +2695,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => window.removeEventListener("napp:safety-change", afterBlock);
   }, [members, session, currentSpace, handleLeaveArchive, refreshRemote]);
 
+  /* Its last member only; `deleteSpace` asks Postgres first and refuses
      before anything is removed. Another archive than this one goes without
      the window moving. */
   const handleDeleteArchive = useCallback(
@@ -3804,18 +3805,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* Both keyboard sheets travel with the settings panel, because both layouts
      mount that and neither wants a second copy of this. */
-  /* Once per account, after What's New has had its turn: the Spotlight's
-     shortcut, until it is pressed. */
-  const spotlightLesson =
-    preferencesReady &&
-    !flags.spotlightLearned &&
-    !loading &&
-    !settingsOpen &&
-    !paletteOpen &&
-    !shortcutsOpen;
   const keyboardSheets = (
     <>
-      {spotlightLesson && <SpotlightLesson />}
       <CommandPalette
         open={paletteOpen}
         commands={paletteCommands}
