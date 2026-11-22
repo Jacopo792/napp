@@ -2,13 +2,13 @@ import { platform } from "@/platform";
 
 export const POLICY_VERSION = "2026-11-16";
 export const NAPP_CONTROLLER = "Jacopo Vincenzo Ansalone";
-export const NAPP_SUPPORT_EMAIL = "ansalonejacpo@gmail.com";
+export const NAPP_SUPPORT_EMAIL = "support@nappnote.com";
+/** Data-protection requests, as on the landing site; an alias of support@. */
+export const NAPP_PRIVACY_EMAIL = "privacy@nappnote.com";
 
 export type PolicyKind = "privacy" | "terms" | "support";
 export function policyUrl(kind: PolicyKind): string {
-  const url = new URL(platform().webOrigin());
-  url.searchParams.set("page", kind);
-  return url.toString();
+  return `https://about.nappnote.com/${kind}/`;
 }
 export function deletionUrl(): string {
   const url = new URL(platform().webOrigin());
@@ -55,11 +55,15 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: "Your choices and rights",
-    text: `You can edit your profile, control presence, leave shared archives and initiate account deletion from Settings or the external account-deletion page. Contact ${NAPP_SUPPORT_EMAIL} to request access, correction, export, restriction or deletion of your personal data, or to object to processing where applicable. You may complain to your local data-protection authority; in Italy this is the Garante per la protezione dei dati personali.`,
+    text: `You can edit your profile, control presence, leave shared archives and initiate account deletion from Settings or the external account-deletion page. Contact ${NAPP_PRIVACY_EMAIL} to request access, correction, export, restriction or deletion of your personal data, or to object to processing where applicable. You may complain to your local data-protection authority; in Italy this is the Garante per la protezione dei dati personali.`,
   },
 ];
 
 export const TERMS_SECTIONS = [
+  {
+    title: "Who can use Napp",
+    text: "You must be at least 16 years old to create an account or use Napp. By accepting these terms you confirm that you are 16 or older. If an account turns out to belong to someone under 16, it may be closed and its data deleted.",
+  },
   {
     title: "Your account and writing",
     text: "Keep your sign-in details private and use an email address you are entitled to use. You retain rights to your writing. You allow Napp to store, process and deliver your content as needed to provide the service and share it with the archive members you choose. Only upload material you have the right to use and share.",

@@ -3,7 +3,8 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through
-[GitHub private vulnerability reporting](https://github.com/Jacopo792/napp/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/Jacopo792/napp/security/advisories/new),
+or by email to security@nappnote.com.
 Do not open a public issue for a vulnerability that could expose an archive,
 an account, or a Storage object.
 

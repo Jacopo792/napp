@@ -1,7 +1,7 @@
 # Gestione abusi – da attivare prima del lancio
 
 Responsabile indicato: Jacopo Vincenzo Ansalone. Contatto pubblico:
-ansalonejacpo@gmail.com. Il codice non invia email né notifiche automatiche ai
+support@nappnote.com (segnalazioni: safety@nappnote.com, alias di support@). Il codice non invia email né notifiche automatiche ai
 moderatori: una coda implementata richiede una persona che la controlli.
 
 Prima del lancio concordare e attivare un controllo almeno quotidiano, con
