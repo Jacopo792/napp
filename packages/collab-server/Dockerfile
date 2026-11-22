@@ -6,17 +6,17 @@ RUN corepack enable && corepack prepare pnpm@11.15.1 --activate
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/collab-server/package.json packages/collab-server/package.json
 COPY packages/core/package.json packages/core/package.json
-# Hoisted, not the default symlink tree: the shared modules below keep their
-# path under `packages/core/`, and a flat `node_modules` at the root is what
-# lets both them and `packages/collab-server/src` resolve the same packages.
-RUN pnpm install --frozen-lockfile --filter @notes-app/collab-server --prod \
-      --config.node-linker=hoisted
+RUN pnpm --filter @notes-app/collab-server... install --frozen-lockfile --prod \
+      --network-concurrency=8
 
 FROM node:22.23-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=deps /app/node_modules ./node_modules
+# Preserve pnpm's relative links from both workspaces to the virtual store.
+COPY --from=deps /app/packages/collab-server/node_modules ./packages/collab-server/node_modules
+COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
 COPY packages/collab-server/package.json ./packages/collab-server/package.json
 COPY packages/collab-server/src ./packages/collab-server/src
 
@@ -35,14 +35,6 @@ COPY packages/core/package.json ./packages/core/package.json
 COPY packages/core/src/features/editor/lib/ ./packages/core/src/features/editor/lib/
 # Shared schema validation now also reads the pure paragraph-link helpers.
 COPY packages/core/src/lib/ ./packages/core/src/lib/
-
-# `--config.node-linker=hoisted` builds a flat node_modules and does not link
-# workspace packages into it, so `@notes-app/core` resolves in development and
-# not in the image — which is the ERR_MODULE_NOT_FOUND above wearing a
-# different hat. The link is what pnpm would have made; making it here is one
-# line and does not depend on how a future pnpm hoists.
-RUN mkdir -p node_modules/@notes-app \
- && ln -s ../../packages/core node_modules/@notes-app/core
 
 USER node
 EXPOSE 8080
