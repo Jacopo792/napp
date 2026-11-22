@@ -1607,6 +1607,16 @@
   view-transition-name: note-body;
 }
 
+/* The band the three clusters sit in travels with them, on the page colour
+   like the body under it. Unnamed, it stayed in the root picture — and the
+   root under a column that has left is the bare wallpaper, so the strip
+   between the list's edge and where it lands flashed the picture through for
+   the length of the glide: a flicker at the end of every opening that read as
+   the panel bouncing. */
+.is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar {
+  view-transition-name: note-bar;
+}
+
 .is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar > :first-child {
   view-transition-name: note-toolbar-start;
 }
@@ -1649,6 +1659,7 @@
 .is-sliding-navigation::view-transition-group(navigation),
 .is-sliding-navigation::view-transition-group(navigation-list),
 .is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-bar),
 .is-sliding-navigation::view-transition-group(note-split) {
   overflow: clip;
 }
@@ -1665,6 +1676,7 @@
 }
 
 .is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-bar),
 .is-sliding-navigation::view-transition-group(note-split) {
   background: var(--page);
 }
@@ -1702,7 +1714,19 @@
   translate: -50% 0;
 }
 
+/* When the list stays, only its new picture travels. Its old one carried the
+   title at the other inset (the gutter beside the traffic lights comes and
+   goes with the folders), and the two printed over each other as a ghost of
+   the title sliding the other way. A list that is itself leaving keeps its
+   old picture: that is the only one with anything in it. */
+.is-sliding-navigation:has(.pane-slide.is-list:not(.is-collapsed))::view-transition-old(
+    navigation-list
+  ) {
+  display: none;
+}
+
 .is-sliding-navigation::view-transition-old(note-body),
+.is-sliding-navigation::view-transition-old(note-bar),
 .is-sliding-navigation::view-transition-old(note-split) {
   display: none;
 }
@@ -6798,6 +6822,11 @@ body:has(.sidebar-row.is-over) .drag-chip {
 }
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
+/* One row in a narrow pane: the writing tools give up a few pixels each. */
+.editor-toolbar.is-compact .editor-tool-button {
+  width: 1.75rem;
+}
+
 .editor-toolbar-compact-tools {
   display: flex;
   align-items: center;
@@ -8925,6 +8954,12 @@ body:has(.sidebar-row.is-over) .drag-chip {
   .editor-toolbar {
   padding-left: var(--titlebar-inset);
   transition: padding-left var(--dur-base) var(--ease);
+}
+
+/* Inside the glide the inset is already where it ends, so the picture taken of
+   it is the finished one and nothing slides on after the panes have stopped. */
+.is-sliding-navigation[data-shell="mac"] :is(.collection-toolbar, .editor-toolbar) {
+  transition: none;
 }
 
 /* The compact layout is not only a phone's: a desktop window narrower than
