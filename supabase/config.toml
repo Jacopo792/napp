@@ -448,3 +448,10 @@ enabled = true
 # project's current signing keys and the server-only scheduled worker.
 [functions.delete-account]
 verify_jwt = false
+
+# Billing verifies the account via Auth and webhook requests via Stripe signatures.
+[functions.stripe-billing]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

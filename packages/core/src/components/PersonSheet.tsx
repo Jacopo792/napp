@@ -15,6 +15,7 @@
  *
  * The work is read from `note_versions`, the same rows the history panel
  * reads, so the "+120" here and the "+120" there are one number. */
+import { SkeletonRows } from "@/components/Skeleton";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Bookmark } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -161,7 +162,7 @@ export function PersonSheet({
               {failure}
             </p>
           )}
-          {!work && !failure && <p className="sheet-quiet">Loading…</p>}
+          {!work && !failure && <SkeletonRows rows={3} lead />}
           {work?.length === 0 && <p className="sheet-quiet">Nothing written yet.</p>}
           {days.map((day) => (
             <section key={day.label} className="sheet-day">

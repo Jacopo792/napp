@@ -392,7 +392,11 @@ export async function restoreSession(): Promise<AppSession | null> {
   } catch {
     return stored;
   }
-  if (archives.some((archive) => archive.archiveId === stored.archiveId)) return stored;
+  if (archives.some((archive) => archive.archiveId === stored.archiveId)) {
+    if (localStorage.getItem(SESSION_KEY) !== JSON.stringify(stored))
+      localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+    return stored;
+  }
   if (archives.length === 0) {
     localStorage.removeItem(SESSION_KEY);
     resetArchiveCache();

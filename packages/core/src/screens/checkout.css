@@ -1,0 +1,802 @@
+/* Napp Plus uses the landing's night palette at checkout and the app palette
+   in Settings. Stripe's Payment Element reads the checkout tokens. */
+
+.checkout-stage {
+  --co-stage: var(--surface);
+  --co-card: var(--paper);
+  --co-card-2: color-mix(in srgb, var(--paper) 94%, var(--ink));
+  --co-ink: var(--ink);
+  --co-ink-2: var(--ink-3);
+  --co-ink-3: var(--ink-4);
+  --co-line: var(--rule-soft);
+  --co-accent: var(--accent);
+  --co-button: var(--co-accent);
+  --co-button-hover: var(--accent-strong);
+  --co-on-accent: var(--on-accent);
+  --co-field: var(--field-fill);
+  --co-danger: var(--danger);
+  --co-ease: var(--ease-out);
+  --serif: "Literata Variable", Literata, Georgia, serif;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  /* Anchored from the top, not centred: when Stripe's fields replace the
+     skeleton only the bottom edge may move, never the whole card. */
+  place-items: start center;
+  padding: max(72px, 14vh) 20px 40px;
+  background: var(--co-stage);
+  color: var(--co-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  isolation: isolate;
+}
+/* Light palettes: the card lifts off the page as white paper does, rather
+   than sinking into the palette's darker "paper" tone. */
+:root[data-theme="light"] .plans-page {
+  --co-stage: var(--page);
+  --co-card: color-mix(in srgb, var(--page) 45%, #fff);
+  --co-card-2: var(--page);
+}
+
+/* Night, rose, the light button and motion from napp-landing shared.css. */
+.checkout-night {
+  --night: #1d1719;
+  --night-text: #f6ecec;
+  --night-2: #b9a9ac;
+  --night-line: #34292d;
+  --night-rose: #f0a3ae;
+  --co-stage: var(--night);
+  --co-card: #241d20;
+  --co-card-2: #2b2326;
+  --co-ink: var(--night-text);
+  --co-ink-2: var(--night-2);
+  --co-ink-3: #a4989b;
+  --co-line: var(--night-line);
+  --co-accent: var(--night-rose);
+  --co-button: var(--night-text);
+  --co-button-hover: #fff;
+  --co-on-accent: #2c2325;
+  --co-danger: #f08c9a;
+  --co-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --rule-soft: var(--co-card-2);
+  --ink: var(--night-text);
+
+  color-scheme: dark;
+  place-items: center;
+  padding: 72px 20px 40px;
+}
+/* Stripe can grow as methods and address fields become available. */
+.checkout-night:has(.checkout-card) {
+  place-items: start center;
+  padding-top: max(72px, calc((100dvh - 480px) / 2 + 16px));
+}
+
+@media (max-width: 760px) {
+  .checkout-night:has(.checkout-card) {
+    padding-top: 72px;
+  }
+}
+
+/* One soft beam of light across the stage, out of focus, as asked for on
+   2026-11-22 after Cursor's checkout. The ink colour only: no coloured wash. */
+.checkout-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -20% -10%;
+  background: radial-gradient(
+    38% 70% at 62% 40%,
+    color-mix(in srgb, var(--co-ink) 12%, transparent),
+    color-mix(in srgb, var(--co-ink) 4%, transparent) 55%,
+    transparent 75%
+  );
+  rotate: -18deg;
+  filter: blur(48px);
+  pointer-events: none;
+}
+
+.checkout-night::after {
+  background: radial-gradient(
+    38% 70% at 62% 40%,
+    color-mix(in srgb, var(--night-text) 11%, transparent),
+    color-mix(in srgb, var(--night-text) 3%, transparent) 55%,
+    transparent 75%
+  );
+}
+
+.checkout-back {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--co-line);
+  color: var(--co-ink-2);
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    color 200ms,
+    background-color 250ms,
+    transform 450ms var(--spring);
+}
+.checkout-back:hover {
+  color: var(--co-ink);
+  background: color-mix(in srgb, var(--co-ink) 6%, transparent);
+}
+
+/* Nothing in a column may push past it: every box measures its border in,
+   and grid tracks may shrink below their content's natural width. */
+.checkout-stage *,
+.checkout-stage *::before,
+.checkout-stage *::after {
+  box-sizing: border-box;
+}
+.checkout-stage
+  :is(.checkout-card, .checkout-pay, .checkout-summary, .checkout-periods, .plans-card)
+  > * {
+  min-width: 0;
+}
+.checkout-enter {
+  width: min(100%, 860px);
+  display: grid;
+  justify-items: center;
+}
+.checkout-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  border: 1px solid var(--co-line);
+  border-radius: 22px;
+  background: var(--co-card);
+  min-height: 420px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lift);
+}
+.checkout-pay {
+  padding: 32px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  border-right: 1px solid var(--co-line);
+}
+.checkout-summary {
+  padding: 32px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  background: var(--co-card-2);
+}
+.checkout-card h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.checkout-label {
+  font-size: 13px;
+  color: var(--co-ink-2);
+}
+
+.checkout-periods {
+  --period-gap: 10px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--period-gap);
+}
+.checkout-period {
+  position: relative;
+  padding: 14px;
+  border: 1px solid var(--co-line);
+  border-radius: 14px;
+  background: none;
+  color: var(--co-ink-2);
+  font: 13px/1.45 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 200ms,
+    box-shadow 200ms,
+    transform 450ms var(--spring);
+}
+.checkout-period b {
+  color: var(--co-ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.checkout-period-indicator {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc((100% - var(--period-gap)) / 2);
+  border: 1px solid var(--co-accent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--co-accent);
+  pointer-events: none;
+  z-index: 1;
+}
+.checkout-periods[data-interval="year"] .checkout-period-indicator {
+  translate: calc(100% + var(--period-gap)) 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes checkout-period-slide {
+    from {
+      translate: var(--period-from) 0;
+    }
+  }
+  .checkout-period-indicator[data-moving] {
+    animation: checkout-period-slide 360ms var(--co-ease) backwards;
+  }
+}
+.checkout-period:active {
+  transform: scale(0.97);
+  transition: transform 90ms;
+}
+.checkout-save {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--co-accent);
+}
+
+@media (max-width: 375px) {
+  .checkout-period {
+    padding-top: 28px;
+  }
+  .checkout-save {
+    top: 8px;
+  }
+}
+
+.checkout-plan {
+  font-size: 14px;
+  color: var(--co-ink-2);
+}
+.checkout-plan .serif {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--co-accent);
+}
+.checkout-price {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+.checkout-price small {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--co-ink-2);
+}
+.checkout-rule {
+  height: 1px;
+  background: var(--co-line);
+}
+.checkout-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--co-ink-2);
+}
+.checkout-row.is-total {
+  color: var(--co-ink);
+  font-weight: 600;
+}
+.checkout-terms {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--co-line);
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--co-ink-3);
+}
+.checkout-terms a {
+  color: var(--co-ink-2);
+}
+.checkout-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--co-danger);
+}
+.checkout-secure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--co-ink-3);
+}
+
+.checkout-pill {
+  min-height: 44px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--co-button);
+  color: var(--co-on-accent);
+  font: 600 15px var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 200ms,
+    opacity 200ms,
+    transform 450ms var(--spring);
+}
+.checkout-pill:hover {
+  background: var(--co-button-hover);
+}
+.checkout-pill:active {
+  transform: scale(0.96);
+  transition: transform 90ms;
+}
+.checkout-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Loading: the real layout in outline, so nothing moves when Stripe arrives.
+   The app's own `.skeleton` sweep, squared to the fields' corners. */
+.checkout-skeleton {
+  border-radius: 10px;
+}
+
+/* The single sheet for everything that is not the form: activating, welcome,
+   manage, errors. Same stage, same card, one column. */
+.checkout-note {
+  width: min(100%, 420px);
+  padding: 36px 32px 32px;
+  border: 1px solid var(--co-line);
+  border-radius: 22px;
+  background: var(--co-card);
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  box-shadow: var(--shadow-lift);
+}
+.checkout-note h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+.checkout-note h1 .serif {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--co-accent);
+  letter-spacing: -0.03em;
+}
+.checkout-note p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--co-ink-2);
+}
+.checkout-note .checkout-pill {
+  margin-top: 8px;
+  min-width: 220px;
+}
+.checkout-sticker {
+  width: 88px;
+  height: 88px;
+}
+
+@media (max-width: 760px) {
+  .checkout-card {
+    grid-template-columns: 1fr;
+  }
+  .checkout-pay {
+    border-right: 0;
+    border-bottom: 1px solid var(--co-line);
+    padding: 24px;
+  }
+  .checkout-summary {
+    padding: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes checkout-in {
+    from {
+      opacity: 0;
+      translate: 0 14px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+  @keyframes checkout-pop {
+    from {
+      opacity: 0;
+      scale: 0.8;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+  @keyframes checkout-wave {
+    0%,
+    100% {
+      rotate: 0deg;
+    }
+    25% {
+      rotate: -16deg;
+    }
+    75% {
+      rotate: 8deg;
+    }
+  }
+  @keyframes checkout-arrive {
+    from {
+      translate: 0 14px;
+    }
+  }
+  .checkout-enter {
+    animation: checkout-arrive 900ms var(--co-ease) backwards;
+  }
+  .checkout-ready {
+    animation: fade-in var(--motion-content) var(--co-ease) both;
+  }
+  .checkout-placeholder {
+    animation: fade-in var(--motion-content) var(--co-ease) var(--motion-wait) backwards;
+  }
+  .checkout-sticker {
+    animation:
+      checkout-pop 900ms var(--spring) both,
+      checkout-wave 700ms ease-in-out 900ms 2;
+    transform-origin: 50% 90%;
+  }
+}
+
+/* Plans: the step before the checkout, as a sheet over the app. One Plus
+   offer with its reasons beside it; Free is a line, not a rival column. */
+.plans-page {
+  position: fixed;
+  z-index: 96;
+  inset: 0;
+  overflow-y: auto;
+}
+.plans-page::before {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 40px;
+  content: "";
+  -webkit-app-region: drag;
+}
+[data-shell="windows"]:not([data-fullscreen]) .plans-page {
+  top: 40px;
+}
+.plans-close {
+  left: auto;
+  right: 20px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+.plans {
+  width: min(100%, 760px);
+  display: grid;
+  gap: 16px;
+  justify-items: stretch;
+}
+
+.plans-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.plans-head h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+.plans-head .serif,
+.plans-status em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--co-accent);
+  letter-spacing: -0.03em;
+}
+
+.plans-interval {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--co-line);
+  background: color-mix(in srgb, var(--co-ink) 4%, transparent);
+}
+.plans-interval button {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--co-ink-2);
+  font: 500 13px var(--font-sans);
+  cursor: pointer;
+  transition: color 250ms;
+}
+.plans-interval button[aria-checked="true"] {
+  color: var(--co-ink);
+}
+.plans-interval button span {
+  color: var(--co-accent);
+  font-size: 11px;
+}
+.plans-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: 96px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--co-ink) 12%, transparent);
+  transition: translate 500ms var(--spring);
+}
+.plans-thumb[data-at="year"] {
+  translate: 96px 0;
+}
+
+.plans-card {
+  display: grid;
+  min-height: 332px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 28px 36px;
+  padding: 28px;
+  border: 1px solid var(--co-line);
+  border-radius: 22px;
+  background: var(--co-card);
+  box-shadow: var(--shadow-lift);
+}
+.plans-offer {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+}
+.plans-status {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--co-ink-2);
+}
+.plans-status em {
+  font-size: 14px;
+}
+.plans-price {
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+.plans-price small {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--co-ink-2);
+}
+.plans-note {
+  font-size: 13px;
+  color: var(--co-ink-3);
+  margin-bottom: 14px;
+}
+.plans-current {
+  background: color-mix(in srgb, var(--co-ink) 8%, transparent);
+  color: var(--co-ink-2);
+  cursor: default;
+}
+.plans-current:hover {
+  background: color-mix(in srgb, var(--co-ink) 8%, transparent);
+}
+
+.plans-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+.plans-features li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--co-ink-2);
+}
+.plans-features b {
+  display: block;
+  color: var(--co-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.plans-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--co-line);
+  background: var(--co-card-2);
+}
+.plans-free-slot {
+  grid-column: 1 / -1;
+}
+.plans-free {
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--co-line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--co-ink-3);
+}
+.plans-foot {
+  margin: 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--co-ink-3);
+}
+
+@media (max-width: 680px) {
+  .plans-card {
+    grid-template-columns: 1fr;
+  }
+  .plans-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .plans-price {
+    animation: checkout-in 500ms var(--co-ease) both;
+  }
+}
+
+/* Liquid Glass: the app's own material (styles.css, "Liquid Glass"), so the
+   cards follow the Settings choice. Solid keeps the lit rim and the depth over
+   an opaque ground; Translucent and Frosted let the stage show through, blurred
+   and pushed more saturated. Pieces inside (period choices, icons, the back
+   and close buttons) are smaller slabs of the same glass. */
+.checkout-card,
+.checkout-note,
+.plans-card {
+  border: 0;
+  border-radius: 26px;
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim),
+    inset -1px -1px 0 var(--glass-rim-soft),
+    inset 0 0 22px var(--glass-glow),
+    var(--glass-drop);
+}
+.checkout-summary {
+  background: color-mix(in srgb, var(--co-card-2) 70%, transparent);
+}
+.has-translucent-sidebar :is(.checkout-card, .checkout-note, .plans-card) {
+  background: color-mix(
+    in srgb,
+    var(--co-card) max(30%, calc(var(--glass-tint, 76%) * 0.7 - 10%)),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(26px) saturate(1.9) brightness(1.04);
+  backdrop-filter: blur(26px) saturate(1.9) brightness(1.04);
+}
+.has-frosted-glass :is(.checkout-card, .checkout-note, .plans-card) {
+  background: color-mix(in srgb, var(--co-card) calc(var(--glass-tint, 76%) * 0.8), transparent);
+  -webkit-backdrop-filter: blur(56px) saturate(1.5) brightness(1.08);
+  backdrop-filter: blur(56px) saturate(1.5) brightness(1.08);
+}
+:is(.has-translucent-sidebar, .has-frosted-glass) .checkout-summary {
+  background: var(--glass-piece);
+}
+
+.checkout-period,
+.plans-icon,
+.checkout-back,
+.plans-interval {
+  border-color: transparent;
+  background: var(--glass-piece);
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim-soft),
+    inset 0 0 0 0.5px var(--glass-rim-soft);
+}
+.checkout-back:hover {
+  background: var(--glass-piece-hover);
+}
+.plans-thumb {
+  background: var(--glass-piece-hover);
+  box-shadow: inset 1px 1px 0 var(--glass-rim);
+}
+
+/* Restore the original checkout panels over the landing's soft light. */
+.checkout-night :is(.checkout-card, .checkout-note) {
+  border: 1px solid var(--co-line);
+  border-radius: 22px;
+  background: var(--co-card);
+  box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.6);
+}
+.checkout-night .checkout-summary {
+  background: var(--co-card-2);
+}
+.checkout-night :is(.checkout-period, .checkout-back) {
+  border-color: var(--co-line);
+  background: transparent;
+  box-shadow: none;
+}
+.checkout-night .checkout-back:hover {
+  color: var(--co-ink);
+  background: color-mix(in srgb, var(--co-ink) 6%, transparent);
+}
+
+/* The plans sheet sits over the app: the room shows through, blurred, as it
+   does behind every other sheet, instead of a blank page. */
+.plans-page {
+  background: color-mix(in srgb, var(--co-stage) 72%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
+}
+
+/* The same content reserves the card's geometry while its skeleton is shown. */
+.plans-card-slot {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.plans-card-slot > [inert] {
+  visibility: hidden;
+}
+.plans-placeholder {
+  position: absolute;
+  inset: 0;
+}
+.plans-placeholder .skeleton-rows {
+  padding: 0;
+  gap: 16px;
+  animation: none;
+}
+.plans-placeholder .skeleton-lead {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.plans-placeholder .skeleton-row {
+  min-height: 39px;
+  align-items: start;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .plans-placeholder {
+    animation: fade-in var(--motion-content) var(--co-ease) var(--motion-wait) backwards;
+  }
+  .plans-card:not([role]) .plans-card-slot > :first-child {
+    animation: fade-in var(--motion-content) var(--co-ease) backwards;
+  }
+}

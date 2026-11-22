@@ -15,8 +15,12 @@ export function localStack(): LocalStack | null {
       execFileSync("supabase", ["status", "-o", "json"], {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
+        timeout: 20_000,
       }),
     );
+    const url = new URL(status.API_URL);
+    if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+      return null;
     return {
       apiUrl: status.API_URL,
       publishableKey: status.ANON_KEY,

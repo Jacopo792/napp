@@ -79,7 +79,7 @@ export default function Login({
     void restoreSession()
       .then((session) => {
         if (!active) return;
-        if (session) void navigate({ to: "/notes", replace: true });
+        if (session && !stayOnPage) void navigate({ to: "/notes", replace: true });
         else setRestoring(false);
       })
       .catch(() => {
@@ -132,7 +132,7 @@ export default function Login({
         return;
       }
       setPassword("");
-      navigate({ to: "/notes" });
+      if (!stayOnPage) void navigate({ to: "/notes" });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign in failed");
       setLoading(false);
@@ -182,7 +182,7 @@ export default function Login({
     setError("");
     try {
       await chooseArchive(archiveChoice.account, archiveId);
-      navigate({ to: "/notes" });
+      if (!stayOnPage) void navigate({ to: "/notes" });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open that group");
       setLoading(false);

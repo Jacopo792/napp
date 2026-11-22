@@ -47,18 +47,31 @@ const toVersion = (row: VersionRow): NoteVersion => ({
   wordsRemoved: row.words_removed,
 });
 
-/* ponytail: the newest 300 and no paging. A note written for a year at ten
-   minutes a stretch passes that; page by `created_at` when one does. */
 export async function loadVersions(session: AppSession, noteId: string): Promise<NoteVersion[]> {
-  const result = await supabase
-    .from("note_versions")
-    .select(LIST)
-    .eq("archive_id", session.archiveId)
-    .eq("note_id", noteId)
-    .order("created_at", { ascending: false })
-    .limit(300);
-  fail(result.error);
-  return ((result.data ?? []) as VersionRow[]).map(toVersion);
+  const versions: NoteVersion[] = [];
+  const batchSize = 300;
+  let cursor: VersionRow | undefined;
+  do {
+    let query = supabase
+      .from("note_versions")
+      .select(LIST)
+      .eq("archive_id", session.archiveId)
+      .eq("note_id", noteId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(batchSize);
+    if (cursor) {
+      query = query.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+      );
+    }
+    const result = await query;
+    fail(result.error);
+    const rows = (result.data ?? []) as VersionRow[];
+    versions.push(...rows.map(toVersion));
+    cursor = rows.length === batchSize ? rows.at(-1) : undefined;
+  } while (cursor);
+  return versions;
 }
 
 export async function loadVersionContent(versionId: string): Promise<VersionBody> {
@@ -93,6 +106,22 @@ export async function nameVersion(
     })
     .select(LIST)
     .single();
+  fail(result.error);
+  return toVersion(result.data as VersionRow);
+}
+
+export async function saveRestoreCheckpoint(
+  _session: AppSession,
+  noteId: string,
+  label: string,
+  current: VersionBody,
+): Promise<NoteVersion> {
+  const result = await supabase.rpc("save_restore_checkpoint", {
+    target_note_id: noteId,
+    snapshot_title: current.title,
+    snapshot_content: current.content,
+    snapshot_label: label.trim().slice(0, 80),
+  });
   fail(result.error);
   return toVersion(result.data as VersionRow);
 }

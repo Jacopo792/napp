@@ -35,6 +35,10 @@ export default defineConfig(({ mode }) => ({
      (invitation and policy links), and the released build keeps requiring it.
      The fixture gets a placeholder unless one is set in the environment. */
   define: {
+    "import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY": JSON.stringify("pk_preview"),
+    "import.meta.env.VITE_PREVIEW_CHECKOUT_URL": JSON.stringify(
+      desktop ? `http://localhost:${process.env.NAPP_PREVIEW_WEB_PORT || 5199}/` : "",
+    ),
     "import.meta.env.VITE_WEB_ORIGIN": JSON.stringify(
       process.env.VITE_WEB_ORIGIN ||
         loadEnv(mode, here("."), "VITE_").VITE_WEB_ORIGIN ||
@@ -43,6 +47,8 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: [
+      { find: /^@stripe\/react-stripe-js\/checkout$/, replacement: here("./preview/stripe.mock.tsx") },
+      { find: /^@stripe\/stripe-js\/pure$/, replacement: here("./preview/stripe.mock.tsx") },
       {
         find: /^(?:@\/lib\/|\.\/)supabaseClient$/,
         replacement: here("./preview/supabaseClient.mock.ts"),
@@ -62,6 +68,7 @@ export default defineConfig(({ mode }) => ({
       { find: /^@\/lib\/collab$/, replacement: here("./preview/collab.mock.ts") },
       { find: /^@\/lib\/comments$/, replacement: here("./preview/comments.mock.ts") },
       { find: /^@\/lib\/stickerPack$/, replacement: here("./preview/stickerPack.mock.ts") },
+      { find: /^@\/lib\/plan$/, replacement: here("./preview/plan.mock.ts") },
       { find: /^@\/lib\/history$/, replacement: here("./preview/history.mock.ts") },
       { find: /^@\/lib\/mediaText$/, replacement: here("./preview/mediaText.mock.ts") },
       { find: /^@\/lib\/spaces$/, replacement: here("./preview/spaces.mock.ts") },

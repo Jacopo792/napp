@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { processErasure, type ErasureBackend, type ErasureObject } from "./worker.ts";
 import { readErasureRequest } from "./request.ts";
+import { createStripe } from "../_shared/stripe.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -9,6 +10,7 @@ declare const Deno: {
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 const publicKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(url, serviceKey, options);
@@ -38,8 +40,37 @@ const backend: ErasureBackend = {
       await admin.rpc("ack_account_erasure_objects", { target_user_id: userId, bucket, paths }),
     );
   },
-  finish: async (userId) =>
-    checked(await admin.rpc("finish_account_erasure", { target_user_id: userId })) === true,
+  finish: async (userId) => {
+    const account = checked(
+      await admin
+        .from("stripe_billing_accounts")
+        .select("customer_id")
+        .eq("owner_id", userId)
+        .maybeSingle(),
+    );
+    if (account?.customer_id) {
+      if (!stripeKey) throw new Error("Stripe cleanup is unavailable");
+      const stripe = createStripe(stripeKey);
+      const customer = await stripe.customers.retrieve(account.customer_id);
+      if (!customer.deleted) {
+        const sessions = stripe.checkout.sessions.list({
+          customer: account.customer_id,
+          status: "open",
+        });
+        for await (const session of sessions) {
+          try {
+            await stripe.checkout.sessions.expire(session.id);
+          } catch (error) {
+            if ((await stripe.checkout.sessions.retrieve(session.id)).status === "open")
+              throw error;
+          }
+        }
+        // Stripe cancels active subscriptions when deleting the Customer.
+        await stripe.customers.del(account.customer_id);
+      }
+    }
+    return checked(await admin.rpc("finish_account_erasure", { target_user_id: userId })) === true;
+  },
 };
 
 Deno.serve(async (request) => {

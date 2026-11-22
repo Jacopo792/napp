@@ -1,3 +1,5 @@
+import { TrialNotice } from "@/components/PlanStatus";
+import { useAccountPlan, useArchivePlan } from "@/lib/usePlan";
 import { ArchiveSheet, NewArchiveSheet } from "@/components/ArchiveSheet";
 import { ChapterBoard } from "@/components/ChapterBoard";
 import { CommandPalette, ShortcutSheet } from "@/components/CommandPalette";
@@ -303,6 +305,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   const windowWidth = useWindowWidth();
 
   const [session, setSession] = useState<AppSession | null>(null);
+  const accountPlan = useAccountPlan(session?.userId);
+  const archivePlan = useArchivePlan(session?.userId, session?.archiveId);
   /** The scope on screen, which is a member id. Empty until the session and
    *  the roster have both arrived. */
   const [viewAs, setViewAs] = useState<string>("");
@@ -1187,7 +1191,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   }, [selected]);
 
   const selfMember = members.find((member) => member.isSelf);
-  const canWriteArchive = selfMember?.role === "editor";
+  const canWriteArchive =
+    selfMember?.role === "editor" && archivePlan?.can_write !== false && archivePlan !== null;
   /* A question about the archive and the note — your role, and whether this is
      Trash. It used to be answered by the websocket as well
      (`canEdit && collaborative.ready`), so a collaboration server that was slow
@@ -2454,7 +2459,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     return () => {
       current = false;
     };
-  }, [paletteOpen, session]);
+  }, [paletteOpen, session, archivePlan?.plan]);
 
   /** A link to a note, pressed. One made by Continue as note carries the
    *  words it was continued from, and those are what it goes back to. */
@@ -2526,7 +2531,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   useEffect(() => {
     void refreshSpaces();
   }, [refreshSpaces]);
-  const spacesView = withLiveRoster(spaces, session?.archiveId, members, seatLimit);
+  const spacesView = withLiveRoster(
+    spaces,
+    session?.archiveId,
+    members,
+    archivePlan?.seat_limit ?? seatLimit,
+  );
   /* The archive an account starts with — the first it joined. It stays
      notes and is never deleted from here; Postgres refuses the last one. */
   const defaultArchiveId = spaces[0]?.archiveId;
@@ -3616,6 +3626,18 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
     );
   }
 
+  const trialDays = accountPlan?.days_left;
+  const trialNotice = !settingsOpen && (trialDays === 7 || trialDays === 1) && (
+    <TrialNotice
+      key={`${session?.userId}/${accountPlan?.trial_ends_at}/${trialDays}`}
+      days={trialDays}
+      onOpen={() => {
+        setSettingsSection("account");
+        setSettingsOpen(true);
+      }}
+    />
+  );
+
   const sheetStack = session && sheets.length > 0 && (
     <SheetStack
       onBack={() => setSheets((stack) => stack.slice(0, -1))}
@@ -3654,6 +3676,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           return (
             <NewArchiveSheet
               key={key}
+              canCreateBook={accountPlan?.plan === "plus"}
               onCreate={async (name, kind, features) => {
                 const archiveId = await createSpace(
                   name,
@@ -3870,6 +3893,8 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             : undefined
         }
         email={session.email}
+        accountPlan={accountPlan}
+        archiveWritable={canWriteArchive}
         onAccountDeleted={() => {
           clearDrafts();
           setSession(null);
@@ -3944,7 +3969,13 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      beside the window navigation. */
   const noteStatus = selected ? (
     <span className="note-status block min-w-0 truncate">
-      {canWriteArchive ? saveReadout : <span className="readout text-ink-4">View only</span>}
+      {canWriteArchive ? (
+        saveReadout
+      ) : (
+        <span className="readout text-ink-4">
+          {archivePlan?.plan_writable === false ? "View only · Free plan" : "View only"}
+        </span>
+      )}
     </span>
   ) : null;
 
@@ -3952,7 +3983,9 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
   /* With no note open there is no header to say what just happened, so the
      list's tally says it instead, for as long as the header would have. */
-  const listNotice = selected ? null : error ? (
+  const listNotice = selected ? null : archivePlan?.plan_writable === false ? (
+    <span className="list-notice text-ink-4">View only · Free plan</span>
+  ) : error ? (
     <span key={`error:${error}`} className="list-notice text-danger" title={error}>
       {error}
     </span>
@@ -3973,36 +4006,38 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           }).catch(() => undefined)
       : undefined;
 
-  const noteActions =
-    selected && canWriteArchive ? (
-      <NoteMenu
-        lock={lockFor(selected.note.id)}
-        pinned={pinned}
-        folders={activeMeta.folders}
-        recent={recentNotes}
-        focusMode={focusMode}
-        onToggleFocus={toggleFocus}
-        onAddCover={addCover}
-        onOpenBeside={() => {
-          setPaletteQuery("beside ");
-          setPaletteOpen(true);
-        }}
-        onCopyMarkdown={() => void handleCopyMarkdown(selected)}
-        onExportMarkdown={() => handleExportMarkdown(selected)}
-        onPrint={() => void platform().print()}
-        onSavePdf={() => noteEditorRef.current?.savePdf()}
-        onTogglePin={() => handleTogglePin(selected.note.id)}
-        onHistory={() => noteEditorRef.current?.openHistory()}
-        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
-        onRecent={handleOpenRecent}
-        onDelete={canEdit ? () => handleMoveToTrash(selected) : undefined}
-      />
-    ) : null;
+  const noteActions = selected ? (
+    <NoteMenu
+      lock={lockFor(selected.note.id)}
+      pinned={pinned}
+      folders={activeMeta.folders}
+      recent={recentNotes}
+      focusMode={focusMode}
+      onToggleFocus={toggleFocus}
+      onAddCover={addCover}
+      onOpenBeside={() => {
+        setPaletteQuery("beside ");
+        setPaletteOpen(true);
+      }}
+      onCopyMarkdown={() => void handleCopyMarkdown(selected)}
+      onExportMarkdown={() => handleExportMarkdown(selected)}
+      onPrint={() => void platform().print()}
+      onSavePdf={() => noteEditorRef.current?.savePdf()}
+      onSaveDocx={canEdit ? undefined : () => noteEditorRef.current?.saveDocx()}
+      onTogglePin={canWriteArchive ? () => handleTogglePin(selected.note.id) : undefined}
+      onHistory={() => noteEditorRef.current?.openHistory()}
+      onMove={
+        canWriteArchive ? (folderId) => handleMoveNote(selected.note.id, folderId) : undefined
+      }
+      onRecent={handleOpenRecent}
+      onDelete={canEdit ? () => handleMoveToTrash(selected) : undefined}
+    />
+  ) : null;
 
   /* The same items the ⋯ carries, opened where the pointer is. The editor
      hands the click over only when it did not land on the words. */
   const editorMenu =
-    selected && editorMenuPoint && canWriteArchive ? (
+    selected && editorMenuPoint ? (
       <NoteContextMenu
         lock={lockFor(selected.note.id)}
         point={editorMenuPoint}
@@ -4020,9 +4055,12 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         onExportMarkdown={() => handleExportMarkdown(selected)}
         onPrint={() => void platform().print()}
         onSavePdf={() => noteEditorRef.current?.savePdf()}
-        onTogglePin={() => handleTogglePin(selected.note.id)}
+        onSaveDocx={canEdit ? undefined : () => noteEditorRef.current?.saveDocx()}
+        onTogglePin={canWriteArchive ? () => handleTogglePin(selected.note.id) : undefined}
         onHistory={() => noteEditorRef.current?.openHistory()}
-        onMove={(folderId) => handleMoveNote(selected.note.id, folderId)}
+        onMove={
+          canWriteArchive ? (folderId) => handleMoveNote(selected.note.id, folderId) : undefined
+        }
         onRecent={handleOpenRecent}
         onDelete={canEdit ? () => handleMoveToTrash(selected) : undefined}
       />
@@ -4601,6 +4639,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
               <div className="mobile-nav-drawer">{structure}</div>
             </div>
           )}
+          {trialNotice}
           {settingsPanel}
           {keyboardSheets}
           {sheetStack}
@@ -4616,6 +4655,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
         <div className="workspace-grid flex h-full min-h-0">
           {boardOpen ? chapterBoard : chapterEditor}
         </div>
+        {trialNotice}
         {settingsPanel}
         {keyboardSheets}
         {sheetStack}
@@ -4793,6 +4833,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
             <div className="mobile-nav-drawer">{sidebar}</div>
           </div>
         )}
+        {trialNotice}
         {settingsPanel}
         {keyboardSheets}
         {sheetStack}
@@ -5107,6 +5148,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
           ) : null}
         </DragOverlay>
       </DndContext>
+      {trialNotice}
       {settingsPanel}
       {keyboardSheets}
       {editorMenu}

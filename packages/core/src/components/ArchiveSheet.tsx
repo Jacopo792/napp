@@ -1,3 +1,4 @@
+import { useArchivePlan } from "@/lib/usePlan";
 /* The archive on screen, opened from the switch at the top of the sidebar:
  * who is in it, how many seats it has, who is waiting to be let in.
  *
@@ -40,11 +41,13 @@ function KindPicker({
   kind,
   disabled,
   cards = false,
+  canChooseBook = true,
   onChange,
 }: {
   kind: ArchiveKind;
   disabled?: boolean;
   cards?: boolean;
+  canChooseBook?: boolean;
   onChange: (kind: ArchiveKind) => void;
 }) {
   return (
@@ -58,7 +61,8 @@ function KindPicker({
           key={preset.id}
           type="button"
           role="radio"
-          disabled={disabled}
+          disabled={disabled || (preset.kind === "document" && !canChooseBook)}
+          title={preset.kind === "document" && !canChooseBook ? "Plus required" : undefined}
           aria-checked={kind === preset.kind}
           className={`press ${kind === preset.kind ? "is-active" : ""}`}
           onClick={() => onChange(preset.kind)}
@@ -115,6 +119,10 @@ export function ArchiveSheet({
   const [deleting, setDeleting] = useState(false);
   const [inviting, setInviting] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
+  const plan = useArchivePlan(selfId, space.archiveId);
+  const writable = plan?.can_write !== false && plan !== null;
+  const seats = plan?.seat_limit ?? space.seatLimit;
+  const configureSeats = writable && plan?.plan !== "free";
   const taken = space.members.length + invites.length;
   const alone = space.members.length <= 1;
   /* Whoever made it ends it, for everybody; leaving would keep it alive for
@@ -153,7 +161,7 @@ export function ArchiveSheet({
             aria-label="Group name"
             value={name}
             maxLength={80}
-            disabled={busy}
+            disabled={busy || !writable}
             onChange={(event) => setName(event.target.value)}
             onBlur={commitName}
             onKeyDown={(event) => {
@@ -163,6 +171,7 @@ export function ArchiveSheet({
           />
           <p>
             {space.kind === "document" ? "Book" : "Notes"}
+            {!writable && " · View only"}
             {notes !== undefined && ` · ${notes === 1 ? "1 note" : `${notes} notes`}`}
             {words !== undefined && ` · ${words.toLocaleString()} words`}
           </p>
@@ -172,6 +181,7 @@ export function ArchiveSheet({
           <button
             type="button"
             className={`press ${inviting ? "is-active" : ""}`}
+            disabled={!writable}
             aria-expanded={inviting}
             onClick={() => setInviting((open) => !open)}
           >
@@ -183,20 +193,20 @@ export function ArchiveSheet({
               type="button"
               className="press"
               aria-label="One seat fewer"
-              disabled={busy || space.seatLimit <= Math.max(1, taken)}
-              onClick={() => void act(() => onSeats(space.seatLimit - 1))}
+              disabled={busy || !configureSeats || seats <= Math.max(1, taken)}
+              onClick={() => void act(() => onSeats(seats - 1))}
             >
               <Minus size={13} />
             </button>
             <span>
-              {taken} of {space.seatLimit} seats
+              {taken} of {seats} seats
             </span>
             <button
               type="button"
               className="press"
               aria-label="One seat more"
-              disabled={busy || space.seatLimit >= MAX_SEATS}
-              onClick={() => void act(() => onSeats(space.seatLimit + 1))}
+              disabled={busy || !configureSeats || seats >= MAX_SEATS}
+              onClick={() => void act(() => onSeats(seats + 1))}
             >
               <Plus size={13} />
             </button>
@@ -204,6 +214,7 @@ export function ArchiveSheet({
           <button
             type="button"
             className="press"
+            disabled={!writable}
             onClick={() => {
               nameField.current?.focus();
               nameField.current?.select();
@@ -219,8 +230,8 @@ export function ArchiveSheet({
             <div className="sheet-invitations">
               <Invitations
                 invites={invites}
-                seatsFull={taken >= space.seatLimit}
-                canManage
+                seatsFull={taken >= seats}
+                canManage={writable}
                 onCreate={onCreateInvite}
                 onRevoke={onRevokeInvite}
               />
@@ -257,7 +268,8 @@ export function ArchiveSheet({
               <h3>Type</h3>
               <KindPicker
                 kind={space.kind}
-                disabled={busy}
+                disabled={busy || !writable}
+                canChooseBook={plan?.plan !== "free"}
                 onChange={(kind) => kind !== space.kind && void act(() => onKind(kind))}
               />
             </>
@@ -267,7 +279,7 @@ export function ArchiveSheet({
               <h3>Book</h3>
               <ArchiveOptions
                 features={space.features}
-                disabled={busy}
+                disabled={busy || !writable}
                 onChange={(features) => void act(() => onOptions(features))}
               />
             </>
@@ -300,7 +312,7 @@ export function ArchiveSheet({
             <button
               type="button"
               className={`sheet-leave press ${deleting ? "is-confirm" : ""}`}
-              disabled={busy || !deletable}
+              disabled={busy || !writable || !deletable}
               title={deletable ? undefined : "Only whoever made it can delete it"}
               onClick={() => {
                 if (!deleting) return setDeleting(true);
@@ -327,7 +339,9 @@ export function ArchiveSheet({
  *  book's tools are set from its own sheet once the window is open on it. */
 export function NewArchiveSheet({
   onCreate,
+  canCreateBook,
 }: {
+  canCreateBook: boolean;
   onCreate: (name: string, kind: ArchiveKind, features: DocumentFeatures) => Promise<void>;
 }) {
   const [name, setName] = useState("");
@@ -371,7 +385,13 @@ export function NewArchiveSheet({
           />
         </header>
         <div className="sheet-work">
-          <KindPicker cards kind={kind} disabled={busy} onChange={setKind} />
+          <KindPicker
+            cards
+            kind={kind}
+            disabled={busy}
+            canChooseBook={canCreateBook}
+            onChange={setKind}
+          />
           {status && (
             <p role="alert" className="sheet-quiet is-failure">
               {status}
@@ -380,7 +400,7 @@ export function NewArchiveSheet({
           <button
             type="submit"
             className="sheet-primary-action press"
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || (kind === "document" && !canCreateBook)}
           >
             {busy ? "Creating…" : "Create"}
           </button>

@@ -43,6 +43,26 @@ test("the archive is asked once per short window, not once per keystroke", async
   assert.equal(world.calls(), 2, "the answer was never refreshed");
 });
 
+test("a paid grant cannot be cached beyond the database's remaining access time", async () => {
+  let clock = 0;
+  const authorize = createAuthorizer(
+    async () => ({
+      userId: "member",
+      note: NOTE,
+      role: clock < 250 ? "editor" : "viewer",
+      nickname: "Jo",
+      remainingMs: clock < 250 ? 250 - clock : undefined,
+    }),
+    { ttl: 5000, now: () => clock },
+  );
+
+  const active = await authorize("token", "note");
+  assert.equal(active.allowed && active.readOnly, false);
+  clock = 250;
+  const expired = await authorize("token", "note");
+  assert.equal(expired.allowed && expired.readOnly, true);
+});
+
 test("a demotion is noticed within the window, and at once when asked freshly", async () => {
   const world = archive({ role: "editor" });
   let clock = 0;

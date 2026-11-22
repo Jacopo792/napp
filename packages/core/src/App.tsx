@@ -38,6 +38,7 @@ initWritingPreferences();
    before the router reads the address, and before a sign-in can lose it. */
 keepCapture();
 
+const BillingScreen = lazyRouteComponent(() => import("./screens/Billing"));
 const LoginScreen = lazyRouteComponent(() => import("./screens/Login"));
 const DeletionScreen = lazyRouteComponent(() => import("./screens/AccountDeletion"));
 const RecoveryScreen = lazyRouteComponent(() => import("./screens/PasswordRecovery"));
@@ -84,6 +85,8 @@ const loginRoute = createRoute({
       <DeletionScreen />
     ) : new URLSearchParams(window.location.search).get("action") === "reset-password" ? (
       <RecoveryScreen />
+    ) : new URLSearchParams(window.location.search).get("action") === "billing" ? (
+      <BillingScreen />
     ) : (
       <SignInEntry />
     ),

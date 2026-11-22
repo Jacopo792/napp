@@ -1,3 +1,5 @@
+import { SkeletonRows } from "@/components/Skeleton";
+import { useArchivePlan } from "@/lib/usePlan";
 /* What the note used to say, and who changed it.
  *
  * A column beside the page, in the comments' place and shape: the two answer
@@ -20,7 +22,13 @@ import { Bookmark, History, X } from "@/components/icons";
 import { Avatar } from "@/components/WorkspaceMenus";
 import { BASE_EXTENSIONS, richTextToPlainText } from "@/features/editor/lib/content";
 import { textChanges, type TextChange } from "@/features/editor/lib/versionDiff";
-import { loadVersionContent, loadVersions, nameVersion, type NoteVersion } from "@/lib/history";
+import {
+  loadVersionContent,
+  loadVersions,
+  nameVersion,
+  saveRestoreCheckpoint,
+  type NoteVersion,
+} from "@/lib/history";
 import { formatDateTime } from "@/lib/format";
 import { dateBucket } from "@/lib/listPreferences";
 import type { AppSession } from "@/lib/session";
@@ -67,6 +75,7 @@ export function NoteHistory({
   onRestore,
   onClose,
 }: Props) {
+  const plan = useArchivePlan(session.userId, session.archiveId);
   const [versions, setVersions] = useState<NoteVersion[] | null>(null);
   const [failure, setFailure] = useState("");
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
@@ -79,13 +88,15 @@ export function NoteHistory({
 
   useEffect(() => {
     let live = true;
+    setBodies(new Map());
+    setVersions(null);
     loadVersions(session, noteId)
       .then((list) => live && setVersions(list))
       .catch((error: Error) => live && setFailure(error.message));
     return () => {
       live = false;
     };
-  }, [session, noteId]);
+  }, [session, noteId, plan?.plan]);
 
   /* Arrived at from the note sheet with a version named: bring it into view
      once the list exists to scroll. */
@@ -158,7 +169,7 @@ export function NoteHistory({
     if (!openBody || !body || !opened) return;
     setBusy(true);
     try {
-      const kept = await nameVersion(
+      const kept = await saveRestoreCheckpoint(
         session,
         noteId,
         `Before restoring ${formatDateTime(opened.createdAt)}`,
@@ -261,7 +272,7 @@ export function NoteHistory({
             )}
 
             {!openBody || (previous && !whole && !changes) ? (
-              <p className="note-comments-empty">Loading…</p>
+              <SkeletonRows rows={2} />
             ) : previous && !whole ? (
               <p className="note-version-diff">
                 {changes!.every(([kind]) => kind === 0)
@@ -314,7 +325,7 @@ export function NoteHistory({
         </button>
       </header>
 
-      {canEdit && (
+      {canEdit && plan?.plan === "plus" && (
         <div className="note-history-name">
           {naming ? (
             <form
@@ -352,7 +363,7 @@ export function NoteHistory({
       )}
 
       <div className="note-comments-scroll">
-        {!versions && !failure && <p className="note-comments-empty">Loading…</p>}
+        {!versions && !failure && <SkeletonRows rows={4} lead />}
         {versions?.length === 0 && <p className="note-comments-empty">No versions yet.</p>}
         {groups.map((group) => (
           <section key={group.label} className="note-version-group">

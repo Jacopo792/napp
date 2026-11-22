@@ -311,10 +311,11 @@ function noteMenuItems({
   onExportMarkdown,
   onPrint,
   onSavePdf,
+  onSaveDocx,
   onDelete,
 }: NoteMenuActions): MenuItem[] {
   return [
-    pinItem(pinned, onTogglePin),
+    ...(onTogglePin ? [pinItem(pinned, onTogglePin)] : []),
     ...lockItems(lock),
     {
       kind: "item",
@@ -358,7 +359,7 @@ function noteMenuItems({
         ]
       : []),
     { kind: "separator" },
-    moveItem(folders, onMove),
+    ...(onMove ? [moveItem(folders, onMove)] : []),
     {
       kind: "item",
       id: "recent",
@@ -405,6 +406,17 @@ function noteMenuItems({
       icon: <FileText size={16} />,
       run: onSavePdf,
     },
+    ...(onSaveDocx
+      ? [
+          {
+            kind: "item" as const,
+            id: "docx",
+            label: "Save as Word",
+            icon: <FileText size={16} />,
+            run: onSaveDocx,
+          },
+        ]
+      : []),
     {
       kind: "item",
       id: "print",
@@ -434,19 +446,20 @@ interface NoteMenuActions {
   lock?: NoteLock;
   folders: Folder[];
   recent: { id: string; title: string }[];
-  onTogglePin: () => void;
+  onTogglePin?: () => void;
   onHistory: () => void;
   onToggleFocus: () => void;
   focusMode: boolean;
   /** Absent where there already is one, or where this reader cannot write. */
   onAddCover?: () => void;
   onOpenBeside: () => void;
-  onMove: (folderId: string | null) => void;
+  onMove?: (folderId: string | null) => void;
   onRecent: (id: string) => void;
   onCopyMarkdown: () => void;
   onExportMarkdown: () => void;
   onPrint: () => void;
   onSavePdf: () => void;
+  onSaveDocx?: () => void;
   /** Absent while somebody else holds the note's lock. */
   onDelete?: () => void;
 }

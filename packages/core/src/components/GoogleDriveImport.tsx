@@ -1,3 +1,4 @@
+import { SkeletonRows } from "@/components/Skeleton";
 import { useEffect, useRef, useState } from "react";
 import { FolderInput } from "@/components/icons";
 import { Sheet, SheetStack } from "@/components/Sheet";
@@ -152,11 +153,7 @@ export function GoogleDriveImport({ destination, members, prepare, importFile, o
                 ))}
               </ul>
             )}
-            {phase === "loading" && (
-              <p role="status" className="text-sm">
-                Loading Google Drive…
-              </p>
-            )}
+            {phase === "loading" && <SkeletonRows rows={4} lead />}
             {phase === "picking" && (
               <p role="status" className="text-sm">
                 Choose files in your browser…

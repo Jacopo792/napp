@@ -1511,8 +1511,62 @@
   animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
 }
 
+/* Placeholder layouts (components/Skeleton.tsx). They wait `--motion-wait`
+   before fading in, so a load that finishes quickly shows nothing at all
+   rather than a flash of grey bars. */
+.skeleton-rows,
+.skeleton-chat {
+  display: grid;
+  gap: 14px;
+  padding: 6px 0;
+  animation: fade-in var(--motion-content) var(--ease-out) var(--motion-wait) backwards;
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skeleton-lead {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.skeleton-lines {
+  flex: 1;
+  display: grid;
+  gap: 7px;
+}
+.skeleton-lines .skeleton {
+  height: 10px;
+}
+.skeleton-lines .skeleton.is-short {
+  height: 8px;
+}
+.skeleton-chat {
+  padding: 12px 14px;
+}
+.skeleton-bubble {
+  height: 34px;
+  border-radius: 18px;
+}
+.skeleton-bubble.is-mine {
+  justify-self: end;
+}
+/* An image or video still on its way: a quiet plate of its likely size. */
+.rich-media-loading.skeleton {
+  min-height: 160px;
+  border: 0;
+  border-radius: var(--radius-md);
+  animation:
+    fade-in var(--motion-content) var(--ease-out) var(--motion-wait) backwards,
+    skeleton-sweep 1.6s var(--ease-in-out) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .skeleton-rows,
+  .skeleton-chat,
+  .rich-media-loading.skeleton {
     animation: none;
   }
 
@@ -15872,6 +15926,253 @@ button.sheet-chip:hover,
   ) {
     corner-shape: squircle;
   }
+}
+
+.trial-notice {
+  position: fixed;
+  z-index: 35;
+  inset-inline-start: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.8125rem;
+}
+
+.trial-notice button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem;
+}
+
+/* ── Account ──────────────────────────────────────────────────────────────
+   As the phone lays out Settings: named groups on a raised plate, a tinted
+   glyph tile per row, hairlines that start after the tile, a chevron where
+   a row opens something. Every change happens in a small window of its own,
+   never by unfolding fields between the rows. */
+.account-groups h3 {
+  margin: 22px 4px 7px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.account-groups h3:first-child {
+  margin-top: 4px;
+}
+
+.account-group {
+  overflow: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--page));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+:root[data-theme="light"] .account-group {
+  background: color-mix(in srgb, var(--page) 45%, white);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 1px 2px rgb(40 20 24 / 0.04);
+}
+
+.account-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px 0 12px;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-press);
+}
+
+.account-row + .account-row::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 52px;
+  height: 0.5px;
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  content: "";
+}
+
+.account-row:is(button, a):hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.account-row:is(button, a):active {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* The glyph answers to Settings → Style like the sidebar's: bare ink when
+   icons are Clear, a tile washed with the tint when they are Tinted. No hue
+   of its own, ever. */
+.account-tile {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ink-3);
+}
+
+:root[data-icon-style="tinted"] .account-tile {
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 20%, transparent);
+  color: var(--icon-tint-strong, var(--accent-strong));
+}
+
+.account-row-label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.account-row-label.is-danger {
+  color: var(--danger);
+}
+
+.account-row-value {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-row-trailing {
+  display: flex;
+  color: var(--ink-4);
+}
+
+/* The window a row opens. */
+.account-dialog-ground {
+  position: fixed;
+  z-index: 96;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+
+.account-dialog {
+  width: min(24rem, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 20px;
+  padding: 22px 22px 18px;
+  background: var(--page);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.1),
+    0 24px 60px -16px rgb(0 0 0 / 0.45);
+}
+
+.account-dialog h2 {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.account-field input {
+  height: 36px;
+  border-radius: 10px;
+  padding: 0 11px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--page));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  outline: none;
+  transition: box-shadow var(--dur-fast) var(--ease-press);
+}
+
+:root[data-theme="light"] .account-field input {
+  background: white;
+}
+
+.account-field input:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px var(--accent-wash);
+}
+
+.account-field input:read-only {
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.account-dialog-link {
+  margin: -2px 0 4px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.account-dialog-status {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.account-dialog-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.account-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.account-dialog-actions button {
+  min-height: 34px;
+  border-radius: var(--radius-pill);
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.account-dialog-actions button.is-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root[data-theme="light"] .account-dialog-actions button.is-primary {
+  color: white;
+}
+
+.account-dialog-actions button:disabled {
+  opacity: 0.6;
 }
 
 /* ══ Controls ════════════════════════════════════════════════════════════════

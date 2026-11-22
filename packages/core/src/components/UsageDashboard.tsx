@@ -1,3 +1,4 @@
+import { SkeletonRows } from "@/components/Skeleton";
 import { ChevronLeft, ChevronRight, RotateCw, Search } from "@/components/icons";
 import { useUsageDashboard } from "@/lib/useUsageDashboard";
 import { USAGE_CLIENT, usageAgo } from "@/lib/usageShape";
@@ -76,11 +77,14 @@ export function UsageDashboard() {
             </span>
           </div>
         ))}
-        {!data.rows.length && (
-          <div className="appearance-row usage-empty" role="status">
-            {data.loading ? "Loading…" : data.search ? "No matches" : "No activity yet"}
-          </div>
-        )}
+        {!data.rows.length &&
+          (data.loading ? (
+            <SkeletonRows rows={4} lead />
+          ) : (
+            <div className="appearance-row usage-empty" role="status">
+              {data.search ? "No matches" : "No activity yet"}
+            </div>
+          ))}
       </div>
 
       {data.total > PAGE && (

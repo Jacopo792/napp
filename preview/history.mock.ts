@@ -130,3 +130,5 @@ export async function loadNamedVersions(session: AppSession) {
       .map((version) => ({ ...version, noteId: note.id, title: note.title })),
   );
 }
+
+export const saveRestoreCheckpoint = nameVersion;

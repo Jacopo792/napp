@@ -9,6 +9,7 @@
  * cannot write and an outsider cannot look, and that a browser still running
  * the old build is refused rather than allowed to overwrite. */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { after, before, describe, it } from "node:test";
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
 import type { Server } from "@hocuspocus/server";
@@ -921,5 +922,235 @@ describe("the collaboration server", { skip }, () => {
       .from("note_versions")
       .insert({ ...named, author_ids: [outsider.userId] });
     assert.notEqual(stranger.error, null, "an outsider named a version");
+  });
+  async function trialEnds(account: Account, timestamp: number) {
+    const result = await asService(local)
+      .from("account_entitlements")
+      .update({ trial_ends_at: new Date(timestamp).toISOString() })
+      .eq("owner_id", account.userId);
+    assert.equal(result.error, null, result.error?.message);
+  }
+
+  const archivePlan = (account: Account, target: string) =>
+    account.client.rpc("archive_plan", { target_archive_id: target });
+
+  it("seats a Free guest under the owner's trial and keeps the archive readable after expiry", async () => {
+    const admin = asService(local);
+    const accountPlan = await editor.client.rpc("my_plan");
+    assert.equal(accountPlan.error, null, accountPlan.error?.message);
+    assert.equal(accountPlan.data?.plan, "plus");
+    assert.equal(accountPlan.data?.days_left, 30);
+    const selfPromotion = await mate.client
+      .from("account_entitlements")
+      .update({ plan: "plus" })
+      .eq("owner_id", mate.userId);
+    assert.ok(selfPromotion.error);
+    const otherPlan = await mate.client
+      .from("account_entitlements")
+      .select("plan")
+      .eq("owner_id", editor.userId);
+    assert.deepEqual(otherPlan.data, []);
+
+    await trialEnds(mate, Date.now() - 10_000);
+    assert.equal((await mate.client.rpc("my_plan")).data?.plan, "free");
+    assert.equal((await archivePlan(mate, archiveId)).data?.can_write, true);
+    assert.equal((await archivePlan(outsider, archiveId)).data, null);
+
+    const book = await editor.client.rpc("create_archive", {
+      archive_name: "Trial book",
+      archive_kind: "document",
+    });
+    assert.equal(book.error, null, book.error?.message);
+    assert.equal((await archivePlan(mate, book.data)).data?.can_write, true);
+
+    const oldNoteId = await newNote("Before the downgrade", "This content remains readable");
+    const oldVersion = await admin
+      .from("note_versions")
+      .insert({
+        note_id: oldNoteId,
+        archive_id: archiveId,
+        title: "An older title",
+        content: { type: "doc" },
+        created_at: new Date(Date.now() - 31 * 86_400_000).toISOString(),
+      })
+      .select("id")
+      .single();
+    assert.equal(oldVersion.error, null, oldVersion.error?.message);
+    assert.equal(
+      (await mate.client.from("note_versions").select("id").eq("id", oldVersion.data!.id)).data
+        ?.length,
+      1,
+    );
+
+    const live = connect(oldNoteId, mate.token);
+    await until(() => live.provider.isSynced);
+    assert.equal(live.provider.authorizedScope, "read-write");
+    try {
+      await trialEnds(editor, Date.now() - 10_000);
+      assert.equal((await editor.client.rpc("my_plan")).data?.plan, "free");
+      assert.equal((await archivePlan(mate, archiveId)).data?.plan_writable, false);
+      assert.equal((await archivePlan(editor, book.data)).data?.plan_writable, false);
+
+      await sleep(200);
+      const reader = connect(oldNoteId, editor.token);
+      try {
+        await until(() => reader.provider.isSynced);
+        assert.equal(reader.provider.authorizedScope, "readonly");
+        assert.equal(reader.doc.getText(TITLE).toString(), "Before the downgrade");
+        append(live.doc, " [forbidden after expiry]");
+        await sleep(700);
+        assert.equal(reader.doc.getText(TITLE).toString(), "Before the downgrade");
+        assert.equal(await titleOf(oldNoteId), "Before the downgrade");
+      } finally {
+        reader.provider.destroy();
+      }
+
+      const update = await mate.client
+        .from("notes")
+        .update({ page_icon: "⭐" })
+        .eq("id", oldNoteId)
+        .select("id");
+      assert.deepEqual(update.data, []);
+      const oldVisible = await mate.client
+        .from("note_versions")
+        .select("id")
+        .eq("id", oldVersion.data!.id);
+      assert.deepEqual(oldVisible.data, []);
+      assert.equal(
+        (await admin.from("note_versions").select("id").eq("id", oldVersion.data!.id)).data?.length,
+        1,
+      );
+
+      const rejected = await editor.client.rpc("create_archive", {
+        archive_name: "Free book",
+        archive_kind: "document",
+      });
+      assert.match(rejected.error?.message ?? "", /require Plus/);
+    } finally {
+      live.provider.destroy();
+    }
+  });
+
+  it("accepts only one Free shared group even when pending invitations are claimed together", async () => {
+    await trialEnds(editor, Date.now() - 10_000);
+    // Create two private spaces and issue both links before either seats a member.
+    const spaces = await Promise.all(
+      ["First group", "Second group"].map((archive_name) =>
+        editor.client.rpc("create_archive", { archive_name }),
+      ),
+    );
+    for (const space of spaces) assert.equal(space.error, null, space.error?.message);
+    const [first, second] = spaces.map((space) => space.data as string);
+    const invitations = await Promise.all([
+      editor.client.rpc("create_archive_invite", {
+        archive_id: first,
+        email: outsider.email,
+        role: "editor",
+      }),
+      editor.client.rpc("create_archive_invite", {
+        archive_id: second,
+        email: mate.email,
+        role: "editor",
+      }),
+    ]);
+    for (const invitation of invitations)
+      assert.equal(invitation.error, null, invitation.error?.message);
+    const claims = await Promise.all([
+      outsider.client.rpc("claim_archive_invite", { token: invitations[0].data }),
+      mate.client.rpc("claim_archive_invite", { token: invitations[1].data }),
+    ]);
+    const accepted = claims.filter((claim) => !claim.error);
+    assert.equal(accepted.length, 1);
+    const rejected = claims.find((claim) => claim.error);
+    assert.match(rejected?.error?.message ?? "", /one shared group/);
+    const thirdSeat = await editor.client.rpc("create_archive_invite", {
+      archive_id: accepted[0].data,
+      email: viewer.email,
+      role: "editor",
+    });
+    assert.match(thirdSeat.error?.message ?? "", /full/);
+
+    const note = await editor.client
+      .from("notes")
+      .insert({
+        archive_id: accepted[0].data,
+        owner_id: editor.userId,
+        id: crypto.randomUUID(),
+        title: "Free note",
+        body: "",
+        content: { type: "doc", content: [] },
+        content_version: 1,
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    assert.equal(note.error, null, note.error?.message);
+    const snapshot = { type: "doc" };
+    const named = await editor.client.from("note_versions").insert({
+      note_id: note.data!.id,
+      archive_id: accepted[0].data,
+      author_ids: [editor.userId],
+      label: "Paid feature",
+      content: snapshot,
+    });
+    assert.ok(named.error);
+    const checkpoint = await editor.client.rpc("save_restore_checkpoint", {
+      target_note_id: note.data!.id,
+      snapshot_title: "Kept before restore",
+      snapshot_content: snapshot,
+      snapshot_label: "Before restoring",
+    });
+    assert.equal(checkpoint.error, null, checkpoint.error?.message);
+    assert.equal(checkpoint.data?.label, null);
+  });
+
+  it("charges note and chat uploads across archives to their owner and retains media on downgrade", async () => {
+    const owner = await makeAccount(local, "quota-owner");
+    const first = await owner.client.rpc("create_archive", { archive_name: "Storage first" });
+    const second = await owner.client.rpc("create_archive", { archive_name: "Storage second" });
+    assert.equal(first.error, null, first.error?.message);
+    assert.equal(second.error, null, second.error?.message);
+
+    const original = new Uint8Array([1, 2, 3]);
+    const source = `${first.data}/${crypto.randomUUID()}`;
+    const chat = `${second.data}/${crypto.randomUUID()}.0.png`;
+    const images = owner.client.storage.from("note-images");
+    const media = owner.client.storage.from("chat-media");
+    const retained = await images.upload(source, original, {
+      contentType: "application/octet-stream",
+    });
+    assert.equal(retained.error, null, retained.error?.message);
+
+    // Adjust the measured size of our own disposable object so the actual
+    // Storage API crosses a production-sized quota with a three-byte upload.
+    assert.match(source, /^[a-f0-9-]{36}\/[a-f0-9-]{36}$/);
+    execFileSync(
+      "supabase",
+      [
+        "db",
+        "query",
+        "--local",
+        `update storage.objects set metadata = jsonb_set(metadata, '{size}', '999999998')
+         where bucket_id = 'note-images' and name = '${source}'`,
+      ],
+      { stdio: "pipe" },
+    );
+    try {
+      const uploaded = await media.upload(chat, original, { contentType: "image/png" });
+      assert.equal(uploaded.error, null, uploaded.error?.message);
+      await trialEnds(owner, Date.now() - 10_000);
+      const rejected = await media.upload(`${second.data}/${crypto.randomUUID()}.0.png`, original, {
+        contentType: "image/png",
+      });
+      assert.match(rejected.error?.message ?? "", /PT413|storage limit/i);
+
+      const downloaded = await images.download(source);
+      assert.equal(downloaded.error, null, downloaded.error?.message);
+      assert.deepEqual(new Uint8Array(await downloaded.data!.arrayBuffer()), original);
+    } finally {
+      await images.remove([source]);
+      await media.remove([chat]);
+    }
   });
 });

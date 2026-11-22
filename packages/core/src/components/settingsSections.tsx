@@ -10,6 +10,7 @@ import {
   BookOpen,
   ChartBar,
   Chapters,
+  IdCard,
   Keyboard,
   Layers,
   MessagesSquare,
@@ -31,6 +32,13 @@ export const SETTINGS_SECTIONS = [
         name: "Profile",
         icon: <UserRound size={16} />,
         keywords: "nickname name avatar picture photo",
+      },
+      {
+        id: "account",
+        tone: "blue",
+        name: "Account",
+        icon: <IdCard size={16} />,
+        keywords: "free plus plan trial upgrade billing email delete policies",
       },
       {
         id: "members",

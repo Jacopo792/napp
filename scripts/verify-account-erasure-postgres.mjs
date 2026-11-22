@@ -19,7 +19,7 @@ try {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     create table realtime.messages(extension text);
     create function realtime.topic() returns text language sql stable as $$select ''::text$$;
-    create table auth.users(id uuid primary key, email text, email_change text, email_confirmed_at timestamptz);
+    create table auth.users(id uuid primary key, email text, email_change text, email_confirmed_at timestamptz, is_anonymous boolean not null default false);
     create table auth.sessions(id uuid primary key, user_id uuid references auth.users(id) on delete cascade);
     create function auth.uid() returns uuid language sql stable as
       $$select (nullif(current_setting('request.jwt.claims', true),'')::jsonb->>'sub')::uuid$$;
@@ -28,7 +28,7 @@ try {
     create function auth.jwt() returns jsonb language sql stable as
       $$select coalesce(nullif(current_setting('request.jwt.claims', true),'')::jsonb,'{}')$$;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,unique(bucket_id,name));
+    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,unique(bucket_id,name));
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
     grant usage on schema public, auth, storage to anon, authenticated, service_role;
@@ -81,8 +81,84 @@ try {
     insert into public.media_text(archive_id,object_id,text) values ('${shared}','${file}','Erase OCR'),('${shared}','${keptFile}','Keep OCR');
   `);
   const scalar = async (sql, args = []) => Object.values((await db.query(sql, args)).rows[0])[0];
+  stage = "check account plan limits";
+  assert.equal(await scalar("select private.effective_plan($1)", [one]), "plus");
+  assert.equal(await scalar("select private.archive_seat_limit($1)", [shared]), 8);
+  await db.query("update public.account_entitlements set trial_ends_at=now() where owner_id=$1", [
+    one,
+  ]);
+  assert.equal(await scalar("select private.effective_plan($1)", [one]), "free");
+  assert.equal(await scalar("select private.archive_seat_limit($1)", [shared]), 2);
+  assert.equal(await scalar("select private.archive_plan_writable($1)", [shared]), true);
+  await db.query("update public.archives set kind='document' where id=$1", [solo]);
+  assert.equal(await scalar("select private.archive_plan_writable($1)", [solo]), false);
+
+  const storedPath = `${shared}/${file}`;
+  await db.query(
+    "update storage.objects set metadata=jsonb_build_object('size',999999999) where name=$1",
+    [storedPath],
+  );
+  await assert.rejects(
+    db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values('note-images',$1,jsonb_build_object('size',2))",
+      [`${shared}/${crypto.randomUUID()}`],
+    ),
+    { code: "PT413" },
+  );
+  await db.query("update storage.objects set metadata=null where name=$1", [storedPath]);
+
+  await db.query(
+    "update public.account_entitlements set status='canceled', current_period_end=now()+interval '1 hour' where owner_id=$1",
+    [one],
+  );
+  assert.equal(await scalar("select private.effective_plan($1)", [one]), "plus");
+  assert.equal(await scalar("select private.archive_plan_writable($1)", [solo]), true);
+  await db.query(
+    "update public.account_entitlements set current_period_end=now() where owner_id=$1",
+    [one],
+  );
+  assert.equal(await scalar("select private.effective_plan($1)", [one]), "free");
+  await db.query("update public.archives set kind='notes' where id=$1", [solo]);
+
+  stage = "reconcile Stripe paid periods";
+  assert.equal(await scalar("select (public.prepare_stripe_billing($1)).owner_id", [one]), one);
+  await db.query("select public.bind_stripe_customer($1, 'cus_stripe_test')", [one]);
+  await db.exec(`
+    select public.record_stripe_paid_period('cus_unknown', 'sub_unknown', now() + interval '60 days');
+    select public.record_stripe_paid_period('cus_stripe_test', 'sub_paid', now() + interval '30 days');
+    select public.record_stripe_paid_period('cus_stripe_test', 'sub_paid', now() + interval '60 days');
+    select public.record_stripe_paid_period('cus_stripe_test', 'sub_old', now() + interval '30 days');
+  `);
+  assert.equal(await scalar("select private.effective_plan($1)", [one]), "plus");
+  assert.equal(
+    await scalar(
+      "select external_subscription_id from public.account_entitlements where owner_id=$1",
+      [one],
+    ),
+    "sub_paid",
+  );
+  assert.equal(
+    await scalar(
+      "select current_period_end > now() + interval '59 days' from public.account_entitlements where owner_id=$1",
+      [one],
+    ),
+    true,
+  );
+  assert.equal(
+    await scalar("select source from public.account_entitlements where owner_id=$1", [two]),
+    "trial",
+  );
+  assert.equal(
+    await scalar(
+      "select has_function_privilege('authenticated', 'public.record_stripe_paid_period(text,text,timestamptz)', 'EXECUTE')",
+    ),
+    false,
+  );
+
   stage = "begin erasure and retain other people's work";
   assert.equal(await scalar("select public.begin_account_erasure($1,$2)", [one, token]), token);
+  assert.equal(await scalar("select (public.prepare_stripe_billing($1)).owner_id", [one]), null);
+  assert.equal(await scalar("select public.bind_stripe_customer($1, 'cus_other')", [one]), null);
   assert.equal(
     await scalar("select public.begin_account_erasure($1,$2)", [one, crypto.randomUUID()]),
     token,

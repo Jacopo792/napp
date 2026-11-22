@@ -10,7 +10,7 @@ export const SESSION_KEY = "napp:archive-session";
 
 interface SessionAuth {
   getUser(): Promise<{
-    data: { user: { id: string } | null };
+    data: { user: { id: string; email?: string } | null };
     error: { message: string; status?: number; name?: string; code?: string } | null;
   }>;
 }
@@ -62,5 +62,6 @@ export async function restoreArchiveSession(
     storage.removeItem(SESSION_KEY);
     return null;
   }
-  return stored;
+  // A confirmed address change is the server's news: the saved copy follows it.
+  return data.user.email ? { ...stored, email: data.user.email } : stored;
 }

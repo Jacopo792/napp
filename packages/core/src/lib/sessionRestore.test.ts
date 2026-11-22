@@ -148,3 +148,13 @@ test("Supabase restores across client restarts, rotates an expired JWT, and resp
   assert.equal(disk.getItem(SESSION_KEY), null);
   assert.ok(requests.every((url) => !url.includes("grant_type=password")));
 });
+
+test("a confirmed address change replaces the saved address", async () => {
+  const restored = await restoreArchiveSession(storage(), {
+    getUser: async () => ({
+      data: { user: { id: saved.userId, email: "new@example.invalid" } },
+      error: null,
+    }),
+  });
+  assert.deepEqual(restored, { ...saved, email: "new@example.invalid" });
+});

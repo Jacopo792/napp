@@ -37,6 +37,7 @@ export type Lookup = (
   note: NoteRow | null;
   role: string | null;
   nickname: string;
+  remainingMs?: number;
 } | null>;
 
 export type Authorizer = (
@@ -54,7 +55,7 @@ export function createAuthorizer(
 ): Authorizer {
   const ttl = options.ttl ?? 5000;
   const now = options.now ?? Date.now;
-  const answers = new Map<string, { at: number; answer?: Authorization }>();
+  const answers = new Map<string, { validUntil: number; answer?: Authorization }>();
 
   return async function authorize(token, noteId, { fresh = false } = {}) {
     const key = `${token} ${noteId}`;
@@ -62,18 +63,18 @@ export function createAuthorizer(
 
     if (!fresh) {
       const cached = answers.get(key);
-      if (cached?.answer && at - cached.at < ttl) return cached.answer;
+      if (cached?.answer && at < cached.validUntil) return cached.answer;
     }
 
     // A fresh check supersedes any old grant even when the backend fails.
     answers.delete(key);
     if (answers.size >= MAX_ANSWERS) {
       for (const [stale, entry] of answers) {
-        if (at - entry.at >= ttl) answers.delete(stale);
+        if (at >= entry.validUntil) answers.delete(stale);
       }
       if (answers.size >= MAX_ANSWERS) answers.delete(answers.keys().next().value!);
     }
-    const pending: { at: number; answer?: Authorization } = { at };
+    const pending: { validUntil: number; answer?: Authorization } = { validUntil: at + ttl };
     answers.set(key, pending);
 
     let answer: Authorization;
@@ -82,11 +83,13 @@ export function createAuthorizer(
       if (!found) {
         answer = { allowed: false, reason: "Sign in again" };
       } else {
+        const deadline = found.remainingMs != null ? at + found.remainingMs : Infinity;
+        pending.validUntil = Math.min(pending.validUntil, deadline);
         const access = decideAccess(found.note, found.role, found.userId);
         answer = access.allowed
           ? {
               allowed: true,
-              readOnly: access.readOnly,
+              readOnly: access.readOnly || now() >= deadline,
               archiveId: access.archiveId,
               identity: {
                 userId: found.userId,
@@ -171,20 +174,17 @@ export function supabaseLookup(asCaller: (token: string) => SupabaseClient): Loo
         ? claimedProfile
         : await caller.from("profiles").select("nickname").eq("user_id", userId).maybeSingle();
 
-    const membership = row
-      ? await caller
-          .from("archive_members")
-          .select("role")
-          .eq("archive_id", row.archive_id)
-          .eq("user_id", userId)
-          .maybeSingle()
+    const archive = row
+      ? await caller.rpc("archive_plan", { target_archive_id: row.archive_id })
       : { data: null, error: null };
-    if (membership.error) throw new Error(membership.error.message);
+    if (archive.error) throw new Error(archive.error.message);
+    const access = archive.data as { can_write: boolean; remaining_ms: number | null } | null;
 
     return {
       userId,
       note: row,
-      role: (membership.data as { role: string } | null)?.role ?? null,
+      role: access ? (access.can_write ? "editor" : "viewer") : null,
+      remainingMs: access?.remaining_ms ?? undefined,
       nickname: (profile.data as { nickname: string | null } | null)?.nickname ?? "",
     };
   };
