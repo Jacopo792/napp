@@ -2,6 +2,7 @@
 
 /* Destructive verification is allowed only against `supabase start`. The
  * endpoint and keys come from that local stack, never from .env files. */
+import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -34,7 +35,12 @@ const run = Date.now().toString(36);
 async function member(label) {
   const email = `verify-${label}-${run}@example.test`;
   const password = `verify-${run}-${label}-correct-horse`;
-  const made = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const made = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
+  });
   if (made.error) throw new Error(`${label}: ${made.error.message}`);
   return { email, password };
 }
@@ -66,6 +72,121 @@ const invited = await firstClient.rpc("create_archive_invite", {
 if (invited.error) throw new Error(`invite: ${invited.error.message}`);
 const claimed = await secondClient.rpc("claim_archive_invite", { token: invited.data });
 if (claimed.error) throw new Error(`claim: ${claimed.error.message}`);
+
+// Exercise the protections through Auth, PostgREST and Storage as a member,
+// rather than through a sessionless service role.
+const guest = createClient(url, key, { auth: { persistSession: false } });
+const joinedGuest = await guest.auth.signInAnonymously();
+assert.ifError(joinedGuest.error);
+const guestId = joinedGuest.data.user.id;
+try {
+  assert.equal((await guest.rpc("has_accepted_policies")).data, false);
+  assert.ifError(
+    (
+      await guest.rpc("accept_policies", {
+        terms_version: "2026-11-16",
+        privacy_version: "2026-11-16",
+      })
+    ).error,
+  );
+  assert.ifError((await guest.rpc("ensure_personal_archive")).error);
+  assert.ok((await guest.rpc("claim_archive_invite", { token: invited.data })).error);
+  assert.ok(
+    (
+      await guest.storage
+        .from("avatars")
+        .upload(`${guestId}/${crypto.randomUUID()}`, new Blob(["test"], { type: "image/png" }))
+    ).error,
+  );
+} finally {
+  // The account contains only its disposable empty personal archive.
+  assert.ifError((await admin.from("archives").delete().eq("created_by", guestId)).error);
+  assert.ifError((await admin.auth.admin.deleteUser(guestId)).error);
+}
+
+for (let count = 1; count < 20; count++) {
+  const renewed = await firstClient.rpc("create_archive_invite", {
+    archive_id: bootstrapped.data,
+    email: outsider.email,
+    role: "editor",
+  });
+  assert.ifError(renewed.error);
+}
+const capped = await firstClient.rpc("create_archive_invite", {
+  archive_id: bootstrapped.data,
+  email: outsider.email,
+  role: "editor",
+});
+assert.equal(capped.error?.code, "PT429");
+
+const suspension = await member("suspension");
+const suspended = await asMember(suspension);
+const oldSession = (await suspended.auth.getSession()).data.session;
+assert.ok(oldSession);
+assert.ifError(
+  (
+    await admin.rpc("set_account_suspension", {
+      target_user_id: oldSession.user.id,
+      suspended: true,
+    })
+  ).error,
+);
+const rejectedWrite = await suspended
+  .from("profiles")
+  .update({ nickname: "Stale" })
+  .eq("user_id", oldSession.user.id)
+  .select("user_id");
+assert.equal(rejectedWrite.data?.length ?? 0, 0);
+assert.ok((await suspended.auth.refreshSession()).error);
+assert.ifError((await admin.auth.admin.deleteUser(oldSession.user.id)).error);
+console.log(
+  "Local Auth/Storage checks passed: acceptance, anonymous restrictions, invite cap and revoked sessions.",
+);
+
+// A benign attachment tests the same Storage copy used for a reported file.
+const author = (await secondClient.auth.getUser()).data.user;
+assert.ok(author);
+const avatarId = crypto.randomUUID();
+const avatarPath = `${author.id}/${avatarId}`;
+const benign = "local safety evidence fixture";
+const avatarBucket = secondClient.storage.from("avatars");
+assert.ifError(
+  (await avatarBucket.upload(avatarPath, new Blob([benign], { type: "image/png" }))).error,
+);
+assert.ifError(
+  (await secondClient.from("profiles").update({ avatar_object: avatarId }).eq("user_id", author.id))
+    .error,
+);
+const reported = await firstClient.rpc("report_safety_issue", {
+  reason_code: "harassment",
+  target_user_id: author.id,
+});
+assert.ifError(reported.error);
+assert.equal((await admin.rpc("account_erasure_held", { target_user_id: author.id })).data, true);
+assert.ok((await avatarBucket.remove([avatarPath])).error);
+assert.ifError((await admin.functions.invoke("safety-worker", { body: {} })).error);
+const preserved = await admin.rpc("safety_report_detail", { target_report_id: reported.data });
+assert.ifError(preserved.error);
+const [evidence] = preserved.data.evidence;
+assert.ok(evidence.copied_at);
+const copy = await admin.storage.from("safety-evidence").download(evidence.path);
+assert.ifError(copy.error);
+assert.equal(await copy.data.text(), benign);
+assert.ok((await firstClient.storage.from("safety-evidence").download(evidence.path)).error);
+assert.ifError(
+  (
+    await admin.rpc("review_safety_report", {
+      target_report_id: reported.data,
+      hide_content: false,
+    })
+  ).error,
+);
+assert.ifError(
+  (await secondClient.from("profiles").update({ avatar_object: null }).eq("user_id", author.id))
+    .error,
+);
+assert.ifError((await avatarBucket.remove([avatarPath])).error);
+console.log("Local safety evidence check passed: hold, private copy and source removal.");
 
 /* A freshly reset local stack reports Realtime as healthy before its tenant
  * has finished starting. Prime that one-time path here so the archive

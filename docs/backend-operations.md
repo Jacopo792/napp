@@ -95,3 +95,11 @@ The CI deploy hook sends the tested Git SHA as the Render `ref` parameter.
 - [Shell and SSH](https://render.com/docs/ssh)
 - [Deployment behavior](https://render.com/docs/deploys)
 - [One-off jobs](https://render.com/docs/one-off-jobs)
+
+## Confirmed email and anonymous sign-ups
+
+Keep Auth email confirmation enabled for production (`[auth.email].enable_confirmations = true`). Configure production SMTP through the Auth dashboard with a verified sender and the production mailbox credentials, then test confirmation, address changes and recovery in staging. Validate callback URLs, limits and mail delivery before making live configuration changes. Postgres checks both `auth.users.email_confirmed_at` and `is_anonymous` for sharing. Auth still allows anonymous sign-ins for personal archives, with a local default of 10 per IP per hour in `[auth.rate_limit].anonymous_users`. Set the hosted limit independently. [Supabase anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous).
+
+CAPTCHA is off by default. For a staged rollout, configure `[auth.captcha]` with `enabled = true`, `provider = "turnstile"` or `"hcaptcha"` and the server-only `NAPP_AUTH_CAPTCHA_SECRET`. Pass the same provider and its public site key as `VITE_AUTH_CAPTCHA_PROVIDER` and `VITE_AUTH_CAPTCHA_SITE_KEY` in the web and desktop builds. Test the challenge on the delivered origins and verify the native clients pass a challenge token for anonymous sign-up before enabling the hosted Auth switch. Existing native clients also need a server policy-acceptance record or support for `accept_policies` before they write. [Supabase CAPTCHA configuration](https://supabase.com/docs/guides/auth/auth-captcha).
+
+The upload ceilings use decimal bytes. Free allows 1 GB per uploader and billing account and 1 GB per archive. Plus allows 20 GB per uploader and billing account and 5 GB per archive. Reaching a limit blocks additional uploads. Existing data remains readable under its existing access rules. Chat upload paths without a message, comment or sticker go to cleanup after 24 hours.

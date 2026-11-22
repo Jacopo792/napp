@@ -19,7 +19,7 @@ try {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     create table realtime.messages(extension text);
     create function realtime.topic() returns text language sql stable as $$select ''::text$$;
-    create table auth.users(id uuid primary key, email text, email_change text, email_confirmed_at timestamptz, is_anonymous boolean not null default false);
+    create table auth.users(id uuid primary key, email text, email_change text, email_confirmed_at timestamptz, banned_until timestamptz, raw_user_meta_data jsonb default '{"napp_terms_version":"2026-11-16","napp_privacy_version":"2026-11-16"}', is_anonymous boolean not null default false);
     create table auth.sessions(id uuid primary key, user_id uuid references auth.users(id) on delete cascade);
     create function auth.uid() returns uuid language sql stable as
       $$select (nullif(current_setting('request.jwt.claims', true),'')::jsonb->>'sub')::uuid$$;
@@ -28,11 +28,12 @@ try {
     create function auth.jwt() returns jsonb language sql stable as
       $$select coalesce(nullif(current_setting('request.jwt.claims', true),'')::jsonb,'{}')$$;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,unique(bucket_id,name));
+    create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text references storage.buckets(id),name text,owner uuid,owner_id text,metadata jsonb,version text,created_at timestamptz default now(),unique(bucket_id,name));
     alter table storage.objects enable row level security;
     create publication supabase_realtime;
     grant usage on schema public, auth, storage to anon, authenticated, service_role;
   `);
+  const legacyAccount = crypto.randomUUID();
   const directory = new URL("../supabase/migrations/", import.meta.url);
   for (const file of (await readdir(directory))
     .filter(
@@ -44,6 +45,19 @@ try {
     )
     .sort()) {
     stage = `migration ${file}`;
+    if (file === "20261122090000_verified_account_writes.sql") {
+      await db.query(
+        "insert into auth.users(id,email,raw_user_meta_data) values ($1,'legacy-policy@example.test',$2)",
+        [
+          legacyAccount,
+          JSON.stringify({
+            napp_terms_version: "2026-11-16",
+            napp_privacy_version: "2026-11-16",
+            napp_policies_accepted_at: "2000-01-01T00:00:00Z",
+          }),
+        ],
+      );
+    }
     await db.exec(await readFile(new URL(file, directory), "utf8"));
   }
   stage = "create disposable fixture rows";
@@ -673,8 +687,397 @@ try {
     await scalar("select count(*)::int from private.safety_reports where target_user_id=$1", [
       three,
     ]),
+    1,
+    "Erasure keeps the report and its target UUID",
+  );
+
+  stage = "terms are recorded on the server and restricted accounts cannot share";
+  assert.equal(
+    await scalar(
+      "select source from private.policy_acceptances where user_id=$1 and accepted_at > '2000-01-02'",
+      [legacyAccount],
+    ),
+    "legacy_metadata",
+  );
+  const unconfirmed = crypto.randomUUID();
+  const guest = crypto.randomUUID();
+  await db.query(
+    "insert into auth.users(id,email,raw_user_meta_data) values ($1,'unconfirmed@example.test',null)",
+    [unconfirmed],
+  );
+  await db.query(
+    "insert into auth.users(id,is_anonymous,raw_user_meta_data) values ($1,true,null)",
+    [guest],
+  );
+  await asUser(unconfirmed);
+  assert.equal(await scalar("select public.has_accepted_policies()"), false);
+  await assert.rejects(db.query("select public.ensure_personal_archive()"), { code: "42501" });
+  await assert.rejects(db.query("select public.accept_policies('wrong','2026-11-16')"), {
+    code: "23514",
+  });
+  await asUser(null);
+  await db.query(
+    "update auth.users set raw_user_meta_data=(select raw_user_meta_data from auth.users where id=$2) where id=$1",
+    [unconfirmed, two],
+  );
+  await asUser(unconfirmed);
+  assert.equal(
+    await scalar("select public.has_accepted_policies()"),
+    false,
+    "Changing Auth metadata after signup cannot establish acceptance",
+  );
+  for (const id of [unconfirmed, guest]) {
+    await asUser(id);
+    await db.query("select public.accept_policies('2026-11-16','2026-11-16')");
+    assert.equal(await scalar("select public.has_accepted_policies()"), true);
+    const personal = await scalar("select public.ensure_personal_archive()");
+    assert.ok(personal, "Restricted accounts can still use their private notes");
+    await assert.rejects(db.query("select public.create_archive('Shared group')"), {
+      code: "42501",
+    });
+    await assert.rejects(db.query("select public.claim_archive_invite($1)", ["a".repeat(64)]), {
+      code: "42501",
+    });
+    await assert.rejects(db.query("select public.report_safety_issue('spam')"), { code: "42501" });
+    await assert.rejects(
+      db.query(
+        "insert into storage.objects(bucket_id,name,owner,owner_id) values ('avatars',$1,$2,$2::uuid::text)",
+        [`${id}/${crypto.randomUUID()}`, id],
+      ),
+      { code: "42501" },
+    );
+    await assert.rejects(
+      db.query(
+        "insert into public.archive_messages(archive_id,author_id,body) values ($1,$2,'Chat')",
+        [personal, id],
+      ),
+      { code: "42501" },
+    );
+    await asUser(null);
+    const saved = (
+      await db.query(
+        "select source, accepted_at from private.policy_acceptances where user_id=$1",
+        [id],
+      )
+    ).rows[0];
+    assert.equal(saved.source, "rpc");
+    assert.ok(saved.accepted_at);
+  }
+  assert.equal(await scalar("select public.email_allowed('x@mailinator.com.')"), false);
+
+  stage = "a stale JWT cannot bypass suspension or an Auth ban";
+  const revokedSession = crypto.randomUUID();
+  await db.query("insert into auth.sessions values ($1,$2)", [revokedSession, two]);
+  await db.query("select public.set_account_suspension($1,true)", [two]);
+  assert.equal(
+    await scalar("select count(*) from auth.sessions where user_id=$1", [two]).then(Number),
     0,
-    "Erasure removes report snapshots about erased content/accounts",
+  );
+  await asUser(two);
+  assert.equal(await scalar("select public.archive_plan($1)", [safetyArchive]), null);
+  await assert.rejects(db.query("select public.report_safety_issue('child_safety')"), {
+    code: "42501",
+  });
+  assert.equal(
+    (
+      await db.query(
+        "update public.profiles set nickname='blocked' where user_id=$1 returning user_id",
+        [two],
+      )
+    ).rows.length,
+    0,
+  );
+  await asUser(null);
+  await db.query("select public.set_account_suspension($1,false)", [two]);
+  await db.query("select set_config('request.jwt.claims',$1,false)", [
+    JSON.stringify({ sub: two, role: "authenticated", session_id: revokedSession }),
+  ]);
+  assert.equal(await scalar("select public.archive_plan($1)", [safetyArchive]), null);
+  await asUser(null);
+  await db.query("update auth.users set banned_until=now() + interval '1 hour' where id=$1", [two]);
+  await asUser(two);
+  assert.equal(await scalar("select public.archive_plan($1)", [safetyArchive]), null);
+  await asUser(null);
+  await db.query("update auth.users set banned_until=null where id=$1", [two]);
+
+  stage = "comment and sticker evidence are hidden and retained independently";
+  const evidenceNote = crypto.randomUUID();
+  const evidenceComment = crypto.randomUUID();
+  const sticker = crypto.randomUUID();
+  const stickerPath = `${safetyArchive}/${sticker}.pack.png`;
+  const commentPath = `${safetyArchive}/${evidenceComment}.0.jpg`;
+  await db.query(
+    "insert into public.notes(id,archive_id,owner_id,created_at,updated_at) values ($1,$2,$3,now(),now())",
+    [evidenceNote, safetyArchive, four],
+  );
+  await db.query(
+    "insert into public.note_comments(id,archive_id,note_id,thread_id,author_id,body,attachments) values ($1,$2,$3,gen_random_uuid(),$4,'Comment',$5)",
+    [
+      evidenceComment,
+      safetyArchive,
+      evidenceNote,
+      four,
+      JSON.stringify([{ path: commentPath, kind: "image", width: 1, height: 1 }]),
+    ],
+  );
+  await db.query(
+    "insert into public.archive_stickers(id,archive_id,owner_id,path,width,height) values ($1,$2,$3,$4,1,1)",
+    [sticker, safetyArchive, four, stickerPath],
+  );
+  for (const path of [stickerPath, commentPath])
+    await db.query(
+      "insert into storage.objects(bucket_id,name,owner,owner_id) values ('chat-media',$1,$2,$2::uuid::text)",
+      [path, four],
+    );
+  await asUser(two);
+  const commentReport = await scalar(
+    "select public.report_safety_issue('harassment', $1, target_comment_id => $2)",
+    [evidenceNote, evidenceComment],
+  );
+  const stickerReport = await scalar(
+    "select public.report_safety_issue('child_safety', target_sticker_id => $1)",
+    [sticker],
+  );
+  await asUser(null);
+  assert.equal(
+    await scalar("select (id=$1) from public.pending_safety_reports() limit 1", [stickerReport]),
+    true,
+  );
+  const evidenceIds = [];
+  for (const [id, path] of [
+    [commentReport, commentPath],
+    [stickerReport, stickerPath],
+  ]) {
+    const evidenceId = await scalar(
+      "select id from private.safety_evidence_objects where report_id=$1 and source_name=$2",
+      [id, path],
+    );
+    assert.ok(evidenceId);
+    evidenceIds.push(evidenceId);
+    await assert.rejects(db.query("delete from storage.objects where name=$1", [path]), {
+      code: "PT423",
+    });
+    await db.query("insert into storage.objects(bucket_id,name) values ('safety-evidence',$1)", [
+      evidenceId,
+    ]);
+    await db.query("select public.safety_worker_ack('copy',$1,$2)", [evidenceId, path]);
+    await db.query("select public.review_safety_report($1,true)", [id]);
+  }
+  await asUser(four);
+  assert.equal(
+    await scalar("select count(*)::int from public.notes where id=$1", [evidenceNote]),
+    1,
+  );
+  assert.equal(
+    await scalar("select count(*)::int from public.note_comments where id=$1", [evidenceComment]),
+    0,
+  );
+  assert.equal(
+    await scalar("select count(*)::int from public.archive_stickers where id=$1", [sticker]),
+    0,
+  );
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where name in ($1,$2)", [
+      stickerPath,
+      commentPath,
+    ]),
+    0,
+  );
+  assert.equal(
+    await scalar("select count(*)::int from storage.objects where bucket_id='safety-evidence'"),
+    0,
+  );
+  await asUser(null);
+  await db.query("update private.safety_reports set legal_hold=true where id=$1", [stickerReport]);
+  await asUser(two);
+  assert.match(
+    await scalar("select public.archive_deletion_refusal($1)", [safetyArchive]),
+    /must be preserved/,
+  );
+  await asUser(null);
+
+  await assert.rejects(
+    db.query("select public.begin_account_erasure($1,$2)", [four, crypto.randomUUID()]),
+    { code: "PT423" },
+  );
+  await assert.rejects(db.query("delete from auth.users where id=$1", [four]), { code: "PT423" });
+  await assert.rejects(db.query("delete from public.archive_stickers where id=$1", [sticker]), {
+    code: "PT423",
+  });
+  await assert.rejects(db.query("delete from storage.objects where name=$1", [evidenceIds[1]]), {
+    code: "PT423",
+  });
+  await db.query("insert into private.account_legal_holds(user_id) values ($1)", [four]);
+  await assert.rejects(db.query("delete from storage.objects where name=$1", [commentPath]), {
+    code: "PT423",
+  });
+  await db.query("delete from private.account_legal_holds where user_id=$1", [four]);
+  await db.query(
+    "update private.safety_reports set legal_hold=false, reviewed_at=now()-interval '91 days' where id in ($1,$2)",
+    [commentReport, stickerReport],
+  );
+  assert.equal(
+    await scalar(
+      "select count(*)::int from public.safety_worker_jobs() where kind='expire' and id=$1",
+      [evidenceIds[0]],
+    ),
+    1,
+  );
+  assert.equal(
+    await scalar(
+      "select count(*)::int from public.safety_worker_jobs() where kind='expire' and id=$1",
+      [evidenceIds[1]],
+    ),
+    0,
+  );
+  await db.query(
+    "update private.safety_reports set reviewed_at=now()-interval '366 days' where id=$1",
+    [stickerReport],
+  );
+  assert.equal(
+    await scalar(
+      "select count(*)::int from public.safety_worker_jobs() where kind='expire' and id=$1",
+      [evidenceIds[1]],
+    ),
+    1,
+  );
+  await db.query("delete from storage.objects where bucket_id='safety-evidence' and name=$1", [
+    evidenceIds[0],
+  ]);
+  await db.query("select public.safety_worker_ack('expire',$1,$2)", [
+    evidenceIds[0],
+    evidenceIds[0],
+  ]);
+  await db.query("select private.purge_reviewed_safety_reports()");
+  assert.equal(
+    await scalar("select count(*)::int from private.safety_reports where id=$1", [commentReport]),
+    0,
+  );
+
+  stage = "storage quotas, orphan cleanup and scan quarantine";
+  assert.equal(
+    await scalar(
+      "select 'application/octet-stream' = any(allowed_mime_types) from storage.buckets where id='note-images'",
+    ),
+    false,
+  );
+  await db.query(
+    "insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values ('avatars',$1,$2,$2::uuid::text,jsonb_build_object('size',20000000000))",
+    [`${four}/${crypto.randomUUID()}`, four],
+  );
+  await assert.rejects(
+    db.query(
+      "insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values ('avatars',$1,$2,$2::uuid::text,jsonb_build_object('size',1))",
+      [`${four}/${crypto.randomUUID()}`, four],
+    ),
+    { code: "PT413" },
+  );
+  await db.query("delete from storage.objects where bucket_id='avatars' and owner=$1", [four]);
+  await assert.rejects(
+    db.query(
+      "insert into storage.objects(bucket_id,name,metadata) values ('note-images',$1,jsonb_build_object('size',5000000001))",
+      [`${safetyArchive}/${crypto.randomUUID()}`],
+    ),
+    { code: "PT413" },
+  );
+  const abandonedId = crypto.randomUUID();
+  const abandoned = `${safetyArchive}/${abandonedId}.0.jpg`;
+  await db.query(
+    "insert into storage.objects(bucket_id,name,created_at) values ('chat-media',$1,now()-interval '2 days')",
+    [abandoned],
+  );
+  const lease = await scalar("select public.safety_worker_start()");
+  assert.ok(lease);
+  assert.equal(await scalar("select public.safety_worker_start()"), null);
+  assert.equal(
+    await scalar(
+      "select count(*)::int from public.safety_worker_jobs() where kind='orphan' and path=$1",
+      [abandoned],
+    ),
+    1,
+  );
+  await assert.rejects(
+    db.query(
+      "insert into public.archive_messages(id,archive_id,author_id,body) values ($1,$2,$3,'Late')",
+      [abandonedId, safetyArchive, four],
+    ),
+    { code: "23514" },
+  );
+  await db.query("select public.safety_worker_finish($1)", [lease]);
+
+  await db.query("update private.safety_retention set scan_new_uploads=true");
+  const suspicious = `${four}/${crypto.randomUUID()}`;
+  const upload = await scalar(
+    "insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values ('avatars',$1,$2,$2::uuid::text,jsonb_build_object('size',1)) returning id",
+    [suspicious, four],
+  );
+  await asUser(four);
+  assert.equal(await scalar("select count(*)::int from storage.objects where id=$1", [upload]), 0);
+  await asUser(null);
+  await assert.rejects(db.query("delete from storage.objects where id=$1", [upload]), {
+    code: "PT423",
+  });
+  const matchedReport = await scalar("select public.flag_safety_scan($1)", [upload]);
+  assert.equal(await scalar("select public.flag_safety_scan($1)", [upload]), matchedReport);
+  assert.equal(
+    await scalar("select reason from private.safety_reports where id=$1 and legal_hold", [
+      matchedReport,
+    ]),
+    "child_safety",
+  );
+  assert.equal(
+    await scalar("select count(*)::int from private.suspended_accounts where user_id=$1", [four]),
+    1,
+  );
+  const quarantineCopy = await scalar(
+    "select id from private.safety_evidence_objects where report_id=$1 and quarantine",
+    [matchedReport],
+  );
+  await db.query("insert into storage.objects(bucket_id,name) values ('safety-evidence',$1)", [
+    quarantineCopy,
+  ]);
+  await db.query("select public.safety_worker_ack('copy',$1,$2)", [quarantineCopy, suspicious]);
+  await db.query("delete from storage.objects where id=$1", [upload]);
+  await db.query("select public.safety_worker_ack('quarantine',$1,$2)", [upload, suspicious]);
+  await assert.rejects(
+    db.query("insert into storage.objects(bucket_id,name) values ('avatars',$1)", [suspicious]),
+    /permanently deleted/,
+  );
+
+  stage =
+    "public notices require a location and good faith, and allow anonymous child-safety notices";
+  await db.exec("set role anon");
+  const notice = "select public.submit_safety_notice($1,$2,$3,$4,$5,$6)";
+  await assert.rejects(
+    db.query(notice, ["https://example.test/content", "Explanation", "", "", false, true]),
+    { code: "23514" },
+  );
+  await assert.rejects(
+    db.query(notice, ["javascript:alert(1)", "Explanation", "", "", true, true]),
+    { code: "23514" },
+  );
+  const publicNotice = await scalar(notice, [
+    "https://example.test/content",
+    "Explanation",
+    "",
+    "",
+    true,
+    true,
+  ]);
+  await assert.rejects(db.query("select public.safety_report_detail($1)", [publicNotice]), {
+    code: "42501",
+  });
+  await asUser(null);
+  assert.equal(
+    await scalar("select reason from private.safety_reports where id=$1", [publicNotice]),
+    "child_safety",
+  );
+  await db.query("select public.decide_safety_notice($1,'Decision and redress information')", [
+    publicNotice,
+  ]);
+  assert.equal(
+    await scalar("select status from private.safety_reports where id=$1", [publicNotice]),
+    "dismissed",
   );
   console.log(
     "Local PostgreSQL erasure checks passed: migration replay, idempotency, retained shared work, files manifest, history, Yjs, stale JWTs, tombstones, RPC privileges, reports, moderation and user blocks",
