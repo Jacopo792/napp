@@ -1,0 +1,2271 @@
+import { compareVersions } from "./whatsNew.ts";
+
+export interface ReleaseItem {
+  title: string;
+  text: string;
+  /** A picture of it, by file name in `assets/whats-new/` — bundled with
+   *  both shells, so it shows with no network. */
+  image?: string;
+}
+
+export interface ReleaseSection {
+  heading: string;
+  items: ReleaseItem[];
+}
+
+export interface Release {
+  version: string;
+  /** ISO day. */
+  date: string;
+  /** One line that says what this release is about. */
+  headline: string;
+  sections: ReleaseSection[];
+}
+
+export const RELEASES: Release[] = [
+  {
+    version: "0.9.79",
+    date: "2026-11-19",
+    headline: "Your own stickers, GIF shelves and favourites",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "GIFs on shelves, and favourites",
+            text: "With nothing typed, GIFs open on shelves: your favourites, what's trending, and a word for every mood. GIPHY's stickers are here too, one switch away. Star any animal, GIF or sticker to keep it at hand on every device.",
+            image: "0.9.79-gif-shelves.jpg",
+          },
+          {
+            title: "Stickers of your own",
+            text: "The Stickers tab is now your group's own pack: add pictures, still or moving, and everyone in the group can send them. Only whoever added a sticker can take it out, and messages keep what was sent.",
+            image: "0.9.79-sticker-pack.jpg",
+          },
+          {
+            title: "Photos open whole",
+            text: "Click a photo in a chat to see it full size over everything; click again or press Escape to go back.",
+          },
+          {
+            title: "Faces open profiles",
+            text: "Click someone's face beside their messages to open their profile.",
+          },
+          {
+            title: "Chat sounds",
+            text: "A soft sound when your message leaves and when someone else's arrives. Turn them off in Settings › Chat.",
+          },
+          {
+            title: "Whole animals",
+            text: "The bunny's ears and the axolotl's gills are no longer cut off at the edge of their stickers.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.78",
+    date: "2026-11-18",
+    headline: "Stickers, GIFs and Google Drive",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Stickers and GIFs in every chat",
+            text: "The new button beside the emoji opens our own stickers, drawn with the animals from the chat bubbles, plus GIFs and stickers from GIPHY. Nobody's address reaches GIPHY, and what you send stays with the message.",
+            image: "0.9.78-stickers.jpg",
+          },
+          {
+            title: "See when someone is writing",
+            text: "While somebody writes to you, their bubble appears with three dots and their animal peeking over the edge. Nothing about it is saved.",
+            image: "0.9.78-typing.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Import from Google Drive",
+            text: "Open the menu at the top of the note list and choose Import from Google Drive. Google Docs become notes you can edit; Sheets, Slides and PDFs arrive as PDF attachments.",
+            image: "0.9.77-google-drive.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.74",
+    date: "2026-11-18",
+    headline: "Links show what they are",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Link previews",
+            text: "Paste a link in a chat and a card with the page's title, description and picture appears before you send. Close it if you'd rather send the plain link. Everyone sees the same card, and nobody's address reaches the site.",
+            image: "0.9.74-link-previews.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.73",
+    date: "2026-11-18",
+    headline: "Send photos and videos in any chat",
+    sections: [
+      {
+        heading: "On your computer",
+        items: [
+          {
+            title: "Photos and videos in every chat",
+            text: "Send pictures and videos from your computer, in the general chat and in the chat of any note. Use the photo button beside the message field, or paste or drop them in.",
+            image: "0.9.73-chat-photos.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.72",
+    date: "2026-11-18",
+    headline: "Fixes for books and chat bubbles",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          {
+            title: "Books no longer get stuck",
+            text: "Switching a book to a shared manuscript could hide your chapters and leave you on a page with no way back. That option is gone: everyone writes their own book, and your chapters are back. A book now opens straight on its first chapter.",
+            image: "0.9.72-book.jpg",
+          },
+          {
+            title: "Chat bubbles fit their words",
+            text: "Short messages no longer sit in a bubble with empty space around them.",
+            image: "0.9.72-chat-bubbles.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.71",
+    date: "2026-11-18",
+    headline: "Photos and videos in the general chat",
+    sections: [
+      {
+        heading: "On your computer",
+        items: [
+          {
+            title: "Photos and videos in the chat",
+            text: "Pictures and videos shared in the general chat show beside their message. Click one to see it full size.",
+            image: "0.9.71-chat-photos.jpg",
+          },
+          {
+            title: "A clear Settings window",
+            text: "With a translucent sidebar, Settings no longer shows a dark smudge behind its sections.",
+          },
+        ],
+      },
+      {
+        heading: "On iPhone (coming soon)",
+        items: [
+          {
+            title: "The general chat on your phone",
+            text: "The same messages as on your computer, with each person's animal bubble, photos and videos.",
+            image: "0.9.71-phone-chat.jpg",
+          },
+          {
+            title: "Chat info",
+            text: "Tap the chat's name to see who is in it, open a profile, and choose your bubble and quick reactions.",
+            image: "0.9.71-phone-chat-info.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.70",
+    date: "2026-11-18",
+    headline: "A tidier chat and a badge that tells the truth",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Names stay with their message",
+            text: "A name now lines up with its bubble and sits beside the animal on it, and reactions sit below the bubble instead of over it.",
+            image: "0.9.70-chat-names.jpg",
+          },
+          {
+            title: "One badge for both chats",
+            text: "The chat button counts new messages in the general chat too, and only those in notes you can open. The menu shows each count.",
+          },
+          {
+            title: "Report a message in the general chat",
+            text: "Report now works there, and blocking someone hides their general-chat messages too.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Moves and pins no longer undo each other",
+            text: "When two people change the same note at once, a pin no longer puts back the folder the other person had just moved it out of.",
+          },
+          {
+            title: "Long chats keep their newest messages",
+            text: "A chat past a thousand messages now shows the latest ones.",
+          },
+          {
+            title: "Formatting is kept in history",
+            text: "A change made only with bold, headings or other formatting now saves a version you can go back to.",
+          },
+          {
+            title: "Square window corners on the Mac",
+            text: "A background picture now reaches the window's edge without a square corner showing outside the curve.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.69",
+    date: "2026-11-17",
+    headline: "Talk about your notes in the general chat",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Quote a passage, name a note",
+            text: "Select words in a note and press Discuss in chat to bring them into the general chat, or type # to name a note. Press either one to open the note.",
+            image: "0.9.69-note-quote.jpg",
+          },
+          {
+            title: "Reply on hover",
+            text: "Pointing at a message shows Reply beside the reactions. Right-click for everything else.",
+          },
+          {
+            title: "Notes and chat in Settings",
+            text: "Chat, Reading and Writing now sit together in one group.",
+            image: "0.9.69-notes-and-chat.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Unread clears when you read",
+            text: "Opening a note's chat now clears its unread count in the sidebar.",
+          },
+          {
+            title: "A smoother general chat",
+            text: "The general chat now grows from where you opened it and shrinks back into it, without stuttering in the desktop app.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.66",
+    date: "2026-11-17",
+    headline: "A chat for everyone in the group",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "General chat",
+            text: "Press the chat in the sidebar to talk with everyone in the group, or to go to the chats in your notes.",
+            image: "0.9.66-general-chat.jpg",
+          },
+          {
+            title: "Reply, even to yourself",
+            text: "Right-click a message to reply, react, copy, edit or delete it. A reply shows the message it answers.",
+            image: "0.9.66-message-menu.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Steadier messages",
+            text: "Sending, enlarging and editing no longer make messages bounce or jump sideways, and right-clicking a message no longer opens the note's menu.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.64",
+    date: "2026-11-17",
+    headline: "A conversation beside every note",
+    sections: [
+      {
+        heading: "Chat",
+        items: [
+          {
+            title: "Talk beside your words",
+            text: "Messages, passage replies, mentions and reactions stay beside the note. Open the larger view when the conversation needs more room.",
+            image: "0.9.64-chat.jpg",
+          },
+          {
+            title: "Your bubble, your reactions",
+            text: "Choose an animal bubble and your six quick reactions in Settings › Chat.",
+            image: "0.9.64-chat-settings.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Details at a glance",
+            text: "Group, person, note and folder sheets share a centered heading, with finer edges and continuous corners across the app.",
+            image: "0.9.64-sheets.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Keep everyone's words",
+            text: "Protecting a held passage preserves what other writers changed at the same time.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.63",
+    date: "2026-11-17",
+    headline: "Books that move calmly, and groups you can edit",
+    sections: [
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Calmer books",
+            text: "Write and Board, Edit and Pages fade into each other with the same timing as switching groups, and panels open without shaking the page.",
+          },
+          {
+            title: "Edit your group",
+            text: "If you made a group, Settings › Groups has Edit: rename it or invite more people.",
+            image: "0.9.63-archive-edit.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "No flash between groups",
+            text: "The wallpaper fades with the screen when you switch groups instead of flashing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.62",
+    date: "2026-11-16",
+    headline: "Smoother, and fewer things that do nothing",
+    sections: [
+      {
+        heading: "Interface",
+        items: [
+          {
+            title: "Calmer openings",
+            text: "Menus, Spotlight, Settings and sheets open in one smooth movement, without the small bounce or the flash of light at the end.",
+          },
+          {
+            title: "Cleaner Info",
+            text: "The Info of a note or folder lines up in the light theme too: equal tiles, and a history that reads as one list.",
+            image: "0.9.62-info.jpg",
+          },
+          {
+            title: "Tidier folders",
+            text: "Folder counts line up with All notes. A folder's actions are in its right-click menu; the ⋯ button that opened behind the sidebar is gone.",
+            image: "0.9.62-folders.jpg",
+          },
+          {
+            title: "A shorter toolbar in books",
+            text: "Focus, Typewriter and Editing are gone from the book's toolbar, and the switch between you and your partner is drawn like Write | Board.",
+            image: "0.9.62-toolbar.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Drawing answers the first click",
+            text: "Undo, redo and handing the board to the phone work on the first click in the desktop app.",
+          },
+          {
+            title: "A light sidebar on a dark Mac",
+            text: "With the light theme on a Mac set to dark, the sidebar no longer turns black, with or without a wallpaper, and switching account no longer leaves it dark until Napp is reopened.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.61",
+    date: "2026-11-16",
+    headline: "A clearer privacy notice",
+    sections: [
+      {
+        heading: "Privacy",
+        items: [
+          {
+            title: "What Napp records about use",
+            text: "The privacy notice now says what Napp keeps about how it is used: web, desktop or phone, the kind of device, and when it was last used. Never note contents, keystrokes or location. Napp asks you to read it once.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.60",
+    date: "2026-11-15",
+    headline: "Sharing that holds together",
+    sections: [
+      {
+        heading: "Drawing",
+        items: [
+          {
+            title: "A canvas of its own",
+            text: "Pictures and boards open full screen and grow out of their place in the note. The pens stand in a tray at the bottom left; shapes, colour and thickness open beside them.",
+            image: "0.9.60-drawing.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Members in Settings",
+            text: "Settings has a Members page: who is in the group, the invitations still waiting, a new invitation, and leaving.",
+            image: "0.9.60-members.jpg",
+          },
+          {
+            title: "Invitations open the shared group",
+            text: "Accepting an invitation opens the group you joined straight away. An empty group made for you automatically is removed, so only one remains.",
+          },
+          {
+            title: "Locked notes read in full",
+            text: "A note someone else has locked shows everything in it, and stays up to date while they write. It can't be changed or moved to the Trash.",
+          },
+          {
+            title: "One Trash for everyone",
+            text: "A note moved to the Trash is in the Trash for every member, straight away.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.59",
+    date: "2026-11-15",
+    headline: "One place to search",
+    sections: [
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "Search lives in the Spotlight",
+            text: "⌘K (Ctrl+K on Windows) searches notes, words inside them and commands. The search buttons in the note and the book are gone; ⌘F still finds and replaces in the open text.",
+            image: "0.9.59-spotlight.jpg",
+          },
+          {
+            title: "Find floats over the page",
+            text: "⌘F opens a find bar that floats over the note, its arrows set beside it like drops. In the Spotlight the group buttons bud off the field and the field opens downward into the results.",
+            image: "0.9.59-find.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Menus",
+        items: [
+          {
+            title: "Quick actions first",
+            text: "Note and row menus open with a row of quick actions — Pin, Lock, History — above the rest. Menus and right-click menus grow from where you press, and their rows follow.",
+            image: "0.9.59-menus.jpg",
+          },
+          {
+            title: "One colour button",
+            text: "The bubble over selected text has a single colour button instead of six swatches.",
+            image: "0.9.59-bubble.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "The Board is a list",
+            text: "A book's Board lists its chapters with the selected page beside them. The ⋯ holds the page's actions, the Trash has its own button, and the group switch is always shown.",
+            image: "0.9.59-board.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Motion",
+        items: [
+          {
+            title: "One rhythm",
+            text: "The selection slides between notes and folders, a folder's notes and a Settings section's rows come in one after another, and everything moves to one shared tempo. Sliding the sidebar no longer shows the desktop through the page.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.58",
+    date: "2026-11-15",
+    headline: "Tidier underneath",
+    sections: [
+      {
+        heading: "Under the hood",
+        items: [
+          {
+            title: "Saving and switching, tested",
+            text: "How changes are saved, and how a group is switched, left or deleted, now have their own tests. Nothing changes in how they work.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.57",
+    date: "2026-11-15",
+    headline: "Privacy that stays put",
+    sections: [
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Archived notes stay private",
+            text: "Keep archived notes private no longer switches itself off when another window or device saves your profile.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.56",
+    date: "2026-11-14",
+    headline: "Safer underneath",
+    sections: [
+      {
+        heading: "Security",
+        items: [
+          {
+            title: "A stricter desktop app",
+            text: "The Mac and Windows app only lets its own pages save files, print or read the clipboard, and stays on the app whatever a link asks it to open.",
+          },
+          {
+            title: "Access ends sooner",
+            text: "When someone loses access to a note, the collaboration server stops accepting their changes even if a check is slow or fails.",
+          },
+          {
+            title: "Up-to-date components",
+            text: "Electron and the tools that build the app are updated with their latest security fixes.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Deleting an account",
+            text: "Deleting an account no longer fails because of an old mention between two people who have blocked each other.",
+          },
+          {
+            title: "Large groups open whole",
+            text: "A group with thousands of notes and folders loads all of them, not only the first page.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.55",
+    date: "2026-11-14",
+    headline: "Keys that behave like a Mac's",
+    sections: [
+      {
+        heading: "Keyboard",
+        items: [
+          {
+            title: "⌘B for the sidebar",
+            text: "⌘B (Ctrl+B on Windows) shows or hides the sidebar. In a note's text it is still Bold.",
+          },
+          {
+            title: "Escape closes Settings",
+            text: "Escape closes Settings. An unsaved nickname is put back first, and an open menu closes on its own.",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "A tidier Delete account",
+            text: "Deleting your account asks for your password in Settings' own rows, with Cancel beside it.",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Whole faces in the list",
+            text: "The small picture beside a note's title is no longer cut at the top.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.54",
+    date: "2026-11-13",
+    headline: "The group menu opens whole",
+    sections: [
+      {
+        heading: "Sidebar",
+        items: [
+          {
+            title: "A full group menu",
+            text: "The menu under the group's name opens over the note list instead of being cut off at the edge of the sidebar.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.53",
+    date: "2026-11-13",
+    headline: "A quieter, more even window",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "A rail down the sidebar",
+            text: "Your faces, Remarks, Archive and Recently Deleted sit in a narrow rail on the left, with Settings and your account at its foot; folders have the column beside it. A small dot on a face says that person is here now.",
+            image: "0.9.53-window.jpg",
+          },
+          {
+            title: "Lists that give the title room",
+            text: "A note's title runs to two lines, with its preview and time under it. The list's title says how many notes it holds, and the sidebar, the list and the note's toolbar share one 40px band.",
+          },
+          {
+            title: "Level on a Mac",
+            text: "In a window that isn't full screen, the traffic lights sit in the top band and the sidebar no longer steps down for them, so the three columns stay level.",
+          },
+        ],
+      },
+      {
+        heading: "Sheets",
+        items: [
+          {
+            title: "Plain information sheets",
+            text: "Holding a note, a folder or a person opens a calmer sheet: three numbers in tiles, then what happened grouped by day, each row with a face, the time and the words changed. The group's sheet and a book's Trash are drawn the same way.",
+            image: "0.9.53-sheets.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "A column of the window",
+            text: "Comments open as a full-height column like the sidebar and the list, with each conversation as a plain row: a face, the name and the time.",
+            image: "0.9.53-comments.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "Ten palettes",
+            text: "Fjord, Rosewood, Night and Paper stay, joined by Sage, Dune, Dusk, Mist, Blush and Linen, each shown as a small window. Fjord is where Napp starts. A palette you chose that is no longer offered keeps working.",
+            image: "0.9.53-palettes.jpg",
+          },
+          {
+            title: "What’s New lives in Settings",
+            text: "This page is now a section of Settings, under Napp, with every release as a row you can open. The installers are at the top.",
+            image: "0.9.53-whats-new.jpg",
+          },
+          {
+            title: "Flat rows and new icons",
+            text: "Settings are plain rows with small controls at their right, and the interface draws its icons from one consistent set.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.52",
+    date: "2026-11-13",
+    headline: "Titles save through the live document",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "A reliable first title",
+            text: "A note's title becomes editable with its live document, so typing as soon as a note opens cannot trigger an obsolete save or a misleading Save failed message.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.51",
+    date: "2026-11-13",
+    headline: "New notes open reliably",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Ready to write",
+            text: "New notes wait for their creation to finish before connecting to collaboration, avoiding an incorrect permission error on slower connections.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.50",
+    date: "2026-11-12",
+    headline: "Marking up pictures, and a calmer app",
+    sections: [
+      {
+        heading: "Pictures",
+        items: [
+          {
+            title: "Mark up in one panel",
+            text: "A picture opens into one panel with a single row of tools: pen, highlighter, eraser, shapes, text, move, thickness, colour, fill and undo. Cancel or Done closes it, and your ink is saved when you press Done.",
+          },
+          {
+            title: "Crop and rotate",
+            text: "Pictures can be cropped and rotated. The original file is never changed.",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Opens on your latest note",
+            text: "The Continue writing page is gone. The app opens the note you wrote in most recently.",
+          },
+          {
+            title: "A flatter list",
+            text: "The note list uses plain date headers and flat rows. A note's cover no longer covers margin comments, and long sheet titles stop at two lines.",
+          },
+          {
+            title: "Room for the note",
+            text: "With a side panel open in a narrow window, the sidebar and then the list step aside so the note stays readable. Panels and popovers now close with the same motion they open with.",
+          },
+        ],
+      },
+      {
+        heading: "Settings",
+        items: [
+          {
+            title: "Fewer words, fewer controls",
+            text: "Explanatory sentences are gone. Accent, Background and Foreground colours come from the themes and palettes only, Translucency and Frosted glass are one Material control, and Reset appearance leaves Style alone. Members and Leave group are in the group sheet.",
+          },
+          {
+            title: "Two icon styles",
+            text: "Icons are Clear or Tinted. The Book names its Write and Board views and reads more easily.",
+          },
+        ],
+      },
+      {
+        heading: "Security",
+        items: [
+          {
+            title: "Safer sessions and attachments",
+            text: "Adding an account no longer signs out the saved one, and auto-lock holds through sleep and restarts. Other tabs close when you sign out or lock. A busy or offline sign-in service is no longer reported as a wrong password. On desktop, only attachments that open in a viewer open directly; others are shown in their folder.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.49",
+    date: "2026-11-02",
+    headline: "Readable on a large monitor",
+    sections: [
+      {
+        heading: "Desktop",
+        items: [
+          {
+            title: "Sized for the screen it is on",
+            text: "On a large external monitor the desktop app grows by up to a quarter, so text no longer reads small. A laptop's own screen keeps the usual size, and moving the window between screens adjusts it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.48",
+    date: "2026-11-02",
+    headline: "Search that finds the place, and a calmer window",
+    sections: [
+      {
+        heading: "Finding things",
+        items: [
+          {
+            title: "Search lights the words it found",
+            text: "Matches are highlighted in the list, the preview shows the words around them, and opening a result — or pressing Return — takes you to that passage and lights it.",
+          },
+          {
+            title: "Copy code in one press",
+            text: "A code block offers a Copy button while the pointer is on it.",
+          },
+          {
+            title: "See where a link goes",
+            text: "In the desktop app, a web link's address appears at the foot of the window while the pointer is on it.",
+          },
+        ],
+      },
+      {
+        heading: "Working together",
+        items: [
+          {
+            title: "You and Partner as one switch",
+            text: "The switch at the top of the sidebar is a single capsule again, with both names in full.",
+          },
+          {
+            title: "A face instead of a dot",
+            text: "A note somebody else has open shows their picture beside the time, and a small bubble while they write.",
+          },
+        ],
+      },
+      {
+        heading: "Details",
+        items: [
+          {
+            title: "Gentler motion",
+            text: "Settings, What's New and the info sheets settle in with a short rise instead of growing out of the button, and switching between light and dark fades.",
+          },
+          {
+            title: "Small touches",
+            text: "Checklist ticks are drawn and finished items step back, pinning drops a pin, links underline under the pointer, table rows follow the pointer, pictures fade in, and dragging text shows where it will land.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Save failed means a save failed",
+            text: "Other problems, such as a copy the system refused, now say what went wrong instead of reporting a failed save, and are shown even when no note is open.",
+          },
+          {
+            title: "The caret beside tables and pictures",
+            text: "The caret next to a table or a picture is visible on dark pages.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.47",
+    date: "2026-11-01",
+    headline: "The desktop in the phone's shape",
+    sections: [
+      {
+        heading: "One design across your devices",
+        items: [
+          {
+            title: "Lists, sidebar and settings as soft cards",
+            text: "The note list, the sidebar, Settings and the note, person and folder sheets take the phone's cards and large titles. Archive and Recently Deleted use the phone's words.",
+          },
+          {
+            title: "Home shows what is happening",
+            text: "With no note open, the window shows notes to continue, remarks to read and what the other person has written.",
+          },
+          {
+            title: "A calmer sign-in",
+            text: "Sign in and Create account are a single card with the phone's switch.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Swiped rows stay put",
+            text: "A row pushed sideways now settles on its buttons instead of bouncing past them.",
+          },
+          {
+            title: "Opening a note is not an edit",
+            text: "Opening a note no longer changes its modification time.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.46",
+    date: "2026-10-25",
+    headline: "Your notes, with clearer control",
+    sections: [
+      {
+        heading: "Your account and this device",
+        items: [
+          {
+            title: "Choose what leaves the device",
+            text: "Signing out now asks before removing this account’s local note copies, including changes that have not reached the server. Automatic locking keeps offline work available for your next sign-in.",
+          },
+          {
+            title: "Account controls in one place",
+            text: "Privacy, terms and support are linked from the account flow. You can request permanent account deletion, report content and manage blocked people from the app.",
+          },
+        ],
+      },
+      {
+        heading: "Reliability",
+        items: [
+          {
+            title: "A clearer answer when a service is unavailable",
+            text: "A temporary sign-in outage is no longer described as an incorrect password. Local-copy removal reports a problem instead of claiming success when another window is still holding a database.",
+          },
+          {
+            title: "The same words in the editor and the group",
+            text: "A save now keeps the document and its list preview together, even when another edit arrives while the database is answering.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.45",
+    date: "2026-10-20",
+    headline: "The server rests at night",
+    sections: [
+      {
+        heading: "Behind the scenes",
+        items: [
+          {
+            title: "No more keeping the server up overnight",
+            text: "A late check after midnight kept Napp's server awake until dawn, spending hours the free plan needs for the day. It now leaves it to sleep, so notes keep opening quickly when you write.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.44",
+    date: "2026-10-19",
+    headline: "No comment without words",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Only passages with a conversation are underlined",
+            text: "A comment started and never written no longer leaves its underline in the note, for you or for anybody else in the group. Choosing other words while one is still empty puts the first back as it was.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.43",
+    date: "2026-10-17",
+    headline: "Opening is only opening",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Mentioned in, without surprises",
+            text: "At the foot of a note, the name of a note that mentions it simply opens it at those words. The Link button beside it is gone: it quietly wrote a link into the other note, so opening it marked it as edited.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.42",
+    date: "2026-10-16",
+    headline: "Every font you have",
+    sections: [
+      {
+        heading: "Writing a book",
+        items: [
+          {
+            title: "All your fonts",
+            text: "The font menu lists every typeface installed on your computer, each written in its own letters, with a search field. Font and size now sit in the bar when there is room.",
+          },
+          {
+            title: "Styles you can see",
+            text: "The style menu shows each style as it looks on the page — headings, body text, quote and lists — with its keyboard shortcut.",
+          },
+          {
+            title: "More in Aa",
+            text: "Type any size you like, add space before or after a paragraph, and set words in all caps or small caps.",
+          },
+          {
+            title: "A fuller board",
+            text: "On the board a part is a card of its own in the run of the book, so the chapters fill the width instead of one short row per part.",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Cleaner cards",
+            text: "Who wrote it and when sit on one line with Resolve beside them; edit, react, assign and delete appear under the pointer. The reply box only opens on the conversation you are in.",
+          },
+          {
+            title: "Right beside the page",
+            text: "In a book the comments stand next to the sheet and stay in view as you scroll, starting just under their heading, each with the words it is about.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.41",
+    date: "2026-10-16",
+    headline: "Remarks that glide",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Smoother margin",
+            text: "When you pick another remark in the margin, the cards now slide to their new places instead of jumping, from the very first one.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.40",
+    date: "2026-10-16",
+    headline: "A book that looks like a book",
+    sections: [
+      {
+        heading: "In a book",
+        items: [
+          {
+            title: "Paper on a desk",
+            text: "The chapter is now a white page on a darker desk, the way Pages and Word show it, whatever theme you use. A bar at the bottom says which page you are on, how many words the chapter has — or how many you have selected — and how far the whole book is from its goal.",
+          },
+          {
+            title: "Everything at the top",
+            text: "The column on the left is gone. The strip across the top says which book and which chapter you are in: press the chapter's name to jump to any other chapter or note. Who else is in the book is beside it, and Settings, Trash and the exports are under ⋯.",
+            image: "0.9.40-book-chapters.jpg",
+          },
+          {
+            title: "Organize on the board",
+            text: "The button at the top left (or ⌘\\) turns the page over to the board: every chapter as a card, in order, grouped by part. Drag a card to move it, write what happens on it, and right-click it for its status, its word goal, its part or the Trash. Your notes are at the end.",
+            image: "0.9.40-book-board.jpg",
+          },
+          {
+            title: "Chapters arrive from where they are",
+            text: "Going to the next chapter brings the page up from below, going back brings it down from above.",
+          },
+        ],
+      },
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "Comments in the margin",
+            text: "When there is room, comments stand in the margin beside the words they are about, in books and in notes, and scroll with the page. The one you are reading moves next to its passage and the others make way. In a narrow window they are the panel they were.",
+            image: "0.9.40-book-margin.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.39",
+    date: "2026-10-15",
+    headline: "A quieter book, tidier flowers",
+    sections: [
+      {
+        heading: "In a book",
+        items: [
+          {
+            title: "A writing bar that steps back",
+            text: "The bar over the page now holds the style, bold, italic and Insert. Fonts, sizes, colours, alignment, spacing and lists are all under Aa. While you type, the bar fades out, and it comes back as soon as you move the pointer.",
+          },
+          {
+            title: "Focus and typewriter, one press away",
+            text: "Focus mode and typewriter scrolling have their own buttons in the bar, instead of being tucked away in Settings.",
+          },
+          {
+            title: "A dark page in your colours",
+            text: "In a dark theme the page now takes the colours you chose, instead of a grey of its own.",
+          },
+          {
+            title: "Chapters named by how they begin",
+            text: "A chapter with no title yet shows its first words in the structure, instead of another Untitled.",
+          },
+        ],
+      },
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Flowers in their place",
+            text: "With no note open, the flower now stands whole in the middle of the page with its line beneath it. At the end of a note it sits small and centred under the last line. Both now grow in order: the stem first, then each leaf and petal.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.38",
+    date: "2026-10-15",
+    headline: "Movement, looked at closely",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes land where they go",
+            text: "A note sent to the Trash, the Archive or a folder now folds into a small page and drops all the way into its place, instead of fading out before it arrives.",
+          },
+          {
+            title: "One page at a time",
+            text: "Moving to the next note, the old page leaves before the new one arrives, so the two never show through each other.",
+          },
+          {
+            title: "Settings opens out of the gear",
+            text: "Settings grows visibly out of the button that opened it, instead of appearing almost at once.",
+          },
+          {
+            title: "A dragged note finds its way back",
+            text: "Let go over nothing, a dragged note travels back to its row before it settles in. Held over a folder, it draws in so you can see the folder it is going into.",
+          },
+          {
+            title: "A smoother mouse wheel",
+            text: "Scrolling with a mouse wheel no longer jerks back at the first moment, and jumping to a heading while the page is still gliding goes where you asked.",
+          },
+          {
+            title: "A quieter toolbar",
+            text: "The toolbar no longer says when the note was edited: its row in the list already does. It speaks only while something is happening, such as saving.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.37",
+    date: "2026-10-15",
+    headline: "Catch a thought from anywhere",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "A new note from any app",
+            text: "In the desktop app, press ⌥⌘N (Ctrl+Alt+N on Windows) wherever you are: Napp comes forward with a new note ready. New Note in the Dock does the same.",
+          },
+          {
+            title: "Share into Napp",
+            text: "On Android, add Napp to your home screen and it appears in the share sheet: what you share becomes a new note. On iPhone, a Shortcut in the share sheet can do the same. What you share never passes through the web server.",
+          },
+          {
+            title: "Back where you were",
+            text: "A long note opens again at the paragraph you were reading, on each device.",
+          },
+          {
+            title: "Picked up and put back",
+            text: "A note you drag lifts off the list. Let go over a folder, the Archive or the Trash and it goes in; let go over nothing and it returns to its place.",
+          },
+        ],
+      },
+      {
+        heading: "Taken out",
+        items: [
+          {
+            title: "Linked from and Today's note",
+            text: "The list of notes linking here is gone from the foot of the page; the note's info sheet still shows it. Today's note is gone from ⌘K. Templates stay.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.36",
+    date: "2026-10-15",
+    headline: "Movement that goes somewhere",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes go where you send them",
+            text: "Move a note to the Trash, the Archive or a folder and it travels there in the sidebar, which takes it in. The notes left behind close the gap, and a pinned note rises into Pinned.",
+          },
+          {
+            title: "Menus and windows come from what you pressed",
+            text: "Menus grow out of their button, or out of the point you right-clicked. Settings and What's New open out of the row that opened them and return to it, and a picture opens out of itself in the note.",
+          },
+          {
+            title: "Places answer when something happens to them",
+            text: "Sidebar icons no longer move when the pointer passes. Hold a note over the Trash, the Archive or a folder and it opens towards it; the gear turns as Settings opens.",
+          },
+          {
+            title: "Moving through notes",
+            text: "The next note down the list rises into place and the one above comes down, as if the notes were one long page. A cover unrolls from the top of the page.",
+          },
+        ],
+      },
+      {
+        heading: "Scrolling",
+        items: [
+          {
+            title: "A mouse wheel that glides",
+            text: "Each notch of a mouse wheel now carries the page smoothly instead of jumping. A trackpad scrolls as it always did.",
+          },
+          {
+            title: "Words pass under the toolbars",
+            text: "Lists, notes and Settings fade at the edge where there is more to read, instead of being cut by the bar above them. Not on Windows, where it would blur the text.",
+          },
+          {
+            title: "The title stays with you",
+            text: "Scroll past a note's title and it rises into the bar above the page, and goes back down when you return to the top.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.35",
+    date: "2026-10-13",
+    headline: "Housekeeping",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Notes stay as you left them",
+            text: "Behind the scenes, the guard that stops a note from showing as edited when you only opened it is now written down, so it holds for whatever Napp learns next.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.34",
+    date: "2026-10-13",
+    headline: "Opening a note no longer edits it",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          {
+            title: "No false “Edited”",
+            text: "Opening a note that links to other notes, for instance from Linked from, no longer shows it as edited when you have changed nothing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.33",
+    date: "2026-10-13",
+    headline: "Quieter, quicker movement",
+    sections: [
+      {
+        heading: "Around Napp",
+        items: [
+          {
+            title: "Less waiting when you navigate",
+            text: "Lists, menus and people cards arrive sooner, with smaller movements. Menus fade away when dismissed, and searching keeps the results still while you type.",
+          },
+          {
+            title: "Presence that means something",
+            text: "A member's dot stays still while they read and moves only when they are writing in that note. Sidebar icons respond with a smaller movement, and reduced motion is respected.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.32",
+    date: "2026-10-13",
+    headline: "Link straight to a paragraph",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Copy a paragraph link",
+            text: "Right-click a paragraph and choose Copy link to paragraph. Paste the link in another note to return directly to those words, even after text is added above them.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.31",
+    date: "2026-10-13",
+    headline: "Find words in pictures",
+    sections: [
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "Make images and PDFs searchable",
+            text: "Choose Make images and PDFs searchable from the list menu, Chapter actions or the command palette. Napp reads the words on your device and keeps them in the group for search. Scanned PDFs can also be imported as text.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.30",
+    date: "2026-10-13",
+    headline: "Read and take your book with you",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Save your book as EPUB",
+            text: "Chapter actions can save the whole book for your ebook reader, with chapters in order, pictures, citations and footnotes.",
+          },
+          {
+            title: "Turn the pages",
+            text: "Pages has previous and next arrows and a page number at the bottom right. The writing bar keeps its tools apart even in Safari and narrow windows.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.29",
+    date: "2026-10-13",
+    headline: "Pages, heads and spreads",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "See the chapter as pages",
+            text: "The book button at the right of the writing bar cuts the chapter into pages the size of your page setup, and shows them as they will print.",
+          },
+          {
+            title: "Page numbers and running heads",
+            text: "Turn them on in Settings → Document. Every page but a chapter's first carries the chapter's name above and its number below, in print and in a saved PDF.",
+          },
+          {
+            title: "Facing pages",
+            text: "Set the book in spreads: the number on the outer corner, the book's name over a left page and the chapter's over a right one. The first page stands alone on the right, as a book opens.",
+          },
+          {
+            title: "Printing follows the page setup",
+            text: "A printed chapter now takes the paper size, orientation and margins you chose, instead of the printer's.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.28",
+    date: "2026-10-13",
+    headline: "The book as cards",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "A board of chapters",
+            text: "The new button beside Chapters lays the book out as index cards: number, title, status and words on each, and what happens written on the card itself. Drag a card to move the chapter; press its name to open it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.27",
+    date: "2026-10-13",
+    headline: "A book that cites its sources",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Citations",
+            text: "Insert → Citation… finds a source by author, title or year and puts it in the sentence, with the page if you give one. Bring your library in from Zotero, as BibTeX or CSL JSON, from the foot of the same list.",
+          },
+          {
+            title: "A bibliography that writes itself",
+            text: "Insert → Bibliography lists every work the book cites, and only those. Choose (Rossi 2020) or [1] in Settings → Document; every citation changes with it.",
+          },
+          {
+            title: "Out to Word and Markdown",
+            text: "A Word export prints the citations and the bibliography as the page shows them. Markdown keeps pandoc's [@key], so pandoc can set the book from it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.26",
+    date: "2026-10-13",
+    headline: "Updates taken out",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "One place to see what changed",
+            text: "The Updates list is gone. A note's history and a person's sheet already say who changed what, and they still do.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.25",
+    date: "2026-10-13",
+    headline: "Tasks taken out again",
+    sections: [
+      {
+        heading: "Tasks",
+        items: [
+          {
+            title: "Back to plain checklists",
+            text: "The Tasks list from the last update is gone. Checklists are what they were: an @name or a date in one is just words.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.23",
+    date: "2026-10-13",
+    headline: "Follow somebody through a note",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Follow",
+            text: "Press the face of somebody in the note you have open and choose Follow. The page keeps their caret in view as they write, until you scroll or type yourself.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.22",
+    date: "2026-10-13",
+    headline: "A note for today, and notes to start from",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Today's note",
+            text: "Ask ⌘K for Today's note (or type oggi). It opens the note titled with today's date, and makes it if there is none yet.",
+          },
+          {
+            title: "Templates",
+            text: "Put notes in a folder called Templates or Modelli and they appear in ⌘K under New from template. A template called Daily or Giornaliera is what each day's note starts from.",
+          },
+          {
+            title: "A search that guesses less",
+            text: "⌘K now ranks a loose match below the words a command is known by, so a few scattered letters no longer jump ahead of what you meant.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.21",
+    date: "2026-10-13",
+    headline: "Suggest changes instead of making them",
+    sections: [
+      {
+        heading: "Book",
+        items: [
+          {
+            title: "Suggesting",
+            text: "In a book with Suggested changes on, press Editing in the writing bar to switch to Suggesting. What you type is proposed in green; what you delete stays, struck through in red, until somebody decides.",
+          },
+          {
+            title: "Accept or reject",
+            text: "Put the caret in a change to accept or reject it, or use the changes menu to settle every one in the chapter at once. Exports and prints show the chapter as it stands until a change is accepted.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.20",
+    date: "2026-10-13",
+    headline: "See what changed while you were away",
+    sections: [
+      {
+        heading: "Sharing",
+        items: [
+          {
+            title: "Updates",
+            text: "A new place in the sidebar lists the notes somebody else has written in since you last opened them, with a count. Open a note and it leaves the list. Switch to a member's notes to see what they changed in their own.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.19",
+    date: "2026-10-13",
+    headline: "Chapters that say how far along they are",
+    sections: [
+      {
+        heading: "Book",
+        items: [
+          {
+            title: "Status",
+            text: "Right-click a chapter and mark it Draft, Revised or Final. A coloured dot before its name says which, for everyone writing the book.",
+          },
+          {
+            title: "Synopsis",
+            text: "Write a synopsis gives a chapter two lines of what happens in it, shown under its name in the structure.",
+          },
+          {
+            title: "A goal for each chapter",
+            text: "Set a word goal on a chapter and its count reads 1,200 / 3,000, turning green once it is met.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.18",
+    date: "2026-10-13",
+    headline: "Comments that know who they are for",
+    sections: [
+      {
+        heading: "Comments",
+        items: [
+          {
+            title: "@ someone",
+            text: "Type @ in a comment and pick a member. Their name is drawn as a name, and the thread shows up under For you in their comments.",
+          },
+          {
+            title: "Hand a thread over",
+            text: "Assign under a thread gives it to a member, and its passage says whose it is. Resolving it is still how it gets done.",
+          },
+          {
+            title: "Reactions",
+            text: "Answer a comment with 👍, ❤️, 😄, 🎉, 👀 or ✅. Hold the pointer over one to see who gave it.",
+          },
+          {
+            title: "Comments arrive as they are written",
+            text: "A comment from another member now reaches you at once, rather than the next time Napp happened to look.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.17",
+    date: "2026-10-13",
+    headline: "Notes that name each other, and a search that forgives",
+    sections: [
+      {
+        heading: "Links",
+        items: [
+          {
+            title: "Mentioned in",
+            text: "At the foot of a note, under Linked from, Napp now lists the notes that name it in plain words without linking to it. Press the name to open that note at the words, or Link to turn them into a link.",
+          },
+        ],
+      },
+      {
+        heading: "Search",
+        items: [
+          {
+            title: "⌘K finds what you half remember",
+            text: "Words or letters in the right order are enough: “wds rem” finds Words to Remember. Whole matches still come first.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.16",
+    date: "2026-10-10",
+    headline: "Frosted glass is yours to turn on",
+    sections: [
+      {
+        heading: "Appearance",
+        items: [
+          {
+            title: "Napp looks as it did",
+            text: "The frosted glass from the last update is now a switch, and it starts off. Turn on Frosted glass in Settings → Style for the softer glass over a wallpaper and for the eight palettes that bring a photograph of their own.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.15",
+    date: "2026-10-10",
+    headline: "Eight palettes made of glass and light",
+    sections: [
+      {
+        heading: "Appearance",
+        items: [
+          {
+            title: "Palettes with a photograph behind them",
+            text: "Cosmic, Violet, Lavender and Vanilla, and four darker ones — Abyss, Ember, Pine and Aurora — each come with their own picture. Choose one in Settings → Appearance and the sidebar and the note list turn to frosted glass with its light coming through.",
+          },
+          {
+            title: "Clearer glass over a wallpaper",
+            text: "With any wallpaper, the sidebar and the list now let the picture through as soft colour, and the Liquid Glass slider decides how much. The strip at the foot of the sidebar is glass too.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.14",
+    date: "2026-10-09",
+    headline: "Pasting from Pages, Word and TextEdit keeps its look",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Centred lines and italics survive a paste",
+            text: "Text copied from Pages, Word or TextEdit now arrives with its centring, italics and bold, and the empty lines used for spacing are tidied away.",
+          },
+          {
+            title: "Copying from a PDF",
+            text: "A PDF opened in Preview hands over plain words only, with no italics or centring. For a document that keeps its look, copy from the original file instead.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.13",
+    date: "2026-10-09",
+    headline: "Text pasted from a PDF keeps its paragraphs",
+    sections: [
+      {
+        heading: "Writing",
+        items: [
+          {
+            title: "Paste from a PDF",
+            text: "Text copied out of a PDF used to land one line per paragraph. Lines are now joined back into their paragraphs, headings stay on their own, and a page turn no longer glues two lines together.",
+          },
+          {
+            title: "One letter in a book",
+            text: "Pasting into a book keeps bold, italics and colour but takes the book's own typeface and size.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.12",
+    date: "2026-10-08",
+    headline: "Switch between your accounts",
+    sections: [
+      {
+        heading: "Accounts",
+        items: [
+          {
+            title: "Switch account",
+            text: "The button at the foot of the sidebar now lists the other accounts you have signed in on this device. Pick one and you are in, with no password.",
+          },
+          {
+            title: "Add an account",
+            text: "Add account keeps you signed in for later and opens the sign-in page. Lock & sign out is in the same menu.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.11",
+    date: "2026-10-07",
+    headline: "Notes open faster in the browser",
+    sections: [
+      {
+        heading: "Speed",
+        items: [
+          {
+            title: "Going back to a note is quick",
+            text: "The notes you opened last stay ready, so returning to one shows its words straight away instead of waiting for the server.",
+          },
+          {
+            title: "A note starts opening when you point at it",
+            text: "Resting the pointer on a note in the list gets it ready before you click. Safari gains the most.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.10",
+    date: "2026-10-07",
+    headline: "The window's shape, back as it was",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "Flush columns again",
+            text: "The sidebar and the list are columns again rather than floating panels, under one band with a line beneath it.",
+          },
+          {
+            title: "Writing tools over the words",
+            text: "The writing tools stay centred over the words of the note, even when the scrollbar is showing.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.9",
+    date: "2026-10-07",
+    headline: "Panels with a shape, and Settings that always opens",
+    sections: [
+      {
+        heading: "Window",
+        items: [
+          {
+            title: "The sidebar and the list float",
+            text: "Both are rounded panels standing off the window, and the note is the darker page beside them.",
+          },
+          {
+            title: "Toolbar buttons on one line",
+            text: "Every group of buttons sits on the same line, and the writing tools are centred over the words of the note.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Settings after an update",
+            text: "A tab left open across an update could fail to open Settings. It now reloads itself and opens.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.8",
+    date: "2026-10-07",
+    headline: "Pictures you can edit, and folders in your order",
+    sections: [
+      {
+        heading: "Pictures",
+        items: [
+          {
+            title: "Edit a note's photo",
+            text: "Click the photo on the page or in Note info to view it, crop it again, change it or remove it. Edit photo is in the note's right-click menu too.",
+          },
+          {
+            title: "Edit the cover",
+            text: "A picture cover has Edit: drag it into place, then Done. Remove takes it off.",
+          },
+          {
+            title: "Hold to see it whole",
+            text: "Hold a photo, a cover or a picture in a note and it opens full screen.",
+          },
+          {
+            title: "No more file names under pictures",
+            text: "A pasted picture or video no longer shows a string of letters and numbers beneath it.",
+          },
+        ],
+      },
+      {
+        heading: "Sidebar",
+        items: [
+          {
+            title: "Hide only the folders",
+            text: "The sidebar button and ⌘\\ hide the folders and leave your notes where they are. Focus mode still hides both.",
+          },
+          {
+            title: "Drag folders into order",
+            text: "Drag a folder above or below another to put it where you want it.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.7",
+    date: "2026-10-06",
+    headline: "Delete what you made, and clear Notes in one go",
+    sections: [
+      {
+        heading: "Groups",
+        items: [
+          {
+            title: "Delete for everyone",
+            text: "Whoever made a group can delete it even while others are in it, and it goes for everybody. Leave is for the others: it no longer leaves your group behind for them.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Clear Notes",
+            text: "Right-click Notes in the sidebar to move every note under it to the Trash.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.6",
+    date: "2026-10-06",
+    headline: "Continue as note, and a book each",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Continue as note",
+            text: "Choose words in a chapter and press Continue as note, in the bubble or the right-click menu. A note opens under Notes with those words quoted at the top; press the quotation to go back to them, lit for a moment.",
+          },
+          {
+            title: "Comments are comments again",
+            text: "Comments keep their own name and live in the side panel, as in a notes group. Notes in the sidebar are the book's own pages.",
+          },
+          {
+            title: "A book each",
+            text: "A new book gives each of you your own chapters, so You and Partner show two different books. One shared manuscript is a switch in Settings → Document.",
+          },
+          {
+            title: "Steadier side panel",
+            text: "Switching between Headings, Comments and Versions no longer flashes Loading.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.5",
+    date: "2026-10-06",
+    headline: "The writing bar works again, and notes you can find",
+    sections: [
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Every menu in the writing bar opens",
+            text: "Colour, highlight, alignment, more effects and Insert opened invisibly since 0.9.3, so the bar seemed to do nothing. They open again.",
+          },
+          {
+            title: "A note in progress waits for you",
+            text: "Looking at Headings or Versions while writing a note no longer throws it away; come back to Notes and it is still there, on the same words. Closing the panel cancels it.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Notes, by name",
+            text: "In a book, comments are called notes everywhere: the button on selected words, the panel, and Add note.",
+          },
+          {
+            title: "Always in the sidebar",
+            text: "Notes is always listed under the chapters, and a note you add appears there at once.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.4",
+    date: "2026-10-06",
+    headline: "Up-to-date guides and download links",
+    sections: [
+      {
+        heading: "Getting the app",
+        items: [
+          {
+            title: "Direct downloads",
+            text: "The project page links straight to the newest Mac (Apple silicon and Intel) and Windows installers, the same ones as the buttons below.",
+          },
+          {
+            title: "Guides brought up to date",
+            text: "The guides now describe books, eight seats per group, and how new groups are shared.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.3",
+    date: "2026-10-06",
+    headline: "A chapter bar on one line",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "One row of tools",
+            text: "The chapter bar no longer wraps onto a second line. In a narrow window the tools used least step aside first — the text's own font, indents, undo and redo — and Insert always stays.",
+          },
+          {
+            title: "Nothing but tools up there",
+            text: "The “Edited” time is gone from the bar.",
+          },
+          {
+            title: "New chapter at the top",
+            text: "The + beside Chapters makes a new one.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.2",
+    date: "2026-10-06",
+    headline: "Notes on the words, a quieter book, and eight seats",
+    sections: [
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "A note on a passage",
+            text: "Select some words, right-click, Add note. Every open note is listed under Notes in the sidebar; pressing one takes you back to the words and lights them for a moment.",
+          },
+          {
+            title: "Research is gone",
+            text: "Notes now live on the words they are about. Pages made before are still there, under Pages, and open as plain notes rather than as a page of the book.",
+          },
+          {
+            title: "Comments and versions in reach",
+            text: "Find, Comments and Versions have their own buttons at the right of the chapter bar, beside when it was last edited.",
+          },
+          {
+            title: "A tidier sidebar",
+            text: "The word count sits at the foot, New chapter is a row at the end of the chapters, and You / Partner only appears when somebody else is in the group.",
+          },
+        ],
+      },
+      {
+        heading: "Groups",
+        items: [
+          {
+            title: "Eight seats",
+            text: "A group holds up to eight people.",
+          },
+          {
+            title: "New groups are shared already",
+            text: "Whoever already shares a group with you is in a new one from the start, without another invitation.",
+          },
+          {
+            title: "The group switch stays on",
+            text: "Turning it on and then changing group no longer turns it off again.",
+          },
+        ],
+      },
+      {
+        heading: "Everywhere",
+        items: [
+          {
+            title: "Search from inside the text",
+            text: "⌘K (Ctrl+K on Windows) opens search even while writing. With words selected it still makes a link.",
+          },
+          {
+            title: "Download from here",
+            text: "What's New has buttons for the Mac and Windows apps, and the desktop app says in the sidebar when a newer version is out — in a book too.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.1",
+    date: "2026-10-06",
+    headline: "Notes or Book, groups you can delete, and a clearer book",
+    sections: [
+      {
+        heading: "Groups",
+        items: [
+          {
+            title: "Notes or Book",
+            text: "New group asks for a name and whether it is notes or a book. A book starts with every tool switched on.",
+          },
+          {
+            title: "Change the type, both ways",
+            text: "Group info → Type turns notes into a book or back, and nothing is lost either way.",
+          },
+          {
+            title: "Delete a group",
+            text: "Any group but your first can be deleted, from Settings → Groups or by right-clicking the group at the top of the sidebar.",
+          },
+        ],
+      },
+      {
+        heading: "Books",
+        items: [
+          {
+            title: "Straight to the writing",
+            text: "A book opens on the chapter you last wrote in.",
+          },
+          {
+            title: "Chapters, parts and notes",
+            text: "Right-click a chapter → Group in a part to start a part there. Pages that are not chapters live under Notes.",
+          },
+          {
+            title: "A real Trash",
+            text: "Trash lists what you threw away, with Put back and Delete forever.",
+          },
+          {
+            title: "Headings that take you there",
+            text: "Pressing a heading under a chapter brings it to the top of the page.",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "What's New stays read",
+            text: "Once opened, New no longer comes back on the sidebar.",
+          },
+          {
+            title: "Profile pictures",
+            text: "A picture fills its circle without a grey edge.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.9.0",
+    date: "2026-10-06",
+    headline: "Write a book, with footnotes, captions and cross-references",
+    sections: [
+      {
+        heading: "Documents",
+        items: [
+          {
+            title: "A new kind of group",
+            text: "New group now offers Notes or Book. A book is one piece of writing in chapters, and a notes group works exactly as before.",
+          },
+          {
+            title: "Chapters and parts",
+            text: "Chapters take the place of the list: drag them into order, group them in parts from a chapter's right-click menu, and keep loose pages under Notes.",
+          },
+          {
+            title: "A page you can print",
+            text: "Each chapter is written on a sheet with the paper, margins, font and spacing of the document's page setup.",
+          },
+          {
+            title: "A writing bar like Word's",
+            text: "Styles, font and size, colour and highlight, alignment, spacing, indents, lists, page breaks, and find and replace.",
+          },
+          {
+            title: "A word goal",
+            text: "The document's goal sits at the top of the structure, with what you wrote today.",
+          },
+        ],
+      },
+      {
+        heading: "References",
+        items: [
+          {
+            title: "Footnotes",
+            text: "Insert → Footnote, or ⌥⌘F. Write the note right beside its number; the chapter's notes are listed at the foot of its sheet.",
+          },
+          {
+            title: "Numbered captions",
+            text: "Insert → Figure caption or Table caption. Numbers like Figure 2.1 update by themselves as you add and move things.",
+          },
+          {
+            title: "Cross-references",
+            text: "Insert → Cross-reference… points at a section, figure, table or footnote in any chapter. It always shows the current number, and a click takes you there.",
+          },
+          {
+            title: "Your house style",
+            text: "Settings → Document → References: label language, footnotes per chapter or continuous, the separator after a caption's number, and captions above or below tables.",
+          },
+        ],
+      },
+      {
+        heading: "Finding your way",
+        items: [
+          {
+            title: "Numbered headings and contents",
+            text: "Headings can be numbered 2.1, 2.1.1. A chapter's headings are listed under it in the sidebar, and a contents block can go anywhere in the text.",
+          },
+          {
+            title: "Spotlight on ⌘K",
+            text: "Finds headings, lines of text, footnotes, people, named versions, settings and other groups. Enter takes you straight to the place.",
+          },
+          {
+            title: "One inspector",
+            text: "⌥⌘I opens headings, comments and versions together, beside the page.",
+          },
+          {
+            title: "Focus and typewriter",
+            text: "Dim everything but the paragraph or sentence you are writing, and keep the line in the middle of the window.",
+          },
+        ],
+      },
+      {
+        heading: "Also",
+        items: [
+          {
+            title: "Print and Save as PDF",
+            text: "Two separate items in the ⋯ menu, and neither prints a blank page any more.",
+          },
+          {
+            title: "What's New",
+            text: "This panel. It opens once after each update and is always in the sidebar.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.8.0",
+    date: "2026-10-05",
+    headline: "A note's history, sheets, and more than one group",
+    sections: [
+      {
+        heading: "History",
+        items: [
+          {
+            title: "Every version of a note",
+            text: "See what a note used to say, who wrote what, and the words added and removed — then restore any version.",
+          },
+          {
+            title: "Named versions",
+            text: "Give a moment a name so you can find it again.",
+          },
+        ],
+      },
+      {
+        heading: "Sheets",
+        items: [
+          {
+            title: "Hold to see more",
+            text: "Hold a note, a folder or a face to open its sheet: owner, folder, words, versions, remarks and links, each one a door.",
+          },
+        ],
+      },
+      {
+        heading: "Groups",
+        items: [
+          {
+            title: "More than one group",
+            text: "Settings → Groups lists every group you belong to and makes new ones. Turn on the switch to change group from the top of the sidebar.",
+          },
+          {
+            title: "Each group keeps its own place",
+            text: "Sorting, recents and folded groups are remembered per group.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.7.0",
+    date: "2026-10-04",
+    headline: "A new sign-in page, quieter toolbars, and where the other member is",
+    sections: [
+      {
+        heading: "Changes",
+        items: [
+          {
+            title: "A new sign-in page",
+            text: "A cleaner door, with the form on its own.",
+          },
+          {
+            title: "Quieter toolbars",
+            text: "Icons stay ink until you point at them, and larger glyphs read better.",
+          },
+          {
+            title: "Where the other member is",
+            text: "A small dot on a note's row shows that somebody else has it open.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.6.0",
+    date: "2026-10-03",
+    headline: "Smoother motion, a Style section, and simpler note rows",
+    sections: [
+      {
+        heading: "Changes",
+        items: [
+          {
+            title: "Smoother motion",
+            text: "The sidebar slides and notes cross-fade without the page being laid out again on every frame.",
+          },
+          {
+            title: "Style",
+            text: "Settings → Style: icon styles, folder and highlight colours, and translucency.",
+          },
+          {
+            title: "Simpler note rows",
+            text: "Title, then date and preview; a photo or drawing appears as a thumbnail.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.5.0",
+    date: "2026-10-03",
+    headline: "A Mac application rather than a page in a window",
+    sections: [
+      {
+        heading: "Changes",
+        items: [
+          {
+            title: "Settings in the shape of System Settings",
+            text: "Coloured tiles in the rail and plain rows on the right.",
+          },
+          {
+            title: "Faces on a shelf",
+            text: "The people in the group sit at the top of the sidebar.",
+          },
+          {
+            title: "New palettes",
+            text: "Graphite by default, with livelier accents and a neutral selection.",
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export function unseenReleases(seen: string): Release[] {
+  return RELEASES.filter((release) => compareVersions(release.version, seen) > 0);
+}

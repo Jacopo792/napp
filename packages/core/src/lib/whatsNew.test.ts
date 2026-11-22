@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync, readFileSync } from "node:fs";
-import {
-  CURRENT_RELEASE,
-  RELEASES,
-  compareVersions,
-  laterVersion,
-  unseenReleases,
-} from "./whatsNew.ts";
+import { RELEASES, unseenReleases } from "./releaseHistory.ts";
+import { CURRENT_RELEASE, compareVersions, laterVersion } from "./whatsNew.ts";
 
 test("versions compare as numbers, and nothing is older than everything", () => {
   assert.ok(compareVersions("0.10.0", "0.9.0") > 0);

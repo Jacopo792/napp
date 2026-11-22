@@ -5,7 +5,8 @@
  * it, to whom all history is new. It opens by itself once after an update. */
 import { useEffect, useState } from "react";
 import { ChevronRight } from "@/components/icons";
-import { DOWNLOADS, RELEASES, compareVersions, releaseDate } from "@/lib/whatsNew";
+import { RELEASES } from "@/lib/releaseHistory";
+import { DOWNLOADS, compareVersions, releaseDate } from "@/lib/whatsNew";
 
 /* The pictures go into the bundle by name, so a release's entry needs no
    import of its own and a missing file is an empty slot, not a failed build. */
