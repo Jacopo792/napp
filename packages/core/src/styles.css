@@ -1478,19 +1478,14 @@
   color: var(--ink-2);
 }
 
-.login-steps {
-  display: grid;
-  gap: 12px;
-  margin-top: 1.25rem;
-  padding-left: 1.15rem;
-  list-style: decimal;
+.login-code-action {
+  justify-self: start;
+  min-height: 44px;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 1.5;
 }
 
-.login-steps::marker,
-.login-steps li::marker {
+.login-code-action:disabled {
   color: var(--ink-4);
 }
 
@@ -1498,10 +1493,6 @@
   color: var(--ink-4);
   font-size: var(--text-xs);
   line-height: 1.6;
-}
-
-.login-steps + .login-note {
-  margin-top: 1.25rem;
 }
 
 /* Said, and shaken once, as Glossa's is: the line arrives from the side it
@@ -16043,4 +16034,92 @@ button.sheet-chip:hover,
   ) {
     corner-shape: squircle;
   }
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.account-field input {
+  height: 36px;
+  border-radius: 10px;
+  padding: 0 11px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--page));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  outline: none;
+  transition: box-shadow var(--dur-fast) var(--ease-press);
+}
+
+:root[data-theme="light"] .account-field input {
+  background: white;
+}
+
+.account-field input:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px var(--accent-wash);
+}
+
+.account-field input:read-only {
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.account-dialog-link {
+  margin: -2px 0 4px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.account-dialog-status {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.account-dialog-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.account-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.account-dialog-actions button {
+  min-height: 34px;
+  border-radius: var(--radius-pill);
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.account-dialog-actions button.is-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root[data-theme="light"] .account-dialog-actions button.is-primary {
+  color: white;
+}
+
+.account-dialog-actions button:disabled {
+  opacity: 0.6;
 }

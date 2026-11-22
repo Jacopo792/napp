@@ -227,12 +227,8 @@ enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
-# Off. Supabase's built-in mail service only delivers to the project's own team
-# addresses, so the confirmation message never reached anybody else and no
-# account could be finished. Turning it back on means configuring
-# [auth.email.smtp] first, and restoring the `email_confirmed_at` check that
-# `20260830040000_invites_without_email_confirmation.sql` removed from
-# `private.redeem_archive_invite()`.
+# Keep disposable local fixtures usable without email. Production requires the
+# signup code and manages its SMTP and confirmation settings separately.
 enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
@@ -255,16 +251,33 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# The Auth emails share one look (version A, Blush). Production reads them from
+# the dashboard: paste each file into Authentication -> Email Templates.
+[auth.email.template.confirmation]
+subject = "Confirm your Napp account"
+content_path = "./supabase/templates/confirmation.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./supabase/templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your Napp password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Napp email"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "Your Napp verification code"
+content_path = "./supabase/templates/reauthentication.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Your Napp email was changed"
+content_path = "./supabase/templates/email_changed_notification.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your Napp password was changed"
+content_path = "./supabase/templates/password_changed_notification.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.

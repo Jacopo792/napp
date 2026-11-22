@@ -3,6 +3,14 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 0.9.81 – 2026-11-22
+
+### Added
+
+- When email confirmation is enabled, enter the eight-digit registration code
+  in Napp, or confirm it in the browser from an older desktop version.
+- Change the sign-in email or password in account settings.
+
 ## 0.9.80 – 2026-11-21
 
 ### Changed

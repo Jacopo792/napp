@@ -50,6 +50,7 @@ import {
   X,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
+import { CredentialSettings } from "@/components/CredentialSettings";
 import { AccountDeletionForm } from "@/components/AccountDeletionForm";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { useUsageAdministrator } from "@/lib/useUsageDashboard";
@@ -799,6 +800,7 @@ export function SettingsPanel({
                     <div className="appearance-row">
                       <PolicyLinks />
                     </div>
+                    {email && <CredentialSettings email={email} />}
                     {deleting ? (
                       <AccountDeletionForm
                         accountEmail={email}

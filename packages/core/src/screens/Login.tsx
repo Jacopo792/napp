@@ -16,7 +16,10 @@ import {
 import {
   authenticate,
   chooseArchive,
+  confirmRegistration,
+  confirmRegistrationAddress,
   registerAccount,
+  resendRegistrationCode,
   restoreSession,
   type ArchiveOption,
 } from "@/lib/session";
@@ -37,8 +40,7 @@ type Mode = "sign-in" | "sign-up";
 
    The confirmation screen below is not dead code even though this project has
    email confirmation turned off: whether it appears is decided by whether
-   Supabase hands back a session, which is a server fact. Configure SMTP and
-   turn confirmations back on and it is correct again. */
+   Supabase hands back a session, which is a server fact. */
 const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   "sign-in": {
     title: "Welcome back.",
@@ -52,7 +54,7 @@ const COPY: Record<Mode, { title: string; lede: string; action: string }> = {
   },
 };
 
-export default function Login() {
+export default function Login({ confirmAddressOnly = false }: { confirmAddressOnly?: boolean }) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
@@ -60,6 +62,10 @@ export default function Login() {
   const [policiesAccepted, setPoliciesAccepted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [code, setCode] = useState("");
+  const [resendAt, setResendAt] = useState(0);
+  const [codeSent, setCodeSent] = useState(false);
   const [archiveChoice, setArchiveChoice] = useState<{
     account: { userId: string; email: string };
     archives: ArchiveOption[];
@@ -68,14 +74,14 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const invited = Boolean(platform().inviteToken());
-  const [restoring, setRestoring] = useState(!invited);
+  const [restoring, setRestoring] = useState(!invited && !confirmAddressOnly);
   const [restoreError, setRestoreError] = useState("");
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const copy = COPY[mode];
 
   useEffect(() => {
     // Invitations must still go through the account flow that claims them.
-    if (invited) return;
+    if (invited || confirmAddressOnly) return;
     let active = true;
     void restoreSession()
       .then((session) => {
@@ -89,7 +95,13 @@ export default function Login() {
     return () => {
       active = false;
     };
-  }, [invited, navigate, restoreAttempt]);
+  }, [confirmAddressOnly, invited, navigate, restoreAttempt]);
+
+  useEffect(() => {
+    if (!resendAt) return;
+    const timer = setTimeout(() => setResendAt(0), Math.max(0, resendAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [resendAt]);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -109,6 +121,9 @@ export default function Login() {
         result = await registerAccount(email.trim(), password, policiesAccepted);
         if (result.confirmationRequired) {
           setConfirmation(email.trim());
+          setCode("");
+          setCodeSent(false);
+          setResendAt(Date.now() + 60_000);
           setPassword("");
           setLoading(false);
           return;
@@ -124,9 +139,46 @@ export default function Login() {
         return;
       }
       setPassword("");
-      navigate({ to: "/notes" });
+      void navigate({ to: "/notes" });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign in failed");
+      setLoading(false);
+    }
+  }
+
+  async function handleConfirmation() {
+    setLoading(true);
+    setError("");
+    setCodeSent(false);
+    try {
+      if (confirmAddressOnly) {
+        await confirmRegistrationAddress(email.trim(), code);
+        setAddressConfirmed(true);
+        return;
+      }
+      const result = await confirmRegistration(confirmation, code);
+      setConfirmation("");
+      if (result.session) {
+        void navigate({ to: "/notes", replace: true });
+      } else setArchiveChoice({ account: result.account, archives: result.archives });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not confirm your email");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    setLoading(true);
+    setError("");
+    setCodeSent(false);
+    try {
+      await resendRegistrationCode(confirmAddressOnly ? email.trim() : confirmation);
+      setResendAt(Date.now() + 60_000);
+      setCodeSent(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not send a new code");
+    } finally {
       setLoading(false);
     }
   }
@@ -137,7 +189,7 @@ export default function Login() {
     setError("");
     try {
       await chooseArchive(archiveChoice.account, archiveId);
-      navigate({ to: "/notes" });
+      void navigate({ to: "/notes" });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open that archive");
       setLoading(false);
@@ -209,7 +261,19 @@ export default function Login() {
     );
   }
 
-  if (confirmation) {
+  if (addressConfirmed) {
+    return (
+      <LoginFrame>
+        <h1 className="login-title">Address confirmed</h1>
+        <p className="login-lede">Return to the app and sign in with your email and password.</p>
+        <a className="login-code-action" href={platform().webOrigin()}>
+          Open Napp on the web
+        </a>
+      </LoginFrame>
+    );
+  }
+
+  if (confirmation || confirmAddressOnly) {
     return (
       <LoginFrame>
         <span className="login-mark is-quiet">
@@ -217,33 +281,92 @@ export default function Login() {
         </span>
         <h1 className="login-title">Confirm your address</h1>
         <p className="login-address">{confirmation}</p>
-        <p className="login-lede">
-          A message is on its way. Opening the link in it proves the address is yours and finishes
-          the account.
-        </p>
-        <ol className="login-steps">
-          <li>Open the message and follow its link — it brings you back here.</li>
-          <li>Sign in with the same address and password.</li>
-          <li>
-            {invited
-              ? "The invitation you followed is claimed, and the shared archive opens."
-              : "Your own private archive is created the first time you sign in."}
-          </li>
-        </ol>
-        <p className="login-note">
-          Nothing arrived? Check the spam folder. The link works for 24 hours; after that, create
-          the account again with the same address.
-        </p>
-        <button
-          type="button"
-          className="login-submit label"
-          onClick={() => {
-            setConfirmation("");
-            switchMode("sign-in");
+        <form
+          className="login-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirmation();
           }}
         >
-          Back to sign in
-        </button>
+          {confirmAddressOnly && (
+            <div className="login-field">
+              <label className="label" htmlFor="signup-confirm-email">
+                Email
+              </label>
+              <input
+                id="signup-confirm-email"
+                className="login-input"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={loading}
+              />
+            </div>
+          )}
+          <div className="login-field">
+            <label className="label" htmlFor="signup-code">
+              Verification code
+            </label>
+            <input
+              id="signup-code"
+              className="login-input"
+              autoFocus={!confirmAddressOnly}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              disabled={loading}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="readout text-danger">
+              {error}
+            </p>
+          )}
+          {codeSent && (
+            <p role="status" className="login-note">
+              New code requested.
+            </p>
+          )}
+          <button
+            type="submit"
+            className="login-submit label"
+            disabled={
+              loading ||
+              (confirmAddressOnly && !email.trim()) ||
+              !/^\d{8}$/.test(code.replace(/\s/g, ""))
+            }
+          >
+            Verify email
+          </button>
+          <button
+            type="button"
+            className="login-code-action"
+            disabled={loading || Boolean(resendAt) || (confirmAddressOnly && !email.trim())}
+            onClick={() => void handleResend()}
+          >
+            Resend code
+          </button>
+          {confirmAddressOnly ? (
+            <a className="login-code-action" href={platform().webOrigin()}>
+              Back to sign in
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="login-code-action"
+              disabled={loading}
+              onClick={() => {
+                setConfirmation("");
+                switchMode("sign-in");
+              }}
+            >
+              Back to sign in
+            </button>
+          )}
+        </form>
       </LoginFrame>
     );
   }

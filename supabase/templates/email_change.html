@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Confirm your new email</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #f6eeee">
+    <table
+      role="presentation"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      bgcolor="#f6eeee"
+      style="background-color: #f6eeee"
+    >
+      <tr>
+        <td align="center" style="padding-top: 70px">
+          <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+          <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="
+              max-width: 600px;
+              font-family:
+                -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+                sans-serif;
+            "
+          >
+            <tr>
+              <td align="right" style="padding-right: 36px; font-size: 0; line-height: 0">
+                <img
+                  src="https://nappnote.com/email/duck.hi-top.png"
+                  width="120"
+                  height="92"
+                  alt=""
+                  style="display: block; border: 0"
+                />
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#000000" style="background-color: #000000; border-radius: 22px 22px 0 0">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding: 20px 0 20px 32px">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td>
+                            <img
+                              src="https://nappnote.com/napp-icon-180.png"
+                              width="32"
+                              height="32"
+                              alt=""
+                              style="display: block; border: 0"
+                            />
+                          </td>
+                          <td
+                            style="
+                              padding-left: 12px;
+                              color: #ffffff;
+                              font-size: 17px;
+                              font-weight: 600;
+                            "
+                          >
+                            Napp
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                    <td
+                      align="right"
+                      valign="top"
+                      style="padding-right: 36px; font-size: 0; line-height: 0"
+                    >
+                      <img
+                        src="https://nappnote.com/email/duck.hi-bottom.png"
+                        width="120"
+                        height="28"
+                        alt=""
+                        style="display: block; border: 0"
+                      />
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td
+                bgcolor="#ffffff"
+                style="background-color: #ffffff; padding: 40px 40px 48px; overflow-wrap: anywhere"
+              >
+                <h1
+                  style="
+                    margin: 0 0 12px;
+                    color: #2c2325;
+                    font-size: 26px;
+                    line-height: 32px;
+                    font-weight: 600;
+                  "
+                >
+                  Confirm your new email
+                </h1>
+                <p style="margin: 0; color: #5c4a4e; font-size: 16px; line-height: 25px">
+                  Your Napp account will use {{ .NewEmail }} after you confirm this change from both
+                  email addresses. This link works for one hour.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding-top: 22px">
+                      <!--[if mso]>
+                        <v:roundrect
+                          xmlns:v="urn:schemas-microsoft-com:vml"
+                          xmlns:w="urn:schemas-microsoft-com:office:word"
+                          href="{{ .ConfirmationURL }}"
+                          style="height: 48px; v-text-anchor: middle; width: 200px"
+                          arcsize="50%"
+                          stroke="f"
+                          fillcolor="#b4606d"
+                        >
+                          <w:anchorlock />
+                          <center
+                            style="
+                              color: #ffffff;
+                              font-family: Arial, sans-serif;
+                              font-size: 16px;
+                              font-weight: bold;
+                            "
+                          >
+                            Confirm new email
+                          </center>
+                        </v:roundrect>
+                      <![endif]-->
+                      <!--[if !mso]><!-->
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        style="
+                          display: inline-block;
+                          background-color: #b4606d;
+                          border-radius: 999px;
+                          color: #ffffff;
+                          padding: 14px 26px;
+                          font-size: 16px;
+                          font-weight: 600;
+                          line-height: 20px;
+                          text-decoration: none;
+                        "
+                        >Confirm new email</a
+                      >
+                      <!--<![endif]-->
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 18px 0 0; color: #8a7377; font-size: 13px; line-height: 20px">
+                  If you didn’t ask for this, ignore this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#000000" style="background-color: #000000; padding: 22px 32px">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="20">
+                      <img
+                        src="https://nappnote.com/email/lock.png"
+                        width="20"
+                        height="20"
+                        alt=""
+                        style="display: block; border: 0"
+                      />
+                    </td>
+                    <td
+                      style="
+                        padding: 0 12px 0 14px;
+                        color: #f6eeee;
+                        font-size: 13px;
+                        line-height: 18px;
+                      "
+                    >
+                      This note is locked to you
+                    </td>
+                    <td align="right" style="font-size: 13px; line-height: 18px">
+                      <a href="https://nappnote.com/" style="color: #b9a7aa; text-decoration: none"
+                        >nappnote.com</a
+                      >
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td
+                align="center"
+                style="padding: 22px 14px 28px; color: #8a7377; font-size: 12px; line-height: 18px"
+              >
+                Napp · notes you share with the people you choose
+              </td>
+            </tr>
+          </table>
+          <!--[if mso]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -25,11 +25,17 @@ function accountFlow(
 ) {
   const calls: { name: string; token?: string }[] = [];
   const storage = new Map<string, string>();
+  const tokens: string[] = [];
+  const ephemeralEvents: string[] = [];
   const archiveIds = ["personal"];
   const authData = { data: { user, session: options.confirmation ? null : {} }, error: null };
   const supabase = {
     auth: {
       signUp: async () => authData,
+      verifyOtp: async ({ token }: { token: string }) => {
+        tokens.push(token);
+        return { data: { user, session: {} }, error: null };
+      },
       signInWithPassword: async () =>
         options.signInStatus !== undefined
           ? {
@@ -87,7 +93,19 @@ function accountFlow(
       removeItem: (key: string) => storage.delete(key),
     },
     require: (name: string) => {
-      if (name === "./supabaseClient") return { supabase };
+      if (name === "./supabaseClient")
+        return {
+          supabase,
+          createEphemeralClient: () => ({
+            auth: {
+              verifyOtp: async ({ token }: { token: string }) => {
+                ephemeralEvents.push(token);
+                return { data: { user, session: {} }, error: null };
+              },
+              signOut: async () => ({ error: null }),
+            },
+          }),
+        };
       if (name === "@/platform")
         return {
           platform: () => ({
@@ -114,7 +132,7 @@ function accountFlow(
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
-  return { api: exports, calls, storage };
+  return { api: exports, calls, storage, tokens, ephemeralEvents };
 }
 
 test("invited registration claims the invitation and opens the joined archive", async () => {
@@ -150,6 +168,26 @@ test("registration awaiting email confirmation does not claim or open an archive
   assert.equal(result.session, null);
   assert.equal(flow.calls.length, 0);
   assert.equal(flow.storage.size, 0);
+});
+
+test("a spaced registration code claims the pending archive invitation", async () => {
+  const flow = accountFlow({ invited: true, confirmation: true });
+  await flow.api.registerAccount(user.email, "test-password", true);
+  const result = await flow.api.confirmRegistration(user.email, "1234 5678");
+  assert.equal(result.session?.archiveId, "shared");
+  assert.deepEqual(flow.tokens, ["12345678"]);
+  assert.ok(flow.calls.some((call) => call.name === "claim_archive_invite"));
+});
+
+test("the fallback confirmation preserves an open session and does not claim an invite", async () => {
+  const flow = accountFlow({ invited: true });
+  flow.storage.set("session", "existing browser session");
+  await assert.rejects(flow.api.confirmRegistrationAddress(user.email, "1234"), /8-digit/);
+  await flow.api.confirmRegistrationAddress(user.email, "1234 5678");
+  assert.deepEqual(flow.ephemeralEvents, ["12345678"]);
+  assert.deepEqual(flow.tokens, []);
+  assert.deepEqual(flow.calls, []);
+  assert.equal(flow.storage.get("session"), "existing browser session");
 });
 
 test("a rejected invitation cannot silently open the personal archive after registration", async () => {

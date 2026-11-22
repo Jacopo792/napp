@@ -10,7 +10,7 @@ export const SESSION_KEY = "napp:archive-session";
 
 interface SessionAuth {
   getUser(): Promise<{
-    data: { user: { id: string } | null };
+    data: { user: { id: string; email?: string } | null };
     error: { message: string; status?: number; name?: string; code?: string } | null;
   }>;
 }
@@ -62,5 +62,25 @@ export async function restoreArchiveSession(
     storage.removeItem(SESSION_KEY);
     return null;
   }
-  return stored;
+  // A confirmed address change is the server's news: the saved copy follows it.
+  return data.user.email ? { ...stored, email: data.user.email } : stored;
+}
+
+/** Written once an account with an address has been open on this device, and
+ *  never taken away by a failed restore. */
+export const SIGNED_IN_BEFORE_KEY = "napp:signed-in-before";
+
+/** The phone opens on an anonymous account only when it has never held a real
+ *  one: no saved archive session, no saved account, no account ever opened.
+ *  A real session that fails to restore — offline, refused, a permission
+ *  error — is asked for again, never replaced. Read it before anything that
+ *  may clear the saved session. */
+export function mayStartAnonymous(storage: Pick<Storage, "getItem">): boolean {
+  if (storage.getItem(SESSION_KEY) || storage.getItem(SIGNED_IN_BEFORE_KEY)) return false;
+  try {
+    const saved = JSON.parse(storage.getItem("napp:accounts") ?? "[]");
+    return !(Array.isArray(saved) && saved.length);
+  } catch {
+    return false;
+  }
 }

@@ -95,3 +95,11 @@ export async function switchAccount(): Promise<void> {
 export function signInFailure(): Error {
   return new Error("Email or password is incorrect");
 }
+
+export async function resendRegistrationCode(_email: string) {}
+export async function confirmRegistrationAddress(_email: string, _code: string) {}
+export async function confirmRegistration(email: string, _code: string) {
+  return authenticate(email);
+}
+export async function requestEmailChange(_current: string, _next: string) {}
+export async function changePassword(_email: string, _current: string, _next: string) {}

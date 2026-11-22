@@ -3,7 +3,7 @@
    so importing it here put all of ProseMirror in the chunk the sign-in page
    loads before you can type a password. This module is the login screen's
    entire back end and must stay editor-free. */
-import { supabase } from "./supabaseClient";
+import { createEphemeralClient, supabase } from "./supabaseClient";
 import { platform } from "@/platform";
 import { clearNoteStore, resetArchiveCache } from "./noteStore";
 import { POLICY_VERSION } from "./storePolicies";
@@ -188,9 +188,62 @@ export async function chooseArchive(
   return storeSession(account.userId, account.email, archiveId);
 }
 
+/** A new address for an account that has one. With `double_confirm_changes`
+ *  the server mails a link to both addresses and keeps the old one until both
+ *  are opened; the next launch reads the confirmed address back. */
+export async function requestEmailChange(current: string, next: string): Promise<void> {
+  const email = next.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address");
+  if (email.toLowerCase() === current.trim().toLowerCase())
+    throw new Error("This is already your email");
+  const { error } = await supabase.auth.updateUser(
+    { email },
+    { emailRedirectTo: platform().webOrigin() },
+  );
+  if (error)
+    throw new Error(error.status === 429 ? "Too many requests. Try again later" : error.message);
+}
+
+/** Whether an address and password open an account, asked on a client of
+ *  its own: the account in front is left alone until they do. */
+export async function checkCredentials(email: string, password: string): Promise<void> {
+  const client = createEphemeralClient();
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw new Error("Email or password is incorrect");
+  await client.auth.signOut({ scope: "local" });
+}
+
+export async function changePassword(email: string, current: string, next: string): Promise<void> {
+  if (next.length < 8) throw new Error("Use at least 8 characters");
+  if (next === current) throw new Error("Choose a different password");
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (session?.user.email?.toLowerCase() !== email.toLowerCase())
+    throw new Error("Sign in to change your password");
+  try {
+    await checkCredentials(email, current);
+  } catch {
+    throw new Error("Your current password is incorrect");
+  }
+  const {
+    data: { session: active },
+  } = await supabase.auth.getSession();
+  if (active?.user.id !== session.user.id) throw new Error("The signed-in account changed");
+  const { error } = await supabase.auth.updateUser({ password: next, current_password: current });
+  if (error)
+    throw new Error(error.status === 429 ? "Too many requests. Try again later" : error.message);
+}
+
 /** Registration deliberately gives the same completion message for a new or
  * existing address. With confirmations enabled Supabase also returns an
  * indistinguishable response, so the page does not become an account lookup. */
+function signupRedirect(inviteToken?: string): string {
+  const redirect = new URL(platform().webOrigin());
+  if (inviteToken) redirect.searchParams.set("invite", inviteToken);
+  return redirect.toString();
+}
+
 export async function registerAccount(
   email: string,
   password: string,
@@ -198,10 +251,8 @@ export async function registerAccount(
 ): Promise<RegistrationResult> {
   if (!acceptedPolicies)
     throw new Error("Accept the Terms of Use and read the Privacy Policy first");
-  const redirect = new URL(platform().webOrigin());
   const inviteToken = platform().inviteToken();
-  if (inviteToken) redirect.searchParams.set("invite", inviteToken);
-  const emailRedirectTo = redirect.toString();
+  const emailRedirectTo = signupRedirect(inviteToken);
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -225,6 +276,41 @@ export async function registerAccount(
   return { session: null, confirmationRequired: true };
 }
 
+export async function resendRegistrationCode(email: string): Promise<void> {
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: signupRedirect(platform().inviteToken()) },
+  });
+  if (error) throw registrationFailure(error);
+}
+
+export async function confirmRegistration(
+  email: string,
+  code: string,
+): Promise<AuthenticationResult> {
+  const { user } = await verifyRegistrationCode(supabase.auth, email, code);
+  return openAccount(user.id, user.email ?? email, platform().inviteToken());
+}
+
+/** The fallback page verifies an address without replacing this browser's session. */
+export async function confirmRegistrationAddress(email: string, code: string): Promise<void> {
+  const { auth } = createEphemeralClient();
+  await verifyRegistrationCode(auth, email, code);
+  await auth.signOut({ scope: "local" });
+}
+
+async function verifyRegistrationCode(auth: typeof supabase.auth, email: string, code: string) {
+  const token = code.replace(/\s/g, "");
+  if (!/^\d{8}$/.test(token)) throw new Error("Enter the 8-digit code");
+  const { data, error } = await auth.verifyOtp({ email, token, type: "signup" });
+  if (error?.code === "otp_expired" || error?.code === "access_denied")
+    throw new Error("This code is invalid or expired. Request a new code.");
+  if (error) throw registrationFailure(error);
+  if (!data.user || !data.session) throw new Error("Could not confirm your email");
+  return { user: data.user, session: data.session };
+}
+
 /** A saved archive the account can no longer read (left, removed, or one that
  *  belongs to another account on this device) opens the account's first
  *  archive instead of an empty list. Offline, the saved one stands. */
@@ -237,7 +323,12 @@ export async function restoreSession(): Promise<AppSession | null> {
   } catch {
     return stored;
   }
-  if (archives.some((archive) => archive.archiveId === stored.archiveId)) return stored;
+  if (archives.some((archive) => archive.archiveId === stored.archiveId)) {
+    if (localStorage.getItem(SESSION_KEY) !== JSON.stringify(stored))
+      localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+    return stored;
+  }
+
   if (archives.length === 0) {
     localStorage.removeItem(SESSION_KEY);
     resetArchiveCache();
