@@ -20,10 +20,11 @@ export function passwordRecovery() {
   const client = createEphemeralClient();
   let verified = false;
   return {
-    async request(email: string) {
+    async request(email: string, captchaToken?: string) {
       if (!email.trim()) throw new Error("Enter your account email.");
       const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: passwordRecoveryUrl(),
+        ...(captchaToken ? { captchaToken } : {}),
       });
       if (error) throw new Error("Could not send the recovery email. Please try again later.");
     },

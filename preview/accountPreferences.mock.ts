@@ -16,6 +16,7 @@ import {
 } from "@/lib/preferenceShape";
 import { currentWritingPreferences } from "@/lib/writingPreferences";
 import { localWhatsNewSeen } from "@/lib/whatsNew";
+import { RELEASES } from "@/lib/releaseHistory";
 
 export { flagsOf, mergeRemarksSeen };
 export type { AccountFlags, AccountPreferences } from "@/lib/preferenceShape";
@@ -54,7 +55,9 @@ export function localPreferences(seen: RemarksSeen = {}) {
   return held ?? preferencesWith(
       {
         ...DEFAULT_FLAGS,
-        whatsNewSeen: localWhatsNewSeen(),
+        /* A returning reader, one release behind, so the latest still
+           announces itself: a never-read account skips it for its welcome. */
+        whatsNewSeen: localWhatsNewSeen() || (RELEASES[1]?.version ?? ""),
         // Previews are for looking at screens, not for the first-launch ⌘K lesson.
         spotlightLearned: true,
       },

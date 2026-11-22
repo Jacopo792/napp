@@ -17,6 +17,7 @@
  *
  * It loads for itself and listens for itself. Comments are not part of the
  * catalogue and must not be on the way to opening a note. */
+import { SkeletonChat } from "@/components/Skeleton";
 import {
   ArrowUp,
   ChevronDown,
@@ -1596,7 +1597,7 @@ export function NoteComments({
         onPointerDown={byHand}
       >
         {loading ? (
-          <p className="chat-quiet">Loading…</p>
+          <SkeletonChat />
         ) : messages.length === 0 ? (
           <div className="chat-empty">
             <ChatBubble bubble={myBubble} mine>

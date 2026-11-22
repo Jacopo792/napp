@@ -3,7 +3,8 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through
-[GitHub private vulnerability reporting](https://github.com/Jacopo792/napp/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/Jacopo792/napp/security/advisories/new),
+or by email to security@nappnote.com.
 Do not open a public issue for a vulnerability that could expose an archive,
 an account, or a Storage object.
 
@@ -195,6 +196,19 @@ content, while existing shared memberships and third-party documents remain.
 Already downloaded files cannot be recalled; fresh authenticated Storage requests
 are tested independently of cached responses. The collaboration server reads
 authorization through the caller's token and rechecks it with a bounded TTL.
+
+Note uploads declare their source note in Storage metadata. The database records
+that association once and checks the source note's visibility and file reference
+on shared downloads. It also applies the file's read rules to extracted text.
+Chat files must match a visible source row and the account that uploaded them.
+Ship clients that include the source note metadata before enforcing this
+migration. Older clients can still upload files, but new files uploaded without
+the metadata are only readable by their uploader. The migration binds existing
+files when their stored references identify a single source note.
+
+Attachment format checks and viewer restrictions reduce exposure to active file
+types. The Storage safety worker holds uploads that require inspection. Moderators
+review reported material using the procedure in `docs/moderation-operations.md`.
 
 Production mail remains a launch blocker: public Auth was confirmed to auto-confirm
 email on 24 October 2026. Store-readiness and moderation operations are tracked in

@@ -7,6 +7,7 @@ const {
   rendererPermission,
   rendererFile,
   safeFileName,
+  opensInViewer,
 } = require("./security");
 
 test("renderer trust compares parsed origins rather than prefixes", () => {
@@ -80,4 +81,11 @@ test("attachment names cannot escape a temporary directory or target Windows dev
     "a.pdf ",
   ])
     assert.throws(() => safeFileName(name), undefined, name);
+});
+
+test("attachments open in a viewer only when they cannot run code", () => {
+  for (const name of ["Chapter.PDF", "clip.mov", "notes.docx"])
+    assert.equal(opensInViewer(name), true);
+  for (const name of ["x.svg", "x.html", "x.xls", "x.doc", "x.ppt", "x.app", "x.exe", "pdf"])
+    assert.equal(opensInViewer(name), false, name);
 });

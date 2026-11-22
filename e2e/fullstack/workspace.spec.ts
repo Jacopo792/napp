@@ -9,6 +9,37 @@ import {
   showMemberNotes,
 } from "./fixture.ts";
 
+test(
+  "a signed-out visit to the workspace opens sign-in",
+  { tag: "@production-smoke" },
+  async ({ page }) => {
+    await page.goto("/notes");
+    await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+    await expect(page.getByText("Could not load your account.")).toHaveCount(0);
+  },
+);
+
+test("the built web policy permits the API and collaboration origins @production-smoke", async ({
+  page,
+}) => {
+  test.skip(process.env.NAPP_E2E_PRODUCTION !== "1", "The development server omits CSP for HMR");
+  await page.goto("/");
+  const policy = await page
+    .locator('meta[http-equiv="Content-Security-Policy" i]')
+    .getAttribute("content");
+  expect(policy).toContain("object-src 'none'");
+  expect(policy).toContain("ws://127.0.0.1:1235");
+  expect(policy).toContain("https://api.stripe.com");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL,
+      ),
+    )
+    .toBe(new URL("/sw.js", page.url()).href);
+});
+
 test("a slow new-note insert is committed before collaboration opens it", async ({
   page,
   accounts,
@@ -78,7 +109,7 @@ test("a slow new-note insert is committed before collaboration opens it", async 
   await expect(page.getByRole("button", { name: "Save failed", exact: true })).toHaveCount(0);
 });
 
-test("typing survives a reload and is persisted by the collaboration server", async ({
+test("typing survives a reload and is persisted by the collaboration server @production-smoke", async ({
   page,
   accounts,
 }) => {
@@ -110,7 +141,7 @@ test("typing survives a reload and is persisted by the collaboration server", as
   await expect(page.locator(".tiptap")).toContainText("Words that must survive");
 });
 
-test("an outsider cannot read another archive through UI or PostgREST", async ({
+test("an outsider cannot read another archive through UI or PostgREST @production-smoke", async ({
   page,
   accounts,
 }) => {

@@ -14,6 +14,7 @@
  * Every name is a door. A folder pushes its own sheet, a face pushes the
  * person, and Back comes back here; a note, a version or a remark opens the
  * note itself. */
+import { SkeletonRows } from "@/components/Skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { FolderOpen, List, MessageSquare } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -204,8 +205,10 @@ export function FolderSheet({
               {failure}
             </p>
           )}
-          {events.length === 0 ? (
-            <p className="sheet-quiet">{versions ? "No notes here yet." : "Loading…"}</p>
+          {!versions && !failure ? (
+            <SkeletonRows rows={3} lead />
+          ) : events.length === 0 ? (
+            <p className="sheet-quiet">No notes here yet.</p>
           ) : (
             <SheetTimeline events={events} onOpenPerson={onOpenPerson} />
           )}

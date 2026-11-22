@@ -63,7 +63,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: "In a note", keys: "\u2318F", what: "Find in this note", kind: NOTES },
   { group: "In a note", keys: "\u2318K", what: "Link the selected words", kind: NOTES },
   { group: "In a note", keys: "/", what: "Formatting and blocks", kind: NOTES },
-  { group: "In a note", keys: "[[", what: "Link another note in this archive", kind: NOTES },
+  { group: "In a note", keys: "[[", what: "Link another note in this group", kind: NOTES },
   { group: "In a note", keys: "Esc", what: "Leave the text", kind: NOTES },
   {
     group: "In the text",

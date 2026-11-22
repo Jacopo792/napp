@@ -28,6 +28,7 @@ export async function eraseAccount(
   password: string | null,
   requestToken: string,
   client = supabase,
+  captchaToken?: string,
 ): Promise<AccountErasureReceipt> {
   if (!userId || password === "") throw new Error("Enter this account's password");
   const { data, error } = await client.functions.invoke("delete-account", {
@@ -37,14 +38,18 @@ export async function eraseAccount(
       expected_user_id: userId,
       password: password ?? "",
       request_token: requestToken,
+      ...(captchaToken ? { captcha_token: captchaToken } : {}),
     },
   });
   if (error) {
     // A timeout after submission can mean that deletion already finished.
     const status = await accountErasureStatus(requestToken).catch(() => "unknown" as const);
     if (status !== "unknown") return { status, requestToken };
-    if ("context" in error && error.context instanceof Response && error.context.status === 403)
-      throw new Error("The password is incorrect");
+    if ("context" in error && error.context instanceof Response) {
+      if (error.context.status === 403) throw new Error("The password is incorrect");
+      if (error.context.status === 423)
+        throw new Error("Account deletion is on hold. Contact support.");
+    }
     throw new Error("Could not confirm deletion. Check your connection and try again.");
   }
   if (
@@ -57,16 +62,26 @@ export async function eraseAccount(
 }
 
 /** The external page works without installing Napp or signing into an archive. */
-export async function eraseAccountWithPassword(email: string, password: string, token: string) {
+export async function eraseAccountWithPassword(
+  email: string,
+  password: string,
+  token: string,
+  captchaToken?: string,
+  reauthCaptchaToken?: string,
+) {
   const client = createEphemeralClient();
-  const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password });
+  const { data, error } = await client.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  });
   if (error || !data.user) {
     const status = await accountErasureStatus(token).catch(() => "unknown" as const);
     if (status !== "unknown") return { status, requestToken: token };
     throw error ? signInFailure(error) : new Error("Email or password is incorrect");
   }
   try {
-    const result = await eraseAccount(data.user.id, password, token, client);
+    const result = await eraseAccount(data.user.id, password, token, client, reauthCaptchaToken);
     return { ...result, userId: data.user.id };
   } finally {
     await client.auth.signOut({ scope: "local" });

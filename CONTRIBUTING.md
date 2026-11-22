@@ -26,17 +26,16 @@ in the README.
 ## The loop
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:server
-pnpm build
+pnpm healthcheck
+pnpm exec playwright install chromium
+pnpm healthcheck:full
 ```
 
-The CI also runs the server against a fresh local Supabase, exercises two
-instances through Redis, and builds the Docker image. Run `pnpm healthcheck`
-before opening a pull request. Formatting is checked with Prettier;
-`pnpm format` applies it and `pnpm lint --fix` applies safe lint fixes.
+Run `pnpm healthcheck` before opening a pull request. Start a disposable Supabase
+stack and Valkey for `pnpm healthcheck:full`. CI also builds the collaboration
+image. See the
+[quality guide](docs/quality-hardening.md) for fixture setup and coverage.
+`pnpm format` applies Prettier and `pnpm lint --fix` applies lint fixes.
 
 ## Branches
 
@@ -88,7 +87,8 @@ screenshot with the window size in it is worth more than an adjective.
 
 ## Licence
 
-The project is under the GNU General Public License, version 3 or later. By
-opening a pull request you are offering your contribution under that licence.
-There is no separate contributor agreement and nobody is asked to assign
-copyright: you keep yours, and it stays GPL.
+The project is under the Functional Source License 1.1, Apache 2.0 future
+licence ([LICENSE](LICENSE)). By opening a pull request you keep the copyright
+in your contribution, license it under that licence, and also grant the
+project's owner a perpetual, irrevocable right to distribute it under other
+terms, including the commercial licence of the official Napp builds.

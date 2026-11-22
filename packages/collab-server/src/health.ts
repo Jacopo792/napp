@@ -8,11 +8,11 @@ export async function probeSupabase(service: SupabaseClient, timeoutMs = PROBE_M
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    // Only connectivity matters. An exact count scans the archive catalogue
-    // even though this request needs no rows and no total.
+    // The entitlement migration also installs archive_plan, required to open
+    // collaborative notes. Checking an older table would accept a stale schema.
     const result = await service
-      .from("archives")
-      .select("id", { head: true })
+      .from("account_entitlements")
+      .select("owner_id", { head: true })
       .limit(1)
       // The platform schedules the next probe. SDK backoff would conceal the
       // original HTTP error and consume this check's entire deadline.

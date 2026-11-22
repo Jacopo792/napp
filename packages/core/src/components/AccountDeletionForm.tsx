@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import {
   ACCOUNT_DELETION_CONSEQUENCES,
+  eraseAccount,
   eraseAccountWithPassword,
   type AccountErasureReceipt,
 } from "@/lib/accountDeletion";
@@ -9,6 +10,7 @@ import { clearSession } from "@/lib/session";
 import { SESSION_KEY } from "@/lib/sessionRestore";
 import { supabase } from "@/lib/supabaseClient";
 import "./accountDeletion.css";
+import { useAuthCaptcha } from "@/lib/useAuthCaptcha";
 import { PolicyLinks } from "./PolicyLinks";
 
 export function AccountDeletionForm({
@@ -21,6 +23,9 @@ export function AccountDeletionForm({
   /** Given by Settings, which draws the form in its own rows. */
   onCancel?: () => void;
 }) {
+  const captcha = useAuthCaptcha();
+  const reauth = useAuthCaptcha();
+  const captchaReady = onCancel ? captcha.ready : captcha.ready && reauth.ready;
   const [email, setEmail] = useState(accountEmail ?? "");
   const [password, setPassword] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -31,7 +36,7 @@ export function AccountDeletionForm({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (submitting.current || !confirmed || !password || !email.trim()) return;
+    if (submitting.current || !confirmed || !password || !email.trim() || !captchaReady) return;
     submitting.current = true;
     setBusy(true);
     setError("");
@@ -39,9 +44,14 @@ export function AccountDeletionForm({
       const key = `napp:erasure-receipt:${email.trim().toLowerCase()}`;
       const token = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, token);
-      const result = await eraseAccountWithPassword(email, password, token);
-      setPassword("");
       const current = (await supabase.auth.getSession()).data.session?.user;
+      if (onCancel && current?.email?.toLowerCase() !== email.trim().toLowerCase())
+        throw new Error("Sign in to this account again.");
+      const result =
+        onCancel && current
+          ? await eraseAccount(current.id, password, token, supabase, captcha.token)
+          : await eraseAccountWithPassword(email, password, token, captcha.token, reauth.token);
+      setPassword("");
       let storedEmail: string | undefined;
       try {
         storedEmail = JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null")?.email;
@@ -61,6 +71,8 @@ export function AccountDeletionForm({
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not delete this account");
     } finally {
+      captcha.reset();
+      reauth.reset();
       setBusy(false);
       submitting.current = false;
     }
@@ -72,13 +84,13 @@ export function AccountDeletionForm({
         <h2>{receipt.status === "completed" ? "Account deleted" : "Deletion in progress"}</h2>
         <p>
           {receipt.status === "completed"
-            ? "Your account and its data have been deleted. Documents created by other people have been kept."
+            ? "Your account has been deleted. Other people’s documents and retained safety evidence may remain."
             : "Deletion continues automatically. You do not need to keep this page open."}
         </p>
       </div>
     );
 
-  const ready = !busy && confirmed && Boolean(password) && Boolean(email.trim());
+  const ready = !busy && captchaReady && confirmed && Boolean(password) && Boolean(email.trim());
 
   /* Inside Settings: the account is already known, and the policy links sit
      in the row above, so neither is asked for again. */
@@ -114,6 +126,7 @@ export function AccountDeletionForm({
             {error}
           </p>
         ) : null}
+        {captcha.widget}
         <div className="appearance-row account-deletion-actions">
           <button type="button" disabled={busy} onClick={onCancel}>
             Cancel
@@ -165,7 +178,9 @@ export function AccountDeletionForm({
           {error}
         </p>
       ) : null}
-      <button type="submit" disabled={busy || !confirmed || !password || !email.trim()}>
+      {captcha.widget}
+      {reauth.widget}
+      <button type="submit" disabled={!ready}>
         {busy ? "Deleting…" : "Delete account permanently"}
       </button>
       <PolicyLinks />

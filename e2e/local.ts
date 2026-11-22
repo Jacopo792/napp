@@ -1,13 +1,14 @@
 import { execFileSync } from "node:child_process";
 
 /** Deliberately never loads .env or accepts a hosted service-role key. */
-export function localStack() {
+function readLocalStack() {
   let status;
   try {
     status = JSON.parse(
       execFileSync("supabase", ["status", "-o", "json"], {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
+        timeout: 20_000,
       }),
     );
   } catch {
@@ -23,4 +24,11 @@ export function localStack() {
     key: status.ANON_KEY as string,
     serviceKey: status.SERVICE_ROLE_KEY as string,
   };
+}
+
+// Playwright reuses each worker for multiple fixtures on the same local stack.
+let stack: ReturnType<typeof readLocalStack> | undefined;
+
+export function localStack() {
+  return (stack ??= readLocalStack());
 }

@@ -25,24 +25,32 @@ function accountFlow(
 ) {
   const calls: { name: string; token?: string }[] = [];
   const storage = new Map<string, string>();
-  const tokens: string[] = [];
-  const ephemeralEvents: string[] = [];
+  const signUpCalls: unknown[] = [];
+  const signupCodeCalls: unknown[] = [];
+  const resendCalls: unknown[] = [];
   const archiveIds = ["personal"];
   const authData = { data: { user, session: options.confirmation ? null : {} }, error: null };
   const supabase = {
     auth: {
-      signUp: async () => authData,
-      verifyOtp: async ({ token }: { token: string }) => {
-        tokens.push(token);
+      signUp: async (input: unknown) => {
+        signUpCalls.push(input);
+        return authData;
+      },
+      verifyOtp: async (input: unknown) => {
+        signupCodeCalls.push(input);
         return { data: { user, session: {} }, error: null };
       },
+      resend: async (input: unknown) => {
+        resendCalls.push(input);
+        return { error: null };
+      },
       signInWithPassword: async () =>
-        options.signInStatus !== undefined
-          ? {
+        options.signInStatus === undefined
+          ? authData
+          : {
               data: { user: null },
               error: { status: options.signInStatus, message: "Auth refused" },
-            }
-          : authData,
+            },
       getSession: async () => ({
         data: { session: { access_token: "test-access", refresh_token: "test-refresh" } },
       }),
@@ -56,7 +64,10 @@ function accountFlow(
         return { error: null };
       },
     },
-    rpc: async (name: string, args?: { token: string }) => {
+    rpc: async (name: string, args?: { token: string; address?: string }) => {
+      // The disposable-address question is not part of the flows counted here.
+      if (name === "email_allowed")
+        return { data: !args?.address?.endsWith("@mailinator.com"), error: null };
       calls.push({ name, token: args?.token });
       if (name === "claim_archive_invite") {
         if (options.claimError) return { data: null, error: { message: options.claimError } };
@@ -69,6 +80,7 @@ function accountFlow(
       const query = {
         select: () => query,
         eq: () => query,
+        update: () => query,
         order: async () => ({
           data: archiveIds.map((archive_id) => ({ archive_id, created_at: "2026-10-04" })),
           error: null,
@@ -93,19 +105,20 @@ function accountFlow(
       removeItem: (key: string) => storage.delete(key),
     },
     require: (name: string) => {
-      if (name === "./supabaseClient")
+      if (name === "./supabaseClient") {
         return {
           supabase,
           createEphemeralClient: () => ({
             auth: {
-              verifyOtp: async ({ token }: { token: string }) => {
-                ephemeralEvents.push(token);
-                return { data: { user, session: {} }, error: null };
+              verifyOtp: async (input: unknown) => {
+                calls.push({ name: "isolated-verification" });
+                return supabase.auth.verifyOtp(input);
               },
-              signOut: async () => ({ error: null }),
+              signOut: async () => calls.push({ name: "isolated-sign-out" }),
             },
           }),
         };
+      }
       if (name === "@/platform")
         return {
           platform: () => ({
@@ -115,6 +128,7 @@ function accountFlow(
         };
       if (name === "./noteStore")
         return { resetArchiveCache: () => {}, clearNoteStore: async () => {} };
+      if (name === "./policyAcceptance") return { loadPolicyAcceptance: async () => true };
       if (name === "./storePolicies") return { POLICY_VERSION: "2026-10-24" };
       if (name === "./accountContent")
         return {
@@ -132,8 +146,17 @@ function accountFlow(
       throw new Error(`Unexpected dependency: ${name}`);
     },
   });
-  return { api: exports, calls, storage, tokens, ephemeralEvents };
+  return { api: exports, signUpCalls, signupCodeCalls, resendCalls, calls, storage };
 }
+
+test("confirming an address for an older client leaves the browser account open", async () => {
+  const flow = accountFlow();
+  const current = JSON.stringify({ userId: "different-user", archiveId: "different-archive" });
+  flow.storage.set("session", current);
+  await flow.api.confirmRegistrationAddress(user.email, "1234 5678");
+  assert.equal(flow.storage.get("session"), current);
+  assert.deepEqual(flow.calls, [{ name: "isolated-verification" }, { name: "isolated-sign-out" }]);
+});
 
 test("invited registration claims the invitation and opens the joined archive", async () => {
   const flow = accountFlow({ invited: true });
@@ -170,24 +193,31 @@ test("registration awaiting email confirmation does not claim or open an archive
   assert.equal(flow.storage.size, 0);
 });
 
-test("a spaced registration code claims the pending archive invitation", async () => {
-  const flow = accountFlow({ invited: true, confirmation: true });
-  await flow.api.registerAccount(user.email, "test-password", true);
-  const result = await flow.api.confirmRegistration(user.email, "1234 5678");
+test("confirming a pasted signup code opens the invited archive", async () => {
+  const flow = accountFlow({ invited: true });
+  await assert.rejects(flow.api.confirmRegistration(user.email, "123-456"), /8-digit code/);
+  assert.equal(flow.signupCodeCalls.length, 0);
+  const result = await flow.api.confirmRegistration(user.email, "0123 4567");
+  assert.equal(
+    JSON.stringify(flow.signupCodeCalls),
+    JSON.stringify([{ email: user.email, token: "01234567", type: "signup" }]),
+  );
   assert.equal(result.session?.archiveId, "shared");
-  assert.deepEqual(flow.tokens, ["12345678"]);
-  assert.ok(flow.calls.some((call) => call.name === "claim_archive_invite"));
 });
 
-test("the fallback confirmation preserves an open session and does not claim an invite", async () => {
+test("resending a signup code keeps the original invitation redirect", async () => {
   const flow = accountFlow({ invited: true });
-  flow.storage.set("session", "existing browser session");
-  await assert.rejects(flow.api.confirmRegistrationAddress(user.email, "1234"), /8-digit/);
-  await flow.api.confirmRegistrationAddress(user.email, "1234 5678");
-  assert.deepEqual(flow.ephemeralEvents, ["12345678"]);
-  assert.deepEqual(flow.tokens, []);
-  assert.deepEqual(flow.calls, []);
-  assert.equal(flow.storage.get("session"), "existing browser session");
+  await flow.api.resendRegistrationCode(user.email);
+  assert.equal(
+    JSON.stringify(flow.resendCalls),
+    JSON.stringify([
+      {
+        type: "signup",
+        email: user.email,
+        options: { emailRedirectTo: `https://example.invalid/napp/?invite=${inviteToken}` },
+      },
+    ]),
+  );
 });
 
 test("a rejected invitation cannot silently open the personal archive after registration", async () => {
@@ -283,4 +313,32 @@ test("a saved archive the account cannot read opens one of its own", async () =>
 
   flow.storage.set("session", JSON.stringify({ ...saved, archiveId: "personal" }));
   assert.equal((await flow.api.restoreSession())?.archiveId, "personal");
+});
+
+test("a disposable address is refused before an account is created", async () => {
+  const flow = accountFlow();
+  await assert.rejects(
+    flow.api.registerAccount("someone@mailinator.com", "test-password", true),
+    /permanent email/,
+  );
+  assert.equal(flow.signUpCalls.length, 0);
+});
+
+test("a spent signup code that cannot open the account sends the person to sign in", async () => {
+  const flow = accountFlow({ switchStatus: 503 });
+  const activate = await flow.api.prepareRegistrationConfirmation(user.email, "0123 4567");
+  await assert.rejects(activate(), /email is confirmed\. Sign in/);
+  assert.ok(flow.calls.some((call) => call.name === "sign-out"));
+  assert.equal(flow.storage.has("session"), false);
+});
+
+test("an invitation refused after the code is spent still says the email is confirmed", async () => {
+  const flow = accountFlow({ invited: true, claimError: "Invitation is invalid or expired" });
+  await assert.rejects(
+    flow.api.confirmRegistration(user.email, "0123 4567"),
+    (error: Error) =>
+      error instanceof flow.api.ConfirmedAddressError &&
+      /^Invitation is invalid or expired\. Your email is confirmed\. Sign in/.test(error.message),
+  );
+  assert.equal(flow.storage.has("session"), false);
 });

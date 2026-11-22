@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.4",
+    "@apple/app-store-server-library": "npm:@apple/app-store-server-library@3.1.0"
+  }
+}

@@ -1,3 +1,4 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { test as base, expect, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
@@ -32,6 +33,7 @@ export const test = base.extend<{
             email,
             password,
             email_confirm: true,
+            user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
           });
           if (created.error || !created.data.user)
             throw new Error("Could not create local E2E account");
@@ -94,9 +96,7 @@ export const test = base.extend<{
 export { expect };
 
 export async function login(page: Page, account: Account, path = "/") {
-  // The first-launch ⌘K lesson covers the page until pressed; these tests are
-  // about something else, so their browser has already learned it.
-  await page.context().addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
+  await dismissWorkspaceHints(page);
   await page.goto(path);
   await page.getByLabel("Email", { exact: true }).fill(account.email);
   await page.getByLabel("Password", { exact: true }).fill(account.password);
@@ -105,11 +105,10 @@ export async function login(page: Page, account: Account, path = "/") {
   const acceptance = page.getByRole("heading", { name: "Before you continue" });
   await expect(
     acceptance
-      .or(page.locator("[data-note-row]").first())
       .or(page.getByRole("button", { name: "New note", exact: true }).first())
-      .or(page.getByRole("heading", { name: "Choose an archive" })),
+      .or(page.getByRole("heading", { name: "Choose a group" })),
   ).toBeVisible();
-  if (await page.getByRole("heading", { name: "Choose an archive" }).isVisible()) {
+  if (await page.getByRole("heading", { name: "Choose a group" }).isVisible()) {
     const archives = await account.client
       .from("archives")
       .select("name")
@@ -127,10 +126,8 @@ export async function login(page: Page, account: Account, path = "/") {
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Agree and continue" }).click();
   }
+  // A new account's first launch skips What's New for its welcome note.
   await expect(page.getByRole("button", { name: "New note", exact: true }).first()).toBeVisible();
-  await page
-    .getByRole("button", { name: "Close settings", exact: true })
-    .click({ position: { x: 4, y: 4 } });
 }
 
 export async function seedNote(account: Account, title: string) {
@@ -184,11 +181,7 @@ export async function join(owner: Account, member: Account) {
   member.archiveId = owner.archiveId;
 }
 
-/** Opens Settings once any earlier one has finished leaving. `login` shuts
- *  the Settings that What's New opens, and the panel takes 160ms to go: its
- *  "Close settings" layer is still on screen meanwhile, and a click on the
- *  rail in that window either lands on the departing layer or is mistaken
- *  for an open panel that then disappears. */
+/** Wait for any previous Settings panel to finish its closing animation. */
 export async function openSettings(page: Page) {
   await expect(page.locator(".settings-layer.is-closing")).toHaveCount(0);
   const close = page.getByRole("button", { name: "Close settings", exact: true });

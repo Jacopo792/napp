@@ -5,7 +5,7 @@ import {
   isDrawingText,
   shapeStroke,
   straightenStroke,
-  strokePoints,
+  strokeDistance,
   translateStroke,
   type DrawingMark,
   type DrawingStroke,
@@ -225,9 +225,7 @@ export function useInk({
                outline: measuring the words would mean measuring the face, and
                a caption is one thing the way a stroke is one thing. */
             Math.hypot(mark.x - point.x, mark.y - point.y) > mark.size
-          : !strokePoints(mark.d).some(
-              (p) => Math.hypot(p.x - point.x, p.y - point.y) < mark.width / 2 + 10,
-            ),
+          : strokeDistance(mark.d, point) >= mark.width / 2 + 10,
       );
       if (kept.length !== live.current.length) {
         live.current = kept;

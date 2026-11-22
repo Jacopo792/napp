@@ -35,6 +35,7 @@ import { targetsOf } from "@/lib/references";
 import { type FocusPosition, type JSONContent } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import { isHiddenPerson, subscribeHiddenPeople } from "@/lib/storeSafety";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import { FindAndReplace } from "@tiptap/extension-find-and-replace";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -248,6 +249,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                           caret.classList.add("collaboration-carets__caret");
                           caret.style.borderColor = user.color ?? "";
                           caret.dataset.caretUser = user.userId ?? "";
+                          caret.hidden = isHiddenPerson(user.userId);
                           const label = document.createElement("div");
                           label.classList.add("collaboration-carets__label");
                           label.style.backgroundColor = user.color ?? "";
@@ -255,6 +257,13 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
                           caret.append(label);
                           return caret;
                         },
+                        selectionRender: (user: { color?: string; userId?: string }) =>
+                          isHiddenPerson(user.userId)
+                            ? {}
+                            : {
+                                style: `background-color: ${user.color}70`,
+                                class: "ProseMirror-yjs-selection",
+                              },
                       }),
                     ]
                   : []),
@@ -392,6 +401,24 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           editor.state.tr.setMeta(unsaidKey, true).setMeta("addToHistory", false),
         );
     }, [editor, saidThreads]);
+
+    /* A block, an unblock or a failed lookup changes whose caret may show:
+       ask the cursor plugin to draw every caret and selection again. */
+    useEffect(() => {
+      if (!editor) return;
+      return subscribeHiddenPeople(() => {
+        if (editor.isDestroyed) return;
+        const cursors = editor.state.plugins.find((plugin) =>
+          (plugin as unknown as { key: string }).key.startsWith("yjs-cursor"),
+        );
+        if (cursors)
+          editor.view.dispatch(
+            editor.state.tr
+              .setMeta(cursors, { awarenessUpdated: true })
+              .setMeta("addToHistory", false),
+          );
+      });
+    }, [editor]);
 
     /* What the selection's passage lock is, so the bubble's padlock can say it.
      The editor does not re-render per transaction; this re-renders only when

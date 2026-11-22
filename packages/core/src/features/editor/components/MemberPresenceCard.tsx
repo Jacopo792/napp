@@ -92,7 +92,7 @@ export function MemberPresenceCard({
                 ? [
                     {
                       icon: <UserRound size={16} />,
-                      label: "Archive member since",
+                      label: "Group member since",
                       value: memberSince(archiveJoinedAt),
                     },
                   ]

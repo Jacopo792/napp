@@ -1,6 +1,7 @@
+import { contentSecurityPolicy } from "../../scripts/contentSecurityPolicy";
 import { ocrAssets } from "../../scripts/ocrAssets";
 import { fileURLToPath } from "node:url";
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
@@ -64,62 +65,3 @@ export default defineConfig(({ command, mode }) => {
     ],
   };
 });
-
-/* Production HTML only. The dev server needs the inline script and the
-   websocket that hot reload is made of, and a policy strict enough to be worth
-   having would refuse both — so dev gets none, and what ships gets one that
-   names the two remote origins it is actually allowed to reach. It lives here,
-   and not in the main process, because these values are the renderer's: the
-   packaged main process has no .env to read them back out of. */
-function contentSecurityPolicy(env: Record<string, string | undefined>): Plugin {
-  /* Both schemes for every host, and this is not belt and braces.
-     Chromium does not match a `wss://host` request against an `https://host`
-     source expression, whatever CSP3 says about scheme-part upgrades — so a
-     policy naming only the Supabase https origin silently refused its Realtime
-     socket while every ordinary request to the same host went through.
-     Nothing looked broken: notes saved, the collaboration socket was fine, and
-     the list simply never heard that a row had changed. An edit landed in
-     Postgres and the "edited" line stayed where it was. */
-  const remote = [env.VITE_SUPABASE_URL, env.VITE_COLLAB_URL]
-    .filter((value): value is string => Boolean(value))
-    .flatMap((value) => {
-      const url = new URL(value);
-      const secure = url.protocol === "https:" || url.protocol === "wss:";
-      return [
-        `${secure ? "https" : "http"}://${url.host}`,
-        `${secure ? "wss" : "ws"}://${url.host}`,
-      ];
-    })
-    .join(" ");
-  const policy = [
-    "default-src 'self'",
-    /* Compiling WebAssembly, not evaluating strings: libheif decodes the
-       iPhone's HEIC photographs, and Chromium decodes none of them itself. */
-    "script-src 'self' 'wasm-unsafe-eval'",
-    /* The interface sets a style attribute from React on a great many
-       elements, and a style attribute is what 'unsafe-inline' governs. */
-    "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: ${remote}`,
-    "font-src 'self' data:",
-    `connect-src 'self' data: blob: ${remote}${env.VITE_GOOGLE_DRIVE_DESKTOP_CLIENT_ID?.trim() ? " https://www.googleapis.com" : ""}`,
-    `media-src 'self' data: blob: ${remote}`,
-    "worker-src 'self' blob:",
-    "object-src 'none'",
-    "frame-src 'none'",
-    "base-uri 'none'",
-  ].join("; ");
-
-  return {
-    name: "napp:content-security-policy",
-    transformIndexHtml: {
-      order: "pre",
-      handler: (html, context) =>
-        context.server
-          ? html
-          : html.replace(
-              "<!--content-security-policy-->",
-              `<meta http-equiv="Content-Security-Policy" content="${policy}" />`,
-            ),
-    },
-  };
-}

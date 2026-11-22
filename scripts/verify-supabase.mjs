@@ -19,6 +19,7 @@
  * both before and after those columns are dropped.
  */
 
+import { createClient } from "@supabase/supabase-js";
 import { anonClient, assert, fail, loadEnv, requireEnv } from "./lib/env.mjs";
 
 /* `SUBSCRIBED` only confirms the socket join. A cold Realtime tenant still has
@@ -105,6 +106,21 @@ const viewerObjectId = crypto.randomUUID();
 const avatarObjectId = crypto.randomUUID();
 const avatarPath = `${first.userId}/${avatarObjectId}`;
 let peerRoleChanged = false;
+/* 20261111010000 keeps role changes off `authenticated`, so the verifier
+   moves the peer between roles with the service role. */
+const roleAdmin = env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : null;
+function setPeerRole(role) {
+  assert(roleAdmin, "Set SUPABASE_SERVICE_ROLE_KEY to verify member roles");
+  return roleAdmin
+    .from("archive_members")
+    .update({ role })
+    .eq("archive_id", archiveId)
+    .eq("user_id", second.userId);
+}
 
 try {
   // ── One archive, several members ─────────────────────────────────────────
@@ -474,11 +490,7 @@ try {
     .upload(objectPath, new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }));
   fail(objectSeed.error);
 
-  const demoted = await first.supabase.rpc("set_archive_member_role", {
-    archive_id: archiveId,
-    user_id: second.userId,
-    role: "viewer",
-  });
+  const demoted = await setPeerRole("viewer");
   fail(demoted.error);
   peerRoleChanged = true;
 
@@ -632,11 +644,7 @@ try {
   fail(viewerRead.error);
   report.roles = { viewerReads: true, viewerWritesRejected: true };
 
-  const restoredEditor = await first.supabase.rpc("set_archive_member_role", {
-    archive_id: archiveId,
-    user_id: second.userId,
-    role: "editor",
-  });
+  const restoredEditor = await setPeerRole("editor");
   fail(restoredEditor.error);
   peerRoleChanged = false;
 
@@ -817,11 +825,7 @@ try {
   }
 } finally {
   if (peerRoleChanged) {
-    await first.supabase.rpc("set_archive_member_role", {
-      archive_id: archiveId,
-      user_id: second.userId,
-      role: "editor",
-    });
+    await setPeerRole("editor");
   }
   await first.supabase.storage.from("note-images").remove([`${archiveId}/${viewerObjectId}`]);
   await first.supabase.storage.from("avatars").remove([avatarPath]);

@@ -376,6 +376,30 @@ export function strokePoints(d: string): { x: number; y: number }[] {
     });
 }
 
+/** How far a point is from the line a stroke draws — its segments, not only
+ *  the points they join. A straightened line is two points far apart, and an
+ *  eraser that measured only those passed straight through its middle: the
+ *  line stayed, and went on standing as the note's thumbnail after everything
+ *  around it was rubbed out. */
+export function strokeDistance(d: string, point: { x: number; y: number }): number {
+  // Each `M` starts a subpath: the gap between two is never drawn.
+  const subpaths = d.split(/(?=M)/).filter(Boolean);
+  if (subpaths.length > 1) return Math.min(...subpaths.map((part) => strokeDistance(part, point)));
+  const points = strokePoints(d);
+  let nearest = Infinity;
+  points.forEach((a, index) => {
+    const b = points[index + 1] ?? a;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = dx * dx + dy * dy;
+    const t = length
+      ? Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / length))
+      : 0;
+    nearest = Math.min(nearest, Math.hypot(a.x + t * dx - point.x, a.y + t * dy - point.y));
+  });
+  return nearest;
+}
+
 /** The box a set of strokes needs. A board is always the same one; a page is
  *  as tall as the lowest stroke on it, because the note it was drawn over has
  *  no height until it is read. */

@@ -2,6 +2,7 @@
 <html lang="en" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <!--content-security-policy-->
     <meta name="google" content="notranslate" />
     <meta
       name="viewport"
@@ -37,10 +38,5 @@
     -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Only for the share sheet: see public/sw.js. -->
-    <script>
-      if ("serviceWorker" in navigator)
-        navigator.serviceWorker.register("%BASE_URL%sw.js").catch(() => {});
-    </script>
   </body>
 </html>

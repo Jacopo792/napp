@@ -15,8 +15,12 @@ export function localStack(): LocalStack | null {
       execFileSync("supabase", ["status", "-o", "json"], {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
+        timeout: 20_000,
       }),
     );
+    const url = new URL(status.API_URL);
+    if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+      return null;
     return {
       apiUrl: status.API_URL,
       publishableKey: status.ANON_KEY,
@@ -65,7 +69,12 @@ export async function makeAccount(stack: LocalStack, label: string): Promise<Acc
   const email = `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
   const password = "correct horse battery staple";
   const created = await pastClockSkew(() =>
-    admin.auth.admin.createUser({ email, password, email_confirm: true }),
+    admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { napp_terms_version: "2026-11-16", napp_privacy_version: "2026-11-16" },
+    }),
   );
   if (created.error) throw new Error(created.error.message);
 

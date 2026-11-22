@@ -1,10 +1,13 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 import { createCollaborationServer } from "../packages/collab-server/src/server.ts";
 import { localStack } from "./local.ts";
 
-const full = process.argv[2] === "fullstack";
+const production = process.argv[2] === "production";
+const full = production || process.argv[2] === "fullstack";
 const port = full ? 5200 : 5198;
+const webDir = fileURLToPath(new URL("./.hosted-editor/web", import.meta.url));
 let collaboration: ReturnType<typeof createCollaborationServer> | undefined;
 // Test-only, loopback-only. Teardown waits for actual stores and version
 // settling, rather than deleting fixture rows under a server still flushing.
@@ -36,6 +39,14 @@ if (full) {
     VITE_COLLAB_URL: "ws://127.0.0.1:1235",
     VITE_WEB_ORIGIN: `http://127.0.0.1:${port}/`,
   });
+  if (production) {
+    const build = spawnSync(
+      "pnpm",
+      ["--filter", "@notes-app/web", "exec", "vite", "build", "--outDir", webDir, "--emptyOutDir"],
+      { env, stdio: "inherit" },
+    );
+    if (build.status !== 0) throw new Error("The production web fixture did not build");
+  }
   collaboration = createCollaborationServer({
     supabaseUrl: stack.url,
     publishableKey: stack.key,
@@ -50,12 +61,13 @@ const args = full
   ? [
       "--filter",
       "@notes-app/web",
-      "dev",
+      production ? "preview:dist" : "dev",
       "--host",
       "127.0.0.1",
       "--port",
       String(port),
       "--strictPort",
+      ...(production ? ["--outDir", webDir] : []),
     ]
   : [
       "exec",

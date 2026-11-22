@@ -8,12 +8,15 @@ export async function uploadObject(
   session: AppSession,
   objectId: string,
   blob: Blob,
+  noteId?: string,
 ): Promise<void> {
+  if (!blob.type) throw new Error("This file has no supported media type");
   const result = await supabase.storage
     .from(OBJECT_BUCKET)
     .upload(`${session.archiveId}/${objectId}`, blob, {
-      contentType: blob.type || "application/octet-stream",
+      contentType: blob.type,
       upsert: false,
+      metadata: noteId ? { noteId } : undefined,
     });
   fail(result.error);
 }
@@ -55,7 +58,7 @@ async function downloadWithRetries(path: string, attempts = 3): Promise<Blob> {
     await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
   }
   fail(refusal);
-  throw new Error("The archive did not return this file");
+  throw new Error("The group did not return this file");
 }
 
 export async function downloadObject(

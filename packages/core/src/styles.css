@@ -89,6 +89,12 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
 
+  /* The controls' one system (see "Controls" at the end of this file): a field
+     is a filled, rounded well of the ink; the main action is an ink pill. */
+  --field-fill: color-mix(in srgb, var(--ink) 6%, transparent);
+  --field-fill-hover: color-mix(in srgb, var(--ink) 9%, transparent);
+  --field-h: 44px;
+
   /* ── The type ramp ─────────────────────────────────────────────────────────
      Six sizes for every piece of chrome in the app, down from twenty — nine of
      which lived inside four pixels of each other: 10, 10.5, 11, 11.5, 12,
@@ -541,9 +547,35 @@
    glass above back. */
 .has-frosted-glass.has-wallpaper .sidebar-column::before,
 .has-frosted-glass.has-wallpaper .collection-column::before {
-  background: color-mix(in srgb, var(--paper) var(--glass-tint, 76%), transparent);
+  background: color-mix(in srgb, var(--paper) max(56%, var(--glass-tint, 76%)), transparent);
   -webkit-backdrop-filter: blur(48px) saturate(1.5);
   backdrop-filter: blur(48px) saturate(1.5);
+}
+
+/* Translucent is clear glass: the picture keeps its shapes, pushed more
+   saturated, under a lighter coat the slider sets; the column's trailing edge
+   catches the light. The 88% above stays Solid's — the picture as a hint. */
+.has-translucent-sidebar:not(.has-frosted-glass).has-wallpaper
+  :is(.sidebar-column, .collection-column)::before {
+  background: color-mix(
+    in srgb,
+    var(--paper) max(52%, calc(var(--glass-tint, 76%) * 0.8)),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) brightness(1.04);
+  backdrop-filter: blur(20px) saturate(1.6) brightness(1.04);
+}
+
+/* The rail's spine is a step of the glass itself, not grey laid over it. */
+.has-translucent-sidebar.has-wallpaper .sidebar-rail {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow: inset -1px 0 0 var(--glass-rim-soft, transparent);
+}
+
+.has-translucent-sidebar.has-wallpaper :is(.sidebar-column, .collection-column)::before {
+  box-shadow:
+    inset -1px 0 0 var(--glass-rim, transparent),
+    inset 1px 0 0 var(--glass-rim-soft, transparent);
 }
 
 /* A band inside a pane that is already tinted and already blurred takes
@@ -701,20 +733,17 @@
    The only screen in the app with nothing of the reader's on it yet, which is
    the one place it may say what kind of place this is. It says it with a drawn
    plate and a ruled form, not with a floating grey box. ────────────────────── */
-/* Glossa's shape: the pitch on the left on a field of colour, the form on
-   the right on the plain ground, with nothing framing it. Stacked on a narrow
-   window, the pitch first and shorter. */
+/* about.nappnote.com's door: one ground, the line large on the left, the form
+   on a white card on the right. Stacked on a narrow window, the line first. */
 .login-shell {
   position: relative;
   display: flex;
   min-height: 100vh;
   flex-direction: column;
-  /* Clipped sideways so the plate may bleed off both edges, but never
-     vertically: on a short laptop window the sign-up card is taller than the
-     viewport, and `overflow: hidden` would have cut its head and feet off with
-     no way to reach either. */
+  /* Never clipped vertically: on a short window the sign-up card is taller
+     than the viewport and has to stay reachable. */
   overflow-x: clip;
-  background: var(--surface);
+  background: var(--page);
 }
 
 @media (min-width: 1024px) {
@@ -724,31 +753,18 @@
   }
 }
 
-/* The field takes the colour of the word in the pill, at a seventh of its
-   strength, and follows it when the word turns. */
 .login-pitch {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 3rem;
-  overflow: clip;
-  background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  gap: 2.5rem;
   padding: clamp(1.5rem, 4vw, 3.5rem);
   color: var(--ink);
-  transition: background-color 700ms var(--ease-in-out);
 }
 
 [data-shell="mac"]:not([data-fullscreen]) .login-pitch {
   padding-top: calc(52px + 1rem);
-}
-
-.login-pitch .botanical-plate.is-near {
-  opacity: 0.09;
-}
-
-.login-pitch > :not(.login-garden) {
-  position: relative;
 }
 
 .login-wordmark {
@@ -769,114 +785,64 @@
 }
 
 .login-headline {
+  margin-bottom: auto;
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 5.4vw, 5rem);
+  font-size: clamp(3rem, 6.4vw, 6rem);
   font-weight: var(--weight-bold);
-  line-height: 1.02;
+  line-height: 1;
   letter-spacing: -0.05em;
 }
 
-/* The one inverted surface on the door, as Glossa's white pill is: ink for a
-   ground, the page for letters, whatever the palette. Its width travels to the
-   word arriving rather than snapping to it. */
-.login-pill {
-  display: inline-flex;
-  box-sizing: content-box;
-  overflow: hidden;
-  margin-top: 0.08em;
-  border-radius: 0.2em;
-  background: var(--ink);
-  padding: 0.02em 0.3em 0.14em;
-  color: var(--surface);
-  line-height: 1.1;
-  white-space: nowrap;
-  box-shadow: 0 8px 30px -12px rgb(0 0 0 / 0.45);
-  transition: width 300ms var(--ease-out);
+.login-headline em {
+  color: var(--accent);
+  font-family: "Literata Variable", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
-.login-pill-word {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.22em;
-  animation: login-word var(--dur-base) var(--ease-out) backwards;
-}
-
-.login-pill-word svg {
-  translate: 0 0.04em;
-  color: color-mix(in oklab, var(--tone) 70%, var(--surface));
-}
-
-@keyframes login-word {
-  from {
-    opacity: 0;
-    transform: translateY(0.6em);
-    filter: blur(6px);
+@media (min-width: 1024px) {
+  .login-headline {
+    margin-block: auto;
   }
-}
-
-.login-kinds {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-
-.login-dots {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.login-dots button {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--tone);
-  opacity: 0.35;
-  filter: grayscale(1);
-  transition:
-    opacity var(--dur-base) var(--ease),
-    filter var(--dur-base) var(--ease),
-    transform var(--dur-base) var(--ease-spring);
-}
-
-.login-dots button:hover {
-  opacity: 0.9;
-  filter: none;
-}
-
-.login-dots button[aria-pressed="true"] {
-  opacity: 1;
-  filter: none;
-  transform: scale(1.3);
-}
-
-.login-eyebrow {
-  color: color-mix(in srgb, var(--ink) 60%, transparent);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 @media (max-width: 1023px) {
   .login-headline {
-    font-size: clamp(2.1rem, 9vw, 3.4rem);
+    font-size: clamp(2.4rem, 11vw, 3.6rem);
   }
 }
 
-/* Clipped to the shell it decorates. The plates are drawn past their own box
-   on purpose — that is what makes them bleed off the edges — but a stem
-   hanging below the fold made the door scrollable, and what was under it was
-   the wallpaper of an app nobody has signed into yet. Clipping the garden
-   rather than the shell leaves the shell free to grow past the window when the
-   card is taller than it, which is the one thing it must still do. */
-.login-garden {
+/* The chat's die-cut stickers, tilted as if pressed on by hand. */
+.login-sticker {
   position: absolute;
-  inset: 0;
-  overflow: clip;
   pointer-events: none;
+  user-select: none;
+}
+
+.login-headline em {
+  position: relative;
+  display: inline-block;
+}
+
+/* On the end of the line, as if pressed on after it was written. */
+.login-sticker.is-bear {
+  top: -0.1em;
+  left: calc(100% + 0.12em);
+  width: 0.9em;
+  rotate: 10deg;
+}
+
+.login-sticker.is-bunny {
+  top: -46px;
+  right: -22px;
+  width: 78px;
+  rotate: 12deg;
+}
+
+@media (max-width: 1023px) {
+  .login-sticker.is-bunny {
+    display: none;
+  }
 }
 
 .botanical-plate {
@@ -1227,15 +1193,20 @@
   padding: 3rem 1.5rem;
 }
 
-/* No drop shadow. A 90px black blur over a near-black ground did not read as
-   lift, it read as a smudge ringing the card. The hairline and the paper step
-   already separate it; the inset highlight catches the top edge. */
-/* No frame: the form stands on the ground, as Glossa's does. The column is
-   the frame. */
+/* The site's white card: no outline and no drop shadow, the step from the
+   ground to the card is the edge. In a dark palette it is the paper. */
 .login-card {
+  position: relative;
   width: 100%;
-  max-width: 24rem;
+  max-width: 25rem;
+  border-radius: 24px;
+  background: var(--paper);
+  padding: 2rem 1.75rem 1.75rem;
   animation: login-settle var(--dur-slow) var(--ease-out) backwards;
+}
+
+:root[data-theme="light"] .login-card {
+  background: white;
 }
 
 @keyframes login-settle {
@@ -1245,17 +1216,9 @@
   }
 }
 
-/* The phone's card: the choice, the fields and the button stand together on
-   the same soft ground as Settings' cards, with no outline. */
+/* The choice, the fields and the button, straight on the card. */
 .login-panel {
-  margin-top: 1.75rem;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  padding: 14px;
-}
-
-:root[data-theme="light"] .login-panel {
-  background: color-mix(in srgb, white 70%, transparent);
+  margin-top: 1.5rem;
 }
 
 /* Which of the two things you are doing is a choice, so it is a control at the
@@ -1266,7 +1229,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: var(--field-fill);
   padding: 4px;
 }
 
@@ -1311,7 +1274,7 @@
 .login-title {
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: var(--weight-bold);
   line-height: 1.12;
   letter-spacing: -0.035em;
@@ -1361,32 +1324,6 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  color: var(--ink-3);
-}
-
-/* Boxed now, as Glossa's are: with the card's frame gone, a ruled line was
-   a field with nothing round it. */
-.login-input {
-  width: 100%;
-  height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  padding: 0 0.85rem;
-  color: var(--ink);
-  font-size: 0.95rem;
-  outline: none;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
-}
-
-.login-input:hover {
-  border-color: var(--rule);
-}
-
-.login-input:focus {
-  border-color: var(--ink-4);
 }
 
 .login-secret .login-input {
@@ -1421,36 +1358,9 @@
 }
 
 .login-submit {
-  display: flex;
   width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
   margin-top: 0.75rem;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink);
   height: 48px;
-  color: var(--paper);
-  font-size: var(--text-sm);
-  letter-spacing: 0;
-  text-transform: none;
-  transition:
-    opacity var(--dur-fast) var(--ease-out),
-    transform var(--dur-press) var(--ease-press);
-}
-
-.login-submit:hover:not(:disabled) {
-  opacity: 0.88;
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.login-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
 }
 
 .login-submit svg {
@@ -1531,7 +1441,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .login-card,
-  .login-pill-word,
   .login-error {
     animation: none;
   }
@@ -1628,8 +1537,62 @@
   animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
 }
 
+/* Placeholder layouts (components/Skeleton.tsx). They wait `--motion-wait`
+   before fading in, so a load that finishes quickly shows nothing at all
+   rather than a flash of grey bars. */
+.skeleton-rows,
+.skeleton-chat {
+  display: grid;
+  gap: 14px;
+  padding: 6px 0;
+  animation: fade-in var(--motion-content) var(--ease-out) var(--motion-wait) backwards;
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skeleton-lead {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.skeleton-lines {
+  flex: 1;
+  display: grid;
+  gap: 7px;
+}
+.skeleton-lines .skeleton {
+  height: 10px;
+}
+.skeleton-lines .skeleton.is-short {
+  height: 8px;
+}
+.skeleton-chat {
+  padding: 12px 14px;
+}
+.skeleton-bubble {
+  height: 34px;
+  border-radius: 18px;
+}
+.skeleton-bubble.is-mine {
+  justify-self: end;
+}
+/* An image or video still on its way: a quiet plate of its likely size. */
+.rich-media-loading.skeleton {
+  min-height: 160px;
+  border: 0;
+  border-radius: var(--radius-md);
+  animation:
+    fade-in var(--motion-content) var(--ease-out) var(--motion-wait) backwards,
+    skeleton-sweep 1.6s var(--ease-in-out) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .skeleton-rows,
+  .skeleton-chat,
+  .rich-media-loading.skeleton {
     animation: none;
   }
 
@@ -1724,6 +1687,16 @@
   view-transition-name: note-body;
 }
 
+/* The band the three clusters sit in travels with them, on the page colour
+   like the body under it. Unnamed, it stayed in the root picture — and the
+   root under a column that has left is the bare wallpaper, so the strip
+   between the list's edge and where it lands flashed the picture through for
+   the length of the glide: a flicker at the end of every opening that read as
+   the panel bouncing. */
+.is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar {
+  view-transition-name: note-bar;
+}
+
 .is-sliding-navigation .pane-slide + .pane-page > .editor-toolbar > :first-child {
   view-transition-name: note-toolbar-start;
 }
@@ -1766,6 +1739,7 @@
 .is-sliding-navigation::view-transition-group(navigation),
 .is-sliding-navigation::view-transition-group(navigation-list),
 .is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-bar),
 .is-sliding-navigation::view-transition-group(note-split) {
   overflow: clip;
 }
@@ -1782,6 +1756,7 @@
 }
 
 .is-sliding-navigation::view-transition-group(note-body),
+.is-sliding-navigation::view-transition-group(note-bar),
 .is-sliding-navigation::view-transition-group(note-split) {
   background: var(--page);
 }
@@ -1819,7 +1794,19 @@
   translate: -50% 0;
 }
 
+/* When the list stays, only its new picture travels. Its old one carried the
+   title at the other inset (the gutter beside the traffic lights comes and
+   goes with the folders), and the two printed over each other as a ghost of
+   the title sliding the other way. A list that is itself leaving keeps its
+   old picture: that is the only one with anything in it. */
+.is-sliding-navigation:has(.pane-slide.is-list:not(.is-collapsed))::view-transition-old(
+    navigation-list
+  ) {
+  display: none;
+}
+
 .is-sliding-navigation::view-transition-old(note-body),
+.is-sliding-navigation::view-transition-old(note-bar),
 .is-sliding-navigation::view-transition-old(note-split) {
   display: none;
 }
@@ -2274,6 +2261,12 @@
   border-right: 0;
   word-break: normal;
   pointer-events: none;
+}
+
+/* Someone on the other side of a block: `display: inline` above would
+   otherwise beat the browser's own rule for `hidden`. */
+.collaboration-carets__caret[hidden] {
+  display: none;
 }
 
 /* Out of the flow, and resting exactly on top of the caret it names.
@@ -4770,13 +4763,6 @@
   color: var(--ink-2);
 }
 
-.invite-form > button:hover:not(:disabled),
-.invite-link-row button:hover {
-  border-color: var(--accent);
-  background: var(--accent-wash);
-  color: var(--ink);
-}
-
 .invite-form > button:disabled {
   opacity: 0.45;
 }
@@ -5657,37 +5643,6 @@
   }
 }
 
-/* A note opened from the list beside it comes from the side of the list it
-   was on: the next note down rises into place, the one above comes down, the
-   way the page would move if the notes were one long scroll. Opened from
-   anywhere else — a link, ⌘K, a reload — it has no direction and only fades. */
-@keyframes page-in-below {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-}
-
-@keyframes page-in-above {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-}
-
-/* The old page is out of the way before the new one moves in: two texts
-   crossing each other in the same place read as a double exposure, not as a
-   page turning. */
-:root[data-note-direction="down"] .page-in > * {
-  animation-name: page-in-below;
-  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
-}
-
-:root[data-note-direction="up"] .page-in > * {
-  animation-name: page-in-above;
-  animation-delay: calc(90ms + min(sibling-index() - 1, 3) * 45ms);
-}
-
 /* Opening another note, raised by `handleSelectNote`. The page being left is
    a picture that fades in 160ms over the new one, which arrives through its
    own `page-in` underneath — so the old words leave rather than being cut.
@@ -5709,35 +5664,8 @@
 }
 
 .is-opening-note::view-transition-old(note-body) {
-  animation: fade-out 160ms var(--ease-out) both;
+  animation: fade-out 120ms var(--ease-out) both;
   mix-blend-mode: normal;
-}
-
-/* The page being left goes the other way from the one arriving. */
-.is-opening-note[data-note-direction="down"]::view-transition-old(note-body) {
-  animation-name: page-out-above;
-  animation-duration: 110ms;
-  animation-timing-function: var(--ease-press);
-}
-
-.is-opening-note[data-note-direction="up"]::view-transition-old(note-body) {
-  animation-name: page-out-below;
-  animation-duration: 110ms;
-  animation-timing-function: var(--ease-press);
-}
-
-@keyframes page-out-above {
-  to {
-    opacity: 0;
-    transform: translateY(-14px);
-  }
-}
-
-@keyframes page-out-below {
-  to {
-    opacity: 0;
-    transform: translateY(14px);
-  }
 }
 
 /* The body that waited behind the skeleton arrives the way the rest of the
@@ -5757,9 +5685,11 @@
    on the title because it is the first thing that settles. `sibling-index()`
    numbers them; where a browser has no such function the delay is dropped
    and they arrive together, which is what they did before. */
+/* One short fade for the whole note, in place. The page used to travel in
+   from the side of the list it came from, piece by piece, while the old one
+   slid the other way: switching notes read as a bounce. Nothing moves now. */
 .page-in > * {
-  animation: page-in 320ms var(--ease-out) backwards;
-  animation-delay: calc(min(sibling-index() - 1, 3) * 45ms);
+  animation: page-in 180ms var(--ease-out) backwards;
 }
 
 /* Phone screens push and pop the way the platform does: the incoming screen
@@ -6922,6 +6852,11 @@ body:has(.sidebar-row.is-over) .drag-chip {
 }
 
 /* ══ The writing toolbar ══════════════════════════════════════════════════════ */
+/* One row in a narrow pane: the writing tools give up a few pixels each. */
+.editor-toolbar.is-compact .editor-tool-button {
+  width: 1.75rem;
+}
+
 .editor-toolbar-compact-tools {
   display: flex;
   align-items: center;
@@ -9051,6 +8986,12 @@ body:has(.sidebar-row.is-over) .drag-chip {
   transition: padding-left var(--dur-base) var(--ease);
 }
 
+/* Inside the glide the inset is already where it ends, so the picture taken of
+   it is the finished one and nothing slides on after the panes have stopped. */
+.is-sliding-navigation[data-shell="mac"] :is(.collection-toolbar, .editor-toolbar) {
+  transition: none !important;
+}
+
 /* The compact layout is not only a phone's: a desktop window narrower than
    768px, or shorter than 520, gets it too — and its strips are the first thing
    under the traffic lights, exactly as the sidebar's is in the wide one. */
@@ -9845,7 +9786,15 @@ text.ink-stroke {
   display: grid;
   place-items: center;
   padding: 16px;
+}
+
+/* The scrim is a layer of its own so it can fade without fading the sheet's
+   backdrop with it (see `Sheet.tsx`). */
+.sheet-backdrop::before {
+  position: absolute;
+  inset: 0;
   background: var(--scrim);
+  content: "";
 }
 
 .sheet {
@@ -10812,14 +10761,6 @@ button.sheet-chip:hover,
   font-weight: var(--weight-semibold);
 }
 
-.sheet-primary-action:hover:not(:disabled) {
-  background: var(--accent-strong);
-}
-
-.sheet-primary-action:disabled {
-  opacity: 0.4;
-}
-
 .settings-segment.is-inline {
   grid-auto-columns: auto;
   padding: 2px;
@@ -11306,16 +11247,7 @@ button.sheet-chip:hover,
 
 .board-card.is-detail {
   min-height: 0;
-  animation: page-in 320ms var(--ease-out) backwards;
-}
-
-/* Picking another row turns the page the way opening another note does. */
-.board-card.is-detail[data-from="below"] {
-  animation-name: page-in-below;
-}
-
-.board-card.is-detail[data-from="above"] {
-  animation-name: page-in-above;
+  animation: page-in 180ms var(--ease-out) backwards;
 }
 
 .board-card-preview {
@@ -14180,6 +14112,7 @@ button.sheet-chip:hover,
 /* Delete account, in Settings' own rows: a small danger button that opens a
    password row, a confirmation and the two actions in place. */
 .account-delete-open,
+.email-change-open,
 .account-deletion-actions button {
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--danger) 46%, var(--rule));
@@ -14210,6 +14143,7 @@ button.sheet-chip:hover,
   gap: 8px;
 }
 
+.email-change-open,
 .account-deletion-actions button:not(.is-danger) {
   border-color: var(--rule);
   color: var(--ink-2);
@@ -15637,72 +15571,6 @@ button.sheet-chip:hover,
   white-space: normal;
 }
 
-/* The first-launch lesson is the Spotlight's own field, with the shortcut
-   where the words go. Its keys arrive one after the other and keep being
-   pressed until the person presses them. Reduced motion keeps only the fade
-   (`.liquid *` drops the rest). */
-.spotlight-lesson {
-  animation: spotlight-lesson-fade var(--dur-base) var(--ease-out) backwards;
-}
-
-.spotlight-lesson .palette-search {
-  gap: 12px;
-}
-
-.spotlight-lesson-word {
-  flex: 1;
-  color: var(--ink-3);
-  font-size: var(--text-md);
-}
-
-.spotlight-lesson-keys {
-  display: flex;
-  gap: 6px;
-}
-
-.spotlight-lesson .palette-search kbd {
-  min-width: 34px;
-  border: 0.5px solid var(--rule);
-  border-bottom-width: 2px;
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  padding: 4px 10px;
-  font-family: var(--font-sans);
-  font-weight: var(--weight-semibold);
-  border-radius: var(--radius-tile);
-  color: var(--ink);
-  font-size: var(--text-lg);
-  text-align: center;
-  animation:
-    spotlight-lesson-key 420ms var(--ease-spring) calc(320ms + var(--key) * 90ms) backwards,
-    spotlight-lesson-press 2400ms var(--ease-press) calc(1400ms + var(--key) * 90ms) infinite;
-}
-
-@keyframes spotlight-lesson-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes spotlight-lesson-key {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-}
-
-@keyframes spotlight-lesson-press {
-  0%,
-  12%,
-  100% {
-    transform: none;
-  }
-  6% {
-    transform: translateY(1px) scale(0.94);
-    border-bottom-width: 1px;
-    background: var(--accent-wash);
-  }
-}
-
 /* ── A centred sheet: archive, person, note, folder ──────────────────────────
    The portrait, the name, what it holds in one line, and a row of what is
    done to it. What happened is rows below. */
@@ -16017,7 +15885,6 @@ button.sheet-chip:hover,
     .space-list-current,
     .space-list-new,
     .space-switch,
-    .spotlight-lesson .palette-search kbd,
     .structure-end,
     .structure-field,
     .structure-headings button,
@@ -16034,6 +15901,165 @@ button.sheet-chip:hover,
   ) {
     corner-shape: squircle;
   }
+}
+
+.trial-notice {
+  position: fixed;
+  z-index: 35;
+  inset-inline-start: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.8125rem;
+}
+
+.trial-notice button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem;
+}
+
+/* ── Account ──────────────────────────────────────────────────────────────
+   As the phone lays out Settings: named groups on a raised plate, a tinted
+   glyph tile per row, hairlines that start after the tile, a chevron where
+   a row opens something. Every change happens in a small window of its own,
+   never by unfolding fields between the rows. */
+.account-groups h3 {
+  margin: 22px 4px 7px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.account-groups h3:first-child {
+  margin-top: 4px;
+}
+
+.account-group {
+  overflow: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--page));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+:root[data-theme="light"] .account-group {
+  background: color-mix(in srgb, var(--page) 45%, white);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 1px 2px rgb(40 20 24 / 0.04);
+}
+
+.account-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px 0 12px;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-press);
+}
+
+.account-row + .account-row::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 52px;
+  height: 0.5px;
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  content: "";
+}
+
+.account-row:is(button, a):hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.account-row:is(button, a):active {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* The glyph answers to Settings → Style like the sidebar's: bare ink when
+   icons are Clear, a tile washed with the tint when they are Tinted. No hue
+   of its own, ever. */
+.account-tile {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ink-3);
+}
+
+:root[data-icon-style="tinted"] .account-tile {
+  background: color-mix(in srgb, var(--icon-tint, var(--accent)) 20%, transparent);
+  color: var(--icon-tint-strong, var(--accent-strong));
+}
+
+.account-row-label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.account-row-label.is-danger {
+  color: var(--danger);
+}
+
+.account-row-value {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-row-trailing {
+  display: flex;
+  color: var(--ink-4);
+}
+
+/* The window a row opens. */
+.account-dialog-ground {
+  position: fixed;
+  z-index: 96;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+
+.account-dialog {
+  width: min(24rem, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 20px;
+  padding: 22px 22px 18px;
+  background: var(--page);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.1),
+    0 24px 60px -16px rgb(0 0 0 / 0.45);
+}
+
+.account-dialog h2 {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .account-field {
@@ -16122,4 +16148,255 @@ button.sheet-chip:hover,
 
 .account-dialog-actions button:disabled {
   opacity: 0.6;
+}
+
+/* ══ Controls ════════════════════════════════════════════════════════════════
+   One system for every form the app shows — sign-in, reset password, Settings,
+   sheets and dialogs: a label in small ink above, a filled rounded field, an
+   ink pill for the one main action, a soft pill for the others, and quiet
+   links at the foot. Last in the file, so each surface's older rule yields to
+   it. ─────────────────────────────────────────────────────────────────────── */
+:is(.login-field .label, .invite-form label) {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input) {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--field-fill);
+  color: var(--ink);
+  outline: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+:is(.login-input, .invite-form input, .invite-link-row input) {
+  width: 100%;
+  height: var(--field-h);
+  padding: 0 0.9rem;
+  font-size: 0.95rem;
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input):hover {
+  background: var(--field-fill-hover);
+}
+
+:is(.login-input, .profile-field, .invite-form input, .invite-link-row input):focus-visible {
+  border-color: var(--ink-4);
+}
+
+:is(.login-submit, .sheet-primary-action) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  padding-inline: 1.25rem;
+  color: var(--page);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  text-transform: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
+}
+
+:is(.login-submit, .sheet-primary-action):hover:not(:disabled) {
+  background: var(--ink);
+  opacity: 0.88;
+}
+
+:is(.login-submit, .sheet-primary-action):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:is(.login-submit, .sheet-primary-action):disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+:is(.invite-form > button, .invite-link-row button, .settings-row-button) {
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--field-fill);
+  color: var(--ink-2);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+:is(.invite-form > button, .invite-link-row button) {
+  min-height: var(--field-h);
+  padding-inline: 1.1rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+:is(.invite-form > button, .invite-link-row button, .settings-row-button):hover:not(:disabled) {
+  background: var(--field-fill-hover);
+  color: var(--ink);
+}
+
+:is(.policy-links, .login-note) {
+  font-size: var(--text-xs);
+}
+
+:is(.policy-links a, a.login-note) {
+  color: var(--ink-3);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+:is(.policy-links a, a.login-note):hover {
+  color: var(--ink);
+}
+
+/* ── Liquid Glass ─────────────────────────────────────────────────────────────
+   What separates glass from a translucent sheet of paper is not how much shows
+   through but what the edge does with it: the picture behind is blurred and
+   pushed more saturated, the edge catches the light along its top and left and
+   a softer reflection along the opposite side, a faint glow sits inside the
+   rim, and the slab throws a contact shadow and a wide one beneath it. Pieces
+   inside a sheet are smaller slabs of the same glass, on radii concentric with
+   the sheet's. Solid keeps the lit edge and the shadows over an opaque ground;
+   Translucent is clear glass whose tint the Liquid Glass slider sets; Frosted
+   is the same glass with a wider, milkier blur. No gradient anywhere: the light
+   is edges and depth, never a wash of colour. */
+:root[data-theme="light"] {
+  --glass-rim: rgb(255 255 255 / 0.9);
+  --glass-rim-soft: rgb(255 255 255 / 0.4);
+  --glass-glow: rgb(255 255 255 / 0.3);
+  --glass-piece: rgb(255 255 255 / 0.34);
+  --glass-piece-hover: rgb(255 255 255 / 0.5);
+  --glass-drop:
+    0 0 0 0.5px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.08), 0 30px 64px -18px rgb(0 0 0 / 0.36);
+}
+
+:root[data-theme="dark"] {
+  --glass-rim: rgb(255 255 255 / 0.26);
+  --glass-rim-soft: rgb(255 255 255 / 0.09);
+  --glass-glow: rgb(255 255 255 / 0.05);
+  --glass-piece: rgb(255 255 255 / 0.07);
+  --glass-piece-hover: rgb(255 255 255 / 0.12);
+  --glass-drop:
+    0 0 0 0.5px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3), 0 30px 70px -16px rgb(0 0 0 / 0.6);
+}
+
+.sheet,
+.sheet:has(.sheet-body.is-plain) {
+  border: 0;
+  border-radius: 26px;
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim),
+    inset -1px -1px 0 var(--glass-rim-soft),
+    inset 0 0 22px var(--glass-glow),
+    var(--glass-drop);
+}
+
+.has-translucent-sidebar .sheet {
+  background: color-mix(
+    in srgb,
+    var(--paper) max(30%, calc(var(--glass-tint, 76%) * 0.7 - 10%)),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(26px) saturate(1.9) brightness(1.04);
+  backdrop-filter: blur(26px) saturate(1.9) brightness(1.04);
+}
+
+.has-frosted-glass .sheet {
+  background: color-mix(in srgb, var(--paper) calc(var(--glass-tint, 76%) * 0.8), transparent);
+  -webkit-backdrop-filter: blur(56px) saturate(1.5) brightness(1.08);
+  backdrop-filter: blur(56px) saturate(1.5) brightness(1.08);
+}
+
+/* Glass is seen against the room, so the room is barely dimmed. */
+.has-translucent-sidebar .sheet-backdrop::before {
+  background: rgb(0 0 0 / 0.14);
+}
+
+:root[data-theme="dark"].has-translucent-sidebar .sheet-backdrop::before {
+  background: rgb(0 0 0 / 0.32);
+}
+
+.has-translucent-sidebar
+  .sheet
+  :is(
+    .sheet-close,
+    .sheet-back,
+    .sheet-actions > button,
+    .sheet-chip,
+    .sheet-note-glyph,
+    .sheet-stats > *
+  ),
+.has-translucent-sidebar .sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back),
+.has-translucent-sidebar .sheet .sheet-body.is-plain :is(.sheet-note-glyph, .sheet-stats > *) {
+  background: var(--glass-piece);
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim),
+    inset -0.5px -0.5px 0 var(--glass-rim-soft);
+}
+
+.has-translucent-sidebar
+  .sheet
+  :is(
+    .sheet-close:hover,
+    .sheet-back:hover,
+    .sheet-actions > button:hover,
+    .sheet-actions > button.is-active,
+    button.sheet-chip:hover,
+    .sheet-stats > button:hover
+  ),
+.has-translucent-sidebar .sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back):hover,
+.has-translucent-sidebar .sheet .sheet-body.is-plain .sheet-stats > button:hover {
+  background: var(--glass-piece-hover);
+}
+
+/* Concentric: a piece inset from the sheet's edge takes the sheet's radius
+   less its inset, so the two curves keep one distance all the way round. */
+.has-translucent-sidebar .sheet :is(.sheet-close, .sheet-back),
+.has-translucent-sidebar .sheet:has(.sheet-body.is-plain) :is(.sheet-close, .sheet-back) {
+  border-radius: var(--radius-pill);
+}
+
+.has-translucent-sidebar .sheet .sheet-body.is-plain .sheet-stats > * {
+  border-radius: 16px;
+}
+
+/* Menus and floating bars are the same glass, at their own floor of tint. */
+.has-translucent-sidebar :is(.popover, .glass-sheet):not(.settings-panel) {
+  border-color: transparent;
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim),
+    inset -0.5px -0.5px 0 var(--glass-rim-soft),
+    var(--shadow-popover);
+}
+
+.has-translucent-sidebar .glass-toolbar {
+  border-color: transparent;
+  box-shadow:
+    inset 1px 1px 0 var(--glass-rim),
+    inset -0.5px -0.5px 0 var(--glass-rim-soft),
+    var(--shadow-soft);
+}
+
+/* Windows has no native material and blurs on the CPU: the sheet keeps its
+   lit edge and depth over a dense tint instead. */
+[data-shell="windows"].has-translucent-sidebar .sheet {
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .has-translucent-sidebar .sheet {
+    background: var(--paper);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }

@@ -63,15 +63,25 @@ export const webPlatform: Platform = {
     return "file";
   },
 
-  async openFile(_name, load) {
+  async openFile(name, load) {
     /* Claimed inside the click, before anything is awaited: a tab opened after
        an await is a tab the pop-up blocker has already refused. */
     const opened = window.open("", "_blank");
     try {
-      const url = URL.createObjectURL(await load());
+      const blob = await load();
+      if (blob.type !== "application/pdf" || (await blob.slice(0, 5).text()) !== "%PDF-") {
+        opened?.close();
+        handOver(
+          name,
+          URL.createObjectURL(blob.slice(0, blob.size, "application/octet-stream")),
+          30_000,
+        );
+        return null;
+      }
       if (!opened) return "Allow pop-ups to open this attachment";
-      opened.location.replace(url);
+      const url = URL.createObjectURL(blob);
       opened.opener = null;
+      opened.location.replace(url);
       window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
       return null;
     } catch (reason) {

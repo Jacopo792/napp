@@ -20,9 +20,9 @@ function expiresIn(expiresAt: string): string {
  *  reaches the invited address without passing through anything of ours, and
  *  there is no server here to send it with. */
 function inviteMailto(email: string, link: string): string {
-  const subject = "An invitation to a shared notes archive";
+  const subject = "An invitation to a shared notes group";
   const body = [
-    "You have been invited to a private notes archive.",
+    "You have been invited to a private notes group.",
     "",
     "Open this link, then create an account with this address (or sign in, if you already have one):",
     link,
@@ -123,7 +123,7 @@ export function Invitations({
             </span>
             <span className="settings-label">
               <dt>Editors only</dt>
-              <dd>An editor in this archive can invite the other person.</dd>
+              <dd>An editor in this group can invite the other person.</dd>
             </span>
           </div>
         </dl>

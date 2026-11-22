@@ -1,3 +1,5 @@
+import { AccountSettings } from "@/components/AccountSettings";
+import type { AccountPlan } from "@/lib/plan";
 import {
   Archive,
   ArchiveRestore,
@@ -50,11 +52,8 @@ import {
   X,
 } from "@/components/icons";
 import { ArchiveOptions } from "@/components/ArchiveOptions";
-import { CredentialSettings } from "@/components/CredentialSettings";
-import { AccountDeletionForm } from "@/components/AccountDeletionForm";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { useUsageAdministrator } from "@/lib/useUsageDashboard";
-import { PolicyLinks } from "@/components/PolicyLinks";
 import { BlockedAccounts } from "@/components/SafetyActions";
 import { PageSetupFields, ReferenceFields } from "@/components/WritingMenus";
 import type { ArchiveKind, DocumentFeatures, PageSetup } from "@/lib/spaceShape";
@@ -316,6 +315,8 @@ export function SettingsPanel({
   kind = "notes",
   document,
   email,
+  accountPlan,
+  archiveWritable,
   onAccountDeleted,
   reading,
   autoLock,
@@ -376,6 +377,8 @@ export function SettingsPanel({
   };
   /** The account signed in, which is not the same thing as the notes on screen. */
   email: string;
+  accountPlan?: AccountPlan;
+  archiveWritable: boolean;
   onAccountDeleted: () => void;
   /** Whose notes the window is currently pointed at. */
   reading: string;
@@ -439,7 +442,6 @@ export function SettingsPanel({
   const [tuning, setTuning] = useState(false);
   const [section, setSection] = useState<SettingsSection>(initialSection ?? "profile");
   const [closing, setClosing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   /* How many spellings this device has been told to leave alone. Read when the
      panel opens rather than held live: the only thing that changes it while
      the panel is up is the button below, which sets it itself. */
@@ -758,7 +760,7 @@ export function SettingsPanel({
                     </div>
 
                     <div className="appearance-row profile-row">
-                      <RowLead icon={<Users size={16} />} label="Archive" />
+                      <RowLead icon={<Users size={16} />} label="Group" />
                       <button
                         type="button"
                         className="space-list-button press"
@@ -795,31 +797,12 @@ export function SettingsPanel({
                     </p>
                   )}
                   <BlockedAccounts />
-                  <h3>Delete account</h3>
-                  <div className="appearance-controls">
-                    <div className="appearance-row">
-                      <PolicyLinks />
-                    </div>
-                    {email && <CredentialSettings email={email} />}
-                    {deleting ? (
-                      <AccountDeletionForm
-                        accountEmail={email}
-                        onErased={onAccountDeleted}
-                        onCancel={() => setDeleting(false)}
-                      />
-                    ) : (
-                      <div className="appearance-row">
-                        Delete account
-                        <button
-                          type="button"
-                          className="account-delete-open"
-                          onClick={() => setDeleting(true)}
-                        >
-                          Delete…
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                </section>
+              )}
+
+              {section === "account" && (
+                <section>
+                  <AccountSettings email={email} plan={accountPlan} onErased={onAccountDeleted} />
                 </section>
               )}
 
@@ -1464,7 +1447,7 @@ export function SettingsPanel({
                       <Invitations
                         invites={invites}
                         seatsFull={taken >= space.seatLimit}
-                        canManage
+                        canManage={archiveWritable}
                         onCreate={onCreateInvite}
                         onRevoke={onRevokeInvite}
                       />
@@ -1482,7 +1465,7 @@ export function SettingsPanel({
                           }}
                         >
                           <LogOut size={16} />
-                          {leaving ? "Leave — press again" : "Leave this archive"}
+                          {leaving ? "Leave — press again" : "Leave this group"}
                         </button>
                       )}
                       {spaceStatus && (
@@ -1496,7 +1479,7 @@ export function SettingsPanel({
 
               {section === "spaces" && (
                 <section>
-                  <h3>Your archives</h3>
+                  <h3>Your groups</h3>
                   <div className="appearance-controls space-list">
                     {spaces.map((space) => {
                       const here = space.archiveId === currentArchiveId;
@@ -1566,7 +1549,7 @@ export function SettingsPanel({
                     onClick={onNewArchive}
                   >
                     <Plus size={16} />
-                    New archive…
+                    New group…
                   </button>
                   {spaceStatus && (
                     <p className="profile-note text-danger" role="alert">

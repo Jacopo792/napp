@@ -18,7 +18,7 @@
  * is what lets the tests stand two of these up against one Redis and drive
  * real clients through both. */
 import { Redis } from "@hocuspocus/extension-redis";
-import { Server, type Extension } from "@hocuspocus/server";
+import { Connection, Server, type Extension } from "@hocuspocus/server";
 import { createClient } from "@supabase/supabase-js";
 import IORedis from "ioredis";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -28,6 +28,7 @@ import { revertIfBroken } from "@notes-app/core/editor/writeLocks.ts";
 import { importImage } from "./importImage.ts";
 import { linkPreview } from "./linkPreview.ts";
 import { giphyCategories, giphyMedia, giphySearch } from "./giphy.ts";
+import { withoutHiddenPresence } from "./hiddenPresence.ts";
 import { PROBE_MS, probeSupabase } from "./health.ts";
 import { noteIdOf, originAllowed } from "./access.ts";
 import { createAuthorizer, supabaseLookup, type Authorizer } from "./authorize.ts";
@@ -122,6 +123,24 @@ const reverts = new WeakMap<object, Uint8Array>();
    note it has been removed from. */
 const proved = new WeakMap<object, number>();
 
+/* Whom each connection's account may not see, read as that account; absent
+   until the first answer, which hides every other person meanwhile. */
+const hiddenFor = new WeakMap<object, ReadonlySet<string>>();
+
+/* Every message to a client leaves through `Connection.send`, including the
+   presence the constructor sends before any hook runs, so the filter sits on
+   the prototype rather than on each connection. */
+const plainSend = Connection.prototype.send;
+Connection.prototype.send = function (this: Connection, message: Uint8Array) {
+  const context = this.context as Partial<Context> | undefined;
+  const visible = withoutHiddenPresence(
+    message,
+    hiddenFor.get(this) ?? null,
+    context?.userId ?? "",
+  );
+  if (visible) plainSend.call(this, visible);
+};
+
 /* A Supabase access token is about a kilobyte. Anything far past that is not
    one, and is not worth three round trips or a slot in the answer cache. */
 const MAX_TOKEN = 4096;
@@ -161,6 +180,19 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+
+  /* A failed read keeps the previous answer; the next token sync asks again. */
+  const refreshHidden = async (connection: {
+    context: Context;
+    send(message: Uint8Array): void;
+  }) => {
+    const { data, error } = await asCaller(connection.context.token).rpc("hidden_people");
+    if (error || !Array.isArray(data)) return;
+    const first = !hiddenFor.has(connection);
+    hiddenFor.set(connection, new Set(data as string[]));
+    // Hocuspocus keeps this private; it resends the presence the filter held back.
+    if (first) (connection as unknown as { sendCurrentAwareness(): void }).sendCurrentAwareness();
+  };
 
   /* The bus, asked whether it is there. `null` means this deployment has no
      bus at all, which is correct for a single instance and must not be
@@ -320,6 +352,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
        without anybody having to reload. */
     async connected({ connection }) {
       proved.set(connection, Date.now());
+      void refreshHidden(connection);
       const timer = setInterval(() => {
         if (Date.now() - (proved.get(connection) ?? 0) > 2 * tokenRefresh) {
           connection.close();
@@ -343,6 +376,7 @@ export function createCollaborationServer(config: CollaborationConfig): Server<C
       }
       proved.set(connection, Date.now());
       connection.context.token = token;
+      void refreshHidden(connection);
       connection.readOnly = answer.readOnly;
       connectionConfig.readOnly = answer.readOnly;
     },

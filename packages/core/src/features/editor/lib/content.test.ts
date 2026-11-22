@@ -17,6 +17,7 @@ import {
   richTextToPlainText,
   shapeStroke,
   straightenStroke,
+  strokeDistance,
   strokePoints,
   translateStroke,
   withoutInvisibleDocumentEnding,
@@ -327,4 +328,12 @@ test("a null attribute is not a difference", () => {
     withoutNullAttributes({ marks: [{ type: "noteLink", attrs: { blockId: null, noteId: "a" } }] }),
     { marks: [{ type: "noteLink", attrs: { noteId: "a" } }] },
   );
+});
+
+test("the eraser reaches the middle of a straight line, not only its ends", () => {
+  // A straightened line is two points 400 apart; the pointer rubs its centre.
+  assert.equal(strokeDistance("M100,100L500,100", { x: 300, y: 104 }), 4);
+  assert.equal(strokeDistance("M100,100L500,100", { x: 600, y: 100 }), 100);
+  assert.equal(strokeDistance("M0,0L100,0M100,100L200,100", { x: 100, y: 50 }), 50);
+  assert.equal(strokeDistance("M7,7", { x: 10, y: 11 }), 5);
 });

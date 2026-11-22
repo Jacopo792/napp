@@ -26,5 +26,8 @@ export const supabase = createClient(url, publishableKey, {
 });
 
 export function fail(error: { message: string } | null): void {
+  if (error?.message === "database error, code: PT413") {
+    throw new Error("This account has reached its storage limit");
+  }
   if (error) throw new Error(error.message);
 }

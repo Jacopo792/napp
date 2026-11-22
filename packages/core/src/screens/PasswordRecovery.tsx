@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { passwordRecovery } from "@/lib/passwordRecovery";
 import { PolicyLinks } from "@/components/PolicyLinks";
-import "@/components/accountDeletion.css";
+import { useAuthCaptcha } from "@/lib/useAuthCaptcha";
+import { AccountCard } from "@/components/AccountCard";
 
 export default function PasswordRecovery() {
+  const captcha = useAuthCaptcha();
   const [recovery] = useState(passwordRecovery);
   const [fragment] = useState(() => window.location.hash);
   const started = useRef<Promise<void> | null>(null);
@@ -32,7 +34,7 @@ export default function PasswordRecovery() {
   }, [fragment, recovery]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || (!ready && !captcha.ready)) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -46,7 +48,7 @@ export default function PasswordRecovery() {
         setDone(true);
         setMessage("Password updated. Return to Napp and sign in with your new password.");
       } else {
-        await recovery.request(email);
+        await recovery.request(email, captcha.token);
         setMessage(
           "If an account uses this address, you will receive a recovery email. Check your inbox and spam folder.",
         );
@@ -54,12 +56,12 @@ export default function PasswordRecovery() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not recover this account.");
     } finally {
+      captcha.reset();
       setBusy(false);
     }
   };
   return (
-    <main className="account-deletion-page">
-      <h1>Reset your Napp password</h1>
+    <AccountCard title={ready || done ? "Choose a new password" : "Reset your password"}>
       <form className="account-deletion" onSubmit={(event) => void submit(event)}>
         {ready ? (
           <>
@@ -103,16 +105,17 @@ export default function PasswordRecovery() {
         ) : null}
         {error ? <p role="alert">{error}</p> : null}
         {message ? <p role="status">{message}</p> : null}
+        {!ready && !done && captcha.widget}
         {!done ? (
           <button
-            style={{ color: "var(--ink)" }}
-            disabled={busy || (ready ? !password || !repeat : !email.trim())}
+            className="account-card-primary"
+            disabled={busy || (ready ? !password || !repeat : !email.trim() || !captcha.ready)}
           >
             {busy ? "Please wait…" : ready ? "Save new password" : "Send recovery email"}
           </button>
         ) : null}
         <PolicyLinks />
       </form>
-    </main>
+    </AccountCard>
   );
 }

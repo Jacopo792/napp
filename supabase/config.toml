@@ -63,11 +63,8 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
-# Specifies an ordered list of seed files to load during db reset.
-# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Integration checks provision fixtures through Auth and the application API.
+enabled = false
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -205,7 +202,7 @@ email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
-anonymous_users = 30
+anonymous_users = 10
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
@@ -216,10 +213,10 @@ token_verifications = 30
 web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+[auth.captcha]
+enabled = false
+provider = "turnstile"
+secret = "env(NAPP_AUTH_CAPTCHA_SECRET)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -227,9 +224,9 @@ enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
-# Keep disposable local fixtures usable without email. Production requires the
-# signup code and manages its SMTP and confirmation settings separately.
-enable_confirmations = false
+# Local confirmations use Mailpit. Production requires the signup code and
+# manages its SMTP and confirmation settings separately.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -241,15 +238,15 @@ otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Enable only for an explicit IONOS test. The local stack uses Mailpit.
+[auth.email.smtp]
+enabled = false
+host = "smtp.ionos.it"
+port = 465
+user = "support@nappnote.com"
+pass = "env(IONOS_SMTP_PASSWORD)"
+admin_email = "support@nappnote.com"
+sender_name = "Napp"
 
 # The Auth emails share one look (version A, Blush). Production reads them from
 # the dashboard: paste each file into Authentication -> Email Templates.
@@ -445,4 +442,19 @@ enabled = true
 # Auth is verified against Auth.getUser inside the function, supporting the
 # project's current signing keys and the server-only scheduled worker.
 [functions.delete-account]
+verify_jwt = false
+
+# Billing verifies the account via Auth and webhook requests via Stripe signatures.
+[functions.stripe-billing]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+# Invoked by pg_net. The function accepts only the service-role bearer.
+[functions.safety-worker]
+verify_jwt = false
+
+# Phone purchases verify Apple signatures; the app call also verifies the account.
+[functions.apple-iap]
 verify_jwt = false

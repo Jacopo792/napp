@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { processErasure, type ErasureBackend, type ErasureObject } from "./worker.ts";
 import { readErasureRequest } from "./request.ts";
+import { createStripe } from "../_shared/stripe.ts";
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
@@ -9,6 +10,7 @@ declare const Deno: {
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 const publicKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(url, serviceKey, options);
@@ -26,10 +28,13 @@ function checked<T>(result: { data: T; error: unknown }): T {
   return result.data;
 }
 const backend: ErasureBackend = {
-  listObjects: async (userId) =>
-    checked(
+  listObjects: async (userId) => {
+    if (checked(await admin.rpc("account_erasure_held", { target_user_id: userId })))
+      throw new Error("Account erasure is on hold");
+    return checked(
       await admin.rpc("account_erasure_objects", { target_user_id: userId }),
-    ) as ErasureObject[],
+    ) as ErasureObject[];
+  },
   remove: async (bucket, paths) => {
     checked(await admin.storage.from(bucket).remove(paths));
   },
@@ -38,8 +43,38 @@ const backend: ErasureBackend = {
       await admin.rpc("ack_account_erasure_objects", { target_user_id: userId, bucket, paths }),
     );
   },
-  finish: async (userId) =>
-    checked(await admin.rpc("finish_account_erasure", { target_user_id: userId })) === true,
+  finish: async (userId) => {
+    if (checked(await admin.rpc("account_erasure_held", { target_user_id: userId }))) return false;
+    const account = checked(
+      await admin
+        .from("stripe_billing_accounts")
+        .select("customer_id")
+        .eq("owner_id", userId)
+        .maybeSingle(),
+    );
+    if (account?.customer_id) {
+      if (!stripeKey) throw new Error("Stripe cleanup is unavailable");
+      const stripe = createStripe(stripeKey);
+      const customer = await stripe.customers.retrieve(account.customer_id);
+      if (!customer.deleted) {
+        const sessions = stripe.checkout.sessions.list({
+          customer: account.customer_id,
+          status: "open",
+        });
+        for await (const session of sessions) {
+          try {
+            await stripe.checkout.sessions.expire(session.id);
+          } catch (error) {
+            if ((await stripe.checkout.sessions.retrieve(session.id)).status === "open")
+              throw error;
+          }
+        }
+        // Stripe cancels active subscriptions when deleting the Customer.
+        await stripe.customers.del(account.customer_id);
+      }
+    }
+    return checked(await admin.rpc("finish_account_erasure", { target_user_id: userId })) === true;
+  },
 };
 
 Deno.serve(async (request) => {
@@ -101,6 +136,9 @@ Deno.serve(async (request) => {
     const signed = await reauth.auth.signInWithPassword({
       email: verified.data.user.email,
       password: body.password as string,
+      options: {
+        captchaToken: typeof body.captcha_token === "string" ? body.captcha_token : undefined,
+      },
     });
     if (signed.error || signed.data.user?.id !== verified.data.user.id)
       return response(403, { error: "The password is incorrect" });
@@ -111,18 +149,25 @@ Deno.serve(async (request) => {
 
   let token: string;
   try {
+    if (
+      checked(await admin.rpc("account_erasure_held", { target_user_id: verified.data.user.id }))
+    ) {
+      return response(423, { error: "Account deletion is on hold. Contact support." });
+    }
     checked(
       await admin.rpc("configure_account_erasure_worker", {
         endpoint: `${url}/functions/v1/delete-account`,
         worker_key: serviceKey,
       }),
     );
-    token = checked(
-      await admin.rpc("begin_account_erasure", {
-        target_user_id: verified.data.user.id,
-        request_token: body.request_token,
-      }),
-    ) as string;
+    const started = await admin.rpc("begin_account_erasure", {
+      target_user_id: verified.data.user.id,
+      request_token: body.request_token,
+    });
+    if (started.error?.code === "PT423") {
+      return response(423, { error: "Account deletion is on hold. Contact support." });
+    }
+    token = checked(started) as string;
   } catch {
     return response(503, { error: "Could not start deletion. Please try again." });
   }

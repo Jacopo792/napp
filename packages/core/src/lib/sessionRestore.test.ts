@@ -149,21 +149,6 @@ test("Supabase restores across client restarts, rotates an expired JWT, and resp
   assert.ok(requests.every((url) => !url.includes("grant_type=password")));
 });
 
-test("only a device that never held a real account may start an anonymous one", async () => {
-  const { mayStartAnonymous, SIGNED_IN_BEFORE_KEY } = await import("./sessionRestore.ts");
-  const read = (values: Record<string, string>) => ({
-    getItem: (key: string) => values[key] ?? null,
-  });
-  assert.equal(mayStartAnonymous(read({})), true);
-  assert.equal(mayStartAnonymous(read({ "napp:accounts": "[]" })), true);
-  // A saved session that may fail to restore is asked for again, never replaced.
-  assert.equal(mayStartAnonymous(read({ [SESSION_KEY]: JSON.stringify(saved) })), false);
-  // A refused token clears the saved session; the marker still remembers it.
-  assert.equal(mayStartAnonymous(read({ [SIGNED_IN_BEFORE_KEY]: "1" })), false);
-  assert.equal(mayStartAnonymous(read({ "napp:accounts": JSON.stringify([saved]) })), false);
-  assert.equal(mayStartAnonymous(read({ "napp:accounts": "{broken" })), false);
-});
-
 test("a confirmed address change replaces the saved address", async () => {
   const restored = await restoreArchiveSession(storage(), {
     getUser: async () => ({

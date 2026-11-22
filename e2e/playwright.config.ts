@@ -1,9 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const full = process.env.NAPP_E2E_FULLSTACK === "1";
+const production = process.env.NAPP_E2E_PRODUCTION === "1";
+const full = production || process.env.NAPP_E2E_FULLSTACK === "1";
 const port = full ? 5200 : 5198;
 export default defineConfig({
   testDir: full ? "./fullstack" : "./ui",
+  testMatch: production ? "**/workspace.spec.ts" : undefined,
+  grep: production ? /@production-smoke/ : undefined,
   outputDir: "../test-results",
   forbidOnly: Boolean(process.env.CI),
   fullyParallel: false,
@@ -20,7 +23,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `node --experimental-strip-types e2e/serve.ts ${full ? "fullstack" : "ui"}`,
+    command: `node --experimental-strip-types e2e/serve.ts ${production ? "production" : full ? "fullstack" : "ui"}`,
     cwd: "..",
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: false,

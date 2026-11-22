@@ -215,12 +215,12 @@ export function useNoteExchange({
 
   async function importDriveFile(file: DriveImportFile, signal: AbortSignal): Promise<string> {
     const session = sessionRef.current;
-    if (!session || !canWriteArchive) throw new Error("This archive is view only.");
+    if (!session || !canWriteArchive) throw new Error("This group is view only.");
     const checkDestination = () => {
       signal.throwIfAborted();
       const current = sessionRef.current;
       if (current?.archiveId !== session.archiveId || current.userId !== session.userId) {
-        throw new Error("The destination archive changed.");
+        throw new Error("The destination group changed.");
       }
     };
     checkDestination();
@@ -255,7 +255,12 @@ export function useNoteExchange({
     checkDestination();
     try {
       if (objectId)
-        await uploadObject(session, objectId, new Blob([blob], { type: "application/pdf" }));
+        await uploadObject(
+          session,
+          objectId,
+          new Blob([blob], { type: "application/pdf" }),
+          note.id,
+        );
       checkDestination();
       entry = await createNote(session, note, metadata);
     } catch (error) {

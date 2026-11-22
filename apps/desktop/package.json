@@ -1,8 +1,8 @@
 {
   "name": "@notes-app/desktop",
-  "version": "0.9.81",
+  "version": "1.0.0",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "FSL-1.1-ALv2",
   "description": "Notes — a shared archive for two",
   "author": "Jacopo792",
   "main": "electron/main.js",

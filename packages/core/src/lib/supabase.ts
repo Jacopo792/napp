@@ -135,7 +135,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
   for (const result of [membersResult, archiveResult]) {
     fail(result.error);
   }
-  if (!archiveResult.data) throw new Error("This archive is no longer available. Sign in again.");
+  if (!archiveResult.data) throw new Error("This group is no longer available. Sign in again.");
 
   // A profile may not exist yet, and a missing name is never a reason to fail
   // to open the archive.
@@ -222,7 +222,7 @@ export async function loadArchive(session: AppSession): Promise<ArchiveSnapshot>
       // A row that appeared between the two queries: keep whatever is cached
       // rather than inventing a note, and let the next wake-up collect it.
       if (payload === undefined) {
-        if (!cached) throw new Error("A note changed while the archive was loading");
+        if (!cached) throw new Error("A note changed while the group was loading");
         return { note: cached.note, version: cached.version } satisfies NoteEntry;
       }
       const { title, body, content, legacy_body: legacyBody, page_icon, cover } = payload;

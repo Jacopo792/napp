@@ -1,3 +1,4 @@
+import { dismissWorkspaceHints } from "../workspaceHints.ts";
 import { expect, test } from "@playwright/test";
 
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
@@ -7,12 +8,9 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion });
-    await page.addInitScript(() => localStorage.setItem("napp:spotlight-learned", "1"));
+    await dismissWorkspaceHints(page);
     await page.goto("/notes");
-    await page
-      .getByRole("button", { name: "Close settings", exact: true })
-      .click({ position: { x: 4, y: 4 } });
-    await page.getByRole("button", { name: "Preview archive", exact: true }).click();
+    await page.getByRole("button", { name: "Preview group", exact: true }).click();
     await page.getByRole("menuitem", { name: "Tesi — Plotino", exact: true }).click();
     const editor = page.locator(".tiptap[contenteditable=true]");
     await expect(editor).toBeVisible();

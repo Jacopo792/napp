@@ -30,13 +30,18 @@ const {
 const { installMenu } = require("./menu");
 const { pickDriveFiles, readLocalDriveCredentials } = require("./googleDrive");
 const {
+  DEV_ORIGIN,
   trustedRendererUrl,
   trustedSender,
   rendererPermission,
   rendererFile,
   safeFileName,
+  opensInViewer,
 } = require("./security");
 const path = require("node:path");
+const { execFile } = require("node:child_process");
+const { promisify } = require("node:util");
+const exec = promisify(execFile);
 const { pathToFileURL } = require("node:url");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
@@ -46,7 +51,7 @@ const fsSync = require("node:fs");
 app.setName("Napp");
 const os = require("node:os");
 
-const DEV_URL = "http://localhost:5174";
+const DEV_URL = DEV_ORIGIN;
 const APP_ORIGIN = "app://notes";
 const isDev = !app.isPackaged;
 
@@ -274,7 +279,19 @@ function createWindow() {
     fittedDisplay = display.id;
     const zoom = display.internal ? 1 : Math.min(1.25, Math.max(1, display.workArea.width / 2048));
     window.webContents.setZoomFactor(zoom);
-    if (isMac) window.setWindowButtonPosition({ x: 19, y: Math.round(26 * zoom - 6) });
+    placeLights();
+  };
+  /* Centred in the 52px strip, which zooms while the lights do not. Applied
+     again on leaving full screen: macOS lays the buttons out afresh then, and
+     they came back at their own default — on the rail's first face and the
+     group's name, with the gutter already back beside them. */
+  const placeLights = () => {
+    if (isMac) {
+      window.setWindowButtonPosition({
+        x: 19,
+        y: Math.round(26 * window.webContents.getZoomFactor() - 6),
+      });
+    }
   };
   window.webContents.on("did-finish-load", () => {
     fittedDisplay = null;
@@ -292,9 +309,15 @@ function createWindow() {
      them has to go with them. It is stated here rather than read from CSS: the
      window is the only thing that knows, and `--titlebar-inset` and
      `trafficLightPosition` are already one decision in two files. */
-  const tellFullScreen = () => window.webContents.send("napp:fullscreen", window.isFullScreen());
-  window.on("enter-full-screen", tellFullScreen);
-  window.on("leave-full-screen", tellFullScreen);
+  /* Each event says which way it went; `isFullScreen()` read inside the
+     handler can still answer the state being left. */
+  const tellFullScreen = (on = window.isFullScreen()) =>
+    window.webContents.send("napp:fullscreen", on);
+  window.on("enter-full-screen", () => tellFullScreen(true));
+  window.on("leave-full-screen", () => {
+    tellFullScreen(false);
+    placeLights();
+  });
 
   /* An answer that arrived before this page had a listener for it — and the
      window's own presentation, which a fresh page has no way to ask about. */
@@ -440,20 +463,30 @@ handle("napp:save", (event, files, fallbackName) =>
    whatever the system does for that kind of file. Only kinds that open in a
    viewer are opened; anything else is shown in its folder, where launching it
    is the reader's own decision and not a click inside a note. */
-const OPENS_IN_A_VIEWER = new Set(
-  (
-    "pdf txt md csv rtf png jpg jpeg gif webp heic svg bmp tiff " +
-    "mp3 m4a wav mp4 mov m4v webm doc docx xls xlsx ppt pptx odt ods odp pages numbers key epub"
-  ).split(" "),
-);
-
 handle("napp:open", async (_event, name, data) => {
   const filename = safeFileName(name);
   const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "napp-")), filename);
   await fs.writeFile(file, Buffer.from(data));
-  if (!OPENS_IN_A_VIEWER.has(path.extname(file).slice(1).toLowerCase())) {
+  if (!opensInViewer(filename)) {
     shell.showItemInFolder(file);
     return null;
+  }
+  if (/\.(docx|xlsx|pptx|odt|ods|odp)$/i.test(filename)) {
+    try {
+      if (process.platform === "darwin") {
+        const downloadedAt = Math.floor(Date.now() / 1000).toString(16);
+        await exec("/usr/bin/xattr", [
+          "-w",
+          "com.apple.quarantine",
+          `0081;${downloadedAt};Napp;`,
+          file,
+        ]);
+      } else if (process.platform === "win32") {
+        await fs.writeFile(`${file}:Zone.Identifier`, "[ZoneTransfer]\r\nZoneId=3\r\n");
+      }
+    } catch {
+      return "Napp could not mark this document as downloaded.";
+    }
   }
   const failure = await shell.openPath(file);
   return failure || null;
@@ -590,7 +623,7 @@ app.whenReady().then(() => {
   app.setAboutPanelOptions({
     applicationName: "Napp",
     applicationVersion: app.getVersion(),
-    credits: "A shared archive, for the people who write in it.",
+    credits: "Shared notes, for the group that writes them.",
   });
   installMenu(isDev);
   createWindow();

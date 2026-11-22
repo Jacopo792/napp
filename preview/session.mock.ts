@@ -40,7 +40,7 @@ export async function authenticate(email: string): Promise<AuthenticationResult>
   signedOut = false;
   const session = await previewSession(email || EMAIL);
   const archives: ArchiveOption[] = [
-    { archiveId: session.archiveId, name: "Preview archive", joinedAt: "2026-05-18" },
+    { archiveId: session.archiveId, name: "Preview group", joinedAt: "2026-05-18" },
   ];
   if (email.startsWith("multi")) {
     archives.push({
@@ -97,9 +97,14 @@ export function signInFailure(): Error {
 }
 
 export async function resendRegistrationCode(_email: string) {}
+
+export class ConfirmedAddressError extends Error {}
+
 export async function confirmRegistrationAddress(_email: string, _code: string) {}
+
 export async function confirmRegistration(email: string, _code: string) {
   return authenticate(email);
 }
-export async function requestEmailChange(_current: string, _next: string) {}
-export async function changePassword(_email: string, _current: string, _next: string) {}
+export async function changePassword(_email: string, _current: string, _next: string): Promise<void> {}
+
+export async function requestEmailChange(_current: string, _next: string): Promise<void> {}

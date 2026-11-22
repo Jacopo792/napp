@@ -224,8 +224,8 @@ interface Props {
   synced?: boolean;
   onNew: () => void;
   onImportMarkdown: () => void;
-  onUploadImage: (file: File) => Promise<string>;
-  onUploadFile: (file: File) => Promise<string>;
+  onUploadImage: (file: File, noteId: string) => Promise<string>;
+  onUploadFile: (file: File, noteId: string) => Promise<string>;
   resolveImage: (imageId: string) => Promise<Blob>;
   resolveFile: (objectId: string) => Promise<Blob>;
   navigationAction?: ReactNode;
@@ -288,6 +288,12 @@ const TOOLBAR_ROOM = 700;
    650px, which is here; a second row is kept for a pane narrower than any
    window with both columns open can make. */
 const TOOLBAR_ROW_ROOM = 460;
+
+/* Under TOOLBAR_ROW_ROOM the strip still keeps one row: Chat joins the
+   capsule on the right and the writing tools narrow a little. A narrow
+   window with both columns open lands here (a 900px window leaves ~350px);
+   the second row is left for panes narrower than any of them. */
+const TOOLBAR_COMPACT_ROOM = 330;
 
 export interface NoteEditorHandle {
   getContent: () => JSONContent | null;
@@ -709,7 +715,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     try {
       assertAttachable(file);
       setStatus("Attaching file…");
-      const objectId = await onUploadFile(file);
+      const objectId = await onUploadFile(file, entry.note.id);
       editorRef.current?.insertAttachment(attachmentLabel(file.name), objectId);
       report("File attached");
     } catch (error) {
@@ -743,7 +749,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     setStatus("Preparing image…");
     try {
-      const src = await onUploadImage(file);
+      const src = await onUploadImage(file, entry.note.id);
       editorRef.current?.insertImage(src, imageAltFromFilename(file.name));
       report("Image inserted", 2600);
     } catch (error) {
@@ -759,7 +765,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     setFailure("");
     setStatus("Preparing pasted image…");
     try {
-      const objectId = await onUploadImage(file);
+      const objectId = await onUploadImage(file, entry.note.id);
       report("Image pasted", 2600);
       return { objectId, alt: file.name ? imageAltFromFilename(file.name) : "Pasted image" };
     } catch (error) {
@@ -917,9 +923,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       ? "stacked"
       : shellWidth === null || shellWidth >= TOOLBAR_ROOM
         ? "centred"
-        : shellWidth >= TOOLBAR_ROW_ROOM
+        : shellWidth >= TOOLBAR_COMPACT_ROOM
           ? "row"
           : "stacked";
+  const compactToolbar =
+    !mobile && toolbarLayout === "row" && shellWidth !== null && shellWidth < TOOLBAR_ROW_ROOM;
 
   /* The writing group is centred on the words, not on the strip. The strip
      spans the whole column; the words are centred in what the scroll box
@@ -1714,11 +1722,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <div
-        className={`editor-toolbar relative shrink-0 px-4 ${
+        className={`editor-toolbar relative shrink-0 ${compactToolbar ? "is-compact px-3" : "px-4"} ${
           toolbarLayout === "centred"
             ? "grid h-13 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2"
             : toolbarLayout === "row"
-              ? "grid h-13 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
+              ? `grid h-13 grid-cols-[auto_minmax(0,1fr)_auto] items-center ${compactToolbar ? "gap-1.5" : "gap-2"}`
               : "editor-toolbar-stacked grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2"
         }`}
       >
@@ -1747,7 +1755,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           (toolbar ? (
             <div ref={centreRef} className="flex items-center gap-2 justify-self-center">
               {toolbar}
-              {!mobile && commentsCircle}
+              {!mobile && !compactToolbar && commentsCircle}
             </div>
           ) : (
             <span />
@@ -1795,7 +1803,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             >
               <ListTree size={16} />
             </button>
-            {mobile && commentsButton}
+            {(mobile || compactToolbar) && commentsButton}
             {headerActions}
           </span>
         </span>
@@ -1825,7 +1833,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             photo={entry.note.photo}
             canEdit={canEdit}
             resolveImage={resolveImage}
-            uploadImage={onUploadImage}
+            uploadImage={(file) => onUploadImage(file, entry.note.id)}
             onChange={updatePageProperties}
             onError={setFailure}
           />

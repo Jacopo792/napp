@@ -180,8 +180,12 @@ export function PrivateImageView({
             )}
           </button>
         ) : (
-          <span className="rich-media-loading">
-            {error || (video ? "Loading video…" : "Loading image…")}
+          <span
+            className={error ? "rich-media-loading" : "rich-media-loading skeleton"}
+            role="status"
+            aria-label={error ? undefined : video ? "Loading video" : "Loading image"}
+          >
+            {error}
             {error && (
               <button
                 type="button"
