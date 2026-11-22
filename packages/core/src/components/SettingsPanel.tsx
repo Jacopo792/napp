@@ -794,7 +794,7 @@ export function SettingsPanel({
                     </p>
                   )}
                   <BlockedAccounts />
-                  <h3>Delete account</h3>
+                  <h3>Account</h3>
                   <div className="appearance-controls">
                     <div className="appearance-row">
                       <PolicyLinks />

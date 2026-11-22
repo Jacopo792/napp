@@ -5,10 +5,10 @@ export const NAPP_CONTROLLER = "Jacopo Vincenzo Ansalone";
 export const NAPP_SUPPORT_EMAIL = "ansalonejacpo@gmail.com";
 
 export type PolicyKind = "privacy" | "terms" | "support";
+// The policies live on the landing site, the same address on every platform.
+// The app still answers its old `?page=` links (see App.tsx).
 export function policyUrl(kind: PolicyKind): string {
-  const url = new URL(platform().webOrigin());
-  url.searchParams.set("page", kind);
-  return url.toString();
+  return `https://about.nappnote.com/${kind}/`;
 }
 export function deletionUrl(): string {
   const url = new URL(platform().webOrigin());
@@ -23,7 +23,7 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: "Data Napp processes",
-    text: "Napp processes your account email and authentication records; your display name and profile image; notes, documents, attachments and version history; comments and reactions; archive membership and invitations; preferences and the online presence you choose to share. Service infrastructure also processes network and technical information, such as IP addresses and operational logs, to deliver and secure the service.",
+    text: "Napp processes your account email and authentication records; your display name and profile image; notes, documents, attachments and version history; comments, chat messages, stickers and reactions, including photos and videos you send; archive membership and invitations; preferences and the online presence you choose to share. Service infrastructure also processes network and technical information, such as IP addresses and operational logs, to deliver and secure the service.",
   },
   {
     title: "Google Drive imports",
@@ -39,11 +39,11 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: "Who can access it",
-    text: "Members of an archive can access its shared content according to the app's permissions. Napp uses Supabase for authentication, database, storage and realtime services, GitHub Pages for the website, and Render for the collaboration service. The Supabase project is configured in the eu-west-1 region (Ireland). The developer and infrastructure providers may access data where needed to operate, secure and support the service. Content is access-controlled but is not end-to-end encrypted.",
+    text: "Members of an archive can access its shared content according to the app's permissions. Napp uses Supabase for authentication, database, storage and realtime services, GitHub Pages for the website, and Render for the collaboration service. When you search for GIFs, Napp's server sends your search words to GIPHY without your account details. When you post a link, Napp's server fetches its title and image for the preview. The Supabase project is configured in the eu-west-1 region (Ireland). The developer and infrastructure providers may access data where needed to operate, secure and support the service. Content is access-controlled but is not end-to-end encrypted.",
   },
   {
     title: "Reports and safety",
-    text: "When you report content, Napp records the reason, any details you supply and a copy of the reported note or comment so the developer can review it. Reports are private and are processed to protect users and address misuse. Pending reports are kept until review; reviewed reports expire after ninety days, or earlier if the linked account or content is deleted. A confirmed content restriction may remain after its report expires. Blocking records the blocked account and display name until you unblock it or either account is deleted.",
+    text: "When you report content, Napp records the reason, any details you supply and a copy of the reported note, comment or chat message so the developer can review it. Reports are private and are processed to protect users and address misuse. Pending reports are kept until review; reviewed reports expire after ninety days, or earlier if the linked account or content is deleted. A confirmed content restriction may remain after its report expires. Blocking hides each person's notes, comments, messages and live presence from the other, and records the blocked account and display name until you unblock it or either account is deleted. The creator of a shared archive can also remove someone they blocked.",
   },
   {
     title: "How long it is kept",
