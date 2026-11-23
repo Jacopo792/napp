@@ -24,23 +24,6 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
-    version: "1.0.1",
-    date: "2026-11-23",
-    headline: "Clearer pictures in What's New",
-    sections: [
-      {
-        heading: "What's New",
-        items: [
-          {
-            title: "Pictures you can read",
-            text: "The pictures for 1.0 now show each change up close, at one size, in the light theme.",
-            image: "1.0.1-whats-new.jpg",
-          },
-        ],
-      },
-    ],
-  },
-  {
     version: "1.0.0",
     date: "2026-11-22",
     headline: "Napp 1.0 brings a new Account page, better writing tools and safer sharing",
