@@ -34,12 +34,11 @@ export const RELEASES: Release[] = [
           {
             title: "Write your first note",
             text: "Your first personal group opens with a welcome note that shows you how to write, find, share and revisit your notes. Edit it or delete it when you're done.",
-            image: "1.0.0-welcome.png",
+            image: "1.0.0-welcome.jpg",
           },
           {
             title: "Confirm your email in Napp",
             text: "Enter the eight-digit code from your email to confirm a new account. You can resend the code or sign in if you already confirmed in the browser.",
-            image: "1.0.0-confirmation.png",
           },
         ],
       },
@@ -49,22 +48,20 @@ export const RELEASES: Release[] = [
           {
             title: "Manage your account from Settings",
             text: "Settings › Account puts your plan, sign-in email, password, policies and support in one place.",
-            image: "1.0.0-account.png",
+            image: "1.0.0-account.jpg",
           },
           {
             title: "See how long your Plus trial lasts",
             text: "The Account page shows when your trial ends. Opening another group or signing in on another device keeps the same trial dates.",
-            image: "1.0.0-trial.png",
           },
           {
             title: "Compare Free and Plus",
             text: "Free includes the editor, one shared group of two, 30 days of history and 1 GB of files. Plus supports groups of up to eight, books and theses, full history and 20 GB of files. The group creator's plan sets the group's limits.",
-            image: "1.0.0-plus.png",
+            image: "1.0.0-plus.jpg",
           },
           {
             title: "See what account deletion removes",
             text: "The confirmation screen explains which notes and files go and which shared work stays before you confirm.",
-            image: "1.0.0-deletion.png",
           },
         ],
       },
@@ -78,17 +75,16 @@ export const RELEASES: Release[] = [
           {
             title: "Keep tools in reach in a narrow window",
             text: "The writing toolbar fits smaller panes with the sidebar and note list open. Notes switch with a short fade.",
-            image: "1.0.0-workspace.png",
           },
           {
             title: "Detail sheets follow your window style",
             text: "Note, group and profile sheets follow Solid, Translucent or Frosted. On a translucent workspace, the sheet keeps the background visible through the glass.",
-            image: "1.0.0-glass.png",
+            image: "1.0.0-glass.jpg",
           },
           {
             title: "Choose a chat bubble by its name",
             text: "In Settings › Chat, the name of your selected animal is highlighted while the bubbles stay easy to compare.",
-            image: "1.0.0-chat.png",
+            image: "1.0.0-chat.jpg",
           },
         ],
       },
@@ -98,22 +94,19 @@ export const RELEASES: Release[] = [
           {
             title: "Invite members to your group",
             text: "Settings › Members keeps your group and its invitations together. Confirm your email before inviting people or sharing content.",
-            image: "1.0.0-invite.png",
           },
           {
             title: "Report or block from a profile",
             text: "Blocking hides each person's notes, messages and live presence from the other. When you own the group, you can also remove a member you blocked.",
-            image: "1.0.0-safety.png",
+            image: "1.0.0-safety.jpg",
           },
           {
             title: "Report a sticker in the group pack",
             text: "Open the options on a sticker in your group's pack to report it without sending it to a chat.",
-            image: "1.0.0-sticker.png",
           },
           {
             title: "File a notice without an account",
             text: "Use the public notice page to report illegal content, even if you aren't signed in.",
-            image: "1.0.0-notice.png",
           },
           {
             title: "File access follows the source note",
