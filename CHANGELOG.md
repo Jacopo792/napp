@@ -3,6 +3,13 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 1.0.1 – 2026-11-23
+
+### Changed
+
+- What's New for 1.0 shows six pictures cropped on their change, at one size,
+  in place of thirteen uneven captures.
+
 ## 1.0.0 – 2026-11-22
 
 ### Added
