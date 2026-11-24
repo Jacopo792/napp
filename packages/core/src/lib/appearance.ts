@@ -79,6 +79,12 @@ export const DEFAULT_APPEARANCE: Appearance = {
   frosted: false,
 };
 
+const DARK_DEFAULTS = {
+  accent: "#e59aa4",
+  background: "#221c1e",
+  foreground: "#f3e9ea",
+};
+
 /* Ten starting points, each a ground, an ink and one colour to act with. Four
    the reader kept out of seventeen (2026-11-13) — Fjord and Rosewood, their
    own favourites, exactly as they were — and six made in the same manner:
@@ -110,9 +116,7 @@ export const APPEARANCE_PRESETS = [
     id: "rosewood",
     name: "Rosewood",
     theme: "dark" as const,
-    accent: "#e59aa4",
-    background: "#221c1e",
-    foreground: "#f3e9ea",
+    ...DARK_DEFAULTS,
   },
   /* Near-black and the yellow every notebook app on the platform is lit by. */
   {
@@ -364,7 +368,7 @@ const KNOWN_COLOURS = new Set([
 function coloursOf(config: Appearance) {
   const { accent, background, foreground } = config;
   if (KNOWN_COLOURS.has(`${accent}${background}${foreground}`.toLowerCase())) return config;
-  return darkMode(config) ? DEFAULT_APPEARANCE : LIGHT_DEFAULTS;
+  return darkMode(config) ? DARK_DEFAULTS : LIGHT_DEFAULTS;
 }
 
 export function applyAppearance(config = current): void {
@@ -621,7 +625,7 @@ export function setAppearance(next: Appearance): void {
 
 export function setTheme(theme: ThemeMode): void {
   const light = theme === "light" || (theme === "system" && media?.matches === false);
-  const defaults = light ? LIGHT_DEFAULTS : DEFAULT_APPEARANCE;
+  const defaults = light ? LIGHT_DEFAULTS : DARK_DEFAULTS;
   setAppearance({ ...current, theme, ...defaults });
 }
 

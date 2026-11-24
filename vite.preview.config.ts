@@ -80,6 +80,11 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
     tsConfigPaths({ root: here(".") }),
+    {
+      name: "preview-desktop-frame",
+      transformIndexHtml: (html) =>
+        desktop ? html.replace("<html ", "<html data-desktop-preview ") : html,
+    },
     /* Screenshots are taken in Blush, so a fresh preview opens in it. Only an
        empty store is seeded: a palette chosen in the preview stays. */
     {

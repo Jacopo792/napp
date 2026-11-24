@@ -9016,7 +9016,7 @@ body:has(.sidebar-row.is-over) .drag-chip {
    controls that are gone is a strip of nothing across the top of the window.
    The preload writes the attribute on both platforms; only macOS was reading
    it. */
-[data-shell="windows"]:not([data-fullscreen])
+[data-shell="windows"]:not([data-fullscreen], [data-desktop-preview])
   :is(.workspace-shell, .mobile-workspace, .login-shell, #root > .min-h-screen) {
   height: 100vh;
   min-height: 100vh;
@@ -9028,6 +9028,12 @@ body:has(.sidebar-row.is-over) .drag-chip {
   background-image: linear-gradient(var(--page), var(--page));
   background-size: 100% 40px;
   background-repeat: no-repeat;
+}
+
+/* The preview places the native caption buttons alongside the app controls. */
+[data-shell="windows"][data-desktop-preview]:not([data-fullscreen])
+  :is(.editor-toolbar, .mobile-appbar, .manuscript-titlebar, .manuscript-bar, .settings-header) {
+  padding-right: calc(100vw - env(titlebar-area-width, 100vw) + 8px);
 }
 
 /* Windows draws no native material, so every backdrop filter is Chromium's,
