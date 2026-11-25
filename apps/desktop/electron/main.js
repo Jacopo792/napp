@@ -54,6 +54,8 @@ const os = require("node:os");
 const DEV_URL = DEV_ORIGIN;
 const APP_ORIGIN = "app://notes";
 const isDev = !app.isPackaged;
+const usesInlineCaption =
+  isDev && process.platform === "win32" && process.env.NAPP_SHELL === "desktop";
 
 /* A two-finger swipe on a note row files it or throws it away, and Chromium
    reads the same gesture as "go back". The row's own handler calls
@@ -218,7 +220,7 @@ function createWindow() {
     ...(isWindows
       ? {
           titleBarOverlay: {
-            color: "#1c1c1e",
+            color: usesInlineCaption ? "#00000000" : "#1c1c1e",
             symbolColor: "#e8e8e8",
             height: 40,
           },
@@ -417,7 +419,7 @@ ipcMain.on("napp:frame-theme", (event, color, symbolColor, mode) => {
   if (process.platform !== "win32") return;
   if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(symbolColor)) return;
   const window = BrowserWindow.fromWebContents(event.sender);
-  window?.setTitleBarOverlay({ color, symbolColor });
+  window?.setTitleBarOverlay({ color: usesInlineCaption ? "#00000000" : color, symbolColor });
   /* And the window's own ground, which is what a resize uncovers for a frame
      before the page has repainted into it — near-black behind a light palette
      otherwise, for as long as the drag lasts. */
