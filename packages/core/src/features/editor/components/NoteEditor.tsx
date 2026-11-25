@@ -618,6 +618,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   useEffect(() => () => setLiveTargets(noteId, null), [noteId]);
 
   const [shellWidth, setShellWidth] = useState<number | null>(null);
+  const [captionInset, setCaptionInset] = useState(0);
+
+  const toolbarRef = useCallback((node: HTMLDivElement | null) => {
+    const root = document.documentElement;
+    if (!node || !root.matches('[data-shell="windows"][data-desktop-preview]')) return;
+    const measure = () => {
+      const inset = root.hasAttribute("data-fullscreen")
+        ? 0
+        : Math.max(0, parseFloat(getComputedStyle(node).paddingRight) - 12);
+      setCaptionInset(inset);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   const shellRef = useCallback((node: HTMLElement | null) => {
     if (!node) return;
@@ -917,17 +933,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      beside the other groups, and only then a row of its own — never two rows
      of its own: the save state stays on the first row and gives up letters
      rather than taking a third. A note with no toolbar is one row always. */
+  const toolbarWidth = shellWidth === null ? null : shellWidth - captionInset;
   const toolbarLayout: "centred" | "row" | "stacked" = !toolbar
     ? "row"
     : mobile
       ? "stacked"
-      : shellWidth === null || shellWidth >= TOOLBAR_ROOM
+      : toolbarWidth === null || toolbarWidth >= TOOLBAR_ROOM
         ? "centred"
-        : shellWidth >= TOOLBAR_COMPACT_ROOM
+        : toolbarWidth >= TOOLBAR_COMPACT_ROOM
           ? "row"
           : "stacked";
   const compactToolbar =
-    !mobile && toolbarLayout === "row" && shellWidth !== null && shellWidth < TOOLBAR_ROW_ROOM;
+    !mobile && toolbarLayout === "row" && toolbarWidth !== null && toolbarWidth < TOOLBAR_ROW_ROOM;
+  const captionAboveToolbar =
+    toolbarLayout === "stacked" && captionInset > 0 && toolbarWidth !== null && toolbarWidth < 260;
 
   /* The writing group is centred on the words, not on the strip. The strip
      spans the whole column; the words are centred in what the scroll box
@@ -1722,6 +1741,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       {/* Frontispiece — set over the measure the body will use. */}
       <div
+        ref={toolbarRef}
+        data-caption-above={captionAboveToolbar || undefined}
         className={`editor-toolbar relative shrink-0 ${compactToolbar ? "is-compact px-3" : "px-4"} ${
           toolbarLayout === "centred"
             ? "grid h-13 grid-cols-[minmax(0,1fr)_auto_minmax(max-content,1fr)] items-center gap-2"
@@ -1771,6 +1792,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         )}
 
         <span
+          data-editor-page-actions=""
           className={`flex min-w-0 items-center justify-end gap-2 justify-self-end ${
             toolbarLayout === "stacked" ? "w-full" : ""
           }`}

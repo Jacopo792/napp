@@ -1361,8 +1361,8 @@ export function NoteList({
 
         {filterStrip}
 
-        <div className="mobile-search-wrap absolute right-20 bottom-5 left-5 z-20">
-          <div className="glass-toolbar flex h-13 items-center gap-2 px-4">
+        <div className="mobile-search-wrap absolute inset-x-5 bottom-5 z-20 flex items-center gap-2">
+          <div className="glass-toolbar flex h-13 min-w-0 flex-1 items-center gap-2 px-4">
             <Search size={16} className="shrink-0 text-ink-4" />
             <input
               ref={searchRef}
@@ -1389,6 +1389,17 @@ export function NoteList({
               </button>
             )}
           </div>
+          {canWrite && !trashMode && !archiveMode && (
+            <button
+              type="button"
+              onClick={onNew}
+              disabled={busy || loading}
+              aria-label="New note"
+              className="mobile-compose glass-toolbar flex h-13 w-13 shrink-0 items-center justify-center text-accent disabled:opacity-40"
+            >
+              <SquarePen size={24} />
+            </button>
+          )}
         </div>
 
         <div
@@ -1415,17 +1426,6 @@ export function NoteList({
           </div>
         </div>
 
-        {canWrite && !trashMode && !archiveMode && (
-          <button
-            type="button"
-            onClick={onNew}
-            disabled={busy || loading}
-            aria-label="New note"
-            className="mobile-compose glass-toolbar absolute right-5 bottom-5 flex h-13 w-13 items-center justify-center text-accent disabled:opacity-40"
-          >
-            <SquarePen size={24} />
-          </button>
-        )}
         {rowMenuPanel}
         {photoPicker}
       </section>
