@@ -3,6 +3,20 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 1.0.1 – 2026-11-26
+
+### Changed
+
+- One Blur setting softens the background image across the whole window, with
+  Unblur and Blur labels on its slider. Panes no longer add their own blur.
+- In a narrow window the search field and the new note button share one row.
+
+### Fixed
+
+- Settings reports when a background image cannot be saved or removed.
+
+Thanks to Lisa ([@dreamm222](https://github.com/dreamm222)) for this release.
+
 ## 1.0.0 – 2026-11-22
 
 ### Added

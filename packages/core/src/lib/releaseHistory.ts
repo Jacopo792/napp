@@ -24,6 +24,37 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.0.1",
+    date: "2026-11-26",
+    headline: "One blur for your background and a roomier note list",
+    sections: [
+      {
+        heading: "Appearance",
+        items: [
+          {
+            title: "Blur your background with one slider",
+            text: "Settings › Appearance › Blur sets how soft your background image looks across the whole window, from Unblur to Blur. The panes no longer add a blur of their own.",
+            image: "1.0.1-wallpaper-blur.jpg",
+          },
+          {
+            title: "Know when a background isn't saved",
+            text: "If Napp can't save or remove your background image, Settings tells you.",
+          },
+        ],
+      },
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Search and write side by side",
+            text: "In a narrow window, the search field and the new note button share one row at the bottom of the list.",
+            image: "1.0.1-search-compose.jpg",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.0",
     date: "2026-11-22",
     headline: "Napp 1.0 brings a new Account page, better writing tools and safer sharing",

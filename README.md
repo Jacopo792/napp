@@ -221,6 +221,11 @@ Update the announcement version in `whatsNew.ts` and the announcement text in
 | [Operations](docs/backend-operations.md) | Backend rollout, readiness and capacity checks.            |
 | [Changelog](CHANGELOG.md)                | Release history.                                           |
 
+## Contributors
+
+- Jacopo ([@Jacopo792](https://github.com/Jacopo792))
+- Lisa ([@dreamm222](https://github.com/dreamm222))
+
 ## Licence
 
 Napp's source is available under the Functional Source License 1.1 with an
