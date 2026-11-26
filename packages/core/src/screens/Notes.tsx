@@ -339,6 +339,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
    *  new text is not its own and may be applied under the caret. */
   const [syncRevision, setSyncRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [switchingAccount, setSwitchingAccount] = useState(false);
   /* A write that did not land, which the readout offers to retry, apart from
      every other failure: those say what went wrong for a moment and go. One
      slot for both read an import or a refused clipboard as "Save failed". */
@@ -2626,6 +2627,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   function handleSwitchAccount(userId: string) {
     saveNow();
     clearDrafts();
+    flushSync(() => setSwitchingAccount(true));
     void switchAccount(userId).catch(() => navigate({ to: "/" }));
   }
 
@@ -2722,6 +2724,14 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
   /* Arrived: everything the archive needs is here. Each entrance is finished
      where it stands — it would otherwise play out under the fade — and the
      screen comes in once. */
+  const showWallpaper = !!session && !loading && preferencesReady && !switchingAccount;
+  useLayoutEffect(() => {
+    if (!showWallpaper) return;
+    const root = document.documentElement;
+    root.setAttribute("data-workspace-wallpaper", "");
+    return () => root.removeAttribute("data-workspace-wallpaper");
+  }, [showWallpaper]);
+
   const arrived = !loading && !!session && spaces.length > 0;
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -2850,7 +2860,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
      order never changes between renders. */
   useAutoLock(autoLock, () => void handleLock(false));
 
-  if (!session) return null;
+  if (!session || switchingAccount) return null;
 
   const dragEntry = dragId ? entries.find((e) => e.note.id === dragId) : null;
   const dragFolder = dragId?.startsWith(FOLDER_DRAG)

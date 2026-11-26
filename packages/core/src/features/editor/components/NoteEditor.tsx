@@ -295,6 +295,10 @@ const TOOLBAR_ROW_ROOM = 460;
    the second row is left for panes narrower than any of them. */
 const TOOLBAR_COMPACT_ROOM = 330;
 
+/* The single-pane layout needs space for the back label, presence and wider
+   writing buttons alongside the note actions. */
+const MOBILE_TOOLBAR_ROW_ROOM = 560;
+
 export interface NoteEditorHandle {
   getContent: () => JSONContent | null;
   openFind: (query?: string) => void;
@@ -933,20 +937,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
      beside the other groups, and only then a row of its own — never two rows
      of its own: the save state stays on the first row and gives up letters
      rather than taking a third. A note with no toolbar is one row always. */
-  const toolbarWidth = shellWidth === null ? null : shellWidth - captionInset;
+  const toolbarWidth = shellWidth === null ? (mobile ? 0 : Infinity) : shellWidth - captionInset;
+  const toolbarRowRoom = mobile ? MOBILE_TOOLBAR_ROW_ROOM : TOOLBAR_COMPACT_ROOM;
   const toolbarLayout: "centred" | "row" | "stacked" = !toolbar
     ? "row"
-    : mobile
-      ? "stacked"
-      : toolbarWidth === null || toolbarWidth >= TOOLBAR_ROOM
-        ? "centred"
-        : toolbarWidth >= TOOLBAR_COMPACT_ROOM
-          ? "row"
-          : "stacked";
-  const compactToolbar =
-    !mobile && toolbarLayout === "row" && toolbarWidth !== null && toolbarWidth < TOOLBAR_ROW_ROOM;
-  const captionAboveToolbar =
-    toolbarLayout === "stacked" && captionInset > 0 && toolbarWidth !== null && toolbarWidth < 260;
+    : toolbarWidth >= TOOLBAR_ROOM
+      ? "centred"
+      : toolbarWidth >= toolbarRowRoom
+        ? "row"
+        : "stacked";
+  const compactToolbar = !mobile && toolbarLayout === "row" && toolbarWidth < TOOLBAR_ROW_ROOM;
+  const captionAboveToolbar = toolbarLayout === "stacked" && captionInset > 0 && toolbarWidth < 260;
 
   /* The writing group is centred on the words, not on the strip. The strip
      spans the whole column; the words are centred in what the scroll box

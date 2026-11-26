@@ -291,7 +291,7 @@
       var(--wallpaper, none);
   }
 
-  .has-wallpaper #root::before {
+  .has-wallpaper[data-workspace-wallpaper] #root::before {
     display: block;
   }
 
@@ -728,11 +728,11 @@
 .login-shell {
   position: relative;
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
   flex-direction: column;
-  /* Never clipped vertically: on a short window the sign-up card is taller
-     than the viewport and has to stay reachable. */
-  overflow-x: clip;
+  /* The workspace locks document scrolling on small screens. Scroll the
+     sign-in page itself when the form exceeds the viewport. */
+  overflow: hidden auto;
   background: var(--page);
 }
 
