@@ -410,8 +410,11 @@
     background: var(--accent-wash);
   }
 
-  .mobile-compose {
+  .mobile-search-wrap {
     bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+  }
+
+  .mobile-compose {
     box-shadow: var(--shadow-lift);
   }
 
@@ -533,28 +536,17 @@
   inset: 0;
   z-index: -1;
   background: color-mix(in srgb, var(--paper) 88%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.06);
-  backdrop-filter: blur(18px) saturate(1.06);
   content: "";
   pointer-events: none;
 }
 
-/* Frosted, not tinted: at a fixed 88% the picture was a shade nobody could
-   see, and the columns read as flat colour. A wide blur turns the picture
-   into soft light inside the pane, the saturation keeps its colour from going
-   grey, and how much of the palette sits over it is the Liquid Glass
-   slider's to say. A switch in Style, because some readers want the plainer
-   glass above back. */
+/* Wallpaper blur is applied once on #root::before. Pane styles tint
+   that shared image. */
 .has-frosted-glass.has-wallpaper .sidebar-column::before,
 .has-frosted-glass.has-wallpaper .collection-column::before {
   background: color-mix(in srgb, var(--paper) max(56%, var(--glass-tint, 76%)), transparent);
-  -webkit-backdrop-filter: blur(48px) saturate(1.5);
-  backdrop-filter: blur(48px) saturate(1.5);
 }
 
-/* Translucent is clear glass: the picture keeps its shapes, pushed more
-   saturated, under a lighter coat the slider sets; the column's trailing edge
-   catches the light. The 88% above stays Solid's — the picture as a hint. */
 .has-translucent-sidebar:not(.has-frosted-glass).has-wallpaper
   :is(.sidebar-column, .collection-column)::before {
   background: color-mix(
@@ -562,8 +554,6 @@
     var(--paper) max(52%, calc(var(--glass-tint, 76%) * 0.8)),
     transparent
   );
-  -webkit-backdrop-filter: blur(20px) saturate(1.6) brightness(1.04);
-  backdrop-filter: blur(20px) saturate(1.6) brightness(1.04);
 }
 
 /* The rail's spine is a step of the glass itself, not grey laid over it. */
@@ -578,8 +568,8 @@
     inset 1px 0 0 var(--glass-rim-soft, transparent);
 }
 
-/* A band inside a pane that is already tinted and already blurred takes
-   neither again. The second coat of `--paper` is what made every toolbar a
+/* A band inside a tinted pane needs no tint or backdrop filter of its own.
+   The second coat of `--paper` is what made every toolbar a
    darker strip across the top of its own column, and the second backdrop
    filter is a full extra compositing pass per frame for output the eye cannot
    tell from one pass. The painted hairline underneath still separates it. */
@@ -4181,8 +4171,20 @@
   transform: translateX(9px);
 }
 
-.appearance-row.is-slider input[type="range"] {
+.appearance-row.is-slider > :is(input[type="range"], .appearance-slider-scale) {
   width: min(190px, 38%);
+}
+
+.appearance-slider-scale {
+  display: grid;
+  gap: 2px;
+}
+
+.appearance-slider-endpoints {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
 }
 
 .appearance-row output {
@@ -9032,21 +9034,47 @@ body:has(.sidebar-row.is-over) .drag-chip {
 
 /* The preview places the native caption buttons alongside the app controls. */
 [data-shell="windows"][data-desktop-preview]:not([data-fullscreen])
-  :is(.editor-toolbar, .mobile-appbar, .manuscript-titlebar, .manuscript-bar, .settings-header) {
-  padding-right: calc(100vw - env(titlebar-area-width, 100vw) + 8px);
+  :is(.editor-toolbar, .mobile-appbar, .manuscript-titlebar, .manuscript-bar) {
+  --caption-padding: calc(100vw - env(titlebar-area-width, 100vw) + 8px);
+  padding-right: var(--caption-padding);
 }
 
-/* Windows draws no native material, so every backdrop filter is Chromium's,
-   often on the CPU: the full-height column layers over a wallpaper made the
-   whole window lag. Plain tint instead, dense enough to read without a blur.
-   The wallpaper layer is absolute, not fixed — the shell never scrolls — so it
-   does not lift the app into a transparent layer that loses ClearType. */
+[data-shell="windows"][data-desktop-preview]:not([data-fullscreen]) .settings-layer {
+  padding-top: calc(40px + 1.25rem);
+}
+
+[data-shell="windows"][data-desktop-preview]:not([data-fullscreen]) .settings-panel {
+  max-height: calc(100dvh - 40px - 2.5rem);
+}
+
+/* Only the top row shares space with the Windows caption buttons. */
+[data-shell="windows"][data-desktop-preview]:not([data-fullscreen])
+  .editor-toolbar-stacked
+  .editor-toolbar-compact-tools {
+  margin-right: calc(16px - var(--caption-padding));
+  justify-content: center;
+  justify-self: stretch;
+}
+
+/* At phone widths, both editor rows sit below the native caption. */
+[data-shell="windows"][data-desktop-preview]:not([data-fullscreen])
+  .editor-toolbar[data-caption-above] {
+  padding-top: 40px;
+}
+
+.editor-toolbar[data-caption-above] > [data-editor-page-actions] {
+  width: auto;
+  margin-right: calc(16px - var(--caption-padding));
+  justify-self: stretch;
+}
+
+/* Keep the wallpaper layer absolute in the Windows workspace to avoid
+   promoting a fixed layer and losing ClearType. */
 [data-shell="windows"] #root::before {
   position: absolute;
 }
 
-[data-shell="windows"].has-translucent-sidebar .pane-glass,
-[data-shell="windows"].has-wallpaper :is(.sidebar-column, .collection-column)::before {
+[data-shell="windows"].has-translucent-sidebar .pane-glass {
   background: color-mix(in srgb, var(--paper) 92%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

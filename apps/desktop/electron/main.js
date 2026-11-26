@@ -54,8 +54,17 @@ const os = require("node:os");
 const DEV_URL = DEV_ORIGIN;
 const APP_ORIGIN = "app://notes";
 const isDev = !app.isPackaged;
-const usesInlineCaption =
-  isDev && process.platform === "win32" && process.env.NAPP_SHELL === "desktop";
+const isDesktopPreview = isDev && process.env.NAPP_SHELL === "desktop";
+const usesInlineCaption = isDesktopPreview && process.platform === "win32";
+
+// The preview and installed app can be open at the same time. Give Chromium
+// separate profile directories so their storage and cache files do not compete.
+if (isDesktopPreview) {
+  const previewProfile = path.join(app.getPath("appData"), "Napp Preview");
+  fsSync.mkdirSync(previewProfile, { recursive: true });
+  app.setPath("userData", previewProfile);
+  app.setPath("sessionData", previewProfile);
+}
 
 /* A two-finger swipe on a note row files it or throws it away, and Chromium
    reads the same gesture as "go back". The row's own handler calls
@@ -180,7 +189,8 @@ function createWindow() {
     width: 1280,
     height: 840,
     ...rememberedBounds(),
-    minWidth: 640,
+    // Let the preview exercise the shared mobile layout at actual phone widths.
+    minWidth: isDesktopPreview ? 360 : 640,
     minHeight: 480,
     show: false,
     /* ── Real material, not a picture of one ──────────────────────────────────

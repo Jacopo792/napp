@@ -176,6 +176,7 @@ function AppearanceSlider({
   max,
   value,
   readout,
+  endpoints,
   onChange,
 }: {
   icon: ReactNode;
@@ -184,22 +185,36 @@ function AppearanceSlider({
   max: number;
   value: number;
   readout: string;
+  endpoints?: readonly [string, string];
   onChange: (value: number) => void;
 }) {
   const fill = ((value - min) / (max - min)) * 100;
+  const slider = (
+    <input
+      type="range"
+      className="axis-range"
+      style={{ "--fill": `${fill}%` } as React.CSSProperties}
+      min={min}
+      max={max}
+      value={value}
+      aria-label={`${label}, ${readout}`}
+      onChange={(event) => onChange(Number(event.target.value))}
+    />
+  );
   return (
     <label className="appearance-row is-slider">
       <RowLead icon={icon} label={label} />
-      <input
-        type="range"
-        className="axis-range"
-        style={{ "--fill": `${fill}%` } as React.CSSProperties}
-        min={min}
-        max={max}
-        value={value}
-        aria-label={`${label}, ${readout}`}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+      {endpoints ? (
+        <span className="appearance-slider-scale">
+          <span className="appearance-slider-endpoints" aria-hidden="true">
+            <span>{endpoints[0]}</span>
+            <span>{endpoints[1]}</span>
+          </span>
+          {slider}
+        </span>
+      ) : (
+        slider
+      )}
       <output>{readout}</output>
     </label>
   );
@@ -458,6 +473,18 @@ export function SettingsPanel({
   const [deletingSpace, setDeletingSpace] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const wallpaperRef = useRef<HTMLInputElement>(null);
+  const [wallpaperError, setWallpaperError] = useState("");
+
+  async function updateWallpaper(file: File | null) {
+    setWallpaperError("");
+    try {
+      await setWallpaper(file);
+    } catch {
+      setWallpaperError(
+        file ? "Could not save the background image." : "Could not remove the background image.",
+      );
+    }
+  }
   const avatarRef = useRef<HTMLInputElement>(null);
   const navList = useRef<HTMLDivElement>(null);
   /* Where the selection sits in the rail. One element that travels, rather than
@@ -897,13 +924,13 @@ export function SettingsPanel({
                         className="hidden"
                         onChange={(event) => {
                           const file = event.target.files?.[0];
-                          if (file) void setWallpaper(file);
+                          if (file) void updateWallpaper(file);
                           event.target.value = "";
                         }}
                       />
                       <span className="wallpaper-actions">
                         {appearance.wallpaper && (
-                          <button type="button" onClick={() => void setWallpaper(null)}>
+                          <button type="button" onClick={() => void updateWallpaper(null)}>
                             Remove
                           </button>
                         )}
@@ -912,6 +939,11 @@ export function SettingsPanel({
                         </button>
                       </span>
                     </div>
+                    {wallpaperError && (
+                      <p className="profile-note text-danger" role="alert">
+                        {wallpaperError}
+                      </p>
+                    )}
 
                     {appearance.wallpaper && (
                       <>
@@ -950,6 +982,7 @@ export function SettingsPanel({
                           max={20}
                           value={appearance.wallpaperBlur}
                           readout={`${appearance.wallpaperBlur}px`}
+                          endpoints={["Unblur", "Blur"]}
                           onChange={(wallpaperBlur) =>
                             setAppearance({ ...appearance, wallpaperBlur })
                           }
