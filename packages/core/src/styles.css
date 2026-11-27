@@ -512,8 +512,7 @@
 }
 
 .has-wallpaper .workspace-shell,
-.has-wallpaper .mobile-workspace,
-.has-wallpaper .mobile-screen {
+.has-wallpaper .mobile-workspace {
   background: transparent;
 }
 
@@ -5662,6 +5661,7 @@
 }
 
 .is-opening-note::view-transition-group(note-body) {
+  background: var(--page);
   animation-duration: 160ms;
 }
 
@@ -5703,7 +5703,12 @@
   }
 }
 
-.mobile-screen {
+/* Keep both screens opaque while their contents move. */
+.mobile-note-screen {
+  background: var(--page);
+}
+
+.mobile-screen > :is(.mobile-appbar, .mobile-note-list, .editor-shell) {
   animation: mobile-push var(--dur-base) var(--ease) backwards;
 }
 
@@ -5847,7 +5852,7 @@
   .settings-scroll > section,
   .settings-sliders,
   .page-in,
-  .mobile-screen {
+  .mobile-screen > :is(.mobile-appbar, .mobile-note-list, .editor-shell) {
     animation: none;
   }
 
