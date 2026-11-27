@@ -24,6 +24,36 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.0.2",
+    date: "2026-11-27",
+    headline: "Writing tools on one row and a steadier start",
+    sections: [
+      {
+        heading: "Notes",
+        items: [
+          {
+            title: "Writing tools on the top row",
+            text: "On a phone or a small window, the writing tools sit beside the note's actions when there is room, instead of on a row of their own.",
+            image: "1.0.2-toolbar-row.jpg",
+          },
+        ],
+      },
+      {
+        heading: "Fixes",
+        items: [
+          {
+            title: "Sign-in scrolls on small screens",
+            text: "The sign-in and create-account forms scroll when they are taller than the window.",
+          },
+          {
+            title: "No background flash",
+            text: "Your background image no longer flashes while your notes load or when you switch accounts.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.1",
     date: "2026-11-26",
     headline: "One blur for your background and a roomier note list",

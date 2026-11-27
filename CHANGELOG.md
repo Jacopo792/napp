@@ -3,6 +3,21 @@
 This file records user-visible changes and security-relevant architecture
 changes. The commit history remains the detailed engineering record.
 
+## 1.0.2 – 2026-11-27
+
+### Changed
+
+- On a phone or small window the writing tools share the top row with the note
+  actions when there is room.
+
+### Fixed
+
+- The sign-in and create-account forms scroll on short and narrow windows.
+- The background image no longer flashes while the workspace loads or during
+  an account switch.
+
+Thanks to Lisa ([@dreamm222](https://github.com/dreamm222)) for this release.
+
 ## 1.0.1 – 2026-11-26
 
 ### Changed

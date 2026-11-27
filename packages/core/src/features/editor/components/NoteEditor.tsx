@@ -296,7 +296,8 @@ const TOOLBAR_ROW_ROOM = 460;
 const TOOLBAR_COMPACT_ROOM = 330;
 
 /* The single-pane layout needs space for the back label, presence and wider
-   writing buttons alongside the note actions. */
+   writing buttons alongside the note actions. It is never centred: TOOLBAR_ROOM
+   was measured with the desktop's narrower buttons and no back label. */
 const MOBILE_TOOLBAR_ROW_ROOM = 560;
 
 export interface NoteEditorHandle {
@@ -941,7 +942,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const toolbarRowRoom = mobile ? MOBILE_TOOLBAR_ROW_ROOM : TOOLBAR_COMPACT_ROOM;
   const toolbarLayout: "centred" | "row" | "stacked" = !toolbar
     ? "row"
-    : toolbarWidth >= TOOLBAR_ROOM
+    : !mobile && toolbarWidth >= TOOLBAR_ROOM
       ? "centred"
       : toolbarWidth >= toolbarRowRoom
         ? "row"
