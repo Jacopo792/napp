@@ -4754,7 +4754,7 @@ function ArchiveScreen({ onReopen }: { onReopen: () => void }) {
 
             {mobileScreen === "note" && selectedId && (
               <section
-                className="mobile-screen flex h-full flex-col"
+                className="mobile-screen mobile-note-screen flex h-full flex-col"
                 style={{ paddingTop: "env(safe-area-inset-top)" }}
               >
                 <Suspense fallback={<div className="h-full w-full bg-page" />}>
